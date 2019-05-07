@@ -1,0 +1,11 @@
+[package]
+name = "wlambda"
+version = "0.1.0"
+authors = ["Weird Constructor <weirdconstructor@gmail.com>"]
+license = "GPL-3.0-or-later"
+edition = "2018"
+
+[dependencies]
+rand = "0.3.14"
+chrono = "0.4.6"
+regex = "1"
