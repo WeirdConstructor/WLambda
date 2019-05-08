@@ -24,6 +24,17 @@ struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
 }
 
+impl GlobalEnv {
+    // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=7011ec14ebade14fe62e438a0db52c98
+    fn add_func<T>(&mut self, fnname: &str, fun: T)
+        where T: Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,u32> {
+        self.env.insert(
+            String::from(fnname),
+            VValFun::new(Rc::new(RefCell::new(fun)),
+                         Vec::new()));
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct CompileEnv {
@@ -340,15 +351,16 @@ mod tests {
             env: std::collections::HashMap::new()
         }));
 
-        let fun_ref = Rc::new(RefCell::new(|_upv: &std::vec::Vec<(usize, VVal)>, args: std::vec::Vec<VVal>| {
-            if args.len() <= 0 { return Ok(VVal::Nul); }
-            if let VVal::Flt(_) = args[0] {
-                Ok(VVal::Flt(args.iter().map(|v| v.f()).sum()))
-            } else {
-                Ok(VVal::Int(args.iter().map(|v| v.i()).sum()))
-            }
-        }));
-        global.borrow_mut().env.insert(String::from("+"), VValFun::new(fun_ref, Vec::new()));
+        global.borrow_mut().add_func(
+            "+",
+            |_upv: &std::vec::Vec<(usize, VVal)>, args: std::vec::Vec<VVal>| {
+                if args.len() <= 0 { return Ok(VVal::Nul); }
+                if let VVal::Flt(_) = args[0] {
+                    Ok(VVal::Flt(args.iter().map(|v| v.f()).sum()))
+                } else {
+                    Ok(VVal::Int(args.iter().map(|v| v.i()).sum()))
+                }
+            });
 
         let mut ps = mk(s);
         match parse_block(&mut ps, false) {
@@ -419,6 +431,14 @@ mod tests {
     fn check_arithmetics() {
         assert_eq!(eval("12 + 23"),         "35");
         assert_eq!(eval("12.12 + 23.23"),   "35.35");
+
+        // coertion of strings and keys to numbers:
+        assert_eq!(eval(":10 + :20"),       "30");
+        assert_eq!(eval(":-10 + :20"),      "10");
+
+        assert_eq!(eval("12 - 23"),         "-11");
+        assert_eq!(eval("5 * 4"),           "20");
+        assert_eq!(eval("20 / 5"),          "4");
     }
 
     #[test]
