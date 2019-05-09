@@ -185,7 +185,7 @@ impl ParseState {
     pub fn peek_op(&self) -> Option<String> {
         if self.at_eof { return None; }
         match self.peek_char {
-            '+' | '-' | '*' | '/' | '%' | '^' | '~'
+            '+' | '-' | '*' | '/' | '%' | '^'
                 => { return Some(self.peek_char.to_string()); },
             '<' | '>' | '!' | '=' | '|' | '&' => {
                 if let Some(s) = self.peek2() {
@@ -195,7 +195,7 @@ impl ParseState {
                         _ => { }
                     }
                 }
-                if self.peek_char != '=' {
+                if self.peek_char != '=' && self.peek_char != '|' {
                     Some(self.peek_char.to_string())
                 } else {
                     None
@@ -1069,6 +1069,7 @@ mod tests {
         assert_eq!(parse("foo.a = 10"),               "[&Block,[&SetKey,[&Var,$\"foo\"],[&Key,$\"a\"],10]]");
         assert_eq!(parse("foo.a = 10 | 20"),          "[&Block,[&SetKey,[&Var,$\"foo\"],[&Key,$\"a\"],[&Call,20,10]]]");
         assert_eq!(parse("foo.a = 10 ~ 20"),          "[&Block,[&SetKey,[&Var,$\"foo\"],[&Key,$\"a\"],[&Call,10,20]]]");
+        assert_eq!(parse("4 == 5 ~ 10"),              "[&Block,[&Call,[&Var,$\"==\"],4,[&Call,5,10]]]");
     }
 
     #[test]
