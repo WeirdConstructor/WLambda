@@ -7,7 +7,7 @@ use crate::vval::VVal;
 use crate::vval::Syntax;
 use crate::vval::Env;
 use crate::vval::VValFun;
-use crate::vval::ClosNode;
+use crate::vval::EvalNode;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -144,8 +144,8 @@ impl CompileEnv {
     }
 }
 
-fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNode, String> {
-    let exprs : Vec<ClosNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
+    let exprs : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
 
     Ok(Box::new(move |e: &mut Env| {
         let mut res = VVal::Nul;
@@ -156,7 +156,7 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNod
     }))
 }
 
-fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNode, String> {
+fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
     let var = ast.at(1).unwrap();
 
     let s = var.s_raw();
@@ -191,10 +191,9 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNode,
             }
         }
     }
-
 }
 
-fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) -> Result<ClosNode, String> {
+fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) -> Result<EvalNode, String> {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
     let cv      = compile(&value, ce)?;
@@ -215,7 +214,7 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) -> Re
     }
 }
 
-fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNode, String> {
+fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
     let cv      = compile(&value, ce)?;
@@ -229,7 +228,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNo
     }))
 }
 
-fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNode, String> {
+fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
     println!("compile {}", ast.s());
     match ast {
         VVal::Lst(_l) => {
@@ -257,7 +256,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNode, Str
                     }))
                 },
                 VVal::Syn(Syntax::Lst)    => {
-                    let list_elems : Vec<ClosNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+                    let list_elems : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
 
                     Ok(Box::new(move |e: &mut Env| {
                         let v = VVal::vec();
@@ -266,7 +265,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNode, Str
                     }))
                 },
                 VVal::Syn(Syntax::Map)    => {
-                    let list_elems : Vec<(ClosNode,ClosNode)> =
+                    let list_elems : Vec<(EvalNode,EvalNode)> =
                         ast.map_skip(|e| {
                             let k = e.at(0).unwrap();
                             let v = e.at(1).unwrap();
@@ -284,37 +283,20 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ClosNode, Str
                     }))
                 },
                 VVal::Syn(Syntax::Call) => {
-                    let mut call_args : Vec<ClosNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+                    let mut call_args : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
                     let func = call_args.remove(0);
 
                     Ok(Box::new(move |e: &mut Env| {
                         let f = func(e)?;
                         let mut args = Vec::new();
                         for x in call_args.iter() { args.push(x(e)?); }
-
-                        match f {
-                            VVal::Fun(fu) => {
-                                (((*fu).fun.borrow()))(&fu.upvalues, args)
-                            },
-                            VVal::Sym(sym) => {
-                                if args.len() > 0 {
-                                    match args[0] {
-                                        VVal::Map(_) => {
-                                            let v = args[0].get_key(&sym);
-                                            Ok(if v.is_some() { v.unwrap() } else { VVal::Nul })
-                                        },
-                                        _ => Ok(VVal::Nul)
-                                    }
-                                } else { Ok(VVal::Nul) }
-                            },
-                            _ => { Ok(VVal::Nul) },
-                        }
+                        f.call(args)
                     }))
                 },
                 VVal::Syn(Syntax::Func) => {
                     let mut ce_sub = CompileEnv::create_env(Some(ce.clone()));
 
-                    let stmts : Vec<ClosNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
+                    let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
 
                     let env_size = CompileEnv::local_env_size(&ce_sub);
                     let fun_ref = Rc::new(RefCell::new(move |upv: &std::vec::Vec<(usize, VVal)>, args: std::vec::Vec<VVal>| {
@@ -439,6 +421,9 @@ mod tests {
         assert_eq!(eval("12 - 23"),         "-11");
         assert_eq!(eval("5 * 4"),           "20");
         assert_eq!(eval("20 / 5"),          "4");
+
+        assert_eq!(eval("6 - 3 * 2"),       "0");
+        assert_eq!(eval("12 / 6 - 3 * 2"),  "-4");
     }
 
     #[test]
@@ -459,5 +444,11 @@ mod tests {
         assert_eq!(ce3.borrow_mut().get("z"), Some(1));
 
         assert_eq!(ce2.borrow_mut().get("x"), Some(3));
+    }
+
+    #[test]
+    fn check_range() {
+        assert_eq!(eval("!:ref x = 10;   range 1 3 1     { .x = x + _ }; x"), "16");
+        assert_eq!(eval("!:ref x = 10.0; range 1.0 3 0.5 { .x = x + _ }; x"), "20");
     }
 }

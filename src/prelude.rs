@@ -51,5 +51,45 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         });
 
+    g.borrow_mut().add_func(
+        "range",
+        |_upv: &std::vec::Vec<(usize, VVal)>, args: std::vec::Vec<VVal>| {
+            if args.len() <= 3 { return Ok(VVal::Nul); }
+
+            if let VVal::Flt(_) = args[0] {
+                let mut from = args[0].f();
+                let to       = args[1].f();
+                let step     = args[2].f();
+                let f        = &args[3];
+
+                let mut ret = VVal::Nul;
+                while from <= to {
+                    let a = vec![VVal::Flt(from)];
+                    match f.call(a) {
+                        Ok(v) => { ret = v; },
+                        e     => { return e; },
+                    }
+                    from += step;
+                }
+                Ok(ret)
+            } else {
+                let mut from = args[0].i();
+                let to       = args[1].i();
+                let step     = args[2].i();
+                let f        = &args[3];
+
+                let mut ret = VVal::Nul;
+                while from <= to {
+                    let a = vec![VVal::Int(from)];
+                    match f.call(a) {
+                        Ok(v) => { ret = v; },
+                        e     => { return e; },
+                    }
+                    from += step;
+                }
+                Ok(ret)
+            }
+        });
+
     g
 }

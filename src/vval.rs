@@ -69,7 +69,7 @@ impl Env {
     }
 }
 
-pub type ClosNode = Box<Fn(&mut Env) -> Result<VVal,u32>>;
+pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,u32>>;
 pub type ClosNodeRef = Rc<RefCell<Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,u32>>>;
 
 pub struct VValFun {
@@ -116,20 +116,25 @@ impl VVal {
         return VVal::Lst(Rc::new(RefCell::new(Vec::new())));
     }
 
-//    pub fn call(&mut self, args: std::vec::Vec<VVal>) -> Result<VVal, u32> {
-//        println!("CALL {}!", self.s());
-//        if let VVal::Fun(f) = &self {
-//            ((**f).fun.borrow())(&f.upvalues, args)
-//        } else {
-//            match self {
-//                VVal::Sym(_s) => {
-//                    println!("CALL SMY!");
-//                    Ok(VVal::Int(12))
-//                },
-//                _ => Ok(VVal::Nul)
-//            }
-//        }
-//    }
+    pub fn call(&self, args: std::vec::Vec<VVal>) -> Result<VVal, u32> {
+        println!("CALL {}!", self.s());
+
+        match self {
+            VVal::Fun(fu) => { (((*fu).fun.borrow()))(&fu.upvalues, args) },
+            VVal::Sym(sym) => {
+                if args.len() > 0 {
+                    match args[0] {
+                        VVal::Map(_) => {
+                            let v = args[0].get_key(&sym);
+                            Ok(if v.is_some() { v.unwrap() } else { VVal::Nul })
+                        },
+                        _ => Ok(VVal::Nul)
+                    }
+                } else { Ok(VVal::Nul) }
+            },
+            _ => { Ok(VVal::Nul) },
+        }
+    }
 
     pub fn to_ref(&mut self) -> VVal {
         VVal::Ref(Rc::new(RefCell::new(self.clone())))
