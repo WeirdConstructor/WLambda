@@ -69,8 +69,14 @@ impl Env {
     }
 }
 
-pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,u32>>;
-pub type ClosNodeRef = Rc<RefCell<Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,u32>>>;
+#[derive(Debug, Clone)]
+pub enum StackAction {
+    Panic(String),
+    Break(VVal),
+}
+
+pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,StackAction>>;
+pub type ClosNodeRef = Rc<RefCell<Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,StackAction>>>;
 
 pub struct VValFun {
     pub fun:        ClosNodeRef,
@@ -116,11 +122,27 @@ impl VVal {
         return VVal::Lst(Rc::new(RefCell::new(Vec::new())));
     }
 
-    pub fn call(&self, args: std::vec::Vec<VVal>) -> Result<VVal, u32> {
+    pub fn call(&self, args: std::vec::Vec<VVal>) -> Result<VVal, StackAction> {
         println!("CALL {}!", self.s());
 
         match self {
             VVal::Fun(fu) => { (((*fu).fun.borrow()))(&fu.upvalues, args) },
+            VVal::Bol(b) => {
+                let a = vec![VVal::Bol(*b)];
+                if *b {
+                    if args.len() > 0 {
+                        args[0].call(a)
+                    } else {
+                        Ok(VVal::Nul)
+                    }
+                } else {
+                    if args.len() > 1 {
+                        args[1].call(a)
+                    } else {
+                        Ok(VVal::Nul)
+                    }
+                }
+            },
             VVal::Sym(sym) => {
                 if args.len() > 0 {
                     match args[0] {
@@ -166,6 +188,14 @@ impl VVal {
 
     pub fn sym(s: &str) -> VVal {
         return VVal::Sym(String::from(s));
+    }
+
+    pub fn eq(&self, v: &VVal) -> bool {
+        match self {
+            VVal::Nul     => { if let VVal::Nul = v { return true; } else { return false; } },
+            VVal::Int(ia) => { if let VVal::Int(ib) = v { return ia == ib; } else { return false; } },
+            _             => { return false; }
+        }
     }
 
     pub fn dump_vec_as_str(v: &Rc<RefCell<std::vec::Vec<VVal>>>) -> String {

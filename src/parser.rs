@@ -175,7 +175,7 @@ impl ParseState {
 
     pub fn peek2(&self) -> Option<String> {
         if self.chars.len() > 1 {
-            let s : String = self.chars[0..1].iter().collect();
+            let s : String = self.chars[0..2].iter().collect();
             Some(s)
         } else {
             None
@@ -189,7 +189,7 @@ impl ParseState {
                 => { return Some(self.peek_char.to_string()); },
             '<' | '>' | '!' | '=' | '|' | '&' => {
                 if let Some(s) = self.peek2() {
-                    match &s[0..1] {
+                    match &s[0..2] {
                           "<=" | ">=" | "!=" | "==" | "<<" | ">>"
                         | "&&" | "||" | "&|" | "&^" => { return Some(s); }
                         _ => { }

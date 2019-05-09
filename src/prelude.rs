@@ -52,6 +52,31 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         });
 
     g.borrow_mut().add_func(
+        "==",
+        |_upv: &std::vec::Vec<(usize, VVal)>, args: std::vec::Vec<VVal>| {
+            if args.len() <= 0 { return Ok(VVal::Nul); }
+            let f = &args[0];
+            Ok(VVal::Bol(args[0].eq(&args[1])))
+        });
+
+    g.borrow_mut().add_func(
+        "break",
+        |_upv: &std::vec::Vec<(usize, VVal)>, mut args: std::vec::Vec<VVal>| {
+            if args.len() < 1 { return Err(StackAction::Break(VVal::Nul)); }
+            Err(StackAction::Break(args.remove(0)))
+        });
+
+    g.borrow_mut().add_func(
+        "push",
+        |_upv: &std::vec::Vec<(usize, VVal)>, mut args: std::vec::Vec<VVal>| {
+            if args.len() < 2 { return Ok(VVal::Nul); }
+            let a = args.remove(1);
+            let v = args.remove(0);
+            v.push(a);
+            Ok(v)
+        });
+
+    g.borrow_mut().add_func(
         "range",
         |_upv: &std::vec::Vec<(usize, VVal)>, args: std::vec::Vec<VVal>| {
             if args.len() <= 3 { return Ok(VVal::Nul); }
@@ -66,8 +91,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 while from <= to {
                     let a = vec![VVal::Flt(from)];
                     match f.call(a) {
-                        Ok(v) => { ret = v; },
-                        e     => { return e; },
+                        Ok(v)                      => { ret = v; },
+                        Err(StackAction::Break(v)) => { return Ok(v); },
+                        e                          => { return e; },
                     }
                     from += step;
                 }
@@ -82,8 +108,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 while from <= to {
                     let a = vec![VVal::Int(from)];
                     match f.call(a) {
-                        Ok(v) => { ret = v; },
-                        e     => { return e; },
+                        Ok(v)                      => { ret = v; },
+                        Err(StackAction::Break(v)) => { return Ok(v); },
+                        e                          => { return e; },
                     }
                     from += step;
                 }

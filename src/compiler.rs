@@ -8,6 +8,7 @@ use crate::vval::Syntax;
 use crate::vval::Env;
 use crate::vval::VValFun;
 use crate::vval::EvalNode;
+use crate::vval::StackAction;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -34,7 +35,7 @@ impl GlobalEnv {
     // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=94811153fadd511effa306e5369e5b19
     // FnMut: https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=ef42feadce57ac61b63ec7c6dc274b2b
     pub fn add_func<T>(&mut self, fnname: &str, fun: T)
-        where T: 'static + Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,u32> {
+        where T: 'static + Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,StackAction> {
         self.env.insert(
             String::from(fnname),
             VValFun::new(Rc::new(RefCell::new(fun)),
@@ -359,8 +360,8 @@ mod tests {
                     Ok(r) => {
                         let mut e = Env::new(CompileEnv::local_env_size(&ce), args);
                         match r(&mut e) {
-                            Ok(v) => { v.s() },
-                            Err(je) => { panic!(format!("EXEC ERR: JUMPED {}", je)); }
+                            Ok(v)   => { v.s() },
+                            Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
                         }
                     },
                     Err(re) => { panic!(format!("COMPILE ERROR: {}", re)); },
@@ -447,8 +448,26 @@ mod tests {
     }
 
     #[test]
+    fn check_bool() {
+        assert_eq!(eval("!:ref a = 0; $t { .a = 1 } { .a = 2 }; a"), "1");
+        assert_eq!(eval("!:ref a = 0; $f { .a = 1 } { .a = 2 }; a"), "2");
+    }
+
+    #[test]
     fn check_range() {
         assert_eq!(eval("!:ref x = 10;   range 1 3 1     { .x = x + _ }; x"), "16");
         assert_eq!(eval("!:ref x = 10.0; range 1.0 3 0.5 { .x = x + _ }; x"), "20");
+    }
+
+    #[test]
+    fn check_push() {
+        assert_eq!(eval("!:ref x = $[]; push x 10; push x 20; x"), "[10,20]");
+    }
+
+    #[test]
+    fn check_break() {
+        assert_eq!(eval("4 == 4"), "$true");
+        assert_eq!(eval("range 0 10 1 { break 14 }"), "14");
+        assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
     }
 }
