@@ -4,6 +4,7 @@
 mod vval;
 mod parser;
 mod compiler;
+mod prelude;
 use parser::*; // ParseState;
 use vval::*;
 use std::rc::Rc;

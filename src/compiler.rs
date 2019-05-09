@@ -2,6 +2,7 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 
 use crate::parser::*; // ParseState;
+use crate::prelude::*;
 use crate::vval::VVal;
 use crate::vval::Syntax;
 use crate::vval::Env;
@@ -20,9 +21,11 @@ struct CompileLocal {
 }
 
 #[derive(Debug, Clone)]
-struct GlobalEnv {
+pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
 }
+
+pub type GlobalEnvRef = Rc<RefCell<GlobalEnv>>;
 
 impl GlobalEnv {
     // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=7011ec14ebade14fe62e438a0db52c98
@@ -30,12 +33,18 @@ impl GlobalEnv {
     //  simplified: https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=45f376a6ef06d81ebbc11f08ec55d918
     // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=94811153fadd511effa306e5369e5b19
     // FnMut: https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=ef42feadce57ac61b63ec7c6dc274b2b
-    fn add_func<T>(&mut self, fnname: &str, fun: T)
+    pub fn add_func<T>(&mut self, fnname: &str, fun: T)
         where T: 'static + Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,u32> {
         self.env.insert(
             String::from(fnname),
             VValFun::new(Rc::new(RefCell::new(fun)),
                          Vec::new()));
+    }
+
+    pub fn new() -> GlobalEnvRef {
+        Rc::new(RefCell::new(GlobalEnv {
+            env: std::collections::HashMap::new()
+        }))
     }
 }
 
@@ -43,7 +52,7 @@ impl GlobalEnv {
 #[derive(Debug, Clone)]
 struct CompileEnv {
     parent:    Option<Rc<RefCell<CompileEnv>>>,
-    global:    Rc<RefCell<GlobalEnv>>,
+    global:    GlobalEnvRef,
     local_map: std::collections::HashMap<String, usize>,
     locals:    std::vec::Vec<CompileLocal>,
     upvals:    std::vec::Vec<(usize,usize)>,
@@ -57,7 +66,7 @@ impl CompileEnv {
         let global = if let Some(p) = &parent {
             p.borrow_mut().global.clone()
         } else {
-            Rc::new(RefCell::new(GlobalEnv { env: std::collections::HashMap::new() }))
+            GlobalEnv::new()
         };
         Rc::new(RefCell::new(CompileEnv {
             parent:    parent,
@@ -351,20 +360,7 @@ mod tests {
 
     fn eval(s: &str) -> String {
         let args = vec![VVal::Int(13), VVal::Flt(42.42)];
-        let global = Rc::new(RefCell::new(GlobalEnv {
-            env: std::collections::HashMap::new()
-        }));
-
-        global.borrow_mut().add_func(
-            "+",
-            |_upv: &std::vec::Vec<(usize, VVal)>, args: std::vec::Vec<VVal>| {
-                if args.len() <= 0 { return Ok(VVal::Nul); }
-                if let VVal::Flt(_) = args[0] {
-                    Ok(VVal::Flt(args.iter().map(|v| v.f()).sum()))
-                } else {
-                    Ok(VVal::Int(args.iter().map(|v| v.i()).sum()))
-                }
-            });
+        let global = create_wlamba_prelude();
 
         let mut ps = mk(s);
         match parse_block(&mut ps, false) {
