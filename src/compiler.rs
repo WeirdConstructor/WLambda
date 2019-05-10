@@ -11,6 +11,7 @@ use crate::vval::EvalNode;
 use crate::vval::StackAction;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::time::{Duration, Instant};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
@@ -97,7 +98,7 @@ impl CompileEnv {
                 Some(v) => { upvalues.push((u.1, v));             },
                 None    => { upvalues.push((u.1, e.locals[u.0].clone())); },
             }
-            println!("COPY UPV: {}, {}, {} => {}", u.0, u.1, e.locals[u.0].s(), upvalues[upvalues.len() - 1].1.s());
+            // println!("COPY UPV: {}, {}, {} => {}", u.0, u.1, e.locals[u.0].s(), upvalues[upvalues.len() - 1].1.s());
         }
     }
 
@@ -223,7 +224,6 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
 
     Ok(Box::new(move |e: &mut Env| {
         let v = cv(e)?;
-        println!("ASSIGN {} = {}", idx, v.s());
         e.set(idx, &v);
         Ok(v)
     }))
@@ -333,43 +333,49 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
     }
 }
 
+fn mk(s: &str) -> ParseState {
+    ParseState::new(s, "<testinput>")
+}
+
+pub fn eval(s: &str) -> String {
+    let args = vec![VVal::Int(13), VVal::Flt(42.42)];
+    let global = create_wlamba_prelude();
+
+    let mut ps = mk(s);
+    match parse_block(&mut ps, false) {
+        Ok(v)  =>  {
+            let mut ce = Rc::new(RefCell::new(CompileEnv {
+                parent:    None,
+                global:    global,
+                local_map: std::collections::HashMap::new(),
+                locals:    Vec::new(),
+                upvals:    Vec::new(),
+            }));
+            let prog = compile(&v, &mut ce);
+            match prog {
+                Ok(r) => {
+                    let mut e = Env::new(CompileEnv::local_env_size(&ce), args);
+                    let now = Instant::now();
+
+                    match r(&mut e) {
+                        Ok(v)   => {
+                            println!("*** runtime: {}", now.elapsed().as_secs());
+                            v.s()
+                        },
+                        Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
+                    }
+                },
+                Err(re) => { panic!(format!("COMPILE ERROR: {}", re)); },
+            }
+        }
+        Err(e) => { panic!(format!("PARSE ERROR: {} at '{}' with input '{}'", e, ps.rest(), s)); },
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn mk(s: &str) -> ParseState {
-        ParseState::new(s, "<testinput>")
-    }
-
-    fn eval(s: &str) -> String {
-        let args = vec![VVal::Int(13), VVal::Flt(42.42)];
-        let global = create_wlamba_prelude();
-
-        let mut ps = mk(s);
-        match parse_block(&mut ps, false) {
-            Ok(v)  =>  {
-                let mut ce = Rc::new(RefCell::new(CompileEnv {
-                    parent:    None,
-                    global:    global,
-                    local_map: std::collections::HashMap::new(),
-                    locals:    Vec::new(),
-                    upvals:    Vec::new(),
-                }));
-                let prog = compile(&v, &mut ce);
-                match prog {
-                    Ok(r) => {
-                        let mut e = Env::new(CompileEnv::local_env_size(&ce), args);
-                        match r(&mut e) {
-                            Ok(v)   => { v.s() },
-                            Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
-                        }
-                    },
-                    Err(re) => { panic!(format!("COMPILE ERROR: {}", re)); },
-                }
-            }
-            Err(e) => { panic!(format!("PARSE ERROR: {} at '{}' with input '{}'", e, ps.rest(), s)); },
-        }
-    }
 
 //    fn parse_error(s: &str) -> String {
 //        let mut ps = mk(s);

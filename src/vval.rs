@@ -123,8 +123,6 @@ impl VVal {
     }
 
     pub fn call(&self, args: std::vec::Vec<VVal>) -> Result<VVal, StackAction> {
-        println!("CALL {}!", self.s());
-
         match self {
             VVal::Fun(fu) => { (((*fu).fun.borrow()))(&fu.upvalues, args) },
             VVal::Bol(b) => {
