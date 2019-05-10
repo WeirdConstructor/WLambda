@@ -59,6 +59,13 @@ impl Env {
         self.sp - 1
     }
 
+    pub fn popn(&mut self, n: usize) {
+        if self.sp < n {
+            panic!(format!("Stack pointer underflow {} {}", self.sp, n));
+        }
+        self.sp = self.sp - n;
+    }
+
     pub fn at(&self, pos: usize) -> &VVal {
         &self.args[self.sp - (pos + 1)]
     }
@@ -71,7 +78,7 @@ impl Env {
 
     pub fn argv(&mut self) -> VVal {
         let v = VVal::vec();
-        for a in self.args.iter() { v.push(a.clone()); }
+        for i in 0..self.sp { v.push(self.args[i].clone()); }
         v
     }
 

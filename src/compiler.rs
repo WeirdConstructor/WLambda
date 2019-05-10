@@ -287,7 +287,9 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     Ok(Box::new(move |e: &mut Env| {
                         let f = func(e)?;
                         for x in call_args.iter() { let v = x(e)?; e.push(v); }
-                        f.call(e, call_args.len())
+                        let v = f.call(e, call_args.len());
+                        e.popn(call_args.len());
+                        v
                     }))
                 },
                 VVal::Syn(Syntax::Func) => {
@@ -296,16 +298,15 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
 
                     let env_size = CompileEnv::local_env_size(&ce_sub);
-                    let fun_ref = Rc::new(RefCell::new(move |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, _argc: usize| {
-//                        let mut e = Env::new(env_size, args);
-//                        for u in upv.iter() {
-//                            if let VVal::WRef(_) = u.1 {
-//                                let mut v = u.1.clone();
-//                                e.locals[u.0] = v.upgrade().unwrap();
-//                            } else {
-//                                e.locals[u.0] = u.1.clone();
-//                            }
-//                        }
+                    let fun_ref = Rc::new(RefCell::new(move |upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, _argc: usize| {
+                        for u in upv.iter() {
+                            if let VVal::WRef(_) = u.1 {
+                                let mut v = u.1.clone();
+                                env.locals[u.0] = v.upgrade().unwrap();
+                            } else {
+                                env.locals[u.0] = u.1.clone();
+                            }
+                        }
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
                             res = s(env)?;
@@ -334,7 +335,6 @@ fn mk(s: &str) -> ParseState {
 }
 
 pub fn eval(s: &str) -> String {
-    let args = vec![VVal::Int(13), VVal::Flt(42.42)];
     let global = create_wlamba_prelude();
 
     let mut ps = mk(s);
@@ -350,7 +350,9 @@ pub fn eval(s: &str) -> String {
             let prog = compile(&v, &mut ce);
             match prog {
                 Ok(r) => {
-                    let mut e = Env::new(CompileEnv::local_env_size(&ce), &args);
+                    let mut e = Env::new_s(CompileEnv::local_env_size(&ce));
+                    e.push(VVal::Int(13));
+                    e.push(VVal::Flt(42.42));
 
                     match r(&mut e) {
                         Ok(v)   => { v.s() },
