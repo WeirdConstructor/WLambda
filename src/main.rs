@@ -10,6 +10,7 @@ use compiler::*; // ParseState;
 use vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::time::Instant;
 
 //use std::iter::Peekable;
 //use std::fmt;
@@ -21,7 +22,16 @@ pub enum BAL {
 }
 
 fn main() {
-    let v = eval("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x");
+    let mut rts = 0.0;
+    let mut cnt = 0;
+    let mut v = String::from("");
+    for i in 0..5 {
+        let now = Instant::now();
+        v = eval("!:ref x = 0; range 0 1000000 1 { .x = x + 1 }; x");
+        rts = rts + (now.elapsed().as_millis() as f64);
+        cnt = cnt + 1;
+    }
+    println!("*** runtime: {} ({} runs)", rts / (cnt as f64), cnt);
     println!("> {:?}", v);
 }
 

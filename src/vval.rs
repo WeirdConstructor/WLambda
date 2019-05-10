@@ -23,19 +23,48 @@ pub enum Syntax {
     DefRef,
 }
 
+const STACK_SIZE : usize = 4096;
+
 pub struct Env {
     pub locals: std::vec::Vec<VVal>,
     pub args:   std::vec::Vec<VVal>,
+    pub sp:     usize,
 }
 
 impl Env {
-    pub fn new(local_size: usize, args: std::vec::Vec<VVal>) -> Env {
+    pub fn new(local_size: usize, args: &[VVal]) -> Env {
         let mut e = Env {
             locals: Vec::with_capacity(local_size),
-            args: args,
+            args: args.to_vec(),
+            sp: 0,
         };
         e.locals.resize(local_size, VVal::Nul);
         e
+    }
+
+    pub fn new_s(local_size: usize) -> Env {
+        let mut e = Env {
+            locals: Vec::with_capacity(local_size),
+            args: Vec::with_capacity(STACK_SIZE),
+            sp: 0,
+        };
+        e.locals.resize(local_size, VVal::Nul);
+        e.args.resize(STACK_SIZE, VVal::Nul);
+        e
+    }
+
+    pub fn push(&mut self, v: VVal) -> usize {
+        self.args[self.sp] = v;
+        self.sp = self.sp + 1;
+        self.sp - 1
+    }
+
+    pub fn at(&self, pos: usize) -> &VVal {
+        &self.args[self.sp - (pos + 1)]
+    }
+
+    pub fn slice(&mut self, size: usize) -> &mut [VVal] {
+        &mut self.args[(self.sp - size)..self.sp]
     }
 
     pub fn arg(&mut self, index: usize) -> VVal { self.args[index].clone() }
@@ -76,7 +105,7 @@ pub enum StackAction {
 }
 
 pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,StackAction>>;
-pub type ClosNodeRef = Rc<RefCell<Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,StackAction>>>;
+pub type ClosNodeRef = Rc<RefCell<Fn(&std::vec::Vec<(usize, VVal)>, &mut Env, usize) -> Result<VVal,StackAction>>>;
 
 pub struct VValFun {
     pub fun:        ClosNodeRef,
@@ -105,7 +134,6 @@ pub enum VVal {
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
     Map(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
     Fun(Rc<VValFun>),
-//    TMap((u32,Rc<RefCell<std::collections::HashMap<String, VVal>>>)),
     Ref(Rc<RefCell<VVal>>),
     WRef(Weak<RefCell<VVal>>),
 }
@@ -122,30 +150,28 @@ impl VVal {
         return VVal::Lst(Rc::new(RefCell::new(Vec::new())));
     }
 
-    pub fn call(&self, args: std::vec::Vec<VVal>) -> Result<VVal, StackAction> {
+    pub fn call(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         match self {
-            VVal::Fun(fu) => { (((*fu).fun.borrow()))(&fu.upvalues, args) },
+            VVal::Fun(fu) => { (((*fu).fun.borrow()))(&fu.upvalues, env, argc) },
             VVal::Bol(b) => {
-                let a = vec![VVal::Bol(*b)];
                 if *b {
-                    if args.len() > 0 {
-                        args[0].call(a)
-                    } else {
-                        Ok(VVal::Nul)
-                    }
+                    if argc > 0 {
+                        let v = env.at(0).clone();
+                        v.call(env, 0)
+                    } else { Ok(VVal::Nul) }
                 } else {
-                    if args.len() > 1 {
-                        args[1].call(a)
-                    } else {
-                        Ok(VVal::Nul)
-                    }
+                    if argc > 1 {
+                        let v = env.at(1).clone();
+                        v.call(env, 0)
+                    } else { Ok(VVal::Nul) }
                 }
             },
             VVal::Sym(sym) => {
-                if args.len() > 0 {
-                    match args[0] {
+                if argc > 0 {
+                    let v = env.at(0);
+                    match v {
                         VVal::Map(_) => {
-                            let v = args[0].get_key(&sym);
+                            let v = v.get_key(&sym);
                             Ok(if v.is_some() { v.unwrap() } else { VVal::Nul })
                         },
                         _ => Ok(VVal::Nul)

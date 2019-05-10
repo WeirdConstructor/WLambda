@@ -11,7 +11,6 @@ use crate::vval::EvalNode;
 use crate::vval::StackAction;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::time::{Duration, Instant};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
@@ -36,7 +35,7 @@ impl GlobalEnv {
     // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=94811153fadd511effa306e5369e5b19
     // FnMut: https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=ef42feadce57ac61b63ec7c6dc274b2b
     pub fn add_func<T>(&mut self, fnname: &str, fun: T)
-        where T: 'static + Fn(&std::vec::Vec<(usize, VVal)>, std::vec::Vec<VVal>) -> Result<VVal,StackAction> {
+        where T: 'static + Fn(&std::vec::Vec<(usize, VVal)>, &mut Env, usize) -> Result<VVal,StackAction> {
         self.env.insert(
             String::from(fnname),
             VValFun::new(Rc::new(RefCell::new(fun)),
@@ -88,7 +87,6 @@ impl CompileEnv {
             name:       String::from(s),
         });
         self.local_map.insert(String::from(s), next_index);
-        println!("CE DEF '{}' => {}", s, next_index);
         next_index
     }
 
@@ -115,7 +113,6 @@ impl CompileEnv {
     }
 
     fn get(&mut self, s: &str) -> Option<usize> {
-        println!("CE GET '{}'", s);
         let opt_idx = self.local_map.get(s);
 
         if let Some(&i) = opt_idx {
@@ -289,9 +286,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
 
                     Ok(Box::new(move |e: &mut Env| {
                         let f = func(e)?;
-                        let mut args = Vec::new();
-                        for x in call_args.iter() { args.push(x(e)?); }
-                        f.call(args)
+                        for x in call_args.iter() { let v = x(e)?; e.push(v); }
+                        f.call(e, call_args.len())
                     }))
                 },
                 VVal::Syn(Syntax::Func) => {
@@ -300,19 +296,19 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
 
                     let env_size = CompileEnv::local_env_size(&ce_sub);
-                    let fun_ref = Rc::new(RefCell::new(move |upv: &std::vec::Vec<(usize, VVal)>, args: std::vec::Vec<VVal>| {
-                        let mut e = Env::new(env_size, args);
-                        for u in upv.iter() {
-                            if let VVal::WRef(_) = u.1 {
-                                let mut v = u.1.clone();
-                                e.locals[u.0] = v.upgrade().unwrap();
-                            } else {
-                                e.locals[u.0] = u.1.clone();
-                            }
-                        }
+                    let fun_ref = Rc::new(RefCell::new(move |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, _argc: usize| {
+//                        let mut e = Env::new(env_size, args);
+//                        for u in upv.iter() {
+//                            if let VVal::WRef(_) = u.1 {
+//                                let mut v = u.1.clone();
+//                                e.locals[u.0] = v.upgrade().unwrap();
+//                            } else {
+//                                e.locals[u.0] = u.1.clone();
+//                            }
+//                        }
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
-                            res = s(&mut e)?;
+                            res = s(env)?;
                         }
                         Ok(res)
                     }));
@@ -354,14 +350,10 @@ pub fn eval(s: &str) -> String {
             let prog = compile(&v, &mut ce);
             match prog {
                 Ok(r) => {
-                    let mut e = Env::new(CompileEnv::local_env_size(&ce), args);
-                    let now = Instant::now();
+                    let mut e = Env::new(CompileEnv::local_env_size(&ce), &args);
 
                     match r(&mut e) {
-                        Ok(v)   => {
-                            println!("*** runtime: {}", now.elapsed().as_secs());
-                            v.s()
-                        },
+                        Ok(v)   => { v.s() },
                         Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
                     }
                 },
