@@ -25,32 +25,42 @@ pub enum Syntax {
 
 const STACK_SIZE : usize = 4096;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum VarPos {
+    NoPos,
+    UpValue(usize),
+    Local(usize),
+}
+
 pub struct Env {
-    pub locals: std::vec::Vec<VVal>,
-    pub args:   std::vec::Vec<VVal>,
-    pub sp:     usize,
+    pub args:       std::vec::Vec<VVal>,
+    pub fun:        Option<Rc<VValFun>>,
+    pub cur_argc:   usize,
+    pub sp:         usize,
 }
 
 impl Env {
-    pub fn new(local_size: usize, args: &[VVal]) -> Env {
+    pub fn new_s() -> Env {
         let mut e = Env {
-            locals: Vec::with_capacity(local_size),
-            args: args.to_vec(),
-            sp: 0,
+            args:       Vec::with_capacity(STACK_SIZE),
+            fun:        None,
+            cur_argc:   0,
+            sp:         0,
         };
-        e.locals.resize(local_size, VVal::Nul);
+        e.args.resize(STACK_SIZE, VVal::Nul);
         e
     }
 
-    pub fn new_s(local_size: usize) -> Env {
-        let mut e = Env {
-            locals: Vec::with_capacity(local_size),
-            args: Vec::with_capacity(STACK_SIZE),
-            sp: 0,
-        };
-        e.locals.resize(local_size, VVal::Nul);
-        e.args.resize(STACK_SIZE, VVal::Nul);
-        e
+    pub fn repl_upv(&mut self, fun: Option<Rc<VValFun>>) -> Option<Rc<VValFun>> {
+        std::mem::replace(&mut self.fun, fun)
+    }
+
+    pub fn repl_argc(&mut self, argc: usize) -> usize {
+        std::mem::replace(&mut self.cur_argc, argc)
+    }
+
+    pub fn reserve_locals(&mut self, env_size: usize) {
+        self.sp = self.sp + env_size;
     }
 
     pub fn push(&mut self, v: VVal) -> usize {
@@ -82,45 +92,64 @@ impl Env {
         v
     }
 
-    pub fn get(&mut self, index: usize) -> VVal {
-        if let VVal::Ref(r) = &self.locals[index] {
-            r.borrow().clone()
+    pub fn get_up(&mut self, i: usize) -> VVal {
+        if let Some(v) = self.fun {
+            v.upvalues[i]
         } else {
-            self.locals[index].clone()
+            VVal::Nul
         }
     }
 
-    pub fn set(&mut self, index: usize, value: &VVal) {
-        self.locals.resize(index + 1, VVal::Nul);
-        if let VVal::Ref(r) = &self.locals[index] {
+    pub fn get_local(&mut self, i: usize) -> VVal {
+        let idx = self.sp - self.argc - (i + 1);
+        if let VVal::Ref(r) = &self.args[idx] {
+            r.borrow().clone()
+        } else {
+            self.args[idx].clone()
+        }
+    }
+
+    pub fn set_up(&mut self, index: usize, value: &VVal) {
+        if let Some(v) = self.fun {
+            if let VVal::Ref(r) = v[index] {
+                r.replace(value.clone());
+            } else {
+                v[index] = value.clone();
+            }
+        }
+    }
+
+    pub fn set_local(&mut self, index: usize, value: &VVal) {
+        let idx = self.sp - self.argc - (i + 1);
+        if let VVal::Ref(r) = &self.args[idx] {
             r.replace(value.clone());
         } else {
-            self.locals.insert(index, value.clone());
+            self.args[idx] = value.clone();
         }
     }
 
     pub fn set_consume(&mut self, index: usize, value: VVal) {
-        self.locals.resize(index + 1, VVal::Nul);
-        self.locals.insert(index, value);
+        let idx = self.sp - self.argc - (i + 1);
+        self.args[index] = value;
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum StackAction {
-    Panic(String),
+//    Panic(String),
     Break(VVal),
 }
 
 pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,StackAction>>;
-pub type ClosNodeRef = Rc<RefCell<Fn(&std::vec::Vec<(usize, VVal)>, &mut Env, usize) -> Result<VVal,StackAction>>>;
+pub type ClosNodeRef = Rc<RefCell<Fn(&Rc<VValFun>, &mut Env, usize) -> Result<VVal,StackAction>>>;
 
 pub struct VValFun {
     pub fun:        ClosNodeRef,
-    pub upvalues:   std::vec::Vec<(usize,VVal)>,
+    pub upvalues:   std::vec::Vec<VVal>,
 }
 
 impl VValFun {
-    pub fn new(fun: ClosNodeRef, upvalues: std::vec::Vec<(usize,VVal)>) -> VVal {
+    pub fn new(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalues:   upvalues,
             fun:        fun,
@@ -159,7 +188,7 @@ impl VVal {
 
     pub fn call(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         match self {
-            VVal::Fun(fu) => { (((*fu).fun.borrow()))(&fu.upvalues, env, argc) },
+            VVal::Fun(fu) => { (((*fu).fun.borrow()))(fu, env, argc) },
             VVal::Bol(b) => {
                 if *b {
                     if argc > 0 {

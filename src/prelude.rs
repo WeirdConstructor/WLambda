@@ -1,12 +1,13 @@
 use crate::compiler::*;
 use crate::vval::*;
+use std::rc::Rc;
 
 pub fn create_wlamba_prelude() -> GlobalEnvRef {
     let g = GlobalEnv::new();
 
     g.borrow_mut().add_func(
         "+",
-        |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, argc: usize| {
+        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
             if let VVal::Flt(_) = args[0] {
@@ -18,7 +19,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "-",
-        |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, argc: usize| {
+        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
             let f = &args[0];
@@ -31,7 +32,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "*",
-        |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, argc: usize| {
+        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
             let f = &args[0];
@@ -44,7 +45,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "/",
-        |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, argc: usize| {
+        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
             let f = &args[0];
@@ -57,16 +58,15 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "==",
-        |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, argc: usize| {
+        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
-            let f = &args[0];
             Ok(VVal::Bol(args[0].eq(&args[1])))
         });
 
     g.borrow_mut().add_func(
         "break",
-        |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, argc: usize| {
+        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
             let args = env.slice(argc);
             Err(StackAction::Break(args[0].clone()))
@@ -74,7 +74,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "push",
-        |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, argc: usize| {
+        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
             let a = &args[1];
@@ -85,7 +85,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "range",
-        |_upv: &std::vec::Vec<(usize, VVal)>, env: &mut Env, argc: usize| {
+        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 3 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
 
@@ -104,7 +104,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                     match f.call(env, 0) {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { return Ok(v); },
-                        e                          => { return e; },
+                        //e                          => { return e; },
                     }
                     from += step;
                 }
@@ -119,7 +119,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                     match f.call(env, 0) {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { return Ok(v); },
-                        e                          => { return e; },
+                        // e                          => { return e; },
                     }
                     from += step;
                 }
