@@ -93,15 +93,15 @@ impl Env {
     }
 
     pub fn get_up(&mut self, i: usize) -> VVal {
-        if let Some(v) = self.fun {
-            v.upvalues[i]
+        if let Some(v) = &self.fun {
+            v.upvalues[i].clone()
         } else {
             VVal::Nul
         }
     }
 
     pub fn get_local(&mut self, i: usize) -> VVal {
-        let idx = self.sp - self.argc - (i + 1);
+        let idx = self.sp - self.cur_argc - (i + 1);
         if let VVal::Ref(r) = &self.args[idx] {
             r.borrow().clone()
         } else {
@@ -110,17 +110,22 @@ impl Env {
     }
 
     pub fn set_up(&mut self, index: usize, value: &VVal) {
-        if let Some(v) = self.fun {
-            if let VVal::Ref(r) = v[index] {
+        if let Some(v) = self.fun.as_mut() {
+            let fun = v.clone();
+            let upv = &fun.upvalues[index];
+            if let VVal::Ref(r) = upv {
                 r.replace(value.clone());
-            } else {
-                v[index] = value.clone();
+                return;
             }
+            // Will not mutate non ref upvalue!
+            // panic!(format!("Cannot mutate a non ref upvalue {} = {}", index, value.s()));
+            // But also not panic here.
         }
     }
 
-    pub fn set_local(&mut self, index: usize, value: &VVal) {
-        let idx = self.sp - self.argc - (i + 1);
+    pub fn set_local(&mut self, i: usize, value: &VVal) {
+        println!("SUBS: {} - {} - {}", self.sp, self.cur_argc, (i + 1));
+        let idx = self.sp - self.cur_argc - (i + 1);
         if let VVal::Ref(r) = &self.args[idx] {
             r.replace(value.clone());
         } else {
@@ -128,9 +133,9 @@ impl Env {
         }
     }
 
-    pub fn set_consume(&mut self, index: usize, value: VVal) {
-        let idx = self.sp - self.argc - (i + 1);
-        self.args[index] = value;
+    pub fn set_consume(&mut self, i: usize, value: VVal) {
+        let idx = self.sp - self.cur_argc - (i + 1);
+        self.args[idx] = value;
     }
 }
 
