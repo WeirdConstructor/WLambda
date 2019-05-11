@@ -100,8 +100,8 @@ impl CompileEnv {
     fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
         for p in self.upvals.iter() {
             let v = match p {
-                VarPos::UpValue(i) => e.get_up(*i),
-                VarPos::Local(i)   => e.get_local(*i),
+                VarPos::UpValue(i) => e.get_up_raw(*i),
+                VarPos::Local(i)   => e.get_local_raw(*i),
                 VarPos::NoPos      => VVal::Nul,
             };
             upvalues.push(v.clone());
@@ -173,19 +173,22 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
 
     let s = var.s_raw();
     match &s[..] {
-        "_"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0)) })) },
-        "_1" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1)) })) },
-        "_2" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2)) })) },
-        "_3" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3)) })) },
-        "_4" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4)) })) },
-        "_5" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5)) })) },
-        "_6" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6)) })) },
-        "_7" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7)) })) },
-        "_8" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8)) })) },
-        "_9" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9)) })) },
+        // FIXME: Check argc vs. variable access, otherwise we will certainly
+        //        get access outside the stack!
+        "_"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(0).clone()) })) },
+        "_1" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(1).clone()) })) },
+        "_2" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(2).clone()) })) },
+        "_3" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(3).clone()) })) },
+        "_4" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(4).clone()) })) },
+        "_5" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(5).clone()) })) },
+        "_6" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(6).clone()) })) },
+        "_7" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(7).clone()) })) },
+        "_8" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(8).clone()) })) },
+        "_9" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(9).clone()) })) },
         "@"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) })) },
         _ => {
             let pos = ce.borrow_mut().get(&s);
+            println!("ACCESS LOCAL: {} => {:?}", s, pos);
             match pos {
                 VarPos::UpValue(i) =>
                     Ok(Box::new(move |e: &mut Env| { Ok(e.get_up(i)) })),
@@ -310,11 +313,14 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                 },
                 VVal::Syn(Syntax::Call) => {
                     let mut call_args : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
-                    let func = call_args.remove(0);
+                    call_args.reverse();
+                    let func = call_args.pop().expect("function in evaluation args list");
 
                     Ok(Box::new(move |e: &mut Env| {
                         let f = func(e)?;
-                        for x in call_args.iter() { let v = x(e)?; e.push(v); }
+                        let mut i = 0;
+                        for x in call_args.iter() { let v = x(e)?; e.set_after(i, v); i = i + 1; }
+                        e.push_sp(i);
                         let v = f.call(e, call_args.len());
                         e.popn(call_args.len());
                         v
@@ -326,24 +332,23 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
 
                     let env_size = CompileEnv::local_env_size(&ce_sub);
-                    let fun_ref = Rc::new(RefCell::new(move |fun: &Rc<VValFun>, env: &mut Env, argc: usize| {
-                        let old_upv  = env.repl_upv(Some(fun.clone()));
-                        let old_argc = env.repl_argc(argc);
-                        env.reserve_locals(env_size);
+                    let fun_ref = Rc::new(RefCell::new(move |fun: &Rc<VValFun>, env: &mut Env, _argc: usize| {
+                        let old_upv = env.repl_upv(Some(fun.clone()));
+                        let old_ls = env.reserve_locals(env_size);
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
                             match s(env) {
                                 Ok(v) => { res = v; },
                                 e => {
                                     env.repl_upv(old_upv);
-                                    env.repl_argc(old_argc);
+                                    env.repl_locals_size(old_ls);
                                     return e;
                                 }
                             }
                         }
                         env.popn(env_size);
                         env.repl_upv(old_upv);
-                        env.repl_argc(old_argc);
+                        env.repl_locals_size(old_ls);
                         Ok(res)
                     }));
 
@@ -384,10 +389,9 @@ pub fn eval(s: &str) -> String {
             match prog {
                 Ok(r) => {
                     let mut e = Env::new_s();
+                    e.push(VVal::Flt(42.42)); // 2nd arg
+                    e.push(VVal::Int(13));    // 1st arg
                     e.reserve_locals(CompileEnv::local_env_size(&ce));
-                    e.push(VVal::Int(13));
-                    e.push(VVal::Flt(42.42));
-                    e.repl_argc(2);
 
                     match r(&mut e) {
                         Ok(v)   => { v.s() },
@@ -419,7 +423,7 @@ mod tests {
     fn check_trivial() {
         assert_eq!(eval("_"),                       "13");          // XXX: in test env
         assert_eq!(eval("_1"),                      "42.42");       // XXX: in test env
-        assert_eq!(eval("@"),                       "[13,42.42]");  // XXX: in test env
+        assert_eq!(eval("@"),                       "[42.42,13]");  // XXX: in test env
 
         assert_eq!(eval("$n"), "$n");
         assert_eq!(eval("10"), "10");
@@ -434,8 +438,8 @@ mod tests {
         assert_eq!(eval("!x = 13; { .x = 12 }(); { x }() "),            "13");
 //        assert_eq!(eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), x]"),  "[12,12]");
 //        assert_eq!(eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), { .x = 15 }(), x]"), "[12,15,15]");
-//        assert_eq!(eval("{ _ } 10"),                        "10");
-//        assert_eq!(eval("!:ref y = 0; { .y = _ } 10; y"),   "10");
+        assert_eq!(eval("{ _ } 10"),                        "10");
+        assert_eq!(eval("!:ref y = 0; { .y = _ } 10; y"),   "10");
         assert_eq!(eval("${:a: 10, :b: 20}"),               "{a:10,b:20}");
         assert_eq!(eval("${:b: 20, :a: 10}"),               "{a:10,b:20}");
         assert_eq!(eval("!x = ${:b: 20, :a: 10}; x"),       "{a:10,b:20}");
@@ -485,8 +489,8 @@ mod tests {
 
     #[test]
     fn check_bool() {
-//        assert_eq!(eval("!:ref a = 0; $t { .a = 1 } { .a = 2 }; a"), "1");
-//        assert_eq!(eval("!:ref a = 0; $f { .a = 1 } { .a = 2 }; a"), "2");
+        assert_eq!(eval("!:ref a = 0; $t { .a = 1 } { .a = 2 }; a"), "1");
+        assert_eq!(eval("!:ref a = 0; $f { .a = 1 } { .a = 2 }; a"), "2");
     }
 
     #[test]
@@ -497,6 +501,11 @@ mod tests {
 
     #[test]
     fn check_push() {
+        assert_eq!(eval("!a = 10; !x = $[1]; !y = 20; x"), "[1]");
+        println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+        assert_eq!(eval("!:ref x = $[]; push x 12; x"), "[12]");
+        println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+        assert_eq!(eval("!a = 10; !x = $[]; !y = 20; push x 10; push x 30; x"), "[10,30]");
         assert_eq!(eval("!:ref x = $[]; push x 10; push x 20; x"), "[10,20]");
     }
 

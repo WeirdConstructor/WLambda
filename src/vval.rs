@@ -33,19 +33,19 @@ pub enum VarPos {
 }
 
 pub struct Env {
-    pub args:       std::vec::Vec<VVal>,
-    pub fun:        Option<Rc<VValFun>>,
-    pub cur_argc:   usize,
-    pub sp:         usize,
+    pub args:               std::vec::Vec<VVal>,
+    pub fun:                Option<Rc<VValFun>>,
+    pub cur_locals_size:    usize,
+    pub sp:                 usize,
 }
 
 impl Env {
     pub fn new_s() -> Env {
         let mut e = Env {
-            args:       Vec::with_capacity(STACK_SIZE),
-            fun:        None,
-            cur_argc:   0,
-            sp:         0,
+            args:               Vec::with_capacity(STACK_SIZE),
+            fun:                None,
+            cur_locals_size:    0,
+            sp:                 0,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -55,12 +55,21 @@ impl Env {
         std::mem::replace(&mut self.fun, fun)
     }
 
-    pub fn repl_argc(&mut self, argc: usize) -> usize {
-        std::mem::replace(&mut self.cur_argc, argc)
+    pub fn repl_locals_size(&mut self, lss: usize) -> usize {
+        std::mem::replace(&mut self.cur_locals_size, lss)
     }
 
-    pub fn reserve_locals(&mut self, env_size: usize) {
+    pub fn reserve_locals(&mut self, env_size: usize) -> usize {
         self.sp = self.sp + env_size;
+        std::mem::replace(&mut self.cur_locals_size, env_size)
+    }
+
+    pub fn set_after(&mut self, offs: usize, v: VVal) {
+        self.args[self.sp + offs] = v;
+    }
+
+    pub fn push_sp(&mut self, n: usize) {
+        self.sp = self.sp + n;
     }
 
     pub fn push(&mut self, v: VVal) -> usize {
@@ -74,17 +83,27 @@ impl Env {
             panic!(format!("Stack pointer underflow {} {}", self.sp, n));
         }
         self.sp = self.sp - n;
+        println!("POPN {} => {}", n, self.sp);
+    }
+
+    pub fn dump_stack(&self) {
+        let mut i = 0;
+        for v in self.args.iter() {
+            println!("    [{:3}] = {}", i, v.s());
+            i = i + 1;
+            if i >= self.sp { break; }
+        }
     }
 
     pub fn at(&self, pos: usize) -> &VVal {
-        &self.args[self.sp - (pos + 1)]
+        println!("VAR AT {} - ({} + {} + 1)", self.sp, self.cur_locals_size, pos);
+        &self.args[self.sp - (self.cur_locals_size + pos + 1)]
     }
 
     pub fn slice(&mut self, size: usize) -> &mut [VVal] {
+        println!("SLICE sp={}, locals={} size={}", self.sp, self.cur_locals_size, size);
         &mut self.args[(self.sp - size)..self.sp]
     }
-
-    pub fn arg(&mut self, index: usize) -> VVal { self.args[index].clone() }
 
     pub fn argv(&mut self) -> VVal {
         let v = VVal::vec();
@@ -92,7 +111,7 @@ impl Env {
         v
     }
 
-    pub fn get_up(&mut self, i: usize) -> VVal {
+    pub fn get_up_raw(&mut self, i: usize) -> VVal {
         if let Some(v) = &self.fun {
             v.upvalues[i].clone()
         } else {
@@ -100,10 +119,33 @@ impl Env {
         }
     }
 
+    pub fn get_up(&mut self, i: usize) -> VVal {
+        if let Some(v) = &self.fun {
+            if let VVal::Ref(r) = &v.upvalues[i] {
+                r.borrow().clone()
+            } else {
+                v.upvalues[i].clone()
+            }
+        } else {
+            VVal::Nul
+        }
+    }
+
+    pub fn get_local_raw(&mut self, i: usize) -> VVal {
+        let idx = self.sp - (i + 1);
+        println!("GET_LOCAL_RAW [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
+        self.dump_stack();
+        self.args[idx].clone()
+    }
+
     pub fn get_local(&mut self, i: usize) -> VVal {
-        let idx = self.sp - self.cur_argc - (i + 1);
+        let idx = self.sp - (i + 1);
+        println!("GET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
+        self.dump_stack();
         if let VVal::Ref(r) = &self.args[idx] {
-            r.borrow().clone()
+            let rr = r.borrow().clone();
+            println!("GOT: {:?}", rr);
+            rr
         } else {
             self.args[idx].clone()
         }
@@ -112,6 +154,7 @@ impl Env {
     pub fn set_up(&mut self, index: usize, value: &VVal) {
         if let Some(v) = self.fun.as_mut() {
             let fun = v.clone();
+            println!("SET_UP [{}] ({})=({})", index, fun.upvalues[index].s(), value.s());
             let upv = &fun.upvalues[index];
             if let VVal::Ref(r) = upv {
                 r.replace(value.clone());
@@ -124,8 +167,8 @@ impl Env {
     }
 
     pub fn set_local(&mut self, i: usize, value: &VVal) {
-        println!("SUBS: {} - {} - {}", self.sp, self.cur_argc, (i + 1));
-        let idx = self.sp - self.cur_argc - (i + 1);
+        let idx = self.sp - (i + 1);
+        println!("SET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
         if let VVal::Ref(r) = &self.args[idx] {
             r.replace(value.clone());
         } else {
@@ -134,7 +177,7 @@ impl Env {
     }
 
     pub fn set_consume(&mut self, i: usize, value: VVal) {
-        let idx = self.sp - self.cur_argc - (i + 1);
+        let idx = self.sp - (i + 1);
         self.args[idx] = value;
     }
 }
@@ -197,12 +240,12 @@ impl VVal {
             VVal::Bol(b) => {
                 if *b {
                     if argc > 0 {
-                        let v = env.at(0).clone();
+                        let v = env.at(1).clone();
                         v.call(env, 0)
                     } else { Ok(VVal::Nul) }
                 } else {
                     if argc > 1 {
-                        let v = env.at(1).clone();
+                        let v = env.at(0).clone();
                         v.call(env, 0)
                     } else { Ok(VVal::Nul) }
                 }
@@ -358,7 +401,9 @@ impl VVal {
     }
 
     pub fn push(&self, val: VVal) -> &VVal {
+        println!("FN PUSH {} v {}", self.s(), val.s());
         if let VVal::Lst(b) = &self {
+            println!("FN ! PUSH {} v {}", self.s(), val.s());
             b.borrow_mut().push(val);
         }
         self

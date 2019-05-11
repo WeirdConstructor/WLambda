@@ -10,10 +10,10 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
-            if let VVal::Flt(_) = args[0] {
-                Ok(VVal::Flt(args.iter().map(|v| v.f()).sum()))
+            if let VVal::Flt(_) = args[args.len() - 1] {
+                Ok(VVal::Flt(args.iter().rev().map(|v| v.f()).sum()))
             } else {
-                Ok(VVal::Int(args.iter().map(|v| v.i()).sum()))
+                Ok(VVal::Int(args.iter().rev().map(|v| v.i()).sum()))
             }
         });
 
@@ -22,11 +22,11 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
-            let f = &args[0];
+            let f = &args[args.len() - 1];
             if let VVal::Flt(_) = f {
-                Ok(VVal::Flt(args.iter().skip(1).fold(f.f(), |a, v| a - v.f())))
+                Ok(VVal::Flt(args.iter().rev().skip(1).fold(f.f(), |a, v| a - v.f())))
             } else {
-                Ok(VVal::Int(args.iter().skip(1).fold(f.i(), |a, v| a - v.i())))
+                Ok(VVal::Int(args.iter().rev().skip(1).fold(f.i(), |a, v| a - v.i())))
             }
         });
 
@@ -35,11 +35,11 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
-            let f = &args[0];
+            let f = &args[args.len() - 1];
             if let VVal::Flt(_) = f {
-                Ok(VVal::Flt(args.iter().skip(1).fold(f.f(), |a, v| a * v.f())))
+                Ok(VVal::Flt(args.iter().rev().skip(1).fold(f.f(), |a, v| a * v.f())))
             } else {
-                Ok(VVal::Int(args.iter().skip(1).fold(f.i(), |a, v| a * v.i())))
+                Ok(VVal::Int(args.iter().rev().skip(1).fold(f.i(), |a, v| a * v.i())))
             }
         });
 
@@ -48,11 +48,11 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
-            let f = &args[0];
+            let f = &args[args.len() - 1];
             if let VVal::Flt(_) = f {
-                Ok(VVal::Flt(args.iter().skip(1).fold(f.f(), |a, v| a / v.f())))
+                Ok(VVal::Flt(args.iter().rev().skip(1).fold(f.f(), |a, v| a / v.f())))
             } else {
-                Ok(VVal::Int(args.iter().skip(1).fold(f.i(), |a, v| a / v.i())))
+                Ok(VVal::Int(args.iter().rev().skip(1).fold(f.i(), |a, v| a / v.i())))
             }
         });
 
@@ -61,7 +61,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
-            Ok(VVal::Bol(args[0].eq(&args[1])))
+            Ok(VVal::Bol(args[1].eq(&args[0])))
         });
 
     g.borrow_mut().add_func(
@@ -77,8 +77,8 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
-            let a = &args[1];
-            let v = args[0].clone();
+            let a = &args[0];
+            let v = args[1].clone();
             v.push(a.clone());
             Ok(v)
         });
@@ -89,10 +89,10 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             if argc <= 3 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
 
-            let from     = args[0].clone();
-            let to       = args[1].clone();
-            let step     = args[2].clone();
-            let f        = args[3].clone();
+            let from     = args[3].clone();
+            let to       = args[2].clone();
+            let step     = args[1].clone();
+            let f        = args[0].clone();
 
             if let VVal::Flt(_) = from {
                 let mut from = from.f();
