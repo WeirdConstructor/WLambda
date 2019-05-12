@@ -27,7 +27,7 @@ fn main() {
     let mut v = String::from("");
     for i in 0..10 {
         let now = Instant::now();
-        v = eval("!:ref x = 0; range 0 1000000 1 { .x = x + 1 }; x");
+        v = eval("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x");
         rts = rts + (now.elapsed().as_millis() as f64);
         cnt = cnt + 1;
     }

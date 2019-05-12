@@ -63,8 +63,8 @@ impl Env {
     }
 
     pub fn reset_bp(&mut self, env_size: usize, oldbp: usize) {
-        println!("RESET BP FROM:");
-        self.dump_stack();
+        //d// println!("RESET BP FROM:");
+        //d// self.dump_stack();
         for i in self.bp..self.sp {
             self.args[i] = VVal::Nul;
         }
@@ -79,7 +79,7 @@ impl Env {
 
     pub fn push_sp(&mut self, n: usize) {
         self.sp = self.sp + n;
-        println!("PUSH_SP {} => {}", n, self.sp);
+        //d// println!("PUSH_SP {} => {}", n, self.sp);
     }
 
     pub fn push(&mut self, v: VVal) -> usize {
@@ -94,12 +94,12 @@ impl Env {
         }
         if n > 0 {
             for i in (self.sp - 1)..((self.sp - n) + 1) {
-                println!("POP[{}] {}", i, self.args[i].s());
+                //d// println!("POP[{}] {}", i, self.args[i].s());
                 self.args[i] = VVal::Nul;
             }
         }
         self.sp = self.sp - n;
-        println!("POPN {} => {}", n, self.sp);
+        //d// println!("POPN {} => {}", n, self.sp);
     }
 
     pub fn dump_stack(&self) {
@@ -151,13 +151,13 @@ impl Env {
     }
 
     pub fn set_arg(&mut self, i: usize, v: VVal) {
-        println!("SET ARG [{}/{}]= {}", i, self.sp - (i + 1), v.s());
+        //d// println!("SET ARG [{}/{}]= {}", i, self.sp - (i + 1), v.s());
         self.args[self.sp - (i + 1)] = v;
     }
 
     pub fn arg(&self, i: usize) -> VVal {
         let v = &self.args[self.bp - (i + 1)];
-        println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
+        //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
         match v {
             VVal::Ref(r)   => r.borrow().clone(),
             VVal::WRef(r)  => r.borrow().clone(),

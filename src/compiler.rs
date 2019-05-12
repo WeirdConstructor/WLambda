@@ -331,7 +331,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     Ok(Box::new(move |e: &mut Env| {
                         let f = func(e)?;
                         let argc = call_args.len();
-                        println!("In Call with argc={}", argc);
+                        //d// println!("In Call with argc={}", argc);
                         e.push_sp(argc);
                         let mut i = 0;
                         for x in call_args.iter() {
@@ -341,8 +341,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                             }
                             i = i + 1;
                         }
-                        println!("ON CALL:");
-                        e.dump_stack();
+                        //d// println!("ON CALL:");
+                        //d// e.dump_stack();
                         let v = f.call(e, argc);
                         e.popn(argc);
                         v
