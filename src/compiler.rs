@@ -21,6 +21,16 @@ struct CompileLocal {
     name:       String,
 }
 
+//pub struct GUA<'a> {
+//    e: &'a mut Env,
+//}
+//
+//impl<'a> Drop for GUA<'a> {
+//    fn drop(&mut self) {
+//        println!("DROPENV!");
+//    }
+//}
+//
 #[derive(Debug, Clone)]
 pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
@@ -35,11 +45,10 @@ impl GlobalEnv {
     // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=94811153fadd511effa306e5369e5b19
     // FnMut: https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=ef42feadce57ac61b63ec7c6dc274b2b
     pub fn add_func<T>(&mut self, fnname: &str, fun: T)
-        where T: 'static + Fn(&Rc<VValFun>, &mut Env, usize) -> Result<VVal,StackAction> {
+        where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
         self.env.insert(
             String::from(fnname),
-            VValFun::new(Rc::new(RefCell::new(fun)),
-                         Vec::new(), 0));
+            VValFun::new(Rc::new(RefCell::new(fun)), Vec::new(), 0));
     }
 
     pub fn new() -> GlobalEnvRef {
@@ -329,23 +338,17 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     let func = call_args.pop().expect("function in evaluation args list");
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let f = func(e)?;
+                        let f    = func(e)?;
                         let argc = call_args.len();
-                        //d// println!("In Call with argc={}", argc);
-                        e.push_sp(argc);
-                        let mut i = 0;
-                        for x in call_args.iter() {
-                            match x(e) {
-                                Ok(v) => { e.set_arg(argc - (i + 1), v); },
-                                err   => { e.popn(argc); return err; }
+                        e.with_pushed_sp(argc, |e: &mut Env| {
+                            let mut i = 0;
+                            for x in call_args.iter() {
+                                let v = x(e)?;
+                                e.set_arg(argc - (i + 1), v);
+                                i = i + 1;
                             }
-                            i = i + 1;
-                        }
-                        //d// println!("ON CALL:");
-                        //d// e.dump_stack();
-                        let v = f.call(e, argc);
-                        e.popn(argc);
-                        v
+                            f.call(e, argc)
+                        })
                     }))
                 },
                 VVal::Syn(Syntax::Func) => {
@@ -353,21 +356,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
 
                     let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
 
-                    let fun_ref = Rc::new(RefCell::new(move |fun: &Rc<VValFun>, env: &mut Env, _argc: usize| {
-                        let old_upv = env.repl_upv(Some(fun.clone()));
+                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
                         //d// println!("FFFFFFFFFFFFFFUUUUUUUUUUUUUUNCALLL");
                         //d// env.dump_stack();
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
-                            match s(env) {
-                                Ok(v) => { res = v; },
-                                e => {
-                                    env.repl_upv(old_upv);
-                                    return e;
-                                }
-                            }
+                            res = s(env)?;
                         }
-                        env.repl_upv(old_upv);
                         Ok(res)
                     }));
 

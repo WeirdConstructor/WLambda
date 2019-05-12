@@ -69,13 +69,21 @@ impl Env {
             self.args[i] = VVal::Nul;
         }
         self.sp = self.sp - env_size;
-        std::mem::replace(&mut self.bp, oldbp);
+        self.bp = oldbp;
     }
 
 //    pub fn reserve_locals(&mut self, env_size: usize) -> usize {
 //        self.sp = self.sp + env_size;
 //        std::mem::replace(&mut self.cur_locals_size, env_size)
 //    }
+//
+    pub fn with_pushed_sp<T>(&mut self, n: usize, f: T) -> Result<VVal, StackAction>
+        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+            self.push_sp(n);
+            let ret = f(self);
+            self.popn(n);
+            ret
+    }
 
     pub fn push_sp(&mut self, n: usize) {
         self.sp = self.sp + n;
@@ -239,7 +247,7 @@ pub enum StackAction {
 }
 
 pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,StackAction>>;
-pub type ClosNodeRef = Rc<RefCell<Fn(&Rc<VValFun>, &mut Env, usize) -> Result<VVal,StackAction>>>;
+pub type ClosNodeRef = Rc<RefCell<Fn(&mut Env, usize) -> Result<VVal,StackAction>>>;
 
 pub struct VValFun {
     pub fun:        ClosNodeRef,
@@ -291,7 +299,9 @@ impl VVal {
         match self {
             VVal::Fun(fu) => {
                 let old_bp = env.set_bp(fu.local_size);
-                let ret = (((*fu).fun.borrow()))(fu, env, argc);
+                let old_upv = env.repl_upv(Some(fu.clone()));
+                let ret = (((*fu).fun.borrow()))(env, argc);
+                env.repl_upv(old_upv);
                 env.reset_bp(fu.local_size, old_bp);
                 ret
             },
@@ -320,10 +330,8 @@ impl VVal {
                 let ret = if argc > 0 {
                     let v = env.arg(0);
                     match v {
-                        VVal::Map(_) => {
-                            let v = v.get_key(&sym);
-                            Ok(if v.is_some() { v.unwrap() } else { VVal::Nul })
-                        },
+                        VVal::Map(_) =>
+                            Ok(v.get_key(&sym).unwrap_or(VVal::Nul)),
                         _ => Ok(VVal::Nul)
                     }
                 } else { Ok(VVal::Nul) };

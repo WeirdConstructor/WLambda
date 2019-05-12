@@ -1,13 +1,12 @@
 use crate::compiler::*;
 use crate::vval::*;
-use std::rc::Rc;
 
 pub fn create_wlamba_prelude() -> GlobalEnvRef {
     let g = GlobalEnv::new();
 
     g.borrow_mut().add_func(
         "+",
-        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
+        |env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             if let VVal::Flt(_) = env.arg(0) {
                 let mut sum = 0.0;
@@ -22,7 +21,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "-",
-        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
+        |env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             if let VVal::Flt(_) = env.arg(0) {
                 let mut sum = env.arg(0).f();
@@ -37,7 +36,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "*",
-        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
+        |env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             if let VVal::Flt(_) = env.arg(0) {
                 let mut sum = env.arg(0).f();
@@ -52,7 +51,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "/",
-        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
+        |env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             if let VVal::Flt(_) = env.arg(0) {
                 let mut sum = env.arg(0).f();
@@ -67,7 +66,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "==",
-        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
+        |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
             println!("EQ: #{} {} {}", argc, env.arg(0).s(), env.arg(1).s());
             env.dump_stack();
@@ -76,14 +75,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "break",
-        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
+        |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
             Err(StackAction::Break(env.arg(0)))
         });
 
     g.borrow_mut().add_func(
         "push",
-        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
+        |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
             let a = env.arg(1);
             let v = env.arg(0);
@@ -95,7 +94,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func(
         "range",
-        |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
+        |env: &mut Env, argc: usize| {
             if argc <= 3 { return Ok(VVal::Nul); }
             let from     = env.arg(0);
             let to       = env.arg(1);
