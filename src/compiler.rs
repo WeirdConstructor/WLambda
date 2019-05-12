@@ -549,6 +549,6 @@ mod tests {
     fn check_break() {
         assert_eq!(eval("4 == 4"), "$true");
         assert_eq!(eval("range 0 10 1 { break 14 }"), "14");
-//        assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
+        assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
     }
 }
