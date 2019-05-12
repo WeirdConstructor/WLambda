@@ -278,6 +278,8 @@ pub enum VVal {
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
     Map(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
     Fun(Rc<VValFun>),
+// TODO:    DropFun(Rc<DropVVal>),
+// struct DropVVal { v: RefCell<VVal>, fun: VValFun, }
     Ref(Rc<RefCell<VVal>>),
     WRef(Rc<RefCell<VVal>>),
     WWRef(Weak<RefCell<VVal>>),
