@@ -80,7 +80,7 @@ impl CompileEnv {
 
     fn def_up(&mut self, s: &str, pos: VarPos) -> usize {
         let next_index = self.upvals.len();
-        println!("NEW UPVALUE {:?} => {}", pos, next_index);
+        //d// println!("NEW UPVALUE {:?} => {}", pos, next_index);
         self.upvals.push(pos);
         self.local_map.insert(String::from(s), VarPos::UpValue(next_index));
         next_index
@@ -188,7 +188,7 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
         "@"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) })) },
         _ => {
             let pos = ce.borrow_mut().get(&s);
-            println!("ACCESS LOCAL: {} => {:?}", s, pos);
+            //d// println!("ACCESS LOCAL: {} => {:?}", s, pos);
             match pos {
                 VarPos::UpValue(i) =>
                     Ok(Box::new(move |e: &mut Env| { Ok(e.get_up(i)) })),
@@ -334,12 +334,15 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     let env_size = CompileEnv::local_env_size(&ce_sub);
                     let fun_ref = Rc::new(RefCell::new(move |fun: &Rc<VValFun>, env: &mut Env, _argc: usize| {
                         let old_upv = env.repl_upv(Some(fun.clone()));
-                        let old_ls = env.reserve_locals(env_size);
+                        let old_ls  = env.reserve_locals(env_size);
+                        //d// println!("FFFFFFFFFFFFFFUUUUUUUUUUUUUUNCALLL");
+                        //d// env.dump_stack();
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
                             match s(env) {
                                 Ok(v) => { res = v; },
                                 e => {
+                                    env.popn(env_size);
                                     env.repl_upv(old_upv);
                                     env.repl_locals_size(old_ls);
                                     return e;
@@ -436,8 +439,8 @@ mod tests {
         assert_eq!(eval("!:ref x = 11; { 12; x }()"),                   "11");
         assert_eq!(eval("!x = 11; { 12; x }()"),                        "11");
         assert_eq!(eval("!x = 13; { .x = 12 }(); { x }() "),            "13");
-//        assert_eq!(eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), x]"),  "[12,12]");
-//        assert_eq!(eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), { .x = 15 }(), x]"), "[12,15,15]");
+        assert_eq!(eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), x]"),  "[12,12]");
+        assert_eq!(eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), { .x = 15 }(), x]"), "[12,15,15]");
         assert_eq!(eval("{ _ } 10"),                        "10");
         assert_eq!(eval("!:ref y = 0; { .y = _ } 10; y"),   "10");
         assert_eq!(eval("${:a: 10, :b: 20}"),               "{a:10,b:20}");
@@ -495,16 +498,14 @@ mod tests {
 
     #[test]
     fn check_range() {
-//        assert_eq!(eval("!:ref x = 10;   range 1 3 1     { .x = x + _ }; x"), "16");
-//        assert_eq!(eval("!:ref x = 10.0; range 1.0 3 0.5 { .x = x + _ }; x"), "20");
+        assert_eq!(eval("!:ref x = 10;   range 1 3 1     { .x = x + _ }; x"), "16");
+        assert_eq!(eval("!:ref x = 10.0; range 1.0 3 0.5 { .x = x + _ }; x"), "20");
     }
 
     #[test]
     fn check_push() {
         assert_eq!(eval("!a = 10; !x = $[1]; !y = 20; x"), "[1]");
-        println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
         assert_eq!(eval("!:ref x = $[]; push x 12; x"), "[12]");
-        println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
         assert_eq!(eval("!a = 10; !x = $[]; !y = 20; push x 10; push x 30; x"), "[10,30]");
         assert_eq!(eval("!:ref x = $[]; push x 10; push x 20; x"), "[10,20]");
     }
@@ -513,6 +514,6 @@ mod tests {
     fn check_break() {
         assert_eq!(eval("4 == 4"), "$true");
         assert_eq!(eval("range 0 10 1 { break 14 }"), "14");
-//        assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
+        assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
     }
 }

@@ -10,6 +10,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
             let args = env.slice(argc);
+            //d// println!("SLICE in PLLLLLLLLLLUUUUUUS: {}", args.len());
             if let VVal::Flt(_) = args[args.len() - 1] {
                 Ok(VVal::Flt(args.iter().rev().map(|v| v.f()).sum()))
             } else {
@@ -93,6 +94,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             let to       = args[2].clone();
             let step     = args[1].clone();
             let f        = args[0].clone();
+            //d// println!("RAGEN from={} to={} f={}", from.s(), to.s(), f.s());
 
             if let VVal::Flt(_) = from {
                 let mut from = from.f();
@@ -101,12 +103,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
                 let mut ret = VVal::Nul;
                 while from <= to {
+                    env.push(VVal::Flt(from));
                     match f.call(env, 0) {
                         Ok(v)                      => { ret = v; },
-                        Err(StackAction::Break(v)) => { return Ok(v); },
+                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
                         //e                          => { return e; },
                     }
                     from += step;
+                    env.popn(1);
                 }
                 Ok(ret)
             } else {
@@ -116,12 +120,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
                 let mut ret = VVal::Nul;
                 while from <= to {
+                    env.push(VVal::Int(from));
                     match f.call(env, 0) {
                         Ok(v)                      => { ret = v; },
-                        Err(StackAction::Break(v)) => { return Ok(v); },
+                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
                         // e                          => { return e; },
                     }
                     from += step;
+                    env.popn(1);
                 }
                 Ok(ret)
             }

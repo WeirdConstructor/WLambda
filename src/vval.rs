@@ -83,26 +83,40 @@ impl Env {
             panic!(format!("Stack pointer underflow {} {}", self.sp, n));
         }
         self.sp = self.sp - n;
-        println!("POPN {} => {}", n, self.sp);
+        //d// println!("POPN {} => {}", n, self.sp);
     }
 
     pub fn dump_stack(&self) {
         let mut i = 0;
+        println!("* SP={}, LS={}", self.sp, self.cur_locals_size);
         for v in self.args.iter() {
             println!("    [{:3}] = {}", i, v.s());
             i = i + 1;
             if i >= self.sp { break; }
         }
+        if let Some(v) = &self.fun {
+            let mut i = 0;
+            for u in v.upvalues.iter() {
+                println!("  UP[{:3}] = {}", i, u.s());
+                i = i + 1;
+            }
+        }
     }
 
     pub fn at(&self, pos: usize) -> &VVal {
-        println!("VAR AT {} - ({} + {} + 1)", self.sp, self.cur_locals_size, pos);
+        //d// println!("VAR AT {} - ({} + {} + 1)", self.sp, self.cur_locals_size, pos);
         &self.args[self.sp - (self.cur_locals_size + pos + 1)]
     }
 
     pub fn slice(&mut self, size: usize) -> &mut [VVal] {
-        println!("SLICE sp={}, locals={} size={}", self.sp, self.cur_locals_size, size);
-        &mut self.args[(self.sp - size)..self.sp]
+        //d// println!("SLICE sp={}, locals={} size={}", self.sp, self.cur_locals_size, size);
+        let sl = &mut self.args[(self.sp - size)..self.sp];
+        let mut i = 0;
+        for s in sl.iter() {
+            //d// println!("    SLICE [{:3}] = {}", i, s.s());
+            i = i + 1;
+        }
+        sl
     }
 
     pub fn argv(&mut self) -> VVal {
@@ -133,18 +147,18 @@ impl Env {
 
     pub fn get_local_raw(&mut self, i: usize) -> VVal {
         let idx = self.sp - (i + 1);
-        println!("GET_LOCAL_RAW [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
-        self.dump_stack();
+        //d// println!("GET_LOCAL_RAW [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
+        //d// self.dump_stack();
         self.args[idx].clone()
     }
 
     pub fn get_local(&mut self, i: usize) -> VVal {
         let idx = self.sp - (i + 1);
-        println!("GET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
-        self.dump_stack();
+        //d// println!("GET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
+        //d// self.dump_stack();
         if let VVal::Ref(r) = &self.args[idx] {
             let rr = r.borrow().clone();
-            println!("GOT: {:?}", rr);
+            //d// println!("GOT: {:?}", rr);
             rr
         } else {
             self.args[idx].clone()
@@ -154,7 +168,7 @@ impl Env {
     pub fn set_up(&mut self, index: usize, value: &VVal) {
         if let Some(v) = self.fun.as_mut() {
             let fun = v.clone();
-            println!("SET_UP [{}] ({})=({})", index, fun.upvalues[index].s(), value.s());
+            //d// println!("SET_UP [{}] ({})=({})", index, fun.upvalues[index].s(), value.s());
             let upv = &fun.upvalues[index];
             if let VVal::Ref(r) = upv {
                 r.replace(value.clone());
@@ -168,7 +182,7 @@ impl Env {
 
     pub fn set_local(&mut self, i: usize, value: &VVal) {
         let idx = self.sp - (i + 1);
-        println!("SET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
+        //d// println!("SET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
         if let VVal::Ref(r) = &self.args[idx] {
             r.replace(value.clone());
         } else {
@@ -238,17 +252,22 @@ impl VVal {
         match self {
             VVal::Fun(fu) => { (((*fu).fun.borrow()))(fu, env, argc) },
             VVal::Bol(b) => {
-                if *b {
+                //d// println!("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOL1");
+                let old_ls = env.reserve_locals(0);
+                //d// env.dump_stack();
+                let ret = if *b {
                     if argc > 0 {
-                        let v = env.at(1).clone();
+                        let v = env.at(0).clone();
                         v.call(env, 0)
                     } else { Ok(VVal::Nul) }
                 } else {
                     if argc > 1 {
-                        let v = env.at(0).clone();
+                        let v = env.at(1).clone();
                         v.call(env, 0)
                     } else { Ok(VVal::Nul) }
-                }
+                };
+                env.repl_locals_size(old_ls);
+                ret
             },
             VVal::Sym(sym) => {
                 if argc > 0 {
@@ -401,9 +420,9 @@ impl VVal {
     }
 
     pub fn push(&self, val: VVal) -> &VVal {
-        println!("FN PUSH {} v {}", self.s(), val.s());
+        //d// println!("FN PUSH {} v {}", self.s(), val.s());
         if let VVal::Lst(b) = &self {
-            println!("FN ! PUSH {} v {}", self.s(), val.s());
+            //d// println!("FN ! PUSH {} v {}", self.s(), val.s());
             b.borrow_mut().push(val);
         }
         self
