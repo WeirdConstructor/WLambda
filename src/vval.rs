@@ -21,6 +21,7 @@ pub enum Syntax {
     Assign,
     Def,
     DefRef,
+    DefWRef,
 }
 
 const STACK_SIZE : usize = 4096;
@@ -33,10 +34,10 @@ pub enum VarPos {
 }
 
 pub struct Env {
-    pub args:               std::vec::Vec<VVal>,
-    pub fun:                Option<Rc<VValFun>>,
-    pub cur_locals_size:    usize,
-    pub sp:                 usize,
+    pub args: std::vec::Vec<VVal>,
+    pub fun:  Option<Rc<VValFun>>,
+    pub bp:   usize,
+    pub sp:   usize,
 }
 
 impl Env {
@@ -44,7 +45,7 @@ impl Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             fun:                None,
-            cur_locals_size:    0,
+            bp:                 0,
             sp:                 0,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
@@ -55,21 +56,30 @@ impl Env {
         std::mem::replace(&mut self.fun, fun)
     }
 
-    pub fn repl_locals_size(&mut self, lss: usize) -> usize {
-        std::mem::replace(&mut self.cur_locals_size, lss)
-    }
-
-    pub fn reserve_locals(&mut self, env_size: usize) -> usize {
+    pub fn set_bp(&mut self, env_size: usize) -> usize {
+        let new_bp = self.sp;
         self.sp = self.sp + env_size;
-        std::mem::replace(&mut self.cur_locals_size, env_size)
+        std::mem::replace(&mut self.bp, new_bp)
     }
 
-    pub fn set_after(&mut self, offs: usize, v: VVal) {
-        self.args[self.sp + offs] = v;
+    pub fn reset_bp(&mut self, env_size: usize, oldbp: usize) {
+        println!("RESET BP FROM:");
+        self.dump_stack();
+        for i in self.bp..self.sp {
+            self.args[i] = VVal::Nul;
+        }
+        self.sp = self.sp - env_size;
+        std::mem::replace(&mut self.bp, oldbp);
     }
+
+//    pub fn reserve_locals(&mut self, env_size: usize) -> usize {
+//        self.sp = self.sp + env_size;
+//        std::mem::replace(&mut self.cur_locals_size, env_size)
+//    }
 
     pub fn push_sp(&mut self, n: usize) {
         self.sp = self.sp + n;
+        println!("PUSH_SP {} => {}", n, self.sp);
     }
 
     pub fn push(&mut self, v: VVal) -> usize {
@@ -82,15 +92,26 @@ impl Env {
         if self.sp < n {
             panic!(format!("Stack pointer underflow {} {}", self.sp, n));
         }
+        if n > 0 {
+            for i in (self.sp - 1)..((self.sp - n) + 1) {
+                println!("POP[{}] {}", i, self.args[i].s());
+                self.args[i] = VVal::Nul;
+            }
+        }
         self.sp = self.sp - n;
-        //d// println!("POPN {} => {}", n, self.sp);
+        println!("POPN {} => {}", n, self.sp);
     }
 
     pub fn dump_stack(&self) {
         let mut i = 0;
-        println!("* SP={}, LS={}", self.sp, self.cur_locals_size);
+        println!("* SP={}, BP={}", self.sp, self.bp);
+        for il in self.bp..self.sp {
+            println!("    LOCAL [{:3}] = {}", i, self.args[il].s());
+            i = i + 1;
+        }
+        i = 0;
         for v in self.args.iter() {
-            println!("    [{:3}] = {}", i, v.s());
+            println!("    GLOBL [{:3}] = {}", i, v.s());
             i = i + 1;
             if i >= self.sp { break; }
         }
@@ -101,22 +122,6 @@ impl Env {
                 i = i + 1;
             }
         }
-    }
-
-    pub fn at(&self, pos: usize) -> &VVal {
-        //d// println!("VAR AT {} - ({} + {} + 1)", self.sp, self.cur_locals_size, pos);
-        &self.args[self.sp - (self.cur_locals_size + pos + 1)]
-    }
-
-    pub fn slice(&mut self, size: usize) -> &mut [VVal] {
-        //d// println!("SLICE sp={}, locals={} size={}", self.sp, self.cur_locals_size, size);
-        let sl = &mut self.args[(self.sp - size)..self.sp];
-        let mut i = 0;
-        for s in sl.iter() {
-            //d// println!("    SLICE [{:3}] = {}", i, s.s());
-            i = i + 1;
-        }
-        sl
     }
 
     pub fn argv(&mut self) -> VVal {
@@ -145,23 +150,38 @@ impl Env {
         }
     }
 
+    pub fn set_arg(&mut self, i: usize, v: VVal) {
+        println!("SET ARG [{}/{}]= {}", i, self.sp - (i + 1), v.s());
+        self.args[self.sp - (i + 1)] = v;
+    }
+
+    pub fn arg(&self, i: usize) -> VVal {
+        let v = &self.args[self.bp - (i + 1)];
+        println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
+        match v {
+            VVal::Ref(r)   => r.borrow().clone(),
+            VVal::WRef(r)  => r.borrow().clone(),
+            VVal::WWRef(r) => if let Some(v) = r.upgrade() { v.borrow().clone() } else { VVal::Nul },
+            v              => v.clone(),
+        }
+    }
+
     pub fn get_local_raw(&mut self, i: usize) -> VVal {
-        let idx = self.sp - (i + 1);
+        let idx = self.bp + i;
         //d// println!("GET_LOCAL_RAW [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
         //d// self.dump_stack();
         self.args[idx].clone()
     }
 
     pub fn get_local(&mut self, i: usize) -> VVal {
-        let idx = self.sp - (i + 1);
+        let idx = self.bp + i;
         //d// println!("GET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
         //d// self.dump_stack();
-        if let VVal::Ref(r) = &self.args[idx] {
-            let rr = r.borrow().clone();
-            //d// println!("GOT: {:?}", rr);
-            rr
-        } else {
-            self.args[idx].clone()
+        match &self.args[idx] {
+            VVal::Ref(r)   => r.borrow().clone(),
+            VVal::WRef(r)  => r.borrow().clone(),
+            VVal::WWRef(r) => if let Some(v) = r.upgrade() { v.borrow().clone() } else { VVal::Nul },
+            v              => v.clone(),
         }
     }
 
@@ -170,28 +190,44 @@ impl Env {
             let fun = v.clone();
             //d// println!("SET_UP [{}] ({})=({})", index, fun.upvalues[index].s(), value.s());
             let upv = &fun.upvalues[index];
-            if let VVal::Ref(r) = upv {
-                r.replace(value.clone());
-                return;
+
+            match upv {
+                VVal::Ref(r)   => { r.replace(value.clone()); }
+                VVal::WRef(r)  => { r.replace(value.clone()); }
+                VVal::WWRef(r) => {
+                    if let Some(r) = Weak::upgrade(r) {
+                        r.replace(value.clone());
+                    }
+                },
+                _ => {}
             }
             // Will not mutate non ref upvalue!
             // panic!(format!("Cannot mutate a non ref upvalue {} = {}", index, value.s()));
             // But also not panic here.
+            return;
         }
     }
 
     pub fn set_local(&mut self, i: usize, value: &VVal) {
-        let idx = self.sp - (i + 1);
+        let idx = self.bp + i;
         //d// println!("SET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
-        if let VVal::Ref(r) = &self.args[idx] {
-            r.replace(value.clone());
-        } else {
-            self.args[idx] = value.clone();
+        //
+        match &self.args[idx] {
+            VVal::Ref(r)   => { r.replace(value.clone()); }
+            VVal::WRef(r)  => { r.replace(value.clone()); }
+            VVal::WWRef(r) => {
+                if let Some(r) = Weak::upgrade(r) {
+                    r.replace(value.clone());
+                }
+            },
+            _ => {
+                self.args[idx] = value.clone();
+            }
         }
     }
 
     pub fn set_consume(&mut self, i: usize, value: VVal) {
-        let idx = self.sp - (i + 1);
+        let idx = self.bp + i;
         self.args[idx] = value;
     }
 }
@@ -208,13 +244,15 @@ pub type ClosNodeRef = Rc<RefCell<Fn(&Rc<VValFun>, &mut Env, usize) -> Result<VV
 pub struct VValFun {
     pub fun:        ClosNodeRef,
     pub upvalues:   std::vec::Vec<VVal>,
+    pub local_size: usize,
 }
 
 impl VValFun {
-    pub fn new(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>) -> VVal {
+    pub fn new(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalues:   upvalues,
             fun:        fun,
+            local_size: env_size,
         }))
     }
 }
@@ -233,7 +271,8 @@ pub enum VVal {
     Map(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
     Fun(Rc<VValFun>),
     Ref(Rc<RefCell<VVal>>),
-    WRef(Weak<RefCell<VVal>>),
+    WRef(Rc<RefCell<VVal>>),
+    WWRef(Weak<RefCell<VVal>>),
 }
 
 impl std::fmt::Debug for VValFun {
@@ -250,28 +289,36 @@ impl VVal {
 
     pub fn call(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         match self {
-            VVal::Fun(fu) => { (((*fu).fun.borrow()))(fu, env, argc) },
+            VVal::Fun(fu) => {
+                let old_bp = env.set_bp(fu.local_size);
+                let ret = (((*fu).fun.borrow()))(fu, env, argc);
+                env.reset_bp(fu.local_size, old_bp);
+                ret
+            },
             VVal::Bol(b) => {
                 //d// println!("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOL1");
-                let old_ls = env.reserve_locals(0);
+                // let old_ls = env.reserve_locals(0);
+                let old_bp = env.set_bp(0);
                 //d// env.dump_stack();
                 let ret = if *b {
                     if argc > 0 {
-                        let v = env.at(0).clone();
+                        let v = env.arg(0).clone();
                         v.call(env, 0)
                     } else { Ok(VVal::Nul) }
                 } else {
                     if argc > 1 {
-                        let v = env.at(1).clone();
+                        let v = env.arg(1).clone();
                         v.call(env, 0)
                     } else { Ok(VVal::Nul) }
                 };
-                env.repl_locals_size(old_ls);
+                env.reset_bp(0, old_bp);
+                // env.repl_locals_size(old_ls);
                 ret
             },
             VVal::Sym(sym) => {
-                if argc > 0 {
-                    let v = env.at(0);
+                let old_bp = env.set_bp(0);
+                let ret = if argc > 0 {
+                    let v = env.arg(0);
                     match v {
                         VVal::Map(_) => {
                             let v = v.get_key(&sym);
@@ -279,7 +326,9 @@ impl VVal {
                         },
                         _ => Ok(VVal::Nul)
                     }
-                } else { Ok(VVal::Nul) }
+                } else { Ok(VVal::Nul) };
+                env.reset_bp(0, old_bp);
+                ret
             },
             _ => { Ok(VVal::Nul) },
         }
@@ -289,18 +338,22 @@ impl VVal {
         VVal::Ref(Rc::new(RefCell::new(self.clone())))
     }
 
+    pub fn to_wref(&mut self) -> VVal {
+        VVal::WRef(Rc::new(RefCell::new(self.clone())))
+    }
+
     pub fn downgrade(&mut self) -> Option<VVal> {
-        if let VVal::Ref(f) = &self {
-            Some(VVal::WRef(Rc::downgrade(f)))
+        if let VVal::WRef(f) = &self {
+            Some(VVal::WWRef(Rc::downgrade(f)))
         } else {
             None
         }
     }
 
     pub fn upgrade(&mut self) -> Option<VVal> {
-        if let VVal::WRef(f) = &self {
+        if let VVal::WWRef(f) = &self {
             if let Some(r) = Weak::upgrade(f) {
-                Some(VVal::Ref(r))
+                Some(VVal::WRef(r))
             } else {
                 None
             }
@@ -321,6 +374,7 @@ impl VVal {
         match self {
             VVal::Nul     => { if let VVal::Nul = v { return true; } else { return false; } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { return ia == ib; } else { return false; } },
+            VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return ia == ib; } else { return false; } },
             _             => { return false; }
         }
     }
@@ -449,7 +503,8 @@ impl VVal {
             VVal::Map(l)  => l.borrow().len() as f64,
             VVal::Fun(_)  => 1.0,
             VVal::Ref(l)  => (*l).borrow().f(),
-            VVal::WRef(l) => {
+            VVal::WRef(l) => (*l).borrow().f(),
+            VVal::WWRef(l) => {
                 match l.upgrade() {
                     Some(v) => v.borrow().f(),
                     None => 0.0,
@@ -471,7 +526,8 @@ impl VVal {
             VVal::Map(l)  => l.borrow().len() as i64,
             VVal::Fun(_)  => 1,
             VVal::Ref(l)  => (*l).borrow().i(),
-            VVal::WRef(l) => {
+            VVal::WRef(l) => (*l).borrow().i(),
+            VVal::WWRef(l) => {
                 match l.upgrade() {
                     Some(v) => v.borrow().i(),
                     None => 0,
@@ -494,10 +550,11 @@ impl VVal {
             VVal::Fun(_)  => format!("&VValFun"),
 //            VVal::TMap((t,_l))  => format!("${}{{}}", t), // VVal::dump_map_as_str(l),
             VVal::Ref(l)  => format!("REF[{}]", (*l).borrow().s()),
-            VVal::WRef(l) => {
+            VVal::WRef(l) => format!("wREF[{}]", (*l).borrow().s()),
+            VVal::WWRef(l) => {
                 match l.upgrade() {
                     Some(v) => format!("WREF[{}]", v.borrow().s()),
-                    None => String::from("<deadref>"),
+                    None => format!("$n"),
                 }
             },
         }

@@ -39,7 +39,7 @@ impl GlobalEnv {
         self.env.insert(
             String::from(fnname),
             VValFun::new(Rc::new(RefCell::new(fun)),
-                         Vec::new()));
+                         Vec::new(), 0));
     }
 
     pub fn new() -> GlobalEnvRef {
@@ -99,11 +99,14 @@ impl CompileEnv {
 
     fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
         for p in self.upvals.iter() {
-            let v = match p {
+            let mut v = match p {
                 VarPos::UpValue(i) => e.get_up_raw(*i),
                 VarPos::Local(i)   => e.get_local_raw(*i),
                 VarPos::NoPos      => VVal::Nul,
             };
+            if let VVal::WRef(_) = v {
+                v = v.downgrade().unwrap_or(VVal::Nul);
+            }
             upvalues.push(v.clone());
         }
     }
@@ -175,16 +178,16 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
     match &s[..] {
         // FIXME: Check argc vs. variable access, otherwise we will certainly
         //        get access outside the stack!
-        "_"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(0).clone()) })) },
-        "_1" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(1).clone()) })) },
-        "_2" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(2).clone()) })) },
-        "_3" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(3).clone()) })) },
-        "_4" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(4).clone()) })) },
-        "_5" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(5).clone()) })) },
-        "_6" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(6).clone()) })) },
-        "_7" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(7).clone()) })) },
-        "_8" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(8).clone()) })) },
-        "_9" => { Ok(Box::new(move |e: &mut Env| { Ok(e.at(9).clone()) })) },
+        "_"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0).clone()) })) },
+        "_1" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1).clone()) })) },
+        "_2" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2).clone()) })) },
+        "_3" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3).clone()) })) },
+        "_4" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4).clone()) })) },
+        "_5" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5).clone()) })) },
+        "_6" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6).clone()) })) },
+        "_7" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7).clone()) })) },
+        "_8" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8).clone()) })) },
+        "_9" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9).clone()) })) },
         "@"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) })) },
         _ => {
             let pos = ce.borrow_mut().get(&s);
@@ -210,18 +213,26 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
     }
 }
 
-fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) -> Result<EvalNode, String> {
+fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_ref: bool) -> Result<EvalNode, String> {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
     let cv      = compile(&value, ce)?;
     let idx     = ce.borrow_mut().def(&vars.at(0).unwrap().s_raw());
 
     if is_ref {
-        Ok(Box::new(move |e: &mut Env| {
-            let mut v = cv(e)?;
-            e.set_consume(idx, (&mut v).to_ref());
-            Ok(v)
-        }))
+        if weak_ref {
+            Ok(Box::new(move |e: &mut Env| {
+                let mut v = cv(e)?;
+                e.set_consume(idx, (&mut v).to_wref());
+                Ok(v)
+            }))
+        } else {
+            Ok(Box::new(move |e: &mut Env| {
+                let mut v = cv(e)?;
+                e.set_consume(idx, (&mut v).to_ref());
+                Ok(v)
+            }))
+        }
     } else {
         Ok(Box::new(move |e: &mut Env| {
             let v = cv(e)?;
@@ -264,8 +275,9 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
             match ast.at(0).unwrap() {
                 VVal::Syn(Syntax::Block)  => { compile_block(ast, ce)       },
                 VVal::Syn(Syntax::Var)    => { compile_var(ast, ce)         },
-                VVal::Syn(Syntax::Def)    => { compile_def(ast, ce, false)  },
-                VVal::Syn(Syntax::DefRef) => { compile_def(ast, ce, true)   },
+                VVal::Syn(Syntax::Def)    => { compile_def(ast, ce, false, false)  },
+                VVal::Syn(Syntax::DefRef) => { compile_def(ast, ce, true, false)   },
+                VVal::Syn(Syntax::DefWRef)=> { compile_def(ast, ce, true, true)    },
                 VVal::Syn(Syntax::Assign) => { compile_assign(ast, ce)      },
                 VVal::Syn(Syntax::Key)    => {
                     let sym = ast.at(1).unwrap();
@@ -318,11 +330,21 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
 
                     Ok(Box::new(move |e: &mut Env| {
                         let f = func(e)?;
+                        let argc = call_args.len();
+                        println!("In Call with argc={}", argc);
+                        e.push_sp(argc);
                         let mut i = 0;
-                        for x in call_args.iter() { let v = x(e)?; e.set_after(i, v); i = i + 1; }
-                        e.push_sp(i);
-                        let v = f.call(e, call_args.len());
-                        e.popn(call_args.len());
+                        for x in call_args.iter() {
+                            match x(e) {
+                                Ok(v) => { e.set_arg(argc - (i + 1), v); },
+                                err   => { e.popn(argc); return err; }
+                            }
+                            i = i + 1;
+                        }
+                        println!("ON CALL:");
+                        e.dump_stack();
+                        let v = f.call(e, argc);
+                        e.popn(argc);
                         v
                     }))
                 },
@@ -331,10 +353,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
 
                     let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
 
-                    let env_size = CompileEnv::local_env_size(&ce_sub);
                     let fun_ref = Rc::new(RefCell::new(move |fun: &Rc<VValFun>, env: &mut Env, _argc: usize| {
                         let old_upv = env.repl_upv(Some(fun.clone()));
-                        let old_ls  = env.reserve_locals(env_size);
                         //d// println!("FFFFFFFFFFFFFFUUUUUUUUUUUUUUNCALLL");
                         //d// env.dump_stack();
                         let mut res = VVal::Nul;
@@ -342,23 +362,20 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                             match s(env) {
                                 Ok(v) => { res = v; },
                                 e => {
-                                    env.popn(env_size);
                                     env.repl_upv(old_upv);
-                                    env.repl_locals_size(old_ls);
                                     return e;
                                 }
                             }
                         }
-                        env.popn(env_size);
                         env.repl_upv(old_upv);
-                        env.repl_locals_size(old_ls);
                         Ok(res)
                     }));
 
+                    let env_size = CompileEnv::local_env_size(&ce_sub);
                     Ok(Box::new(move |e: &mut Env| {
                         let mut v = Vec::new();
                         ce_sub.borrow_mut().copy_upvals(e, &mut v);
-                        Ok(VValFun::new(fun_ref.clone(), v))
+                        Ok(VValFun::new(fun_ref.clone(), v, env_size))
                     }))
                 },
                 _ => { Err(format!("bad input: {}", ast.s())) }
@@ -394,7 +411,7 @@ pub fn eval(s: &str) -> String {
                     let mut e = Env::new_s();
                     e.push(VVal::Flt(42.42)); // 2nd arg
                     e.push(VVal::Int(13));    // 1st arg
-                    e.reserve_locals(CompileEnv::local_env_size(&ce));
+                    e.set_bp(CompileEnv::local_env_size(&ce));
 
                     match r(&mut e) {
                         Ok(v)   => { v.s() },
@@ -453,9 +470,25 @@ mod tests {
     }
 
     #[test]
+    fn check_ref_closures() {
+        assert_eq!(eval("!c1 = { !:ref a = 1.2; { a } }; c1()()"),  "1.2");
+        assert_eq!(eval("!c1 = { !:wref a = 1.2; { a } }; c1()()"), "$n");
+        assert_eq!(eval("!c1 = { !:wref a = 1.2; { a }() }; c1()"), "$n");
+        assert_eq!(eval("!:wref outer_a = 2.3; !c1 = { !:ref a = 1.2; { a + outer_a } }; c1()()"), "3.5");
+        assert_eq!(eval("!:wref outer_a = 2.3; !c1 = { !:wref a = 1.2; { outer_a + a } }; c1()()"), "2.3");
+    }
+
+    #[test]
     fn check_arithmetics() {
         assert_eq!(eval("12 + 23"),         "35");
-        assert_eq!(eval("12.12 + 23.23"),   "35.35");
+        assert_eq!(eval("+(12, 23)"),       "35");
+        assert_eq!(eval("+ 12 23"),         "35");
+        assert_eq!(eval("+ 12 ~ - 24 23"),  "13");
+        assert_eq!(eval("[+ 12 ~ - 24 23] + 1"),    "14");
+        assert_eq!(eval("[12 + 1] == 13"),          "$true");
+        assert_eq!(eval("[+ 12 ~ - 24 23] == 13"),  "$true");
+        assert_eq!(eval("[+ 12 ~ - 24 23] == 14"),  "$false");
+        assert_eq!(eval("12.12 + 23.23"),           "35.35");
 
         // coertion of strings and keys to numbers:
         assert_eq!(eval(":10 + :20"),       "30");
@@ -498,6 +531,8 @@ mod tests {
 
     #[test]
     fn check_range() {
+        assert_eq!(eval("!:ref x = 10; { .x = x + _ } 5"),                    "15");
+        assert_eq!(eval("!:ref x = 10; { .x = { x + 11 + _ }(2) + _ } 5"),    "28");
         assert_eq!(eval("!:ref x = 10;   range 1 3 1     { .x = x + _ }; x"), "16");
         assert_eq!(eval("!:ref x = 10.0; range 1.0 3 0.5 { .x = x + _ }; x"), "20");
     }
@@ -514,6 +549,6 @@ mod tests {
     fn check_break() {
         assert_eq!(eval("4 == 4"), "$true");
         assert_eq!(eval("range 0 10 1 { break 14 }"), "14");
-        assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
+//        assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
     }
 }

@@ -380,8 +380,22 @@ pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
 
     let c = ps.peek().unwrap();
     let sign = match c {
-        '-' => { ps.consume(); -1 },
-        '+' => { ps.consume();  1 },
+        '-' => {
+            ps.consume();
+            if !ps.peek().unwrap_or(' ').is_digit(10) {
+                ps.skip_ws_and_comments();
+                return Ok(make_var("-"));
+            }
+            -1
+        },
+        '+' => {
+            ps.consume();
+            if !ps.peek().unwrap_or(' ').is_digit(10) {
+                ps.skip_ws_and_comments();
+                return Ok(make_var("+"));
+            }
+            1
+        },
         _   => 1
     };
 
@@ -881,6 +895,9 @@ pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, Strin
             if key == "ref" {
                 assign = VVal::vec();
                 assign.push(VVal::Syn(Syntax::DefRef));
+            } else if key == "wref" {
+                assign = VVal::vec();
+                assign.push(VVal::Syn(Syntax::DefWRef));
             }
         }
     }
@@ -1079,6 +1096,14 @@ mod tests {
 
     #[test]
     fn check_identifier() {
+        assert_eq!(parse("+"),          "[&Block,[&Var,$\"+\"]]");
+        assert_eq!(parse("-"),          "[&Block,[&Var,$\"-\"]]");
+        assert_eq!(parse("+ 10 20"),    "[&Block,[&Call,[&Var,$\"+\"],10,20]]");
+        assert_eq!(parse("13 + 10 20"), "[&Block,[&Call,[&Call,[&Var,$\"+\"],13,10],20]]");
+        assert_eq!(parse("13 + 10 == 23"),
+                                        "[&Block,[&Call,[&Var,$\"==\"],[&Call,[&Var,$\"+\"],13,10],23]]");
+        assert_eq!(parse("[+ 12 ~ - 24 23] == 13"),
+           "[&Block,[&Call,[&Var,$\"==\"],[&Call,[&Var,$\"+\"],12,[&Call,[&Var,$\"-\"],24,23]],13]]");
         assert_eq!(parse("_"),          "[&Block,[&Var,$\"_\"]]");
         assert_eq!(parse("ten"),        "[&Block,[&Var,$\"ten\"]]");
         assert_eq!(parse("tenäß foo"),  "[&Block,[&Call,[&Var,$\"tenäß\"],[&Var,$\"foo\"]]]");

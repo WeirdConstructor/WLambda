@@ -9,12 +9,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         "+",
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
-            let args = env.slice(argc);
-            //d// println!("SLICE in PLLLLLLLLLLUUUUUUS: {}", args.len());
-            if let VVal::Flt(_) = args[args.len() - 1] {
-                Ok(VVal::Flt(args.iter().rev().map(|v| v.f()).sum()))
+            if let VVal::Flt(_) = env.arg(0) {
+                let mut sum = 0.0;
+                for i in 0..argc { sum = sum + env.arg(i).f() }
+                Ok(VVal::Flt(sum))
             } else {
-                Ok(VVal::Int(args.iter().rev().map(|v| v.i()).sum()))
+                let mut sum = 0;
+                for i in 0..argc { sum = sum + env.arg(i).i() }
+                Ok(VVal::Int(sum))
             }
         });
 
@@ -22,12 +24,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         "-",
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
-            let args = env.slice(argc);
-            let f = &args[args.len() - 1];
-            if let VVal::Flt(_) = f {
-                Ok(VVal::Flt(args.iter().rev().skip(1).fold(f.f(), |a, v| a - v.f())))
+            if let VVal::Flt(_) = env.arg(0) {
+                let mut sum = env.arg(0).f();
+                for i in 1..argc { sum = sum - env.arg(i).f() }
+                Ok(VVal::Flt(sum))
             } else {
-                Ok(VVal::Int(args.iter().rev().skip(1).fold(f.i(), |a, v| a - v.i())))
+                let mut sum = env.arg(0).i();
+                for i in 1..argc { sum = sum - env.arg(i).i() }
+                Ok(VVal::Int(sum))
             }
         });
 
@@ -35,12 +39,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         "*",
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
-            let args = env.slice(argc);
-            let f = &args[args.len() - 1];
-            if let VVal::Flt(_) = f {
-                Ok(VVal::Flt(args.iter().rev().skip(1).fold(f.f(), |a, v| a * v.f())))
+            if let VVal::Flt(_) = env.arg(0) {
+                let mut sum = env.arg(0).f();
+                for i in 1..argc { sum = sum * env.arg(i).f() }
+                Ok(VVal::Flt(sum))
             } else {
-                Ok(VVal::Int(args.iter().rev().skip(1).fold(f.i(), |a, v| a * v.i())))
+                let mut sum = env.arg(0).i();
+                for i in 1..argc { sum = sum * env.arg(i).i() }
+                Ok(VVal::Int(sum))
             }
         });
 
@@ -48,39 +54,42 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         "/",
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 0 { return Ok(VVal::Nul); }
-            let args = env.slice(argc);
-            let f = &args[args.len() - 1];
-            if let VVal::Flt(_) = f {
-                Ok(VVal::Flt(args.iter().rev().skip(1).fold(f.f(), |a, v| a / v.f())))
+            if let VVal::Flt(_) = env.arg(0) {
+                let mut sum = env.arg(0).f();
+                for i in 1..argc { sum = sum / env.arg(i).f() }
+                Ok(VVal::Flt(sum))
             } else {
-                Ok(VVal::Int(args.iter().rev().skip(1).fold(f.i(), |a, v| a / v.i())))
+                let mut sum = env.arg(0).i();
+                for i in 1..argc { sum = sum / env.arg(i).i() }
+                Ok(VVal::Int(sum))
             }
         });
 
     g.borrow_mut().add_func(
         "==",
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
-            if argc <= 0 { return Ok(VVal::Nul); }
-            let args = env.slice(argc);
-            Ok(VVal::Bol(args[1].eq(&args[0])))
+            if argc < 2 { return Ok(VVal::Nul); }
+            println!("EQ: #{} {} {}", argc, env.arg(0).s(), env.arg(1).s());
+            env.dump_stack();
+            Ok(VVal::Bol(env.arg(1).eq(&env.arg(0))))
         });
 
     g.borrow_mut().add_func(
         "break",
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
-            let args = env.slice(argc);
-            Err(StackAction::Break(args[0].clone()))
+            Err(StackAction::Break(env.arg(0)))
         });
 
     g.borrow_mut().add_func(
         "push",
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
-            let args = env.slice(argc);
-            let a = &args[0];
-            let v = args[1].clone();
-            v.push(a.clone());
+            let a = env.arg(1);
+            let v = env.arg(0);
+            println!("PUSH:");
+            env.dump_stack();
+            v.push(a);
             Ok(v)
         });
 
@@ -88,13 +97,11 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         "range",
         |_: &Rc<VValFun>, env: &mut Env, argc: usize| {
             if argc <= 3 { return Ok(VVal::Nul); }
-            let args = env.slice(argc);
-
-            let from     = args[3].clone();
-            let to       = args[2].clone();
-            let step     = args[1].clone();
-            let f        = args[0].clone();
-            //d// println!("RAGEN from={} to={} f={}", from.s(), to.s(), f.s());
+            let from     = env.arg(0);
+            let to       = env.arg(1);
+            let step     = env.arg(2);
+            let f        = env.arg(3);
+            println!("RAGEN from={} to={} f={}", from.s(), to.s(), f.s());
 
             if let VVal::Flt(_) = from {
                 let mut from = from.f();
@@ -104,7 +111,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 let mut ret = VVal::Nul;
                 while from <= to {
                     env.push(VVal::Flt(from));
-                    match f.call(env, 0) {
+                    match f.call(env, 1) {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
                         //e                          => { return e; },
@@ -121,9 +128,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 let mut ret = VVal::Nul;
                 while from <= to {
                     env.push(VVal::Int(from));
-                    match f.call(env, 0) {
+                    match f.call(env, 1) {
                         Ok(v)                      => { ret = v; },
-                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
+                        Err(StackAction::Break(v)) => { env.popn(1); println!("BREAK {}", v.s()); return Ok(v); },
                         // e                          => { return e; },
                     }
                     from += step;
