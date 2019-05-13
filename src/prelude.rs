@@ -83,6 +83,13 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         });
 
     g.borrow_mut().add_func(
+        "next",
+        |_env: &mut Env, argc: usize| {
+            if argc < 1 { return Err(StackAction::Next); }
+            Err(StackAction::Next)
+        });
+
+    g.borrow_mut().add_func(
         "push",
         |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
@@ -113,6 +120,29 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         });
 
     g.borrow_mut().add_func(
+        "while",
+        |env: &mut Env, argc: usize| {
+            if argc < 2 { return Ok(VVal::Nul); }
+            let test = env.arg(0);
+            let f    = env.arg(1);
+
+            let mut ret = VVal::Nul;
+            loop {
+                match test.call(env, 0) {
+                    Ok(v)                      => { if !v.b() { return Ok(ret); } },
+                    Err(StackAction::Break(v)) => { return Ok(v); },
+                    Err(StackAction::Next)     => { continue; },
+                }
+
+                match f.call(env, 0) {
+                    Ok(v)                      => { ret = v; },
+                    Err(StackAction::Break(v)) => { return Ok(v); },
+                    Err(StackAction::Next)     => { },
+                }
+            }
+        });
+
+    g.borrow_mut().add_func(
         "range",
         |env: &mut Env, argc: usize| {
             if argc <= 3 { return Ok(VVal::Nul); }
@@ -128,11 +158,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 let step     = step.f();
 
                 let mut ret = VVal::Nul;
+                #[allow(unused_must_use)]
                 while from <= to {
+                    ret = VVal::Nul;
                     env.push(VVal::Flt(from));
                     match f.call(env, 1) {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
+                        Err(StackAction::Next)     => { },
                         //e                          => { return e; },
                     }
                     from += step;
@@ -145,11 +178,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 let step     = step.i();
 
                 let mut ret = VVal::Nul;
+                #[allow(unused_must_use)]
                 while from <= to {
+                    ret = VVal::Nul;
                     env.push(VVal::Int(from));
                     match f.call(env, 1) {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { env.popn(1); println!("BREAK {}", v.s()); return Ok(v); },
+                        Err(StackAction::Next)     => { },
                         // e                          => { return e; },
                     }
                     from += step;

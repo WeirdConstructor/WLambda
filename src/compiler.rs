@@ -545,10 +545,47 @@ mod tests {
     }
 
     #[test]
-    fn check_break() {
+    fn check_range_break() {
         assert_eq!(eval("4 == 4"), "$true");
         assert_eq!(eval("range 0 10 1 { break 14 }"), "14");
         assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
+    }
+
+    #[test]
+    fn check_range_next() {
+        assert_eq!(eval("!:ref x = 0; range 0 10 1 { [_ == 4] { next() }; .x = x + _; }; x"), "51");
+        assert_eq!(eval("!:ref x = 0; range 0 10 1 { next(); .x = x + _; }; x"), "0");
+    }
+
+    #[test]
+    fn check_while() {
+        assert_eq!(eval(r#"
+            !:ref x = 0;
+            while { x == 0 } {
+                .x = x + 1;
+            };
+            x
+        "#),
+        "1");
+
+        assert_eq!(eval(r#"
+            !:ref x = 0;
+            while { x == 0 } {
+                break 10;
+                .x = x + 1;
+            }
+        "#),
+        "10");
+
+        assert_eq!(eval(r#"
+            !:ref x = 0;
+            while { x == 0 } {
+                next;
+                .x = x + 1;
+            };
+            x
+        "#),
+        "1");
     }
 
     #[test]

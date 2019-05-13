@@ -261,6 +261,7 @@ impl Env {
 pub enum StackAction {
 //    Panic(String),
     Break(VVal),
+    Next,
 }
 
 pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,StackAction>>;
@@ -626,6 +627,31 @@ impl VVal {
                 match l.upgrade() {
                     Some(v) => v.borrow().i(),
                     None => 0,
+                }
+            },
+        }
+    }
+
+    pub fn b(&self) -> bool {
+        match self {
+            VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0) != 0,
+            VVal::Byt(s)     => (if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 }) != 0,
+            VVal::Nul        => false,
+            VVal::Bol(b)     => *b,
+            VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0) != 0,
+            VVal::Syn(s)     => (s.clone() as i64) != 0,
+            VVal::Int(i)     => (*i) != 0,
+            VVal::Flt(f)     => (*f as i64) != 0,
+            VVal::Lst(l)     => (l.borrow().len() as i64) != 0,
+            VVal::Map(l)     => (l.borrow().len() as i64) != 0,
+            VVal::Fun(_)     => true,
+            VVal::DropFun(f) => f.v.i() != 0,
+            VVal::Ref(l)     => (*l).borrow().i() != 0,
+            VVal::WRef(l)    => (*l).borrow().i() != 0,
+            VVal::WWRef(l)   => {
+                match l.upgrade() {
+                    Some(v) => v.borrow().i() != 0,
+                    None => false,
                 }
             },
         }
