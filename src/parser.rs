@@ -147,7 +147,7 @@ Thoughts about cyclic referencing
 
 Callable objects:
 
-    let my_cond = {
+    !my_cond = {
         let :ref self = ${ inner_val: #t };
         { apply self->inner_val @ }
     }()
@@ -157,6 +157,25 @@ Callable objects:
     } { # else
         println "INNER VALUE IS FALSE!"
     }
+
+Prototyped inheritance:
+
+    !proto = ${ print: { println _ }, };
+    !o = to_obj { _proto_: proto };
+    o.print(123);
+
+    # MetaMap(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
+    # => invokes _proto_ lookup on field access (not write)
+
+Tagged values:
+    !tag = 123;
+    !v = tag 10 tag;
+    !fun = { println("not tagged!") };
+    .fun = add_tag fun tag { println("tagged with 123"); }
+    fun(v); # prints "tagged with 123"
+    fun(10); # prints "not tagged!"
+
+    # TagFun(Rc<RefCell<std::collections::HashMap<String, Rc<VValFun>>>>),
 */
 
 #[allow(dead_code)]
