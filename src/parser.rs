@@ -486,7 +486,7 @@ fn parse_vec(ps: &mut ParseState) -> Result<VVal, String> {
 }
 
 fn parse_map(ps: &mut ParseState) -> Result<VVal, String> {
-    println!("parse_map [{}]", ps.rest());
+    //println!("parse_map [{}]", ps.rest());
     if !ps.consume_if_eq_wsc('{') { return Err(String::from("Expected '{'")); }
 
     let map = VVal::vec();
@@ -609,7 +609,7 @@ pub fn parse_identifier(ps: &mut ParseState) -> String {
 }
 
 pub fn parse_value(ps: &mut ParseState) -> Result<VVal, String> {
-    println!("parse_value [{}]", ps.rest());
+    //println!("parse_value [{}]", ps.rest());
     if let Some(c) = ps.peek() {
         match c {
             '0' ... '9' | '+' | '-' => parse_num(ps),
@@ -763,11 +763,11 @@ pub fn parse_binop(mut left: VVal, ps: &mut ParseState, op: &str) -> Result<VVal
 }
 
 pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Result<VVal, String> {
-    println!("parse_call [{}]", ps.rest());
+    //println!("parse_call [{}]", ps.rest());
     let mut res_call = VVal::Nul;
 
     while let Some(c) = ps.peek() {
-        println!("PC c={}", c);
+        //println!("PC c={}", c);
         let op = ps.peek_op();
         match c {
             '(' => {
@@ -831,7 +831,7 @@ pub fn parse_expr(ps: &mut ParseState) -> Result<VVal, String> {
 }
 
 pub fn parse_call_expr(ps: &mut ParseState, no_pipe: bool, binop_mode: bool) -> Result<VVal, String> {
-    println!("parse_expr [{}] np={}", ps.rest(), no_pipe);
+    //println!("parse_expr [{}] np={}", ps.rest(), no_pipe);
     let value = parse_value(ps)?;
 
     // look ahead, if we see an expression delimiter.
@@ -938,7 +938,7 @@ pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, Strin
 }
 
 pub fn parse_stmt(ps: &mut ParseState) -> Result<VVal, String> {
-    println!("parse_stmt [{}]", ps.rest());
+    //println!("parse_stmt [{}]", ps.rest());
     match ps.peek() {
         Some(c) => {
             match c {
@@ -953,7 +953,7 @@ pub fn parse_stmt(ps: &mut ParseState) -> Result<VVal, String> {
 }
 
 pub fn parse_block(ps: &mut ParseState, is_delimited: bool) -> Result<VVal, String> {
-    println!("parse_block [{}]", ps.rest());
+    //println!("parse_block [{}]", ps.rest());
     if is_delimited {
         if !ps.consume_if_eq_wsc('{') { return Err(String::from("Expected '{' for block")); }
     }

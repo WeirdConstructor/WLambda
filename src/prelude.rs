@@ -1,5 +1,7 @@
 use crate::compiler::*;
 use crate::vval::*;
+use std::rc::Rc;
+//use std::cell::RefCell;
 
 pub fn create_wlamba_prelude() -> GlobalEnvRef {
     let g = GlobalEnv::new();
@@ -92,6 +94,25 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         });
 
     g.borrow_mut().add_func(
+        "yay",
+        |env: &mut Env, argc: usize| {
+            if argc < 1 { println!("YOOOY"); return Ok(VVal::Nul); }
+            println!("YAAAAY {}", env.arg(0).s());
+            env.dump_stack();
+            Ok(VVal::Nul)
+        });
+
+    g.borrow_mut().add_func(
+        "to_drop",
+        |env: &mut Env, argc: usize| {
+            if argc < 2 { return Ok(VVal::Nul); }
+            let f = env.arg(1);
+            let v = env.arg(0);
+
+            Ok(VVal::DropFun(Rc::new(DropVVal { v: v, fun: f, })))
+        });
+
+    g.borrow_mut().add_func(
         "range",
         |env: &mut Env, argc: usize| {
             if argc <= 3 { return Ok(VVal::Nul); }
@@ -99,7 +120,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             let to       = env.arg(1);
             let step     = env.arg(2);
             let f        = env.arg(3);
-            println!("RAGEN from={} to={} f={}", from.s(), to.s(), f.s());
+            //println!("RAGEN from={} to={} f={}", from.s(), to.s(), f.s());
 
             if let VVal::Flt(_) = from {
                 let mut from = from.f();

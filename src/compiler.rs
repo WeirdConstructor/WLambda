@@ -113,6 +113,7 @@ impl CompileEnv {
                 VarPos::Local(i)   => e.get_local_raw(*i),
                 VarPos::NoPos      => VVal::Nul,
             };
+            //d// println!("COPY AN UPVAL! {:?}({})", p, v.s());
             if let VVal::WRef(_) = v {
                 v = v.downgrade().unwrap_or(VVal::Nul);
             }
@@ -174,6 +175,7 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
     Ok(Box::new(move |e: &mut Env| {
         let mut res = VVal::Nul;
         for x in exprs.iter() {
+//            res = VVal::Nul;
             res = x(e)?;
         }
         Ok(res)
@@ -276,7 +278,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
 }
 
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
-    println!("compile {}", ast.s());
+//    println!("compile {}", ast.s());
     match ast {
         VVal::Lst(_l) => {
             match ast.at(0).unwrap() {
@@ -359,6 +361,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         //d// env.dump_stack();
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
+//                            res = VVal::Nul;
                             res = s(env)?;
                         }
                         Ok(res)
@@ -551,5 +554,17 @@ mod tests {
         assert_eq!(eval("{ $[_, _1, _2] }(1, 2, 3)"),       "[1,2,3]");
         assert_eq!(eval("{ @ }(1, 2, 3)"),                  "[1,2,3]");
         assert_eq!(eval("{ $[_, _1, _2, _3] }(1, 2, 3)"),   "[1,2,3,$n]");
+    }
+
+    #[test]
+    fn check_to_drop() {
+        assert_eq!(eval("!:ref x = 1; { .x = 2; }(); x"), "2");
+        assert_eq!(eval("!:ref x = 1; { !d = { .x = 2; }; d }()(); x"), "2");
+        assert_eq!(eval(r#"
+            !:ref x = 0;
+            { !d = to_drop 10 { .x = 17; } }();
+            x
+        "#),
+        "17");
     }
 }
