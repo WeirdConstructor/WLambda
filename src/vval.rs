@@ -303,8 +303,9 @@ impl Drop for DropVVal {
 pub enum VVal {
     Nul,
     Bol(bool),
-    Str(String),
     Sym(String),
+    Str(Rc<RefCell<String>>),
+//    Byt(Rc<RefCell<Vec<u8>>>),
     Syn(Syntax),
     Int(i64),
     Flt(f64),
@@ -346,6 +347,10 @@ pub fn format_vval_str(s: &str) -> String {
 
 #[allow(dead_code)]
 impl VVal {
+    pub fn new_str(s: &str) -> VVal {
+        VVal::Str(Rc::new(RefCell::new(String::from(s))))
+    }
+
     pub fn vec() -> VVal {
         return VVal::Lst(Rc::new(RefCell::new(Vec::new())));
     }
@@ -551,7 +556,7 @@ impl VVal {
 
     pub fn s_raw(&self) -> String {
         match self {
-            VVal::Str(s)  => s.clone(),
+            VVal::Str(s)  => s.borrow().clone(),
             VVal::Sym(s)  => s.clone(),
             _             => String::from(""),
         }
@@ -559,7 +564,7 @@ impl VVal {
 
     pub fn f(&self) -> f64 {
         match self {
-            VVal::Str(s)     => s.parse::<f64>().unwrap_or(0.0),
+            VVal::Str(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
             VVal::Nul        => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
             VVal::Sym(s)     => s.parse::<f64>().unwrap_or(0.0),
@@ -583,7 +588,7 @@ impl VVal {
 
     pub fn i(&self) -> i64 {
         match self {
-            VVal::Str(s)     => s.parse::<i64>().unwrap_or(0),
+            VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
             VVal::Nul        => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
             VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0),
@@ -607,7 +612,7 @@ impl VVal {
 
     pub fn s(&self) -> String {
         match self {
-            VVal::Str(s)     => format_vval_str(&s),
+            VVal::Str(s)     => format_vval_str(&s.borrow()),
             VVal::Nul        => format!("$n"),
             VVal::Bol(b)     => if *b { format!("$true") } else { format!("$false") },
             VVal::Sym(s)     => format!("$\"{}\"", s),

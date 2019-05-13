@@ -402,7 +402,7 @@ impl ParseState {
 ////    let k = it.peek().unwrap();
 ////    println!("FO: {:?}", k);
 //}
-pub fn parse_string(ps: &mut ParseState) -> Result<VVal, String> {
+pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String> {
     if ps.at_eof { return Err(String::from("EOF, expected string")); }
 
     ps.consume_if_eq('"');
@@ -411,6 +411,7 @@ pub fn parse_string(ps: &mut ParseState) -> Result<VVal, String> {
     vec.push(VVal::Syn(Syntax::Str));
 
     let mut s = String::from("");
+    let mut v : Vec<u8> = Vec::new();
 
     while ps.peek().unwrap_or('"') != '"' {
         let c = ps.peek().unwrap();
@@ -473,7 +474,7 @@ pub fn parse_string(ps: &mut ParseState) -> Result<VVal, String> {
         }
     }
 
-    vec.push(VVal::Str(s));
+    vec.push(VVal::new_str(&s));
 
     if !ps.consume_if_eq('"') { return Err(String::from("Expected '\"'")); }
 
@@ -718,7 +719,7 @@ pub fn parse_value(ps: &mut ParseState) -> Result<VVal, String> {
     if let Some(c) = ps.peek() {
         match c {
             '0' ... '9' | '+' | '-' => parse_num(ps),
-            '"' => parse_string(ps),
+            '"' => parse_string(ps, false),
             '$' => { ps.consume_wsc(); parse_primitive(ps) },
             '[' => {
                 ps.consume_wsc();
