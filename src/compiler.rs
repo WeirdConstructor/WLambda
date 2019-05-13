@@ -172,6 +172,7 @@ impl CompileEnv {
 fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
     let exprs : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
 
+    #[allow(unused_assignments)]
     Ok(Box::new(move |e: &mut Env| {
         let mut res = VVal::Nul;
         for x in exprs.iter() {
@@ -356,6 +357,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
 
                     let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
 
+                    #[allow(unused_assignments)]
                     let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
                         //d// println!("FFFFFFFFFFFFFFUUUUUUUUUUUUUUNCALLL");
                         //d// env.dump_stack();

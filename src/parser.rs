@@ -192,6 +192,15 @@ pub struct ParseState {
 impl ParseState {
     pub fn peek(&self) -> Option<char> { if self.at_eof { None } else { Some(self.peek_char) } }
 
+    pub fn peek4(&self) -> Option<String> {
+        if self.chars.len() > 3 {
+            let s : String = self.chars[0..4].iter().collect();
+            Some(s)
+        } else {
+            None
+        }
+    }
+
     pub fn peek2(&self) -> Option<String> {
         if self.chars.len() > 1 {
             let s : String = self.chars[0..2].iter().collect();
@@ -393,9 +402,86 @@ impl ParseState {
 ////    let k = it.peek().unwrap();
 ////    println!("FO: {:?}", k);
 //}
+pub fn parse_string(ps: &mut ParseState) -> Result<VVal, String> {
+    if ps.at_eof { return Err(String::from("EOF, expected string")); }
+
+    ps.consume_if_eq('"');
+
+    let vec = VVal::vec();
+    vec.push(VVal::Syn(Syntax::Str));
+
+    let mut s = String::from("");
+
+    while ps.peek().unwrap_or('"') != '"' {
+        let c = ps.peek().unwrap();
+        match c {
+            '\\' => {
+                ps.consume();
+                if let Some(c) = ps.peek() {
+                    match c {
+                        'x' => {
+                            ps.consume();
+                            let hex = ps.peek2();
+                            if let Some(h) = hex {
+                                ps.consume();
+                                ps.consume();
+                                if let Ok(cn) = u8::from_str_radix(&h, 16) {
+                                    s.push(cn as char);
+                                } else {
+                                    return Err(String::from("Bad hex escape in string"));
+                                }
+                            } else {
+                                return Err(String::from("EOF in string hex escape"));
+                            }
+                        },
+                        'n'  => { ps.consume(); s.push('\n'); },
+                        'r'  => { ps.consume(); s.push('\r'); },
+                        't'  => { ps.consume(); s.push('\t'); },
+                        '\\' => { ps.consume(); s.push('\\'); },
+                        '0'  => { ps.consume(); s.push('\0'); },
+                        '\'' => { ps.consume(); s.push('\''); },
+                        '"'  => { ps.consume(); s.push('"'); },
+                        'u' => {
+                            ps.consume();
+                            if !ps.consume_if_eq('{') {
+                                return Err(String::from("Expected '{' after unicode escape"));
+                            }
+
+                            let uh : String = ps.take_while(|c| c.is_digit(16)).iter().collect();
+
+                            if let Ok(cn) = u32::from_str_radix(&uh, 16) {
+                                if let Some(c) = std::char::from_u32(cn) {
+                                    s.push(c);
+                                } else {
+                                    return Err(String::from("Bad char in unicode escape in string"));
+                                }
+                            } else {
+                                return Err(String::from("Bad unicode hex escape in string"));
+                            }
+
+                            if !ps.consume_if_eq('}') {
+                                return Err(String::from("Expected '}' after unicode escape"));
+                            }
+                        },
+                        c => { ps.consume(); s.push(c); },
+                    }
+                } else {
+                    return Err(String::from("EOF in string escape"));
+                }
+            },
+            _ => { ps.consume(); s.push(c); },
+        }
+    }
+
+    vec.push(VVal::Str(s));
+
+    if !ps.consume_if_eq('"') { return Err(String::from("Expected '\"'")); }
+
+    Ok(vec)
+}
 
 pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
-    if ps.at_eof { return Err(String::from("EOF, expected num")); }
+    if ps.at_eof { return Err(String::from("EOF, expected number")); }
 
     let c = ps.peek().unwrap();
     let sign = match c {
@@ -632,6 +718,7 @@ pub fn parse_value(ps: &mut ParseState) -> Result<VVal, String> {
     if let Some(c) = ps.peek() {
         match c {
             '0' ... '9' | '+' | '-' => parse_num(ps),
+            '"' => parse_string(ps),
             '$' => { ps.consume_wsc(); parse_primitive(ps) },
             '[' => {
                 ps.consume_wsc();
@@ -1178,5 +1265,19 @@ mod tests {
     fn check_map() {
         assert_eq!(parse("${a:10}"),   "[&Block,[&Map,[[&Var,$\"a\"],10]]]");
         assert_eq!(parse("${:a:10}"),  "[&Block,[&Map,[[&Key,$\"a\"],10]]]");
+    }
+
+    #[test]
+    fn check_str() {
+        assert_eq!(parse("\"foo\""),       "[&Block,[&Str,\"foo\"]]");
+        assert_eq!(parse("\"fo\0o\""),     "[&Block,[&Str,\"fo\\0o\"]]");
+        assert_eq!(parse("\"fo\no\""),     "[&Block,[&Str,\"fo\\no\"]]");
+        assert_eq!(parse("\"fo\ro\""),     "[&Block,[&Str,\"fo\\ro\"]]");
+        assert_eq!(parse("\"fo\\\"o\""),   "[&Block,[&Str,\"fo\\\"o\"]]");
+        assert_eq!(parse("\"fo\x05o\""),  "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
+        assert_eq!(parse("\"fo\x05o\\u{9f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
+        assert_eq!(parse("\"fo\x05o\\u{0009f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
+        assert_eq!(parse("\"fo\x05o\\u{09f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
+        assert_eq!(parse("\"fo\x05o\\u{2400}\""), "[&Block,[&Str,\"fo\\x05o␀\"]]");
     }
 }

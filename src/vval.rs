@@ -12,6 +12,7 @@ pub enum Syntax {
     Var,
     Key,
     SetKey,
+    Str,
     Lst,
     Map,
     Expr,
@@ -322,6 +323,27 @@ impl std::fmt::Debug for VValFun {
     }
 }
 
+pub fn format_vval_str(s: &str) -> String {
+    let mut v : Vec<String> = s.chars().map(|c| {
+        match c {
+            '\\' => { String::from("\\\\") },
+            '\n' => { String::from("\\n")  },
+            '\t' => { String::from("\\t")  },
+            '\r' => { String::from("\\r")  },
+            '\0' => { String::from("\\0")  },
+            '\'' => { String::from("\\'")  },
+            '\"' => { String::from("\\\"") },
+            _ if c.is_ascii_control() => { format!("\\x{:02x}", c as u32) },
+            _ if c.is_control() => { c.escape_unicode().to_string() },
+            _ => { format!("{}", c) }
+
+        }
+    }).collect();
+    v.insert(0, String::from("\""));
+    v.push(String::from("\""));
+    v.concat()
+}
+
 #[allow(dead_code)]
 impl VVal {
     pub fn vec() -> VVal {
@@ -585,7 +607,7 @@ impl VVal {
 
     pub fn s(&self) -> String {
         match self {
-            VVal::Str(s)     => s.clone(),
+            VVal::Str(s)     => format_vval_str(&s),
             VVal::Nul        => format!("$n"),
             VVal::Bol(b)     => if *b { format!("$true") } else { format!("$false") },
             VVal::Sym(s)     => format!("$\"{}\"", s),
