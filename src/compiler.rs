@@ -175,7 +175,7 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
     Ok(Box::new(move |e: &mut Env| {
         let mut res = VVal::Nul;
         for x in exprs.iter() {
-//            res = VVal::Nul;
+            res = VVal::Nul;
             res = x(e)?;
         }
         Ok(res)
@@ -361,7 +361,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         //d// env.dump_stack();
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
-//                            res = VVal::Nul;
+                            res = VVal::Nul;
                             res = s(env)?;
                         }
                         Ok(res)
