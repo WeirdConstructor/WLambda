@@ -305,7 +305,7 @@ pub enum VVal {
     Bol(bool),
     Sym(String),
     Str(Rc<RefCell<String>>),
-//    Byt(Rc<RefCell<Vec<u8>>>),
+    Byt(Rc<RefCell<Vec<u8>>>),
     Syn(Syntax),
     Int(i64),
     Flt(f64),
@@ -324,7 +324,7 @@ impl std::fmt::Debug for VValFun {
     }
 }
 
-pub fn format_vval_str(s: &str) -> String {
+pub fn format_vval_str(s: &str, narrow_ascii: bool) -> String {
     let mut v : Vec<String> = s.chars().map(|c| {
         match c {
             '\\' => { String::from("\\\\") },
@@ -334,8 +334,15 @@ pub fn format_vval_str(s: &str) -> String {
             '\0' => { String::from("\\0")  },
             '\'' => { String::from("\\'")  },
             '\"' => { String::from("\\\"") },
-            _ if c.is_ascii_control() => { format!("\\x{:02x}", c as u32) },
-            _ if c.is_control() => { c.escape_unicode().to_string() },
+            _ if narrow_ascii
+                 && c.is_ascii()
+                 && (c.is_ascii_alphanumeric()
+                     || c.is_ascii_graphic()
+                     || c.is_ascii_punctuation()
+                     || c == ' ') => { format!("{}", c) },
+            _ if narrow_ascii => { format!("\\x{:02X}", c as u32) },
+            _ if !narrow_ascii && c.is_ascii_control() => { format!("\\x{:02x}", c as u32) },
+            _ if !narrow_ascii && c.is_control() => { c.escape_unicode().to_string() },
             _ => { format!("{}", c) }
 
         }
@@ -345,10 +352,22 @@ pub fn format_vval_str(s: &str) -> String {
     v.concat()
 }
 
+pub fn format_vval_byt(v: &Vec<u8>) -> String {
+    let mut s = String::from("");
+    for b in v.iter() {
+        s.push(*b as char);
+    }
+    format_vval_str(&s, true)
+}
+
 #[allow(dead_code)]
 impl VVal {
     pub fn new_str(s: &str) -> VVal {
         VVal::Str(Rc::new(RefCell::new(String::from(s))))
+    }
+
+    pub fn new_byt(v: Vec<u8>) -> VVal {
+        VVal::Byt(Rc::new(RefCell::new(v)))
     }
 
     pub fn vec() -> VVal {
@@ -565,6 +584,7 @@ impl VVal {
     pub fn f(&self) -> f64 {
         match self {
             VVal::Str(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
+            VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as f64 } else { 0.0 },
             VVal::Nul        => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
             VVal::Sym(s)     => s.parse::<f64>().unwrap_or(0.0),
@@ -589,6 +609,7 @@ impl VVal {
     pub fn i(&self) -> i64 {
         match self {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
+            VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 },
             VVal::Nul        => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
             VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0),
@@ -612,7 +633,8 @@ impl VVal {
 
     pub fn s(&self) -> String {
         match self {
-            VVal::Str(s)     => format_vval_str(&s.borrow()),
+            VVal::Str(s)     => format_vval_str(&s.borrow(), false),
+            VVal::Byt(s)     => format!("$b{}", format_vval_byt(&s.borrow())),
             VVal::Nul        => format!("$n"),
             VVal::Bol(b)     => if *b { format!("$true") } else { format!("$false") },
             VVal::Sym(s)     => format!("$\"{}\"", s),

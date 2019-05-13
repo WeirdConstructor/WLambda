@@ -398,6 +398,22 @@ impl ParseState {
     }
 }
 
+fn add_c_to_vec(v: &mut Vec<u8>, c: char) {
+    if c.is_ascii() {
+        v.push((c as u32) as u8);
+    } else {
+        let mut b = [0; 4];
+        for cb in c.encode_utf8(&mut b).as_bytes().iter() {
+            v.push(*cb);
+        }
+    }
+}
+
+fn adchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
+    if b { add_c_to_vec(v, c); }
+    else { s.push(c); }
+}
+
 //pub fn read_int(it: &mut TE) {
 ////    let k = it.peek().unwrap();
 ////    println!("FO: {:?}", k);
@@ -427,7 +443,8 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
                                 ps.consume();
                                 ps.consume();
                                 if let Ok(cn) = u8::from_str_radix(&h, 16) {
-                                    s.push(cn as char);
+                                    if byte_str { v.push(cn) }
+                                    else { s.push(cn as char); }
                                 } else {
                                     return Err(String::from("Bad hex escape in string"));
                                 }
@@ -435,13 +452,13 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
                                 return Err(String::from("EOF in string hex escape"));
                             }
                         },
-                        'n'  => { ps.consume(); s.push('\n'); },
-                        'r'  => { ps.consume(); s.push('\r'); },
-                        't'  => { ps.consume(); s.push('\t'); },
-                        '\\' => { ps.consume(); s.push('\\'); },
-                        '0'  => { ps.consume(); s.push('\0'); },
-                        '\'' => { ps.consume(); s.push('\''); },
-                        '"'  => { ps.consume(); s.push('"'); },
+                        'n'  => { ps.consume(); adchr(&mut v, &mut s, byte_str, '\n'); },
+                        'r'  => { ps.consume(); adchr(&mut v, &mut s, byte_str, '\r'); },
+                        't'  => { ps.consume(); adchr(&mut v, &mut s, byte_str, '\t'); },
+                        '\\' => { ps.consume(); adchr(&mut v, &mut s, byte_str, '\\'); },
+                        '0'  => { ps.consume(); adchr(&mut v, &mut s, byte_str, '\0'); },
+                        '\'' => { ps.consume(); adchr(&mut v, &mut s, byte_str, '\''); },
+                        '"'  => { ps.consume(); adchr(&mut v, &mut s, byte_str, '"'); },
                         'u' => {
                             ps.consume();
                             if !ps.consume_if_eq('{') {
@@ -452,7 +469,7 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
 
                             if let Ok(cn) = u32::from_str_radix(&uh, 16) {
                                 if let Some(c) = std::char::from_u32(cn) {
-                                    s.push(c);
+                                    adchr(&mut v, &mut s, byte_str, c);
                                 } else {
                                     return Err(String::from("Bad char in unicode escape in string"));
                                 }
@@ -464,17 +481,24 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
                                 return Err(String::from("Expected '}' after unicode escape"));
                             }
                         },
-                        c => { ps.consume(); s.push(c); },
+                        c => { ps.consume(); adchr(&mut v, &mut s, byte_str, c); },
                     }
                 } else {
                     return Err(String::from("EOF in string escape"));
                 }
             },
-            _ => { ps.consume(); s.push(c); },
+            _ => {
+                ps.consume();
+                adchr(&mut v, &mut s, byte_str, c);
+            },
         }
     }
 
-    vec.push(VVal::new_str(&s));
+    if byte_str {
+        vec.push(VVal::new_byt(v));
+    } else {
+        vec.push(VVal::new_str(&s));
+    }
 
     if !ps.consume_if_eq('"') { return Err(String::from("Expected '\"'")); }
 
@@ -624,6 +648,7 @@ fn parse_primitive(ps: &mut ParseState) -> Result<VVal, String> {
     let c = ps.peek().unwrap();
 
     match c {
+        'b' => { ps.consume(); parse_string(ps, true) },
         '[' => parse_vec(ps),
         '{' => parse_map(ps),
         'n' => {
@@ -1280,5 +1305,8 @@ mod tests {
         assert_eq!(parse("\"fo\x05o\\u{0009f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
         assert_eq!(parse("\"fo\x05o\\u{09f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
         assert_eq!(parse("\"fo\x05o\\u{2400}\""), "[&Block,[&Str,\"fo\\x05o␀\"]]");
+
+        assert_eq!(parse("$b\"\\u{2400}\""), "[&Block,[&Str,$b\"\\xE2\\x90\\x80\"]]");
+        assert_eq!(parse("$b\"\\x00\\xFF\\xEB\""), "[&Block,[&Str,$b\"\\0\\xFF\\xEB\"]]");
     }
 }
