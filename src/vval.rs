@@ -38,6 +38,7 @@ pub struct Env {
     pub fun:  Option<Rc<VValFun>>,
     pub bp:   usize,
     pub sp:   usize,
+    pub argc: usize,
 }
 
 impl Env {
@@ -47,13 +48,10 @@ impl Env {
             fun:                None,
             bp:                 0,
             sp:                 0,
+            argc:               0,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
-    }
-
-    pub fn repl_upv(&mut self, fun: Option<Rc<VValFun>>) -> Option<Rc<VValFun>> {
-        std::mem::replace(&mut self.fun, fun)
     }
 
     pub fn set_bp(&mut self, env_size: usize) -> usize {
@@ -76,13 +74,30 @@ impl Env {
 //        self.sp = self.sp + env_size;
 //        std::mem::replace(&mut self.cur_locals_size, env_size)
 //    }
-//
+
+
+    pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
+        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+        let old_argc = std::mem::replace(&mut self.argc, argc);
+        let old_bp   = self.set_bp(fu.local_size);
+        let old_fun  = std::mem::replace(&mut self.fun, Some(fu.clone()));
+
+        let ret = f(self);
+
+        self.reset_bp(fu.local_size, old_bp);
+        self.fun  = old_fun;
+        self.argc = old_argc;
+
+        ret
+    }
+
     pub fn with_pushed_sp<T>(&mut self, n: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
-            self.push_sp(n);
-            let ret = f(self);
-            self.popn(n);
-            ret
+
+        self.push_sp(n);
+        let ret = f(self);
+        self.popn(n);
+        ret
     }
 
     pub fn push_sp(&mut self, n: usize) {
@@ -133,9 +148,7 @@ impl Env {
     }
 
     pub fn argv(&mut self) -> VVal {
-        let v = VVal::vec();
-        for i in 0..self.sp { v.push(self.args[i].clone()); }
-        v
+        VVal::vec_from(&self.args[(self.sp - self.argc)..self.sp])
     }
 
     pub fn get_up_raw(&mut self, i: usize) -> VVal {
@@ -164,6 +177,7 @@ impl Env {
     }
 
     pub fn arg(&self, i: usize) -> VVal {
+        if i >= self.argc { return VVal::Nul; }
         let v = &self.args[self.bp - (i + 1)];
         //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
         match v {
@@ -297,15 +311,19 @@ impl VVal {
         return VVal::Lst(Rc::new(RefCell::new(Vec::new())));
     }
 
+    pub fn vec_from(vl: &[VVal]) -> VVal {
+        let mut v = Vec::new();
+        v.extend_from_slice(vl);
+        v.reverse();
+        VVal::Lst(Rc::new(RefCell::new(v)))
+    }
+
     pub fn call(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         match self {
             VVal::Fun(fu) => {
-                let old_bp = env.set_bp(fu.local_size);
-                let old_upv = env.repl_upv(Some(fu.clone()));
-                let ret = (((*fu).fun.borrow()))(env, argc);
-                env.repl_upv(old_upv);
-                env.reset_bp(fu.local_size, old_bp);
-                ret
+                env.with_fun_info(fu.clone(), argc, |e: &mut Env| {
+                    (((*fu).fun.borrow()))(e, argc)
+                })
             },
             VVal::Bol(b) => {
                 //d// println!("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOL1");

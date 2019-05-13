@@ -185,8 +185,6 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
 
     let s = var.s_raw();
     match &s[..] {
-        // FIXME: Check argc vs. variable access, otherwise we will certainly
-        //        get access outside the stack!
         "_"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0).clone()) })) },
         "_1" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1).clone()) })) },
         "_2" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2).clone()) })) },
@@ -406,6 +404,7 @@ pub fn eval(s: &str) -> String {
                     let mut e = Env::new_s();
                     e.push(VVal::Flt(42.42)); // 2nd arg
                     e.push(VVal::Int(13));    // 1st arg
+                    e.argc = 2;
                     e.set_bp(CompileEnv::local_env_size(&ce));
 
                     match r(&mut e) {
@@ -438,7 +437,7 @@ mod tests {
     fn check_trivial() {
         assert_eq!(eval("_"),                       "13");          // XXX: in test env
         assert_eq!(eval("_1"),                      "42.42");       // XXX: in test env
-        assert_eq!(eval("@"),                       "[42.42,13]");  // XXX: in test env
+        assert_eq!(eval("@"),                       "[13,42.42]");  // XXX: in test env
 
         assert_eq!(eval("$n"), "$n");
         assert_eq!(eval("10"), "10");
@@ -545,5 +544,12 @@ mod tests {
         assert_eq!(eval("4 == 4"), "$true");
         assert_eq!(eval("range 0 10 1 { break 14 }"), "14");
         assert_eq!(eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
+    }
+
+    #[test]
+    fn check_args() {
+        assert_eq!(eval("{ $[_, _1, _2] }(1, 2, 3)"),       "[1,2,3]");
+        assert_eq!(eval("{ @ }(1, 2, 3)"),                  "[1,2,3]");
+        assert_eq!(eval("{ $[_, _1, _2, _3] }(1, 2, 3)"),   "[1,2,3,$n]");
     }
 }

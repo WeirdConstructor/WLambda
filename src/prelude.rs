@@ -77,19 +77,18 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         "break",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
-            Err(StackAction::Break(env.arg(0)))
+            Err(StackAction::Break(env.arg(0).clone()))
         });
 
     g.borrow_mut().add_func(
         "push",
         |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
-            let a = env.arg(1);
             let v = env.arg(0);
-            println!("PUSH:");
-            env.dump_stack();
-            v.push(a);
-            Ok(v)
+            // println!("PUSH:");
+            // env.dump_stack();
+            v.push(env.arg(1).clone());
+            Ok(v.clone())
         });
 
     g.borrow_mut().add_func(
