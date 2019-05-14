@@ -12,6 +12,7 @@ use crate::vval::StackAction;
 use crate::vval::VarPos;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::time::Instant;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
@@ -396,38 +397,62 @@ fn mk(s: &str) -> ParseState {
     ParseState::new(s, 1)
 }
 
-pub fn eval(s: &str) -> String {
-    let global = create_wlamba_prelude();
-
+pub fn parse(s: &str) -> VVal {
     let mut ps = mk(s);
     match parse_block(&mut ps, false) {
-        Ok(v)  =>  {
-            let mut ce = Rc::new(RefCell::new(CompileEnv {
-                parent:    None,
-                global:    global,
-                local_map: std::collections::HashMap::new(),
-                locals:    Vec::new(),
-                upvals:    Vec::new(),
-            }));
-            let prog = compile(&v, &mut ce);
-            match prog {
-                Ok(r) => {
-                    let mut e = Env::new_s();
-                    e.push(VVal::Flt(42.42)); // 2nd arg
-                    e.push(VVal::Int(13));    // 1st arg
-                    e.argc = 2;
-                    e.set_bp(CompileEnv::local_env_size(&ce));
+        Ok(v) => v,
+        Err(e) => { panic!(format!("PARSE ERROR: {:?} at '{}' with input '{}'", e, ps.rest(), s)); },
+    }
+}
 
+pub fn eval_tree(v: VVal, g: GlobalEnvRef, runs: u32) -> String {
+    let mut ce = Rc::new(RefCell::new(CompileEnv {
+        parent:    None,
+        global:    g,
+        local_map: std::collections::HashMap::new(),
+        locals:    Vec::new(),
+        upvals:    Vec::new(),
+    }));
+
+    let prog = compile(&v, &mut ce);
+    match prog {
+        Ok(r) => {
+            let mut e = Env::new_s();
+            e.push(VVal::Flt(42.42)); // 2nd arg
+            e.push(VVal::Int(13));    // 1st arg
+            e.argc = 2;
+            e.set_bp(CompileEnv::local_env_size(&ce));
+
+            if runs > 1 {
+                let mut ret = String::from("");
+                let mut rts = 0.0;
+                let mut cnt = 0;
+                for _ in 0..runs {
+                    let now = Instant::now();
                     match r(&mut e) {
-                        Ok(v)   => { v.s() },
+                        Ok(v)   => { ret = v.s() },
                         Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
                     }
-                },
-                Err(re) => { panic!(format!("COMPILE ERROR: {}", re)); },
+                    rts = rts + (now.elapsed().as_millis() as f64);
+                    cnt = cnt + 1;
+                }
+                println!("*** runtime: {} ({} runs)", rts / (cnt as f64), cnt);
+                ret
+            } else {
+                match r(&mut e) {
+                    Ok(v)   => { v.s() },
+                    Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
+                }
             }
-        }
-        Err(e) => { panic!(format!("PARSE ERROR: {} at '{}' with input '{}'", e, ps.rest(), s)); },
+        },
+        Err(re) => { panic!(format!("COMPILE ERROR: {}", re)); },
     }
+}
+
+pub fn eval(s: &str) -> String {
+    let global = create_wlamba_prelude();
+    let v = parse(s);
+    eval_tree(v, global, 1)
 }
 
 

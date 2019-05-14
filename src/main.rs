@@ -6,6 +6,7 @@ mod parser;
 mod compiler;
 mod prelude;
 use compiler::*; // ParseState;
+use crate::prelude::*;
 use std::time::Instant;
 
 //use std::iter::Peekable;
@@ -18,16 +19,12 @@ pub enum BAL {
 }
 
 fn main() {
-    let mut rts = 0.0;
-    let mut cnt = 0;
     let mut v = String::from("");
-    for _ in 0..5 {
-        let now = Instant::now();
-        v = eval("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x");
-        rts = rts + (now.elapsed().as_millis() as f64);
-        cnt = cnt + 1;
-    }
-    println!("*** runtime: {} ({} runs)", rts / (cnt as f64), cnt);
+
+    let pt = compiler::parse("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x");
+    let global = create_wlamba_prelude();
+
+    v = compiler::eval_tree(pt, global, 2);
     println!("> {:?}", v);
 }
 

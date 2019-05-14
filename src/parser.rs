@@ -190,8 +190,42 @@ pub struct ParseState {
     at_eof:     bool,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParseError {
+    UnexpectedToken((String, String, u32, u32, u32)),
+    BadEscape(      (String, String, u32, u32, u32)),
+    BadValue(       (String, String, u32, u32, u32)),
+    BadNumber(      (String, String, u32, u32, u32)),
+    EOF(            (String, String, u32, u32, u32)),
+    BadCall(        (String, String, u32, u32, u32)),
+}
+
 #[allow(dead_code)]
 impl ParseState {
+    pub fn err_unexpected_token(&self, c: char, s: &str) -> Result<VVal,ParseError> {
+        Err(ParseError::UnexpectedToken((format!("Unexpected token '{}'. {}", c, s), self.rest(), self.line_no, self.col_no, self.file_no)))
+    }
+
+    pub fn err_bad_value(&self, s: &str) -> Result<VVal,ParseError> {
+        Err(ParseError::BadValue((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+    }
+
+    pub fn err_bad_number(&self, s: &str) -> Result<VVal,ParseError> {
+        Err(ParseError::BadNumber((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+    }
+
+    pub fn err_bad_call(&self, s: &str) -> Result<VVal,ParseError> {
+        Err(ParseError::BadCall((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+    }
+
+    pub fn err_eof(&self, s: &str) -> Result<VVal,ParseError> {
+        Err(ParseError::EOF((format!("EOF while parsing {}", s), self.rest(), self.line_no, self.col_no, self.file_no)))
+    }
+
+    pub fn err_bad_escape(&self, s: &str) -> Result<VVal,ParseError> {
+        Err(ParseError::BadEscape((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+    }
+
     pub fn syn_raw(&self, s: Syntax) -> VVal {
         VVal::Syn(SynPos {
             syn:  s,
@@ -251,7 +285,9 @@ impl ParseState {
     }
 
     pub fn rest(&self) -> String {
-        self.chars.iter().collect()
+        let s : String = self.chars.iter().collect();
+        let len = if s.len() > 50 { 50 } else { s.len() };
+        String::from(&s[0..len])
     }
 
     pub fn expect_char(&mut self, expected_char: char) -> bool {
@@ -440,8 +476,8 @@ fn adchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
 ////    let k = it.peek().unwrap();
 ////    println!("FO: {:?}", k);
 //}
-pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String> {
-    if ps.at_eof { return Err(String::from("EOF, expected string")); }
+pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, ParseError> {
+    if ps.at_eof { return ps.err_eof("string"); }
 
     ps.consume_if_eq('"');
 
@@ -467,10 +503,10 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
                                     if byte_str { v.push(cn) }
                                     else { s.push(cn as char); }
                                 } else {
-                                    return Err(String::from("Bad hex escape in string"));
+                                    return ps.err_bad_escape("Bad hex escape in string");
                                 }
                             } else {
-                                return Err(String::from("EOF in string hex escape"));
+                                return ps.err_eof("string hex escape");
                             }
                         },
                         'n'  => { ps.consume(); adchr(&mut v, &mut s, byte_str, '\n'); },
@@ -483,7 +519,7 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
                         'u' => {
                             ps.consume();
                             if !ps.consume_if_eq('{') {
-                                return Err(String::from("Expected '{' after unicode escape"));
+                                return ps.err_unexpected_token('{', "After unicode escape.");
                             }
 
                             let uh : String = ps.take_while(|c| c.is_digit(16)).iter().collect();
@@ -492,20 +528,22 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
                                 if let Some(c) = std::char::from_u32(cn) {
                                     adchr(&mut v, &mut s, byte_str, c);
                                 } else {
-                                    return Err(String::from("Bad char in unicode escape in string"));
+                                    return ps.err_bad_escape(
+                                        "Bad char in unicode escape in string");
                                 }
                             } else {
-                                return Err(String::from("Bad unicode hex escape in string"));
+                                return ps.err_bad_escape(
+                                    "Bad unicode hex escape in string");
                             }
 
                             if !ps.consume_if_eq('}') {
-                                return Err(String::from("Expected '}' after unicode escape"));
+                                return ps.err_unexpected_token('}', "After unicode escape.");
                             }
                         },
                         c => { ps.consume(); adchr(&mut v, &mut s, byte_str, c); },
                     }
                 } else {
-                    return Err(String::from("EOF in string escape"));
+                    return ps.err_eof("string escape");
                 }
             },
             _ => {
@@ -521,13 +559,15 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
         vec.push(VVal::new_str(&s));
     }
 
-    if !ps.consume_if_eq('"') { return Err(String::from("Expected '\"'")); }
+    if !ps.consume_if_eq('"') {
+        return ps.err_unexpected_token('\"', "");
+    }
 
     Ok(vec)
 }
 
-pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
-    if ps.at_eof { return Err(String::from("EOF, expected number")); }
+pub fn parse_num(ps: &mut ParseState) -> Result<VVal, ParseError> {
+    if ps.at_eof { return ps.err_eof("number"); }
 
     let c = ps.peek().unwrap();
     let sign = match c {
@@ -560,25 +600,25 @@ pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
         };
 
         if radix < 2 || radix > 36 {
-            return Err(format!("Unsupported radix: {}", radix));
+            return ps.err_bad_number(&format!("Unsupported radix: {}", radix));
         }
 
         (radix, ps.take_while(|c| c.is_digit(radix as u32)).iter().collect())
     } else if ps.consume_if_eq('x') {
         if radix_or_num != "0" {
-            return Err(format!("Unsupported radix prefix. \
+            return ps.err_bad_number(&format!("Unsupported radix prefix. \
                                 Must be '0x'. Found '{}x'", radix_or_num));
         }
         (16, ps.take_while(|c| c.is_digit(16)).iter().collect())
     } else if ps.consume_if_eq('b') {
         if radix_or_num != "0" {
-            return Err(format!("Unsupported radix prefix. \
+            return ps.err_bad_number(&format!("Unsupported radix prefix. \
                                 Must be '0b'. Found '{}b'", radix_or_num));
         }
         (2, ps.take_while(|c| c.is_digit(2)).iter().collect())
     } else if ps.consume_if_eq('o') {
         if radix_or_num != "0" {
-            return Err(format!("Unsupported radix prefix. \
+            return ps.err_bad_number(&format!("Unsupported radix prefix. \
                                 Must be '0o'. Found '{}o'", radix_or_num));
         }
         (8, ps.take_while(|c| c.is_digit(8)).iter().collect())
@@ -591,7 +631,7 @@ pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
         if let Ok(fract_num) = u64::from_str_radix(&fract_digits, radix as u32) {
             (true, (fract_num as f64) / (radix as f64).powf(fract_digits.len() as f64))
         } else {
-            return Err(format!("Invalid fractional digits {}", fract_digits));
+            return ps.err_bad_number(&format!("Invalid fractional digits {}", fract_digits));
         }
     } else {
         (false, 0.0)
@@ -615,12 +655,15 @@ pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
                 }
             }
         },
-        _       => Err(String::from("Couldn't parse number")),
+        _ => ps.err_bad_number(&format!(
+                "Couldn't parse number '{}' with radix={}", num, radix)),
     }
 }
 
-fn parse_vec(ps: &mut ParseState) -> Result<VVal, String> {
-    if !ps.consume_if_eq_wsc('[') { return Err(String::from("Expected '['")); }
+fn parse_vec(ps: &mut ParseState) -> Result<VVal, ParseError> {
+    if !ps.consume_if_eq_wsc('[') {
+        return ps.err_unexpected_token('[', "At vector.");
+    }
 
     let vec = ps.syn(Syntax::Lst);
 
@@ -630,21 +673,25 @@ fn parse_vec(ps: &mut ParseState) -> Result<VVal, String> {
         if !ps.consume_if_eq_wsc(',') { break; }
     }
 
-    if !ps.consume_if_eq_wsc(']') { return Err(String::from("Expected ']'")); }
+    if !ps.consume_if_eq_wsc(']') {
+        return ps.err_unexpected_token(']', "At the end of vector");
+    }
 
     Ok(vec)
 }
 
-fn parse_map(ps: &mut ParseState) -> Result<VVal, String> {
+fn parse_map(ps: &mut ParseState) -> Result<VVal, ParseError> {
     //println!("parse_map [{}]", ps.rest());
-    if !ps.consume_if_eq_wsc('{') { return Err(String::from("Expected '{'")); }
+    if !ps.consume_if_eq_wsc('{') {
+        return ps.err_unexpected_token('{', "At map");
+    }
 
     let map = ps.syn(Syntax::Map);
 
     while ps.peek().unwrap() != '}' {
         let key = parse_expr(ps)?;
         if !ps.consume_if_eq_wsc(':') {
-            return Err(String::from("Expected ':' after key"));
+            return ps.err_unexpected_token(':', "After reading map key");
         }
         let value = parse_expr(ps)?;
 
@@ -656,14 +703,16 @@ fn parse_map(ps: &mut ParseState) -> Result<VVal, String> {
         if !ps.consume_if_eq_wsc(',') { break; }
     }
 
-    if !ps.consume_if_eq_wsc('}') { return Err(String::from("Expected '}'")); }
+    if !ps.consume_if_eq_wsc('}') {
+        return ps.err_unexpected_token('}', "At the end of a map");
+    }
 
     Ok(map)
 }
 
 
-fn parse_primitive(ps: &mut ParseState) -> Result<VVal, String> {
-    if ps.at_eof { return Err(String::from("EOF, expected num")); }
+fn parse_literal(ps: &mut ParseState) -> Result<VVal, ParseError> {
+    if ps.at_eof { return ps.err_eof("literal value"); }
     let c = ps.peek().unwrap();
 
     match c {
@@ -755,18 +804,18 @@ pub fn parse_identifier(ps: &mut ParseState) -> String {
     identifier
 }
 
-pub fn parse_value(ps: &mut ParseState) -> Result<VVal, String> {
+pub fn parse_value(ps: &mut ParseState) -> Result<VVal, ParseError> {
     //println!("parse_value [{}]", ps.rest());
     if let Some(c) = ps.peek() {
         match c {
             '0' ... '9' | '+' | '-' => parse_num(ps),
             '"' => parse_string(ps, false),
-            '$' => { ps.consume_wsc(); parse_primitive(ps) },
+            '$' => { ps.consume_wsc(); parse_literal(ps) },
             '[' => {
                 ps.consume_wsc();
                 let expr = parse_expr(ps)?;
                 if !ps.consume_if_eq_wsc(']') {
-                    return Err(String::from("Expected ']' in sub expression"));
+                    return ps.err_unexpected_token(']', "In sub expression.");
                 }
                 Ok(expr)
             },
@@ -784,14 +833,17 @@ pub fn parse_value(ps: &mut ParseState) -> Result<VVal, String> {
                 let id = parse_identifier(ps);
                 Ok(make_var(ps, &id))
             },
-            _ => { Err(String::from("FAIL!")) }
+            _ => {
+                ps.err_bad_value("Expected literal value, sub \
+                                 expression, block, key or identifier.")
+            }
         }
     } else {
-        Err(String::from("EOF, but expected atom"))
+        ps.err_eof("value.")
     }
 }
 
-pub fn parse_field_access(obj_val: VVal, ps: &mut ParseState) -> Result<VVal, String> {
+pub fn parse_field_access(obj_val: VVal, ps: &mut ParseState) -> Result<VVal, ParseError> {
     let mut obj = obj_val;
 
     while let Some(c) = ps.peek() {
@@ -842,9 +894,9 @@ pub fn parse_field_access(obj_val: VVal, ps: &mut ParseState) -> Result<VVal, St
     Ok(obj)
 }
 
-pub fn parse_arg_list<'a>(call: &'a mut VVal, ps: &mut ParseState) -> Result<&'a mut VVal, String> {
+pub fn parse_arg_list<'a>(call: &'a mut VVal, ps: &mut ParseState) -> Result<&'a mut VVal, ParseError> {
     if !ps.consume_if_eq_wsc('(') {
-        return Err(String::from("Expected '(' while reading call arguments"));
+        return Err(ps.err_unexpected_token('(', "At start of call arguments.").unwrap_err());
     }
 
     while let Some(c) = ps.peek() {
@@ -859,10 +911,11 @@ pub fn parse_arg_list<'a>(call: &'a mut VVal, ps: &mut ParseState) -> Result<&'a
     }
 
     if ps.at_eof {
-        return Err(String::from("EOF while reading call args"));
+        return Err(ps.err_eof("call args").unwrap_err());
     }
     if !ps.consume_if_eq_wsc(')') {
-        return Err(String::from("Expected ')' while reading call arguments"));
+        return Err(ps.err_unexpected_token(')',
+            "While reading call arguments").unwrap_err());
     }
 
     return Ok(call);
@@ -885,7 +938,7 @@ pub fn get_op_prec(op: &str) -> i32 {
     }
 }
 
-pub fn parse_binop(mut left: VVal, ps: &mut ParseState, op: &str) -> Result<VVal, String> {
+pub fn parse_binop(mut left: VVal, ps: &mut ParseState, op: &str) -> Result<VVal, ParseError> {
     let prec = get_op_prec(op);
     let mut right = parse_call_expr(ps, true, true)?;
 
@@ -909,7 +962,7 @@ pub fn parse_binop(mut left: VVal, ps: &mut ParseState, op: &str) -> Result<VVal
     return Ok(make_binop(ps, op, left, right));
 }
 
-pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Result<VVal, String> {
+pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Result<VVal, ParseError> {
     //println!("parse_call [{}]", ps.rest());
     let mut res_call = VVal::Nul;
 
@@ -952,7 +1005,7 @@ pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Res
                 value = parse_binop(value, ps, &op)?;
             },
             '=' => {
-                return Err(String::from("Unexpected '=' while parsing call"));
+                return ps.err_bad_call("Unexpected '='");
             },
             _ => {
                 if binop_mode { break; }
@@ -973,11 +1026,11 @@ pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Res
     Ok(res_call)
 }
 
-pub fn parse_expr(ps: &mut ParseState) -> Result<VVal, String> {
+pub fn parse_expr(ps: &mut ParseState) -> Result<VVal, ParseError> {
     return parse_call_expr(ps, false, false);
 }
 
-pub fn parse_call_expr(ps: &mut ParseState, no_pipe: bool, binop_mode: bool) -> Result<VVal, String> {
+pub fn parse_call_expr(ps: &mut ParseState, no_pipe: bool, binop_mode: bool) -> Result<VVal, ParseError> {
     //println!("parse_expr [{}] np={}", ps.rest(), no_pipe);
     let value = parse_value(ps)?;
 
@@ -1024,9 +1077,9 @@ pub fn parse_call_expr(ps: &mut ParseState, no_pipe: bool, binop_mode: bool) -> 
     Ok(call)
 }
 
-pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, String> {
+pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, ParseError> {
     if ps.at_eof {
-        return Err(String::from("EOF but expected assignment"));
+        return ps.err_eof("assignment");
     }
 
     let mut assign = VVal::vec();
@@ -1060,13 +1113,13 @@ pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, Strin
             }
 
             if ps.at_eof {
-                return Err(String::from(
-                    "EOF while reading destructuring assignment"));
+                return ps.err_eof(
+                    "destructuring assignment");
             }
 
             if !ps.consume_if_eq_wsc(')') {
-                return Err(String::from(
-                    "Expected ')' at the end of destructuring assignment"));
+                return ps.err_unexpected_token(
+                    ')', "At the end of destructuring assignment.");
             }
         },
         _ => { ids.push(VVal::Sym(parse_identifier(ps))); }
@@ -1075,14 +1128,14 @@ pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, Strin
     assign.push(ids);
 
     if !ps.consume_if_eq_wsc('=') {
-        return Err(String::from("Expected '=' in assignment"));
+        return ps.err_unexpected_token('=', "In assignment");
     }
     assign.push(parse_expr(ps)?);
 
     return Ok(assign);
 }
 
-pub fn parse_stmt(ps: &mut ParseState) -> Result<VVal, String> {
+pub fn parse_stmt(ps: &mut ParseState) -> Result<VVal, ParseError> {
     //println!("parse_stmt [{}]", ps.rest());
     match ps.peek() {
         Some(c) => {
@@ -1093,14 +1146,16 @@ pub fn parse_stmt(ps: &mut ParseState) -> Result<VVal, String> {
                 _   => { parse_expr(ps) },
             }
         },
-        None => { Err(String::from("EOF, but expected statement")) }
+        None => { ps.err_eof("statement") }
     }
 }
 
-pub fn parse_block(ps: &mut ParseState, is_delimited: bool) -> Result<VVal, String> {
+pub fn parse_block(ps: &mut ParseState, is_delimited: bool) -> Result<VVal, ParseError> {
     //println!("parse_block [{}]", ps.rest());
     if is_delimited {
-        if !ps.consume_if_eq_wsc('{') { return Err(String::from("Expected '{' for block")); }
+        if !ps.consume_if_eq_wsc('{') {
+            return ps.err_unexpected_token('{', "When parsing a block.");
+        }
     }
 
     let block = ps.syn(Syntax::Block);
@@ -1120,8 +1175,10 @@ pub fn parse_block(ps: &mut ParseState, is_delimited: bool) -> Result<VVal, Stri
     }
 
     if is_delimited {
-        if ps.at_eof { return Err(String::from("EOF while parsing block")); }
-        if !ps.consume_if_eq_wsc('}') { return Err(String::from("Expected '}' for block")); }
+        if ps.at_eof { return ps.err_eof("parsing block"); }
+        if !ps.consume_if_eq_wsc('}') {
+            return ps.err_unexpected_token('}', "When parsing a block.");
+        }
     }
 
     Ok(block)
@@ -1139,7 +1196,7 @@ mod tests {
         let mut ps = mk(s);
         match parse_block(&mut ps, false) {
             Ok(v)  => v.s(),
-            Err(e) => { panic!(format!("ERROR: {} at '{}' with input '{}'", e, ps.rest(), s)); },
+            Err(e) => { panic!(format!("ERROR: {:?} at '{}' with input '{}'", e, ps.rest(), s)); },
         }
     }
 
@@ -1148,7 +1205,7 @@ mod tests {
         match parse_block(&mut ps, false) {
             Ok(v)  => panic!(format!("Expected error but got result: {} for input '{}'",
                                      v.s(), s)),
-            Err(e) => { format!("{}", e) },
+            Err(e) => { format!("Parse error: {:?}", e) },
         }
     }
 
@@ -1235,7 +1292,7 @@ mod tests {
 
     #[test]
     fn check_expr_err() {
-        assert_eq!(parse_error("foo.a() = 10"),       "Unexpected \'=\' while parsing call");
+        assert_eq!(parse_error("foo.a() = 10"),       "Parse error: BadCall((\"Unexpected \\\'=\\\'\", \"= 10\", 1, 9, 1))");
     }
 
     #[test]
