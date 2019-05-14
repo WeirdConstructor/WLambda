@@ -660,6 +660,12 @@ mod tests {
         assert_eq!(eval("22 != 22"),    "$false");
         assert_eq!(eval("21 != 22"),    "$true");
 
+//        assert_eq!(eval("$t && $t"),    "$true");
+//        assert_eq!(eval("$f && $t"),    "$false");
+//        assert_eq!(eval("$t || $t"),    "$true");
+//        assert_eq!(eval("$f || $t"),    "$false");
+//        assert_eq!(eval("$f || $f"),    "$false");
+
         assert_eq!(eval("2 ^ 2"),       "4");
         assert_eq!(eval("2 ^ 3"),       "8");
         assert_eq!(eval("2.1 ^ 2"),     "4.41");
