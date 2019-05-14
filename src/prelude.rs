@@ -3,77 +3,85 @@ use crate::vval::*;
 use std::rc::Rc;
 //use std::cell::RefCell;
 
+macro_rules! add_func {
+    ($g: ident, $op: tt, $env: ident, $argc: ident, $b: block) => {
+        $g.borrow_mut().add_func(
+            stringify!($op), |$env: &mut Env, $argc: usize| $b);
+    }
+}
+
+macro_rules! add_multi_op {
+    ($g: ident, $op: tt) => {
+        add_func!($g, $op, env, argc, {
+            if argc <= 0 { return Ok(VVal::Nul); }
+            if let VVal::Flt(f) = env.arg(0) {
+                let mut accum = f;
+                for i in 1..argc { accum = accum $op env.arg(i).f() }
+                Ok(VVal::Flt(accum))
+            } else {
+                let mut accum = env.arg(0).i();
+                for i in 1..argc { accum = accum $op env.arg(i).i() }
+                Ok(VVal::Int(accum))
+            }
+        })
+    }
+}
+
+macro_rules! add_bool_bin_op {
+    ($g: ident, $op: tt) => {
+        add_func!($g, $op, env, argc, {
+            if argc < 2 { return Ok(VVal::Nul); }
+            let a = env.arg(0);
+            if let VVal::Flt(af) = a { Ok(VVal::Bol(af $op env.arg(1).f())) }
+            else { Ok(VVal::Bol(a.i() $op env.arg(1).i())) }
+        })
+    }
+}
+
+macro_rules! add_fi_bin_op {
+    ($g: ident, $op: tt, $a: ident, $b: ident, $ef: expr, $ei: expr) => {
+        add_func!($g, $op, env, argc, {
+            if argc < 2 { return Ok(VVal::Nul); }
+            let $a = env.arg(0);
+            let $b = env.arg(1);
+            if let VVal::Flt(_) = $a { $ef }
+            else { $ei }
+        })
+    }
+}
+
+macro_rules! add_bin_op {
+    ($g: ident, $op: tt, $a: ident, $b: ident, $e: expr) => {
+        add_func!($g, $op, env, argc, {
+            if argc < 2 { return Ok(VVal::Nul); }
+            let $a = env.arg(0);
+            let $b = env.arg(1);
+            $e
+        })
+    }
+}
+
+
 pub fn create_wlamba_prelude() -> GlobalEnvRef {
     let g = GlobalEnv::new();
 
-    g.borrow_mut().add_func(
-        "+",
-        |env: &mut Env, argc: usize| {
-            if argc <= 0 { return Ok(VVal::Nul); }
-            if let VVal::Flt(_) = env.arg(0) {
-                let mut sum = 0.0;
-                for i in 0..argc { sum = sum + env.arg(i).f() }
-                Ok(VVal::Flt(sum))
-            } else {
-                let mut sum = 0;
-                for i in 0..argc { sum = sum + env.arg(i).i() }
-                Ok(VVal::Int(sum))
-            }
-        });
+    add_multi_op!(g, +);
+    add_multi_op!(g, -);
+    add_multi_op!(g, *);
+    add_multi_op!(g, /);
+    add_multi_op!(g, %);
 
-    g.borrow_mut().add_func(
-        "-",
-        |env: &mut Env, argc: usize| {
-            if argc <= 0 { return Ok(VVal::Nul); }
-            if let VVal::Flt(_) = env.arg(0) {
-                let mut sum = env.arg(0).f();
-                for i in 1..argc { sum = sum - env.arg(i).f() }
-                Ok(VVal::Flt(sum))
-            } else {
-                let mut sum = env.arg(0).i();
-                for i in 1..argc { sum = sum - env.arg(i).i() }
-                Ok(VVal::Int(sum))
-            }
-        });
+    add_bool_bin_op!(g, <);
+    add_bool_bin_op!(g, >);
+    add_bool_bin_op!(g, <=);
+    add_bool_bin_op!(g, >=);
 
-    g.borrow_mut().add_func(
-        "*",
-        |env: &mut Env, argc: usize| {
-            if argc <= 0 { return Ok(VVal::Nul); }
-            if let VVal::Flt(_) = env.arg(0) {
-                let mut sum = env.arg(0).f();
-                for i in 1..argc { sum = sum * env.arg(i).f() }
-                Ok(VVal::Flt(sum))
-            } else {
-                let mut sum = env.arg(0).i();
-                for i in 1..argc { sum = sum * env.arg(i).i() }
-                Ok(VVal::Int(sum))
-            }
-        });
+    add_bin_op!(g, ==, a, b, Ok(VVal::Bol(a.eq(&b))));
+    add_bin_op!(g, !=, a, b, Ok(VVal::Bol(!a.eq(&b))));
 
-    g.borrow_mut().add_func(
-        "/",
-        |env: &mut Env, argc: usize| {
-            if argc <= 0 { return Ok(VVal::Nul); }
-            if let VVal::Flt(_) = env.arg(0) {
-                let mut sum = env.arg(0).f();
-                for i in 1..argc { sum = sum / env.arg(i).f() }
-                Ok(VVal::Flt(sum))
-            } else {
-                let mut sum = env.arg(0).i();
-                for i in 1..argc { sum = sum / env.arg(i).i() }
-                Ok(VVal::Int(sum))
-            }
-        });
-
-    g.borrow_mut().add_func(
-        "==",
-        |env: &mut Env, argc: usize| {
-            if argc < 2 { return Ok(VVal::Nul); }
-            println!("EQ: #{} {} {}", argc, env.arg(0).s(), env.arg(1).s());
-            env.dump_stack();
-            Ok(VVal::Bol(env.arg(1).eq(&env.arg(0))))
-        });
+    add_fi_bin_op!(g, ^, a, b,
+        Ok(VVal::Flt(a.f().powf(b.f()))),
+        Ok(VVal::Int(a.i().pow(b.i() as u32))));
 
     g.borrow_mut().add_func(
         "break",
@@ -94,8 +102,6 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
             let v = env.arg(0);
-            // println!("PUSH:");
-            // env.dump_stack();
             v.push(env.arg(1).clone());
             Ok(v.clone())
         });

@@ -637,4 +637,39 @@ mod tests {
         "#),
         "17");
     }
+
+    #[test]
+    fn check_ops() {
+        assert_eq!(eval("10 < 20"),     "$true");
+        assert_eq!(eval("11 < 10"),     "$false");
+        assert_eq!(eval("10 < 10"),     "$false");
+        assert_eq!(eval("10 > 20"),     "$false");
+        assert_eq!(eval("11 > 10"),     "$true");
+        assert_eq!(eval("10 > 10"),     "$false");
+        assert_eq!(eval("10 <= 20"),    "$true");
+        assert_eq!(eval("11 <= 10"),    "$false");
+        assert_eq!(eval("10 <= 10"),    "$true");
+        assert_eq!(eval("10 >= 20"),    "$false");
+        assert_eq!(eval("11 >= 10"),    "$true");
+        assert_eq!(eval("10 >= 10"),    "$true");
+        assert_eq!(eval("10.1 < 20.4"), "$true");
+        assert_eq!(eval("11.2 < 10.2"), "$false");
+        assert_eq!(eval("10.3 < 10.4"), "$true");
+        assert_eq!(eval("22 == 22"),    "$true");
+        assert_eq!(eval("22 == 23"),    "$false");
+        assert_eq!(eval("22 != 22"),    "$false");
+        assert_eq!(eval("21 != 22"),    "$true");
+
+        assert_eq!(eval("2 ^ 2"),       "4");
+        assert_eq!(eval("2 ^ 3"),       "8");
+        assert_eq!(eval("2.1 ^ 2"),     "4.41");
+        assert_eq!(eval("4 ^ 0.5"),     "1");
+        assert_eq!(eval("4.0 ^ 0.5"),   "2");
+
+        assert_eq!(eval("4 % 5"),       "4");
+        assert_eq!(eval("6 % 5"),       "1");
+        assert_eq!(eval("4.4 % 5.5"),   "4.4");
+        assert_eq!(eval("5.5 % 5.5"),   "0");
+    }
+
 }
