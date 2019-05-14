@@ -36,7 +36,7 @@ pub enum VarPos {
 
 pub struct Env {
     pub args: std::vec::Vec<VVal>,
-    pub fun:  Option<Rc<VValFun>>,
+    pub fun:  Rc<VValFun>,
     pub bp:   usize,
     pub sp:   usize,
     pub argc: usize,
@@ -46,7 +46,7 @@ impl Env {
     pub fn new_s() -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
-            fun:                None,
+            fun:                VValFun::new_dummy(),
             bp:                 0,
             sp:                 0,
             argc:               0,
@@ -79,13 +79,14 @@ impl Env {
 
     pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+        let local_size = fu.local_size;
         let old_argc = std::mem::replace(&mut self.argc, argc);
-        let old_bp   = self.set_bp(fu.local_size);
-        let old_fun  = std::mem::replace(&mut self.fun, Some(fu.clone()));
+        let old_fun  = std::mem::replace(&mut self.fun, fu);
+        let old_bp   = self.set_bp(local_size);
 
         let ret = f(self);
 
-        self.reset_bp(fu.local_size, old_bp);
+        self.reset_bp(local_size, old_bp);
         self.fun  = old_fun;
         self.argc = old_argc;
 
@@ -139,12 +140,10 @@ impl Env {
             i = i + 1;
             if i >= self.sp { break; }
         }
-        if let Some(v) = &self.fun {
-            let mut i = 0;
-            for u in v.upvalues.iter() {
-                println!("  UP[{:3}] = {}", i, u.s());
-                i = i + 1;
-            }
+        let mut i = 0;
+        for u in self.fun.upvalues.iter() {
+            println!("  UP[{:3}] = {}", i, u.s());
+            i = i + 1;
         }
     }
 
@@ -153,22 +152,14 @@ impl Env {
     }
 
     pub fn get_up_raw(&mut self, i: usize) -> VVal {
-        if let Some(v) = &self.fun {
-            v.upvalues[i].clone()
-        } else {
-            VVal::Nul
-        }
+        self.fun.upvalues[i].clone()
     }
 
     pub fn get_up(&mut self, i: usize) -> VVal {
-        if let Some(v) = &self.fun {
-            if let VVal::Ref(r) = &v.upvalues[i] {
-                r.borrow().clone()
-            } else {
-                v.upvalues[i].clone()
-            }
+        if let VVal::Ref(r) = &self.fun.upvalues[i] {
+            r.borrow().clone()
         } else {
-            VVal::Nul
+            self.fun.upvalues[i].clone()
         }
     }
 
@@ -211,26 +202,24 @@ impl Env {
     }
 
     pub fn set_up(&mut self, index: usize, value: &VVal) {
-        if let Some(v) = self.fun.as_mut() {
-            let fun = v.clone();
-            //d// println!("SET_UP [{}] ({})=({})", index, fun.upvalues[index].s(), value.s());
-            let upv = &fun.upvalues[index];
+        let fun = self.fun.clone();
+        //d// println!("SET_UP [{}] ({})=({})", index, fun.upvalues[index].s(), value.s());
+        let upv = &fun.upvalues[index];
 
-            match upv {
-                VVal::Ref(r)     => { r.replace(value.clone()); }
-                VVal::WRef(r)    => { r.replace(value.clone()); }
-                VVal::WWRef(r)   => {
-                    if let Some(r) = Weak::upgrade(r) {
-                        r.replace(value.clone());
-                    }
-                },
-                _ => {}
-            }
-            // Will not mutate non ref upvalue!
-            // panic!(format!("Cannot mutate a non ref upvalue {} = {}", index, value.s()));
-            // But also not panic here.
-            return;
+        match upv {
+            VVal::Ref(r)     => { r.replace(value.clone()); }
+            VVal::WRef(r)    => { r.replace(value.clone()); }
+            VVal::WWRef(r)   => {
+                if let Some(r) = Weak::upgrade(r) {
+                    r.replace(value.clone());
+                }
+            },
+            _ => {}
         }
+        // Will not mutate non ref upvalue!
+        // panic!(format!("Cannot mutate a non ref upvalue {} = {}", index, value.s()));
+        // But also not panic here.
+        return;
     }
 
     pub fn set_local(&mut self, i: usize, value: &VVal) {
@@ -280,6 +269,14 @@ impl VValFun {
             fun:        fun,
             local_size: env_size,
         }))
+    }
+
+    pub fn new_dummy() -> Rc<VValFun> {
+        Rc::new(VValFun {
+            fun:        Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) })),
+            upvalues:   Vec::new(),
+            local_size: 0,
+        })
     }
 }
 
