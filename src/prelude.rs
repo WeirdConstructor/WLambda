@@ -61,6 +61,17 @@ macro_rules! add_bin_op {
     }
 }
 
+macro_rules! add_sbin_op {
+    ($g: ident, $op: literal, $a: ident, $b: ident, $e: expr) => {
+        $g.borrow_mut().add_func(
+            $op, |env: &mut Env, argc: usize| {
+                if argc < 2 { return Ok(VVal::Nul); }
+                let $a = env.arg(0);
+                let $b = env.arg(1);
+                $e
+            });
+    }
+}
 
 pub fn create_wlamba_prelude() -> GlobalEnvRef {
     let g = GlobalEnv::new();
@@ -78,10 +89,34 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     add_bin_op!(g, ==, a, b, Ok(VVal::Bol(a.eq(&b))));
     add_bin_op!(g, !=, a, b, Ok(VVal::Bol(!a.eq(&b))));
+    add_sbin_op!(g, "&|", a, b,
+        Ok(VVal::Int(((a.i() as u32) | (b.i() as u32)) as i64)));
+    add_sbin_op!(g, "&", a, b,
+        Ok(VVal::Int(((a.i() as u32) & (b.i() as u32)) as i64)));
+    add_sbin_op!(g, "&^", a, b,
+        Ok(VVal::Int(((a.i() as u32) ^ (b.i() as u32)) as i64)));
+    add_sbin_op!(g, "<<", a, b,
+        Ok(VVal::Int(((a.i() as u32) << (b.i() as u32)) as i64)));
+    add_sbin_op!(g, ">>", a, b,
+        Ok(VVal::Int(((a.i() as u32) >> (b.i() as u32)) as i64)));
 
     add_fi_bin_op!(g, ^, a, b,
         Ok(VVal::Flt(a.f().powf(b.f()))),
         Ok(VVal::Int(a.i().pow(b.i() as u32))));
+
+    g.borrow_mut().add_func(
+        "neg",
+        |env: &mut Env, argc: usize| {
+            if argc < 1 { return Ok(VVal::Nul); }
+            Ok(VVal::Int(!env.arg(0).i()))
+        });
+
+    g.borrow_mut().add_func(
+        "uneg",
+        |env: &mut Env, argc: usize| {
+            if argc < 1 { return Ok(VVal::Nul); }
+            Ok(VVal::Int((!(env.arg(0).i() as u32)) as i64))
+        });
 
     g.borrow_mut().add_func(
         "break",

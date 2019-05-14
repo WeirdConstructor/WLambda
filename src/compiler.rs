@@ -670,6 +670,18 @@ mod tests {
         assert_eq!(eval("6 % 5"),       "1");
         assert_eq!(eval("4.4 % 5.5"),   "4.4");
         assert_eq!(eval("5.5 % 5.5"),   "0");
+
+        assert_eq!(eval("neg 0xFF"),    "-256");
+        assert_eq!(eval("uneg 0xFF"),   "4294967040");
+        assert_eq!(eval("uneg 0x1"),    "4294967294");
+        assert_eq!(eval("uneg 0x0"),    "4294967295");
+
+        assert_eq!(eval("[0x10 &| 0x01] == 0x11"), "$true");
+        assert_eq!(eval("[0x0f &  0x33] == 0x3"),  "$true");
+        assert_eq!(eval("[0x11 &^ 0x01] == 0x10"), "$true");
+        assert_eq!(eval("[0b1 << 1] == 0b10"),     "$true");
+        assert_eq!(eval("[0b1 << 2] == 0b100"),    "$true");
+        assert_eq!(eval("[0b1 >> 1] == 0x0"),      "$true");
     }
 
 }
