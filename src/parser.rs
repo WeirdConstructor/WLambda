@@ -3,6 +3,7 @@
 
 use crate::vval::VVal;
 use crate::vval::Syntax;
+use crate::vval::SynPos;
 
 /*
 
@@ -183,13 +184,29 @@ pub struct ParseState {
 //    contents:   String,
     chars:      Vec<char>,
     peek_char:  char,
-    line_no:    i32,
-    file:       String,
+    line_no:    u32,
+    col_no:     u32,
+    file_no:    u32,
     at_eof:     bool,
 }
 
 #[allow(dead_code)]
 impl ParseState {
+    pub fn syn_raw(&self, s: Syntax) -> VVal {
+        VVal::Syn(SynPos {
+            syn:  s,
+            line: self.line_no,
+            col:  self.col_no,
+            file: self.file_no
+        })
+    }
+
+    pub fn syn(&self, s: Syntax) -> VVal {
+        let vec = VVal::vec();
+        vec.push(self.syn_raw(s));
+        vec
+    }
+
     pub fn peek(&self) -> Option<char> { if self.at_eof { None } else { Some(self.peek_char) } }
 
     pub fn peek4(&self) -> Option<String> {
@@ -344,7 +361,11 @@ impl ParseState {
         if self.at_eof { return }
 
         let c = self.peek_char;
-        if c == '\n' { self.line_no = self.line_no + 1; }
+        self.col_no += 1;
+        if c == '\n' {
+            self.line_no = self.line_no + 1;
+            self.col_no = 1;
+        }
 
         if self.chars.len() > 0 {
             self.chars.remove(0);
@@ -384,13 +405,14 @@ impl ParseState {
         }
     }
 
-    pub fn new(content: &str, file: &str) -> ParseState {
+    pub fn new(content: &str, file_no: u32) -> ParseState {
         let mut ps = ParseState {
             chars:     content.chars().collect(),
             peek_char: ' ',
             at_eof:    false,
             line_no:   1,
-            file:      String::from(file),
+            col_no:    1,
+            file_no:   file_no,
         };
         ps.init();
         ps.skip_ws_and_comments();
@@ -423,8 +445,7 @@ pub fn parse_string(ps: &mut ParseState, byte_str: bool) -> Result<VVal, String>
 
     ps.consume_if_eq('"');
 
-    let vec = VVal::vec();
-    vec.push(VVal::Syn(Syntax::Str));
+    let vec = ps.syn(Syntax::Str);
 
     let mut s = String::from("");
     let mut v : Vec<u8> = Vec::new();
@@ -514,7 +535,7 @@ pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
             ps.consume();
             if !ps.peek().unwrap_or(' ').is_digit(10) {
                 ps.skip_ws_and_comments();
-                return Ok(make_var("-"));
+                return Ok(make_var(ps, "-"));
             }
             -1
         },
@@ -522,7 +543,7 @@ pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
             ps.consume();
             if !ps.peek().unwrap_or(' ').is_digit(10) {
                 ps.skip_ws_and_comments();
-                return Ok(make_var("+"));
+                return Ok(make_var(ps, "+"));
             }
             1
         },
@@ -601,8 +622,7 @@ pub fn parse_num(ps: &mut ParseState) -> Result<VVal, String> {
 fn parse_vec(ps: &mut ParseState) -> Result<VVal, String> {
     if !ps.consume_if_eq_wsc('[') { return Err(String::from("Expected '['")); }
 
-    let vec = VVal::vec();
-    vec.push(VVal::Syn(Syntax::Lst));
+    let vec = ps.syn(Syntax::Lst);
 
     while ps.peek().unwrap() != ']' {
         let atom = parse_expr(ps)?;
@@ -619,8 +639,7 @@ fn parse_map(ps: &mut ParseState) -> Result<VVal, String> {
     //println!("parse_map [{}]", ps.rest());
     if !ps.consume_if_eq_wsc('{') { return Err(String::from("Expected '{'")); }
 
-    let map = VVal::vec();
-    map.push(VVal::Syn(Syntax::Map));
+    let map = ps.syn(Syntax::Map);
 
     while ps.peek().unwrap() != '}' {
         let key = parse_expr(ps)?;
@@ -683,7 +702,7 @@ fn parse_primitive(ps: &mut ParseState) -> Result<VVal, String> {
 fn is_var(expr: &VVal) -> bool {
     if let Some(ea) = expr.at(0) {
         if let VVal::Syn(s) = ea {
-            return s == Syntax::Var;
+            return s.syn == Syntax::Var;
         }
     }
     return false;
@@ -692,35 +711,32 @@ fn is_var(expr: &VVal) -> bool {
 fn is_call(expr: &VVal) -> bool {
     if let Some(ea) = expr.at(0) {
         if let VVal::Syn(s) = ea {
-            return s == Syntax::Call;
+            return s.syn == Syntax::Call;
         }
     }
     return false;
 }
 
-fn make_to_call(expr: VVal) -> VVal {
-    let call = VVal::vec();
-    call.push(VVal::Syn(Syntax::Call));
+fn make_to_call(ps: &ParseState, expr: VVal) -> VVal {
+    let call = ps.syn(Syntax::Call);
     call.push(expr);
     call
 }
 
-fn make_var(identifier: &str) -> VVal {
-    let id = VVal::vec();
-    id.push(VVal::Syn(Syntax::Var));
+fn make_var(ps: &ParseState, identifier: &str) -> VVal {
+    let id = ps.syn(Syntax::Var);
     id.push(VVal::Sym(String::from(identifier)));
     return id;
 }
 
-fn make_key(identifier: &str) -> VVal {
-    let id = VVal::vec();
-    id.push(VVal::Syn(Syntax::Key));
+fn make_key(ps: &ParseState, identifier: &str) -> VVal {
+    let id = ps.syn(Syntax::Key);
     id.push(VVal::Sym(String::from(identifier)));
     return id;
 }
 
-fn make_binop(op: &str, left: VVal, right: VVal) -> VVal {
-    let call = make_to_call(make_var(op));
+fn make_binop(ps: &ParseState, op: &str, left: VVal, right: VVal) -> VVal {
+    let call = make_to_call(ps, make_var(ps, op));
     call.push(left);
     call.push(right);
     return call;
@@ -756,17 +772,17 @@ pub fn parse_value(ps: &mut ParseState) -> Result<VVal, String> {
             },
             '{' => {
                 let block = parse_block(ps, true)?;
-                block.set_at(0, VVal::Syn(Syntax::Func));
+                block.set_at(0, ps.syn_raw(Syntax::Func));
                 Ok(block)
             },
             ':' => {
                 ps.consume_wsc();
                 let id = parse_identifier(ps);
-                Ok(make_key(&id))
+                Ok(make_key(ps, &id))
             },
             _ if c.is_alphanumeric() || c == '_' || c == '@' => {
                 let id = parse_identifier(ps);
-                Ok(make_var(&id))
+                Ok(make_var(ps, &id))
             },
             _ => { Err(String::from("FAIL!")) }
         }
@@ -785,8 +801,8 @@ pub fn parse_field_access(obj_val: VVal, ps: &mut ParseState) -> Result<VVal, St
         let value = parse_value(ps)?;
         if let Some(ea) = value.at(0) {
             if let VVal::Syn(s) = ea {
-                if s == Syntax::Var {
-                    value.set_at(0, VVal::Syn(Syntax::Key));
+                if s.syn == Syntax::Var {
+                    value.set_at(0, ps.syn_raw(Syntax::Key));
                 }
             }
         }
@@ -795,30 +811,29 @@ pub fn parse_field_access(obj_val: VVal, ps: &mut ParseState) -> Result<VVal, St
             match c {
                 '=' => {
                     ps.consume_wsc();
-                    let field_set = VVal::vec();
-                    field_set.push(VVal::Syn(Syntax::SetKey));
+                    let field_set = ps.syn(Syntax::SetKey);
                     field_set.push(obj);
                     field_set.push(value);
                     field_set.push(parse_expr(ps)?);
                     return Ok(field_set);
                 },
                 '(' => {
-                    let call = make_to_call(value);
+                    let call = make_to_call(ps, value);
                     call.push(obj);
-                    let mut field_call = make_to_call(call);
+                    let mut field_call = make_to_call(ps, call);
                     match parse_arg_list(&mut field_call, ps) {
                         Ok(_)    => return Ok(field_call),
                         Err(err) => return Err(err),
                     }
                 },
                 _ => {
-                    let call = make_to_call(value);
+                    let call = make_to_call(ps, value);
                     call.push(obj);
                     obj = call;
                 }
             }
         } else {
-            let call = make_to_call(value);
+            let call = make_to_call(ps, value);
             call.push(obj);
             obj = call;
         }
@@ -886,12 +901,12 @@ pub fn parse_binop(mut left: VVal, ps: &mut ParseState, op: &str) -> Result<VVal
         if prec < next_prec {
             right = parse_binop(right, ps, &next_op)?;
         } else {
-            left = make_binop(&op, left, right);
+            left = make_binop(ps, &op, left, right);
             return parse_binop(left, ps, &next_op);
         }
     }
 
-    return Ok(make_binop(op, left, right));
+    return Ok(make_binop(ps, op, left, right));
 }
 
 pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Result<VVal, String> {
@@ -903,7 +918,7 @@ pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Res
         let op = ps.peek_op();
         match c {
             '(' => {
-                let mut call = make_to_call(value);
+                let mut call = make_to_call(ps, value);
                 match parse_arg_list(&mut call, ps) {
                     Ok(_)    => { value = call; },
                     Err(err) => return Err(err),
@@ -914,7 +929,7 @@ pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Res
             },
             '~' => {
                 ps.consume_wsc();
-                if let VVal::Nul = res_call { res_call = make_to_call(value); }
+                if let VVal::Nul = res_call { res_call = make_to_call(ps, value); }
                 else { res_call.push(value); }
                 res_call.push(parse_expr(ps)?);
                 // We don't set value here, because it will not be
@@ -942,7 +957,7 @@ pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Res
             _ => {
                 if binop_mode { break; }
 
-                if let VVal::Nul = res_call { res_call = make_to_call(value); }
+                if let VVal::Nul = res_call { res_call = make_to_call(ps, value); }
                 else { res_call.push(value); }
                 value = parse_value(ps)?;
             },
@@ -995,7 +1010,7 @@ pub fn parse_call_expr(ps: &mut ParseState, no_pipe: bool, binop_mode: bool) -> 
                 ps.consume_wsc();
                 let mut fn_expr = parse_call_expr(ps, true, binop_mode)?;
                 if !is_call(&fn_expr) {
-                    fn_expr = make_to_call(fn_expr);
+                    fn_expr = make_to_call(ps, fn_expr);
                 }
                 fn_expr.push(call);
                 call = fn_expr;
@@ -1016,20 +1031,18 @@ pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, Strin
 
     let mut assign = VVal::vec();
     if is_def {
-        assign.push(VVal::Syn(Syntax::Def));
+        assign.push(ps.syn_raw(Syntax::Def));
     } else {
-        assign.push(VVal::Syn(Syntax::Assign));
+        assign.push(ps.syn_raw(Syntax::Assign));
     }
 
     if is_def {
         if ps.consume_if_eq_wsc(':') {
             let key = parse_identifier(ps);
             if key == "ref" {
-                assign = VVal::vec();
-                assign.push(VVal::Syn(Syntax::DefRef));
+                assign = ps.syn(Syntax::DefRef);
             } else if key == "wref" {
-                assign = VVal::vec();
-                assign.push(VVal::Syn(Syntax::DefWRef));
+                assign = ps.syn(Syntax::DefWRef);
             }
         }
     }
@@ -1090,8 +1103,7 @@ pub fn parse_block(ps: &mut ParseState, is_delimited: bool) -> Result<VVal, Stri
         if !ps.consume_if_eq_wsc('{') { return Err(String::from("Expected '{' for block")); }
     }
 
-    let block = VVal::vec();
-    block.push(VVal::Syn(Syntax::Block));
+    let block = ps.syn(Syntax::Block);
 
     while let Some(c) = ps.peek() {
         if is_delimited { if c == '}' { break; } }
@@ -1120,7 +1132,7 @@ mod tests {
     use super::*;
 
     fn mk(s: &str) -> ParseState {
-        ParseState::new(s, "<testinput>")
+        ParseState::new(s, 1)
     }
 
     fn parse(s: &str) -> String {

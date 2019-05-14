@@ -282,18 +282,24 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
 //    println!("compile {}", ast.s());
     match ast {
         VVal::Lst(_l) => {
-            match ast.at(0).unwrap() {
-                VVal::Syn(Syntax::Block)  => { compile_block(ast, ce)       },
-                VVal::Syn(Syntax::Var)    => { compile_var(ast, ce)         },
-                VVal::Syn(Syntax::Def)    => { compile_def(ast, ce, false, false)  },
-                VVal::Syn(Syntax::DefRef) => { compile_def(ast, ce, true, false)   },
-                VVal::Syn(Syntax::DefWRef)=> { compile_def(ast, ce, true, true)    },
-                VVal::Syn(Syntax::Assign) => { compile_assign(ast, ce)      },
-                VVal::Syn(Syntax::Key)    => {
+            let syn = if let VVal::Syn(s) = ast.at(0).unwrap() {
+                s.syn
+            } else {
+                return Err(format!("Bad AST {:?}", ast));
+            };
+
+            match syn {
+                Syntax::Block  => { compile_block(ast, ce)       },
+                Syntax::Var    => { compile_var(ast, ce)         },
+                Syntax::Def    => { compile_def(ast, ce, false, false)  },
+                Syntax::DefRef => { compile_def(ast, ce, true, false)   },
+                Syntax::DefWRef=> { compile_def(ast, ce, true, true)    },
+                Syntax::Assign => { compile_assign(ast, ce)      },
+                Syntax::Key    => {
                     let sym = ast.at(1).unwrap();
                     Ok(Box::new(move |_: &mut Env| { Ok(sym.clone()) }))
                 },
-                VVal::Syn(Syntax::SetKey)    => {
+                Syntax::SetKey => {
                     let map = compile(&ast.at(1).unwrap(), ce)?;
                     let sym = compile(&ast.at(2).unwrap(), ce)?;
                     let val = compile(&ast.at(3).unwrap(), ce)?;
@@ -306,7 +312,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         Ok(v)
                     }))
                 },
-                VVal::Syn(Syntax::Lst)    => {
+                Syntax::Lst    => {
                     let list_elems : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
 
                     Ok(Box::new(move |e: &mut Env| {
@@ -315,7 +321,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         Ok(v)
                     }))
                 },
-                VVal::Syn(Syntax::Map)    => {
+                Syntax::Map    => {
                     let list_elems : Vec<(EvalNode,EvalNode)> =
                         ast.map_skip(|e| {
                             let k = e.at(0).unwrap();
@@ -333,7 +339,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         Ok(v)
                     }))
                 },
-                VVal::Syn(Syntax::Call) => {
+                Syntax::Call => {
                     let mut call_args : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
                     call_args.reverse();
                     let func = call_args.pop().expect("function in evaluation args list");
@@ -352,7 +358,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         })
                     }))
                 },
-                VVal::Syn(Syntax::Func) => {
+                Syntax::Func => {
                     let mut ce_sub = CompileEnv::create_env(Some(ce.clone()));
 
                     let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
@@ -387,7 +393,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
 }
 
 fn mk(s: &str) -> ParseState {
-    ParseState::new(s, "<testinput>")
+    ParseState::new(s, 1)
 }
 
 pub fn eval(s: &str) -> String {

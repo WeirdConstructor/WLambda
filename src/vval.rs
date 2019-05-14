@@ -7,6 +7,14 @@ use std::cell::RefCell;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct SynPos {
+    pub syn:        Syntax,
+    pub line:       u32,
+    pub col:        u32,
+    pub file:       u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum Syntax {
     Var,
@@ -304,7 +312,7 @@ pub enum VVal {
     Sym(String),
     Str(Rc<RefCell<String>>),
     Byt(Rc<RefCell<Vec<u8>>>),
-    Syn(Syntax),
+    Syn(SynPos),
     Int(i64),
     Flt(f64),
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
@@ -586,7 +594,7 @@ impl VVal {
             VVal::Nul        => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
             VVal::Sym(s)     => s.parse::<f64>().unwrap_or(0.0),
-            VVal::Syn(s)     => (s.clone() as i64) as f64,
+            VVal::Syn(s)     => (s.syn.clone() as i64) as f64,
             VVal::Int(i)     => *i as f64,
             VVal::Flt(f)     => *f,
             VVal::Lst(l)     => l.borrow().len() as f64,
@@ -611,7 +619,7 @@ impl VVal {
             VVal::Nul        => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
             VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0),
-            VVal::Syn(s)     => s.clone() as i64,
+            VVal::Syn(s)     => s.syn.clone() as i64,
             VVal::Int(i)     => *i,
             VVal::Flt(f)     => (*f as i64),
             VVal::Lst(l)     => l.borrow().len() as i64,
@@ -636,7 +644,7 @@ impl VVal {
             VVal::Nul        => false,
             VVal::Bol(b)     => *b,
             VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0) != 0,
-            VVal::Syn(s)     => (s.clone() as i64) != 0,
+            VVal::Syn(s)     => (s.syn.clone() as i64) != 0,
             VVal::Int(i)     => (*i) != 0,
             VVal::Flt(f)     => (*f as i64) != 0,
             VVal::Lst(l)     => (l.borrow().len() as i64) != 0,
@@ -661,7 +669,7 @@ impl VVal {
             VVal::Nul        => format!("$n"),
             VVal::Bol(b)     => if *b { format!("$true") } else { format!("$false") },
             VVal::Sym(s)     => format!("$\"{}\"", s),
-            VVal::Syn(s)     => format!("&{:?}", s),
+            VVal::Syn(s)     => format!("&{:?}", s.syn),
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
             VVal::Lst(l)     => VVal::dump_vec_as_str(l),
