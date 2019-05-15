@@ -273,21 +273,15 @@ impl ParseState {
     pub fn peek_op(&self) -> Option<String> {
         if self.at_eof { return None; }
         match self.peek_char {
-            'a' => {
-                if let Some(s) = self.peek3() {
-                    if s == "and" { return Some(s); }
-                }
-                None
-            },
-            'o' => {
-                if let Some(s) = self.peek2() {
-                    if s == "or" { return Some(s); }
-                }
-                None
-            },
             '+' | '-' | '*' | '/' | '%' | '^'
                 => { return Some(self.peek_char.to_string()); },
             '<' | '>' | '!' | '=' | '|' | '&' => {
+                if let Some(s) = self.peek4() {
+                    if s == "&and" { return Some(s); }
+                }
+                if let Some(s) = self.peek3() {
+                    if s == "&or" { return Some(s); }
+                }
                 if let Some(s) = self.peek2() {
                     match &s[0..2] {
                           "<=" | ">=" | "!=" | "==" | "<<" | ">>"
@@ -407,6 +401,13 @@ impl ParseState {
         }
 
         true
+    }
+
+    pub fn consume_wsc_n(&mut self, n: usize) {
+        for _i in 0..n {
+            self.consume();
+        }
+        self.skip_ws_and_comments();
     }
 
     pub fn consume_wsc(&mut self) {
@@ -806,10 +807,24 @@ fn make_key(ps: &ParseState, identifier: &str) -> VVal {
 }
 
 fn make_binop(ps: &ParseState, op: &str, left: VVal, right: VVal) -> VVal {
-    let call = make_to_call(ps, make_var(ps, op));
-    call.push(left);
-    call.push(right);
-    return call;
+    if op == "&and" {
+        let and = ps.syn(Syntax::And);
+        and.push(left);
+        and.push(right);
+        return and;
+
+    } else if op == "&or" {
+        let or = ps.syn(Syntax::Or);
+        or.push(left);
+        or.push(right);
+        return or;
+
+    } else {
+        let call = make_to_call(ps, make_var(ps, op));
+        call.push(left);
+        call.push(right);
+        return call;
+    }
 }
 
 pub fn parse_identifier(ps: &mut ParseState) -> String {
@@ -953,8 +968,8 @@ pub fn get_op_prec(op: &str) -> i32 {
         "&"                         => 9,
         "&^"                        => 8,
         "&|"                        => 7,
-        "and"                       => 6,
-        "or"                        => 5,
+        "&and"                      => 6,
+        "&or"                       => 5,
         _                           => 0
     }
 }
@@ -964,16 +979,7 @@ pub fn parse_binop(mut left: VVal, ps: &mut ParseState, op: &str) -> Result<VVal
     let mut right = parse_call_expr(ps, true, true)?;
 
     while let Some(next_op) = ps.peek_op() {
-        if next_op.len() == 2 {
-            ps.consume_wsc();
-            ps.consume_wsc();
-        } else if next_op.len() == 3 {
-            ps.consume_wsc();
-            ps.consume_wsc();
-            ps.consume_wsc();
-        } else {
-            ps.consume_wsc();
-        }
+        ps.consume_wsc_n(next_op.len());
 
         let next_prec = get_op_prec(&next_op);
         if prec < next_prec {
@@ -1021,16 +1027,7 @@ pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Res
             _ if op.is_some() => {
                 if binop_mode { break; }
                 let op = op.unwrap();
-                if op.len() == 2 {
-                    ps.consume_wsc();
-                    ps.consume_wsc();
-                } else if op.len() == 3 {
-                    ps.consume_wsc();
-                    ps.consume_wsc();
-                    ps.consume_wsc();
-                } else {
-                    ps.consume_wsc();
-                }
+                ps.consume_wsc_n(op.len());
                 value = parse_binop(value, ps, &op)?;
             },
             '=' => {
@@ -1364,9 +1361,10 @@ mod tests {
         assert_eq!(parse("10 - 20 - 30 - 40"),      "[&Block,[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],10,20],30],40]]");
         assert_eq!(parse("10 - 20 - [30 - 40]"),    "[&Block,[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],10,20],[&Call,[&Var,$\"-\"],30,40]]]");
 
-        assert_eq!(parse("$t and $f"),              "[&Block,[&Call,[&Var,$\"and\"],$true,$false]]");
-        assert_eq!(parse("$t or $f"),               "[&Block,[&Call,[&Var,$\"or\"],$true,$false]]");
-        assert_eq!(parse("$t and $f or $f and $f"), "[&Block,[&Call,[&Var,$\"or\"],[&Call,[&Var,$\"and\"],$true,$false],[&Call,[&Var,$\"and\"],$false,$false]]]");
+        assert_eq!(parse("$t &and $f"),                "[&Block,[&And,$true,$false]]");
+        assert_eq!(parse("1 &and 2 &and 3 &and 4"),    "[&Block,[&And,[&And,[&And,1,2],3],4]]");
+        assert_eq!(parse("$t &or $f"),                 "[&Block,[&Or,$true,$false]]");
+        assert_eq!(parse("$t &and $f &or $f &and $f"), "[&Block,[&Or,[&And,$true,$false],[&And,$false,$false]]]");
     }
 
     #[test]

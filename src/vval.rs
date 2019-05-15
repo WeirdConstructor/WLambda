@@ -27,6 +27,8 @@ pub enum Syntax {
     Func,
     Block,
     Call,
+    And,
+    Or,
     Assign,
     Def,
     DefRef,
@@ -403,12 +405,12 @@ impl VVal {
                     if argc > 0 {
                         let v = env.arg(0).clone();
                         v.call(env, 0)
-                    } else { Ok(VVal::Nul) }
+                    } else { Ok(self.clone()) }
                 } else {
                     if argc > 1 {
                         let v = env.arg(1).clone();
                         v.call(env, 0)
-                    } else { Ok(VVal::Nul) }
+                    } else { Ok(self.clone()) }
                 };
                 env.reset_bp(0, old_bp);
                 // env.repl_locals_size(old_ls);
@@ -423,11 +425,11 @@ impl VVal {
                             Ok(v.get_key(&sym).unwrap_or(VVal::Nul)),
                         _ => Ok(VVal::Nul)
                     }
-                } else { Ok(VVal::Nul) };
+                } else { Ok(self.clone()) };
                 env.reset_bp(0, old_bp);
                 ret
             },
-            _ => { Ok(VVal::Nul) },
+            _ => { Ok(self.clone()) },
         }
     }
 

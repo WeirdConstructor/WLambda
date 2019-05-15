@@ -340,6 +340,34 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         Ok(v)
                     }))
                 },
+                Syntax::Or => {
+                    let exprs : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        for x in exprs.iter() {
+                            let ret = x(e)?;
+                            if ret.b() {
+                                return Ok(ret);
+                            }
+                        }
+                        return Ok(VVal::Bol(false));
+                    }))
+                },
+                Syntax::And => {
+                    let exprs : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let mut ret = VVal::Nul;
+                        for x in exprs.iter() {
+                            ret = x(e)?;
+                            println!("ANDRET: {}", ret.s());
+                            if !ret.b() {
+                                return Ok(VVal::Bol(false));
+                            }
+                        }
+                        return Ok(ret);
+                    }))
+                },
                 Syntax::Call => {
                     let mut call_args : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
                     call_args.reverse();
@@ -372,7 +400,9 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         for s in stmts.iter() {
                             res = VVal::Nul;
                             res = s(env)?;
+                            println!("RES STMT: {}", res.s());
                         }
+                            println!("eeRES STMT: {}", res.s());
                         Ok(res)
                     }));
 
@@ -639,6 +669,13 @@ mod tests {
     }
 
     #[test]
+    fn check_call_primitives() {
+        assert_eq!(eval("13()"), "13");
+        assert_eq!(eval("$t()"), "$true");
+        assert_eq!(eval(":foo"), "$\"foo\"");
+    }
+
+    #[test]
     fn check_ops() {
         assert_eq!(eval("10 < 20"),     "$true");
         assert_eq!(eval("11 < 10"),     "$false");
@@ -660,11 +697,11 @@ mod tests {
         assert_eq!(eval("22 != 22"),    "$false");
         assert_eq!(eval("21 != 22"),    "$true");
 
-//        assert_eq!(eval("$t && $t"),    "$true");
-//        assert_eq!(eval("$f && $t"),    "$false");
-//        assert_eq!(eval("$t || $t"),    "$true");
-//        assert_eq!(eval("$f || $t"),    "$false");
-//        assert_eq!(eval("$f || $f"),    "$false");
+        assert_eq!(eval("$t &and $t"),    "$true");
+        assert_eq!(eval("$f &and $t"),    "$false");
+        assert_eq!(eval("$t &or  $t"),    "$true");
+        assert_eq!(eval("$f &or  $t"),    "$true");
+        assert_eq!(eval("$f &or  $f"),    "$false");
 
         assert_eq!(eval("2 ^ 2"),       "4");
         assert_eq!(eval("2 ^ 3"),       "8");
@@ -688,6 +725,21 @@ mod tests {
         assert_eq!(eval("[0b1 << 1] == 0b10"),     "$true");
         assert_eq!(eval("[0b1 << 2] == 0b100"),    "$true");
         assert_eq!(eval("[0b1 >> 1] == 0x0"),      "$true");
+
+        assert_eq!(eval("!:ref x = 0; !b = { $t }() &and { .x = 1; 10 }(); $[x, b]"), "[1,10]");
+        assert_eq!(eval("!:ref x = 0; !b = { $f }() &and { .x = 1; 10 }(); $[x, b]"), "[0,$false]");
+        assert_eq!(eval("!:ref x = 0; !b = { $f }() &or { .x = 1; 10 }(); $[x, b]"),  "[1,10]");
+        assert_eq!(eval("!:ref x = 0; !b = { 12 }() &or { .x = 1; 10 }(); $[x, b]"),  "[0,12]");
+        assert_eq!(eval(r#"
+            !:ref x = 0;
+            !f = { yay(x); .x = x + 1; x };
+            !b = f()
+                &and f()
+                &and f()
+                &and f()
+                &and f();
+            $[x, b]
+        "#),  "[5,5]");
     }
 
 }
