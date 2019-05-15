@@ -243,6 +243,15 @@ impl ParseState {
 
     pub fn peek(&self) -> Option<char> { if self.at_eof { None } else { Some(self.peek_char) } }
 
+    pub fn peek3(&self) -> Option<String> {
+        if self.chars.len() > 2 {
+            let s : String = self.chars[0..3].iter().collect();
+            Some(s)
+        } else {
+            None
+        }
+    }
+
     pub fn peek4(&self) -> Option<String> {
         if self.chars.len() > 3 {
             let s : String = self.chars[0..4].iter().collect();
@@ -264,6 +273,18 @@ impl ParseState {
     pub fn peek_op(&self) -> Option<String> {
         if self.at_eof { return None; }
         match self.peek_char {
+            'a' => {
+                if let Some(s) = self.peek3() {
+                    if s == "and" { return Some(s); }
+                }
+                None
+            },
+            'o' => {
+                if let Some(s) = self.peek2() {
+                    if s == "or" { return Some(s); }
+                }
+                None
+            },
             '+' | '-' | '*' | '/' | '%' | '^'
                 => { return Some(self.peek_char.to_string()); },
             '<' | '>' | '!' | '=' | '|' | '&' => {
@@ -932,8 +953,8 @@ pub fn get_op_prec(op: &str) -> i32 {
         "&"                         => 9,
         "&^"                        => 8,
         "&|"                        => 7,
-//        "&&"                        => 6,
-//        "||"                        => 5,
+        "and"                       => 6,
+        "or"                        => 5,
         _                           => 0
     }
 }
@@ -944,6 +965,10 @@ pub fn parse_binop(mut left: VVal, ps: &mut ParseState, op: &str) -> Result<VVal
 
     while let Some(next_op) = ps.peek_op() {
         if next_op.len() == 2 {
+            ps.consume_wsc();
+            ps.consume_wsc();
+        } else if next_op.len() == 3 {
+            ps.consume_wsc();
             ps.consume_wsc();
             ps.consume_wsc();
         } else {
@@ -997,6 +1022,10 @@ pub fn parse_call(mut value: VVal, ps: &mut ParseState, binop_mode: bool) -> Res
                 if binop_mode { break; }
                 let op = op.unwrap();
                 if op.len() == 2 {
+                    ps.consume_wsc();
+                    ps.consume_wsc();
+                } else if op.len() == 3 {
+                    ps.consume_wsc();
                     ps.consume_wsc();
                     ps.consume_wsc();
                 } else {
@@ -1334,6 +1363,10 @@ mod tests {
         assert_eq!(parse("10 * 20 * 30"),           "[&Block,[&Call,[&Var,$\"*\"],[&Call,[&Var,$\"*\"],10,20],30]]");
         assert_eq!(parse("10 - 20 - 30 - 40"),      "[&Block,[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],10,20],30],40]]");
         assert_eq!(parse("10 - 20 - [30 - 40]"),    "[&Block,[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],10,20],[&Call,[&Var,$\"-\"],30,40]]]");
+
+        assert_eq!(parse("$t and $f"),              "[&Block,[&Call,[&Var,$\"and\"],$true,$false]]");
+        assert_eq!(parse("$t or $f"),               "[&Block,[&Call,[&Var,$\"or\"],$true,$false]]");
+        assert_eq!(parse("$t and $f or $f and $f"), "[&Block,[&Call,[&Var,$\"or\"],[&Call,[&Var,$\"and\"],$true,$false],[&Call,[&Var,$\"and\"],$false,$false]]]");
     }
 
     #[test]
