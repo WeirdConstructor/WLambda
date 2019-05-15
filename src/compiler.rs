@@ -227,29 +227,88 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
 fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_ref: bool) -> Result<EvalNode, String> {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
-    let cv      = compile(&value, ce)?;
-    let idx     = ce.borrow_mut().def(&vars.at(0).unwrap().s_raw());
+    let destr   = ast.at(3).unwrap_or(VVal::Nul);
 
-    if is_ref {
-        if weak_ref {
-            Ok(Box::new(move |e: &mut Env| {
-                let mut v = cv(e)?;
-                e.set_consume(idx, (&mut v).to_wref());
-                Ok(v)
-            }))
+    let cv  = compile(&value, ce)?;
+    if destr.b() {
+        let idxs = vars.map_skip(|v| ce.borrow_mut().def(&v.s_raw()), 0);
+        println!("IDXS: {:?}", idxs);
+
+        Ok(Box::new(move |e: &mut Env| {
+            let v = cv(e)?;
+            match v {
+                VVal::Lst(l) => {
+                    let mut i = 0;
+                    for vi in idxs.iter() {
+                        if l.borrow().len() <= i {
+                            e.set_consume(*vi, VVal::Nul);
+                        } else {
+                            let mut val = &mut l.borrow_mut()[i];
+
+                            if is_ref {
+                                if weak_ref {
+                                    e.set_consume(*vi, (&mut val).to_wref());
+                                } else {
+                                    e.set_consume(*vi, (&mut val).to_ref());
+                                }
+                            } else {
+                                e.set_local(*vi, val);
+                            }
+                        }
+                        i += 1;
+                    }
+                    Ok(VVal::Lst(l))
+                },
+                VVal::Map(m) => {
+                    let mut i = 0;
+                    for vi in idxs.iter() {
+                        let vname = vars.at(i).unwrap().s_raw();
+                        let mut val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+                        if is_ref {
+                            if weak_ref {
+                                val = (&mut val).to_wref();
+                            } else {
+                                val = (&mut val).to_ref();
+                            }
+                        }
+
+                        e.set_consume(*vi, val);
+                        i += 1;
+                    }
+                    Ok(VVal::Map(m))
+                },
+                _ => {
+                    for vi in idxs.iter() {
+                        e.set_local(*vi, &v);
+                    }
+                    Ok(v)
+                }
+            }
+        }))
+    } else {
+        let idx = ce.borrow_mut().def(&vars.at(0).unwrap().s_raw());
+
+        if is_ref {
+            if weak_ref {
+                Ok(Box::new(move |e: &mut Env| {
+                    let mut v = cv(e)?;
+                    e.set_consume(idx, (&mut v).to_wref());
+                    Ok(v)
+                }))
+            } else {
+                Ok(Box::new(move |e: &mut Env| {
+                    let mut v = cv(e)?;
+                    e.set_consume(idx, (&mut v).to_ref());
+                    Ok(v)
+                }))
+            }
         } else {
             Ok(Box::new(move |e: &mut Env| {
-                let mut v = cv(e)?;
-                e.set_consume(idx, (&mut v).to_ref());
+                let v = cv(e)?;
+                e.set_local(idx, &v);
                 Ok(v)
             }))
         }
-    } else {
-        Ok(Box::new(move |e: &mut Env| {
-            let v = cv(e)?;
-            e.set_local(idx, &v);
-            Ok(v)
-        }))
     }
 }
 
@@ -360,7 +419,6 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         let mut ret = VVal::Nul;
                         for x in exprs.iter() {
                             ret = x(e)?;
-                            println!("ANDRET: {}", ret.s());
                             if !ret.b() {
                                 return Ok(VVal::Bol(false));
                             }
@@ -400,9 +458,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         for s in stmts.iter() {
                             res = VVal::Nul;
                             res = s(env)?;
-                            println!("RES STMT: {}", res.s());
                         }
-                            println!("eeRES STMT: {}", res.s());
                         Ok(res)
                     }));
 
@@ -527,6 +583,11 @@ mod tests {
         assert_eq!(eval("!x = ${:b: 20, :a: 11}; :a x"),    "11");
         assert_eq!(eval("!x = ${}; x.a = 12; x.a"),         "12");
         assert_eq!(eval("!x = ${}; x.a = 12; x"),           "{a:12}");
+
+        assert_eq!(eval("$[33,44,55].2"), "55");
+        assert_eq!(eval("$[33,44,55].0"), "33");
+        assert_eq!(eval("$[33,44,55].3"), "$n");
+        assert_eq!(eval("1 $[33,44,55]"), "44");
     }
 
     #[test]
@@ -742,4 +803,58 @@ mod tests {
         "#),  "[5,5]");
     }
 
+    #[test]
+    fn check_destructure() {
+        assert_eq!(eval("!(a, b) = $[10, 20]; $[a, b]"),        "[10,20]");
+        assert_eq!(eval("!(a, b) = $[10, 20, 30]; $[a, b]"),    "[10,20]");
+        assert_eq!(eval("!(a, b) = $[10]; $[a, b]"),            "[10,$n]");
+        assert_eq!(eval(
+            "!(a, b) = ${:a: 10, :b: 20, :c: 30}; $[a, b]"),
+            "[10,20]");
+        assert_eq!(eval(
+            "!(a, b) = ${:a: 10}; $[a, b]"),
+            "[10,$n]");
+        assert_eq!(eval(
+            "!(a, b) = ${:b: 20, :c: 30}; $[a, b]"),
+            "[$n,20]");
+
+        assert_eq!(eval("!:ref(a, b) = $[10, 20]; { .a = 33; }(); $[a, b]"), "[33,20]");
+        assert_eq!(eval(r#"
+            !fun = {
+                !:ref(a, b) = $[10, 20];
+                $[{a}, { .a = 33; }];
+            }();
+            [1 fun]();
+            [0 fun]()
+        "#),
+        "33");
+        assert_eq!(eval(r#"
+            !fun = {
+                !:wref(a, b) = $[10, 20];
+                $[{$[a, b]}, { .a = 33; }];
+            }();
+            [1 fun]();
+            [0 fun]()
+        "#),
+        "[$n,$n]");
+        assert_eq!(eval(r#"
+            !fun = {
+                !:ref(a, b) = $[10, 20];
+                $[{$[a, b]}, { .a = 33; }];
+            }();
+            [1 fun]();
+            [0 fun]()
+        "#),
+        "[33,20]");
+    }
+
+    #[test]
+    fn check_type() {
+        assert_eq!(eval("type type"), "\"function\"");
+        assert_eq!(eval("type 12"),   "\"int\"");
+        assert_eq!(eval("type 12.2"), "\"float\"");
+        assert_eq!(eval("type $n"),   "\"nul\"");
+        assert_eq!(eval("type $[]"),  "\"vector\"");
+        assert_eq!(eval("type ${}"),  "\"map\"");
+    }
 }

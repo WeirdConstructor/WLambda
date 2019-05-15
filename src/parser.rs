@@ -1126,11 +1126,13 @@ pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, Parse
         }
     }
 
+    let mut destructuring = false;
     let ids = VVal::vec();
 
     match ps.peek().unwrap() {
         '(' => {
             ps.consume_wsc();
+            destructuring = true;
 
             while let Some(c) = ps.peek() {
                 if c == ')' { break; }
@@ -1157,6 +1159,9 @@ pub fn parse_assignment(ps: &mut ParseState, is_def: bool) -> Result<VVal, Parse
         return ps.err_unexpected_token('=', "In assignment");
     }
     assign.push(parse_expr(ps)?);
+    if destructuring {
+        assign.push(VVal::Bol(destructuring));
+    }
 
     return Ok(assign);
 }
@@ -1373,9 +1378,9 @@ mod tests {
         assert_eq!(parse("! x = 10 ;"),          "[&Block,[&Def,[$\"x\"],10]]");
         assert_eq!(parse("! x = 10"),            "[&Block,[&Def,[$\"x\"],10]]");
         assert_eq!(parse("!:ref x = 10"),        "[&Block,[&DefRef,[$\"x\"],10]]");
-        assert_eq!(parse("!:ref (a,b) = 10"),    "[&Block,[&DefRef,[$\"a\",$\"b\"],10]]");
-        assert_eq!(parse(". (a,b) = 10"),        "[&Block,[&Assign,[$\"a\",$\"b\"],10]]");
-        assert_eq!(parse("(a,b)=10"),            "[&Block,[&Assign,[$\"a\",$\"b\"],10]]");
+        assert_eq!(parse("!:ref (a,b) = 10"),    "[&Block,[&DefRef,[$\"a\",$\"b\"],10,$true]]");
+        assert_eq!(parse(". (a,b) = 10"),        "[&Block,[&Assign,[$\"a\",$\"b\"],10,$true]]");
+        assert_eq!(parse("(a,b)=10"),            "[&Block,[&Assign,[$\"a\",$\"b\"],10,$true]]");
     }
 
     #[test]

@@ -397,10 +397,7 @@ impl VVal {
                 })
             },
             VVal::Bol(b) => {
-                //d// println!("BOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOL1");
-                // let old_ls = env.reserve_locals(0);
                 let old_bp = env.set_bp(0);
-                //d// env.dump_stack();
                 let ret = if *b {
                     if argc > 0 {
                         let v = env.arg(0).clone();
@@ -413,7 +410,6 @@ impl VVal {
                     } else { Ok(self.clone()) }
                 };
                 env.reset_bp(0, old_bp);
-                // env.repl_locals_size(old_ls);
                 ret
             },
             VVal::Sym(sym) => {
@@ -429,6 +425,19 @@ impl VVal {
                 env.reset_bp(0, old_bp);
                 ret
             },
+            VVal::Int(i) => {
+                let old_bp = env.set_bp(0);
+                let ret = if argc > 0 {
+                    let v = env.arg(0);
+                    match v {
+                        VVal::Lst(_) =>
+                            Ok(v.at(*i as usize).unwrap_or(VVal::Nul)),
+                        _ => Ok(VVal::Nul)
+                    }
+                } else { Ok(self.clone()) };
+                env.reset_bp(0, old_bp);
+                ret
+            }
             _ => { Ok(self.clone()) },
         }
     }
@@ -553,7 +562,9 @@ impl VVal {
 
     pub fn at(&self, index: usize) -> Option<VVal> {
         if let VVal::Lst(b) = &self {
-            return Some(b.borrow()[index].clone());
+            if b.borrow().len() > index {
+                return Some(b.borrow()[index].clone());
+            }
         }
         None
     }
@@ -586,6 +597,31 @@ impl VVal {
             VVal::Str(s)  => s.borrow().clone(),
             VVal::Sym(s)  => s.clone(),
             _             => String::from(""),
+        }
+    }
+
+    pub fn type_name(&self) -> String {
+        match self {
+            VVal::Str(_)     => String::from("string"),
+            VVal::Byt(_)     => String::from("bytes"),
+            VVal::Nul        => String::from("nul"),
+            VVal::Bol(_)     => String::from("bool"),
+            VVal::Sym(_)     => String::from("sym"),
+            VVal::Syn(_)     => String::from("syn"),
+            VVal::Int(_)     => String::from("int"),
+            VVal::Flt(_)     => String::from("float"),
+            VVal::Lst(_)     => String::from("vector"),
+            VVal::Map(_)     => String::from("map"),
+            VVal::Fun(_)     => String::from("function"),
+            VVal::DropFun(_) => String::from("drop_function"),
+            VVal::Ref(l)     => (*l).borrow().type_name(),
+            VVal::WRef(l)    => (*l).borrow().type_name(),
+            VVal::WWRef(l)   => {
+                match l.upgrade() {
+                    Some(v) => v.borrow().type_name(),
+                    None => String::from("nul"),
+                }
+            },
         }
     }
 

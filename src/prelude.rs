@@ -90,9 +90,6 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     add_bin_op!(g, ==, a, b, Ok(VVal::Bol(a.eq(&b))));
     add_bin_op!(g, !=, a, b, Ok(VVal::Bol(!a.eq(&b))));
 
-//    add_bin_op!(g, &&, a, b, Ok(VVal::Bol(a.b() && b.b())));
-//    add_bin_op!(g, ||, a, b, Ok(VVal::Bol(a.b() || b.b())));
-
     add_sbin_op!(g, "&|", a, b,
         Ok(VVal::Int(((a.i() as u32) | (b.i() as u32)) as i64)));
     add_sbin_op!(g, "&", a, b,
@@ -143,6 +140,21 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             let v = env.arg(0);
             v.push(env.arg(1).clone());
             Ok(v.clone())
+        });
+
+    g.borrow_mut().add_func(
+        "type",
+        |env: &mut Env, argc: usize| {
+            if argc < 1 { println!("YOOOY"); return Ok(VVal::Nul); }
+            if argc > 1 {
+                let vec = VVal::vec();
+                for i in 0..argc {
+                    vec.push(VVal::new_str(&env.arg(i).type_name()));
+                }
+                Ok(vec)
+            } else {
+                Ok(VVal::new_str(&env.arg(0).type_name()))
+            }
         });
 
     g.borrow_mut().add_func(
