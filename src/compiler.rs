@@ -118,8 +118,8 @@ impl CompileEnv {
             GlobalEnv::new()
         };
         Rc::new(RefCell::new(CompileEnv {
-            parent:    parent,
-            global:    global,
+            parent,
+            global,
             local_map: std::collections::HashMap::new(),
             locals:    Vec::new(),
             upvals:    Vec::new(),

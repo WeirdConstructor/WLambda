@@ -296,8 +296,8 @@ pub struct VValFun {
 impl VValFun {
     pub fn new(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize) -> VVal {
         VVal::Fun(Rc::new(VValFun {
-            upvalues:   upvalues,
-            fun:        fun,
+            upvalues,
+            fun,
             local_size: env_size,
         }))
     }
@@ -425,7 +425,7 @@ impl VVal {
     }
 
     pub fn vec() -> VVal {
-        return VVal::Lst(Rc::new(RefCell::new(Vec::new())));
+        VVal::Lst(Rc::new(RefCell::new(Vec::new())))
     }
 
     pub fn vec_from(vl: &[VVal]) -> VVal {
@@ -439,22 +439,16 @@ impl VVal {
         match self {
             VVal::Fun(fu) => {
                 env.with_fun_info(fu.clone(), argc, |e: &mut Env| {
-                    (((*fu).fun.borrow()))(e, argc)
+                    ((*fu).fun.borrow())(e, argc)
                 })
             },
             VVal::Bol(b) => {
                 let old_bp = env.set_bp(0);
-                let ret = if *b {
-                    if argc > 0 {
-                        let v = env.arg(0).clone();
-                        v.call(env, 0)
-                    } else { Ok(self.clone()) }
-                } else {
-                    if argc > 1 {
-                        let v = env.arg(1).clone();
-                        v.call(env, 0)
-                    } else { Ok(self.clone()) }
-                };
+                let idx = if *b { 0 } else { 1 };
+                let ret = if argc > 0 {
+                    let v = env.arg(idx).clone();
+                    v.call(env, 0)
+                } else { Ok(self.clone()) };
                 env.reset_bp(0, old_bp);
                 ret
             },
@@ -517,11 +511,11 @@ impl VVal {
     }
 
     pub fn map() -> VVal {
-        return VVal::Map(Rc::new(RefCell::new(std::collections::HashMap::new())));
+        VVal::Map(Rc::new(RefCell::new(std::collections::HashMap::new())))
     }
 
     pub fn sym(s: &str) -> VVal {
-        return VVal::Sym(String::from(s));
+        VVal::Sym(String::from(s))
     }
 
     pub fn eq(&self, v: &VVal) -> bool {
@@ -529,7 +523,7 @@ impl VVal {
             VVal::Nul     => { if let VVal::Nul = v { return true; } else { return false; } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { return ia == ib; } else { return false; } },
             VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return ia == ib; } else { return false; } },
-            _             => { return false; }
+            _             => { false }
         }
     }
 

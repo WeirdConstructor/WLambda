@@ -158,7 +158,7 @@ impl State {
         if self.at_eof { return None; }
         match self.peek_char {
             '+' | '-' | '*' | '/' | '%' | '^'
-                => { return Some(self.peek_char.to_string()); },
+                => { Some(self.peek_char.to_string()) },
             '<' | '>' | '!' | '=' | '&' => {
                 if let Some(s) = self.peek4() {
                     if s == "&and" { return Some(s); }
@@ -264,7 +264,7 @@ impl State {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     pub fn lookahead(&mut self, s: &str) -> bool {
@@ -368,7 +368,7 @@ impl State {
             at_eof:    false,
             line_no:   1,
             col_no:    1,
-            file_no:   file_no,
+            file_no,
         };
         ps.init();
         ps.skip_ws_and_comments();

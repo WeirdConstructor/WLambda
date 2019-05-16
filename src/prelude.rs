@@ -187,10 +187,10 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         "to_drop",
         |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
-            let f = env.arg(1);
-            let v = env.arg(0);
+            let fun = env.arg(1);
+            let v   = env.arg(0);
 
-            Ok(VVal::DropFun(Rc::new(DropVVal { v: v, fun: f, })))
+            Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
         });
 
     g.borrow_mut().add_func(
