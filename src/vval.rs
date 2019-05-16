@@ -1,11 +1,20 @@
 // Copyright (c) 2019 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
+/*!
+
+This module provides the core data structures used by the parser,
+compiler and evaluator of WLambda.
+
+*/
+
 use std::rc::Rc;
 use std::rc::Weak;
 use std::cell::RefCell;
 use std::fmt;
 
+/// Structure for holding information about origin
+/// of an AST node.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SynPos {
     pub syn:        Syntax,
@@ -14,6 +23,7 @@ pub struct SynPos {
     pub file:       u32,
 }
 
+/// Encodes the different types of AST nodes.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum Syntax {
@@ -35,25 +45,34 @@ pub enum Syntax {
     DefWRef,
 }
 
-const STACK_SIZE : usize = 4096;
+/// The maximum stack size.
+///
+/// Currently hardcoded, but later the API user will be able to specify it.
+const STACK_SIZE : usize = 10240;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum VarPos {
-    NoPos,
-    UpValue(usize),
-    Local(usize),
-}
-
+/// The runtime environment of the evaluator.
 pub struct Env {
+    /// The argument stack, limited to `STACK_SIZE`.
     pub args: std::vec::Vec<VVal>,
+    /// A reference to the currently executed function.
+    ///
+    /// Used for accessing the up values and other details
+    /// about the function.
     pub fun:  Rc<VValFun>,
+    /// The basepointer to reference arguments and
+    /// local variables.
+    ///
+    /// - `bp + n (n >= 0)` references a local variable
+    /// - `bp - n (n > 0)` references an argument
     pub bp:   usize,
+    /// The current stack pointer.
     pub sp:   usize,
+    /// The argument count to the current call.
     pub argc: usize,
 }
 
 impl Env {
-    pub fn new_s() -> Env {
+    pub fn new() -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             fun:                VValFun::new_dummy(),
@@ -290,6 +309,7 @@ impl VValFun {
     }
 }
 
+/// Handles calling of destructor functions.
 #[derive(Debug, Clone)]
 pub struct DropVVal {
     pub v:      VVal,
@@ -299,10 +319,9 @@ pub struct DropVVal {
 impl Drop for DropVVal {
     #[allow(unused_must_use)]
     fn drop(&mut self) {
-        let mut e = Env::new_s();
+        let mut e = Env::new();
         e.push(self.v.clone());
         self.fun.call(&mut e, 1);
-        println!("DROPENV!");
     }
 }
 
@@ -577,9 +596,21 @@ impl VVal {
         }
     }
 
-    pub fn set_key(&self, key: &str, val: VVal) {
-        if let VVal::Map(m) = &self {
-            m.borrow_mut().insert(String::from(key), val);
+    pub fn set_key(&self, key: &VVal, val: VVal) {
+        match self {
+            VVal::Map(m) => {
+                let ks = key.s_raw();
+                m.borrow_mut().insert(ks, val);
+            },
+            VVal::Lst(l) => {
+                let idx = key.i() as usize;
+                let mut v = l.borrow_mut();
+                if v.len() <= idx {
+                    v.resize(idx + 1, VVal::Nul);
+                }
+                v[idx] = val;
+            },
+            _ => {}
         }
     }
 

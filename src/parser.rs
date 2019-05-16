@@ -13,7 +13,7 @@ and small implementation, and I hope I could achieve that here.
 The syntax of WLambda is in part also to make it a bit easier
 to parse in this hand written parser.
 
-## WLambda Lexical Syntax and Grammar
+## Full WLambda Lexical Syntax and Grammar
 
 White space is everything that satisfies `std::char::is_whitespace`,
 so unicode white space is respected. Comments have to following syntax:
@@ -24,7 +24,7 @@ In the following grammar, white space and comments are omitted:
 
 ```ebnf
 
-    ident_start   = ( ?alphanumeric? | "_" | "@" )
+    ident_start   = ( ?alphabetic? | "_" | "@" )
     ident_end     = { ?any character?
                      - ( ?white space?
                          | "." | "," | ":" | ";"
@@ -38,54 +38,141 @@ In the following grammar, white space and comments are omitted:
                   ;
     ident         = ident_start, [ ident_end ]
                   ;
+    ref_specifier = ":", qident
+                  ;
 
-    op = (* here all operators are listed line by line regarding
-            their precedence, top to bottom *)
-          "^"
-        | "*" | "/" | "%"
-        | "-" | "+"
-        | "<<" | ">>"       (* binary shift *)
-        | "<" | ">" | "<=" | ">="
-        | "==" | "!="
-        | "&"               (* binary and *)
-        | "&^"              (* binary xor *)
-        | "&|"              (* binary or *)
-        | "&and"            (* logical and, short circuit *)
-        | "&or"             (* logical or, short circuit *)
-        |
-    bin_op = call_no_ops, { op, bin_op }
-           ;
-    call_no_ops = value, { arg_list | field_access }, [ "~", expr ]
-                ;
-    call = value,
-           { arg_list | field_access | bin_op | value },
-           [ "~", expr ] (* this is a tail argument, if present the
-                            expr is appended to the argument list *)
-         ;
-    pipe_expr = call, { "|", call }
-              ;
-    expr     = pipe_expr
-             ;
+    digit         = "0" | "1" | "2" | "3" | "4" | "5"
+                  | "6" | "7" | "8" | "9"
+                  ;
+    radix         = digit, { digit }
+                  ;
+    radix_digits  = (* digits in the radix specified
+                       earlier in the number.
+                       Default radix is of course 10. *)
+    number        = [ "-" | "+" ],
+                    [ ( radix, "r"
+                      | "0", "x"
+                      | "0", "b"
+                      | "0", "o"
+                      ) ],
+                    radix_digits,
+                    [ ".", radix_digits ]
+                  ;
+    hexdigit      = ?hexdigit, upper or lower case?
+                  ;
+    string_escape = "x", hexdigit, hexdigit  (* byte/ascii escape *)
+                  | "n"                      (* newline *)
+                  | "r"                      (* carriage return *)
+                  | "t"                      (* horizontal tab *)
+                  | "0"                      (* nul byte/char *)
+                  | "u", hexdigit, { hexdigit }
+                                             (* unicode char, or in byte strings
+                                                their utf-8 encoded form *)
+                  | "\""
+                  | "\'"
+                  | "\\"
+                  ;
+    string        = "\"", { "\\", string_escape | ?any character? - "\\" },"\""
+                  ;
+    byte_string   = "b", string
+                  ;
+    list          = "[", [ expr, { ",", expr } ], "]"
+                  ;
+    map           = "{", [
+                        (ident | expr), ":", expr,
+                        { ",", (ident | expr), ":", expr },
+                    ], "}"
+                  ;
+    true          = "t" | "true"
+                  ;
+    false         = "f" | "false"
+                  ;
+    nul           = "n" | "nul"
+                  ;
+    special_value = byte_string
+                  | list
+                  | map
+                  | none
+                  | true
+                  | false
+                  ;
+    function      = "{", block, "}"
+                  ;
+    var           = ident
+                  ;
+    symbol        = ":" qident
+                  (* symbols are usually used to specify
+                     fields in literal map definitions *)
+                  ;
+    value         = number
+                  | string
+                  | "$", special_value
+                  | "[", expr, "]"
+                  | function
+                  | symbol
+                  | var
+                  ;
+    op            = (* here all operators are listed line by line regarding
+                       their precedence, top to bottom *)
+                    "^"
+                  | "*" | "/" | "%"
+                  | "-" | "+"
+                  | "<<" | ">>"       (* binary shift *)
+                  | "<" | ">" | "<=" | ">="
+                  | "==" | "!="
+                  | "&"               (* binary and *)
+                  | "&^"              (* binary xor *)
+                  | "&|"              (* binary or *)
+                  | "&and"            (* logical and, short circuit *)
+                  | "&or"             (* logical or, short circuit *)
+                  ;
+    bin_op        = call_no_ops, { op, bin_op } (* precedence parsing is done
+                                                   in a Pratt parser style *)
+                  ;
+    arg_list      = "(", [ expr, { ",", expr } ], ")"
+                  ;
+    field         = ".", ( ident | value ), [ field ]
+                  ;
+    field_access  = field, "=", expr
+                  | field, arg_list
+                  | field
+                  (* please note, that a field access like:
+                     `obj.field` is equivalent to the call:
+                     `field(obj)`. That also means that
+                     `obj.field(...)` is transformed into
+                     `field(obj)(...)`.
+                     The exception is "=" which assigns
+                     the field as specified.
+                     BUT: There is a special case, when you specify
+                     an `indent` it is quoted and interpreted as symbol. *)
+                  ;
+    call_no_ops   = value, { arg_list | field_access }, [ "~", expr ]
+                  ;
+    call          = value,
+                    { arg_list | field_access | bin_op | value },
+                    [ "~", expr ] (* this is a tail argument, if present the
+                                     expr is appended to the argument list *)
+                  ;
+    expr          = call, { "|", call }
+                  ;
     simple_assign = qident, "=", expr
                   ;
     destr_assign  = "(", [ qident, { ",", qident } ], ")", "=" expr
-                  ;
-    ref_specifier = ":", quoted_ident
                   ;
     definition    = [ ref_specifier ],
                     ( simple_assign
                     | destr_assign )
                   ;
-    statement = "!" definition
-              | "." assign
-              | destr_assign
-              | expr
-              ;
-    block = "{", { statement, ";", {";"}}, [ statement, {";"} ], "}"
-          | { statement, ";", {";"} }, [ statement, {";"} ]
-          ;
-    code = block
-         ;
+    statement     = "!" definition
+                  | "." assign
+                  | destr_assign
+                  | expr
+                  ;
+    block         = "{", { statement, ";", {";"}}, [ statement, {";"} ], "}"
+                  | { statement, ";", {";"} }, [ statement, {";"} ]
+                  ;
+    code          = block
+                  ;
 ```
 
 */
@@ -101,50 +188,13 @@ pub use parse_state::ParseError;
 
 /*
 
-Bukclo
-
-vector      := '$[' expr (',' expr)* ','? ']'
-map         := '${' expr ':' expr (',' expr ':' expr)* ','? '}'
-number      := float | int
-string      := '"' ... '"'
-nul         := "$nul" | "$n"
-bool        := "$t" | "$f" | "$true" | "$false"
-native_keys := "$if" | "$while" | "$break" | "$for"
-key         := ':' identifier
-primitive   := vector | map | number | key | string | nul | bool
-var         := identifier
-
-block       := '{' stmt* '}'
-func        := block
-value       := primitive | func | var | '[' expr ']'
-field       := value | identifier
-arglist     := '(' (expr (',' expr)*)?)? ')'
-field-acc   := value ('.' field)+          // field access
-             | value ('.' field)+ '=' expr // assignment
-             | value ('.' field)+ arglist  // method/field call
-call        := call arglist
-             | call '~' expr
-             | field-acc
-             | call (binop call)+ // where call is limited to arglist and field-acc
-             | call call+ // field-acc and others have priority
-             | value call+ // this is then always
-expr        := call ('|' expr)*
-             | value
-def         := '!' key? assignment
-assignment  := '.' identifier '=' expr
-             | '.'? '(' (identifier (',' identifier)*)? ')' = expr
-stmt        := def ';'
-             | assignment ';'
-             | expr ';'
-             | ';'
-
 special variables:
     arguments are in '@', first one is in '_' and _1
     others: _1 up to _9
 
 special functions:
     range   - returning a range iterator
-    iter    - called on vec/map it returns a collection iterator
+    iter    - called on list/map it returns a collection iterator
     apply fn arg-list - calls fn with arguments from arg-list
                         makes stuff like `apply bla @` possible
 
@@ -167,8 +217,6 @@ tilde:
     =>
     { * _ 2 }({ - _ 2 }({ pow _ 10 } 20))
 
-
-
 dotcall:
 
     a.b c d
@@ -179,7 +227,7 @@ what calling means for primitive types:
 
     number  => access index in first arg
     key     => access field in first arg
-    vec     => call first arg for every element
+    list    => call first arg for every element
     map     => call first arg for every kv pair
     #true   => call first arg
     #false  => call second arg
@@ -477,24 +525,24 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
     }
 }
 
-fn parse_vec(ps: &mut State) -> Result<VVal, ParseError> {
+fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_wsc('[') {
-        return ps.err_unexpected_token('[', "At vector.");
+        return ps.err_unexpected_token('[', "At list.");
     }
 
-    let vec = ps.syn(Syntax::Lst);
+    let list = ps.syn(Syntax::Lst);
 
     while ps.peek().unwrap() != ']' {
         let atom = parse_expr(ps)?;
-        vec.push(atom);
+        list.push(atom);
         if !ps.consume_if_eq_wsc(',') { break; }
     }
 
     if !ps.consume_if_eq_wsc(']') {
-        return ps.err_unexpected_token(']', "At the end of vector");
+        return ps.err_unexpected_token(']', "At the end of list");
     }
 
-    Ok(vec)
+    Ok(list)
 }
 
 fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
@@ -506,7 +554,12 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
     let map = ps.syn(Syntax::Map);
 
     while ps.peek().unwrap() != '}' {
-        let key = parse_expr(ps)?;
+        let c = ps.peek().unwrap();
+        let key = if is_ident_start(c) {
+            VVal::Sym(parse_identifier(ps))
+        } else {
+            parse_expr(ps)?
+        };
         if !ps.consume_if_eq_wsc(':') {
             return ps.err_unexpected_token(':', "After reading map key");
         }
@@ -528,13 +581,13 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 
-fn parse_literal(ps: &mut State) -> Result<VVal, ParseError> {
+fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
     if ps.at_eof { return ps.err_eof("literal value"); }
     let c = ps.peek().unwrap();
 
     match c {
         'b' => { ps.consume(); parse_string(ps, true) },
-        '[' => parse_vec(ps),
+        '[' => parse_list(ps),
         '{' => parse_map(ps),
         'n' => {
             if ps.consume_lookahead("nul") {
@@ -595,7 +648,7 @@ fn make_var(ps: &State, identifier: &str) -> VVal {
     return id;
 }
 
-fn make_key(ps: &State, identifier: &str) -> VVal {
+fn make_sym(ps: &State, identifier: &str) -> VVal {
     let id = ps.syn(Syntax::Key);
     id.push(VVal::Sym(String::from(identifier)));
     return id;
@@ -635,13 +688,17 @@ fn parse_identifier(ps: &mut State) -> String {
     identifier
 }
 
+fn is_ident_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_' || c == '@'
+}
+
 fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
     //println!("parse_value [{}]", ps.rest());
     if let Some(c) = ps.peek() {
         match c {
             '0' ... '9' | '+' | '-' => parse_num(ps),
             '"' => parse_string(ps, false),
-            '$' => { ps.consume_wsc(); parse_literal(ps) },
+            '$' => { ps.consume_wsc(); parse_special_value(ps) },
             '[' => {
                 ps.consume_wsc();
                 let expr = parse_expr(ps)?;
@@ -658,9 +715,9 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
             ':' => {
                 ps.consume_wsc();
                 let id = parse_identifier(ps);
-                Ok(make_key(ps, &id))
+                Ok(make_sym(ps, &id))
             },
-            _ if c.is_alphanumeric() || c == '_' || c == '@' => {
+            _ if is_ident_start(c) => {
                 let id = parse_identifier(ps);
                 Ok(make_var(ps, &id))
             },
@@ -681,14 +738,20 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
         if c != '.' { break; }
 
         ps.consume_wsc();
-        let value = parse_value(ps)?;
-        if let Some(ea) = value.at(0) {
-            if let VVal::Syn(s) = ea {
-                if s.syn == Syntax::Var {
-                    value.set_at(0, ps.syn_raw(Syntax::Key));
-                }
-            }
-        }
+
+        let c = if let Some(c) = ps.peek() {
+            c
+        } else {
+            return ps.err_eof("field access");
+        };
+
+        let value = if is_ident_start(c) {
+            let id = ps.syn(Syntax::Key);
+            id.push(VVal::Sym(parse_identifier(ps)));
+            id
+        } else {
+            parse_value(ps)?
+        };
 
         if let Some(c) = ps.peek() {
             match c {
@@ -709,17 +772,13 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                         Err(err) => return Err(err),
                     }
                 },
-                _ => {
-                    let call = make_to_call(ps, value);
-                    call.push(obj);
-                    obj = call;
-                }
+                _ => { }
             }
-        } else {
-            let call = make_to_call(ps, value);
-            call.push(obj);
-            obj = call;
         }
+
+        let call = make_to_call(ps, value);
+        call.push(obj);
+        obj = call;
     }
 
     Ok(obj)
@@ -794,7 +853,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
 
     // look ahead, if we see an expression delimiter.
     // because then, this is not going to be a call!
-    // Also exception to parse_pipe_expr, we are excluding the '|'.
+    // Also exception to parse_expr, we are excluding the '|'.
     if ps.lookahead_one_of(";),]}:|") {
         return Ok(value);
 
@@ -861,11 +920,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
 }
 
 fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
-    return parse_pipe_expr(ps, false);
-}
-
-fn parse_pipe_expr(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
-    let mut call = parse_call(ps, binop_mode)?;
+    let mut call = parse_call(ps, false)?;
     if ps.at_eof {
         return Ok(call);
     }
@@ -874,7 +929,7 @@ fn parse_pipe_expr(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError>
         match c {
             '|' => {
                 ps.consume_wsc();
-                let mut fn_expr = parse_call(ps, binop_mode)?;
+                let mut fn_expr = parse_call(ps, false)?;
                 if !is_call(&fn_expr) {
                     fn_expr = make_to_call(ps, fn_expr);
                 }
@@ -1134,6 +1189,7 @@ mod tests {
         assert_eq!(parse("foo.a = 10 | 20"),          "[&Block,[&SetKey,[&Var,$\"foo\"],[&Key,$\"a\"],[&Call,20,10]]]");
         assert_eq!(parse("foo.a = 10 ~ 20"),          "[&Block,[&SetKey,[&Var,$\"foo\"],[&Key,$\"a\"],[&Call,10,20]]]");
         assert_eq!(parse("4 == 5 ~ 10"),              "[&Block,[&Call,[&Var,$\"==\"],4,[&Call,5,10]]]");
+        assert_eq!(parse("foo.[i] = 10"),             "[&Block,[&SetKey,[&Var,$\"foo\"],[&Var,$\"i\"],10]]");
     }
 
     #[test]
@@ -1210,7 +1266,7 @@ mod tests {
 
     #[test]
     fn check_map() {
-        assert_eq!(parse("${a:10}"),   "[&Block,[&Map,[[&Var,$\"a\"],10]]]");
+        assert_eq!(parse("${a:10}"),   "[&Block,[&Map,[$\"a\",10]]]");
         assert_eq!(parse("${:a:10}"),  "[&Block,[&Map,[[&Key,$\"a\"],10]]]");
     }
 

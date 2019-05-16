@@ -9,7 +9,6 @@ use crate::vval::Env;
 use crate::vval::VValFun;
 use crate::vval::EvalNode;
 use crate::vval::StackAction;
-use crate::vval::VarPos;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::time::Instant;
@@ -57,6 +56,13 @@ impl GlobalEnv {
             env: std::collections::HashMap::new()
         }))
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum VarPos {
+    NoPos,
+    UpValue(usize),
+    Local(usize),
 }
 
 #[allow(dead_code)]
@@ -367,8 +373,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         let m = map(e)?;
                         let s = sym(e)?;
                         let v = val(e)?;
-                        let ks = s.s_raw();
-                        m.set_key(&ks, v.clone());
+                        m.set_key(&s, v.clone());
                         Ok(v)
                     }))
                 },
@@ -393,8 +398,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         let v = VVal::map();
                         for x in list_elems.iter() {
                             let ke = x.0(e)?;
-                            let ks = ke.s_raw();
-                            v.set_key(&ks, x.1(e)?);
+                            v.set_key(&ke, x.1(e)?);
                         }
                         Ok(v)
                     }))
@@ -491,7 +495,7 @@ pub fn eval_tree(v: VVal, g: GlobalEnvRef, runs: u32) -> String {
     let prog = compile(&v, &mut ce);
     match prog {
         Ok(r) => {
-            let mut e = Env::new_s();
+            let mut e = Env::new();
             e.push(VVal::Flt(42.42)); // 2nd arg
             e.push(VVal::Int(13));    // 1st arg
             e.argc = 2;
@@ -570,6 +574,10 @@ mod tests {
         assert_eq!(eval("!:ref y = 0; { .y = _ } 10; y"),   "10");
         assert_eq!(eval("${:a: 10, :b: 20}"),               "{a:10,b:20}");
         assert_eq!(eval("${:b: 20, :a: 10}"),               "{a:10,b:20}");
+        assert_eq!(eval("${a: 10, b: 20}"),               "{a:10,b:20}");
+        assert_eq!(eval("${b: 20, a: 10}"),               "{a:10,b:20}");
+        assert_eq!(eval("${[:a]: 10, b: 20}"),               "{a:10,b:20}");
+        assert_eq!(eval("${[:b]: 20, a: 10}"),               "{a:10,b:20}");
         assert_eq!(eval("!x = ${:b: 20, :a: 10}; x"),       "{a:10,b:20}");
         assert_eq!(eval("!x = ${:b: 20, :a: 10}; x.a"),     "10");
         assert_eq!(eval("!x = ${:b: 20, :a: 11}; :a x"),    "11");
@@ -801,13 +809,13 @@ mod tests {
         assert_eq!(eval("!(a, b) = $[10, 20, 30]; $[a, b]"),    "[10,20]");
         assert_eq!(eval("!(a, b) = $[10]; $[a, b]"),            "[10,$n]");
         assert_eq!(eval(
-            "!(a, b) = ${:a: 10, :b: 20, :c: 30}; $[a, b]"),
+            "!(a, b) = ${a: 10, b: 20, c: 30}; $[a, b]"),
             "[10,20]");
         assert_eq!(eval(
-            "!(a, b) = ${:a: 10}; $[a, b]"),
+            "!(a, b) = ${a: 10}; $[a, b]"),
             "[10,$n]");
         assert_eq!(eval(
-            "!(a, b) = ${:b: 20, :c: 30}; $[a, b]"),
+            "!(a, b) = ${b: 20, c: 30}; $[a, b]"),
             "[$n,20]");
 
         assert_eq!(eval("!:ref(a, b) = $[10, 20]; { .a = 33; }(); $[a, b]"), "[33,20]");
@@ -842,6 +850,13 @@ mod tests {
 //        assert_eq!(
 //            eval("!a = 0; !b = 0; .(a, b) = $[10, 20]; $[a, b]"),
 //            "[10,20]");
+    }
+
+    #[test]
+    fn check_field() {
+        assert_eq!(eval("!v = $[]; v.0 = 10; v"), "[10]");
+        assert_eq!(eval("!v = $[]; v.2 = 10; v"), "[$n,$n,10]");
+        assert_eq!(eval("!i = 2; !v = $[]; v.[i] = 10; v"), "[$n,$n,10]");
     }
 
     #[test]
