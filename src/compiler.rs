@@ -318,6 +318,14 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
     }
 }
 
+fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) {
+    match pos {
+        VarPos::UpValue(d) => { e.set_up(*d, v); },
+        VarPos::Local(d)   => { e.set_local(*d, v); },
+        VarPos::NoPos      => { panic!(format!("Assignment to unknow pos!")); }
+    }
+}
+
 fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
@@ -334,13 +342,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                     let mut i = 0;
                     for pos in poses.iter() {
                         let val = &mut l.borrow_mut()[i];
-                        match pos {
-                            VarPos::UpValue(d) => { e.set_up(*d, val); },
-                            VarPos::Local(d)   => { e.set_local(*d, val); },
-                            VarPos::NoPos => {
-                                panic!(format!("Assignment to unknow pos!"));
-                            }
-                        }
+                        set_env_at_varpos(e, pos, val);
                         i += 1;
                     }
                     Ok(VVal::Lst(l))
@@ -350,26 +352,14 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                     for pos in poses.iter() {
                         let vname = vars.at(i).unwrap().s_raw();
                         let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-                        match pos {
-                            VarPos::UpValue(d) => { e.set_up(*d, &val); },
-                            VarPos::Local(d)   => { e.set_local(*d, &val); },
-                            VarPos::NoPos => {
-                                panic!(format!("Assignment to unknow pos!"));
-                            }
-                        }
+                        set_env_at_varpos(e, pos, &val);
                         i += 1;
                     }
                     Ok(VVal::Map(m))
                 },
                 _ => {
                     for pos in poses.iter() {
-                        match pos {
-                            VarPos::UpValue(d) => { e.set_up(*d, &v); },
-                            VarPos::Local(d)   => { e.set_local(*d, &v); },
-                            VarPos::NoPos => {
-                                panic!(format!("Assignment to unknow pos!"));
-                            }
-                        }
+                        set_env_at_varpos(e, pos, &v);
                     }
                     Ok(v)
                 }
