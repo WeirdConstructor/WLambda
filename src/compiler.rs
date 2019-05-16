@@ -1,7 +1,7 @@
 // Copyright (c) 2019 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
-use crate::parser::*; // ParseState;
+use crate::parser::{self};
 use crate::prelude::*;
 use crate::vval::VVal;
 use crate::vval::Syntax;
@@ -479,18 +479,6 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
     }
 }
 
-fn mk(s: &str) -> ParseState {
-    ParseState::new(s, 1)
-}
-
-pub fn parse(s: &str) -> VVal {
-    let mut ps = mk(s);
-    match parse_block(&mut ps, false) {
-        Ok(v) => v,
-        Err(e) => { panic!(format!("PARSE ERROR: {:?} at '{}' with input '{}'", e, ps.rest(), s)); },
-    }
-}
-
 pub fn eval_tree(v: VVal, g: GlobalEnvRef, runs: u32) -> String {
     let mut ce = Rc::new(RefCell::new(CompileEnv {
         parent:    None,
@@ -537,8 +525,12 @@ pub fn eval_tree(v: VVal, g: GlobalEnvRef, runs: u32) -> String {
 
 pub fn eval(s: &str) -> String {
     let global = create_wlamba_prelude();
-    let v = parse(s);
-    eval_tree(v, global, 1)
+    match parser::parse(s, 0) {
+        Ok(ast) => {
+            eval_tree(ast, global, 1)
+        }
+        Err(e) => { panic!(format!("PARSE ERROR: {}", e)); },
+    }
 }
 
 
