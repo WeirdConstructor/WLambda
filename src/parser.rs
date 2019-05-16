@@ -1,6 +1,96 @@
 // Copyright (c) 2019 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
+/*!
+This is the grammar parser for WLambda. It produces an AST to be further
+transformed by `wlambda::compiler::compile()` into an executable form
+of the program.
+
+The parser is a bit crufty as I did not go the extra step of writing
+a lexer/tokenizer. One goal of WLambda is to have a rather uncomplicated
+and small implementation, and I hope I could achieve that here.
+
+The syntax of WLambda is in part also to make it a bit easier
+to parse in this hand written parser.
+
+## WLambda Lexical Syntax and Grammar
+
+White space is everything that satisfies `std::char::is_whitespace`,
+so unicode white space is respected. Comments have to following syntax:
+
+   comment = "#" ?anything except "\n"? "\n"
+
+In the following grammar, white space and comments are omitted:
+
+```ebnf
+
+    ident_start   = ( ?alphanumeric? | "_" | "@" )
+    ident_end     = { ?any character?
+                     - ( ?white space?
+                         | "." | "," | ":" | ";"
+                         | "{" | "}" | "[" | "]" | "(" | ")"
+                         | "~" | "|" | "=" ) }
+                  ;
+    qident        = ident_end
+                  (* a quoted identifier can not appear anywhere,
+                     it's usually delimited or follows something that
+                     makes sure we are now expecting an identifier *)
+                  ;
+    ident         = ident_start, [ ident_end ]
+                  ;
+
+    op = (* here all operators are listed line by line regarding
+            their precedence, top to bottom *)
+          "^"
+        | "*" | "/" | "%"
+        | "-" | "+"
+        | "<<" | ">>"       (* binary shift *)
+        | "<" | ">" | "<=" | ">="
+        | "==" | "!="
+        | "&"               (* binary and *)
+        | "&^"              (* binary xor *)
+        | "&|"              (* binary or *)
+        | "&and"            (* logical and, short circuit *)
+        | "&or"             (* logical or, short circuit *)
+        |
+    bin_op = call_no_ops, { op, bin_op }
+           ;
+    call_no_ops = value, { arg_list | field_access }, [ "~", expr ]
+                ;
+    call = value,
+           { arg_list | field_access | bin_op | value },
+           [ "~", expr ] (* this is a tail argument, if present the
+                            expr is appended to the argument list *)
+         ;
+    pipe_expr = call, { "|", call }
+              ;
+    expr     = pipe_expr
+             ;
+    simple_assign = qident, "=", expr
+                  ;
+    destr_assign  = "(", [ qident, { ",", qident } ], ")", "=" expr
+                  ;
+    ref_specifier = ":", quoted_ident
+                  ;
+    definition    = [ ref_specifier ],
+                    ( simple_assign
+                    | destr_assign )
+                  ;
+    statement = "!" definition
+              | "." assign
+              | destr_assign
+              | expr
+              ;
+    block = "{", { statement, ";", {";"}}, [ statement, {";"} ], "}"
+          | { statement, ";", {";"} }, [ statement, {";"} ]
+          ;
+    code = block
+         ;
+```
+
+*/
+
+
 use crate::vval::VVal;
 use crate::vval::Syntax;
 
@@ -681,7 +771,7 @@ fn get_op_prec(op: &str) -> i32 {
 
 fn parse_binop(mut left: VVal, ps: &mut State, op: &str) -> Result<VVal, ParseError> {
     let prec = get_op_prec(op);
-    let mut right = parse_call_expr(ps, true, true)?;
+    let mut right = parse_call(ps, true)?;
 
     while let Some(next_op) = ps.peek_op() {
         ps.consume_wsc_n(next_op.len());
@@ -698,7 +788,20 @@ fn parse_binop(mut left: VVal, ps: &mut State, op: &str) -> Result<VVal, ParseEr
     return Ok(make_binop(ps, op, left, right));
 }
 
-fn parse_call(mut value: VVal, ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
+fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
+    //println!("parse_expr [{}] np={}", ps.rest(), no_pipe);
+    let mut value = parse_value(ps)?;
+
+    // look ahead, if we see an expression delimiter.
+    // because then, this is not going to be a call!
+    // Also exception to parse_pipe_expr, we are excluding the '|'.
+    if ps.lookahead_one_of(";),]}:|") {
+        return Ok(value);
+
+    } else if ps.at_eof {
+        return Ok(value);
+    }
+
     //println!("parse_call [{}]", ps.rest());
     let mut res_call = VVal::Nul;
 
@@ -758,33 +861,12 @@ fn parse_call(mut value: VVal, ps: &mut State, binop_mode: bool) -> Result<VVal,
 }
 
 fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
-    return parse_call_expr(ps, false, false);
+    return parse_pipe_expr(ps, false);
 }
 
-fn parse_call_expr(ps: &mut State, no_pipe: bool, binop_mode: bool) -> Result<VVal, ParseError> {
-    //println!("parse_expr [{}] np={}", ps.rest(), no_pipe);
-    let value = parse_value(ps)?;
-
-    // look ahead, if we see an expression delimiter.
-    // because then, this is not going to be a call!
-    if ps.lookahead_one_of(";),]}:") {
-        return Ok(value);
-
-    } else if ps.at_eof {
-        return Ok(value);
-
-    } else if no_pipe && ps.peek().unwrap() == '|' {
-        return Ok(value);
-    }
-
-    let mut call = value;
-    if ps.peek().unwrap() != '|' {
-        // if we have something left to read, and it's not a
-        // delimiter, then we have to read a call:
-        call = parse_call(call, ps, binop_mode)?;
-    }
-
-    if ps.at_eof || (no_pipe && ps.peek().unwrap() == '|') {
+fn parse_pipe_expr(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
+    let mut call = parse_call(ps, binop_mode)?;
+    if ps.at_eof {
         return Ok(call);
     }
 
@@ -792,7 +874,7 @@ fn parse_call_expr(ps: &mut State, no_pipe: bool, binop_mode: bool) -> Result<VV
         match c {
             '|' => {
                 ps.consume_wsc();
-                let mut fn_expr = parse_call_expr(ps, true, binop_mode)?;
+                let mut fn_expr = parse_call(ps, binop_mode)?;
                 if !is_call(&fn_expr) {
                     fn_expr = make_to_call(ps, fn_expr);
                 }
@@ -863,7 +945,9 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_wsc('=') {
         return ps.err_unexpected_token('=', "In assignment");
     }
+
     assign.push(parse_expr(ps)?);
+
     if destructuring {
         assign.push(VVal::Bol(destructuring));
     }

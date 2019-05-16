@@ -155,7 +155,7 @@ impl State {
         match self.peek_char {
             '+' | '-' | '*' | '/' | '%' | '^'
                 => { return Some(self.peek_char.to_string()); },
-            '<' | '>' | '!' | '=' | '|' | '&' => {
+            '<' | '>' | '!' | '=' | '&' => {
                 if let Some(s) = self.peek4() {
                     if s == "&and" { return Some(s); }
                 }
@@ -169,7 +169,7 @@ impl State {
                         _ => { }
                     }
                 }
-                if self.peek_char != '=' && self.peek_char != '|' {
+                if self.peek_char != '=' {
                     Some(self.peek_char.to_string())
                 } else {
                     None
