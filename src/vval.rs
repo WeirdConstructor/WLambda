@@ -275,6 +275,10 @@ impl Env {
     }
 }
 
+/// Encodes all kinds of jumps up the call stack, like `break` and `next` in Loops.
+///
+/// As WLambda is not using a VM, it uses return values of the
+/// closure call tree to handle jumping up the stack.
 #[derive(Debug, Clone)]
 pub enum StackAction {
 //    Panic(String),
@@ -285,9 +289,15 @@ pub enum StackAction {
 pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,StackAction>>;
 pub type ClosNodeRef = Rc<RefCell<Fn(&mut Env, usize) -> Result<VVal,StackAction>>>;
 
+/// This structure is the runtime representation of a WLambda function value.
 pub struct VValFun {
+    /// The closure that runs the function.
     pub fun:        ClosNodeRef,
+    /// Contains any caught upvalues.
     pub upvalues:   std::vec::Vec<VVal>,
+    /// The number of local variables defined in this functions.
+    ///
+    /// This value is used to reserve stack space for storing them.
     pub local_size: usize,
 }
 
@@ -325,23 +335,48 @@ impl Drop for DropVVal {
     }
 }
 
+/// VVal aka. VariantValue is a data structure to represent
+/// all kinds of WLambda data structures.
+///
+/// It's used for the AST, for internal data and for runtime data structures.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum VVal {
+    /// The nul value, the default value of all non initialized data.
     Nul,
+    /// Representation of a boolean value.
     Bol(bool),
+    /// Representation of a symbol or key.
+    ///
+    /// This one might be interned at some point, so that it only contains
+    /// an Rc<SymRef> in future.
     Sym(String),
+    /// Representation of a unicode/text string.
     Str(Rc<RefCell<String>>),
+    /// Representation of a byte buffer.
     Byt(Rc<RefCell<Vec<u8>>>),
-    Syn(SynPos),
+    /// Integer value
     Int(i64),
+    /// Float value
     Flt(f64),
+    /// A syntax node in the AST, records the position too.
+    Syn(SynPos),
+    /// A list (or vector) of VVals.
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
+    /// A mapping of strings to VVals.
     Map(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
+    /// A function, see also [VValFun](struct.VValFun.html)
     Fun(Rc<VValFun>),
+    /// A guarded VVal, that executes a given function when it is
+    /// no longer referenced.
     DropFun(Rc<DropVVal>),
+    /// A (strong) reference to a VVal.
     Ref(Rc<RefCell<VVal>>),
+    /// A (strong) reference to a VVal, which is cloned
+    /// as weak reference when copied into a `VValFun`
+    /// as up value.
     WRef(Rc<RefCell<VVal>>),
+    /// A weak reference to a VVal. Might turn VVal::Nul anytime.
     WWRef(Weak<RefCell<VVal>>),
 }
 

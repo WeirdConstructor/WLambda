@@ -12,6 +12,8 @@ use std::fmt::{Display, Formatter};
 /// Can be created using `parser::State::new`:
 ///
 /// ```rust
+/// use wlambda::parser::State;
+///
 /// let code    = "{ 123 }";
 /// let file_no = 400;
 /// let mut ps  = State::new(code, file_no);
@@ -33,11 +35,13 @@ pub struct State {
 /// The errors all take a tuple of 5 elements, with the following
 /// semantics:
 ///
+/// ```txt
 ///     (<error message>,
 ///      <snipped of the following code>,
 ///      <line number>,
 ///      <column number>,
 ///      <file number>)
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {
     UnexpectedToken((String, String, u32, u32, u32)),
@@ -348,9 +352,11 @@ impl State {
     /// from other sources, that I can not anticipate here.
     ///
     /// ```rust
+    /// use wlambda::parser::State;
+    ///
     /// let code    = "{ 123 }";
     /// let file_no = 400;
-    /// let mut ps  = parser::State::new(code, file_no);
+    /// let mut ps  = State::new(code, file_no);
     /// // ...
     /// wlambda::parser::parse_block(&mut ps, true);
     /// // ...

@@ -527,6 +527,7 @@ pub fn eval_tree(v: VVal, g: GlobalEnvRef, runs: u32) -> String {
     }
 }
 
+#[allow(dead_code)]
 pub fn eval(s: &str) -> String {
     let global = create_wlamba_prelude();
     match parser::parse(s, 0) {

@@ -5,27 +5,15 @@ mod vval;
 mod parser;
 mod compiler;
 mod prelude;
-use compiler::*; // ParseState;
-use parser::*; // ParseState;
-use crate::prelude::*;
-use std::time::Instant;
 
-//use std::iter::Peekable;
-//use std::fmt;
-//
-pub enum BAL {
-    S(i8),
-    Nul,
-    Bar,
-}
+use compiler::eval_tree;
+use parser::parse;
+use crate::prelude::create_wlamba_prelude;
 
 fn main() {
-    let mut v = String::from("");
-
-    let pt = parser::parse("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x", 0).unwrap();
+    let pt = parse("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x", 0).unwrap();
     let global = create_wlamba_prelude();
-
-    v = compiler::eval_tree(pt, global, 2);
+    let v = eval_tree(pt, global, 2);
     println!("> {:?}", v);
 }
 

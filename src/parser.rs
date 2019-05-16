@@ -2,7 +2,9 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 
 /*!
-This is the grammar parser for WLambda. It produces an AST to be further
+This is the grammar parser for WLambda.
+
+It produces an AST to be further
 transformed by `wlambda::compiler::compile()` into an executable form
 of the program.
 
@@ -181,10 +183,10 @@ In the following grammar, white space and comments are omitted:
 use crate::vval::VVal;
 use crate::vval::Syntax;
 
-pub mod parse_state;
+pub mod state;
 
-use parse_state::State;
-pub use parse_state::ParseError;
+pub use state::State;
+pub use state::ParseError;
 
 /*
 
@@ -1028,12 +1030,14 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
 /// This function parses the an optionally delimited block of WLambda statements.
 ///
 /// ```rust
+/// use wlambda::parser::{State, parse_block};
+///
 /// let code = "!a = 0; !b = 1; a + b";
-/// let mut ps = parser::State::new(&code, 1);
+/// let mut ps = State::new(&code, 1);
 ///
 /// // Parse a bare block without '{' ... '}' delimiters:
 /// match parse_block(&mut ps, false) {
-///     Ok(v)  => v.s(),
+///     Ok(v)  => { println!("Result: {}", v.s()); },
 ///     Err(e) => { panic!(format!("ERROR: {}", e)); },
 /// }
 /// ```
@@ -1079,6 +1083,8 @@ pub fn parse_block(ps: &mut State, is_delimited: bool) -> Result<VVal, ParseErro
 /// Facade function for an undelimited `parse_block`.
 ///
 /// ```rust
+/// use wlambda::parser::parse;
+///
 /// match parse("123; 456", 0) {
 ///     Ok(ast)  => println!("AST: {}", ast.s()),
 ///     Err(e) => { panic!(format!("ERROR: {}", e)); },

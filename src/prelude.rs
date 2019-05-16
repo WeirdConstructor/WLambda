@@ -1,3 +1,13 @@
+// Copyright (c) 2019 Weird Constructor <weirdconstructor@gmail.com>
+// This is a part of WLambda. See README.md and COPYING for details.
+
+/*!
+This module defines some default functions and operations
+available in the WLambda language.
+
+For an example, refer to [create_wlamba_prelude](fn.create_wlamba_prelude.html).
+*/
+
 use crate::compiler::*;
 use crate::vval::*;
 use std::rc::Rc;
@@ -73,6 +83,25 @@ macro_rules! add_sbin_op {
     }
 }
 
+/// Defines a new global Environment for running the `compiler`.
+///
+/// The global Environment `GlobalEnvRef` can be reused in different
+/// compilations. Keep in mind, that the compiler might add/remove/change
+/// global definitions.
+///
+/// ```
+///     use wlambda::prelude::create_wlamba_prelude;
+///
+///     let s = "$[1,2,3]";
+///     let global = create_wlamba_prelude();
+///     match wlambda::parser::parse(s, 0) {
+///         Ok(ast) => {
+///             let r = wlambda::compiler::eval_tree(ast, global, 1);
+///             println!("Res: {}", r);
+///         }
+///         Err(e) => { panic!(format!("PARSE ERROR: {}", e)); },
+///     }
+/// ```
 pub fn create_wlamba_prelude() -> GlobalEnvRef {
     let g = GlobalEnv::new();
 
