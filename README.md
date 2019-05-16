@@ -3,7 +3,7 @@
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
-This library/crate is an embeddable scripting language interpreter.
+This crate is an embeddable scripting language interpreter.
 The goals of WLambda are:
 
 * Simple syntax
@@ -11,9 +11,7 @@ The goals of WLambda are:
 * Not being too slow
 * The implementation should be easily maintainable
 
-## Usage
-
-## Overview
+Further documentation can be found in the crate docs.
 
 ## License
 

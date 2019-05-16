@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Weird Constructor <weirdconstructor@gmail.com>"]
 license = "GPL-3.0-or-later"
 edition = "2018"
+description = "WLambda is an embeddable scripting language for Rust"
+repository = "https://github.com/WeirdConstructor/WLambda"
+readme = "README.md"
 
 [dependencies]
 rand = "0.3.14"

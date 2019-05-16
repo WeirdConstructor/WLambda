@@ -6,6 +6,7 @@ mod parser;
 mod compiler;
 mod prelude;
 use compiler::*; // ParseState;
+use parser::*; // ParseState;
 use crate::prelude::*;
 use std::time::Instant;
 
@@ -21,7 +22,7 @@ pub enum BAL {
 fn main() {
     let mut v = String::from("");
 
-    let pt = compiler::parse("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x");
+    let pt = parser::parse("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x", 0).unwrap();
     let global = create_wlamba_prelude();
 
     v = compiler::eval_tree(pt, global, 2);
