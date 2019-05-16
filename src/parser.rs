@@ -1,5 +1,6 @@
 // Copyright (c) 2019 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
+#![allow(clippy::collapsible_if)]
 
 /*!
 This is the grammar parser for WLambda.
@@ -626,7 +627,7 @@ fn is_var(expr: &VVal) -> bool {
             return s.syn == Syntax::Var;
         }
     }
-    return false;
+    false
 }
 
 fn is_call(expr: &VVal) -> bool {
@@ -635,7 +636,7 @@ fn is_call(expr: &VVal) -> bool {
             return s.syn == Syntax::Call;
         }
     }
-    return false;
+    false
 }
 
 fn make_to_call(ps: &State, expr: VVal) -> VVal {
@@ -647,13 +648,13 @@ fn make_to_call(ps: &State, expr: VVal) -> VVal {
 fn make_var(ps: &State, identifier: &str) -> VVal {
     let id = ps.syn(Syntax::Var);
     id.push(VVal::Sym(String::from(identifier)));
-    return id;
+    id
 }
 
 fn make_sym(ps: &State, identifier: &str) -> VVal {
     let id = ps.syn(Syntax::Key);
     id.push(VVal::Sym(String::from(identifier)));
-    return id;
+    id
 }
 
 fn make_binop(ps: &State, op: &str, left: VVal, right: VVal) -> VVal {
@@ -661,19 +662,19 @@ fn make_binop(ps: &State, op: &str, left: VVal, right: VVal) -> VVal {
         let and = ps.syn(Syntax::And);
         and.push(left);
         and.push(right);
-        return and;
+        and
 
     } else if op == "&or" {
         let or = ps.syn(Syntax::Or);
         or.push(left);
         or.push(right);
-        return or;
+        or
 
     } else {
         let call = make_to_call(ps, make_var(ps, op));
         call.push(left);
         call.push(right);
-        return call;
+        call
     }
 }
 
@@ -810,7 +811,7 @@ fn parse_arg_list<'a>(call: &'a mut VVal, ps: &mut State) -> Result<&'a mut VVal
             "While reading call arguments").unwrap_err());
     }
 
-    return Ok(call);
+    Ok(call)
 }
 
 fn get_op_prec(op: &str) -> i32 {
@@ -846,7 +847,7 @@ fn parse_binop(mut left: VVal, ps: &mut State, op: &str) -> Result<VVal, ParseEr
         }
     }
 
-    return Ok(make_binop(ps, op, left, right));
+    Ok(make_binop(ps, op, left, right))
 }
 
 fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
@@ -856,10 +857,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
     // look ahead, if we see an expression delimiter.
     // because then, this is not going to be a call!
     // Also exception to parse_expr, we are excluding the '|'.
-    if ps.lookahead_one_of(";),]}:|") {
-        return Ok(value);
-
-    } else if ps.at_eof {
+    if ps.lookahead_one_of(";),]}:|") || ps.at_eof {
         return Ok(value);
     }
 
@@ -1009,7 +1007,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
         assign.push(VVal::Bol(destructuring));
     }
 
-    return Ok(assign);
+    Ok(assign)
 }
 
 fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {

@@ -245,7 +245,7 @@ impl State {
     pub fn consume_lookahead(&mut self, s: &str) -> bool {
         if self.lookahead(s) {
             for _ in s.chars() { self.chars.remove(0); }
-            if self.chars.len() > 0 {
+            if !self.chars.is_empty() {
                 self.peek_char = self.chars[0];
             } else {
                 self.peek_char = ' ';
@@ -272,12 +272,10 @@ impl State {
             return false;
         }
 
-        let mut i = 0;
-        for c in s.chars() {
+        for (i, c) in s.chars().enumerate() {
             if self.chars[i] != c {
                 return false;
             }
-            i = i + 1;
         }
 
         true
@@ -301,15 +299,15 @@ impl State {
         let c = self.peek_char;
         self.col_no += 1;
         if c == '\n' {
-            self.line_no = self.line_no + 1;
+            self.line_no += 1;
             self.col_no = 1;
         }
 
-        if self.chars.len() > 0 {
+        if !self.chars.is_empty() {
             self.chars.remove(0);
         }
 
-        if self.chars.len() > 0 {
+        if !self.chars.is_empty() {
             self.peek_char = self.chars[0];
         } else {
             self.at_eof = true;
@@ -336,7 +334,7 @@ impl State {
     }
 
     fn init(&mut self) {
-        if self.chars.len() > 0 {
+        if !self.chars.is_empty() {
             self.peek_char = self.chars[0];
         } else {
             self.at_eof = true;

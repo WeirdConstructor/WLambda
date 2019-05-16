@@ -104,8 +104,8 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     add_bool_bin_op!(g, <=);
     add_bool_bin_op!(g, >=);
 
-    add_bin_op!(g, ==, a, b, Ok(VVal::Bol(a.eq(&b))));
-    add_bin_op!(g, !=, a, b, Ok(VVal::Bol(!a.eq(&b))));
+    add_bin_op!(g, ==, a, b, Ok(VVal::Bol(a.eqv(&b))));
+    add_bin_op!(g, !=, a, b, Ok(VVal::Bol(!a.eqv(&b))));
 
     add_sbin_op!(g, "&|", a, b,
         Ok(VVal::Int(((a.i() as u32) | (b.i() as u32)) as i64)));

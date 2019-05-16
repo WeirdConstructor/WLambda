@@ -71,6 +71,10 @@ pub struct Env {
     pub argc: usize,
 }
 
+impl Default for Env {
+    fn default() -> Self { Self::new() }
+}
+
 impl Env {
     pub fn new() -> Env {
         let mut e = Env {
@@ -86,7 +90,7 @@ impl Env {
 
     pub fn set_bp(&mut self, env_size: usize) -> usize {
         let new_bp = self.sp;
-        self.sp = self.sp + env_size;
+        self.sp += env_size;
         std::mem::replace(&mut self.bp, new_bp)
     }
 
@@ -94,7 +98,7 @@ impl Env {
         for i in self.bp..self.sp {
             self.args[i] = VVal::Nul;
         }
-        self.sp = self.sp - env_size;
+        self.sp -= env_size;
         self.bp = oldbp;
     }
 
@@ -124,13 +128,13 @@ impl Env {
     }
 
     pub fn push_sp(&mut self, n: usize) {
-        self.sp = self.sp + n;
+        self.sp += n;
         //d// println!("PUSH_SP {} => {}", n, self.sp);
     }
 
     pub fn push(&mut self, v: VVal) -> usize {
         self.args[self.sp] = v;
-        self.sp = self.sp + 1;
+        self.sp += 1;
         self.sp - 1
     }
 
@@ -139,12 +143,12 @@ impl Env {
             panic!(format!("Stack pointer underflow {} {}", self.sp, n));
         }
         if n > 0 {
-            for i in (self.sp - 1)..((self.sp - n) + 1) {
+            for i in (self.sp - 1)..=(self.sp - n) {
                 //d// println!("POP[{}] {}", i, self.args[i].s());
                 self.args[i] = VVal::Nul;
             }
         }
-        self.sp = self.sp - n;
+        self.sp -= n;
         //d// println!("POPN {} => {}", n, self.sp);
     }
 
@@ -153,18 +157,16 @@ impl Env {
         println!("* SP={}, BP={}", self.sp, self.bp);
         for il in self.bp..self.sp {
             println!("    LOCAL [{:3}] = {}", i, self.args[il].s());
-            i = i + 1;
+            i += 1;
         }
         i = 0;
         for v in self.args.iter() {
             println!("    GLOBL [{:3}] = {}", i, v.s());
-            i = i + 1;
+            i += 1;
             if i >= self.sp { break; }
         }
-        let mut i = 0;
-        for u in self.fun.upvalues.iter() {
+        for (i, u) in self.fun.upvalues.iter().enumerate() {
             println!("  UP[{:3}] = {}", i, u.s());
-            i = i + 1;
         }
     }
 
@@ -294,7 +296,7 @@ pub struct VValFun {
 }
 
 impl VValFun {
-    pub fn new(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize) -> VVal {
+    pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalues,
             fun,
@@ -406,7 +408,7 @@ pub fn format_vval_str(s: &str, narrow_ascii: bool) -> String {
     v.concat()
 }
 
-pub fn format_vval_byt(v: &Vec<u8>) -> String {
+pub fn format_vval_byt(v: &[u8]) -> String {
     let mut s = String::from("");
     for b in v.iter() {
         s.push(*b as char);
@@ -482,11 +484,11 @@ impl VVal {
         }
     }
 
-    pub fn to_ref(&mut self) -> VVal {
+    pub fn to_ref(&self) -> VVal {
         VVal::Ref(Rc::new(RefCell::new(self.clone())))
     }
 
-    pub fn to_wref(&mut self) -> VVal {
+    pub fn to_wref(&self) -> VVal {
         VVal::WRef(Rc::new(RefCell::new(self.clone())))
     }
 
@@ -518,11 +520,11 @@ impl VVal {
         VVal::Sym(String::from(s))
     }
 
-    pub fn eq(&self, v: &VVal) -> bool {
+    pub fn eqv(&self, v: &VVal) -> bool {
         match self {
             VVal::Nul     => { if let VVal::Nul = v { return true; } else { return false; } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { return ia == ib; } else { return false; } },
-            VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return ia == ib; } else { return false; } },
+            VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return (ia - ib).abs() < std::f64::EPSILON; } else { return false; } },
             _             => { false }
         }
     }
@@ -751,22 +753,22 @@ impl VVal {
         match self {
             VVal::Str(s)     => format_vval_str(&s.borrow(), false),
             VVal::Byt(s)     => format!("$b{}", format_vval_byt(&s.borrow())),
-            VVal::Nul        => format!("$n"),
-            VVal::Bol(b)     => if *b { format!("$true") } else { format!("$false") },
+            VVal::Nul        => "$n".to_string(),
+            VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
             VVal::Sym(s)     => format!("$\"{}\"", s),
             VVal::Syn(s)     => format!("&{:?}", s.syn),
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
             VVal::Lst(l)     => VVal::dump_vec_as_str(l),
             VVal::Map(l)     => VVal::dump_map_as_str(l), // VVal::dump_map_as_str(l),
-            VVal::Fun(_)     => format!("&VValFun"),
+            VVal::Fun(_)     => "&VValFun".to_string(),
             VVal::DropFun(f) => f.v.s(),
             VVal::Ref(l)     => format!("REF[{}]", (*l).borrow().s()),
             VVal::WRef(l)    => format!("wREF[{}]", (*l).borrow().s()),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => format!("WREF[{}]", v.borrow().s()),
-                    None => format!("$n"),
+                    None => "$n".to_string(),
                 }
             },
         }

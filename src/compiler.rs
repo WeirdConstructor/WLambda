@@ -64,7 +64,7 @@ impl GlobalEnv {
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
         self.env.insert(
             String::from(fnname),
-            VValFun::new(Rc::new(RefCell::new(fun)), Vec::new(), 0));
+            VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0));
     }
 
     /// Creates a new GlobalEnv.
@@ -170,7 +170,7 @@ impl CompileEnv {
         match pos {
             None => {
                 let opt_p = self.parent.as_mut();
-                if let None = opt_p { return VarPos::NoPos; }
+                if opt_p.is_none() { return VarPos::NoPos; }
                 let parent = opt_p.unwrap().clone();
                 let mut par_mut = parent.borrow_mut();
 
@@ -260,42 +260,38 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
             let v = cv(e)?;
             match v {
                 VVal::Lst(l) => {
-                    let mut i = 0;
-                    for vi in idxs.iter() {
+                    for (i, vi) in idxs.iter().enumerate() {
                         if l.borrow().len() <= i {
                             e.set_consume(*vi, VVal::Nul);
                         } else {
-                            let mut val = &mut l.borrow_mut()[i];
+                            let val = &mut l.borrow_mut()[i];
 
                             if is_ref {
                                 if weak_ref {
-                                    e.set_consume(*vi, (&mut val).to_wref());
+                                    e.set_consume(*vi, (&val).to_wref());
                                 } else {
-                                    e.set_consume(*vi, (&mut val).to_ref());
+                                    e.set_consume(*vi, (&val).to_ref());
                                 }
                             } else {
                                 e.set_local(*vi, val);
                             }
                         }
-                        i += 1;
                     }
                     Ok(VVal::Lst(l))
                 },
                 VVal::Map(m) => {
-                    let mut i = 0;
-                    for vi in idxs.iter() {
+                    for (i, vi) in idxs.iter().enumerate() {
                         let vname = vars.at(i).unwrap().s_raw();
                         let mut val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
                         if is_ref {
                             if weak_ref {
-                                val = (&mut val).to_wref();
+                                val = (&val).to_wref();
                             } else {
-                                val = (&mut val).to_ref();
+                                val = (&val).to_ref();
                             }
                         }
 
                         e.set_consume(*vi, val);
-                        i += 1;
                     }
                     Ok(VVal::Map(m))
                 },
@@ -313,14 +309,14 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
         if is_ref {
             if weak_ref {
                 Ok(Box::new(move |e: &mut Env| {
-                    let mut v = cv(e)?;
-                    e.set_consume(idx, (&mut v).to_wref());
+                    let v = cv(e)?;
+                    e.set_consume(idx, (&v).to_wref());
                     Ok(v)
                 }))
             } else {
                 Ok(Box::new(move |e: &mut Env| {
-                    let mut v = cv(e)?;
-                    e.set_consume(idx, (&mut v).to_ref());
+                    let v = cv(e)?;
+                    e.set_consume(idx, (&v).to_ref());
                     Ok(v)
                 }))
             }
@@ -338,7 +334,7 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) {
     match pos {
         VarPos::UpValue(d) => { e.set_up(*d, v); },
         VarPos::Local(d)   => { e.set_local(*d, v); },
-        VarPos::NoPos      => { panic!(format!("Assignment to unknow pos!")); }
+        VarPos::NoPos      => { panic!("Assignment to unknow pos!".to_string()); }
     }
 }
 
@@ -355,21 +351,17 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
             let v = cv(e)?;
             match v {
                 VVal::Lst(l) => {
-                    let mut i = 0;
-                    for pos in poses.iter() {
+                    for (i, pos) in poses.iter().enumerate() {
                         let val = &mut l.borrow_mut()[i];
                         set_env_at_varpos(e, pos, val);
-                        i += 1;
                     }
                     Ok(VVal::Lst(l))
                 },
                 VVal::Map(m) => {
-                    let mut i = 0;
-                    for pos in poses.iter() {
+                    for (i, pos) in poses.iter().enumerate() {
                         let vname = vars.at(i).unwrap().s_raw();
                         let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
                         set_env_at_varpos(e, pos, &val);
-                        i += 1;
                     }
                     Ok(VVal::Map(m))
                 },
@@ -474,7 +466,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                                 return Ok(ret);
                             }
                         }
-                        return Ok(VVal::Bol(false));
+                        Ok(VVal::Bol(false))
                     }))
                 },
                 Syntax::And => {
@@ -488,7 +480,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                                 return Ok(VVal::Bol(false));
                             }
                         }
-                        return Ok(ret);
+                        Ok(ret)
                     }))
                 },
                 Syntax::Call => {
@@ -500,11 +492,9 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         let f    = func(e)?;
                         let argc = call_args.len();
                         e.with_pushed_sp(argc, |e: &mut Env| {
-                            let mut i = 0;
-                            for x in call_args.iter() {
+                            for (i, x) in call_args.iter().enumerate() {
                                 let v = x(e)?;
                                 e.set_arg(argc - (i + 1), v);
-                                i = i + 1;
                             }
                             f.call(e, argc)
                         })
@@ -529,7 +519,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     Ok(Box::new(move |e: &mut Env| {
                         let mut v = Vec::new();
                         ce_sub.borrow_mut().copy_upvals(e, &mut v);
-                        Ok(VValFun::new(fun_ref.clone(), v, env_size))
+                        Ok(VValFun::new_val(fun_ref.clone(), v, env_size))
                     }))
                 },
                 _ => { Err(format!("bad input: {}", ast.s())) }
@@ -572,8 +562,8 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
                         Ok(v)   => { ret = v },
                         Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
                     }
-                    rts = rts + (now.elapsed().as_millis() as f64);
-                    cnt = cnt + 1;
+                    rts += now.elapsed().as_millis() as f64;
+                    cnt += 1;
                 }
                 println!("*** runtime: {} ({} runs)", rts / (cnt as f64), cnt);
                 ret

@@ -147,6 +147,24 @@ from a closure tree to a VM and/or JIT speedup.
 However, if someone is able to significantly speed up the
 evaluation this can be changed.
 
+# License
+
+This project is licensed under the GNU General Public License Version 3 or
+later.
+
+If you need this crate in a more Rust compatible Licesen, please contact me.
+
+# Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in WLambda by you, shall be licensed as GPLv3 or later,
+without any additional terms or conditions.
+
+# Authors
+
+* Weird Constructor <weirdconstructor@gmail.com>
+  (You may find me as `WeirdConstructor` on the Rust Discord.)
+
 */
 
 pub mod vval;
