@@ -6,14 +6,14 @@ mod parser;
 mod compiler;
 mod prelude;
 
-use compiler::eval_tree;
+use compiler::bench_eval_ast;
 use parser::parse;
 use crate::prelude::create_wlamba_prelude;
 
 fn main() {
     let pt = parse("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x", 0).unwrap();
     let global = create_wlamba_prelude();
-    let v = eval_tree(pt, global, 2);
+    let v = bench_eval_ast(pt, global, 2);
     println!("> {:?}", v);
 }
 

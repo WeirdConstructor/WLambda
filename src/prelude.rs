@@ -89,19 +89,7 @@ macro_rules! add_sbin_op {
 /// compilations. Keep in mind, that the compiler might add/remove/change
 /// global definitions.
 ///
-/// ```
-///     use wlambda::prelude::create_wlamba_prelude;
-///
-///     let s = "$[1,2,3]";
-///     let global = create_wlamba_prelude();
-///     match wlambda::parser::parse(s, 0) {
-///         Ok(ast) => {
-///             let r = wlambda::compiler::eval_tree(ast, global, 1);
-///             println!("Res: {}", r);
-///         }
-///         Err(e) => { panic!(format!("PARSE ERROR: {}", e)); },
-///     }
-/// ```
+/// For an example see also [compiler::eval](../compiler/fn.eval.html)
 pub fn create_wlamba_prelude() -> GlobalEnvRef {
     let g = GlobalEnv::new();
 
