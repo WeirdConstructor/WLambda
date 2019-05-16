@@ -321,26 +321,82 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
 fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
+    let destr   = ast.at(3).unwrap_or(VVal::Nul);
     let cv      = compile(&value, ce)?;
-    let s       = &vars.at(0).unwrap().s_raw();
-    let pos     = ce.borrow_mut().get(s);
 
-    match pos {
-        VarPos::UpValue(i) => {
-            Ok(Box::new(move |e: &mut Env| {
-                let v = cv(e)?;
-                e.set_up(i, &v);
-                Ok(v)
-            }))
-        },
-        VarPos::Local(i) => {
-            Ok(Box::new(move |e: &mut Env| {
-                let v = cv(e)?;
-                e.set_local(i, &v);
-                Ok(v)
-            }))
-        },
-        VarPos::NoPos => panic!(format!("assigning without definition of '{}'", s)),
+    if destr.b() {
+        let poses = vars.map_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
+
+        Ok(Box::new(move |e: &mut Env| {
+            let v = cv(e)?;
+            match v {
+                VVal::Lst(l) => {
+                    let mut i = 0;
+                    for pos in poses.iter() {
+                        let val = &mut l.borrow_mut()[i];
+                        match pos {
+                            VarPos::UpValue(d) => { e.set_up(*d, val); },
+                            VarPos::Local(d)   => { e.set_local(*d, val); },
+                            VarPos::NoPos => {
+                                panic!(format!("Assignment to unknow pos!"));
+                            }
+                        }
+                        i += 1;
+                    }
+                    Ok(VVal::Lst(l))
+                },
+                VVal::Map(m) => {
+                    let mut i = 0;
+                    for pos in poses.iter() {
+                        let vname = vars.at(i).unwrap().s_raw();
+                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+                        match pos {
+                            VarPos::UpValue(d) => { e.set_up(*d, &val); },
+                            VarPos::Local(d)   => { e.set_local(*d, &val); },
+                            VarPos::NoPos => {
+                                panic!(format!("Assignment to unknow pos!"));
+                            }
+                        }
+                        i += 1;
+                    }
+                    Ok(VVal::Map(m))
+                },
+                _ => {
+                    for pos in poses.iter() {
+                        match pos {
+                            VarPos::UpValue(d) => { e.set_up(*d, &v); },
+                            VarPos::Local(d)   => { e.set_local(*d, &v); },
+                            VarPos::NoPos => {
+                                panic!(format!("Assignment to unknow pos!"));
+                            }
+                        }
+                    }
+                    Ok(v)
+                }
+            }
+        }))
+
+    } else {
+        let s   = &vars.at(0).unwrap().s_raw();
+        let pos = ce.borrow_mut().get(s);
+
+        match pos {
+            VarPos::UpValue(i) => {
+                Ok(Box::new(move |e: &mut Env| {
+                    let v = cv(e)?;
+                    e.set_up(i, &v);
+                    Ok(v)
+                }))
+            },
+            VarPos::Local(i) => {
+                Ok(Box::new(move |e: &mut Env| {
+                    let v = cv(e)?;
+                    e.set_local(i, &v);
+                    Ok(v)
+                }))
+            },
+            VarPos::NoPos => panic!(format!("assigning without definition of '{}'", s)),
+        }
     }
 }
 
@@ -848,9 +904,9 @@ mod tests {
         "#),
         "[33,20]");
 
-//        assert_eq!(
-//            eval("!a = 0; !b = 0; .(a, b) = $[10, 20]; $[a, b]"),
-//            "[10,20]");
+        assert_eq!(
+            eval("!a = 0; !b = 0; .(a, b) = $[10, 20]; $[a, b]"),
+            "[10,20]");
     }
 
     #[test]

@@ -91,20 +91,12 @@ impl Env {
     }
 
     pub fn reset_bp(&mut self, env_size: usize, oldbp: usize) {
-        //d// println!("RESET BP FROM:");
-        //d// self.dump_stack();
         for i in self.bp..self.sp {
             self.args[i] = VVal::Nul;
         }
         self.sp = self.sp - env_size;
         self.bp = oldbp;
     }
-
-//    pub fn reserve_locals(&mut self, env_size: usize) -> usize {
-//        self.sp = self.sp + env_size;
-//        std::mem::replace(&mut self.cur_locals_size, env_size)
-//    }
-
 
     pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
@@ -589,11 +581,6 @@ impl VVal {
         }
         res
     }
-
-//    fn dump_map_as_str(v: &Rc<RefCell<std::collections::HashMap<String, VVal>>>) -> String {
-////        v.iter().map(| x | x.s() + ", ").collect()
-//        String::from("")
-//    }
 
     pub fn unshift(&self, val: VVal) -> &VVal {
         if let VVal::Lst(b) = &self {
