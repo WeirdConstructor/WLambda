@@ -154,11 +154,13 @@ later.
 
 ## Why GPL?
 
-I've long thought about this, which license should I use for my published
-code. And I've read and had some discussions about this. First
-about _why I write code for free_ at all:
+Picking a license for my code bothered me for a long time. I read many
+discussions about this topic. Read the license explanations. And discussed
+this matter with other developers.
 
-- It's my passion to write computer programs. And in my free time I can
+First about _why I write code for free_ at all:
+
+- It's my passion to write computer programs. In my free time I can
 write the code I want, when I want and the way I want. I can freely
 allocate my time and freely choose the projects I want to work on.
 - To help a friend or member of my family.
@@ -182,10 +184,10 @@ It ultimately prevents _"vendor lock in"_. I really dislike vendor lock in,
 especially as developer. Especially as developer I want and need to stay
 in control of the computers I use.
 
-Another point is, that I have to pay my bills with my development skill.
-If I give away my work without _any_ strings attached, I effectively work
-for free. Work for free for companies. I would compromise the price I can
-demand for my skill, workforce and time.
+Another point is, that my work has a value. If I give away my work without
+_any_ strings attached, I effectively work for free. Work for free for
+companies. I would compromise the price I can demand for my skill, workforce
+and time.
 
 This makes two reasons for me to choose the GPL:
 
@@ -193,7 +195,7 @@ This makes two reasons for me to choose the GPL:
    I want to prevent those when I have a choice.
    And before you ask, yes I work for a company that sells closed source
    software. I am not happy about the closed source fact.
-   But it pays my bills and gives me the freedom to write free software at least
+   But it pays my bills and gives me the freedom to write free software
    in my free time.
 2. I don't want to low ball my own wage and prices by giving away free software
    with no strings attached (for companies).
