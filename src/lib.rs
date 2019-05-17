@@ -2,7 +2,8 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 
 /*!
-# WLambda Scripting Language
+WLambda - Embeddable Scripting Language for Rust
+================================================
 
 This crate provides you with a small and simple embeddable
 scripting language. It's primary feature are functions and calling
@@ -10,14 +11,15 @@ functions. It could be viewed as Lisp without parenthesis.
 
 Here are some of it's properties:
 
+- Simple syntax. For a reference look at the [parser](parser/index.html).
+- Easily embeddable into Rust programs due to a simple API.
 - Performance in the ball park of Python.
 - Garbage collection relies only on reference counting.
-- Simple API.
 - Main data structures are Lists and Maps.
 - Closures can capture up values either by value, by reference
   or by weak reference. Giving you the ability to keep cyclic
   references in check.
-- Small and simple syntax, for a reference look at the [parser](parser/index.html).
+- Easy maintenance of the implementation.
 
 The API relies on a data structure made of [VVal](vval/index.html) nodes.
 
@@ -172,8 +174,7 @@ _why I publish the code_, when I could as well keep it to myself:
 - So that it may bring value to users and the free software community.
 - Show my work as an artist.
 - To get into contact with other developers.
-- Have a reason to put more of the last 20% of work into a project
-to make it more complete.
+- And it's a nice change to put some more polish on my private projects.
 
 Most of those reasons don't yet justify GPL. The main point of the GPL, as far
 as I understand: The GPL makes sure the software stays free software until
@@ -199,6 +200,12 @@ This makes two reasons for me to choose the GPL:
    in my free time.
 2. I don't want to low ball my own wage and prices by giving away free software
    with no strings attached (for companies).
+
+## If you need a permissive or private license (MIT)
+
+Please contact me if you need a different license and really want to use
+my code. As long as I am the only author, I can change the license.
+We might find an agreement.
 
 # Contribution
 
