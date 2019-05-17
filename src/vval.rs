@@ -674,6 +674,7 @@ impl VVal {
         }
     }
 
+    #[allow(clippy::cast_lossless)]
     pub fn f(&self) -> f64 {
         match self {
             VVal::Str(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
@@ -699,6 +700,7 @@ impl VVal {
         }
     }
 
+    #[allow(clippy::cast_lossless)]
     pub fn i(&self) -> i64 {
         match self {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
@@ -724,6 +726,7 @@ impl VVal {
         }
     }
 
+    #[allow(clippy::cast_lossless)]
     pub fn b(&self) -> bool {
         match self {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0) != 0,

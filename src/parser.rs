@@ -434,6 +434,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     Ok(vec)
 }
 
+#[allow(clippy::cast_lossless)]
 fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
     if ps.at_eof { return ps.err_eof("number"); }
 

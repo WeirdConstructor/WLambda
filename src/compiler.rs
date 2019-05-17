@@ -534,6 +534,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
 
 /// Evaluates a parsed AST a number of times and prints out
 /// some benchmarking information.
+#[allow(clippy::cast_lossless)]
 pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
     let mut ce = Rc::new(RefCell::new(CompileEnv {
         parent:    None,

@@ -90,6 +90,7 @@ macro_rules! add_sbin_op {
 /// global definitions.
 ///
 /// For an example see also [compiler::eval](../compiler/fn.eval.html)
+#[allow(clippy::cast_lossless,clippy::assign_op_pattern)]
 pub fn create_wlamba_prelude() -> GlobalEnvRef {
     let g = GlobalEnv::new();
 
