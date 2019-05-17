@@ -106,7 +106,7 @@ WLambda. But I am currently working on making the language more
 complete for real world use. So my current goals are:
 
 - Add namespacing and importing for managing the global environment.
-- Make namespaces for ultility functions in the areas:
+- Make namespaces for utility functions in the areas:
     - List handling
     - Map handling
     - Iteration
@@ -117,6 +117,8 @@ complete for real world use. So my current goals are:
 - Add `panic` and `assert` and also make the compiler aware of
   the debugging positions that the parser augmented the AST with for
   error reporting.
+- Add a simple REPL binary.
+- Make VVal::Sym hold an interned string instead of a `String` instance.
 
 Future plans could be:
 
