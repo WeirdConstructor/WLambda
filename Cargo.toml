@@ -11,7 +11,8 @@ keywords     = ["simple","scripting","language","embeddable","lisp"]
 categories   = ["parsing","config","parser-implementations"]
 exclude      = ["res/*"]
 
-# [dependencies]
+[dependencies]
+rustyline = "4.1.0"
 # rand         = "0.3.14"
 # chrono       = "0.4.6"
 # regex        = "1"

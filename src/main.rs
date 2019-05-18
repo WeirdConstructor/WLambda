@@ -6,14 +6,24 @@ mod parser;
 mod compiler;
 mod prelude;
 
-use compiler::bench_eval_ast;
-use parser::parse;
+use compiler::eval;
 use crate::prelude::create_wlamba_prelude;
 
 fn main() {
-    let pt = parse("!:ref x = 0; range 0 10000000 1 { .x = x + 1 }; x", 0).unwrap();
     let global = create_wlamba_prelude();
-    let v = bench_eval_ast(pt, global, 2);
-    println!("> {:?}", v);
+    let mut rl = rustyline::Editor::<()>::new();
+    loop {
+    let readline = rl.readline(">> ");
+        match readline {
+            Ok(line) => {
+                let r = eval(&line, global.clone());
+                println!("> {}", r.s());
+            },
+            Err(_) => {
+                println!("No input");
+                break;
+            },
+        }
+    }
 }
 
