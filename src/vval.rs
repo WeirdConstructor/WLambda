@@ -51,6 +51,7 @@ pub enum Syntax {
 const STACK_SIZE : usize = 10240;
 
 /// The runtime environment of the evaluator.
+#[derive(Debug, Clone)]
 pub struct Env {
     /// The argument stack, limited to `STACK_SIZE`.
     pub args: std::vec::Vec<VVal>,
@@ -152,17 +153,16 @@ impl Env {
         //d// println!("POPN {} => {}", n, self.sp);
     }
 
+    /// Prints a dump of the stack state.
     pub fn dump_stack(&self) {
-        let mut i = 0;
         println!("* SP={}, BP={}", self.sp, self.bp);
-        for il in self.bp..self.sp {
-            println!("    LOCAL [{:3}] = {}", i, self.args[il].s());
-            i += 1;
-        }
-        i = 0;
-        for v in self.args.iter() {
-            println!("    GLOBL [{:3}] = {}", i, v.s());
-            i += 1;
+        for (i, v) in self.args.iter().enumerate() {
+            let mut mark = String::from("");
+            if i == self.bp { mark = format!("{} BP", mark); }
+            if i == self.sp { mark = format!("{} SP", mark); }
+            if mark.len() > 0 { mark = format!("{} ->", mark); }
+
+            println!("    {:9} [{:3}] = {}", mark, i, v.s());
             if i >= self.sp { break; }
         }
         for (i, u) in self.fun.upvalues.iter().enumerate() {
@@ -247,7 +247,6 @@ impl Env {
 
     pub fn set_local(&mut self, i: usize, value: &VVal) {
         let idx = self.bp + i;
-        //d// println!("SET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
         //
         match &self.args[idx] {
             VVal::Ref(r)     => { r.replace(value.clone()); }
@@ -261,6 +260,8 @@ impl Env {
                 self.args[idx] = value.clone();
             }
         }
+        //d// println!("SET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
+        //d// self.dump_stack();
     }
 
     pub fn set_consume(&mut self, i: usize, value: VVal) {

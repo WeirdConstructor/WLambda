@@ -12,6 +12,7 @@ use crate::vval::StackAction;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::time::Instant;
+use std::fmt::{Display, Formatter};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
@@ -86,6 +87,45 @@ enum VarPos {
     Local(usize),
 }
 
+#[derive(Debug, Clone)]
+pub enum EvalError {
+    ParseError(parser::ParseError),
+    CompileError(String),
+    ExecError(String),
+}
+
+impl Display for EvalError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            EvalError::ParseError(e)   => { write!(f, "Parse error: {}", e) },
+            EvalError::CompileError(e) => { write!(f, "Compile error: {}", e) },
+            EvalError::ExecError(s)    => { write!(f, "Execution error: {}", s) },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EvalContext {
+    pub global:        GlobalEnvRef,
+    local_compile:     Rc<RefCell<CompileEnv>>,
+    pub local:         Rc<RefCell<Env>>,
+}
+
+impl EvalContext {
+    pub fn new(global: GlobalEnvRef) -> EvalContext {
+        EvalContext {
+            global: global.clone(),
+            local_compile: Rc::new(RefCell::new(CompileEnv {
+                parent:    None,
+                global:    global.clone(),
+                local_map: std::collections::HashMap::new(),
+                locals:    Vec::new(),
+                upvals:    Vec::new(),
+            })),
+            local: Rc::new(RefCell::new(Env::new())),
+        }
+    }
+}
 
 /// Compile time environment for allocating and
 /// storing variables inside a function scope.
@@ -134,6 +174,18 @@ impl CompileEnv {
     }
 
     fn def(&mut self, s: &str) -> usize {
+        let pos = self.local_map.get(s);
+        match pos {
+            None => {},
+            Some(p) => {
+                match p {
+                    VarPos::NoPos       => {},
+                    VarPos::UpValue(_)  => {},
+                    VarPos::Local(i)    => return *i,
+                }
+            },
+        }
+
         let next_index = self.locals.len();
         self.locals.push(CompileLocal {
             is_upvalue: false,
@@ -195,7 +247,13 @@ impl CompileEnv {
 }
 
 fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
-    let exprs : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+    let mut exprs : Vec<EvalNode> = Vec::new();
+    for e in ast.map_skip(|e| compile(e, ce), 1) {
+        match e {
+            Ok(v)  => exprs.push(v),
+            Err(_) => return e,
+        }
+    }
 
     #[allow(unused_assignments)]
     Ok(Box::new(move |e: &mut Env| {
@@ -431,7 +489,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     }))
                 },
                 Syntax::Lst    => {
-                    let list_elems : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+                    let mut list_elems : Vec<EvalNode> = Vec::new();
+                    for e in ast.map_skip(|e| compile(e, ce), 1) {
+                        match e {
+                            Ok(v)  => list_elems.push(v),
+                            Err(_) => return e,
+                        }
+                    }
 
                     Ok(Box::new(move |e: &mut Env| {
                         let v = VVal::vec();
@@ -440,16 +504,25 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     }))
                 },
                 Syntax::Map    => {
-                    let list_elems : Vec<(EvalNode,EvalNode)> =
-                        ast.map_skip(|e| {
+                    let mut map_elems : Vec<(EvalNode,EvalNode)> = Vec::new();
+
+                    for e in ast.map_skip(|e| {
                             let k = e.at(0).unwrap();
                             let v = e.at(1).unwrap();
-                            (compile(&k, ce).unwrap(), compile(&v, ce).unwrap())
-                        }, 1);
+                            let kc = compile(&k, ce)?;
+                            let vc = compile(&v, ce)?;
+                            Ok((kc, vc))
+                        }, 1) {
+
+                        match e {
+                            Ok((k,v))  => map_elems.push((k,v)),
+                            Err(s)     => return Err(s),
+                        }
+                    }
 
                     Ok(Box::new(move |e: &mut Env| {
                         let v = VVal::map();
-                        for x in list_elems.iter() {
+                        for x in map_elems.iter() {
                             let ke = x.0(e)?;
                             v.set_key(&ke, x.1(e)?);
                         }
@@ -591,24 +664,64 @@ pub fn s_eval(s: &str) -> String {
     }
 }
 
-/// Evaluates a string of WLambda code and executes it with the given `GlobalEnv`.
+/// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
 ///
 /// ```
+/// use wlambda::compiler;
+/// use wlambda::parser;
 /// use wlambda::prelude::create_wlamba_prelude;
 ///
 /// let global_env = create_wlamba_prelude();
+/// let mut ctx = compiler::EvalContext::new(global_env);
 ///
 /// let s = "$[1,2,3]";
-/// let r = wlambda::compiler::eval(&s, global_env);
+/// let ast = parser::parse(s, 0).unwrap();
+/// let r = wlambda::compiler::eval_ast_in_ctx(&ast, &mut ctx).unwrap();
 ///
 /// println!("Res: {}", r.s());
 /// ```
+pub fn eval_ast_in_ctx(ast: &VVal, ctx: &mut EvalContext) -> Result<VVal, EvalError>  {
+    let prog = compile(ast, &mut ctx.local_compile);
+    let local_env_size = CompileEnv::local_env_size(&ctx.local_compile);
+
+    let env = ctx.local.borrow_mut();
+    let mut res = Ok(VVal::Nul);
+
+    std::cell::RefMut::map(env, |l_env| {
+        res = match prog {
+            Ok(prog_closures) => {
+                l_env.sp = 0;
+                l_env.set_bp(local_env_size);
+                let res = match prog_closures(l_env) {
+                    Ok(v)   => Ok(v.clone()),
+                    Err(je) =>
+                        Err(EvalError::ExecError(
+                            format!("Jumped out of execution: {:?}", je))),
+                };
+                res
+            },
+            Err(e) => { Err(EvalError::CompileError(e)) },
+        };
+        l_env
+    });
+
+    res
+}
+
 #[allow(dead_code)]
-pub fn eval(s: &str, global: GlobalEnvRef) -> VVal {
+pub fn eval_in_ctx(s: &str, ctx: &mut EvalContext) -> Result<VVal, EvalError>  {
     match parser::parse(s, 0) {
-        Ok(ast) => bench_eval_ast(ast, global, 1),
-        Err(e)  => { panic!(format!("PARSE ERROR: {}", e)); },
+        Ok(ast) => { eval_ast_in_ctx(&ast, ctx) },
+        Err(e) => { Err(EvalError::ParseError(e)) },
     }
+}
+
+#[allow(dead_code)]
+pub fn eval(s: &str) -> Result<VVal, EvalError>  {
+    let global = create_wlamba_prelude();
+    let mut ctx = EvalContext::new(global);
+
+    eval_in_ctx(s, &mut ctx)
 }
 
 #[cfg(test)]

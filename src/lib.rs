@@ -94,8 +94,7 @@ how it looks currently:
 use wlambda::prelude::create_wlamba_prelude;
 
 let s = "$[1,2,3]";
-let global = create_wlamba_prelude();
-let r = wlambda::compiler::eval(&s, global);
+let r = wlambda::compiler::eval(&s).unwrap();
 println!("Res: {}", r.s());
 ```
 
