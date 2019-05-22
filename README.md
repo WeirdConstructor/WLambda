@@ -9,7 +9,7 @@ functions. It could be viewed as Lisp without parenthesis.
 
 Here are some of it's properties:
 
-- Simple syntax. For a reference look at the [parser](parser/index.html).
+- Simple syntax. For a reference look at the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
 - Performance in the ball park of Python.
 - Garbage collection relies only on reference counting.
@@ -19,7 +19,7 @@ Here are some of it's properties:
   references in check.
 - Easy maintenance of the implementation.
 
-The API relies on a data structure made of [VVal](vval/index.html) nodes.
+The API relies on a data structure made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
 # Example WLambda Code
 
@@ -92,8 +92,7 @@ how it looks currently:
 use wlambda::prelude::create_wlamba_prelude;
 
 let s = "$[1,2,3]";
-let global = create_wlamba_prelude();
-let r = wlambda::compiler::eval(&s, global);
+let r = wlambda::compiler::eval(&s).unwrap();
 println!("Res: {}", r.s());
 ```
 

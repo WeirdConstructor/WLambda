@@ -160,7 +160,7 @@ impl Env {
             let mut mark = String::from("");
             if i == self.bp { mark = format!("{} BP", mark); }
             if i == self.sp { mark = format!("{} SP", mark); }
-            if mark.len() > 0 { mark = format!("{} ->", mark); }
+            if !mark.is_empty() { mark = format!("{} ->", mark); }
 
             println!("    {:9} [{:3}] = {}", mark, i, v.s());
             if i >= self.sp { break; }
@@ -534,7 +534,7 @@ impl VVal {
         let mut out : Vec<String> = Vec::new();
         let mut first = true;
         out.push(String::from("["));
-        for s in v.borrow().iter().map(| x | x.s()) {
+        for s in v.borrow().iter().map(VVal::s) {
             if !first { out.push(String::from(",")); }
             else { first = false; }
             out.push(s);
@@ -555,7 +555,7 @@ impl VVal {
             let v = hm.get(k).unwrap();
             if !first { out.push(String::from(",")); }
             else { first = false; }
-            if k.chars().any(|c| c.is_whitespace()) {
+            if k.chars().any(char::is_whitespace) {
                 out.push(format!("\"{}\"", k));
             } else {
                 out.push(k.to_string());

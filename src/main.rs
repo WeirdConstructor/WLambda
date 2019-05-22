@@ -11,21 +11,22 @@ use vval::VVal;
 use compiler::eval_in_ctx;
 use crate::prelude::create_wlamba_prelude;
 
-struct ReplState {
-    dump_stack: bool,
-}
-
 fn main() {
     let global = create_wlamba_prelude();
-    global.borrow_mut().add_func("dump_stack", move |env: &mut Env, _argc: usize| {
-        env.dump_stack();
-        Ok(VVal::Nul)
-    });
+    global.borrow_mut().add_func(
+        "dump_stack",
+        move |env: &mut Env, _argc: usize| {
+            env.dump_stack();
+            Ok(VVal::Nul)
+        });
 
     let mut ctx = compiler::EvalContext::new(global);
 
     let mut rl = rustyline::Editor::<()>::new();
-    rl.load_history("wlambda.history");
+    if rl.load_history("wlambda.history").is_ok() {
+        println!("Loaded history from 'wlambda.history' file.");
+    }
+
     loop {
         let readline = rl.readline(">> ");
         match readline {
@@ -44,6 +45,8 @@ fn main() {
             Err(_) => { break; },
         }
     }
-    rl.save_history("wlambda.history");
+    if rl.save_history("wlambda.history").is_ok() {
+        println!("Saved history to 'wlambda.history'");
+    }
 }
 

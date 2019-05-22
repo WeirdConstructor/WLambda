@@ -315,7 +315,7 @@ impl State {
     }
 
     fn skip_ws(&mut self) {
-        self.consume_while(|c| c.is_whitespace());
+        self.consume_while(char::is_whitespace);
     }
 
     pub fn skip_ws_and_comments(&mut self) {

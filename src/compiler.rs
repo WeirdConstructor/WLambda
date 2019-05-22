@@ -692,13 +692,12 @@ pub fn eval_ast_in_ctx(ast: &VVal, ctx: &mut EvalContext) -> Result<VVal, EvalEr
             Ok(prog_closures) => {
                 l_env.sp = 0;
                 l_env.set_bp(local_env_size);
-                let res = match prog_closures(l_env) {
+                match prog_closures(l_env) {
                     Ok(v)   => Ok(v.clone()),
                     Err(je) =>
                         Err(EvalError::ExecError(
                             format!("Jumped out of execution: {:?}", je))),
-                };
-                res
+                }
             },
             Err(e) => { Err(EvalError::CompileError(e)) },
         };
@@ -708,6 +707,17 @@ pub fn eval_ast_in_ctx(ast: &VVal, ctx: &mut EvalContext) -> Result<VVal, EvalEr
     res
 }
 
+/// Evaluates a piece of WLambda code with the given `EvalContext`.
+///
+/// ```
+/// use wlambda::prelude::create_wlamba_prelude;
+///
+/// let global_env = create_wlamba_prelude();
+/// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+///
+/// let r = wlambda::compiler::eval_in_ctx("$[1,2,3]", &mut ctx).unwrap();
+/// println!("Res: {}", r.s());
+/// ```
 #[allow(dead_code)]
 pub fn eval_in_ctx(s: &str, ctx: &mut EvalContext) -> Result<VVal, EvalError>  {
     match parser::parse(s, 0) {
@@ -716,6 +726,11 @@ pub fn eval_in_ctx(s: &str, ctx: &mut EvalContext) -> Result<VVal, EvalError>  {
     }
 }
 
+/// Evaluates a piece of WLambda code in a default global environment.
+///
+/// ```
+/// println!("> {}", wlambda::compiler::eval("${a: 10, b: 20}").unwrap().s());
+/// ```
 #[allow(dead_code)]
 pub fn eval(s: &str) -> Result<VVal, EvalError>  {
     let global = create_wlamba_prelude();
