@@ -3,6 +3,7 @@
 
 * Completed string support in compiler.
 * Added support for arbitrarily quoted string with $q/fooobar/.
+* Added string calling semantics for substring and concatenation.
 
 0.1.1 (2019-05-23)
 ==================

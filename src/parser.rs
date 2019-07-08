@@ -374,6 +374,8 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
         return ps.err_unexpected_token(quote_char, "");
     }
 
+    ps.skip_ws_and_comments();
+
     Ok(vec)
 }
 
@@ -465,6 +467,8 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq('"') {
         return ps.err_unexpected_token('\"', "");
     }
+
+    ps.skip_ws_and_comments();
 
     Ok(vec)
 }

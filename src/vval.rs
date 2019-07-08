@@ -103,6 +103,20 @@ impl Env {
         self.bp = oldbp;
     }
 
+    pub fn with_local_call_info<T>(&mut self, argc: usize, f: T) -> Result<VVal, StackAction>
+        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+        let local_size = 0;
+        let old_argc = std::mem::replace(&mut self.argc, argc);
+        let old_bp   = self.set_bp(local_size);
+
+        let ret = f(self);
+
+        self.reset_bp(local_size, old_bp);
+        self.argc = old_argc;
+
+        ret
+    }
+
     pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let local_size = fu.local_size;
@@ -192,6 +206,7 @@ impl Env {
     }
 
     pub fn arg(&self, i: usize) -> VVal {
+        //d// println!("GET ARGC [{}] = {}", i, self.argc);
         if i >= self.argc { return VVal::Nul; }
         let v = &self.args[self.bp - (i + 1)];
         //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
@@ -439,6 +454,7 @@ impl VVal {
     }
 
     pub fn call(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
+        //d// env.dump_stack();
         match self {
             VVal::Fun(fu) => {
                 env.with_fun_info(fu.clone(), argc, |e: &mut Env| {
@@ -446,40 +462,88 @@ impl VVal {
                 })
             },
             VVal::Bol(b) => {
-                let old_bp = env.set_bp(0);
-                let idx = if *b { 0 } else { 1 };
-                let ret = if argc > 0 {
-                    let v = env.arg(idx).clone();
-                    v.call(env, 0)
-                } else { Ok(self.clone()) };
-                env.reset_bp(0, old_bp);
-                ret
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    let idx = if *b { 0 } else { 1 };
+                    let ret = if argc > 0 {
+                        let v = e.arg(idx).clone();
+                        v.call(e, 0)
+                    } else { Ok(self.clone()) };
+                    ret
+                })
             },
             VVal::Sym(sym) => {
-                let old_bp = env.set_bp(0);
-                let ret = if argc > 0 {
-                    let v = env.arg(0);
-                    match v {
-                        VVal::Map(_) =>
-                            Ok(v.get_key(&sym).unwrap_or(VVal::Nul)),
-                        _ => Ok(VVal::Nul)
-                    }
-                } else { Ok(self.clone()) };
-                env.reset_bp(0, old_bp);
-                ret
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    let ret = if argc > 0 {
+                        let v = e.arg(0);
+                        match v {
+                            VVal::Map(_) =>
+                                Ok(v.get_key(&sym).unwrap_or(VVal::Nul)),
+                            _ => Ok(VVal::Nul)
+                        }
+                    } else { Ok(self.clone()) };
+                    ret
+                })
+            },
+            VVal::Str(s) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    let ret = if argc > 0 {
+                        let v = e.arg(0);
+                        match v {
+                            VVal::Int(i) => {
+                                if argc > 1 {
+                                    let from = i as usize;
+                                    let cnt  = e.arg(1).i() as usize;
+                                    let r : String = s.borrow().chars().skip(from).take(cnt).collect();
+                                    Ok(VVal::new_str(&r))
+                                } else {
+                                    let r = s.borrow().chars().nth(i as usize);
+                                    match r {
+                                        None    => Ok(VVal::Nul),
+                                        Some(c) => {
+                                            let mut b = [0; 4];
+                                            Ok(VVal::new_str(c.encode_utf8(&mut b)))
+                                        },
+                                    }
+                                }
+                            },
+                            VVal::Lst(_) => {
+                                let from = v.at(0).unwrap_or(VVal::Int(0)).i() as usize;
+                                let cnt  = v.at(1).unwrap_or(VVal::Int((s.borrow().len() - from) as i64)).i() as usize;
+                                let r : String = s.borrow().chars().skip(from).take(cnt).collect();
+                                Ok(VVal::new_str(&r))
+                            },
+                            VVal::Str(s2) => {
+                                if argc > 1 {
+                                    // TODO: Fix the extra clone here:
+                                    let mut accum = s.borrow().clone() + &s2.borrow().clone();
+                                    for i in 2..argc {
+                                        accum += &e.arg(i).s_raw();
+                                    }
+                                    Ok(VVal::new_str(&accum))
+                                } else {
+                                    // TODO: Fix the extra clone here:
+                                    Ok(VVal::new_str(&(s.borrow().clone() + &s2.borrow().clone())))
+                                }
+                            },
+                            VVal::Map(_) => Ok(v.get_key(&s.borrow()).unwrap_or(VVal::Nul)),
+                            _ => Ok(VVal::Nul)
+                        }
+                    } else { Ok(self.clone()) };
+                    ret
+                })
             },
             VVal::Int(i) => {
-                let old_bp = env.set_bp(0);
-                let ret = if argc > 0 {
-                    let v = env.arg(0);
-                    match v {
-                        VVal::Lst(_) =>
-                            Ok(v.at(*i as usize).unwrap_or(VVal::Nul)),
-                        _ => Ok(VVal::Nul)
-                    }
-                } else { Ok(self.clone()) };
-                env.reset_bp(0, old_bp);
-                ret
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    let ret = if argc > 0 {
+                        let v = e.arg(0);
+                        match v {
+                            VVal::Lst(_) =>
+                                Ok(v.at(*i as usize).unwrap_or(VVal::Nul)),
+                            _ => Ok(VVal::Nul)
+                        }
+                    } else { Ok(self.clone()) };
+                    ret
+                })
             }
             _ => { Ok(self.clone()) },
         }

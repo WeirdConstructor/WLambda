@@ -571,6 +571,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         e.with_pushed_sp(argc, |e: &mut Env| {
                             for (i, x) in call_args.iter().enumerate() {
                                 let v = x(e)?;
+                                //d// println!("SETARGC: {} => {:?}", i, v);
                                 e.set_arg(argc - (i + 1), v);
                             }
                             f.call(e, argc)
@@ -1080,9 +1081,18 @@ mod tests {
 
     #[test]
     fn check_string() {
-        assert_eq!(s_eval("\"foo\""), "\"foo\"");
-        assert_eq!(s_eval("$q#foo#"), "\"foo\"");
+        assert_eq!(s_eval("\"foo\""),   "\"foo\"");
+        assert_eq!(s_eval("$q#foo#"),   "\"foo\"");
         assert_eq!(s_eval("$b\"foo\""), "$b\"foo\"");
+
+        assert_eq!(s_eval("\"foo\"(0)"),                       "\"f\"");
+        assert_eq!(s_eval("\"foo\" 0"),                        "\"f\"");
+        assert_eq!(s_eval("\"foobar\" 1 3"),                   "\"oob\"");
+        assert_eq!(s_eval("\"foobar\"(1, 3)"),                 "\"oob\"");
+        assert_eq!(s_eval("\"foobar\" $[1, 3]"),               "\"oob\"");
+        assert_eq!(s_eval("\"foobar\" $q/xyz/"),               "\"foobarxyz\"");
+        assert_eq!(s_eval("\"foobar\" ${ foobar: 12 }"),       "12");
+        assert_eq!(s_eval("\"foobar\" ${ [\"foobar\"]: 12 }"), "12");
     }
 
     #[test]
