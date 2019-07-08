@@ -79,6 +79,8 @@ In the following grammar, white space and comments are omitted:
                   ;
     byte_string   = "b", string
                   ;
+    quote_string  = "q", ?any character as quote?, { ?any character? }, ?any character as quote?
+                  ;
     list          = "[", [ expr, { ",", expr } ], "]"
                   ;
     map           = "{", [
@@ -93,6 +95,7 @@ In the following grammar, white space and comments are omitted:
     nul           = "n" | "nul"
                   ;
     special_value = byte_string
+                  | quote_string
                   | list
                   | map
                   | none
@@ -343,6 +346,38 @@ fn adchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
     else { s.push(c); }
 }
 
+/// Parsers a WLambda special quote string or byte buffer.
+fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
+    if ps.at_eof { return ps.err_eof("string"); }
+
+    let quote_char = ps.peek().unwrap();
+    ps.consume();
+
+    let vec = ps.syn(Syntax::Str);
+
+    let mut s = String::from("");
+    let mut v : Vec<u8> = Vec::new();
+
+    while ps.peek().unwrap_or(quote_char) != quote_char {
+        let c = ps.peek().unwrap();
+        ps.consume();
+        adchr(&mut v, &mut s, bytes, c);
+    }
+
+    if bytes {
+        vec.push(VVal::new_byt(v));
+    } else {
+        vec.push(VVal::new_str(&s));
+    }
+
+    if !ps.consume_if_eq(quote_char) {
+        return ps.err_unexpected_token(quote_char, "");
+    }
+
+    Ok(vec)
+}
+
+
 /// Parsers a WLambda string or byte buffer.
 fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     if ps.at_eof { return ps.err_eof("string"); }
@@ -591,6 +626,8 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
 
     match c {
         'b' => { ps.consume(); parse_string(ps, true) },
+        'q' => { ps.consume(); parse_q_string(ps, false) },
+        'Q' => { ps.consume(); parse_q_string(ps, true) },
         '[' => parse_list(ps),
         '{' => parse_map(ps),
         'n' => {
@@ -1278,6 +1315,7 @@ mod tests {
     #[test]
     fn check_str() {
         assert_eq!(parse("\"foo\""),       "[&Block,[&Str,\"foo\"]]");
+        assert_eq!(parse("$q$foo$"),       "[&Block,[&Str,\"foo\"]]");
         assert_eq!(parse("\"fo\0o\""),     "[&Block,[&Str,\"fo\\0o\"]]");
         assert_eq!(parse("\"fo\no\""),     "[&Block,[&Str,\"fo\\no\"]]");
         assert_eq!(parse("\"fo\ro\""),     "[&Block,[&Str,\"fo\\ro\"]]");
@@ -1288,7 +1326,8 @@ mod tests {
         assert_eq!(parse("\"fo\x05o\\u{09f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
         assert_eq!(parse("\"fo\x05o\\u{2400}\""), "[&Block,[&Str,\"fo\\x05o␀\"]]");
 
-        assert_eq!(parse("$b\"\\u{2400}\""), "[&Block,[&Str,$b\"\\xE2\\x90\\x80\"]]");
+        assert_eq!(parse("$b\"\\u{2400}\""),       "[&Block,[&Str,$b\"\\xE2\\x90\\x80\"]]");
+        assert_eq!(parse("$Q'foo'"),               "[&Block,[&Str,$b\"foo\"]]");
         assert_eq!(parse("$b\"\\x00\\xFF\\xEB\""), "[&Block,[&Str,$b\"\\0\\xFF\\xEB\"]]");
     }
 }

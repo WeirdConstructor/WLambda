@@ -474,7 +474,11 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                 Syntax::Assign => { compile_assign(ast, ce)      },
                 Syntax::Key    => {
                     let sym = ast.at(1).unwrap();
-                    Ok(Box::new(move |_: &mut Env| { Ok(sym.clone()) }))
+                    Ok(Box::new(move |_: &mut Env| Ok(sym.clone())))
+                },
+                Syntax::Str => {
+                    let str = ast.at(1).unwrap();
+                    Ok(Box::new(move |_: &mut Env| Ok(str.clone())))
                 },
                 Syntax::SetKey => {
                     let map = compile(&ast.at(1).unwrap(), ce)?;
@@ -1072,6 +1076,13 @@ mod tests {
         assert_eq!(s_eval("type $n"),   "\"nul\"");
         assert_eq!(s_eval("type $[]"),  "\"vector\"");
         assert_eq!(s_eval("type ${}"),  "\"map\"");
+    }
+
+    #[test]
+    fn check_string() {
+        assert_eq!(s_eval("\"foo\""), "\"foo\"");
+        assert_eq!(s_eval("$q#foo#"), "\"foo\"");
+        assert_eq!(s_eval("$b\"foo\""), "$b\"foo\"");
     }
 
     #[test]

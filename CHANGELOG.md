@@ -1,3 +1,9 @@
+0.1.2 (unreleased)
+==================
+
+* Completed string support in compiler.
+* Added support for arbitrarily quoted string with $q/fooobar/.
+
 0.1.1 (2019-05-23)
 ==================
 
