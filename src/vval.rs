@@ -138,11 +138,11 @@ impl Env {
     /// let ret = ctx.call(&n, &vec![VVal::Int(11)]).unwrap();
     /// assert_eq!(ret.i(), 21);
     /// ```
-    pub fn with_user_do<T: 'static, F>(&mut self, f: F)
-        where F: Fn(&mut T) {
+    pub fn with_user_do<T: 'static, F, X>(&mut self, f: F) -> X
+        where F: Fn(&mut T) -> X {
         let mut any = self.user.borrow_mut();
         let ref_reg = any.downcast_mut::<T>().unwrap();
-        f(ref_reg);
+        f(ref_reg)
     }
 
     pub fn set_bp(&mut self, env_size: usize) -> usize {
@@ -805,6 +805,18 @@ impl VVal {
 
     pub fn is_fun(&self) -> bool {
         match self { VVal::Fun(_) => true, _ => false }
+    }
+
+    pub fn is_vec(&self) -> bool {
+        match self { VVal::Lst(_) => true, _ => false }
+    }
+
+    pub fn is_map(&self) -> bool {
+        match self { VVal::Map(_) => true, _ => false }
+    }
+
+    pub fn is_nul(&self) -> bool {
+        match self { VVal::Nul => true, _ => false }
     }
 
     pub fn type_name(&self) -> String {
