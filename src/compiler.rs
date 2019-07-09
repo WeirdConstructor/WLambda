@@ -1147,9 +1147,8 @@ mod tests {
     fn check_callbacks() {
         let global = create_wlamba_prelude();
         global.borrow_mut().add_func("reg", |env: &mut Env, _argc: usize| {
-            let mut any = env.user.borrow_mut();
-            let ref_reg = any.downcast_mut::<Vec<VVal>>().unwrap();
-            ref_reg.push(env.arg(0).clone());
+            let fun = env.arg(0);
+            env.with_user_do(|v: &mut Vec<VVal>| v.push(fun.clone()));
             Ok(VVal::Nul)
         });
 

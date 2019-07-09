@@ -71,6 +71,7 @@ pub struct Env {
     /// The argument count to the current call.
     pub argc: usize,
     /// A user defined variable that holds user context information.
+    /// See also the [with_user_do](struct.Env.html#method.with_user_do) function.
     pub user: Rc<RefCell<dyn std::any::Any>>,
 }
 
@@ -103,6 +104,45 @@ impl Env {
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
+    }
+
+    /// Easier access to the user data field in Env
+    ///
+    /// In the following example the user supplies a registry
+    /// vector for storing VVals. A callback is stored, which is
+    /// then later executed.
+    ///
+    /// ```
+    /// use wlambda::prelude::create_wlamba_prelude;
+    /// use wlambda::vval::VVal;
+    /// use wlambda::vval::Env;
+    /// use wlambda::compiler::EvalContext;
+    /// use std::rc::Rc;
+    /// use std::cell::RefCell;
+    ///
+    /// let global = create_wlamba_prelude();
+    ///
+    /// global.borrow_mut().add_func("reg", |env: &mut Env, _argc: usize| {
+    ///     let fun = env.arg(0);
+    ///     env.with_user_do(|v: &mut Vec<VVal>| v.push(fun.clone()));
+    ///     Ok(VVal::Nul)
+    /// });
+    ///
+    /// let reg : Rc<RefCell<Vec<VVal>>> =
+    ///     Rc::new(RefCell::new(Vec::new()));
+    ///
+    /// let mut ctx = EvalContext::new_with_user(global, reg.clone());
+    /// ctx.eval("reg { _ + 10 }").unwrap();
+    ///
+    /// let n = reg.borrow_mut()[0].clone();
+    /// let ret = ctx.call(&n, &vec![VVal::Int(11)]).unwrap();
+    /// assert_eq!(ret.i(), 21);
+    /// ```
+    pub fn with_user_do<T: 'static, F>(&mut self, f: F)
+        where F: Fn(&mut T) {
+        let mut any = self.user.borrow_mut();
+        let ref_reg = any.downcast_mut::<T>().unwrap();
+        f(ref_reg);
     }
 
     pub fn set_bp(&mut self, env_size: usize) -> usize {
