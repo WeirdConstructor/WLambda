@@ -83,6 +83,92 @@ macro_rules! add_sbin_op {
     }
 }
 
+fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Result<VVal, StackAction> {
+    while arg_idx < argc {
+        if env.arg(arg_idx).is_fun() {
+            return env.with_restore_sp(|e: &mut Env| {
+                e.push(val.clone());
+                e.arg(arg_idx).call(e, 1)
+            });
+        }
+
+        let mut match_vals = vec![arg_idx];
+        arg_idx += 1;
+        while arg_idx < argc && !env.arg(arg_idx).is_fun() {
+            match_vals.push(arg_idx);
+            arg_idx += 1;
+        }
+
+        if arg_idx >= argc { return Ok(val.clone()); }
+
+        let fun_idx = arg_idx;
+
+        if    env.arg(match_vals[0]).is_sym()
+           && env.arg(match_vals[0]).s_raw().chars().nth(0).unwrap_or('_') == '?' {
+
+            match &env.arg(match_vals[0]).s_raw()[..] {
+                "?t" => {
+                    let val_type_name = val.type_name();
+                    for i in match_vals.iter().skip(1) {
+                        if env.arg(*i).s_raw() == val_type_name {
+                            return env.with_restore_sp(|e: &mut Env| {
+                                e.push(val.clone());
+                                e.arg(fun_idx).call(e, 1)
+                            });
+                        }
+                    }
+                },
+                "?s" => {
+                    let val_s = val.s_raw();
+                    for i in match_vals.iter().skip(1) {
+                        if env.arg(*i).s_raw() == val_s {
+                            return env.with_restore_sp(|e: &mut Env| {
+                                e.push(val.clone());
+                                e.arg(fun_idx).call(e, 1)
+                            });
+                        }
+                    }
+                },
+                "?p" => {
+                    if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
+                    let fun_idx = fun_idx + 1;
+
+                    let pred_res = env.with_restore_sp(|e: &mut Env| {
+                        e.push(val.clone());
+                        e.arg(arg_idx).call(e, 1)
+                    });
+                    match pred_res {
+                        Ok(v) => {
+                            arg_idx += 1;
+                            if v.b() {
+                                return env.with_restore_sp(|e: &mut Env| {
+                                    e.push(val.clone());
+                                    e.arg(fun_idx).call(e, 1)
+                                });
+                            }
+                        },
+                        Err(sa) => { return Err(sa); }
+                    }
+                },
+                _ => {
+                    // TODO: Usually we should bail out with an error here.
+                }
+            }
+        } else {
+            for i in match_vals.iter() {
+                if env.arg(*i).eqv(val) {
+                    env.push(val.clone());
+                    return env.arg(fun_idx).call(env, 1);
+                }
+            }
+        }
+
+        arg_idx += 1;
+    }
+
+    Ok(VVal::Nul)
+}
+
 /// Defines a new global Environment for running the `compiler`.
 ///
 /// The global Environment `GlobalEnvRef` can be reused in different
@@ -163,7 +249,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     g.borrow_mut().add_func(
         "type",
         |env: &mut Env, argc: usize| {
-            if argc < 1 { println!("YOOOY"); return Ok(VVal::Nul); }
+            if argc < 1 { return Ok(VVal::Nul); }
             if argc > 1 {
                 let vec = VVal::vec();
                 for i in 0..argc {
@@ -192,6 +278,22 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             let v   = env.arg(0);
 
             Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
+        });
+
+    /*
+
+       match val
+          :sym :x { ... }
+          { ... }
+
+
+    */
+    g.borrow_mut().add_func(
+        "match",
+        |env: &mut Env, argc: usize| {
+            if argc < 1 { return Ok(VVal::Nul); }
+            if argc == 1 { return Ok(VVal::Nul) }
+            return match_next(env, &env.arg(0), 1, argc);
         });
 
     g.borrow_mut().add_func(

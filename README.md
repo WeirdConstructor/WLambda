@@ -38,7 +38,7 @@ Just a quick glance at the WLambda syntax and semantics.
 !a_list = $[1, 2, 3, 4];
 
 # Map assignment:
-!a_map = ${a: 10, b: 20};
+!a_map = ${a = 10, b = 20};
 
 # Function definition/assignment:
 !a_func = {
@@ -120,8 +120,8 @@ Future plans could be:
 - Prototyped inheritance, sketched out like this:
 
     ```wlambda
-        !proto = ${ print: { println _ }, };
-        !o = to_obj { _proto_: proto };
+        !proto = ${ print = { println _ }, };
+        !o = to_obj { _proto_ = proto };
         o.print(123);
 
         # MetaMap(Rc<RefCell<std::collections::HashMap<String, VVal>>>),

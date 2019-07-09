@@ -4,6 +4,9 @@
 * Completed string support in compiler.
 * Added support for arbitrarily quoted string with $q/fooobar/.
 * Added string calling semantics for substring and concatenation.
+* Added 'match' 
+* Changed map syntax incompatible. Keys are delimited by '=' now, not ':' because
+to make parsing easier with multiple symbols as arguments for calls.
 
 0.1.1 (2019-05-23)
 ==================

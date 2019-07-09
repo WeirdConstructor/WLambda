@@ -734,7 +734,7 @@ pub fn eval_in_ctx(s: &str, ctx: &mut EvalContext) -> Result<VVal, EvalError>  {
 /// Evaluates a piece of WLambda code in a default global environment.
 ///
 /// ```
-/// println!("> {}", wlambda::compiler::eval("${a: 10, b: 20}").unwrap().s());
+/// println!("> {}", wlambda::compiler::eval("${a = 10, b = 20}").unwrap().s());
 /// ```
 #[allow(dead_code)]
 pub fn eval(s: &str) -> Result<VVal, EvalError>  {
@@ -769,17 +769,17 @@ mod tests {
         assert_eq!(s_eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), { .x = 15 }(), x]"), "[12,15,15]");
         assert_eq!(s_eval("{ _ } 10"),                        "10");
         assert_eq!(s_eval("!:ref y = 0; { .y = _ } 10; y"),   "10");
-        assert_eq!(s_eval("${:a: 10, :b: 20}"),               "{a:10,b:20}");
-        assert_eq!(s_eval("${:b: 20, :a: 10}"),               "{a:10,b:20}");
-        assert_eq!(s_eval("${a: 10, b: 20}"),               "{a:10,b:20}");
-        assert_eq!(s_eval("${b: 20, a: 10}"),               "{a:10,b:20}");
-        assert_eq!(s_eval("${[:a]: 10, b: 20}"),               "{a:10,b:20}");
-        assert_eq!(s_eval("${[:b]: 20, a: 10}"),               "{a:10,b:20}");
-        assert_eq!(s_eval("!x = ${:b: 20, :a: 10}; x"),       "{a:10,b:20}");
-        assert_eq!(s_eval("!x = ${:b: 20, :a: 10}; x.a"),     "10");
-        assert_eq!(s_eval("!x = ${:b: 20, :a: 11}; :a x"),    "11");
+        assert_eq!(s_eval("${:a = 10, :b = 20}"),             "{a=10,b=20}");
+        assert_eq!(s_eval("${:b = 20, :a = 10}"),             "{a=10,b=20}");
+        assert_eq!(s_eval("${a = 10, b = 20}"),               "{a=10,b=20}");
+        assert_eq!(s_eval("${b = 20, a = 10}"),               "{a=10,b=20}");
+        assert_eq!(s_eval("${[:a] = 10, b = 20}"),            "{a=10,b=20}");
+        assert_eq!(s_eval("${[:b] = 20, a = 10}"),            "{a=10,b=20}");
+        assert_eq!(s_eval("!x = ${:b = 20, :a = 10}; x"),     "{a=10,b=20}");
+        assert_eq!(s_eval("!x = ${:b = 20, :a = 10}; x.a"),   "10");
+        assert_eq!(s_eval("!x = ${:b = 20, :a = 11}; :a x"),  "11");
         assert_eq!(s_eval("!x = ${}; x.a = 12; x.a"),         "12");
-        assert_eq!(s_eval("!x = ${}; x.a = 12; x"),           "{a:12}");
+        assert_eq!(s_eval("!x = ${}; x.a = 12; x"),           "{a=12}");
 
         assert_eq!(s_eval("$[33,44,55].2"), "55");
         assert_eq!(s_eval("$[33,44,55].0"), "33");
@@ -1015,13 +1015,13 @@ mod tests {
         assert_eq!(s_eval("!(a, b) = $[10, 20, 30]; $[a, b]"),    "[10,20]");
         assert_eq!(s_eval("!(a, b) = $[10]; $[a, b]"),            "[10,$n]");
         assert_eq!(s_eval(
-            "!(a, b) = ${a: 10, b: 20, c: 30}; $[a, b]"),
+            "!(a, b) = ${a = 10, b= 20, c=30}; $[a, b]"),
             "[10,20]");
         assert_eq!(s_eval(
-            "!(a, b) = ${a: 10}; $[a, b]"),
+            "!(a, b) = ${a = 10}; $[a, b]"),
             "[10,$n]");
         assert_eq!(s_eval(
-            "!(a, b) = ${b: 20, c: 30}; $[a, b]"),
+            "!(a, b) = ${b = 20, c = 30}; $[a, b]"),
             "[$n,20]");
 
         assert_eq!(s_eval("!:ref(a, b) = $[10, 20]; { .a = 33; }(); $[a, b]"), "[33,20]");
@@ -1091,8 +1091,21 @@ mod tests {
         assert_eq!(s_eval("\"foobar\"(1, 3)"),                 "\"oob\"");
         assert_eq!(s_eval("\"foobar\" $[1, 3]"),               "\"oob\"");
         assert_eq!(s_eval("\"foobar\" $q/xyz/"),               "\"foobarxyz\"");
-        assert_eq!(s_eval("\"foobar\" ${ foobar: 12 }"),       "12");
-        assert_eq!(s_eval("\"foobar\" ${ [\"foobar\"]: 12 }"), "12");
+        assert_eq!(s_eval("\"foobar\" ${ foobar = 12 }"),       "12");
+        assert_eq!(s_eval("\"foobar\" ${ [\"foobar\"] = 12 }"), "12");
+    }
+
+    #[test]
+    fn check_match() {
+        assert_eq!(s_eval("match 10 :?t :int { 13 } { 14 }"), "13");
+        assert_eq!(s_eval("match 10 :?t :str { 13 } { 14 }"), "14");
+        assert_eq!(s_eval("match 10 :?t :str { 13 }"),        "$n");
+        assert_eq!(s_eval("match $q xx :?s :xx      { 15 }"),    "15");
+        assert_eq!(s_eval("match $q xx :?s :yx :xx  { 16 }"),    "16");
+        assert_eq!(s_eval("match $q zx :?s :yx :xx  { 16 } { 17 }"), "17");
+        assert_eq!(s_eval("match $q xx :?p { _ == $q|xx| } { 18 }"),    "18");
+        assert_eq!(s_eval("match $q x9 :?p { yay _; _ == $q|xx| } { 181 } { 19 }"), "19");
+        assert_eq!(s_eval("match 10"),                           "$n");
     }
 
     #[test]

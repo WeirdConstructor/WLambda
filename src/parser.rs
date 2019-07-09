@@ -30,7 +30,7 @@ In the following grammar, white space and comments are omitted:
     ident_start   = ( ?alphabetic? | "_" | "@" )
     ident_end     = { ?any character?
                      - ( ?white space?
-                         | "." | "," | ":" | ";"
+                         | "." | "," | ";"
                          | "{" | "}" | "[" | "]" | "(" | ")"
                          | "~" | "|" | "=" ) }
                   ;
@@ -84,8 +84,8 @@ In the following grammar, white space and comments are omitted:
     list          = "[", [ expr, { ",", expr } ], "]"
                   ;
     map           = "{", [
-                        (ident | expr), ":", expr,
-                        { ",", (ident | expr), ":", expr },
+                        (ident | expr), "=", expr,
+                        { ",", (ident | expr), "=", expr },
                     ], "}"
                   ;
     true          = "t" | "true"
@@ -107,8 +107,11 @@ In the following grammar, white space and comments are omitted:
     var           = ident
                   ;
     symbol        = ":" qident
-                  (* symbols are usually used to specify
-                     fields in literal map definitions *)
+                  (*
+                     symbols are usually used to specify
+                     fields in literal map definitions
+                     and lots of other places as stringy sentinel values
+                  *)
                   ;
     value         = number
                   | string
@@ -262,7 +265,7 @@ Thoughts about cyclic referencing
 
     let new = {
         ! self = ${ // self on stack
-            x: 10
+            x = 10
         };
         ! y = $[1,2,3]; // y on stack
         ! :ref yhard = $[1,2,3]; // yhard puts upvalue on stack, any closure captures the upvalue by value so it references it strongly
@@ -297,7 +300,7 @@ Thoughts about cyclic referencing
 Callable objects:
 
     !my_cond = {
-        let :ref self = ${ inner_val: #t };
+        let :ref self = ${ inner_val = #t };
         { apply self->inner_val @ }
     }()
 
@@ -309,8 +312,8 @@ Callable objects:
 
 Prototyped inheritance:
 
-    !proto = ${ print: { println _ }, };
-    !o = to_obj { _proto_: proto };
+    !proto = ${ print = { println _ }, };
+    !o = to_obj { _proto_ = proto };
     o.print(123);
 
     # MetaMap(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
@@ -603,8 +606,8 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
         } else {
             parse_expr(ps)?
         };
-        if !ps.consume_if_eq_wsc(':') {
-            return ps.err_unexpected_token(':', "After reading map key");
+        if !ps.consume_if_eq_wsc('=') {
+            return ps.err_unexpected_token('=', "After reading map key");
         }
         let value = parse_expr(ps)?;
 
@@ -724,7 +727,7 @@ fn parse_identifier(ps: &mut State) -> String {
     let identifier : String =
         ps.take_while_wsc(|c| {
             match c {
-               '.' | ',' | ':' | ';' | '{' | '}'
+               '.' | ',' | ';' | '{' | '}'
              | '[' | ']' | '(' | ')' | '~' | '|' | '='
                     => false,
                 _   => !c.is_whitespace()
@@ -930,7 +933,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                 // Those will be covered by parse_expr() presumably.
                 return Ok(res_call);
             },
-            ';' | ')' | ',' | ']' | '|' | '}' | ':' => {
+            ';' | ')' | ',' | ']' | '|' | '}' => {
                 break;
             },
             _ if op.is_some() => {
@@ -939,9 +942,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                 ps.consume_wsc_n(op.len());
                 value = parse_binop(value, ps, &op)?;
             },
-            '=' => {
-                return ps.err_bad_call("Unexpected '='");
-            },
+            '=' => { break; }, // '=' from parsing map keys
             _ => {
                 if binop_mode { break; }
 
@@ -1241,7 +1242,7 @@ mod tests {
     #[test]
     fn check_expr_err() {
         assert_eq!(parse_error("foo.a() = 10"),
-            "Parse error: error[1:9] Unexpected \'=\' at code \'= 10\'");
+            "Parse error: error[1:9] Expected literal value, sub expression, block, key or identifier. at code \'= 10\'");
     }
 
     #[test]
@@ -1312,8 +1313,8 @@ mod tests {
 
     #[test]
     fn check_map() {
-        assert_eq!(parse("${a:10}"),   "[&Block,[&Map,[$\"a\",10]]]");
-        assert_eq!(parse("${:a:10}"),  "[&Block,[&Map,[[&Key,$\"a\"],10]]]");
+        assert_eq!(parse("${a=10}"),   "[&Block,[&Map,[$\"a\",10]]]");
+        assert_eq!(parse("${:a=10}"),  "[&Block,[&Map,[[&Key,$\"a\"],10]]]");
     }
 
     #[test]

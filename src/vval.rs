@@ -133,6 +133,15 @@ impl Env {
         ret
     }
 
+    pub fn with_restore_sp<T>(&mut self, f: T) -> Result<VVal, StackAction>
+        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+
+        let old_sp = self.sp;
+        let ret = f(self);
+        self.popn(self.sp - old_sp);
+        ret
+    }
+
     pub fn with_pushed_sp<T>(&mut self, n: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
 
@@ -590,6 +599,8 @@ impl VVal {
             VVal::Nul     => { if let VVal::Nul = v { return true; } else { return false; } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { return ia == ib; } else { return false; } },
             VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return (ia - ib).abs() < std::f64::EPSILON; } else { return false; } },
+            VVal::Sym(s)  => { if let VVal::Sym(ib) = v { return *s == *ib; } else { return false; } },
+            VVal::Str(_)  => { self.s_raw() == v.s_raw() },
             _             => { false }
         }
     }
@@ -624,7 +635,7 @@ impl VVal {
             } else {
                 out.push(k.to_string());
             }
-            out.push(String::from(":"));
+            out.push(String::from("="));
             out.push(v.s());
         }
         out.push(String::from("}"));
@@ -712,6 +723,18 @@ impl VVal {
             VVal::Sym(s)  => s.clone(),
             _             => String::from(""),
         }
+    }
+
+    pub fn is_sym(&self) -> bool {
+        match self { VVal::Sym(_) => true, _ => false }
+    }
+
+    pub fn is_str(&self) -> bool {
+        match self { VVal::Str(_) => true, _ => false }
+    }
+
+    pub fn is_fun(&self) -> bool {
+        match self { VVal::Fun(_) => true, _ => false }
     }
 
     pub fn type_name(&self) -> String {
