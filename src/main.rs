@@ -8,7 +8,6 @@ mod prelude;
 
 use vval::Env;
 use vval::VVal;
-use compiler::eval_in_ctx;
 use crate::prelude::create_wlamba_prelude;
 
 fn main() {
@@ -33,7 +32,7 @@ fn main() {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
 
-                match eval_in_ctx(&line, &mut ctx) {
+                match ctx.eval(&line) {
                     Ok(v) => {
                         println!("> {}", v.s());
                     },

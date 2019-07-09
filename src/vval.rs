@@ -70,6 +70,8 @@ pub struct Env {
     pub sp:   usize,
     /// The argument count to the current call.
     pub argc: usize,
+    /// A user defined variable that holds user context information.
+    pub user: Rc<RefCell<dyn std::any::Any>>,
 }
 
 impl Default for Env {
@@ -84,6 +86,20 @@ impl Env {
             bp:                 0,
             sp:                 0,
             argc:               0,
+            user:               Rc::new(RefCell::new(VVal::vec())),
+        };
+        e.args.resize(STACK_SIZE, VVal::Nul);
+        e
+    }
+
+    pub fn new_with_user(user: Rc<RefCell<std::any::Any>>) -> Env {
+        let mut e = Env {
+            args:               Vec::with_capacity(STACK_SIZE),
+            fun:                VValFun::new_dummy(),
+            bp:                 0,
+            sp:                 0,
+            argc:               0,
+            user,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -350,7 +366,7 @@ impl Drop for DropVVal {
     fn drop(&mut self) {
         let mut e = Env::new();
         e.push(self.v.clone());
-        self.fun.call(&mut e, 1);
+        self.fun.call_internal(&mut e, 1);
     }
 }
 
@@ -462,7 +478,21 @@ impl VVal {
         VVal::Lst(Rc::new(RefCell::new(v)))
     }
 
-    pub fn call(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
+    pub fn call(&self, env: &mut Env, args: &[VVal]) -> Result<VVal, StackAction> {
+        let argc = args.len();
+        env.with_pushed_sp(argc, |e: &mut Env| {
+            for (i, v) in args.iter().enumerate() {
+                e.set_arg(i, v.clone());
+            }
+            self.call_internal(e, argc)
+        })
+    }
+
+    pub fn call_no_args(&self, env: &mut Env) -> Result<VVal, StackAction> {
+        self.call_internal(env, 0)
+    }
+
+    pub fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         //d// env.dump_stack();
         match self {
             VVal::Fun(fu) => {
@@ -475,7 +505,7 @@ impl VVal {
                     let idx = if *b { 0 } else { 1 };
                     let ret = if argc > 0 {
                         let v = e.arg(idx).clone();
-                        v.call(e, 0)
+                        v.call_internal(e, 0)
                     } else { Ok(self.clone()) };
                     ret
                 })

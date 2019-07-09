@@ -125,6 +125,103 @@ impl EvalContext {
             local: Rc::new(RefCell::new(Env::new())),
         }
     }
+
+    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<std::any::Any>>) -> EvalContext {
+        EvalContext {
+            global: global.clone(),
+            local_compile: Rc::new(RefCell::new(CompileEnv {
+                parent:    None,
+                global:    global.clone(),
+                local_map: std::collections::HashMap::new(),
+                locals:    Vec::new(),
+                upvals:    Vec::new(),
+            })),
+            local: Rc::new(RefCell::new(Env::new_with_user(user))),
+        }
+    }
+
+    /// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
+    ///
+    /// ```
+    /// use wlambda::compiler;
+    /// use wlambda::parser;
+    /// use wlambda::prelude::create_wlamba_prelude;
+    ///
+    /// let global_env = create_wlamba_prelude();
+    /// let mut ctx = compiler::EvalContext::new(global_env);
+    ///
+    /// let s = "$[1,2,3]";
+    /// let ast = parser::parse(s, 0).unwrap();
+    /// let r = &mut ctx.eval_ast(&ast).unwrap();
+    ///
+    /// println!("Res: {}", r.s());
+    /// ```
+    pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
+        let prog = compile(ast, &mut self.local_compile);
+        let local_env_size = CompileEnv::local_env_size(&self.local_compile);
+
+        let env = self.local.borrow_mut();
+        let mut res = Ok(VVal::Nul);
+
+        std::cell::RefMut::map(env, |l_env| {
+            res = match prog {
+                Ok(prog_closures) => {
+                    l_env.sp = 0;
+                    l_env.set_bp(local_env_size);
+                    match prog_closures(l_env) {
+                        Ok(v)   => Ok(v.clone()),
+                        Err(je) =>
+                            Err(EvalError::ExecError(
+                                format!("Jumped out of execution: {:?}", je))),
+                    }
+                },
+                Err(e) => { Err(EvalError::CompileError(e)) },
+            };
+            l_env
+        });
+
+        res
+    }
+
+    /// Evaluates a piece of WLambda code with the given `EvalContext`.
+    ///
+    /// ```
+    /// use wlambda::prelude::create_wlamba_prelude;
+    ///
+    /// let global_env = create_wlamba_prelude();
+    /// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+    ///
+    /// let r = &mut ctx.eval("$[1,2,3]").unwrap();
+    /// println!("Res: {}", r.s());
+    /// ```
+    #[allow(dead_code)]
+    pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
+        match parser::parse(s, 0) {
+            Ok(ast) => { self.eval_ast(&ast) },
+            Err(e) => { Err(EvalError::ParseError(e)) },
+        }
+    }
+
+    /// Calls a wlambda function with the given `EvalContext`.
+    ///
+    /// ```
+    /// use wlambda::prelude::create_wlamba_prelude;
+    /// use wlambda::vval::VVal;
+    ///
+    /// let global_env = create_wlamba_prelude();
+    /// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+    ///
+    /// let returned_func = &mut ctx.eval("{ _ + _1 }").unwrap();
+    /// assert_eq!(
+    ///     ctx.call(returned_func,
+    ///              &vec![VVal::Int(10), VVal::Int(11)]).unwrap().i(),
+    ///     21);
+    /// ```
+    #[allow(dead_code)]
+    pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
+        let mut env = self.local.borrow_mut();
+        f.call(&mut env, args)
+    }
 }
 
 /// Compile time environment for allocating and
@@ -574,7 +671,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                                 //d// println!("SETARGC: {} => {:?}", i, v);
                                 e.set_arg(argc - (i + 1), v);
                             }
-                            f.call(e, argc)
+                            f.call_internal(e, argc)
                         })
                     }))
                 },
@@ -669,68 +766,6 @@ pub fn s_eval(s: &str) -> String {
     }
 }
 
-/// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
-///
-/// ```
-/// use wlambda::compiler;
-/// use wlambda::parser;
-/// use wlambda::prelude::create_wlamba_prelude;
-///
-/// let global_env = create_wlamba_prelude();
-/// let mut ctx = compiler::EvalContext::new(global_env);
-///
-/// let s = "$[1,2,3]";
-/// let ast = parser::parse(s, 0).unwrap();
-/// let r = wlambda::compiler::eval_ast_in_ctx(&ast, &mut ctx).unwrap();
-///
-/// println!("Res: {}", r.s());
-/// ```
-pub fn eval_ast_in_ctx(ast: &VVal, ctx: &mut EvalContext) -> Result<VVal, EvalError>  {
-    let prog = compile(ast, &mut ctx.local_compile);
-    let local_env_size = CompileEnv::local_env_size(&ctx.local_compile);
-
-    let env = ctx.local.borrow_mut();
-    let mut res = Ok(VVal::Nul);
-
-    std::cell::RefMut::map(env, |l_env| {
-        res = match prog {
-            Ok(prog_closures) => {
-                l_env.sp = 0;
-                l_env.set_bp(local_env_size);
-                match prog_closures(l_env) {
-                    Ok(v)   => Ok(v.clone()),
-                    Err(je) =>
-                        Err(EvalError::ExecError(
-                            format!("Jumped out of execution: {:?}", je))),
-                }
-            },
-            Err(e) => { Err(EvalError::CompileError(e)) },
-        };
-        l_env
-    });
-
-    res
-}
-
-/// Evaluates a piece of WLambda code with the given `EvalContext`.
-///
-/// ```
-/// use wlambda::prelude::create_wlamba_prelude;
-///
-/// let global_env = create_wlamba_prelude();
-/// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
-///
-/// let r = wlambda::compiler::eval_in_ctx("$[1,2,3]", &mut ctx).unwrap();
-/// println!("Res: {}", r.s());
-/// ```
-#[allow(dead_code)]
-pub fn eval_in_ctx(s: &str, ctx: &mut EvalContext) -> Result<VVal, EvalError>  {
-    match parser::parse(s, 0) {
-        Ok(ast) => { eval_ast_in_ctx(&ast, ctx) },
-        Err(e) => { Err(EvalError::ParseError(e)) },
-    }
-}
-
 /// Evaluates a piece of WLambda code in a default global environment.
 ///
 /// ```
@@ -741,7 +776,7 @@ pub fn eval(s: &str) -> Result<VVal, EvalError>  {
     let global = create_wlamba_prelude();
     let mut ctx = EvalContext::new(global);
 
-    eval_in_ctx(s, &mut ctx)
+    ctx.eval(s)
 }
 
 #[cfg(test)]
@@ -1106,6 +1141,34 @@ mod tests {
         assert_eq!(s_eval("match $q xx :?p { _ == $q|xx| } { 18 }"),    "18");
         assert_eq!(s_eval("match $q x9 :?p { yay _; _ == $q|xx| } { 181 } { 19 }"), "19");
         assert_eq!(s_eval("match 10"),                           "$n");
+    }
+
+    #[test]
+    fn check_callbacks() {
+        let global = create_wlamba_prelude();
+        global.borrow_mut().add_func("reg", |env: &mut Env, _argc: usize| {
+            let mut any = env.user.borrow_mut();
+            let ref_reg = any.downcast_mut::<Vec<VVal>>().unwrap();
+            ref_reg.push(env.arg(0).clone());
+            Ok(VVal::Nul)
+        });
+
+        let reg : Rc<RefCell<Vec<VVal>>> = Rc::new(RefCell::new(Vec::new()));
+
+        let mut ctx = EvalContext::new_with_user(global, reg.clone());
+        ctx.eval("reg { _ + 10 }").unwrap();
+        let n = reg.borrow_mut()[0].clone();
+        let ret = ctx.call(&n, &vec![VVal::Int(11)]).unwrap();
+        assert_eq!(ret.i(), 21);
+    }
+
+    #[test]
+    fn check_returned_functions() {
+        let global = create_wlamba_prelude();
+        let mut ctx = EvalContext::new(global);
+        let n = ctx.eval("{ _ + 11 }").unwrap();
+        let ret = ctx.call(&n, &vec![VVal::Int(11)]).unwrap();
+        assert_eq!(ret.i(), 22);
     }
 
     #[test]

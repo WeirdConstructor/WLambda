@@ -7,6 +7,10 @@
 * Added 'match' 
 * Changed map syntax incompatible. Keys are delimited by '=' now, not ':' because
 to make parsing easier with multiple symbols as arguments for calls.
+* Added ability to call VVal::Fun in the EvalContext and an available Env.
+Useful for storing callbacks.
+* Added user field to Env, so the user of wlambda can provide his own registry for
+storing data from globally added functions.
 
 0.1.1 (2019-05-23)
 ==================

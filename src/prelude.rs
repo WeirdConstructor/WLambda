@@ -88,7 +88,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
         if env.arg(arg_idx).is_fun() {
             return env.with_restore_sp(|e: &mut Env| {
                 e.push(val.clone());
-                e.arg(arg_idx).call(e, 1)
+                e.arg(arg_idx).call_internal(e, 1)
             });
         }
 
@@ -111,10 +111,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                     let val_type_name = val.type_name();
                     for i in match_vals.iter().skip(1) {
                         if env.arg(*i).s_raw() == val_type_name {
-                            return env.with_restore_sp(|e: &mut Env| {
-                                e.push(val.clone());
-                                e.arg(fun_idx).call(e, 1)
-                            });
+                            return env.arg(fun_idx).call(env, &vec![val.clone()]);
                         }
                     }
                 },
@@ -122,10 +119,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                     let val_s = val.s_raw();
                     for i in match_vals.iter().skip(1) {
                         if env.arg(*i).s_raw() == val_s {
-                            return env.with_restore_sp(|e: &mut Env| {
-                                e.push(val.clone());
-                                e.arg(fun_idx).call(e, 1)
-                            });
+                            return env.arg(fun_idx).call(env, &vec![val.clone()]);
                         }
                     }
                 },
@@ -133,18 +127,12 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                     if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
                     let fun_idx = fun_idx + 1;
 
-                    let pred_res = env.with_restore_sp(|e: &mut Env| {
-                        e.push(val.clone());
-                        e.arg(arg_idx).call(e, 1)
-                    });
+                    let pred_res = env.arg(arg_idx).call(env, &vec![val.clone()]);
                     match pred_res {
                         Ok(v) => {
                             arg_idx += 1;
                             if v.b() {
-                                return env.with_restore_sp(|e: &mut Env| {
-                                    e.push(val.clone());
-                                    e.arg(fun_idx).call(e, 1)
-                                });
+                                return env.arg(fun_idx).call(env, &vec![val.clone()]);
                             }
                         },
                         Err(sa) => { return Err(sa); }
@@ -157,8 +145,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
         } else {
             for i in match_vals.iter() {
                 if env.arg(*i).eqv(val) {
-                    env.push(val.clone());
-                    return env.arg(fun_idx).call(env, 1);
+                    return env.arg(fun_idx).call(env, &vec![val.clone()]);
                 }
             }
         }
@@ -305,13 +292,13 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
             let mut ret = VVal::Nul;
             loop {
-                match test.call(env, 0) {
+                match test.call_no_args(env) {
                     Ok(v)                      => { if !v.b() { return Ok(ret); } },
                     Err(StackAction::Break(v)) => { return Ok(v); },
                     Err(StackAction::Next)     => { continue; },
                 }
 
-                match f.call(env, 0) {
+                match f.call_no_args(env) {
                     Ok(v)                      => { ret = v; },
                     Err(StackAction::Break(v)) => { return Ok(v); },
                     Err(StackAction::Next)     => { },
@@ -339,7 +326,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 while from <= to {
                     ret = VVal::Nul;
                     env.push(VVal::Flt(from));
-                    match f.call(env, 1) {
+                    match f.call_internal(env, 1) {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
                         Err(StackAction::Next)     => { },
@@ -359,7 +346,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 while from <= to {
                     ret = VVal::Nul;
                     env.push(VVal::Int(from));
-                    match f.call(env, 1) {
+                    match f.call_internal(env, 1) {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { env.popn(1); println!("BREAK {}", v.s()); return Ok(v); },
                         Err(StackAction::Next)     => { },
