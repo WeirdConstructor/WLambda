@@ -23,6 +23,7 @@ argument.
 * Added panic for fatal error reporting.
 * Added bool, int, float, str and sym routines to prelude for converting values.
 * Changed symbol text representation.
+* Added checking functions like is_nul, is_sym, is_str, ...
 
 0.1.1 (2019-05-23)
 ==================

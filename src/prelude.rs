@@ -332,6 +332,33 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     g.borrow_mut().add_func(
         "sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_sym(&env.arg(0).s_raw())) });
+    g.borrow_mut().add_func(
+        "is_nul",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_nul())) });
+    g.borrow_mut().add_func(
+        "is_err",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_err())) });
+    g.borrow_mut().add_func(
+        "is_map",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_map())) });
+    g.borrow_mut().add_func(
+        "is_vec",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_vec())) });
+    g.borrow_mut().add_func(
+        "is_fun",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_fun())) });
+    g.borrow_mut().add_func(
+        "is_str",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_str())) });
+    g.borrow_mut().add_func(
+        "is_sym",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_sym())) });
+    g.borrow_mut().add_func(
+        "is_float",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_float())) });
+    g.borrow_mut().add_func(
+        "is_int",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) });
 
     g.borrow_mut().add_func(
         "type",

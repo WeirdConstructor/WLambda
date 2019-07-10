@@ -1359,4 +1359,17 @@ mod tests {
         "#),
         "10");
     }
+
+    #[test]
+    fn check_test_funs() {
+        assert_eq!(s_eval("is_nul $n"),    "$true");
+        assert_eq!(s_eval("is_err $e $n"), "$true");
+        assert_eq!(s_eval("is_map ${}"),   "$true");
+        assert_eq!(s_eval("is_vec $[]"),   "$true");
+        assert_eq!(s_eval("is_sym :f"),    "$true");
+        assert_eq!(s_eval("is_str \"f\""), "$true");
+        assert_eq!(s_eval("is_int 1"),     "$true");
+        assert_eq!(s_eval("is_float 1.2"), "$true");
+        assert_eq!(s_eval("is_fun {}"),    "$true");
+    }
 }

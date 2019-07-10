@@ -814,6 +814,14 @@ impl VVal {
         }
     }
 
+    pub fn is_float(&self) -> bool {
+        match self { VVal::Flt(_) => true, _ => false }
+    }
+
+    pub fn is_int(&self) -> bool {
+        match self { VVal::Int(_) => true, _ => false }
+    }
+
     pub fn is_sym(&self) -> bool {
         match self { VVal::Sym(_) => true, _ => false }
     }
