@@ -15,6 +15,7 @@ storing data from globally added functions.
 handling error values. \_? returns error values directly upwards, like ? in
 Rust. And on\_error handles an error value in the function passed as first
 argument.
+* Added unwrap routine to prelude.
 * Added match with ?e for errors.
 * Added block and return for non local jumps upwards the stack.
 * Added syntax: \:func_label { ... } for easier returns.

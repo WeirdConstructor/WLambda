@@ -259,6 +259,19 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         });
 
     g.borrow_mut().add_func(
+        "unwrap",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0) {
+                VVal::Err(err_v) => {
+                    return Err(StackAction::Panic(
+                        VVal::new_str(&format!(
+                            "unwrap error: {}", err_v.borrow().s()))));
+                },
+                v => Ok(v)
+            }
+        });
+
+    g.borrow_mut().add_func(
         "on_error",
         |env: &mut Env, _argc: usize| {
             let err_fn = env.arg(0).clone();

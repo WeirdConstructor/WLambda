@@ -1292,6 +1292,9 @@ mod tests {
                    "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: Int(10) })))\"");
         assert_eq!(s_eval_no_panic("_? { return $e 10; 10 }()"),
                    "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: Int(10) })))\"");
+        assert_eq!(s_eval_no_panic("unwrap $e 1"),
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"unwrap error: 1\\\" }))\"");
+        assert_eq!(s_eval_no_panic("unwrap 1.1"), "1.1");
         assert_eq!(s_eval_no_panic("on_error { _ + 20 } $e 19.9"), "39.9");
 
         assert_eq!(s_eval_no_panic("{ { { panic 102 }(); 20 }(); return 20 }(); 49"),
