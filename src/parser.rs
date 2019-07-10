@@ -94,6 +94,7 @@ In the following grammar, white space and comments are omitted:
                   ;
     nul           = "n" | "nul"
                   ;
+    err           = ("e" | "error"), expr
     special_value = byte_string
                   | quote_string
                   | list
@@ -101,8 +102,10 @@ In the following grammar, white space and comments are omitted:
                   | none
                   | true
                   | false
+                  | err
                   ;
-    function      = "{", block, "}"
+    function      = [ "\:", ident ], "{", block, "}"
+                  | "\", statement
                   ;
     var           = ident
                   ;
@@ -661,6 +664,17 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             }
             Ok(VVal::Bol(false))
         },
+        'e' => {
+            if ps.consume_lookahead("error") {
+                ps.skip_ws_and_comments();
+            } else {
+                ps.consume_wsc();
+            }
+
+            let err = ps.syn(Syntax::Err);
+            err.push(parse_expr(ps)?);
+            Ok(err)
+        },
         _   => Ok(VVal::Flt(0.2)),
     }
 }
@@ -758,7 +772,26 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
             '{' => {
                 let block = parse_block(ps, true)?;
                 block.set_at(0, ps.syn_raw(Syntax::Func));
+                block.insert_at(1, VVal::Nul);
                 Ok(block)
+            },
+            '\\' => {
+                ps.consume_wsc();
+
+                if ps.consume_if_eq_wsc(':') {
+                    let block_name = parse_identifier(ps);
+                    ps.skip_ws_and_comments();
+                    let block = parse_block(ps, true)?;
+                    block.set_at(0, ps.syn_raw(Syntax::Func));
+                    block.insert_at(1, VVal::Sym(String::from(block_name)));
+                    Ok(block)
+                } else {
+                    let next_stmt = parse_stmt(ps)?;
+                    let block = ps.syn(Syntax::Func);
+                    block.push(VVal::Nul);
+                    block.push(next_stmt);
+                    Ok(block)
+                }
             },
             ':' => {
                 ps.consume_wsc();
@@ -902,7 +935,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
     // look ahead, if we see an expression delimiter.
     // because then, this is not going to be a call!
     // Also exception to parse_expr, we are excluding the '|'.
-    if ps.lookahead_one_of(";),]}:|") || ps.at_eof {
+    if ps.lookahead_one_of(";),]}|") || ps.at_eof {
         return Ok(value);
     }
 
@@ -1159,84 +1192,85 @@ mod tests {
 
     #[test]
     fn check_parse_numbers() {
-        assert_eq!(parse("#comment \n10;#fom \n"),  "[&Block,10]");
-        assert_eq!(parse("10;"),       "[&Block,10]");
-        assert_eq!(parse("10.123;"),   "[&Block,10.123]");
-        assert_eq!(parse("-10;"),      "[&Block,-10]");
-        assert_eq!(parse("-0xFF;"),    "[&Block,-255]");
-        assert_eq!(parse("-0xFF.1;"),  "[&Block,-255.0625]");
-        assert_eq!(parse("-0xFF.9;"),  "[&Block,-255.5625]");
-        assert_eq!(parse("-0xFF.A;"),  "[&Block,-255.625]");
-        assert_eq!(parse("-0xFF.F;"),  "[&Block,-255.9375]");
+        assert_eq!(parse("#comment \n10;#fom \n"),  "$[&Block,10]");
+        assert_eq!(parse("10;"),       "$[&Block,10]");
+        assert_eq!(parse("10.123;"),   "$[&Block,10.123]");
+        assert_eq!(parse("-10;"),      "$[&Block,-10]");
+        assert_eq!(parse("-0xFF;"),    "$[&Block,-255]");
+        assert_eq!(parse("-0xFF.1;"),  "$[&Block,-255.0625]");
+        assert_eq!(parse("-0xFF.9;"),  "$[&Block,-255.5625]");
+        assert_eq!(parse("-0xFF.A;"),  "$[&Block,-255.625]");
+        assert_eq!(parse("-0xFF.F;"),  "$[&Block,-255.9375]");
     }
 
     #[test]
     fn check_parse_vec() {
         assert_eq!(parse("$[10];"),
-                   "[&Block,[&Lst,10]]");
+                   "$[&Block,$[&Lst,10]]");
         assert_eq!(parse("$[10, 11.23, -30, -0xFF];"),
-                   "[&Block,[&Lst,10,11.23,-30,-255]]");
+                   "$[&Block,$[&Lst,10,11.23,-30,-255]]");
         assert_eq!(parse("$[10, $[1,2,3], 11.23, -30, -0xFF];"),
-                   "[&Block,[&Lst,10,[&Lst,1,2,3],11.23,-30,-255]]");
+                   "$[&Block,$[&Lst,10,$[&Lst,1,2,3],11.23,-30,-255]]");
     }
 
     #[test]
     fn check_calls() {
-        assert_eq!(parse("10"),         "[&Block,10]");
-        assert_eq!(parse("10;"),        "[&Block,10]");
-        assert_eq!(parse("10; 20"),     "[&Block,10,20]");
-        assert_eq!(parse("10;;; 20"),   "[&Block,10,20]");
-        assert_eq!(parse("10;;; 20;"),  "[&Block,10,20]");
-        assert_eq!(parse("10 20;"),     "[&Block,[&Call,10,20]]");
-        assert_eq!(parse("[10] 20;"),   "[&Block,[&Call,10,20]]");
+        assert_eq!(parse("10"),         "$[&Block,10]");
+        assert_eq!(parse("10;"),        "$[&Block,10]");
+        assert_eq!(parse("10; 20"),     "$[&Block,10,20]");
+        assert_eq!(parse("10;;; 20"),   "$[&Block,10,20]");
+        assert_eq!(parse("10;;; 20;"),  "$[&Block,10,20]");
+        assert_eq!(parse("10 20;"),     "$[&Block,$[&Call,10,20]]");
+        assert_eq!(parse("[10] 20;"),   "$[&Block,$[&Call,10,20]]");
     }
 
     #[test]
     fn check_expr() {
         assert_eq!(parse("10 20 30"),
-                   "[&Block,[&Call,10,20,30]]");
+                   "$[&Block,$[&Call,10,20,30]]");
         assert_eq!(parse("10 20 30 40"),
-                   "[&Block,[&Call,10,20,30,40]]");
+                   "$[&Block,$[&Call,10,20,30,40]]");
         assert_eq!(parse("10 | 20 30"),
-                   "[&Block,[&Call,20,30,10]]");
+                   "$[&Block,$[&Call,20,30,10]]");
         assert_eq!(parse("10 20 | 30 40"),
-                   "[&Block,[&Call,30,40,[&Call,10,20]]]");
+                   "$[&Block,$[&Call,30,40,$[&Call,10,20]]]");
         assert_eq!(parse("10 20 | 30 40 | 50"),
-                   "[&Block,[&Call,50,[&Call,30,40,[&Call,10,20]]]]");
+                   "$[&Block,$[&Call,50,$[&Call,30,40,$[&Call,10,20]]]]");
         assert_eq!(parse("10 | 20 | 30 | 40"),
-                   "[&Block,[&Call,40,[&Call,30,[&Call,20,10]]]]");
+                   "$[&Block,$[&Call,40,$[&Call,30,$[&Call,20,10]]]]");
         assert_eq!(parse("10() | 20 | 30 | 40"),
-                   "[&Block,[&Call,40,[&Call,30,[&Call,20,[&Call,10]]]]]");
+                   "$[&Block,$[&Call,40,$[&Call,30,$[&Call,20,$[&Call,10]]]]]");
         assert_eq!(parse("10()() | 20 | 30 | 40"),
-                   "[&Block,[&Call,40,[&Call,30,[&Call,20,[&Call,[&Call,10]]]]]]");
+                   "$[&Block,$[&Call,40,$[&Call,30,$[&Call,20,$[&Call,$[&Call,10]]]]]]");
         assert_eq!(parse("[10 | 20] | [foo(bar)]"),
-                   "[&Block,[&Call,[&Var,$\"foo\"],[&Var,$\"bar\"],[&Call,20,10]]]");
+                   "$[&Block,$[&Call,$[&Var,$\"foo\"],$[&Var,$\"bar\"],$[&Call,20,10]]]");
         assert_eq!(parse("10 ~ 20 ~ 30 ~ 40"),
-                   "[&Block,[&Call,10,[&Call,20,[&Call,30,40]]]]");
-        assert_eq!(parse("10 | 20"),                  "[&Block,[&Call,20,10]]");
-        assert_eq!(parse("10 [1 2] [3 4 5] [6 [7]]"), "[&Block,[&Call,10,[&Call,1,2],[&Call,3,4,5],[&Call,6,7]]]");
-        assert_eq!(parse("10()"),                     "[&Block,[&Call,10]]");
-        assert_eq!(parse("10(20, 30)"),               "[&Block,[&Call,10,20,30]]");
-        assert_eq!(parse("10 x(20, 30)"),             "[&Block,[&Call,10,[&Call,[&Var,$\"x\"],20,30]]]");
-        assert_eq!(parse("10 x(20, 30) | 50"),        "[&Block,[&Call,50,[&Call,10,[&Call,[&Var,$\"x\"],20,30]]]]");
-        assert_eq!(parse("[10].a"),                   "[&Block,[&Call,[&Key,$\"a\"],10]]");
-        assert_eq!(parse("a.b"),                      "[&Block,[&Call,[&Key,$\"b\"],[&Var,$\"a\"]]]");
-        assert_eq!(parse("10 a.b"),                   "[&Block,[&Call,10,[&Call,[&Key,$\"b\"],[&Var,$\"a\"]]]]");
-        assert_eq!(parse("[10].[20]"),                "[&Block,[&Call,20,10]]");
-        assert_eq!(parse("10.20 30"),                 "[&Block,[&Call,10.2,30]]");
-        assert_eq!(parse("10 20 ~ 30 ~ 40 ~ 50"),     "[&Block,[&Call,10,20,[&Call,30,[&Call,40,50]]]]");
-        assert_eq!(parse("10 20 ~ 30 40 ~ 40 1 2 3 ~ 50 60"),  "[&Block,[&Call,10,20,[&Call,30,40,[&Call,40,1,2,3,[&Call,50,60]]]]]");
-        assert_eq!(parse("10[10(1,2,3 foo) ~ 4]"),    "[&Block,[&Call,10,[&Call,[&Call,10,1,2,[&Call,3,[&Var,$\"foo\"]]],4]]]");
-        assert_eq!(parse("foo.b.c.d"),                "[&Block,[&Call,[&Key,$\"d\"],[&Call,[&Key,$\"c\"],[&Call,[&Key,$\"b\"],[&Var,$\"foo\"]]]]]");
-        assert_eq!(parse("foo.b.c.d()"),              "[&Block,[&Call,[&Call,[&Key,$\"d\"],[&Call,[&Key,$\"c\"],[&Call,[&Key,$\"b\"],[&Var,$\"foo\"]]]]]]");
-        assert_eq!(parse("foo.b.c.d(1,2,3)"),         "[&Block,[&Call,[&Call,[&Key,$\"d\"],[&Call,[&Key,$\"c\"],[&Call,[&Key,$\"b\"],[&Var,$\"foo\"]]]],1,2,3]]");
-        assert_eq!(parse("foo.b.c.d 1 2 3"),          "[&Block,[&Call,[&Call,[&Key,$\"d\"],[&Call,[&Key,$\"c\"],[&Call,[&Key,$\"b\"],[&Var,$\"foo\"]]]],1,2,3]]");
-        assert_eq!(parse("[foo.b.c.d] 1 2 3"),        "[&Block,[&Call,[&Call,[&Key,$\"d\"],[&Call,[&Key,$\"c\"],[&Call,[&Key,$\"b\"],[&Var,$\"foo\"]]]],1,2,3]]");
-        assert_eq!(parse("foo.a = 10"),               "[&Block,[&SetKey,[&Var,$\"foo\"],[&Key,$\"a\"],10]]");
-        assert_eq!(parse("foo.a = 10 | 20"),          "[&Block,[&SetKey,[&Var,$\"foo\"],[&Key,$\"a\"],[&Call,20,10]]]");
-        assert_eq!(parse("foo.a = 10 ~ 20"),          "[&Block,[&SetKey,[&Var,$\"foo\"],[&Key,$\"a\"],[&Call,10,20]]]");
-        assert_eq!(parse("4 == 5 ~ 10"),              "[&Block,[&Call,[&Var,$\"==\"],4,[&Call,5,10]]]");
-        assert_eq!(parse("foo.[i] = 10"),             "[&Block,[&SetKey,[&Var,$\"foo\"],[&Var,$\"i\"],10]]");
+                   "$[&Block,$[&Call,10,$[&Call,20,$[&Call,30,40]]]]");
+        assert_eq!(parse("10 | 20"),                  "$[&Block,$[&Call,20,10]]");
+        assert_eq!(parse("10 [1 2] [3 4 5] [6 [7]]"), "$[&Block,$[&Call,10,$[&Call,1,2],$[&Call,3,4,5],$[&Call,6,7]]]");
+        assert_eq!(parse("10()"),                     "$[&Block,$[&Call,10]]");
+        assert_eq!(parse("10(20, 30)"),               "$[&Block,$[&Call,10,20,30]]");
+        assert_eq!(parse("10 x(20, 30)"),             "$[&Block,$[&Call,10,$[&Call,$[&Var,$\"x\"],20,30]]]");
+        assert_eq!(parse("10 x(20, 30) | 50"),        "$[&Block,$[&Call,50,$[&Call,10,$[&Call,$[&Var,$\"x\"],20,30]]]]");
+        assert_eq!(parse("[10].a"),                   "$[&Block,$[&Call,$[&Key,$\"a\"],10]]");
+        assert_eq!(parse("a.b"),                      "$[&Block,$[&Call,$[&Key,$\"b\"],$[&Var,$\"a\"]]]");
+        assert_eq!(parse("10 a.b"),                   "$[&Block,$[&Call,10,$[&Call,$[&Key,$\"b\"],$[&Var,$\"a\"]]]]");
+        assert_eq!(parse("[10].[20]"),                "$[&Block,$[&Call,20,10]]");
+        assert_eq!(parse("10.20 30"),                 "$[&Block,$[&Call,10.2,30]]");
+        assert_eq!(parse("10 20 ~ 30 ~ 40 ~ 50"),     "$[&Block,$[&Call,10,20,$[&Call,30,$[&Call,40,50]]]]");
+        assert_eq!(parse("10 20 ~ 30 40 ~ 40 1 2 3 ~ 50 60"),  "$[&Block,$[&Call,10,20,$[&Call,30,40,$[&Call,40,1,2,3,$[&Call,50,60]]]]]");
+        assert_eq!(parse("10[10(1,2,3 foo) ~ 4]"),    "$[&Block,$[&Call,10,$[&Call,$[&Call,10,1,2,$[&Call,3,$[&Var,$\"foo\"]]],4]]]");
+        assert_eq!(parse("foo.b.c.d"),                "$[&Block,$[&Call,$[&Key,$\"d\"],$[&Call,$[&Key,$\"c\"],$[&Call,$[&Key,$\"b\"],$[&Var,$\"foo\"]]]]]");
+        assert_eq!(parse("foo.b.c.d()"),              "$[&Block,$[&Call,$[&Call,$[&Key,$\"d\"],$[&Call,$[&Key,$\"c\"],$[&Call,$[&Key,$\"b\"],$[&Var,$\"foo\"]]]]]]");
+        assert_eq!(parse("foo.b.c.d(1,2,3)"),         "$[&Block,$[&Call,$[&Call,$[&Key,$\"d\"],$[&Call,$[&Key,$\"c\"],$[&Call,$[&Key,$\"b\"],$[&Var,$\"foo\"]]]],1,2,3]]");
+        assert_eq!(parse("foo.b.c.d 1 2 3"),          "$[&Block,$[&Call,$[&Call,$[&Key,$\"d\"],$[&Call,$[&Key,$\"c\"],$[&Call,$[&Key,$\"b\"],$[&Var,$\"foo\"]]]],1,2,3]]");
+        assert_eq!(parse("[foo.b.c.d] 1 2 3"),        "$[&Block,$[&Call,$[&Call,$[&Key,$\"d\"],$[&Call,$[&Key,$\"c\"],$[&Call,$[&Key,$\"b\"],$[&Var,$\"foo\"]]]],1,2,3]]");
+        assert_eq!(parse("foo.a = 10"),               "$[&Block,$[&SetKey,$[&Var,$\"foo\"],$[&Key,$\"a\"],10]]");
+        assert_eq!(parse("foo.a = 10 | 20"),          "$[&Block,$[&SetKey,$[&Var,$\"foo\"],$[&Key,$\"a\"],$[&Call,20,10]]]");
+        assert_eq!(parse("foo.a = 10 ~ 20"),          "$[&Block,$[&SetKey,$[&Var,$\"foo\"],$[&Key,$\"a\"],$[&Call,10,20]]]");
+        assert_eq!(parse("4 == 5 ~ 10"),              "$[&Block,$[&Call,$[&Var,$\"==\"],4,$[&Call,5,10]]]");
+        assert_eq!(parse("foo.[i] = 10"),             "$[&Block,$[&SetKey,$[&Var,$\"foo\"],$[&Var,$\"i\"],10]]");
+        assert_eq!(parse("foo :x :y 10"),             "$[&Block,$[&Call,$[&Var,$\"foo\"],$[&Key,$\"x\"],$[&Key,$\"y\"],10]]");
     }
 
     #[test]
@@ -1247,92 +1281,100 @@ mod tests {
 
     #[test]
     fn check_identifier() {
-        assert_eq!(parse("+"),          "[&Block,[&Var,$\"+\"]]");
-        assert_eq!(parse("-"),          "[&Block,[&Var,$\"-\"]]");
-        assert_eq!(parse("+ 10 20"),    "[&Block,[&Call,[&Var,$\"+\"],10,20]]");
-        assert_eq!(parse("13 + 10 20"), "[&Block,[&Call,[&Call,[&Var,$\"+\"],13,10],20]]");
+        assert_eq!(parse("+"),          "$[&Block,$[&Var,$\"+\"]]");
+        assert_eq!(parse("-"),          "$[&Block,$[&Var,$\"-\"]]");
+        assert_eq!(parse("+ 10 20"),    "$[&Block,$[&Call,$[&Var,$\"+\"],10,20]]");
+        assert_eq!(parse("13 + 10 20"), "$[&Block,$[&Call,$[&Call,$[&Var,$\"+\"],13,10],20]]");
         assert_eq!(parse("13 + 10 == 23"),
-                                        "[&Block,[&Call,[&Var,$\"==\"],[&Call,[&Var,$\"+\"],13,10],23]]");
+                                        "$[&Block,$[&Call,$[&Var,$\"==\"],$[&Call,$[&Var,$\"+\"],13,10],23]]");
         assert_eq!(parse("[+ 12 ~ - 24 23] == 13"),
-           "[&Block,[&Call,[&Var,$\"==\"],[&Call,[&Var,$\"+\"],12,[&Call,[&Var,$\"-\"],24,23]],13]]");
-        assert_eq!(parse("_"),          "[&Block,[&Var,$\"_\"]]");
-        assert_eq!(parse("ten"),        "[&Block,[&Var,$\"ten\"]]");
-        assert_eq!(parse("tenäß foo"),  "[&Block,[&Call,[&Var,$\"tenäß\"],[&Var,$\"foo\"]]]");
+           "$[&Block,$[&Call,$[&Var,$\"==\"],$[&Call,$[&Var,$\"+\"],12,$[&Call,$[&Var,$\"-\"],24,23]],13]]");
+        assert_eq!(parse("_"),          "$[&Block,$[&Var,$\"_\"]]");
+        assert_eq!(parse("ten"),        "$[&Block,$[&Var,$\"ten\"]]");
+        assert_eq!(parse("tenäß foo"),  "$[&Block,$[&Call,$[&Var,$\"tenäß\"],$[&Var,$\"foo\"]]]");
     }
 
     #[test]
     fn check_primitives() {
-        assert_eq!(parse("$n"),         "[&Block,$n]");
-        assert_eq!(parse("$nul"),       "[&Block,$n]");
-        assert_eq!(parse("$t"),         "[&Block,$true]");
-        assert_eq!(parse("$true"),      "[&Block,$true]");
-        assert_eq!(parse("$f"),         "[&Block,$false]");
-        assert_eq!(parse("$false"),     "[&Block,$false]");
+        assert_eq!(parse("$n"),         "$[&Block,$n]");
+        assert_eq!(parse("$nul"),       "$[&Block,$n]");
+        assert_eq!(parse("$t"),         "$[&Block,$true]");
+        assert_eq!(parse("$true"),      "$[&Block,$true]");
+        assert_eq!(parse("$f"),         "$[&Block,$false]");
+        assert_eq!(parse("$false"),     "$[&Block,$false]");
     }
 
     #[test]
     fn check_binops() {
-        assert_eq!(parse("20 * 10"),                "[&Block,[&Call,[&Var,$\"*\"],20,10]]");
-        assert_eq!(parse("40 20 * 10"),             "[&Block,[&Call,40,[&Call,[&Var,$\"*\"],20,10]]]");
-        assert_eq!(parse("40 20 * 10 30"),          "[&Block,[&Call,40,[&Call,[&Var,$\"*\"],20,10],30]]");
-        assert_eq!(parse("40 20 * 10()"),           "[&Block,[&Call,40,[&Call,[&Var,$\"*\"],20,[&Call,10]]]]");
-        assert_eq!(parse("40 20() * 10()"),         "[&Block,[&Call,40,[&Call,[&Var,$\"*\"],[&Call,20],[&Call,10]]]]");
-        assert_eq!(parse("20() * 10()"),            "[&Block,[&Call,[&Var,$\"*\"],[&Call,20],[&Call,10]]]");
-        assert_eq!(parse("10 - 20 * 30"),           "[&Block,[&Call,[&Var,$\"-\"],10,[&Call,[&Var,$\"*\"],20,30]]]");
-        assert_eq!(parse("10 * 20 - 30"),           "[&Block,[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"*\"],10,20],30]]");
-        assert_eq!(parse("10 * 20 - 30 * 2"),       "[&Block,[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"*\"],10,20],[&Call,[&Var,$\"*\"],30,2]]]");
-        assert_eq!(parse("10 * 20 * 30"),           "[&Block,[&Call,[&Var,$\"*\"],[&Call,[&Var,$\"*\"],10,20],30]]");
-        assert_eq!(parse("10 - 20 - 30 - 40"),      "[&Block,[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],10,20],30],40]]");
-        assert_eq!(parse("10 - 20 - [30 - 40]"),    "[&Block,[&Call,[&Var,$\"-\"],[&Call,[&Var,$\"-\"],10,20],[&Call,[&Var,$\"-\"],30,40]]]");
+        assert_eq!(parse("20 * 10"),                "$[&Block,$[&Call,$[&Var,$\"*\"],20,10]]");
+        assert_eq!(parse("40 20 * 10"),             "$[&Block,$[&Call,40,$[&Call,$[&Var,$\"*\"],20,10]]]");
+        assert_eq!(parse("40 20 * 10 30"),          "$[&Block,$[&Call,40,$[&Call,$[&Var,$\"*\"],20,10],30]]");
+        assert_eq!(parse("40 20 * 10()"),           "$[&Block,$[&Call,40,$[&Call,$[&Var,$\"*\"],20,$[&Call,10]]]]");
+        assert_eq!(parse("40 20() * 10()"),         "$[&Block,$[&Call,40,$[&Call,$[&Var,$\"*\"],$[&Call,20],$[&Call,10]]]]");
+        assert_eq!(parse("20() * 10()"),            "$[&Block,$[&Call,$[&Var,$\"*\"],$[&Call,20],$[&Call,10]]]");
+        assert_eq!(parse("10 - 20 * 30"),           "$[&Block,$[&Call,$[&Var,$\"-\"],10,$[&Call,$[&Var,$\"*\"],20,30]]]");
+        assert_eq!(parse("10 * 20 - 30"),           "$[&Block,$[&Call,$[&Var,$\"-\"],$[&Call,$[&Var,$\"*\"],10,20],30]]");
+        assert_eq!(parse("10 * 20 - 30 * 2"),       "$[&Block,$[&Call,$[&Var,$\"-\"],$[&Call,$[&Var,$\"*\"],10,20],$[&Call,$[&Var,$\"*\"],30,2]]]");
+        assert_eq!(parse("10 * 20 * 30"),           "$[&Block,$[&Call,$[&Var,$\"*\"],$[&Call,$[&Var,$\"*\"],10,20],30]]");
+        assert_eq!(parse("10 - 20 - 30 - 40"),      "$[&Block,$[&Call,$[&Var,$\"-\"],$[&Call,$[&Var,$\"-\"],$[&Call,$[&Var,$\"-\"],10,20],30],40]]");
+        assert_eq!(parse("10 - 20 - [30 - 40]"),    "$[&Block,$[&Call,$[&Var,$\"-\"],$[&Call,$[&Var,$\"-\"],10,20],$[&Call,$[&Var,$\"-\"],30,40]]]");
 
-        assert_eq!(parse("$t &and $f"),                "[&Block,[&And,$true,$false]]");
-        assert_eq!(parse("1 &and 2 &and 3 &and 4"),    "[&Block,[&And,[&And,[&And,1,2],3],4]]");
-        assert_eq!(parse("$t &or $f"),                 "[&Block,[&Or,$true,$false]]");
-        assert_eq!(parse("$t &and $f &or $f &and $f"), "[&Block,[&Or,[&And,$true,$false],[&And,$false,$false]]]");
+        assert_eq!(parse("$t &and $f"),                "$[&Block,$[&And,$true,$false]]");
+        assert_eq!(parse("1 &and 2 &and 3 &and 4"),    "$[&Block,$[&And,$[&And,$[&And,1,2],3],4]]");
+        assert_eq!(parse("$t &or $f"),                 "$[&Block,$[&Or,$true,$false]]");
+        assert_eq!(parse("$t &and $f &or $f &and $f"), "$[&Block,$[&Or,$[&And,$true,$false],$[&And,$false,$false]]]");
     }
 
     #[test]
     fn check_assignments() {
-        assert_eq!(parse("!x=10;"),              "[&Block,[&Def,[$\"x\"],10]]");
-        assert_eq!(parse("! x = 10 ;"),          "[&Block,[&Def,[$\"x\"],10]]");
-        assert_eq!(parse("! x = 10"),            "[&Block,[&Def,[$\"x\"],10]]");
-        assert_eq!(parse("!:ref x = 10"),        "[&Block,[&DefRef,[$\"x\"],10]]");
-        assert_eq!(parse("!:ref (a,b) = 10"),    "[&Block,[&DefRef,[$\"a\",$\"b\"],10,$true]]");
-        assert_eq!(parse(". (a,b) = 10"),        "[&Block,[&Assign,[$\"a\",$\"b\"],10,$true]]");
-        assert_eq!(parse("(a,b)=10"),            "[&Block,[&Assign,[$\"a\",$\"b\"],10,$true]]");
+        assert_eq!(parse("!x=10;"),              "$[&Block,$[&Def,$[$\"x\"],10]]");
+        assert_eq!(parse("! x = 10 ;"),          "$[&Block,$[&Def,$[$\"x\"],10]]");
+        assert_eq!(parse("! x = 10"),            "$[&Block,$[&Def,$[$\"x\"],10]]");
+        assert_eq!(parse("!:ref x = 10"),        "$[&Block,$[&DefRef,$[$\"x\"],10]]");
+        assert_eq!(parse("!:ref (a,b) = 10"),    "$[&Block,$[&DefRef,$[$\"a\",$\"b\"],10,$true]]");
+        assert_eq!(parse(". (a,b) = 10"),        "$[&Block,$[&Assign,$[$\"a\",$\"b\"],10,$true]]");
+        assert_eq!(parse("(a,b)=10"),            "$[&Block,$[&Assign,$[$\"a\",$\"b\"],10,$true]]");
     }
 
     #[test]
     fn check_func() {
-        assert_eq!(parse("{}"),           "[&Block,[&Func]]");
-        assert_eq!(parse("{10;}"),        "[&Block,[&Func,10]]");
-        assert_eq!(parse("{10;;;}"),      "[&Block,[&Func,10]]");
-        assert_eq!(parse("{10; 20}"),     "[&Block,[&Func,10,20]]");
-        assert_eq!(parse("{ 10 } { }"),   "[&Block,[&Call,[&Func,10],[&Func]]]");
+        assert_eq!(parse("{}"),           "$[&Block,$[&Func,$n]]");
+        assert_eq!(parse("{10;}"),        "$[&Block,$[&Func,$n,10]]");
+        assert_eq!(parse("{10;;;}"),      "$[&Block,$[&Func,$n,10]]");
+        assert_eq!(parse("{10; 20}"),     "$[&Block,$[&Func,$n,10,20]]");
+        assert_eq!(parse("{ 10 } { }"),   "$[&Block,$[&Call,$[&Func,$n,10],$[&Func,$n]]]");
+        assert_eq!(parse("\\:x { }"),     "$[&Block,$[&Func,$\"x\"]]");
+        assert_eq!(parse("\\ p 1 | 20 ~ 30"),  "$[&Block,$[&Func,$n,$[&Call,20,30,$[&Call,$[&Var,$\"p\"],1]]]]");
     }
 
     #[test]
     fn check_map() {
-        assert_eq!(parse("${a=10}"),   "[&Block,[&Map,[$\"a\",10]]]");
-        assert_eq!(parse("${:a=10}"),  "[&Block,[&Map,[[&Key,$\"a\"],10]]]");
+        assert_eq!(parse("${a=10}"),   "$[&Block,$[&Map,$[$\"a\",10]]]");
+        assert_eq!(parse("${:a=10}"),  "$[&Block,$[&Map,$[$[&Key,$\"a\"],10]]]");
     }
 
     #[test]
     fn check_str() {
-        assert_eq!(parse("\"foo\""),       "[&Block,[&Str,\"foo\"]]");
-        assert_eq!(parse("$q$foo$"),       "[&Block,[&Str,\"foo\"]]");
-        assert_eq!(parse("\"fo\0o\""),     "[&Block,[&Str,\"fo\\0o\"]]");
-        assert_eq!(parse("\"fo\no\""),     "[&Block,[&Str,\"fo\\no\"]]");
-        assert_eq!(parse("\"fo\ro\""),     "[&Block,[&Str,\"fo\\ro\"]]");
-        assert_eq!(parse("\"fo\\\"o\""),   "[&Block,[&Str,\"fo\\\"o\"]]");
-        assert_eq!(parse("\"fo\x05o\""),  "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
-        assert_eq!(parse("\"fo\x05o\\u{9f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
-        assert_eq!(parse("\"fo\x05o\\u{0009f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
-        assert_eq!(parse("\"fo\x05o\\u{09f}\""),   "[&Block,[&Str,\"fo\\x05o\\u{9f}\"]]");
-        assert_eq!(parse("\"fo\x05o\\u{2400}\""), "[&Block,[&Str,\"fo\\x05o␀\"]]");
+        assert_eq!(parse("\"foo\""),       "$[&Block,$[&Str,\"foo\"]]");
+        assert_eq!(parse("$q$foo$"),       "$[&Block,$[&Str,\"foo\"]]");
+        assert_eq!(parse("\"fo\0o\""),     "$[&Block,$[&Str,\"fo\\0o\"]]");
+        assert_eq!(parse("\"fo\no\""),     "$[&Block,$[&Str,\"fo\\no\"]]");
+        assert_eq!(parse("\"fo\ro\""),     "$[&Block,$[&Str,\"fo\\ro\"]]");
+        assert_eq!(parse("\"fo\\\"o\""),   "$[&Block,$[&Str,\"fo\\\"o\"]]");
+        assert_eq!(parse("\"fo\x05o\""),  "$[&Block,$[&Str,\"fo\\x05o\\u{9f}\"]]");
+        assert_eq!(parse("\"fo\x05o\\u{9f}\""),   "$[&Block,$[&Str,\"fo\\x05o\\u{9f}\"]]");
+        assert_eq!(parse("\"fo\x05o\\u{0009f}\""),   "$[&Block,$[&Str,\"fo\\x05o\\u{9f}\"]]");
+        assert_eq!(parse("\"fo\x05o\\u{09f}\""),   "$[&Block,$[&Str,\"fo\\x05o\\u{9f}\"]]");
+        assert_eq!(parse("\"fo\x05o\\u{2400}\""), "$[&Block,$[&Str,\"fo\\x05o␀\"]]");
 
-        assert_eq!(parse("$b\"\\u{2400}\""),       "[&Block,[&Str,$b\"\\xE2\\x90\\x80\"]]");
-        assert_eq!(parse("$Q'foo'"),               "[&Block,[&Str,$b\"foo\"]]");
-        assert_eq!(parse("$b\"\\x00\\xFF\\xEB\""), "[&Block,[&Str,$b\"\\0\\xFF\\xEB\"]]");
+        assert_eq!(parse("$b\"\\u{2400}\""),       "$[&Block,$[&Str,$b\"\\xE2\\x90\\x80\"]]");
+        assert_eq!(parse("$Q'foo'"),               "$[&Block,$[&Str,$b\"foo\"]]");
+        assert_eq!(parse("$b\"\\x00\\xFF\\xEB\""), "$[&Block,$[&Str,$b\"\\0\\xFF\\xEB\"]]");
+    }
+
+    #[test]
+    fn check_err_val() {
+        assert_eq!(parse("$e 10 20 30"),        "$[&Block,$[&Err,$[&Call,10,20,30]]]");
+        assert_eq!(parse("$e 10 20 30 | 20"),   "$[&Block,$[&Err,$[&Call,20,$[&Call,10,20,30]]]]");
     }
 }

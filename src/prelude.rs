@@ -211,6 +211,66 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         });
 
     g.borrow_mut().add_func(
+        "panic",
+        |env: &mut Env, argc: usize| {
+            if argc < 1 { return Err(StackAction::Panic(VVal::Nul)); }
+            Err(StackAction::Panic(env.arg(0).clone()))
+        });
+
+    g.borrow_mut().add_func(
+        "block",
+        |env: &mut Env, argc: usize| {
+            let mut label = VVal::Nul;
+            let fn_arg_idx = if argc <= 1 { 0 } else { label = env.arg(0); 1 };
+            match env.arg(fn_arg_idx).call_no_args(env) {
+                Ok(v)   => Ok(v),
+                Err(StackAction::Return((v_lbl, v))) => {
+                    if v_lbl.eqv(&label) { Ok(v) }
+                    else { Err(StackAction::Return((v_lbl, v))) }
+                },
+                Err(e)  => Err(e),
+            }
+        });
+
+    g.borrow_mut().add_func(
+        "_?",
+        |env: &mut Env, argc: usize| {
+            let mut lbl = VVal::Nul;
+            let err_val = if argc > 1 {
+                lbl = env.arg(0);
+                env.arg(1)
+            } else { env.arg(0) };
+
+            match err_val {
+                VVal::Err(e) => Err(StackAction::Return((lbl, VVal::Err(e)))),
+                v            => Ok(v),
+            }
+        });
+
+    g.borrow_mut().add_func(
+        "on_error",
+        |env: &mut Env, _argc: usize| {
+            let err_fn = env.arg(0).clone();
+            match env.arg(1) {
+                VVal::Err(err_v) => {
+                    return env.with_restore_sp(|e: &mut Env| {
+                        e.push(err_v.borrow().clone());
+                        err_fn.call_internal(e, 1)
+                    });
+                },
+                e => Ok(e)
+            }
+        });
+
+    g.borrow_mut().add_func(
+        "return",
+        |env: &mut Env, argc: usize| {
+            if argc < 1 { return Err(StackAction::Return((VVal::Nul, VVal::Nul))); }
+            if argc < 2 { return Err(StackAction::Return((VVal::Nul, env.arg(0).clone()))); }
+            Err(StackAction::Return((env.arg(0).clone(), env.arg(1).clone())))
+        });
+
+    g.borrow_mut().add_func(
         "break",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
@@ -296,12 +356,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                     Ok(v)                      => { if !v.b() { return Ok(ret); } },
                     Err(StackAction::Break(v)) => { return Ok(v); },
                     Err(StackAction::Next)     => { continue; },
+                    Err(e)                     => { return Err(e); }
                 }
 
                 match f.call_no_args(env) {
                     Ok(v)                      => { ret = v; },
                     Err(StackAction::Break(v)) => { return Ok(v); },
                     Err(StackAction::Next)     => { },
+                    Err(e)                     => { return Err(e); }
                 }
             }
         });
@@ -330,7 +392,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
                         Err(StackAction::Next)     => { },
-                        //e                          => { return e; },
+                        Err(e)                     => { return Err(e); }
                     }
                     from += step;
                     env.popn(1);
@@ -350,7 +412,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                         Ok(v)                      => { ret = v; },
                         Err(StackAction::Break(v)) => { env.popn(1); println!("BREAK {}", v.s()); return Ok(v); },
                         Err(StackAction::Next)     => { },
-                        // e                          => { return e; },
+                        Err(e)                     => { return Err(e); }
                     }
                     from += step;
                     env.popn(1);

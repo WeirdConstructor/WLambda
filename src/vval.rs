@@ -36,6 +36,7 @@ pub enum Syntax {
     Expr,
     Func,
     Block,
+    Err,
     Call,
     And,
     Or,
@@ -356,7 +357,8 @@ impl Env {
 /// closure call tree to handle jumping up the stack.
 #[derive(Debug, Clone)]
 pub enum StackAction {
-//    Panic(String),
+    Panic(VVal),
+    Return((VVal, VVal)),
     Break(VVal),
     Next,
 }
@@ -419,6 +421,10 @@ impl Drop for DropVVal {
 pub enum VVal {
     /// The nul value, the default value of all non initialized data.
     Nul,
+    /// The err value is a special sentinel value for representing any kind of
+    /// application error condition. It's created using the special $e <expr> or $error <expr>
+    /// syntax.
+    Err(Rc<RefCell<VVal>>),
     /// Representation of a boolean value.
     Bol(bool),
     /// Representation of a symbol or key.
@@ -507,6 +513,10 @@ impl VVal {
         VVal::Byt(Rc::new(RefCell::new(v)))
     }
 
+    pub fn err(v: VVal) -> VVal {
+        VVal::Err(Rc::new(RefCell::new(v)))
+    }
+
     pub fn vec() -> VVal {
         VVal::Lst(Rc::new(RefCell::new(Vec::new())))
     }
@@ -549,6 +559,11 @@ impl VVal {
                     } else { Ok(self.clone()) };
                     ret
                 })
+            },
+            VVal::Err(e) => {
+                Err(StackAction::Panic(
+                    VVal::new_str(
+                        &format!("Called an error value: {}", e.borrow().s()))))
             },
             VVal::Sym(sym) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
@@ -678,7 +693,7 @@ impl VVal {
     pub fn dump_vec_as_str(v: &Rc<RefCell<std::vec::Vec<VVal>>>) -> String {
         let mut out : Vec<String> = Vec::new();
         let mut first = true;
-        out.push(String::from("["));
+        out.push(String::from("$["));
         for s in v.borrow().iter().map(VVal::s) {
             if !first { out.push(String::from(",")); }
             else { first = false; }
@@ -691,7 +706,7 @@ impl VVal {
     pub fn dump_map_as_str(m: &Rc<RefCell<std::collections::HashMap<String,VVal>>>) -> String {
         let mut out : Vec<String> = Vec::new();
         let mut first = true;
-        out.push(String::from("{"));
+        out.push(String::from("${"));
         let hm = m.borrow();
 
         let mut keys : Vec<&String> = hm.keys().collect();
@@ -819,11 +834,16 @@ impl VVal {
         match self { VVal::Nul => true, _ => false }
     }
 
+    pub fn is_err(&self) -> bool {
+        match self { VVal::Err(_) => true, _ => false }
+    }
+
     pub fn type_name(&self) -> String {
         match self {
             VVal::Str(_)     => String::from("string"),
             VVal::Byt(_)     => String::from("bytes"),
             VVal::Nul        => String::from("nul"),
+            VVal::Err(_)     => String::from("err"),
             VVal::Bol(_)     => String::from("bool"),
             VVal::Sym(_)     => String::from("sym"),
             VVal::Syn(_)     => String::from("syn"),
@@ -850,6 +870,7 @@ impl VVal {
             VVal::Str(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
             VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as f64 } else { 0.0 },
             VVal::Nul        => 0.0,
+            VVal::Err(_)     => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
             VVal::Sym(s)     => s.parse::<f64>().unwrap_or(0.0),
             VVal::Syn(s)     => (s.syn.clone() as i64) as f64,
@@ -876,6 +897,7 @@ impl VVal {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
             VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 },
             VVal::Nul        => 0,
+            VVal::Err(_)     => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
             VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0),
             VVal::Syn(s)     => s.syn.clone() as i64,
@@ -902,6 +924,7 @@ impl VVal {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0) != 0,
             VVal::Byt(s)     => (if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 }) != 0,
             VVal::Nul        => false,
+            VVal::Err(_)     => false,
             VVal::Bol(b)     => *b,
             VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0) != 0,
             VVal::Syn(s)     => (s.syn.clone() as i64) != 0,
@@ -927,6 +950,7 @@ impl VVal {
             VVal::Str(s)     => format_vval_str(&s.borrow(), false),
             VVal::Byt(s)     => format!("$b{}", format_vval_byt(&s.borrow())),
             VVal::Nul        => "$n".to_string(),
+            VVal::Err(e)     => format!("$e {}", (*e).borrow().s()),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
             VVal::Sym(s)     => format!("$\"{}\"", s),
             VVal::Syn(s)     => format!("&{:?}", s.syn),

@@ -74,6 +74,65 @@ range 0 10 1 { # This is a regular function.
     [_ == 5] { break 22 };
 };
 
+# Returning early from functions:
+!some_fun = \:some_fun_lbl { # \:xxx defines a function label for returning
+    !x = 10;
+    .x = do_something_to x;
+    [x > 20] {
+        return :some_fun_lbl 20; # explicit argument for return returns from
+                                 # the specified block.
+    }
+    .x = 20;
+    x
+};
+
+# `return` implicitly jumps to the topmost $nul label
+# you may specify the _ label to jump out some unnamed func:
+!some_fun = {
+    [x == 20] \:_{ return 30 } # returns from some_fun, not from the if-branch
+};
+
+# Error reporting:
+    # There are special error values, that will make the program panic
+    # if they are not handled correctly at statement block level:
+    !some_erroring_func = {
+        return $error "An error happened!"
+    };
+    !value = some_erroring_func();
+    # on_error calls the first argument if the second argument
+    #
+    on_error {
+        # handle error here, eg. report, or make a new error value
+    } value;
+
+    # with the ~ operator, you can chain it nicely:
+    on_error { handle_err(_) } ~ some_erroring_func();
+    # or without ~:
+    on_error { handle_err(_) } [some_erroring_func()];
+    # or with |
+    some_erroring_func() | on_error { handle_err(_) };
+
+    # _? transforms an error value, and returns it from the current
+    #    function. optionally jumping outwards.
+
+    _? $e "ok" # is with an error value the same as: `return $e "ok"`
+    _? 10 # passes the value through
+
+!some_erroring_func = {
+    on_error {
+        report_my_error _;
+    } block :outer {
+        # do something...
+        [_ != 10] {
+            return :from_outer $error "Something really failed"
+            # same as, with the difference, that _? only returns
+            # from :outer if it is an error value.
+            _? :outer $error "Something really failed"
+        }
+        # do more ...
+    }
+    # cleanup ...
+};
 
 # Basic OOP:
 !some_obj = ${};

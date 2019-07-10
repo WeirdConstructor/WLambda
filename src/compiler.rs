@@ -356,8 +356,24 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
     Ok(Box::new(move |e: &mut Env| {
         let mut res = VVal::Nul;
         for x in exprs.iter() {
+            match res {
+                VVal::Err(ev) => {
+                    let err_msg =
+                        format!("Error value '{}' dropped.",
+                                ev.borrow().s());
+                    return
+                        Err(StackAction::Panic(
+                            VVal::new_str(&err_msg)));
+                },
+                _ => (),
+            }
+
             res = VVal::Nul;
-            res = x(e)?;
+
+            match x(e) {
+                Ok(v)  => { res = v; },
+                Err(e) => { return Err(e); },
+            }
         }
         Ok(res)
     }))
@@ -569,6 +585,11 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                 Syntax::DefRef => { compile_def(ast, ce, true, false)   },
                 Syntax::DefWRef=> { compile_def(ast, ce, true, true)    },
                 Syntax::Assign => { compile_assign(ast, ce)      },
+                Syntax::Err    => {
+                    let err_val = compile(&ast.at(1).unwrap(), ce)?;
+                    Ok(Box::new(move |e: &mut Env|
+                                    Ok(VVal::err(err_val(e)?.clone()))))
+                },
                 Syntax::Key    => {
                     let sym = ast.at(1).unwrap();
                     Ok(Box::new(move |_: &mut Env| Ok(sym.clone())))
@@ -678,14 +699,36 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                 Syntax::Func => {
                     let mut ce_sub = CompileEnv::create_env(Some(ce.clone()));
 
-                    let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 1);
+                    let label = ast.at(1).unwrap();
+                    let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 2);
 
                     #[allow(unused_assignments)]
                     let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
+                            match res {
+                                VVal::Err(ev) => {
+                                    let err_msg =
+                                        format!("Error value '{}' dropped.",
+                                                ev.borrow().s());
+                                    return
+                                        Err(StackAction::Panic(
+                                            VVal::new_str(&err_msg)));
+                                },
+                                _ => (),
+                            }
+
                             res = VVal::Nul;
-                            res = s(env)?;
+                            match s(env) {
+                                Ok(v)  => { res = v; },
+                                Err(StackAction::Return((v_lbl, v))) => {
+                                    println!("RETTETE {} {} {}", v_lbl.s(), label.s(), v.s());
+                                    return
+                                        if v_lbl.eqv(&label) { Ok(v) }
+                                        else { Err(StackAction::Return((v_lbl, v))) }
+                                },
+                                Err(e) => { return Err(e); }
+                            }
                         }
                         Ok(res)
                     }));
@@ -736,7 +779,7 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
                     let now = Instant::now();
                     match r(&mut e) {
                         Ok(v)   => { ret = v },
-                        Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
+                        Err(je) => { ret = VVal::err(VVal::new_str(&format!("EXEC ERR: Caught {:?}", je))) }
                     }
                     rts += now.elapsed().as_millis() as f64;
                     cnt += 1;
@@ -746,7 +789,7 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
             } else {
                 match r(&mut e) {
                     Ok(v)   => { v },
-                    Err(je) => { panic!(format!("EXEC ERR: JUMPED {:?}", je)); }
+                    Err(je) => { VVal::err(VVal::new_str(&format!("EXEC ERR: Caught {:?}", je))) }
                 }
             }
         },
@@ -762,7 +805,22 @@ pub fn s_eval(s: &str) -> String {
     let global = create_wlamba_prelude();
     match parser::parse(s, 0) {
         Ok(ast) => bench_eval_ast(ast, global, 1).s(),
-        Err(e)  => { panic!(format!("PARSE ERROR: {}", e)); },
+        Err(e)  => { panic!(format!("EVAL ERROR: {}", e)); },
+    }
+}
+
+
+/// Evaluates a string of WLambda code, executes it and returns a string representation of the VVal.
+/// Any critical error (parse error for instance) is not panic!'ed, but
+/// returned as informal string.
+///
+/// This functions is mainly existing for testing purposes.
+#[allow(dead_code)]
+pub fn s_eval_no_panic(s: &str) -> String {
+    let global = create_wlamba_prelude();
+    match parser::parse(s, 0) {
+        Ok(ast) => bench_eval_ast(ast, global, 1).s(),
+        Err(e)  => { format!("EVAL ERROR: {}", e) },
     }
 }
 
@@ -787,7 +845,7 @@ mod tests {
     fn check_trivial() {
         assert_eq!(s_eval("_"),                       "13");          // XXX: in test env
         assert_eq!(s_eval("_1"),                      "42.42");       // XXX: in test env
-        assert_eq!(s_eval("@"),                       "[13,42.42]");  // XXX: in test env
+        assert_eq!(s_eval("@"),                       "$[13,42.42]");  // XXX: in test env
 
         assert_eq!(s_eval("$n"), "$n");
         assert_eq!(s_eval("10"), "10");
@@ -800,21 +858,21 @@ mod tests {
         assert_eq!(s_eval("!:ref x = 11; { 12; x }()"),                   "11");
         assert_eq!(s_eval("!x = 11; { 12; x }()"),                        "11");
         assert_eq!(s_eval("!x = 13; { .x = 12 }(); { x }() "),            "13");
-        assert_eq!(s_eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), x]"),  "[12,12]");
-        assert_eq!(s_eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), { .x = 15 }(), x]"), "[12,15,15]");
+        assert_eq!(s_eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), x]"),  "$[12,12]");
+        assert_eq!(s_eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), { .x = 15 }(), x]"), "$[12,15,15]");
         assert_eq!(s_eval("{ _ } 10"),                        "10");
         assert_eq!(s_eval("!:ref y = 0; { .y = _ } 10; y"),   "10");
-        assert_eq!(s_eval("${:a = 10, :b = 20}"),             "{a=10,b=20}");
-        assert_eq!(s_eval("${:b = 20, :a = 10}"),             "{a=10,b=20}");
-        assert_eq!(s_eval("${a = 10, b = 20}"),               "{a=10,b=20}");
-        assert_eq!(s_eval("${b = 20, a = 10}"),               "{a=10,b=20}");
-        assert_eq!(s_eval("${[:a] = 10, b = 20}"),            "{a=10,b=20}");
-        assert_eq!(s_eval("${[:b] = 20, a = 10}"),            "{a=10,b=20}");
-        assert_eq!(s_eval("!x = ${:b = 20, :a = 10}; x"),     "{a=10,b=20}");
+        assert_eq!(s_eval("${:a = 10, :b = 20}"),             "${a=10,b=20}");
+        assert_eq!(s_eval("${:b = 20, :a = 10}"),             "${a=10,b=20}");
+        assert_eq!(s_eval("${a = 10, b = 20}"),               "${a=10,b=20}");
+        assert_eq!(s_eval("${b = 20, a = 10}"),               "${a=10,b=20}");
+        assert_eq!(s_eval("${[:a] = 10, b = 20}"),            "${a=10,b=20}");
+        assert_eq!(s_eval("${[:b] = 20, a = 10}"),            "${a=10,b=20}");
+        assert_eq!(s_eval("!x = ${:b = 20, :a = 10}; x"),     "${a=10,b=20}");
         assert_eq!(s_eval("!x = ${:b = 20, :a = 10}; x.a"),   "10");
         assert_eq!(s_eval("!x = ${:b = 20, :a = 11}; :a x"),  "11");
         assert_eq!(s_eval("!x = ${}; x.a = 12; x.a"),         "12");
-        assert_eq!(s_eval("!x = ${}; x.a = 12; x"),           "{a=12}");
+        assert_eq!(s_eval("!x = ${}; x.a = 12; x"),           "${a=12}");
 
         assert_eq!(s_eval("$[33,44,55].2"), "55");
         assert_eq!(s_eval("$[33,44,55].0"), "33");
@@ -892,10 +950,10 @@ mod tests {
 
     #[test]
     fn check_push() {
-        assert_eq!(s_eval("!a = 10; !x = $[1]; !y = 20; x"), "[1]");
-        assert_eq!(s_eval("!:ref x = $[]; push x 12; x"), "[12]");
-        assert_eq!(s_eval("!a = 10; !x = $[]; !y = 20; push x 10; push x 30; x"), "[10,30]");
-        assert_eq!(s_eval("!:ref x = $[]; push x 10; push x 20; x"), "[10,20]");
+        assert_eq!(s_eval("!a = 10; !x = $[1]; !y = 20; x"), "$[1]");
+        assert_eq!(s_eval("!:ref x = $[]; push x 12; x"), "$[12]");
+        assert_eq!(s_eval("!a = 10; !x = $[]; !y = 20; push x 10; push x 30; x"), "$[10,30]");
+        assert_eq!(s_eval("!:ref x = $[]; push x 10; push x 20; x"), "$[10,20]");
     }
 
     #[test]
@@ -953,9 +1011,9 @@ mod tests {
 
     #[test]
     fn check_args() {
-        assert_eq!(s_eval("{ $[_, _1, _2] }(1, 2, 3)"),       "[1,2,3]");
-        assert_eq!(s_eval("{ @ }(1, 2, 3)"),                  "[1,2,3]");
-        assert_eq!(s_eval("{ $[_, _1, _2, _3] }(1, 2, 3)"),   "[1,2,3,$n]");
+        assert_eq!(s_eval("{ $[_, _1, _2] }(1, 2, 3)"),       "$[1,2,3]");
+        assert_eq!(s_eval("{ @ }(1, 2, 3)"),                  "$[1,2,3]");
+        assert_eq!(s_eval("{ $[_, _1, _2, _3] }(1, 2, 3)"),   "$[1,2,3,$n]");
     }
 
     #[test]
@@ -1028,10 +1086,10 @@ mod tests {
         assert_eq!(s_eval("[0b1 << 2] == 0b100"),    "$true");
         assert_eq!(s_eval("[0b1 >> 1] == 0x0"),      "$true");
 
-        assert_eq!(s_eval("!:ref x = 0; !b = { $t }() &and { .x = 1; 10 }(); $[x, b]"), "[1,10]");
-        assert_eq!(s_eval("!:ref x = 0; !b = { $f }() &and { .x = 1; 10 }(); $[x, b]"), "[0,$false]");
-        assert_eq!(s_eval("!:ref x = 0; !b = { $f }() &or { .x = 1; 10 }(); $[x, b]"),  "[1,10]");
-        assert_eq!(s_eval("!:ref x = 0; !b = { 12 }() &or { .x = 1; 10 }(); $[x, b]"),  "[0,12]");
+        assert_eq!(s_eval("!:ref x = 0; !b = { $t }() &and { .x = 1; 10 }(); $[x, b]"), "$[1,10]");
+        assert_eq!(s_eval("!:ref x = 0; !b = { $f }() &and { .x = 1; 10 }(); $[x, b]"), "$[0,$false]");
+        assert_eq!(s_eval("!:ref x = 0; !b = { $f }() &or { .x = 1; 10 }(); $[x, b]"),  "$[1,10]");
+        assert_eq!(s_eval("!:ref x = 0; !b = { 12 }() &or { .x = 1; 10 }(); $[x, b]"),  "$[0,12]");
         assert_eq!(s_eval(r#"
             !:ref x = 0;
             !f = { yay(x); .x = x + 1; x };
@@ -1041,25 +1099,25 @@ mod tests {
                 &and f()
                 &and f();
             $[x, b]
-        "#),  "[5,5]");
+        "#),  "$[5,5]");
     }
 
     #[test]
     fn check_destructure() {
-        assert_eq!(s_eval("!(a, b) = $[10, 20]; $[a, b]"),        "[10,20]");
-        assert_eq!(s_eval("!(a, b) = $[10, 20, 30]; $[a, b]"),    "[10,20]");
-        assert_eq!(s_eval("!(a, b) = $[10]; $[a, b]"),            "[10,$n]");
+        assert_eq!(s_eval("!(a, b) = $[10, 20]; $[a, b]"),        "$[10,20]");
+        assert_eq!(s_eval("!(a, b) = $[10, 20, 30]; $[a, b]"),    "$[10,20]");
+        assert_eq!(s_eval("!(a, b) = $[10]; $[a, b]"),            "$[10,$n]");
         assert_eq!(s_eval(
             "!(a, b) = ${a = 10, b= 20, c=30}; $[a, b]"),
-            "[10,20]");
+            "$[10,20]");
         assert_eq!(s_eval(
             "!(a, b) = ${a = 10}; $[a, b]"),
-            "[10,$n]");
+            "$[10,$n]");
         assert_eq!(s_eval(
             "!(a, b) = ${b = 20, c = 30}; $[a, b]"),
-            "[$n,20]");
+            "$[$n,20]");
 
-        assert_eq!(s_eval("!:ref(a, b) = $[10, 20]; { .a = 33; }(); $[a, b]"), "[33,20]");
+        assert_eq!(s_eval("!:ref(a, b) = $[10, 20]; { .a = 33; }(); $[a, b]"), "$[33,20]");
         assert_eq!(s_eval(r#"
             !fun = {
                 !:ref(a, b) = $[10, 20];
@@ -1077,7 +1135,7 @@ mod tests {
             [1 fun]();
             [0 fun]()
         "#),
-        "[$n,$n]");
+        "$[$n,$n]");
         assert_eq!(s_eval(r#"
             !fun = {
                 !:ref(a, b) = $[10, 20];
@@ -1086,22 +1144,22 @@ mod tests {
             [1 fun]();
             [0 fun]()
         "#),
-        "[33,20]");
+        "$[33,20]");
 
         assert_eq!(
             s_eval("!a = 0; !b = 0; .(a, b) = $[10, 20]; $[a, b]"),
-            "[10,20]");
+            "$[10,20]");
 
         assert_eq!(
             s_eval("!a = 0; !b = 0; .(a, b) = 40; $[a, b]"),
-            "[40,40]");
+            "$[40,40]");
     }
 
     #[test]
     fn check_field() {
-        assert_eq!(s_eval("!v = $[]; v.0 = 10; v"), "[10]");
-        assert_eq!(s_eval("!v = $[]; v.2 = 10; v"), "[$n,$n,10]");
-        assert_eq!(s_eval("!i = 2; !v = $[]; v.[i] = 10; v"), "[$n,$n,10]");
+        assert_eq!(s_eval("!v = $[]; v.0 = 10; v"), "$[10]");
+        assert_eq!(s_eval("!v = $[]; v.2 = 10; v"), "$[$n,$n,10]");
+        assert_eq!(s_eval("!i = 2; !v = $[]; v.[i] = 10; v"), "$[$n,$n,10]");
     }
 
     #[test]
@@ -1168,6 +1226,91 @@ mod tests {
         let n = ctx.eval("{ _ + 11 }").unwrap();
         let ret = ctx.call(&n, &vec![VVal::Int(11)]).unwrap();
         assert_eq!(ret.i(), 22);
+    }
+
+    #[test]
+    fn check_return() {
+        assert_eq!(s_eval("block {
+            !x = { return 11; 20 }();
+            .x = x + 20;
+            x
+        }"), "31");
+        assert_eq!(s_eval("block {
+            !x = { 13 }();
+            .x = 20;
+            x
+        }"), "20");
+        assert_eq!(s_eval("block :x {
+            !x = { return :x 10; 20 }();
+            .x = x + 20;
+            x
+        }"), "10");
+        assert_eq!(s_eval("\\:x {
+                !x = { return :x 10; 20 }();
+                .x = x + 20;
+                x
+            }()
+        "), "10");
+        assert_eq!(s_eval("{ 10; 20 }()"), "20");
+        assert_eq!(s_eval("!g = { _1 }; g :x 10"), "10");
+        assert_eq!(s_eval("block {
+            !x = { block :x { return :x 13; 20 } }();
+            yay x;
+            .x = x + 12;
+            x
+        }"), "25");
+    }
+
+    #[test]
+    fn check_error() {
+        assert_eq!(s_eval_no_panic("$e 10; 14"),
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\" }))\"");
+        assert_eq!(s_eval_no_panic("{ { { { $e 10; 14 }(); 3 }(); 9 }(); 10 }()"),
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\" }))\"");
+        assert_eq!(s_eval_no_panic("_? $e 10"),
+                   "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: Int(10) })))\"");
+        assert_eq!(s_eval_no_panic("_? { return $e 10; 10 }()"),
+                   "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: Int(10) })))\"");
+        assert_eq!(s_eval_no_panic("on_error { _ + 20 } $e 19.9"), "39.9");
+
+        assert_eq!(s_eval_no_panic("{ { { panic 102 }(); 20 }(); return 20 }(); 49"),
+                   "$e \"EXEC ERR: Caught Panic(Int(102))\"");
+
+        assert_eq!(s_eval_no_panic("
+            !:ref x = 10;
+            {
+                .x = x + 1;
+                block :outer { .x = x + 1; };
+                .x = x + 1;
+            }();
+            x
+        "), "13");
+        assert_eq!(s_eval_no_panic("
+            !gen_err = { $e $q$something_failed!$ };
+            !:ref x = 10;
+            !:ref msg = $q'all ok';
+            {
+                .x = x + 1;
+                on_error { .x = x * 2; .msg = _; }
+                    [block :outer { _? :outer gen_err(); .x = x + 1; }];
+                .x = x + 1;
+            }();
+            $[x, msg]
+        "), "$[23,\"something_failed!\"]");
+        assert_eq!(s_eval_no_panic("
+            !gen_ok = { 99 };
+            !:ref x = 10;
+            !:ref msg = $q'all ok';
+            {
+                .x = x + 1;
+                on_error { .x = x * 2; .msg = _; }
+                    ~ block :outer { _? :outer gen_ok(); .x = x + 1; };
+                .x = x + 1;
+            }();
+            $[x, msg]
+        "), "$[13,\"all ok\"]");
+
+        assert_eq!(s_eval_no_panic("{ $e 23 }() | on_error { _ + 21 }"), "44");
     }
 
     #[test]
