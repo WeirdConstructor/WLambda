@@ -509,6 +509,10 @@ impl VVal {
         VVal::Str(Rc::new(RefCell::new(String::from(s))))
     }
 
+    pub fn new_sym(s: &str) -> VVal {
+        VVal::Sym(String::from(s))
+    }
+
     pub fn new_byt(v: Vec<u8>) -> VVal {
         VVal::Byt(Rc::new(RefCell::new(v)))
     }
@@ -806,7 +810,7 @@ impl VVal {
         match self {
             VVal::Str(s)  => s.borrow().clone(),
             VVal::Sym(s)  => s.clone(),
-            _             => String::from(""),
+            _             => self.s(),
         }
     }
 
@@ -952,7 +956,7 @@ impl VVal {
             VVal::Nul        => "$n".to_string(),
             VVal::Err(e)     => format!("$e {}", (*e).borrow().s()),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
-            VVal::Sym(s)     => format!("$\"{}\"", s),
+            VVal::Sym(s)     => format!(":\"{}\"", s),
             VVal::Syn(s)     => format!("&{:?}", s.syn),
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),

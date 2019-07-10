@@ -15,10 +15,13 @@ storing data from globally added functions.
 handling error values. \_? returns error values directly upwards, like ? in
 Rust. And on\_error handles an error value in the function passed as first
 argument.
+* Added match with ?e for errors.
 * Added block and return for non local jumps upwards the stack.
 * Added syntax: \:func_label { ... } for easier returns.
 * Added syntax: \ \<statement\>  for one statement functions.
 * Added panic for fatal error reporting.
+* Added bool, int, float, str and sym routines to prelude for converting values.
+* Changed symbol text representation.
 
 0.1.1 (2019-05-23)
 ==================

@@ -1032,7 +1032,7 @@ mod tests {
     fn check_call_primitives() {
         assert_eq!(s_eval("13()"), "13");
         assert_eq!(s_eval("$t()"), "$true");
-        assert_eq!(s_eval(":foo"), "$\"foo\"");
+        assert_eq!(s_eval(":foo"), ":\"foo\"");
     }
 
     #[test]
@@ -1199,6 +1199,27 @@ mod tests {
         assert_eq!(s_eval("match $q xx :?p { _ == $q|xx| } { 18 }"),    "18");
         assert_eq!(s_eval("match $q x9 :?p { yay _; _ == $q|xx| } { 181 } { 19 }"), "19");
         assert_eq!(s_eval("match 10"),                           "$n");
+        assert_eq!(s_eval("
+            match [$e $[:foo, 1, 2, 3]]
+                :?e :foo { 19 }
+                :?e :bar { 19.2 }
+                :?e :sna :snu { 19.4 }
+                { :nothin }
+        "), "19");
+        assert_eq!(s_eval("
+            match [$e $[:bar, 1, 2, 3]]
+                :?e :foo { 19 }
+                :?e :bar { [2 _] + 19.2 }
+                :?e :sna :snu { 19.4 }
+                { :nothin }
+        "), "21");
+        assert_eq!(s_eval("
+            match [$e $[:snu, 1, 2, 3]]
+                :?e :foo { 19 }
+                :?e :bar { 19.2 }
+                :?e :sna :snu { 19.4 + _.3 }
+                { :nothin }
+        "), "22.4");
     }
 
     #[test]
@@ -1311,6 +1332,17 @@ mod tests {
         "), "$[13,\"all ok\"]");
 
         assert_eq!(s_eval_no_panic("{ $e 23 }() | on_error { _ + 21 }"), "44");
+    }
+
+    #[test]
+    fn check_prelude() {
+        assert_eq!(s_eval("bool $n"),           "$false");
+        assert_eq!(s_eval("int $n"),            "0");
+        assert_eq!(s_eval("float $q$10.2$"),    "10.2");
+        assert_eq!(s_eval("str 10.3"),          "\"10.3\"");
+        assert_eq!(s_eval("sym \"foo\""),       ":\"foo\"");
+        assert_eq!(s_eval("sym 10.4"),          ":\"10.4\"");
+        assert_eq!(s_eval("[bool $e :fail] { 10 } { 20 }"), "20");
     }
 
     #[test]

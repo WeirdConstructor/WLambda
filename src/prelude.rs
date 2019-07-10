@@ -123,6 +123,17 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                         }
                     }
                 },
+                "?e" => {
+                    if let VVal::Err(e) = val {
+                        let err_val = e.borrow().at(0).unwrap_or(e.borrow().clone());
+
+                        for i in match_vals.iter().skip(1) {
+                            if env.arg(*i).eqv(&err_val) {
+                                return env.arg(fun_idx).call(env, &vec![e.borrow().clone()]);
+                            }
+                        }
+                    }
+                },
                 "?p" => {
                     if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
                     let fun_idx = fun_idx + 1;
@@ -292,6 +303,22 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             v.push(env.arg(1).clone());
             Ok(v.clone())
         });
+
+    g.borrow_mut().add_func(
+        "bool",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).b())) });
+    g.borrow_mut().add_func(
+        "float",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Flt(env.arg(0).f())) });
+    g.borrow_mut().add_func(
+        "int",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).i())) });
+    g.borrow_mut().add_func(
+        "str",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str(&env.arg(0).s_raw())) });
+    g.borrow_mut().add_func(
+        "sym",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_sym(&env.arg(0).s_raw())) });
 
     g.borrow_mut().add_func(
         "type",
