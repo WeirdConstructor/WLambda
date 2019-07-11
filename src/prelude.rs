@@ -9,14 +9,41 @@ For an example, refer to [create_wlamba_prelude](fn.create_wlamba_prelude.html).
 
 # WLambda Reference
 
+WLambda is a functional programming language. The syntax gravitates around the
+concept that everything is callable like a function. There is special syntax
+for composing arguments of functions, to give the programmer the ability to
+express his thoughts as they see fit.
+
 ## Syntax
 
 A more formal introduction to the syntax can be found in the [parser API documentation](../parser/index.html).
 
+### Data Types
+
+- nul
+- bool
+- int
+- floats
+- string
+- bytes
+- symbols
+- lists/vectors
+- maps
+
 ### Functions
 
-- {... } syntax
+- {... } syntax and statements
 - \ ... syntax
+- Implicit @ and _, _1, _2 argument variables
+
+### Function call composition
+
+- chaining
+- traditional () call syntax
+- ~ syntax
+- | syntax
+- || syntax
+- [...] syntax
 
 #### Control Flow - Returning
 
@@ -68,6 +95,20 @@ syntax, but still works:
 
 [x == 20]({ displayln "x is 20" }, { displayln "x is 20" })
 ```
+
+### Lexical Scope and Variable assignment
+
+- !x = y        variable definition
+- .x = y        assignments
+- !:ref x = y   upvalue references
+- !:wref x = y  weak upvalue references
+- !(x, y) = list / map    destructuring assignments
+- (x, y) = list / map    destructuring assignments
+
+### Arithmetics
+
+- operator precedence syntax
+- prefix operator syntax
 
 ## Prelude
 
@@ -302,6 +343,12 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     add_fi_bin_op!(g, ^, a, b,
         Ok(VVal::Flt(a.f().powf(b.f()))),
         Ok(VVal::Int(a.i().pow(b.i() as u32))));
+
+    g.borrow_mut().add_func("not",
+        |env: &mut Env, argc: usize| {
+            if argc < 1 { return Ok(VVal::Nul); }
+            Ok(VVal::Bol(!env.arg(0).b()))
+        });
 
     g.borrow_mut().add_func("neg",
         |env: &mut Env, argc: usize| {

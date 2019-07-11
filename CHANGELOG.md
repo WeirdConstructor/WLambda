@@ -28,6 +28,7 @@ argument.
 * Added regex and chrono as optional features.
 * Added wl:assert.
 * Added || syntax for prepending a function call.
+* Added 'not'.
 
 0.1.1 (2019-05-23)
 ==================

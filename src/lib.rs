@@ -5,16 +5,19 @@
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
-This crate provides you with a small and simple embeddable
-scripting language. It's primary feature are functions and calling
-functions. It could be viewed as Lisp without parenthesis.
+This crate provides you with a small and simple embeddable scripting language. It's syntax
+gravitates around functions and argument composition for functions. A core concept is, that
+everything is callable. It could be viewed as Lisp without parenthesis.
 
 Here are some of it's properties:
 
-- Simple syntax. For a reference look at the [parser](parser/index.html).
+- Simple syntax. For a reference look at the [WLambda Language Reference](prelude/index.html#wlambda-reference) and the [parser](parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
-- Performance in the ball park of Python.
-- Garbage collection relies only on reference counting.
+- It's about getting things done quickly, so performance is not a main priority.
+  Current performance is roughly in the ball park of (C)Python. Which means,
+  it's too slow if you need speed. But fast enough if you are not primarily concerned
+  about speed.
+- No garbage collector. Garbage collection relies only on reference counting.
 - Main data structures are Lists and Maps.
 - Closures can capture up values either by value, by reference
   or by weak reference. Giving you the ability to keep cyclic
