@@ -9,6 +9,7 @@ use crate::vval::Env;
 use crate::vval::VValFun;
 use crate::vval::EvalNode;
 use crate::vval::StackAction;
+use crate::vval::CompileError;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::time::Instant;
@@ -90,7 +91,7 @@ enum VarPos {
 #[derive(Debug, Clone)]
 pub enum EvalError {
     ParseError(parser::ParseError),
-    CompileError(String),
+    CompileError(CompileError),
     ExecError(String),
 }
 
@@ -343,7 +344,7 @@ impl CompileEnv {
     }
 }
 
-fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
+fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     let exprs : Vec<EvalNode> =
         ast.map_skip(|e| compile(e, ce), 1)?;
 
@@ -354,8 +355,11 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
             match res {
                 VVal::Err(ev) => {
                     let err_msg =
-                        format!("Error value '{}' dropped.",
-                                ev.borrow().s());
+                        format!("Error value '{}'(@{},{}:{}) dropped.",
+                                ev.borrow().0.s(),
+                                ev.borrow().1.line,
+                                ev.borrow().1.col,
+                                ev.borrow().1.file);
                     return
                         Err(StackAction::Panic(
                             VVal::new_str(&err_msg), None));
@@ -374,7 +378,7 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
     }))
 }
 
-fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
+fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     let var = ast.at(1).unwrap();
 
     let s = var.s_raw();
@@ -404,8 +408,8 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
                             Ok(Box::new(move |_: &mut Env| { Ok(val.clone()) }))
                         },
                         None =>
-                            Err(format!(
-                                "Variable '{}' undefined", var.s_raw())),
+                            ast.to_compile_err(
+                                format!("Variable '{}' undefined", var.s_raw())),
                     }
                 }
             }
@@ -413,7 +417,7 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
     }
 }
 
-fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_ref: bool) -> Result<EvalNode, String> {
+fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_ref: bool) -> Result<EvalNode, CompileError> {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
     let destr   = ast.at(3).unwrap_or(VVal::Nul);
@@ -504,7 +508,7 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) {
     }
 }
 
-fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
+fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
     let destr   = ast.at(3).unwrap_or(VVal::Nul);
@@ -564,12 +568,13 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
     }
 }
 
-fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
+fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
 
     match ast {
         VVal::Lst(_l) => {
-            let syn = ast.at(0).unwrap_or(VVal::Nul);
-            let syn = syn.get_syn();
+            let syn  = ast.at(0).unwrap_or(VVal::Nul);
+            let spos = ast.get_syn_pos();
+            let syn  = syn.get_syn();
 
             match syn {
                 Syntax::Block  => { compile_block(ast, ce)       },
@@ -581,7 +586,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                 Syntax::Err    => {
                     let err_val = compile(&ast.at(1).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env|
-                                    Ok(VVal::err(err_val(e)?.clone()))))
+                                    Ok(VVal::err(err_val(e)?.clone(), spos.clone()))))
                 },
                 Syntax::Key    => {
                     let sym = ast.at(1).unwrap();
@@ -614,7 +619,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     }))
                 },
                 Syntax::Map    => {
-                    let map_elems : Result<Vec<(EvalNode,EvalNode)>, String> =
+                    let map_elems : Result<Vec<(EvalNode,EvalNode)>, CompileError> =
                         ast.map_skip(|e| {
                                 let k = e.at(0).unwrap();
                                 let v = e.at(1).unwrap();
@@ -696,8 +701,11 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                             match res {
                                 VVal::Err(ev) => {
                                     let err_msg =
-                                        format!("Error value '{}' dropped.",
-                                                ev.borrow().s());
+                                        format!("Error value '{}'@({},{}:{}) dropped.",
+                                                ev.borrow().0.s(),
+                                                ev.borrow().1.line,
+                                                ev.borrow().1.col,
+                                                ev.borrow().1.file);
                                     return
                                         Err(StackAction::Panic(
                                             VVal::new_str(&err_msg), None));
@@ -727,7 +735,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                         Ok(VValFun::new_val(fun_ref.clone(), v, env_size))
                     }))
                 },
-                _ => { Err(format!("bad input: {}", ast.s())) }
+                _ => { ast.to_compile_err(format!("bad input: {}", ast.s())) }
             }
         },
         _ => {
@@ -766,7 +774,7 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
                     let now = Instant::now();
                     match r(&mut e) {
                         Ok(v)   => { ret = v },
-                        Err(je) => { ret = VVal::err(VVal::new_str(&format!("EXEC ERR: Caught {:?}", je))) }
+                        Err(je) => { ret = VVal::err(VVal::new_str(&format!("EXEC ERR: Caught {:?}", je)), v.get_syn_pos()) }
                     }
                     rts += now.elapsed().as_millis() as f64;
                     cnt += 1;
@@ -776,7 +784,7 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
             } else {
                 match r(&mut e) {
                     Ok(v)   => { v },
-                    Err(je) => { VVal::err(VVal::new_str(&format!("EXEC ERR: Caught {:?}", je))) }
+                    Err(je) => { VVal::err(VVal::new_str(&format!("EXEC ERR: Caught {:?}", je)), v.get_syn_pos()) }
                 }
             }
         },

@@ -262,11 +262,17 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                 },
                 "?e" => {
                     if let VVal::Err(e) = val {
-                        let err_val = e.borrow().at(0).unwrap_or(e.borrow().clone());
+                        let err_val = e.borrow().0.at(0).unwrap_or(e.borrow().0.clone());
 
                         for i in match_vals.iter().skip(1) {
                             if env.arg(*i).eqv(&err_val) {
-                                return env.arg(fun_idx).call(env, &vec![e.borrow().clone()]);
+                                let args = vec![
+                                    e.borrow().0.clone(),
+                                    VVal::Int(e.borrow().1.line as i64),
+                                    VVal::Int(e.borrow().1.col as i64),
+                                    VVal::Int(e.borrow().1.file as i64),
+                                ];
+                                return env.arg(fun_idx).call(env, &args);
                             }
                         }
                     }
@@ -402,7 +408,11 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 VVal::Err(err_v) => {
                     return Err(StackAction::Panic(
                         VVal::new_str(&format!(
-                            "unwrap error: {}", err_v.borrow().s())), None));
+                            "unwrap error: {}@({},{}:{})",
+                            err_v.borrow().0.s(),
+                            err_v.borrow().1.line,
+                            err_v.borrow().1.col,
+                            err_v.borrow().1.file)), None));
                 },
                 v => Ok(v)
             }
@@ -414,8 +424,11 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             match env.arg(1) {
                 VVal::Err(err_v) => {
                     return env.with_restore_sp(|e: &mut Env| {
-                        e.push(err_v.borrow().clone());
-                        err_fn.call_internal(e, 1)
+                        e.push(err_v.borrow().0.clone());
+                        e.push(VVal::Int(err_v.borrow().1.line as i64));
+                        e.push(VVal::Int(err_v.borrow().1.col as i64));
+                        e.push(VVal::Int(err_v.borrow().1.file as i64));
+                        err_fn.call_internal(e, 4)
                     });
                 },
                 e => Ok(e)

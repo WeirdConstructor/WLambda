@@ -12,6 +12,7 @@ use std::rc::Rc;
 use std::rc::Weak;
 use std::cell::RefCell;
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 /// Structure for holding information about origin
 /// of an AST node.
@@ -28,6 +29,16 @@ pub struct CompileError {
     pub pos:    SynPos,
     pub msg:    String,
 }
+
+impl Display for CompileError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "[{},{}:{}] Compilation Error: {}",
+            self.pos.line, self.pos.col, self.pos.file, self.msg)
+    }
+}
+
 
 /// Encodes the different types of AST nodes.
 #[derive(Debug, Clone, PartialEq)]
@@ -430,7 +441,7 @@ pub enum VVal {
     /// The err value is a special sentinel value for representing any kind of
     /// application error condition. It's created using the special $e <expr> or $error <expr>
     /// syntax.
-    Err(Rc<RefCell<VVal>>),
+    Err(Rc<RefCell<(VVal, SynPos)>>),
     /// Representation of a boolean value.
     Bol(bool),
     /// Representation of a symbol or key.
@@ -523,8 +534,8 @@ impl VVal {
         VVal::Byt(Rc::new(RefCell::new(v)))
     }
 
-    pub fn err(v: VVal) -> VVal {
-        VVal::Err(Rc::new(RefCell::new(v)))
+    pub fn err(v: VVal, pos: SynPos) -> VVal {
+        VVal::Err(Rc::new(RefCell::new((v, pos))))
     }
 
     pub fn vec() -> VVal {
@@ -573,7 +584,8 @@ impl VVal {
             VVal::Err(e) => {
                 Err(StackAction::Panic(
                     VVal::new_str(
-                        &format!("Called an error value: {}", e.borrow().s())), None))
+                        &format!("Called an error value: {}",
+                                 e.borrow().0.s())), None))
             },
             VVal::Sym(sym) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
@@ -1017,7 +1029,7 @@ impl VVal {
             VVal::Str(s)     => format_vval_str(&s.borrow(), false),
             VVal::Byt(s)     => format!("$b{}", format_vval_byt(&s.borrow())),
             VVal::Nul        => "$n".to_string(),
-            VVal::Err(e)     => format!("$e {}", (*e).borrow().s()),
+            VVal::Err(e)     => format!("$e {}", (*e).borrow().0.s()),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
             VVal::Sym(s)     => format!(":\"{}\"", s),
             VVal::Syn(s)     => format!("&{:?}", s.syn),
