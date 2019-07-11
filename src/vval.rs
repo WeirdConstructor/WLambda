@@ -23,6 +23,12 @@ pub struct SynPos {
     pub file:       u32,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompileError {
+    pub pos:    SynPos,
+    pub msg:    String,
+}
+
 /// Encodes the different types of AST nodes.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -357,7 +363,7 @@ impl Env {
 /// closure call tree to handle jumping up the stack.
 #[derive(Debug, Clone)]
 pub enum StackAction {
-    Panic(VVal),
+    Panic(VVal, Option<Vec<SynPos>>),
     Return((VVal, VVal)),
     Break(VVal),
     Next,
@@ -567,7 +573,7 @@ impl VVal {
             VVal::Err(e) => {
                 Err(StackAction::Panic(
                     VVal::new_str(
-                        &format!("Called an error value: {}", e.borrow().s()))))
+                        &format!("Called an error value: {}", e.borrow().s())), None))
             },
             VVal::Sym(sym) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
@@ -731,16 +737,28 @@ impl VVal {
         out.concat()
     }
 
-    pub fn map_skip<T, R>(&self, mut op: T, skip: usize) -> Vec<R>
+    pub fn map_ok_skip<T, R>(&self, mut op: T, skip: usize) -> Vec<R>
         where T: FnMut(&VVal) -> R {
 
-        let mut res = Vec::new();
+        let mut res : Vec<R> = Vec::new();
         if let VVal::Lst(b) = &self {
             for i in b.borrow_mut().iter().skip(skip) {
                 res.push(op(i));
             }
         }
         res
+    }
+
+    pub fn map_skip<R, E, T>(&self, mut op: T, skip: usize) -> Result<Vec<R>, E>
+        where T: FnMut(&VVal) -> Result<R, E> {
+
+        let mut res : Vec<R> = Vec::new();
+        if let VVal::Lst(b) = &self {
+            for i in b.borrow_mut().iter().skip(skip) {
+                res.push(op(i)?);
+            }
+        }
+        Ok(res)
     }
 
     pub fn unshift(&self, val: VVal) -> &VVal {
@@ -824,6 +842,43 @@ impl VVal {
 
     pub fn is_sym(&self) -> bool {
         match self { VVal::Sym(_) => true, _ => false }
+    }
+
+    pub fn is_syn(&self) -> bool {
+        match self { VVal::Syn(_) => true, _ => false }
+    }
+
+    pub fn get_syn_pos(&self) -> SynPos {
+        if let VVal::Syn(s) = self {
+            s.clone()
+        } else {
+            SynPos {
+                syn: Syntax::Block,
+                line: 0, col: 0, file: 0
+            }
+        }
+    }
+
+    pub fn get_syn(&self) -> Syntax {
+        if let VVal::Syn(s) = self {
+            s.syn.clone()
+        } else {
+            Syntax::Block
+        }
+    }
+
+//    pub fn to_eval_panic(&self, msg: String) -> Result<VVal, StackAction> {
+//        Err(StackAction::Panic( {
+//            msg,
+//            pos: self.get_syn_pos(),
+//        })
+//    }
+
+    pub fn to_compile_err(&self, msg: String) -> Result<EvalNode, CompileError> {
+        Err(CompileError {
+            msg,
+            pos: self.get_syn_pos(),
+        })
     }
 
     pub fn is_str(&self) -> bool {

@@ -344,13 +344,8 @@ impl CompileEnv {
 }
 
 fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
-    let mut exprs : Vec<EvalNode> = Vec::new();
-    for e in ast.map_skip(|e| compile(e, ce), 1) {
-        match e {
-            Ok(v)  => exprs.push(v),
-            Err(_) => return e,
-        }
-    }
+    let exprs : Vec<EvalNode> =
+        ast.map_skip(|e| compile(e, ce), 1)?;
 
     #[allow(unused_assignments)]
     Ok(Box::new(move |e: &mut Env| {
@@ -363,7 +358,7 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
                                 ev.borrow().s());
                     return
                         Err(StackAction::Panic(
-                            VVal::new_str(&err_msg)));
+                            VVal::new_str(&err_msg), None));
                 },
                 _ => (),
             }
@@ -425,7 +420,7 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
 
     let cv  = compile(&value, ce)?;
     if destr.b() {
-        let idxs = vars.map_skip(|v| ce.borrow_mut().def(&v.s_raw()), 0);
+        let idxs = vars.map_ok_skip(|v| ce.borrow_mut().def(&v.s_raw()), 0);
 
         Ok(Box::new(move |e: &mut Env| {
             let v = cv(e)?;
@@ -516,7 +511,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
     let cv      = compile(&value, ce)?;
 
     if destr.b() {
-        let poses = vars.map_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
+        let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
 
         Ok(Box::new(move |e: &mut Env| {
             let v = cv(e)?;
@@ -570,13 +565,11 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
 }
 
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, String> {
+
     match ast {
         VVal::Lst(_l) => {
-            let syn = if let VVal::Syn(s) = ast.at(0).unwrap() {
-                s.syn
-            } else {
-                return Err(format!("Bad AST {:?}", ast));
-            };
+            let syn = ast.at(0).unwrap_or(VVal::Nul);
+            let syn = syn.get_syn();
 
             match syn {
                 Syntax::Block  => { compile_block(ast, ce)       },
@@ -611,13 +604,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     }))
                 },
                 Syntax::Lst    => {
-                    let mut list_elems : Vec<EvalNode> = Vec::new();
-                    for e in ast.map_skip(|e| compile(e, ce), 1) {
-                        match e {
-                            Ok(v)  => list_elems.push(v),
-                            Err(_) => return e,
-                        }
-                    }
+                    let list_elems : Vec<EvalNode> =
+                        ast.map_skip(|e| compile(e, ce), 1)?; 
 
                     Ok(Box::new(move |e: &mut Env| {
                         let v = VVal::vec();
@@ -626,21 +614,16 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     }))
                 },
                 Syntax::Map    => {
-                    let mut map_elems : Vec<(EvalNode,EvalNode)> = Vec::new();
-
-                    for e in ast.map_skip(|e| {
-                            let k = e.at(0).unwrap();
-                            let v = e.at(1).unwrap();
-                            let kc = compile(&k, ce)?;
-                            let vc = compile(&v, ce)?;
-                            Ok((kc, vc))
-                        }, 1) {
-
-                        match e {
-                            Ok((k,v))  => map_elems.push((k,v)),
-                            Err(s)     => return Err(s),
-                        }
-                    }
+                    let map_elems : Result<Vec<(EvalNode,EvalNode)>, String> =
+                        ast.map_skip(|e| {
+                                let k = e.at(0).unwrap();
+                                let v = e.at(1).unwrap();
+                                let kc = compile(&k, ce)?;
+                                let vc = compile(&v, ce)?;
+                                Ok((kc, vc))
+                            }, 1);
+                    if let Err(e) = map_elems { return Err(e); }
+                    let map_elems = map_elems.unwrap();
 
                     Ok(Box::new(move |e: &mut Env| {
                         let v = VVal::map();
@@ -652,7 +635,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     }))
                 },
                 Syntax::Or => {
-                    let exprs : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+                    let exprs : Vec<EvalNode> =
+                        ast.map_skip(|e| compile(e, ce), 1)?;
 
                     Ok(Box::new(move |e: &mut Env| {
                         for x in exprs.iter() {
@@ -665,7 +649,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     }))
                 },
                 Syntax::And => {
-                    let exprs : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+                    let exprs : Vec<EvalNode> =
+                        ast.map_skip(|e| compile(e, ce), 1)?;
 
                     Ok(Box::new(move |e: &mut Env| {
                         let mut ret = VVal::Nul;
@@ -679,7 +664,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     }))
                 },
                 Syntax::Call => {
-                    let mut call_args : Vec<EvalNode> = ast.map_skip(|e| compile(e, ce).unwrap(), 1);
+                    let mut call_args : Vec<EvalNode> =
+                        ast.map_skip(|e| compile(e, ce), 1)?;
                     call_args.reverse();
                     let func = call_args.pop().expect("function in evaluation args list");
 
@@ -700,7 +686,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                     let mut ce_sub = CompileEnv::create_env(Some(ce.clone()));
 
                     let label = ast.at(1).unwrap();
-                    let stmts : Vec<EvalNode> = ast.map_skip(|e| compile(e, &mut ce_sub).unwrap(), 2);
+                    let stmts : Vec<EvalNode> =
+                        ast.map_skip(|e| compile(e, &mut ce_sub), 2)?;
 
                     #[allow(unused_assignments)]
                     let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
@@ -713,7 +700,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                                                 ev.borrow().s());
                                     return
                                         Err(StackAction::Panic(
-                                            VVal::new_str(&err_msg)));
+                                            VVal::new_str(&err_msg), None));
                                 },
                                 _ => (),
                             }
@@ -722,7 +709,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Str
                             match s(env) {
                                 Ok(v)  => { res = v; },
                                 Err(StackAction::Return((v_lbl, v))) => {
-                                    println!("RETTETE {} {} {}", v_lbl.s(), label.s(), v.s());
+                                    //d// println!("RETTETE {} {} {}", v_lbl.s(), label.s(), v.s());
                                     return
                                         if v_lbl.eqv(&label) { Ok(v) }
                                         else { Err(StackAction::Return((v_lbl, v))) }
@@ -1285,20 +1272,20 @@ mod tests {
     #[test]
     fn check_error() {
         assert_eq!(s_eval_no_panic("$e 10; 14"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\" }))\"");
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\" }), None)\"");
         assert_eq!(s_eval_no_panic("{ { { { $e 10; 14 }(); 3 }(); 9 }(); 10 }()"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\" }))\"");
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\" }), None)\"");
         assert_eq!(s_eval_no_panic("_? $e 10"),
                    "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: Int(10) })))\"");
         assert_eq!(s_eval_no_panic("_? { return $e 10; 10 }()"),
                    "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: Int(10) })))\"");
         assert_eq!(s_eval_no_panic("unwrap $e 1"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"unwrap error: 1\\\" }))\"");
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"unwrap error: 1\\\" }), None)\"");
         assert_eq!(s_eval_no_panic("unwrap 1.1"), "1.1");
         assert_eq!(s_eval_no_panic("on_error { _ + 20 } $e 19.9"), "39.9");
 
         assert_eq!(s_eval_no_panic("{ { { panic 102 }(); 20 }(); return 20 }(); 49"),
-                   "$e \"EXEC ERR: Caught Panic(Int(102))\"");
+                   "$e \"EXEC ERR: Caught Panic(Int(102), None)\"");
 
         assert_eq!(s_eval_no_panic("
             !:ref x = 10;

@@ -364,8 +364,8 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     g.borrow_mut().add_func("panic",
         |env: &mut Env, argc: usize| {
-            if argc < 1 { return Err(StackAction::Panic(VVal::Nul)); }
-            Err(StackAction::Panic(env.arg(0).clone()))
+            if argc < 1 { return Err(StackAction::Panic(VVal::Nul, None)); }
+            Err(StackAction::Panic(env.arg(0).clone(), None))
         });
 
     g.borrow_mut().add_func("block",
@@ -402,7 +402,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 VVal::Err(err_v) => {
                     return Err(StackAction::Panic(
                         VVal::new_str(&format!(
-                            "unwrap error: {}", err_v.borrow().s()))));
+                            "unwrap error: {}", err_v.borrow().s())), None));
                 },
                 v => Ok(v)
             }
@@ -624,9 +624,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |env: &mut Env, _argc: usize| {
             if !env.arg(0).b() {
                 if env.arg(1).is_nul() {
-                    Err(StackAction::Panic(VVal::new_str("assertion failed")))
+                    Err(StackAction::Panic(VVal::new_str("assertion failed"), None))
                 } else {
-                    Err(StackAction::Panic(VVal::new_str(&format!("assertion failed '{}'", env.arg(1).s_raw()))))
+                    Err(StackAction::Panic(VVal::new_str(&format!("assertion failed '{}'", env.arg(1).s_raw())), None))
                 }
             } else {
                 Ok(env.arg(0).clone())
