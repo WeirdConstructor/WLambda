@@ -25,7 +25,7 @@ A more formal introduction to the syntax can be found in the [parser API documen
 WLambda uses labelled blocks for control flow, as returning from the current function would not be
 very helpful for the control flow in wlambda in case of conditional execution.
 
-```
+```wlambda
 !some_func = \:outer {
     # does stuff
 

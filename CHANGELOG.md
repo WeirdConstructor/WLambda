@@ -27,6 +27,7 @@ argument.
 * Added checking functions like is_nul, is_sym, is_str, ...
 * Added regex and chrono as optional features.
 * Added wl:assert.
+* Added || syntax for prepending a function call.
 
 0.1.1 (2019-05-23)
 ==================

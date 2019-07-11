@@ -1020,12 +1020,21 @@ fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
     while let Some(c) = ps.peek() {
         match c {
             '|' => {
+                let push_front =
+                    if ps.lookahead("||") { ps.consume(); true } else { false };
                 ps.consume_wsc();
+
                 let mut fn_expr = parse_call(ps, false)?;
                 if !is_call(&fn_expr) {
                     fn_expr = make_to_call(ps, fn_expr);
                 }
-                fn_expr.push(call);
+
+                if push_front {
+                    fn_expr.insert_at(2, call);
+                } else {
+                    fn_expr.push(call);
+                }
+
                 call = fn_expr;
             },
             _ => {
@@ -1252,10 +1261,14 @@ mod tests {
                    "$[&Block,$[&Call,10,20,30]]");
         assert_eq!(parse("10 20 30 40"),
                    "$[&Block,$[&Call,10,20,30,40]]");
+        assert_eq!(parse("10 || 20 30"),
+                   "$[&Block,$[&Call,20,10,30]]");
         assert_eq!(parse("10 | 20 30"),
                    "$[&Block,$[&Call,20,30,10]]");
         assert_eq!(parse("10 20 | 30 40"),
                    "$[&Block,$[&Call,30,40,$[&Call,10,20]]]");
+        assert_eq!(parse("10 20 || 30 40"),
+                   "$[&Block,$[&Call,30,$[&Call,10,20],40]]");
         assert_eq!(parse("10 20 | 30 40 | 50"),
                    "$[&Block,$[&Call,50,$[&Call,30,40,$[&Call,10,20]]]]");
         assert_eq!(parse("10 | 20 | 30 | 40"),
