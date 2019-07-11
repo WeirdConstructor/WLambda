@@ -360,6 +360,14 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     let quote_char = ps.peek().unwrap();
     ps.consume();
 
+    let quote_char = match quote_char {
+        '[' => ']',
+        '(' => ')',
+        '{' => '}',
+        '<' => '>',
+        _ => quote_char
+    };
+
     let vec = ps.syn(Syntax::Str);
 
     let mut s = String::from("");
@@ -843,12 +851,14 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
         if let Some(c) = ps.peek() {
             match c {
                 '=' => {
-                    ps.consume_wsc();
-                    let field_set = ps.syn(Syntax::SetKey);
-                    field_set.push(obj);
-                    field_set.push(value);
-                    field_set.push(parse_expr(ps)?);
-                    return Ok(field_set);
+                    if !ps.lookahead("==") {
+                        ps.consume_wsc();
+                        let field_set = ps.syn(Syntax::SetKey);
+                        field_set.push(obj);
+                        field_set.push(value);
+                        field_set.push(parse_expr(ps)?);
+                        return Ok(field_set);
+                    }
                 },
                 '(' => {
                     let call = make_to_call(ps, value);
@@ -1378,10 +1388,20 @@ mod tests {
         assert_eq!(parse("\"fo\x05o\\u{0009f}\""),   "$[&Block,$[&Str,\"fo\\x05o\\u{9f}\"]]");
         assert_eq!(parse("\"fo\x05o\\u{09f}\""),   "$[&Block,$[&Str,\"fo\\x05o\\u{9f}\"]]");
         assert_eq!(parse("\"fo\x05o\\u{2400}\""), "$[&Block,$[&Str,\"fo\\x05o␀\"]]");
+        assert_eq!(parse("$q foo "),        "$[&Block,$[&Str,\"foo\"]]");
+        assert_eq!(parse("$q[foo]"),        "$[&Block,$[&Str,\"foo\"]]");
+        assert_eq!(parse("$q(foo)"),        "$[&Block,$[&Str,\"foo\"]]");
+        assert_eq!(parse("$q{foo}"),        "$[&Block,$[&Str,\"foo\"]]");
+        assert_eq!(parse("$q<foo>"),        "$[&Block,$[&Str,\"foo\"]]");
 
         assert_eq!(parse("$b\"\\u{2400}\""),       "$[&Block,$[&Str,$b\"\\xE2\\x90\\x80\"]]");
         assert_eq!(parse("$Q'foo'"),               "$[&Block,$[&Str,$b\"foo\"]]");
         assert_eq!(parse("$b\"\\x00\\xFF\\xEB\""), "$[&Block,$[&Str,$b\"\\0\\xFF\\xEB\"]]");
+    }
+
+    #[test]
+    fn check_parse_field_access() {
+        assert_eq!(parse("foo.[bar] == 2019"), "$[&Block,$[&Call,$[&Var,:\"==\"],$[&Call,$[&Var,:\"bar\"],$[&Var,:\"foo\"]],2019]]");
     }
 
     #[test]

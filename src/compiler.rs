@@ -1372,4 +1372,9 @@ mod tests {
         assert_eq!(s_eval("is_float 1.2"), "$true");
         assert_eq!(s_eval("is_fun {}"),    "$true");
     }
+
+    #[test]
+    fn check_prelude_assert() {
+        assert_eq!(s_eval("wl:assert ~ [type \"2019\".[int]] == $q int "), "$true");
+    }
 }

@@ -21,11 +21,16 @@ Here are some of it's properties:
   references in check.
 - Easy maintenance of the implementation.
 
-The API relies on a data structure made of [VVal](vval/index.html) nodes.
+The embedding API relies on a data structure made of [VVal](vval/index.html) nodes.
+
+Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
 # Example WLambda Code
 
 Just a quick glance at the WLambda syntax and semantics.
+
+More details for the syntax and the provided global functions
+can be found in the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
 ```wlambda
 # This is a comment

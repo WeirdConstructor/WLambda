@@ -2,6 +2,7 @@
 ==================
 
 * Completed string support in compiler.
+* Started documentation for wlambda prelude.
 * Added support for arbitrarily quoted string with $q/fooobar/.
 * Added string calling semantics for substring and concatenation.
 * Added 'match' 
@@ -24,6 +25,8 @@ argument.
 * Added bool, int, float, str and sym routines to prelude for converting values.
 * Changed symbol text representation.
 * Added checking functions like is_nul, is_sym, is_str, ...
+* Added regex and chrono as optional features.
+* Added wl:assert.
 
 0.1.1 (2019-05-23)
 ==================

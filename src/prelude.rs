@@ -6,6 +6,102 @@ This module defines some default functions and operations
 available in the WLambda language.
 
 For an example, refer to [create_wlamba_prelude](fn.create_wlamba_prelude.html).
+
+# WLambda Reference
+
+## Syntax
+
+A more formal introduction to the syntax can be found in the [parser API documentation](../parser/index.html).
+
+### Functions
+
+- {... } syntax
+- \ ... syntax
+
+#### Control Flow - Returning
+
+- \:lbl { ... } syntax and returning
+
+WLambda uses labelled blocks for control flow, as returning from the current function would not be
+very helpful for the control flow in wlambda in case of conditional execution.
+
+```
+!some_func = \:outer {
+    # does stuff
+
+    [x == 10] {
+        return :outer 20
+    }
+
+    # more stuff that is not executed if x == 10.
+}
+```
+
+### Conditional Execution - if / then / else
+
+WLambda has no `if`. Conditional execution is provided by the bool
+data type. As in WLambda everything can be called like a function, you
+can just pass other functions as arguments to `$true` and `$false`.
+If you pass a function as first argument to `$true`, it will
+be executed. If you pass a function as second argument to `$false` then that
+will be executed.
+
+```wlambda
+[10 == 10] { displayln "10 is 10" }         #=> prints "10 is 10"
+[10 != 10] { displayln "10 is not 10" }     #=> doesn't print anything
+
+!x = 20;
+
+[x == 20] {
+    displayln "x is 20";
+} {
+    displayln "x is 20";
+}; // Do not forget the ";"!
+```
+
+Actually, as the values `$true` and `$false` can be called like any other
+function you may write it also like this, which is not the recommended
+syntax, but still works:
+
+```wlambda
+[10 == 10]({ display "10 is 10" })
+
+[x == 20]({ displayln "x is 20" }, { displayln "x is 20" })
+```
+
+## Prelude
+
+
+### wl:assert _bool_ \[_message_]
+
+Just a simple assertion function that panics if the first argument is not true.
+Returns the passed value if it is a true value.
+You can pass an optional message as second parameter.
+
+```wlambda
+wl:assert $false #=> Panic
+wl:assert 120    #=> 120
+```
+
+## Optional Prelude
+
+### regex
+
+
+### chrono
+
+#### chrono:timestamp \[_format_]
+
+For the documentation of _format_ please consule the
+chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
+
+```wlambda
+!year_str = chrono:timestamp "%Y";
+wl:assert [year_str | int] == 2019
+
+!now_str = chrono:timestamp();
+```
+
 */
 
 use crate::compiler::*;
@@ -207,29 +303,25 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         Ok(VVal::Flt(a.f().powf(b.f()))),
         Ok(VVal::Int(a.i().pow(b.i() as u32))));
 
-    g.borrow_mut().add_func(
-        "neg",
+    g.borrow_mut().add_func("neg",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Ok(VVal::Nul); }
             Ok(VVal::Int(!env.arg(0).i()))
         });
 
-    g.borrow_mut().add_func(
-        "uneg",
+    g.borrow_mut().add_func("uneg",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Ok(VVal::Nul); }
             Ok(VVal::Int((!(env.arg(0).i() as u32)) as i64))
         });
 
-    g.borrow_mut().add_func(
-        "panic",
+    g.borrow_mut().add_func("panic",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Panic(VVal::Nul)); }
             Err(StackAction::Panic(env.arg(0).clone()))
         });
 
-    g.borrow_mut().add_func(
-        "block",
+    g.borrow_mut().add_func("block",
         |env: &mut Env, argc: usize| {
             let mut label = VVal::Nul;
             let fn_arg_idx = if argc <= 1 { 0 } else { label = env.arg(0); 1 };
@@ -243,8 +335,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         });
 
-    g.borrow_mut().add_func(
-        "_?",
+    g.borrow_mut().add_func("_?",
         |env: &mut Env, argc: usize| {
             let mut lbl = VVal::Nul;
             let err_val = if argc > 1 {
@@ -258,8 +349,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         });
 
-    g.borrow_mut().add_func(
-        "unwrap",
+    g.borrow_mut().add_func("unwrap",
         |env: &mut Env, _argc: usize| {
             match env.arg(0) {
                 VVal::Err(err_v) => {
@@ -271,8 +361,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         });
 
-    g.borrow_mut().add_func(
-        "on_error",
+    g.borrow_mut().add_func("on_error",
         |env: &mut Env, _argc: usize| {
             let err_fn = env.arg(0).clone();
             match env.arg(1) {
@@ -286,30 +375,26 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         });
 
-    g.borrow_mut().add_func(
-        "return",
+    g.borrow_mut().add_func("return",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Return((VVal::Nul, VVal::Nul))); }
             if argc < 2 { return Err(StackAction::Return((VVal::Nul, env.arg(0).clone()))); }
             Err(StackAction::Return((env.arg(0).clone(), env.arg(1).clone())))
         });
 
-    g.borrow_mut().add_func(
-        "break",
+    g.borrow_mut().add_func("break",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
             Err(StackAction::Break(env.arg(0).clone()))
         });
 
-    g.borrow_mut().add_func(
-        "next",
+    g.borrow_mut().add_func("next",
         |_env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Next); }
             Err(StackAction::Next)
         });
 
-    g.borrow_mut().add_func(
-        "push",
+    g.borrow_mut().add_func("push",
         |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
             let v = env.arg(0);
@@ -317,51 +402,36 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             Ok(v.clone())
         });
 
-    g.borrow_mut().add_func(
-        "bool",
+    g.borrow_mut().add_func("bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).b())) });
-    g.borrow_mut().add_func(
-        "float",
+    g.borrow_mut().add_func("float",
         |env: &mut Env, _argc: usize| { Ok(VVal::Flt(env.arg(0).f())) });
-    g.borrow_mut().add_func(
-        "int",
+    g.borrow_mut().add_func("int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).i())) });
-    g.borrow_mut().add_func(
-        "str",
+    g.borrow_mut().add_func("str",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str(&env.arg(0).s_raw())) });
-    g.borrow_mut().add_func(
-        "sym",
+    g.borrow_mut().add_func("sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_sym(&env.arg(0).s_raw())) });
-    g.borrow_mut().add_func(
-        "is_nul",
+    g.borrow_mut().add_func("is_nul",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_nul())) });
-    g.borrow_mut().add_func(
-        "is_err",
+    g.borrow_mut().add_func("is_err",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_err())) });
-    g.borrow_mut().add_func(
-        "is_map",
+    g.borrow_mut().add_func("is_map",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_map())) });
-    g.borrow_mut().add_func(
-        "is_vec",
+    g.borrow_mut().add_func("is_vec",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_vec())) });
-    g.borrow_mut().add_func(
-        "is_fun",
+    g.borrow_mut().add_func("is_fun",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_fun())) });
-    g.borrow_mut().add_func(
-        "is_str",
+    g.borrow_mut().add_func("is_str",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_str())) });
-    g.borrow_mut().add_func(
-        "is_sym",
+    g.borrow_mut().add_func("is_sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_sym())) });
-    g.borrow_mut().add_func(
-        "is_float",
+    g.borrow_mut().add_func("is_float",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_float())) });
-    g.borrow_mut().add_func(
-        "is_int",
+    g.borrow_mut().add_func("is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) });
 
-    g.borrow_mut().add_func(
-        "type",
+    g.borrow_mut().add_func("type",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Ok(VVal::Nul); }
             if argc > 1 {
@@ -375,8 +445,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         });
 
-    g.borrow_mut().add_func(
-        "yay",
+    g.borrow_mut().add_func("yay",
         |env: &mut Env, argc: usize| {
             if argc < 1 { println!("YOOOY"); return Ok(VVal::Nul); }
             println!("YAAAAY {}", env.arg(0).s());
@@ -384,8 +453,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             Ok(VVal::Nul)
         });
 
-    g.borrow_mut().add_func(
-        "to_drop",
+    g.borrow_mut().add_func("to_drop",
         |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
             let fun = env.arg(1);
@@ -394,24 +462,24 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
         });
 
-    /*
 
-       match val
-          :sym :x { ... }
-          { ... }
+    g.borrow_mut().add_func("to_drop",
+        |env: &mut Env, argc: usize| {
+            if argc < 2 { return Ok(VVal::Nul); }
+            let fun = env.arg(1);
+            let v   = env.arg(0);
 
+            Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
+        });
 
-    */
-    g.borrow_mut().add_func(
-        "match",
+    g.borrow_mut().add_func("match",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Ok(VVal::Nul); }
             if argc == 1 { return Ok(VVal::Nul) }
             return match_next(env, &env.arg(0), 1, argc);
         });
 
-    g.borrow_mut().add_func(
-        "while",
+    g.borrow_mut().add_func("while",
         |env: &mut Env, argc: usize| {
             if argc < 2 { return Ok(VVal::Nul); }
             let test = env.arg(0);
@@ -435,8 +503,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         });
 
-    g.borrow_mut().add_func(
-        "range",
+    g.borrow_mut().add_func("range",
         |env: &mut Env, argc: usize| {
             if argc <= 3 { return Ok(VVal::Nul); }
             let from     = env.arg(0);
@@ -487,6 +554,58 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 Ok(ret)
             }
         });
+
+    g.borrow_mut().add_func("displayln",
+        |env: &mut Env, argc: usize| {
+            for i in 0..argc {
+                if i == (argc - 1) {
+                    println!("{}", env.arg(i).s_raw());
+                } else if i > 0 {
+                    print!(" {}", env.arg(i).s_raw());
+                } else {
+                    print!("{}", env.arg(i).s_raw());
+                }
+            }
+            if argc > 0 {
+                Ok(env.arg(argc - 1).clone())
+            } else {
+                Ok(VVal::Nul)
+            }
+        });
+
+    g.borrow_mut().add_func("wl:assert",
+        |env: &mut Env, _argc: usize| {
+            if !env.arg(0).b() {
+                if env.arg(1).is_nul() {
+                    Err(StackAction::Panic(VVal::new_str("assertion failed")))
+                } else {
+                    Err(StackAction::Panic(VVal::new_str(&format!("assertion failed '{}'", env.arg(1).s_raw()))))
+                }
+            } else {
+                Ok(env.arg(0).clone())
+            }
+        });
+
+    if cfg!(feature="regex") {
+    }
+
+    if cfg!(feature="chrono") {
+        g.borrow_mut().add_func("chrono:timestamp",
+            |env: &mut Env, _argc: usize| {
+                use chrono::prelude::*;
+                let dt = Local::now();
+
+                let fmt = env.arg(0);
+                let fmt = if fmt.is_str() {
+                    fmt.s_raw()
+                } else {
+                    String::from("%Y-%m-%d %H:%M:%S.%f")
+
+                };
+
+                Ok(VVal::new_str(&dt.format(&fmt).to_string()))
+            });
+    }
 
     g
 }
