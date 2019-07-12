@@ -527,6 +527,10 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) });
     g.borrow_mut().add_func("str:len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_raw().len() as i64)) });
+    g.borrow_mut().add_func("str:to_lowercase",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_lowercase())) });
+    g.borrow_mut().add_func("str:to_uppercase",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_uppercase())) });
     g.borrow_mut().add_func("str:cat",
         |env: &mut Env, argc: usize| {
             let lst = env.arg(0);
