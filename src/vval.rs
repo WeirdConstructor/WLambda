@@ -526,6 +526,10 @@ impl VVal {
         VVal::Str(Rc::new(RefCell::new(String::from(s))))
     }
 
+    pub fn new_str_mv(s: String) -> VVal {
+        VVal::Str(Rc::new(RefCell::new(String::from(s))))
+    }
+
     pub fn new_sym(s: &str) -> VVal {
         VVal::Sym(String::from(s))
     }
@@ -536,6 +540,12 @@ impl VVal {
 
     pub fn err(v: VVal, pos: SynPos) -> VVal {
         VVal::Err(Rc::new(RefCell::new((v, pos))))
+    }
+
+    pub fn err_msg(s: &str) -> VVal {
+        VVal::Err(Rc::new(RefCell::new(
+            (VVal::new_str(s),
+             SynPos { syn: Syntax::Block, line: 0, col: 0, file: 0 }))))
     }
 
     pub fn vec() -> VVal {
@@ -583,8 +593,8 @@ impl VVal {
             },
             VVal::Err(e) => {
                 Err(StackAction::Panic(
-                    VVal::new_str(
-                        &format!("Called an error value: {}",
+                    VVal::new_str_mv(
+                        format!("Called an error value: {}",
                                  e.borrow().0.s())), None))
             },
             VVal::Sym(sym) => {
@@ -600,6 +610,26 @@ impl VVal {
                     ret
                 })
             },
+            VVal::Lst(l) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    let f = e.arg(0);
+
+                    let ret = VVal::vec();
+                    for i in l.borrow_mut().iter() {
+                        e.push(i.clone());
+                        let el = f.call_internal(e, 1);
+                        e.popn(1);
+
+                        match el {
+                            Ok(v)                      => { ret.push(v); },
+                            Err(StackAction::Break(v)) => { ret.push(v); break; },
+                            Err(StackAction::Next)     => { },
+                            Err(e)                     => { return Err(e); },
+                        }
+                    }
+                    Ok(ret)
+                })
+            },
             VVal::Str(s) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let ret = if argc > 0 {
@@ -610,7 +640,7 @@ impl VVal {
                                     let from = i as usize;
                                     let cnt  = e.arg(1).i() as usize;
                                     let r : String = s.borrow().chars().skip(from).take(cnt).collect();
-                                    Ok(VVal::new_str(&r))
+                                    Ok(VVal::new_str_mv(r))
                                 } else {
                                     let r = s.borrow().chars().nth(i as usize);
                                     match r {
@@ -626,7 +656,7 @@ impl VVal {
                                 let from = v.at(0).unwrap_or(VVal::Int(0)).i() as usize;
                                 let cnt  = v.at(1).unwrap_or(VVal::Int((s.borrow().len() - from) as i64)).i() as usize;
                                 let r : String = s.borrow().chars().skip(from).take(cnt).collect();
-                                Ok(VVal::new_str(&r))
+                                Ok(VVal::new_str_mv(r))
                             },
                             VVal::Str(s2) => {
                                 if argc > 1 {
@@ -635,10 +665,10 @@ impl VVal {
                                     for i in 2..argc {
                                         accum += &e.arg(i).s_raw();
                                     }
-                                    Ok(VVal::new_str(&accum))
+                                    Ok(VVal::new_str_mv(accum))
                                 } else {
                                     // TODO: Fix the extra clone here:
-                                    Ok(VVal::new_str(&(s.borrow().clone() + &s2.borrow().clone())))
+                                    Ok(VVal::new_str_mv(s.borrow().clone() + &s2.borrow().clone()))
                                 }
                             },
                             VVal::Map(_) => Ok(v.get_key(&s.borrow()).unwrap_or(VVal::Nul)),

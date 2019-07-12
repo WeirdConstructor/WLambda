@@ -1280,15 +1280,15 @@ mod tests {
     #[test]
     fn check_error() {
         assert_eq!(s_eval_no_panic("$e 10; 14"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\" }), None)\"");
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\'(@0,0:0) dropped.\\\" }), None)\"");
         assert_eq!(s_eval_no_panic("{ { { { $e 10; 14 }(); 3 }(); 9 }(); 10 }()"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\" }), None)\"");
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\'@(0,0:0) dropped.\\\" }), None)\"");
         assert_eq!(s_eval_no_panic("_? $e 10"),
-                   "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: Int(10) })))\"");
+                   "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: (Int(10), SynPos { syn: Block, line: 0, col: 0, file: 0 }) })))\"");
         assert_eq!(s_eval_no_panic("_? { return $e 10; 10 }()"),
-                   "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: Int(10) })))\"");
+                   "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: (Int(10), SynPos { syn: Block, line: 0, col: 0, file: 0 }) })))\"");
         assert_eq!(s_eval_no_panic("unwrap $e 1"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"unwrap error: 1\\\" }), None)\"");
+                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"unwrap error: 1@(0,0:0)\\\" }), None)\"");
         assert_eq!(s_eval_no_panic("unwrap 1.1"), "1.1");
         assert_eq!(s_eval_no_panic("on_error { _ + 20 } $e 19.9"), "39.9");
 
@@ -1369,7 +1369,35 @@ mod tests {
     }
 
     #[test]
+    fn check_lst_map() {
+        assert_eq!(s_eval("$[12,1,30] \\_ * 2"),        "$[24,2,60]");
+        assert_eq!(s_eval("$[12,1,304] str:len"),       "$[2,1,3]");
+        assert_eq!(s_eval("$[123,22,4304] str:len"),    "$[3,2,4]");
+        assert_eq!(s_eval("$[123,22,4304] str:len | fold 1 \\_ * _1"), "24");
+    }
+
+    #[test]
     fn check_prelude_assert() {
         assert_eq!(s_eval("wl:assert ~ [type \"2019\".[int]] == $q int "), "$true");
+    }
+
+    #[test]
+    fn check_prelude_chrono() {
+        if cfg!(feature="chrono") {
+            assert_eq!(s_eval("chrono:timestamp $q$%Y$ | int"), "2019");
+        }
+    }
+
+    #[test]
+    fn check_prelude_regex() {
+        if cfg!(feature="regex") {
+            assert_eq!(s_eval("$q$fofoaaaaofefoeaafefeoaaaa$ | re:map $q{(a+)} { _.1 } | str:join $q$,$"),
+                       "\"aaaa,aa,aaaa\"");
+            assert_eq!(s_eval("
+                $q$fofoaaaofefoeaaaaafefeoaaaaaaa$
+                | re:map $q{(a+)} { str:len _.1 }
+                | fold 1 \\_ * _1"),
+                "105");
+        }
     }
 }

@@ -148,6 +148,7 @@ wl:assert [year_str | int] == 2019
 use crate::compiler::*;
 use crate::vval::*;
 use std::rc::Rc;
+use regex::Regex;
 //use std::cell::RefCell;
 
 macro_rules! add_func {
@@ -407,7 +408,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             match env.arg(0) {
                 VVal::Err(err_v) => {
                     return Err(StackAction::Panic(
-                        VVal::new_str(&format!(
+                        VVal::new_str_mv(format!(
                             "unwrap error: {}@({},{}:{})",
                             err_v.borrow().0.s(),
                             err_v.borrow().1.line,
@@ -424,10 +425,10 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             match env.arg(1) {
                 VVal::Err(err_v) => {
                     return env.with_restore_sp(|e: &mut Env| {
-                        e.push(err_v.borrow().0.clone());
-                        e.push(VVal::Int(err_v.borrow().1.line as i64));
-                        e.push(VVal::Int(err_v.borrow().1.col as i64));
                         e.push(VVal::Int(err_v.borrow().1.file as i64));
+                        e.push(VVal::Int(err_v.borrow().1.col as i64));
+                        e.push(VVal::Int(err_v.borrow().1.line as i64));
+                        e.push(err_v.borrow().0.clone());
                         err_fn.call_internal(e, 4)
                     });
                 },
@@ -469,7 +470,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     g.borrow_mut().add_func("int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).i())) });
     g.borrow_mut().add_func("str",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_str(&env.arg(0).s_raw())) });
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw())) });
     g.borrow_mut().add_func("sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_sym(&env.arg(0).s_raw())) });
     g.borrow_mut().add_func("is_nul",
@@ -490,6 +491,23 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_float())) });
     g.borrow_mut().add_func("is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) });
+    g.borrow_mut().add_func("str:len",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_raw().len() as i64)) });
+    g.borrow_mut().add_func("str:join",
+        |env: &mut Env, _argc: usize| {
+            let sep = env.arg(0).s_raw();
+            let lst = env.arg(1);
+            if let VVal::Lst(l) = lst {
+                let svec : Vec<String> = l.borrow_mut().iter().map(|v| v.s_raw()).collect();
+                Ok(VVal::new_str_mv((&svec).join(&sep)))
+
+            } else {
+                Ok(VVal::err_msg(
+                    &format!(
+                        "str:join only works with lists as second argument, got '{}'",
+                        lst.s())))
+            }
+        });
 
     g.borrow_mut().add_func("type",
         |env: &mut Env, argc: usize| {
@@ -497,11 +515,11 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             if argc > 1 {
                 let vec = VVal::vec();
                 for i in 0..argc {
-                    vec.push(VVal::new_str(&env.arg(i).type_name()));
+                    vec.push(VVal::new_str_mv(env.arg(i).type_name()));
                 }
                 Ok(vec)
             } else {
-                Ok(VVal::new_str(&env.arg(0).type_name()))
+                Ok(VVal::new_str_mv(env.arg(0).type_name()))
             }
         });
 
@@ -561,6 +579,36 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                     Err(e)                     => { return Err(e); }
                 }
             }
+        });
+
+    g.borrow_mut().add_func("fold",
+        |env: &mut Env, _argc: usize| {
+            let mut acc = env.arg(0);
+            let f       = env.arg(1);
+            let lst     = env.arg(2);
+
+            if let VVal::Lst(l) = lst {
+                for i in l.borrow_mut().iter() {
+                    env.push(acc.clone());
+                    env.push(i.clone());
+                    let rv = f.call_internal(env, 2);
+                    env.popn(2);
+
+                    match rv {
+                        Ok(v)                      => { acc = v;  },
+                        Err(StackAction::Break(v)) => { acc = v; break; },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { return Err(e); },
+                    }
+                }
+            } else {
+                return Ok(VVal::err_msg(
+                    &format!(
+                        "fold only works with lists as argument, got '{}'",
+                        lst.s())));
+            }
+
+            Ok(acc)
         });
 
     g.borrow_mut().add_func("range",
@@ -639,7 +687,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 if env.arg(1).is_nul() {
                     Err(StackAction::Panic(VVal::new_str("assertion failed"), None))
                 } else {
-                    Err(StackAction::Panic(VVal::new_str(&format!("assertion failed '{}'", env.arg(1).s_raw())), None))
+                    Err(StackAction::Panic(VVal::new_str_mv(format!("assertion failed '{}'", env.arg(1).s_raw())), None))
                 }
             } else {
                 Ok(env.arg(0).clone())
@@ -647,6 +695,44 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         });
 
     if cfg!(feature="regex") {
+        g.borrow_mut().add_func("re:map",
+            |env: &mut Env, _argc: usize| {
+                let re   = env.arg(0).s_raw();
+                let f    = env.arg(1);
+                let text = env.arg(2).s_raw();
+
+                let rx = Regex::new(&re);
+                if let Err(e) = rx {
+                    return Ok(VVal::err_msg(
+                        &format!("Regex '{}' did not compile: {}", re, e)));
+                }
+                let rx = rx.unwrap();
+
+                let ret = VVal::vec();
+                for capts in rx.captures_iter(&text) {
+                    let captures = VVal::vec();
+                    for cap in capts.iter() {
+                        match cap {
+                            None    => { captures.push(VVal::Nul); },
+                            Some(c) => {
+                                captures.push(VVal::new_str(c.as_str()));
+                            }
+                        }
+                    }
+
+                    env.push(captures);
+                    let rv = f.call_internal(env, 1);
+                    env.popn(1);
+
+                    match rv {
+                        Ok(v)                      => { ret.push(v); },
+                        Err(StackAction::Break(v)) => { ret.push(v); break; },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { return Err(e); },
+                    }
+                }
+                Ok(ret)
+            });
     }
 
     if cfg!(feature="chrono") {
@@ -663,7 +749,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
                 };
 
-                Ok(VVal::new_str(&dt.format(&fmt).to_string()))
+                Ok(VVal::new_str_mv(dt.format(&fmt).to_string()))
             });
     }
 
