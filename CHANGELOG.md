@@ -30,6 +30,7 @@ argument.
 * Added || syntax for prepending a function call.
 * Added 'not'.
 * Added re:map, str:len, str:join, fold and made lists do a map operation on calling.
+* Added take, drop, str:cat and re:replace_all.
 
 0.1.1 (2019-05-23)
 ==================

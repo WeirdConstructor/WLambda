@@ -463,6 +463,40 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             Ok(v.clone())
         });
 
+    g.borrow_mut().add_func("take",
+        |env: &mut Env, argc: usize| {
+            if argc < 2 { return Ok(VVal::Nul); }
+            let cnt = env.arg(0).i() as usize;
+            let lst = env.arg(1);
+            if let VVal::Lst(l) = lst {
+                let svec : Vec<VVal> =
+                    l.borrow_mut().iter().take(cnt).map(|v| v.clone()).collect();
+                Ok(VVal::vec_mv(svec))
+            } else {
+                Ok(VVal::err_msg(
+                    &format!(
+                        "drop only works with a list as second argument, got '{}'",
+                        lst.s())))
+            }
+        });
+
+    g.borrow_mut().add_func("drop",
+        |env: &mut Env, argc: usize| {
+            if argc < 2 { return Ok(VVal::Nul); }
+            let cnt = env.arg(0).i() as usize;
+            let lst = env.arg(1);
+            if let VVal::Lst(l) = lst {
+                let svec : Vec<VVal> =
+                    l.borrow_mut().iter().skip(cnt).map(|v| v.clone()).collect();
+                Ok(VVal::vec_mv(svec))
+            } else {
+                Ok(VVal::err_msg(
+                    &format!(
+                        "drop only works with a list as second argument, got '{}'",
+                        lst.s())))
+            }
+        });
+
     g.borrow_mut().add_func("bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).b())) });
     g.borrow_mut().add_func("float",
@@ -493,6 +527,21 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) });
     g.borrow_mut().add_func("str:len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_raw().len() as i64)) });
+    g.borrow_mut().add_func("str:cat",
+        |env: &mut Env, argc: usize| {
+            let lst = env.arg(0);
+            if let VVal::Lst(l) = lst {
+                let svec : Vec<String> = l.borrow_mut().iter().map(|v| v.s_raw()).collect();
+                Ok(VVal::new_str_mv((&svec).concat()))
+
+            } else {
+                let mut s = String::from("");
+                for i in 0..argc {
+                    s += &env.arg(i).s_raw();
+                }
+                Ok(VVal::new_str_mv(s))
+            }
+        });
     g.borrow_mut().add_func("str:join",
         |env: &mut Env, _argc: usize| {
             let sep = env.arg(0).s_raw();
@@ -695,6 +744,47 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         });
 
     if cfg!(feature="regex") {
+        g.borrow_mut().add_func("re:replace_all",
+            |env: &mut Env, _argc: usize| {
+                let re   = env.arg(0).s_raw();
+                let f    = env.arg(1);
+                let text = env.arg(2).s_raw();
+
+                let rx = Regex::new(&re);
+                if let Err(e) = rx {
+                    return Ok(VVal::err_msg(
+                        &format!("Regex '{}' did not compile: {}", re, e)));
+                }
+                let rx = rx.unwrap();
+
+                Ok(VVal::new_str_mv(String::from(rx.replace_all(&text, |capts: &regex::Captures| {
+                    let captures = VVal::vec();
+                    for cap in capts.iter() {
+                        match cap {
+                            None    => { captures.push(VVal::Nul); },
+                            Some(c) => {
+                                captures.push(VVal::new_str(c.as_str()));
+                            }
+                        }
+                    }
+
+                    let repl = captures.at(0).unwrap_or(VVal::Nul).s_raw();
+
+                    if f.is_fun() {
+                        env.push(captures);
+                        let rv = f.call_internal(env, 1);
+                        env.popn(1);
+
+                        match rv {
+                            Ok(v)  => v.s_raw(),
+                            Err(e) => repl,
+                        }
+                    } else {
+                        f.s_raw()
+                    }
+                }))))
+            });
+
         g.borrow_mut().add_func("re:map",
             |env: &mut Env, _argc: usize| {
                 let re   = env.arg(0).s_raw();
@@ -719,7 +809,6 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                             }
                         }
                     }
-
                     env.push(captures);
                     let rv = f.call_internal(env, 1);
                     env.popn(1);

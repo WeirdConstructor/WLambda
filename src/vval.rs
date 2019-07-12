@@ -268,7 +268,7 @@ impl Env {
     }
 
     pub fn argv(&mut self) -> VVal {
-        VVal::vec_from(&self.args[(self.sp - self.argc)..self.sp])
+        VVal::vec_from(&self.args[(self.bp - self.argc)..self.bp])
     }
 
     pub fn get_up_raw(&mut self, i: usize) -> VVal {
@@ -556,6 +556,10 @@ impl VVal {
         let mut v = Vec::new();
         v.extend_from_slice(vl);
         v.reverse();
+        VVal::Lst(Rc::new(RefCell::new(v)))
+    }
+
+    pub fn vec_mv(v: Vec<VVal>) -> VVal {
         VVal::Lst(Rc::new(RefCell::new(v)))
     }
 
