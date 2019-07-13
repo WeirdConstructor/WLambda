@@ -17,7 +17,7 @@ fn main() {
         move |env: &mut Env, _argc: usize| {
             env.dump_stack();
             Ok(VVal::Nul)
-        });
+        }, Some(0), Some(0));
 
     let mut ctx = compiler::EvalContext::new(global);
 

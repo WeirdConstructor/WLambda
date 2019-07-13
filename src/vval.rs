@@ -393,14 +393,20 @@ pub struct VValFun {
     ///
     /// This value is used to reserve stack space for storing them.
     pub local_size: usize,
+    /// Min number of arguments this functions requires:
+    pub min_args:   Option<usize>,
+    /// Max number of arguments this functions requires:
+    pub max_args:   Option<usize>,
 }
 
 impl VValFun {
-    pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize) -> VVal {
+    pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize, min_args: Option<usize>, max_args: Option<usize>) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalues,
             fun,
             local_size: env_size,
+            min_args,
+            max_args,
         }))
     }
 
@@ -409,6 +415,8 @@ impl VValFun {
             fun:        Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) })),
             upvalues:   Vec::new(),
             local_size: 0,
+            min_args: None,
+            max_args: None,
         })
     }
 }
@@ -581,6 +589,24 @@ impl VVal {
         //d// env.dump_stack();
         match self {
             VVal::Fun(fu) => {
+                if let Some(i) = fu.min_args {
+                    if argc < i {
+                        return Err(StackAction::Panic(
+                            VVal::new_str_mv(format!(
+                                "function expects at least {} arguments, got {}",
+                                i, argc)), None));
+                    }
+                }
+
+                if let Some(i) = fu.max_args {
+                    if argc > i {
+                        return Err(StackAction::Panic(
+                            VVal::new_str_mv(format!(
+                                "function expects at most {} arguments, got {}",
+                                i, argc)), None));
+                    }
+                }
+
                 env.with_fun_info(fu.clone(), argc, |e: &mut Env| {
                     ((*fu).fun.borrow())(e, argc)
                 })

@@ -62,11 +62,11 @@ impl GlobalEnv {
     ///
     /// 
     /// ```
-    pub fn add_func<T>(&mut self, fnname: &str, fun: T)
+    pub fn add_func<T>(&mut self, fnname: &str, fun: T, min_args: Option<usize>, max_args: Option<usize>)
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
         self.env.insert(
             String::from(fnname),
-            VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0));
+            VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args));
     }
 
     /// Creates a new GlobalEnv.
@@ -122,6 +122,8 @@ impl EvalContext {
                 local_map: std::collections::HashMap::new(),
                 locals:    Vec::new(),
                 upvals:    Vec::new(),
+                implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+                explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             })),
             local: Rc::new(RefCell::new(Env::new())),
         }
@@ -136,6 +138,8 @@ impl EvalContext {
                 local_map: std::collections::HashMap::new(),
                 locals:    Vec::new(),
                 upvals:    Vec::new(),
+                implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+                explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             })),
             local: Rc::new(RefCell::new(Env::new_with_user(user))),
         }
@@ -225,6 +229,13 @@ impl EvalContext {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArityParam {
+    Undefined,
+    Limit(usize),
+    Infinite,
+}
+
 /// Compile time environment for allocating and
 /// storing variables inside a function scope.
 ///
@@ -243,6 +254,10 @@ struct CompileEnv {
     locals:    std::vec::Vec<CompileLocal>,
     /// Stores position of the upvalues for copying the upvalues at runtime.
     upvals:    std::vec::Vec<VarPos>,
+    /// Stores the implicitly calculated arity of this function.
+    implicit_arity: (ArityParam, ArityParam),
+    /// Stores the explicitly defined arity of this function.
+    explicit_arity: (ArityParam, ArityParam),
 }
 
 /// Reference type to a `CompileEnv`.
@@ -261,6 +276,8 @@ impl CompileEnv {
             local_map: std::collections::HashMap::new(),
             locals:    Vec::new(),
             upvals:    Vec::new(),
+            implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+            explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
         }))
     }
 
@@ -378,22 +395,45 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
     }))
 }
 
+fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
+    let min = ce.borrow().implicit_arity.0.clone();
+    match min {
+        ArityParam::Undefined => { ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i); },
+        ArityParam::Limit(j) => { if j < i { ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i); }; },
+        _ => (),
+    }
+
+    let max = ce.borrow_mut().implicit_arity.1.clone();
+    match max {
+        ArityParam::Undefined => {
+            ce.borrow_mut().implicit_arity.1 = ArityParam::Limit(i);
+        },
+        ArityParam::Limit(j) => {
+            if j < i { ce.borrow_mut().implicit_arity.1 = ArityParam::Limit(i); }
+        },
+        _ => (),
+    }
+}
+
 fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     let var = ast.at(1).unwrap();
 
     let s = var.s_raw();
     match &s[..] {
-        "_"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0).clone()) })) },
-        "_1" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1).clone()) })) },
-        "_2" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2).clone()) })) },
-        "_3" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3).clone()) })) },
-        "_4" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4).clone()) })) },
-        "_5" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5).clone()) })) },
-        "_6" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6).clone()) })) },
-        "_7" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7).clone()) })) },
-        "_8" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8).clone()) })) },
-        "_9" => { Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9).clone()) })) },
-        "@"  => { Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) })) },
+        "_"  => { set_impl_arity(1,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0).clone()) })) },
+        "_1" => { set_impl_arity(2,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1).clone()) })) },
+        "_2" => { set_impl_arity(3,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2).clone()) })) },
+        "_3" => { set_impl_arity(4,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3).clone()) })) },
+        "_4" => { set_impl_arity(5,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4).clone()) })) },
+        "_5" => { set_impl_arity(6,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5).clone()) })) },
+        "_6" => { set_impl_arity(7,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6).clone()) })) },
+        "_7" => { set_impl_arity(8,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7).clone()) })) },
+        "_8" => { set_impl_arity(9,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8).clone()) })) },
+        "_9" => { set_impl_arity(10, ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9).clone()) })) },
+        "@"  => {
+            ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+            Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) }))
+        },
         _ => {
             let pos = ce.borrow_mut().get(&s);
             match pos {
@@ -417,13 +457,39 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
     }
 }
 
+fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, vars: &VVal) {
+    // If we have an destructuring assignment directly from "@", then we conclude
+    // the implicit max arity to be minimum of number of vars:
+    if ast.at(2).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() == Syntax::Var {
+        if let VVal::Lst(l) = vars {
+            let llen = l.borrow().len();
+
+            let var = ast.at(2).unwrap().at(1).unwrap();
+            if var.s_raw() == "@" {
+                if    prev_arity.1                 != ArityParam::Infinite
+                   && ce.borrow().implicit_arity.1 == ArityParam::Infinite {
+                   // we let set_impl_arity overwrite the arity if
+                   // it was just Infinite because of compiling "@"
+                   ce.borrow_mut().implicit_arity.1 = ArityParam::Undefined;
+                }
+
+                set_impl_arity(llen, ce);
+            }
+        }
+    }
+}
+
 fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_ref: bool) -> Result<EvalNode, CompileError> {
+    let prev_max_arity = ce.borrow().implicit_arity.clone();
+
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
     let destr   = ast.at(3).unwrap_or(VVal::Nul);
 
-    let cv  = compile(&value, ce)?;
+    let cv = compile(&value, ce)?;
     if destr.b() {
+        check_for_at_arity(prev_max_arity, ast, ce, &vars);
+
         let idxs = vars.map_ok_skip(|v| ce.borrow_mut().def(&v.s_raw()), 0);
 
         Ok(Box::new(move |e: &mut Env| {
@@ -509,12 +575,16 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) {
 }
 
 fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
+    let prev_max_arity = ce.borrow().implicit_arity.clone();
+
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
     let destr   = ast.at(3).unwrap_or(VVal::Nul);
     let cv      = compile(&value, ce)?;
 
     if destr.b() {
+        check_for_at_arity(prev_max_arity, ast, ce, &vars);
+
         let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
 
         Ok(Box::new(move |e: &mut Env| {
@@ -683,7 +753,16 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                 //d// println!("SETARGC: {} => {:?}", i, v);
                                 e.set_arg(argc - (i + 1), v);
                             }
-                            f.call_internal(e, argc)
+                            let ret = f.call_internal(e, argc);
+                            if let Err(StackAction::Panic(msg, synpos)) = ret {
+                                if synpos.is_none() {
+                                    return Err(StackAction::Panic(msg, Some(vec![spos.clone()])));
+                                } else {
+                                    return Err(StackAction::Panic(msg, synpos));
+                                }
+                            } else {
+                                ret
+                            }
                         })
                     }))
                 },
@@ -728,11 +807,35 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         Ok(res)
                     }));
 
+                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
+                        ce_sub.borrow().explicit_arity.0.clone()
+                    } else {
+                        ce_sub.borrow().implicit_arity.0.clone()
+                    };
+
+                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
+                        ce_sub.borrow().explicit_arity.1.clone()
+                    } else {
+                        ce_sub.borrow().implicit_arity.1.clone()
+                    };
+
+                    let min_args : Option<usize> = match deciding_min_arity {
+                        ArityParam::Infinite  => None,
+                        ArityParam::Undefined => Some(0),
+                        ArityParam::Limit(i)  => Some(i),
+                    };
+
+                    let max_args : Option<usize> = match deciding_max_arity {
+                        ArityParam::Infinite  => None,
+                        ArityParam::Undefined => Some(0),
+                        ArityParam::Limit(i)  => Some(i),
+                    };
+
                     let env_size = CompileEnv::local_env_size(&ce_sub);
                     Ok(Box::new(move |e: &mut Env| {
                         let mut v = Vec::new();
                         ce_sub.borrow_mut().copy_upvals(e, &mut v);
-                        Ok(VValFun::new_val(fun_ref.clone(), v, env_size))
+                        Ok(VValFun::new_val(fun_ref.clone(), v, env_size, min_args, max_args))
                     }))
                 },
                 _ => { ast.to_compile_err(format!("bad input: {}", ast.s())) }
@@ -755,6 +858,8 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
         local_map: std::collections::HashMap::new(),
         locals:    Vec::new(),
         upvals:    Vec::new(),
+        implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+        explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
     }));
 
     let prog = compile(&v, &mut ce);
@@ -1224,7 +1329,7 @@ mod tests {
             let fun = env.arg(0);
             env.with_user_do(|v: &mut Vec<VVal>| v.push(fun.clone()));
             Ok(VVal::Nul)
-        });
+        }, Some(1), Some(1));
 
         let reg : Rc<RefCell<Vec<VVal>>> = Rc::new(RefCell::new(Vec::new()));
 

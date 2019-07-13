@@ -104,8 +104,12 @@ In the following grammar, white space and comments are omitted:
                   | false
                   | err
                   ;
-    function      = [ "\:", ident ], "{", block, "}"
-                  | "\", statement
+    arity_def     = "|", (number | "@"), "<", (number | @), "|" (* set min/max *)
+                  | "|", (number | @), "|"                      (* set maximum *)
+                  | "|", "|"                                    (* no enforcement *)
+                  ;
+    function      = [ "\:", ident ], "{", [ arity_def ], block, "}"
+                  | "\", [ arity_def ], statement
                   ;
     var           = ident
                   ;
