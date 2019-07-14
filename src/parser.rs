@@ -99,7 +99,7 @@ In the following grammar, white space and comments are omitted:
                   | quote_string
                   | list
                   | map
-                  | none
+                  | nul
                   | true
                   | false
                   | err
