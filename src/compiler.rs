@@ -1481,6 +1481,9 @@ mod tests {
         assert_eq!(s_eval("sym \"foo\""),       ":\"foo\"");
         assert_eq!(s_eval("sym 10.4"),          ":\"10.4\"");
         assert_eq!(s_eval("[bool $e :fail] { 10 } { 20 }"), "20");
+        assert_eq!(s_eval("fold 1 { _ + _1 } $[1,2,3,4]"), "11");
+        assert_eq!(s_eval("take 2 $[1,2,3,4,5,6]"), "$[1,2]");
+        assert_eq!(s_eval("drop 2 $[1,2,3,4,5,6]"), "$[3,4,5,6]");
     }
 
     #[test]
@@ -1522,6 +1525,14 @@ mod tests {
     }
 
     #[test]
+    fn check_prelude_str() {
+        assert_eq!(s_eval("str:to_uppercase $q foo "), "\"FOO\"");
+        assert_eq!(s_eval("str:to_lowercase $q FOO "), "\"foo\"");
+        assert_eq!(s_eval("str:join \",\" $[1,2,3,${a=:x}]"), "\"1,2,3,${a=:\\\"x\\\"}\"");
+        assert_eq!(s_eval("str:cat $[1,2,3,${a=:x}]"), "\"123${a=:\\\"x\\\"}\"");
+    }
+
+    #[test]
     fn check_prelude_chrono() {
         if cfg!(feature="chrono") {
             assert_eq!(s_eval("chrono:timestamp $q$%Y$ | int"), "2019");
@@ -1538,6 +1549,35 @@ mod tests {
                 | re:map $q{(a+)} { str:len _.1 }
                 | fold 1 \\_ * _1"),
                 "105");
+
+            assert_eq!(s_eval_no_panic("
+                re:replace_all $q/ar/ { \"mak\" } $q/foobarbarfoobararar/
+            "),
+            "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 0 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 2, col: 32, file: 0 }]))\"");
+            assert_eq!(s_eval("
+                re:replace_all $q/a+r/ { str:cat \"mak\" ~ str:len _.0 } $q/foobarbaaaarfoobaararar/
+            "),
+            "\"foobmak2bmak5foobmak3mak2mak2\"");
+            assert_eq!(s_eval("
+                re:replace_all $q/a+r/
+                    {
+                        [str:len(_.0) == 3] {
+                            break \"XX\"
+                        };
+                        [str:cat \"<\" _.0 \">\"]
+                    }
+                    $q/foobarbaaaarfoobaararar/
+            "),
+            "\"foob<ar>b<aaaar>foobXXarar\"");
+            assert_eq!(s_eval("
+                re:replace_all $q/a+r/
+                    {
+                        [str:len(_.0) == 3] { next() };
+                        [str:cat \"<\" _.0 \">\"]
+                    }
+                    $q/foobarbaaaarfoobaararar/
+            "),
+            "\"foob<ar>b<aaaar>foobaar<ar><ar>\"");
         }
     }
 }

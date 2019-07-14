@@ -773,7 +773,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 }
                 let rx = rx.unwrap();
 
-                Ok(VVal::new_str_mv(String::from(rx.replace_all(&text, |capts: &regex::Captures| {
+                let mut finished = false;
+                let mut ret = Ok(VVal::Nul);
+                let ret_str = VVal::new_str_mv(String::from(rx.replace_all(&text, |capts: &regex::Captures| {
                     let captures = VVal::vec();
                     for cap in capts.iter() {
                         match cap {
@@ -785,6 +787,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                     }
 
                     let repl = captures.at(0).unwrap_or(VVal::Nul).s_raw();
+                    if finished { return repl; }
 
                     if f.is_fun() {
                         env.push(captures);
@@ -792,13 +795,17 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                         env.popn(1);
 
                         match rv {
-                            Ok(v)  => v.s_raw(),
-                            Err(_) => repl,
+                            Ok(v)                      => v.s_raw(),
+                            Err(StackAction::Break(v)) => { finished = true; v.s_raw() },
+                            Err(StackAction::Next)     => { repl },
+                            Err(e)                     => { finished = true; ret = Err(e); repl },
                         }
                     } else {
                         f.s_raw()
                     }
-                }))))
+                })));
+                if ret.is_err() { return ret; }
+                Ok(ret_str)
             }, Some(3), Some(3));
 
         g.borrow_mut().add_func("re:map",
