@@ -17,6 +17,9 @@ storing data from globally added functions.
 handling error values. \_? returns error values directly upwards, like ? in
 Rust. And on\_error handles an error value in the function passed as first
 argument.
+* Added `panic` and `assert` and also make the compiler aware of
+the debugging positions that the parser augmented the AST with for
+error reporting.
 * Added unwrap routine to prelude.
 * Added match with ?e for errors.
 * Added block and return for non local jumps upwards the stack.

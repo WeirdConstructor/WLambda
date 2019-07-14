@@ -180,10 +180,6 @@ complete for real world use. So my current goals are:
       (WLambda is for embedding, there are currently no goals
        to provide a binary beyond basic needs.)
 - Improve and further document the VVal API for interacting with WLambda.
-- Add `panic` and `assert` and also make the compiler aware of
-  the debugging positions that the parser augmented the AST with for
-  error reporting.
-- Add a simple REPL binary.
 - Make VVal::Sym hold an interned string instead of a `String` instance.
 
 Future plans could be:
