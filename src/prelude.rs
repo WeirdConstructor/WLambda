@@ -613,7 +613,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             let v   = env.arg(0);
 
             Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
-        }, Some(1), Some(1));
+        }, Some(2), Some(2));
 
 
     g.borrow_mut().add_func("match",

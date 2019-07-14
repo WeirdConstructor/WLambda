@@ -1,12 +1,13 @@
-0.1.2 (unreleased)
+0.2.0 (unreleased)
 ==================
 
 * Completed string support in compiler.
 * Started documentation for wlambda prelude.
+* Incompatible change: Introduced function arity checks and arity definition syntax.
 * Added support for arbitrarily quoted string with $q/fooobar/.
 * Added string calling semantics for substring and concatenation.
-* Added 'match' 
-* Changed map syntax incompatible. Keys are delimited by '=' now, not ':' because
+* Added 'match'.
+* Incompatible change: Changed map syntax, keys are delimited by '=' now, not ':'
 to make parsing easier with multiple symbols as arguments for calls.
 * Added ability to call VVal::Fun in the EvalContext and an available Env.
 Useful for storing callbacks.

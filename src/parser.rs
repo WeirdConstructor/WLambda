@@ -105,7 +105,7 @@ In the following grammar, white space and comments are omitted:
                   | err
                   ;
     arity_def     = "|", (number | "@"), "<", (number | @), "|" (* set min/max *)
-                  | "|", (number | @), "|"                      (* set maximum *)
+                  | "|", (number | @), "|"                      (* set min and max *)
                   | "|", "|"                                    (* no enforcement *)
                   ;
     function      = [ "\:", ident ], "{", [ arity_def ], block, "}"
@@ -799,9 +799,14 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                     block.insert_at(1, VVal::Sym(String::from(block_name)));
                     Ok(block)
                 } else {
+                    let arity =
+                        if ps.lookahead("|") { parse_arity(ps)? }
+                        else { VVal::Nul };
+
                     let next_stmt = parse_stmt(ps)?;
                     let block = ps.syn(Syntax::Func);
                     block.push(VVal::Nul);
+                    block.push(arity);
                     block.push(next_stmt);
                     Ok(block)
                 }
@@ -1130,6 +1135,48 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
     }
 }
 
+/// Parses an arity definition for a function.
+fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
+    if !ps.consume_if_eq_wsc('|') {
+        return ps.err_unexpected_token('|', "When parsing an arity definition.");
+    }
+
+    if ps.at_eof { return ps.err_eof("parsing arity definition"); }
+
+    let arity = if ps.peek().unwrap() != '|' {
+        let min = parse_num(ps)?;
+        if !min.is_int() {
+            return ps.err_bad_value("Expected integer value for min arity.");
+        }
+
+        let max = if ps.consume_if_eq_wsc('<') {
+            let max = parse_num(ps)?;
+            if !max.is_int() {
+                return ps.err_bad_value("Expected integer value for max arity.");
+            }
+            max
+        } else {
+            min.clone()
+        };
+
+        let arity = VVal::vec();
+        arity.push(min);
+        arity.push(max);
+        arity
+    } else {
+        let arity = VVal::vec();
+        arity.push(VVal::Bol(true));
+        arity.push(VVal::Bol(true));
+        arity
+    };
+
+    if !ps.consume_if_eq_wsc('|') {
+        return ps.err_unexpected_token('|', "When parsing an arity definition.");
+    }
+
+    Ok(arity)
+}
+
 /// This function parses the an optionally delimited block of WLambda statements.
 ///
 /// ```rust
@@ -1149,9 +1196,9 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
 /// that is ready for the `compiler` to be compiled. It consists mostly of
 /// `VVal::Lst` and `VVal::Syn` nodes. The latter hold the position information
 /// of the AST nodes.
-pub fn parse_block(ps: &mut State, is_delimited: bool) -> Result<VVal, ParseError> {
+pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
     //println!("parse_block [{}]", ps.rest());
-    if is_delimited {
+    if is_func {
         if !ps.consume_if_eq_wsc('{') {
             return ps.err_unexpected_token('{', "When parsing a block.");
         }
@@ -1159,8 +1206,14 @@ pub fn parse_block(ps: &mut State, is_delimited: bool) -> Result<VVal, ParseErro
 
     let block = ps.syn(Syntax::Block);
 
+    if is_func && ps.lookahead("|") {
+        block.push(parse_arity(ps)?);
+    } else if is_func {
+        block.push(VVal::Nul);
+    }
+
     while let Some(c) = ps.peek() {
-        if is_delimited { if c == '}' { break; } }
+        if is_func { if c == '}' { break; } }
 
         let next_stmt = parse_stmt(ps)?;
         block.push(next_stmt);
@@ -1173,7 +1226,7 @@ pub fn parse_block(ps: &mut State, is_delimited: bool) -> Result<VVal, ParseErro
         }
     }
 
-    if is_delimited {
+    if is_func {
         if ps.at_eof { return ps.err_eof("parsing block"); }
         if !ps.consume_if_eq_wsc('}') {
             return ps.err_unexpected_token('}', "When parsing a block.");
@@ -1377,13 +1430,13 @@ mod tests {
 
     #[test]
     fn check_func() {
-        assert_eq!(parse("{}"),           "$[&Block,$[&Func,$n]]");
-        assert_eq!(parse("{10;}"),        "$[&Block,$[&Func,$n,10]]");
-        assert_eq!(parse("{10;;;}"),      "$[&Block,$[&Func,$n,10]]");
-        assert_eq!(parse("{10; 20}"),     "$[&Block,$[&Func,$n,10,20]]");
-        assert_eq!(parse("{ 10 } { }"),   "$[&Block,$[&Call,$[&Func,$n,10],$[&Func,$n]]]");
-        assert_eq!(parse("\\:x { }"),     "$[&Block,$[&Func,:\"x\"]]");
-        assert_eq!(parse("\\ p 1 | 20 ~ 30"),  "$[&Block,$[&Func,$n,$[&Call,20,30,$[&Call,$[&Var,:\"p\"],1]]]]");
+        assert_eq!(parse("{}"),           "$[&Block,$[&Func,$n,$n]]");
+        assert_eq!(parse("{10;}"),        "$[&Block,$[&Func,$n,$n,10]]");
+        assert_eq!(parse("{10;;;}"),      "$[&Block,$[&Func,$n,$n,10]]");
+        assert_eq!(parse("{10; 20}"),     "$[&Block,$[&Func,$n,$n,10,20]]");
+        assert_eq!(parse("{ 10 } { }"),   "$[&Block,$[&Call,$[&Func,$n,$n,10],$[&Func,$n,$n]]]");
+        assert_eq!(parse("\\:x { }"),     "$[&Block,$[&Func,:\"x\",$n]]");
+        assert_eq!(parse("\\ p 1 | 20 ~ 30"),  "$[&Block,$[&Func,$n,$n,$[&Call,20,30,$[&Call,$[&Var,:\"p\"],1]]]]");
     }
 
     #[test]
