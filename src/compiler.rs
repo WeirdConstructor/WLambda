@@ -466,13 +466,7 @@ fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut
 
             let var = ast.at(2).unwrap().at(1).unwrap();
             if var.s_raw() == "@" {
-                if    prev_arity.1                 != ArityParam::Infinite
-                   && ce.borrow().implicit_arity.1 == ArityParam::Infinite {
-                   // we let set_impl_arity overwrite the arity if
-                   // it was just Infinite because of compiling "@"
-                   ce.borrow_mut().implicit_arity.1 = ArityParam::Undefined;
-                }
-
+                ce.borrow_mut().implicit_arity = prev_arity;
                 set_impl_arity(llen, ce);
             }
         }
@@ -1415,6 +1409,12 @@ mod tests {
         assert_eq!(s_eval("{|2| @ }(1,2)"), "$[1,2]");
         assert_eq!(s_eval_no_panic("{|2| @ }(1)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at least 2 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
         assert_eq!(s_eval_no_panic("{|2| @ }(1,2,3)"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 2 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
+
+        assert_eq!(s_eval_no_panic("{!(a,b,c) = @;}(1,2,3,4)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 16, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{_3; !(a,b,c) = @; }(1,2,3,4,5)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 21, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{!(a,b,c) = @; _3 }(1,2,3,4,5)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
+        assert_eq!(s_eval("{!(a,b,c) = @; b }(1,2,3)"), "2");
+        assert_eq!(s_eval("{!(a,b,c) = @; _3 }(1,2,3,5)"), "5");
     }
 
     #[test]
