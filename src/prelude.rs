@@ -110,8 +110,27 @@ syntax, but still works:
 - operator precedence syntax
 - prefix operator syntax
 
-## Prelude
+## Modules
 
+### export
+
+```wlambda
+
+export :symbol expr; # exports :symbol with value of expr
+
+```
+
+### import
+
+```wlambda
+
+import :x :modixes; # prefixes everything from modixes with x:
+
+x:symbol foo; 
+
+```
+
+## Prelude
 
 ### wl:assert _bool_ \[_message_]
 

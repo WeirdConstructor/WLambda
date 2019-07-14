@@ -144,7 +144,7 @@ impl Env {
     ///     let fun = env.arg(0);
     ///     env.with_user_do(|v: &mut Vec<VVal>| v.push(fun.clone()));
     ///     Ok(VVal::Nul)
-    /// });
+    /// }, Some(1), Some(1));
     ///
     /// let reg : Rc<RefCell<Vec<VVal>>> =
     ///     Rc::new(RefCell::new(Vec::new()));

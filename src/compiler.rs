@@ -58,7 +58,7 @@ impl GlobalEnv {
     ///         let v = env.arg(0);
     ///         v.push(env.arg(1).clone());
     ///         Ok(v.clone())
-    ///     });
+    ///     }, Some(2), Some(2));
     ///
     /// 
     /// ```
@@ -90,6 +90,7 @@ enum VarPos {
 
 #[derive(Debug, Clone)]
 pub enum EvalError {
+    IOError(String),
     ParseError(parser::ParseError),
     CompileError(CompileError),
     ExecError(String),
@@ -98,6 +99,7 @@ pub enum EvalError {
 impl Display for EvalError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
+            EvalError::IOError(e)      => { write!(f, "IO error: {}", e) },
             EvalError::ParseError(e)   => { write!(f, "Parse error: {}", e) },
             EvalError::CompileError(e) => { write!(f, "Compile error: {}", e) },
             EvalError::ExecError(s)    => { write!(f, "Execution error: {}", s) },
@@ -202,6 +204,30 @@ impl EvalContext {
     #[allow(dead_code)]
     pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
         match parser::parse(s, 0) {
+            Ok(ast) => { self.eval_ast(&ast) },
+            Err(e) => { Err(EvalError::ParseError(e)) },
+        }
+    }
+
+    /// Evaluates a WLambda code in a file with the given `EvalContext`.
+    ///
+    /// ```
+    /// use wlambda::prelude::create_wlamba_prelude;
+    ///
+    /// let global_env = create_wlamba_prelude();
+    /// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+    ///
+    /// let r = &mut ctx.eval_file("examples/read_test.wl").unwrap();
+    /// assert_eq!(r.i(), 403, "matches contents!");
+    /// ```
+    #[allow(dead_code)]
+    pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
+        let contents = std::fs::read_to_string(filename);
+        if contents.is_err() {
+            return Err(EvalError::IOError(format!("{}", contents.unwrap_err())));
+        }
+        let contents = contents.unwrap();
+        match parser::parse(&contents, 0) {
             Ok(ast) => { self.eval_ast(&ast) },
             Err(e) => { Err(EvalError::ParseError(e)) },
         }
