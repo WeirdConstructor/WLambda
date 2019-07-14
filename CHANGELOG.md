@@ -1,12 +1,13 @@
-0.1.2 (unreleased)
+0.2.0 (unreleased)
 ==================
 
 * Completed string support in compiler.
 * Started documentation for wlambda prelude.
+* Incompatible change: Introduced function arity checks and arity definition syntax.
 * Added support for arbitrarily quoted string with $q/fooobar/.
 * Added string calling semantics for substring and concatenation.
-* Added 'match' 
-* Changed map syntax incompatible. Keys are delimited by '=' now, not ':' because
+* Added 'match'.
+* Incompatible change: Changed map syntax, keys are delimited by '=' now, not ':'
 to make parsing easier with multiple symbols as arguments for calls.
 * Added ability to call VVal::Fun in the EvalContext and an available Env.
 Useful for storing callbacks.
@@ -16,6 +17,9 @@ storing data from globally added functions.
 handling error values. \_? returns error values directly upwards, like ? in
 Rust. And on\_error handles an error value in the function passed as first
 argument.
+* Added `panic` and `assert` and also make the compiler aware of
+the debugging positions that the parser augmented the AST with for
+error reporting.
 * Added unwrap routine to prelude.
 * Added match with ?e for errors.
 * Added block and return for non local jumps upwards the stack.
