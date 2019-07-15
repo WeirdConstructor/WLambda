@@ -181,6 +181,10 @@ complete for real world use. So my current goals are:
        to provide a binary beyond basic needs.)
 - Improve and further document the VVal API for interacting with WLambda.
 - Make VVal::Sym hold an interned string instead of a `String` instance.
+- Make global environment mutable from the script: `!:global x = 10` assigns
+a VVal::Ref to the slot "x" in the global environment at compile time and
+any access that resolves to that global slot gets the reference to
+resolve and assign to at runtime.
 
 Future plans could be:
 

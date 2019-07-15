@@ -660,7 +660,7 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) {
     match pos {
         VarPos::UpValue(d) => { e.set_up(*d, v); },
         VarPos::Local(d)   => { e.set_local(*d, v); },
-        VarPos::NoPos      => { panic!("Assignment to unknow pos!".to_string()); }
+        VarPos::NoPos      => { panic!("unknow pos not handled at compile time!".to_string()); }
     }
 }
 
@@ -676,6 +676,18 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
         check_for_at_arity(prev_max_arity, ast, ce, &vars);
 
         let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
+
+        for (i, pos) in poses.iter().enumerate() {
+            match pos {
+                VarPos::NoPos => {
+                    return 
+                        ast.to_compile_err(
+                            format!("Can't assign to undefined local variable '{}'",
+                                    vars.at(i).unwrap_or(VVal::Nul).s_raw()));
+                },
+                _ => (),
+            }
+        }
 
         Ok(Box::new(move |e: &mut Env| {
             let v = cv(e)?;
@@ -725,7 +737,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
             },
             VarPos::NoPos =>
                 ast.to_compile_err(
-                    format!("Can't assign undefined variable '{}'", s)),
+                    format!("Can't assign to undefined local variable '{}'", s)),
         }
     }
 }
