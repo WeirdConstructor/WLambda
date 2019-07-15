@@ -61,6 +61,8 @@ pub enum Syntax {
     Def,
     DefRef,
     DefWRef,
+    Import,
+    Export,
 }
 
 /// The maximum stack size.
@@ -91,6 +93,8 @@ pub struct Env {
     /// A user defined variable that holds user context information.
     /// See also the [with_user_do](struct.Env.html#method.with_user_do) function.
     pub user: Rc<RefCell<dyn std::any::Any>>,
+    /// The exported names of this module.
+    pub exports: std::collections::HashMap<String, VVal>,
 }
 
 impl Default for Env {
@@ -106,6 +110,7 @@ impl Env {
             sp:                 0,
             argc:               0,
             user:               Rc::new(RefCell::new(VVal::vec())),
+            exports:            std::collections::HashMap::new(),
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -118,6 +123,7 @@ impl Env {
             bp:                 0,
             sp:                 0,
             argc:               0,
+            exports:            std::collections::HashMap::new(),
             user,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
@@ -161,6 +167,10 @@ impl Env {
         let mut any = self.user.borrow_mut();
         let ref_reg = any.downcast_mut::<T>().unwrap();
         f(ref_reg)
+    }
+
+    pub fn export_name(&mut self, name: &str, value: &VVal) {
+        self.exports.insert(String::from(name), value.clone());
     }
 
     pub fn set_bp(&mut self, env_size: usize) -> usize {

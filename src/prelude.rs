@@ -116,7 +116,7 @@ syntax, but still works:
 
 ```wlambda
 
-export :symbol expr; # exports :symbol with value of expr
+!@export :symbol expr; # exports :symbol with value of expr
 
 ```
 
@@ -124,7 +124,7 @@ export :symbol expr; # exports :symbol with value of expr
 
 ```wlambda
 
-import :x :modixes; # prefixes everything from modixes with x:
+!@import :x :modixes; # prefixes everything from modixes with x:
 
 x:symbol foo; 
 

@@ -180,9 +180,15 @@ In the following grammar, white space and comments are omitted:
                     ( simple_assign
                     | destr_assign )
                   ;
+    import        = "!", "import", symbol, symbol
+                  ;
+    export        = "!", "export", symbol, expr
+                  ;
     statement     = "!" definition
                   | "." assign
                   | destr_assign
+                  | import
+                  | export
                   | expr
                   ;
     block         = "{", { statement, ";", {";"}}, [ statement, {";"} ], "}"
@@ -1125,7 +1131,34 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
     match ps.peek() {
         Some(c) => {
             match c {
-                '!' => { ps.consume_wsc(); parse_assignment(ps, true) },
+                '!' => {
+                    ps.consume_wsc();
+                    if ps.consume_if_eq_wsc('@') {
+                        if ps.at_eof { return ps.err_eof("special assignment"); }
+                        let id = parse_identifier(ps);
+                        match &id[..] {
+                            "import" => {
+                                let prefix = parse_identifier(ps);
+                                let name   = parse_identifier(ps);
+                                let imp = ps.syn(Syntax::Import);
+                                imp.push(VVal::new_sym(&prefix));
+                                imp.push(VVal::new_sym(&name));
+                                Ok(imp)
+                            },
+                            "export" => {
+                                let name = parse_identifier(ps);
+                                let expr = parse_expr(ps)?;
+                                let exp = ps.syn(Syntax::Export);
+                                exp.push(VVal::new_sym(&name));
+                                exp.push(expr);
+                                Ok(exp)
+                            },
+                            _ => { ps.err_bad_keyword(&id, "import or export") }
+                        }
+                    } else {
+                        parse_assignment(ps, true)
+                    }
+                },
                 '.' => { ps.consume_wsc(); parse_assignment(ps, false) },
                 '(' => { parse_assignment(ps, false) },
                 _   => { parse_expr(ps) },

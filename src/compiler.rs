@@ -21,6 +21,10 @@ struct CompileLocal {
     is_upvalue: bool,
 }
 
+pub trait ModuleResolver {
+    fn resolve(&self, path: &Vec<String>) -> std::collections::HashMap<String, VVal>;
+}
+
 /// Holds global environment variables.
 ///
 /// This data structure is part of the API. It's there
@@ -28,9 +32,16 @@ struct CompileLocal {
 ///
 /// See also `GlobalEnv::add_func` of how to create a function and put it
 /// into the global variable.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
+    resolver: Option<Rc<dyn ModuleResolver>>,
+}
+
+impl std::fmt::Debug for GlobalEnv {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "<<GlobalEnv>>")
+    }
 }
 
 /// Reference type of `GlobalEnv`.
@@ -69,10 +80,15 @@ impl GlobalEnv {
             VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args));
     }
 
+    pub fn set_resolver<T>(&mut self, res: &Rc<dyn ModuleResolver>) {
+        self.resolver = Some(res.clone());
+    }
+
     /// Creates a new GlobalEnv.
     pub fn new() -> GlobalEnvRef {
         Rc::new(RefCell::new(GlobalEnv {
-            env: std::collections::HashMap::new()
+            env: std::collections::HashMap::new(),
+            resolver: None,
         }))
     }
 }
@@ -653,7 +669,9 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                     Ok(v)
                 }))
             },
-            VarPos::NoPos => panic!(format!("assigning without definition of '{}'", s)),
+            VarPos::NoPos =>
+                ast.to_compile_err(
+                    format!("Can't assign do undefined variable '{}'", s)),
         }
     }
 }
@@ -673,6 +691,40 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::DefRef => { compile_def(ast, ce, true, false)   },
                 Syntax::DefWRef=> { compile_def(ast, ce, true, true)    },
                 Syntax::Assign => { compile_assign(ast, ce)      },
+                Syntax::Import => {
+                    let prefix = ast.at(1).unwrap();
+                    let name   = ast.at(2).unwrap();
+                    let path : Vec<String> =
+                        (&name.s_raw())
+                            .split(":")
+                            .map(|s| String::from(s))
+                            .collect();
+
+                    if let Some(mut resolver) = ce.borrow_mut().global.borrow_mut().resolver.clone() {
+                        let exports = resolver.resolve(&path);
+                        let set_defs : Vec<(usize, VVal)> = Vec::new();
+                        for (k, v) in exports {
+                            ce.borrow_mut().global.borrow_mut().env.insert(
+                                name.s_raw() + ":" + &k,
+                                v.clone());
+                        }
+
+                        Ok(Box::new(move |e: &mut Env| { Ok(VVal::Nul) }))
+                    } else {
+                        ast.to_compile_err(
+                            format!("Couldn't resolve module '{}'", name.s_raw()))
+                    }
+                },
+                Syntax::Export => {
+                    let name = ast.at(1).unwrap();
+                    let val = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let value = val(e)?;
+                        e.export_name(&name.s_raw(), &value);
+                        Ok(value)
+                    }))
+                },
                 Syntax::Err    => {
                     let err_val = compile(&ast.at(1).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env|

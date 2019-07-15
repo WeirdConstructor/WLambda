@@ -47,6 +47,7 @@ pub enum ParseError {
     UnexpectedToken((String, String, u32, u32, u32)),
     BadEscape(      (String, String, u32, u32, u32)),
     BadValue(       (String, String, u32, u32, u32)),
+    BadKeyword(     (String, String, u32, u32, u32)),
     BadNumber(      (String, String, u32, u32, u32)),
     BadCall(        (String, String, u32, u32, u32)),
     EOF(            (String, String, u32, u32, u32)),
@@ -61,6 +62,7 @@ pub fn parse_error_to_string(pe: &ParseError) -> String {
         ParseError::UnexpectedToken(t) => tuple2str(t),
         ParseError::BadEscape(t)       => tuple2str(t),
         ParseError::BadValue(t)        => tuple2str(t),
+        ParseError::BadKeyword(t)      => tuple2str(t),
         ParseError::BadNumber(t)       => tuple2str(t),
         ParseError::BadCall(t)         => tuple2str(t),
         ParseError::EOF(t)             => tuple2str(t),
@@ -81,6 +83,10 @@ impl State {
 
     pub fn err_bad_value(&self, s: &str) -> Result<VVal,ParseError> {
         Err(ParseError::BadValue((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+    }
+
+    pub fn err_bad_keyword(&self, kw: &str, s: &str) -> Result<VVal,ParseError> {
+        Err(ParseError::BadKeyword((format!("Got '{}', expected {}", kw, s), self.rest(), self.line_no, self.col_no, self.file_no)))
     }
 
     pub fn err_bad_number(&self, s: &str) -> Result<VVal,ParseError> {
