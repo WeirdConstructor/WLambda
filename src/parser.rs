@@ -1080,6 +1080,8 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                 assign = ps.syn(Syntax::DefRef);
             } else if key == "wref" {
                 assign = ps.syn(Syntax::DefWRef);
+            } else if key == "global" {
+                assign = ps.syn(Syntax::DefGlobRef);
             }
         }
     }

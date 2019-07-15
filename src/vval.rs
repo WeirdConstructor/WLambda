@@ -61,6 +61,7 @@ pub enum Syntax {
     Def,
     DefRef,
     DefWRef,
+    DefGlobRef,
     Import,
     Export,
 }

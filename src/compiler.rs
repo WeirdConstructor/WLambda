@@ -143,7 +143,7 @@ impl GlobalEnv {
 }
 
 /// Position of a variable represented in the `CompileEnv`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 enum VarPos {
     /// No position of the variable. Mostly placeholder value for non existing variable.
     NoPos,
@@ -151,6 +151,8 @@ enum VarPos {
     UpValue(usize),
     /// Variable is stored in local variables on the stack at the specified position.
     Local(usize),
+    /// Variable is stored in the global variables with the given value.
+    Global(VVal),
 }
 
 #[derive(Debug, Clone)]
@@ -392,6 +394,7 @@ impl CompileEnv {
                 match p {
                     VarPos::NoPos       => {},
                     VarPos::UpValue(_)  => {},
+                    VarPos::Global(_)   => {},
                     VarPos::Local(i)    => return *i,
                 }
             },
@@ -410,6 +413,8 @@ impl CompileEnv {
             let mut v = match p {
                 VarPos::UpValue(i) => e.get_up_raw(*i),
                 VarPos::Local(i)   => e.get_local_raw(*i),
+                VarPos::Global(v)  => v.clone(), // Will probably be never used, as upvalues are
+                                                 // always defined on the base of local variables.
                 VarPos::NoPos      => VVal::Nul,
             };
             //d// println!("COPY AN UPVAL! {:?}({})", p, v.s());
@@ -433,7 +438,13 @@ impl CompileEnv {
         match pos {
             None => {
                 let opt_p = self.parent.as_mut();
-                if opt_p.is_none() { return VarPos::NoPos; }
+                if opt_p.is_none() {
+                    if let Some(v) = self.global.borrow().env.get(s){
+                        return VarPos::Global(v.clone());
+                    } else {
+                        return VarPos::NoPos;
+                    }
+                }
                 let parent = opt_p.unwrap().clone();
                 let mut par_mut = parent.borrow_mut();
 
@@ -449,6 +460,7 @@ impl CompileEnv {
                         VarPos::UpValue(self.def_up(s, par_var_pos))
                     },
                     VarPos::UpValue(_) => VarPos::UpValue(self.def_up(s, par_var_pos)),
+                    VarPos::Global(g)  => VarPos::Global(g.clone()),
                     VarPos::NoPos      => VarPos::NoPos
                 }
             }
@@ -537,16 +549,11 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
                     Ok(Box::new(move |e: &mut Env| { Ok(e.get_up(i)) })),
                 VarPos::Local(i) =>
                     Ok(Box::new(move |e: &mut Env| { Ok(e.get_local(i)) })),
+                VarPos::Global(v) =>
+                    Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
                 VarPos::NoPos => {
-                    match ce.borrow_mut().global.borrow().env.get(&s) {
-                        Some(v) => {
-                            let val = v.clone();
-                            Ok(Box::new(move |_: &mut Env| { Ok(val.clone()) }))
-                        },
-                        None =>
-                            ast.to_compile_err(
-                                format!("Variable '{}' undefined", var.s_raw())),
-                    }
+                    ast.to_compile_err(
+                        format!("Variable '{}' undefined", var.s_raw()))
                 }
             }
         }
@@ -656,16 +663,29 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
     }
 }
 
-fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) {
+fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
     match pos {
-        VarPos::UpValue(d) => { e.set_up(*d, v); },
-        VarPos::Local(d)   => { e.set_local(*d, v); },
-        VarPos::NoPos      => { panic!("unknow pos not handled at compile time!".to_string()); }
+        VarPos::UpValue(d) => { e.set_up(*d, v); None },
+        VarPos::Local(d)   => { e.set_local(*d, v); None },
+        VarPos::Global(v)  => {
+            if let VVal::Ref(r) = v {
+                r.replace(v.clone());
+                None
+            } else {
+                Some(format!("Can't assign to global read only variable!"))
+            }
+        },
+        VarPos::NoPos => {
+            Some(format!("Unknown pos to assign value '{}' to!", v.s()))
+        }
     }
 }
 
 fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
+
+    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+    let spos = syn.get_syn_pos();
 
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
@@ -695,7 +715,15 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                 VVal::Lst(l) => {
                     for (i, pos) in poses.iter().enumerate() {
                         let val = &mut l.borrow_mut()[i];
-                        set_env_at_varpos(e, pos, val);
+                        match set_env_at_varpos(e, pos, val) {
+                            None => (),
+                            Some(err) => {
+                                return
+                                    Err(StackAction::Panic(
+                                        VVal::new_str_mv(err),
+                                        Some(vec![spos.clone()])));
+                            }
+                        }
                     }
                     Ok(VVal::Lst(l))
                 },
@@ -735,6 +763,19 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                     Ok(v)
                 }))
             },
+            VarPos::Global(glob_v) => {
+                if let VVal::Ref(glob_r) = glob_v {
+                    Ok(Box::new(move |e: &mut Env| {
+                        let v = cv(e)?;
+                        glob_r.replace(v.clone());
+                        Ok(v)
+                    }))
+                } else {
+                    ast.to_compile_err(
+                        format!("Can't assign to read only global variable '{}'",
+                                s))
+                }
+            },
             VarPos::NoPos =>
                 ast.to_compile_err(
                     format!("Can't assign to undefined local variable '{}'", s)),
@@ -751,12 +792,19 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
             let syn  = syn.get_syn();
 
             match syn {
-                Syntax::Block  => { compile_block(ast, ce)       },
-                Syntax::Var    => { compile_var(ast, ce)         },
-                Syntax::Def    => { compile_def(ast, ce, false, false)  },
-                Syntax::DefRef => { compile_def(ast, ce, true, false)   },
-                Syntax::DefWRef=> { compile_def(ast, ce, true, true)    },
-                Syntax::Assign => { compile_assign(ast, ce)      },
+                Syntax::Block       => { compile_block(ast, ce)       },
+                Syntax::Var         => { compile_var(ast, ce)         },
+                Syntax::Def         => { compile_def(ast, ce, false, false)  },
+                Syntax::DefRef      => { compile_def(ast, ce, true, false)   },
+                Syntax::DefWRef     => { compile_def(ast, ce, true, true)    },
+                Syntax::DefGlobRef  => {
+                    let vars    = ast.at(1).unwrap();
+                    let value   = ast.at(2).unwrap();
+                    let destr   = ast.at(3).unwrap_or(VVal::Nul);
+
+                    Ok(Box::new(move |_e: &mut Env| { Ok(VVal::Nul) }))
+                },
+                Syntax::Assign => { compile_assign(ast, ce) },
                 Syntax::Import => {
                     let prefix = ast.at(1).unwrap();
                     let name   = ast.at(2).unwrap();
