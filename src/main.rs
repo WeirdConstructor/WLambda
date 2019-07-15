@@ -18,6 +18,8 @@ fn main() {
             env.dump_stack();
             Ok(VVal::Nul)
         }, Some(0), Some(0));
+    let lfmr = std::rc::Rc::new(std::cell::RefCell::new(compiler::LocalFileModuleResolver::new()));
+    global.borrow_mut().set_resolver(lfmr);
 
     let mut ctx = compiler::EvalContext::new(global);
 

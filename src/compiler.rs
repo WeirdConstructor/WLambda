@@ -21,8 +21,57 @@ struct CompileLocal {
     is_upvalue: bool,
 }
 
+#[derive(Debug, Clone)]
+pub enum ModuleLoadError {
+    NoSuchModule,
+    ModuleEvalError(EvalError),
+    Other(String),
+}
+
+/// This trait is responsible for loading modules
+/// and returning a collection of name->value mappings for a module
+/// name.
+///
+/// See also GlobalEnv::set_resolver() about how to configure the
+/// global environment to use you trait implementation.
+///
+/// There is a default implementation named LocalFileModuleResolver,
+/// which loads the modules from files.
 pub trait ModuleResolver {
-    fn resolve(&self, path: &Vec<String>) -> std::collections::HashMap<String, VVal>;
+    /// Resolves the path to a HashMap of names -> VVal.
+    /// Where you obtain this mapping from is completely up to you.
+    /// You can statically define these, load them from a JSON file,
+    /// load them by executing another WLambda script or whatever you fancy.
+    ///
+    /// See LocalFileModuleResolver as example on how to implement this.
+    fn resolve(&mut self, global: GlobalEnvRef, path: &Vec<String>) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError>;
+}
+
+/// This structure implements the ModuleResolver trait and is
+/// responsible for loading modules on `!@import` for WLambda.
+#[derive(Debug, Clone)]
+pub struct LocalFileModuleResolver {
+    loaded_modules: std::collections::HashMap<String, std::rc::Rc<std::collections::HashMap<String, VVal>>>,
+}
+
+#[allow(dead_code)]
+impl LocalFileModuleResolver {
+    pub fn new() -> LocalFileModuleResolver {
+        LocalFileModuleResolver {
+            loaded_modules: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl ModuleResolver for LocalFileModuleResolver {
+    fn resolve(&mut self, _global: GlobalEnvRef, path: &Vec<String>) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError> {
+        let global = create_wlamba_prelude();
+        let mut ctx = EvalContext::new(global);
+        match ctx.eval_file(&(path[0].clone() + ".wl")) {
+            Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
+            Ok(_v) => Ok(ctx.get_exports()),
+        }
+    }
 }
 
 /// Holds global environment variables.
@@ -35,7 +84,7 @@ pub trait ModuleResolver {
 #[derive(Clone)]
 pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
-    resolver: Option<Rc<dyn ModuleResolver>>,
+    resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
 }
 
 impl std::fmt::Debug for GlobalEnv {
@@ -80,7 +129,7 @@ impl GlobalEnv {
             VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args));
     }
 
-    pub fn set_resolver<T>(&mut self, res: &Rc<dyn ModuleResolver>) {
+    pub fn set_resolver(&mut self, res: Rc<RefCell<dyn ModuleResolver>>) {
         self.resolver = Some(res.clone());
     }
 
@@ -147,6 +196,11 @@ impl EvalContext {
         }
     }
 
+    pub fn get_exports(&self) -> std::collections::HashMap<String, VVal> {
+        return self.local.borrow_mut().exports.clone();
+    }
+
+    #[allow(dead_code)]
     pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<std::any::Any>>) -> EvalContext {
         EvalContext {
             global: global.clone(),
@@ -240,7 +294,7 @@ impl EvalContext {
     pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
         let contents = std::fs::read_to_string(filename);
         if contents.is_err() {
-            return Err(EvalError::IOError(format!("{}", contents.unwrap_err())));
+            return Err(EvalError::IOError(format!("file '{}': {}", filename, contents.unwrap_err())));
         }
         let contents = contents.unwrap();
         match parser::parse(&contents, 0) {
@@ -671,7 +725,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
             },
             VarPos::NoPos =>
                 ast.to_compile_err(
-                    format!("Can't assign do undefined variable '{}'", s)),
+                    format!("Can't assign undefined variable '{}'", s)),
         }
     }
 }
@@ -700,16 +754,35 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             .map(|s| String::from(s))
                             .collect();
 
-                    if let Some(mut resolver) = ce.borrow_mut().global.borrow_mut().resolver.clone() {
-                        let exports = resolver.resolve(&path);
-                        let set_defs : Vec<(usize, VVal)> = Vec::new();
-                        for (k, v) in exports {
-                            ce.borrow_mut().global.borrow_mut().env.insert(
-                                name.s_raw() + ":" + &k,
-                                v.clone());
-                        }
+                    let glob_ref = ce.borrow_mut().global.clone();
+                    let resolver : Option<Rc<RefCell<dyn ModuleResolver>>> =
+                        glob_ref.borrow_mut().resolver.clone();
 
-                        Ok(Box::new(move |e: &mut Env| { Ok(VVal::Nul) }))
+                    if resolver.is_some() {
+                        let exports = resolver.unwrap().borrow_mut().resolve(glob_ref.clone(), &path);
+                        match exports {
+                            Err(ModuleLoadError::NoSuchModule) => {
+                                ast.to_compile_err(
+                                    format!("Couldn't find module '{}'", name.s_raw()))
+                            },
+                            Err(ModuleLoadError::ModuleEvalError(e)) => {
+                                ast.to_compile_err(
+                                    format!("Error on evaluating module '{}': {}", name.s_raw(), e))
+                            },
+                            Err(ModuleLoadError::Other(s)) => {
+                                ast.to_compile_err(
+                                    format!("Error on resolving module '{}': {}", name.s_raw(), s))
+                            },
+                            Ok(map) => {
+                                for (k, v) in map {
+                                    ce.borrow_mut().global.borrow_mut().env.insert(
+                                        prefix.s_raw() + ":" + &k,
+                                        v.clone());
+                                }
+
+                                Ok(Box::new(move |_e: &mut Env| { Ok(VVal::Nul) }))
+                            },
+                        }
                     } else {
                         ast.to_compile_err(
                             format!("Couldn't resolve module '{}'", name.s_raw()))
