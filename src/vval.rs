@@ -740,6 +740,12 @@ impl VVal {
         VVal::Ref(Rc::new(RefCell::new(self.clone())))
     }
 
+    pub fn set_ref(&self, v: VVal) {
+        if let VVal::Ref(r) = self {
+            r.replace(v);
+        }
+    }
+
     pub fn to_wref(&self) -> VVal {
         VVal::WRef(Rc::new(RefCell::new(self.clone())))
     }
