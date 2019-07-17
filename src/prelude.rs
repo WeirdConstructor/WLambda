@@ -20,7 +20,24 @@ A more formal introduction to the syntax can be found in the [parser API documen
 
 ### Data Types
 
-- nul
+#### `$n` or `$none`
+
+This is a special sentinel value that is returned by functions and
+when a non existing field of a datastructure is accessed. It's semantic
+meaning is that there is no value.
+
+Please note for API design: In case of errornous states you should not
+return a `$none` but an `$error` value.
+
+```wlambda
+wl:assert($n        == $none);
+wl:assert(int($n)   == 0);
+wl:assert(float($n) == 0.0);
+wl:assert(str($n)   == "$n");
+```
+
+- none
+- error
 - bool
 - int
 - floats
@@ -527,8 +544,8 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     g.borrow_mut().add_func("sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_sym(&env.arg(0).s_raw())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_nul",
-        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_nul())) },
+    g.borrow_mut().add_func("is_none",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_none())) },
         Some(1), Some(1));
     g.borrow_mut().add_func("is_err",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_err())) },
@@ -780,7 +797,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     g.borrow_mut().add_func("wl:assert",
         |env: &mut Env, _argc: usize| {
             if !env.arg(0).b() {
-                if env.arg(1).is_nul() {
+                if env.arg(1).is_none() {
                     Err(StackAction::Panic(VVal::new_str("assertion failed"), None))
                 } else {
                     Err(StackAction::Panic(VVal::new_str_mv(format!("assertion failed '{}'", env.arg(1).s_raw())), None))

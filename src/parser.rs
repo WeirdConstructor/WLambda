@@ -92,14 +92,14 @@ In the following grammar, white space and comments are omitted:
                   ;
     false         = "f" | "false"
                   ;
-    nul           = "n" | "nul"
+    none          = "n" | "none
                   ;
     err           = ("e" | "error"), expr
     special_value = byte_string
                   | quote_string
                   | list
                   | map
-                  | nul
+                  | none
                   | true
                   | false
                   | err
@@ -660,7 +660,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         '[' => parse_list(ps),
         '{' => parse_map(ps),
         'n' => {
-            if ps.consume_lookahead("nul") {
+            if ps.consume_lookahead("none") {
                 ps.skip_ws_and_comments();
             } else {
                 ps.consume_wsc();
@@ -1424,7 +1424,7 @@ mod tests {
     #[test]
     fn check_primitives() {
         assert_eq!(parse("$n"),         "$[&Block,$n]");
-        assert_eq!(parse("$nul"),       "$[&Block,$n]");
+        assert_eq!(parse("$none"),      "$[&Block,$n]");
         assert_eq!(parse("$t"),         "$[&Block,$true]");
         assert_eq!(parse("$true"),      "$[&Block,$true]");
         assert_eq!(parse("$f"),         "$[&Block,$false]");

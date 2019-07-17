@@ -1672,7 +1672,7 @@ mod tests {
         assert_eq!(s_eval("type type"), "\"function\"");
         assert_eq!(s_eval("type 12"),   "\"int\"");
         assert_eq!(s_eval("type 12.2"), "\"float\"");
-        assert_eq!(s_eval("type $n"),   "\"nul\"");
+        assert_eq!(s_eval("type $n"),   "\"none\"");
         assert_eq!(s_eval("type $[]"),  "\"vector\"");
         assert_eq!(s_eval("type ${}"),  "\"map\"");
     }
@@ -1909,7 +1909,7 @@ mod tests {
 
     #[test]
     fn check_test_funs() {
-        assert_eq!(s_eval("is_nul $n"),    "$true");
+        assert_eq!(s_eval("is_none $n"),   "$true");
         assert_eq!(s_eval("is_err $e $n"), "$true");
         assert_eq!(s_eval("is_map ${}"),   "$true");
         assert_eq!(s_eval("is_vec $[]"),   "$true");

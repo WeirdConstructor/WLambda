@@ -20,6 +20,7 @@ storing data from globally added functions.
 handling error values. \_? returns error values directly upwards, like ? in
 Rust. And on\_error handles an error value in the function passed as first
 argument.
+* Renamed `$nul` to `$none` which makes more sense in the `$error` context.
 * Added `panic` and `assert` and also make the compiler aware of
 the debugging positions that the parser augmented the AST with for
 error reporting.

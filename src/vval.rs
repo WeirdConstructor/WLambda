@@ -464,7 +464,7 @@ impl Drop for DropVVal {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum VVal {
-    /// The nul value, the default value of all non initialized data.
+    /// The none value, the default value of all non initialized data.
     Nul,
     /// The err value is a special sentinel value for representing any kind of
     /// application error condition. It's created using the special $e <expr> or $error <expr>
@@ -1009,7 +1009,7 @@ impl VVal {
         match self { VVal::Map(_) => true, _ => false }
     }
 
-    pub fn is_nul(&self) -> bool {
+    pub fn is_none(&self) -> bool {
         match self { VVal::Nul => true, _ => false }
     }
 
@@ -1021,7 +1021,7 @@ impl VVal {
         match self {
             VVal::Str(_)     => String::from("string"),
             VVal::Byt(_)     => String::from("bytes"),
-            VVal::Nul        => String::from("nul"),
+            VVal::Nul        => String::from("none"),
             VVal::Err(_)     => String::from("err"),
             VVal::Bol(_)     => String::from("bool"),
             VVal::Sym(_)     => String::from("sym"),
@@ -1037,7 +1037,7 @@ impl VVal {
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => v.borrow().type_name(),
-                    None => String::from("nul"),
+                    None => String::from("none"),
                 }
             },
         }
