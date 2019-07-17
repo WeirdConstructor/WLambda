@@ -28,8 +28,9 @@ A function can be defined using the `{ ... }` syntax and the `\ _statement_`
 syntax: To give functions a name, you need to assign them to a variable with
 the `!_name_ = _expr_` syntax.
 
-To call functions, you have at least 2 alternatives. First is the `_expr_ (arg1, arg2, arg3, ...)`
-syntax. And the second is the delimiter less variant: `_expr_ arg1 arg2 arg3 arg4`.
+To call functions, you have at least 2 alternatives. First is the bare
+`_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the delimiter
+full variant: `_expr_ (arg1, arg2, arg3, ...)`.
 
 The arguments passed to the function are accessible using the `_`, `_1`, `_2`, ..., `_9`
 variables. If you need to access more arguments the `@` variable holds a list of all
