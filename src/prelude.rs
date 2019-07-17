@@ -22,7 +22,7 @@ some semantics of the language.
 
 A more formal introduction to the syntax can be found in the [parser API documentation](../parser/index.html).
 
-### Functions
+## Functions (part 1/2)
 
 A function can be defined using the `{ ... }` syntax and the `\ _statement_`
 syntax: To give functions a name, you need to assign them to a variable with
@@ -62,7 +62,7 @@ syntax:
 wl:assert_eq add(1, 2) 3;
 ```
 
-#### Function arity checks
+### Function arity checks
 
 Functions check the number of arguments passed to them. The compiler tries to
 infer the number of arguments the function requires by looking at the parameter
@@ -98,9 +98,9 @@ wl:assert_eq dosomething(1, 2)         3;
 wl:assert_eq dosomething(2, 2, 3, 4)  16;
 ```
 
-### Data Types
+## Data Types
 
-#### None sentinel value: `$n` or `$none`
+### None sentinel value: `$n` or `$none`
 
 This is a special sentinel value that is returned by functions and
 when a non existing field of a datastructure is accessed. It's semantic
@@ -117,7 +117,7 @@ wl:assert ~ str($n)   == "$n";
 wl:assert ~ is_none($n);
 ```
 
-#### Error values: `$e expr` or `$error expr`
+### Error values: `$e expr` or `$error expr`
 
 There are no exceptions in WLambda, except the panic, that
 halts all execution of the currently running WLambda
@@ -144,7 +144,7 @@ will be passed through. And `unwrap_err` unwraps an error value, it's
 the opposite of `unwrap` because it will cause a panic if you don't pass
 an error value.
 
-##### Return on error with `_?`
+#### Return on error with `_?`
 
 ```wlambda
 !func = { $e "this failed!" };
@@ -188,7 +188,7 @@ as jump label. That is handy if you want to jump up multiple call frames:
 wl:assert_eq [unwrap_err ~ func 42] :FAIL;
 ```
 
-##### Handle errors with `on_error`
+#### Handle errors with `on_error`
 
 ```wlambda
 !func = {
@@ -219,6 +219,8 @@ wl:assert_eq ret "all ok!";
 - lists/vectors
 - maps
 
+## Functions (part 2/2)
+
 ### Function call composition
 
 - chaining
@@ -228,7 +230,7 @@ wl:assert_eq ret "all ok!";
 - || syntax
 - [...] syntax
 
-#### Control Flow - Returning
+### Control Flow - Returning
 
 - \:lbl { ... } syntax and returning
 
@@ -281,7 +283,7 @@ syntax, but still works:
 [x == 20]({ displayln "x is 20" }, { displayln "x isn't 20" }); #=> print "x isn't 20"
 ```
 
-### Lexical Scope and Variable assignment
+## Lexical Scope and Variable assignment
 
 - !x = y        variable definition
 - .x = y        assignments
@@ -290,7 +292,7 @@ syntax, but still works:
 - !(x, y) = list / map    destructuring assignments
 - (x, y) = list / map    destructuring assignments
 
-### Arithmetics
+## Arithmetics
 
 - operator precedence syntax
 - prefix operator syntax
@@ -328,6 +330,17 @@ You can pass an optional message as second parameter.
 ```norun_wlambda
 wl:assert $false; #=> Panic
 wl:assert 120;    #=> 120
+```
+
+### wl:assert_eq _actual_ _expected_ \[_message_]
+
+This function check if the _actual_ value is equal to the
+_expected_ value and panics if not. The optional _message_ is
+passed in the panic for reference.
+
+```wlambda
+!x = 30 * 2;
+wl:assert_eq x 60 "30 * 2 == 60";
 ```
 
 ## Optional Prelude
