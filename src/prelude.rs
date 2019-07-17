@@ -30,12 +30,12 @@ the `!_name_ = _expr_` syntax.
 
 To call functions, you have at least 2 alternatives. First is the bare
 `_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the delimiter
-full variant: `_expr_ (arg1, arg2, arg3, ...)`.
+full variant: `_expr_ (arg1, arg2, arg3, ...)`. You can always delimit the first
+variant using the `[ ... ]` brackets.
 
 The arguments passed to the function are accessible using the `_`, `_1`, `_2`, ..., `_9`
 variables. If you need to access more arguments the `@` variable holds a list of all
 arguments.
-
 
 ```wlambda
 !twoify = { _ * 2 };
@@ -45,6 +45,10 @@ wl:assert_eq twoify(2) 4;
 !twoify2 = \_ * 2;
 
 wl:assert_eq twoify2(2) 4;
+
+# You may also call them directly, notice the bracket [ ... ] syntax
+# for delimiting the inner function call:
+wl:assert_eq [{ _ * 2 } 2] 4;
 ```
 
 If you want to name arguments, you can use the destructuring assignment
