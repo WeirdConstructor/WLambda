@@ -14,13 +14,88 @@ concept that everything is callable like a function. There is special syntax
 for composing arguments of functions, to give the programmer the ability to
 express his thoughts as they see fit.
 
+You can use this document as reference or as cover to cover lecture. It starts
+out with functions and the base data types of WLambda, where I also explain
+some semantics of the language.
+
 ## Syntax
 
 A more formal introduction to the syntax can be found in the [parser API documentation](../parser/index.html).
 
+### Functions
+
+A function can be defined using the `{ ... }` syntax and the `\ _statement_`
+syntax: To give functions a name, you need to assign them to a variable with
+the `!_name_ = _expr_` syntax.
+
+To call functions, you have at least 2 alternatives. First is the `_expr_ (arg1, arg2, arg3, ...)`
+syntax. And the second is the delimiter less variant: `_expr_ arg1 arg2 arg3 arg4`.
+
+The arguments passed to the function are accessible using the `_`, `_1`, `_2`, ..., `_9`
+variables. If you need to access more arguments the `@` variable holds a list of all
+arguments.
+
+
+```wlambda
+!twoify = { _ * 2 };
+
+wl:assert_eq twoify(2) 4;
+
+!twoify2 = \_ * 2;
+
+wl:assert_eq twoify2(2) 4;
+```
+
+If you want to name arguments, you can use the destructuring assignment
+syntax:
+
+```wlamdba
+!add = {!(a, b) = @;
+    a + b
+};
+
+wl:assert_eq add(1, 2) 3;
+```
+
+#### Function arity checks
+
+Functions check the number of arguments passed to them. The compiler tries to
+infer the number of arguments the function requires by looking at the parameter
+variables `_` to `_9` and `@`. If the compiler gets it wrong, you can:
+
+* Define minimum and maximum number of arguments with: `{|min < max| ... }`
+* Define exact number of arguments with: `{|num_of_args| ... }`
+* Accept any number of arguments: `{|| ... }`
+
+For the shortened function syntax there is:
+
+* `\|min < max| ...`
+* `\|num_of_args| ...`
+* `\|| ...`
+
+Here an example:
+
+```wlambda
+!dosomething = {|2 < 4|
+    !a = _;
+    !b = _1;
+    !c = _2;
+    !d = _3;
+
+    # Please note: We have to assign _ to _3 here, because
+    # the arms of the conditional below have
+    # their own set of arguments.
+
+    [is_none c] { a + b } { a * b + c * d }
+};
+
+wl:assert_eq dosomething(1, 2)         3;
+wl:assert_eq dosomething(2, 2, 3, 4)  16;
+```
+
 ### Data Types
 
-#### `$n` or `$none`
+#### None sentinel value: `$n` or `$none`
 
 This is a special sentinel value that is returned by functions and
 when a non existing field of a datastructure is accessed. It's semantic
@@ -30,14 +105,106 @@ Please note for API design: In case of errornous states you should not
 return a `$none` but an `$error` value.
 
 ```wlambda
-wl:assert($n        == $none);
-wl:assert(int($n)   == 0);
-wl:assert(float($n) == 0.0);
-wl:assert(str($n)   == "$n");
+wl:assert ~ $n        == $none;
+wl:assert ~ int($n)   == 0;
+wl:assert ~ float($n) == 0.0;
+wl:assert ~ str($n)   == "$n";
+wl:assert ~ is_none($n);
 ```
 
-- none
-- error
+#### Error values: `$e expr` or `$error expr`
+
+There are no exceptions in WLambda, except the panic, that
+halts all execution of the currently running WLambda
+program. To signal errors, you return an `$error` value.
+
+These error values, if not handled, will cause a panic of your
+program. This means, you need to handle returned error values
+one way or the other.
+
+The error value wraps any value you pass to the `$error` or `$e`
+constructor syntax.
+
+```wlambda
+wl:assert ~ is_err ~ $e "something went wrong!"
+```
+
+There are more routines except `is_err` to handle an error.
+`_?` will return from the currently executed function
+up until some given label. `on_error` executes a function
+if the second argument was an error value. Otherwise it
+just passes through the value. `unwrap` will explicitly cause
+an panic if an error value was passed to it. All other values
+will be passed through. And `unwrap_err` unwraps an error value, it's
+the opposite of `unwrap` because it will cause a panic if you don't pass
+an error value.
+
+##### Return on error with `_?`
+
+```wlambda
+!func = { $e "this failed!" };
+
+!other = {
+    # some code ...
+
+    _? func(); # If you would not catch the error value here,
+               # the program would panic, as an error value
+               # must not be ignored!
+
+    # other code ...
+
+    panic "this will never be reached!";
+
+    # something here...
+};
+
+wl:assert ~ [unwrap_err other()] == "this failed!";
+```
+
+`_?` can take up to 2 arguments. If so, the first argument is interpreted
+as jump label. That is handy if you want to jump up multiple call frames:
+
+```wlambda
+!failing_func = { $e :FAIL };
+
+!func = \:some_unique_label {
+    [ _ == 42 ] {
+        displayln "We got 42!";
+
+        # The `then` branch we are currently in is a call frame.
+        # To jump further up the call stack, we need the label
+        # we defined for the function above.
+        !val = _? :some_unique_label failing_func();
+
+        displayln "Returned:" val;
+    }
+};
+
+wl:assert_eq [unwrap_err ~ func 42] :FAIL;
+```
+
+##### Handle errors with `on_error`
+
+```wlambda
+!func = {
+    [_ == 13] {
+        $e "this failed!"
+    } {
+        "all ok!"
+    }
+};
+
+!:ref x = $n;
+
+# The first function of on_error will be called with the unwrapped
+# error if an error occured.
+on_error {|4| .x = _; } ~ func 13;
+wl:assert_eq x "this failed!";
+
+!ret = on_error {|4| .x = _; } ~ func 1;
+wl:assert_eq ret "all ok!";
+```
+
 - bool
 - int
 - floats
@@ -46,12 +213,6 @@ wl:assert(str($n)   == "$n");
 - symbols
 - lists/vectors
 - maps
-
-### Functions
-
-- {... } syntax and statements
-- \ ... syntax
-- Implicit @ and _, _1, _2 argument variables
 
 ### Function call composition
 
@@ -439,6 +600,20 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(1), Some(2));
 
+    g.borrow_mut().add_func("unwrap_err",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0) {
+                VVal::Err(err_v) => {
+                    Ok(err_v.borrow().0.clone())
+                },
+                v => {
+                    return Err(StackAction::Panic(
+                        VVal::new_str_mv(format!(
+                            "unwrap_err on non error value: {}", v.s())), None));
+                },
+            }
+        }, Some(1), Some(1));
+
     g.borrow_mut().add_func("unwrap",
         |env: &mut Env, _argc: usize| {
             match env.arg(0) {
@@ -793,6 +968,33 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
             Ok(VVal::Nul)
         }, Some(1), Some(1));
+
+    g.borrow_mut().add_func("wl:assert_eq",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0);
+            let b = env.arg(1);
+            if !a.eqv(&b) {
+                if env.arg(2).is_none() {
+                    Err(
+                        StackAction::Panic(
+                            VVal::new_str_mv(
+                                format!(
+                                    "assertion failed: expected: '{}', got: '{}'",
+                                    b.s(), a.s())),
+                            None))
+                } else {
+                    Err(
+                        StackAction::Panic(
+                            VVal::new_str_mv(
+                                format!(
+                                    "assertion '{}' failed: expected: '{}', got: '{}'",
+                                    env.arg(2).s_raw(), b.s(), a.s())),
+                            None))
+                }
+            } else {
+                Ok(VVal::Bol(true))
+            }
+        }, Some(2), Some(3));
 
     g.borrow_mut().add_func("wl:assert",
         |env: &mut Env, _argc: usize| {
