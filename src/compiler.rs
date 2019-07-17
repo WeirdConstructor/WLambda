@@ -80,8 +80,14 @@ impl ModuleResolver for LocalFileModuleResolver {
 /// This data structure is part of the API. It's there
 /// to make functions or values available to a WLambda program.
 ///
-/// See also `GlobalEnv::add_func` of how to create a function and put it
+/// This environment structure is usually wrapped inside an [EvalContext](struct.EvalContext.html)
+/// which augments it for calling the compiler and allows evaluation
+/// of the code.
+///
+/// See also [GlobalEnv::add_func()](#method.add_func) of how to create a function and put it
 /// into the global variable.
+/// And [GlobalEnv::set_var()](#method.set_var).
+/// And [GlobalEnv::get_var()](#method.get_var).
 #[derive(Clone)]
 pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
@@ -128,6 +134,23 @@ impl GlobalEnv {
         self.env.insert(
             String::from(fnname),
             VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args));
+    }
+
+    /// Sets a global variable to a value.
+    ///
+    /// See also [EvalContext::set_global_var()](struct.EvalContext.html#method.set_global_var)
+    pub fn set_var(&mut self, var: &str, val: &VVal) {
+        self.env.insert(String::from(var), val.to_ref());
+    }
+
+    /// Returns the value of a global variable.
+    ///
+    /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
+    pub fn get_var(&mut self, var: &str) -> Option<VVal> {
+        match self.env.get(var) {
+            Some(v) => Some(v.deref()),
+            None    => None,
+        }
     }
 
     pub fn set_resolver(&mut self, res: Rc<RefCell<dyn ModuleResolver>>) {
@@ -325,6 +348,36 @@ impl EvalContext {
     pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
         let mut env = self.local.borrow_mut();
         f.call(&mut env, args)
+    }
+
+    /// Sets a global variable for the scripts to access.
+    ///
+    /// ```
+    /// use wlambda::vval::VVal;
+    ///
+    /// let global  = wlambda::prelude::create_wlamba_prelude();
+    /// let mut ctx = wlambda::compiler::EvalContext::new(global);
+    ///
+    /// ctx.set_global_var("XXX", &VVal::Int(200));
+    ///
+    /// assert_eq!(ctx.eval("XXX * 2").unwrap().i(), 400);
+    /// ```
+    pub fn set_global_var(&mut self, var: &str, val: &VVal) {
+        self.global.borrow_mut().set_var(var, val);
+    }
+
+    /// Gets the value of a global variable from the script:
+    ///
+    /// ```
+    /// use wlambda::vval::VVal;
+    ///
+    /// let global  = wlambda::prelude::create_wlamba_prelude();
+    /// let mut ctx = wlambda::compiler::EvalContext::new(global);
+    ///
+    /// assert_eq!(ctx.eval("!:global XXX = 22 * 2").unwrap().i(), 44);
+    /// ```
+    pub fn get_global_var(&mut self, var: &str) -> Option<VVal> {
+        self.global.borrow_mut().get_var(var)
     }
 }
 
@@ -1699,6 +1752,17 @@ mod tests {
         let n = ctx.eval("{ _ + 11 }").unwrap();
         let ret = ctx.call(&n, &vec![VVal::Int(11)]).unwrap();
         assert_eq!(ret.i(), 22);
+    }
+
+    #[test]
+    fn check_global_var_api() {
+        let global = create_wlamba_prelude();
+        let mut ctx = EvalContext::new(global);
+        ctx.set_global_var("XXX", &VVal::Int(210));
+        ctx.set_global_var("YYY", &VVal::Nul);
+        let n = ctx.eval("{ .YYY = _ + 11; XXX + _ } 20").unwrap();
+        assert_eq!(ctx.get_global_var("YYY").unwrap().i(), 31);
+        assert_eq!(n.i(), 230);
     }
 
     #[test]

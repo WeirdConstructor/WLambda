@@ -11,6 +11,9 @@
 to make parsing easier with multiple symbols as arguments for calls.
 * Added ability to call VVal::Fun in the EvalContext and an available Env.
 Useful for storing callbacks.
+* Added global variables to syntax, compiler and API.
+* EvalContext got set_global_var and get_global_var for easy access to the
+global environment.
 * Added user field to Env, so the user of wlambda can provide his own registry for
 storing data from globally added functions.
 * Added error values for error reporting, and \_? and on\_error functions for
