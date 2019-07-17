@@ -22,6 +22,7 @@ struct CompileLocal {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum ModuleLoadError {
     NoSuchModule,
     ModuleEvalError(EvalError),
@@ -387,22 +388,32 @@ impl CompileEnv {
     }
 
     fn def(&mut self, s: &str, is_global: bool) -> VarPos {
+        //d// println!("DEF: {} global={}", s, is_global);
         let pos = self.local_map.get(s);
         match pos {
-            None => {},
+            None => {
+                if is_global {
+                    let v = VVal::Nul;
+                    let r = v.to_ref();
+                    //d// println!("GLOBAL: {} => {}", s, r.s());
+                    self.global.borrow_mut().env.insert(String::from(s), r.clone());
+                    return VarPos::Global(r);
+                }
+            },
             Some(p) => {
                 match p {
                     VarPos::NoPos => {
                         if is_global {
                             let v = VVal::Nul;
                             let r = v.to_ref();
+                            //d// println!("GLOBAL: {} => {}", s, r.s());
                             self.global.borrow_mut().env.insert(String::from(s), r.clone());
                             return VarPos::Global(r);
                         }
                     },
                     VarPos::UpValue(_)  => {},
                     VarPos::Global(_)   => {},
-                    VarPos::Local(_i)    => return p.clone(),
+                    VarPos::Local(_i)   => return p.clone(),
                 }
             },
         }
@@ -416,6 +427,7 @@ impl CompileEnv {
     }
 
     fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
+        //d// println!("COPY UPVALS: {:?}", self.upvals);
         for p in self.upvals.iter() {
             let mut v = match p {
                 VarPos::UpValue(i) => e.get_up_raw(*i),
@@ -557,7 +569,7 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
                 VarPos::Local(i) =>
                     Ok(Box::new(move |e: &mut Env| { Ok(e.get_local(i)) })),
                 VarPos::Global(v) =>
-                    Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
+                    Ok(Box::new(move |_e: &mut Env| { Ok(v.deref()) })),
                 VarPos::NoPos => {
                     ast.to_compile_err(
                         format!("Variable '{}' undefined", var.s_raw()))
@@ -589,6 +601,8 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
     let destr   = ast.at(3).unwrap_or(VVal::Nul);
+
+    //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
     let cv = compile(&value, ce)?;
     if destr.b() {
@@ -1429,6 +1443,50 @@ mod tests {
     }
 
     #[test]
+    fn check_global_vars() {
+        assert_eq!(s_eval("
+            !:global x = 120;
+            !f = { x };
+            !l = f();
+            .x = 30;
+            !l2 = f();
+            $[l, l2, x]
+        "), "$[120,30,30]");
+        assert_eq!(s_eval("
+            !:global x = 120;
+            !f = {
+                !(x, b) = @;
+                .x = x + 2;
+                $[x, b]
+            };
+            !l = f(1, 2);
+            .x = 30;
+            !l2 = f(3, 4);
+            $[l, l2, x]
+        "), "$[$[3,2],$[5,4],30]");
+        assert_eq!(s_eval("
+            !:global x = 120;
+            !f = {
+                !(y, b) = @;
+                .x = x + 2;
+                $[y, x, b]
+            };
+            !l = f(1, 2);
+            .x = x + 30;
+            !l2 = f(3, 4);
+            $[l, l2, x]
+        "), "$[$[1,122,2],$[3,154,4],154]");
+        assert_eq!(s_eval("
+            !f = { !:global (a, b, c) = @; };
+            .b = 20;
+            !x1 = $[a, b, c];
+            f(13, 17, 43);
+            !x2 = $[a, b, c];
+            $[x1, x2]
+        "), "$[$[$n,20,$n],$[13,17,43]]");
+    }
+
+    #[test]
     fn check_ops() {
         assert_eq!(s_eval("10 < 20"),     "$true");
         assert_eq!(s_eval("11 < 10"),     "$false");
@@ -1699,6 +1757,8 @@ mod tests {
         assert_eq!(s_eval_no_panic("{!(a,b,c) = @; _3 }(1,2,3,4,5)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
         assert_eq!(s_eval("{!(a,b,c) = @; b }(1,2,3)"), "2");
         assert_eq!(s_eval("{!(a,b,c) = @; _3 }(1,2,3,5)"), "5");
+        assert_eq!(s_eval("{!:global (a,b,c) = @; _3 }(1,2,3,5)"), "5");
+        assert_eq!(s_eval_no_panic("{!:global (a,b,c) = @; _3 }(1,2,3,4,5)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 28, file: 0 }]))\"");
     }
 
     #[test]

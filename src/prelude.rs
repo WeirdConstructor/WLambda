@@ -735,7 +735,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                     env.push(VVal::Int(from));
                     match f.call_internal(env, 1) {
                         Ok(v)                      => { ret = v; },
-                        Err(StackAction::Break(v)) => { env.popn(1); println!("BREAK {}", v.s()); return Ok(v); },
+                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
                         Err(StackAction::Next)     => { },
                         Err(e)                     => { return Err(e); }
                     }
@@ -763,6 +763,14 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 Ok(VVal::Nul)
             }
         }, None, None);
+
+    g.borrow_mut().add_func("wl:dump_func",
+        |env: &mut Env, _argc: usize| {
+            if let VVal::Fun(f) = env.arg(0) {
+                return Ok(f.dump_upvals());
+            }
+            Ok(VVal::Nul)
+        }, Some(1), Some(1));
 
     g.borrow_mut().add_func("wl:assert",
         |env: &mut Env, _argc: usize| {

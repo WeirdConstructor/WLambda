@@ -163,6 +163,7 @@ impl Env {
     /// let ret = ctx.call(&n, &vec![VVal::Int(11)]).unwrap();
     /// assert_eq!(ret.i(), 21);
     /// ```
+    #[allow(dead_code)]
     pub fn with_user_do<T: 'static, F, X>(&mut self, f: F) -> X
         where F: Fn(&mut T) -> X {
         let mut any = self.user.borrow_mut();
@@ -429,6 +430,14 @@ impl VValFun {
             min_args: None,
             max_args: None,
         })
+    }
+
+    pub fn dump_upvals(&self) -> VVal {
+        let v = VVal::vec();
+        for uv in self.upvalues.iter() {
+            v.push(VVal::new_str_mv(uv.s()));
+        }
+        v
     }
 }
 
@@ -750,6 +759,20 @@ impl VVal {
         VVal::WRef(Rc::new(RefCell::new(self.clone())))
     }
 
+    pub fn deref(&self) -> VVal {
+        match self {
+            VVal::Ref(l)     => (*l).borrow().clone(),
+            VVal::WRef(l)    => (*l).borrow().clone(),
+            VVal::WWRef(l)   => {
+                match l.upgrade() {
+                    Some(v) => v.borrow().clone(),
+                    None => VVal::Nul,
+                }
+            },
+            _ => self.clone()
+        }
+    }
+
     pub fn downgrade(&mut self) -> Option<VVal> {
         if let VVal::WRef(f) = &self {
             Some(VVal::WWRef(Rc::downgrade(f)))
@@ -966,7 +989,7 @@ impl VVal {
     pub fn to_compile_err(&self, msg: String) -> Result<EvalNode, CompileError> {
         Err(CompileError {
             msg,
-            pos: self.get_syn_pos(),
+            pos: self.at(0).unwrap_or(VVal::Nul).get_syn_pos(),
         })
     }
 

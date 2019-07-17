@@ -1459,6 +1459,7 @@ mod tests {
         assert_eq!(parse("! x = 10"),            "$[&Block,$[&Def,$[:\"x\"],10]]");
         assert_eq!(parse("!:ref x = 10"),        "$[&Block,$[&DefRef,$[:\"x\"],10]]");
         assert_eq!(parse("!:ref (a,b) = 10"),    "$[&Block,$[&DefRef,$[:\"a\",:\"b\"],10,$true]]");
+        assert_eq!(parse("!:global (y,x) = @"),  "$[&Block,$[&DefGlobRef,$[:\"y\",:\"x\"],$[&Var,:\"@\"],$true]]");
         assert_eq!(parse(". (a,b) = 10"),        "$[&Block,$[&Assign,$[:\"a\",:\"b\"],10,$true]]");
         assert_eq!(parse("(a,b)=10"),            "$[&Block,$[&Assign,$[:\"a\",:\"b\"],10,$true]]");
     }
