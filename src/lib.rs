@@ -5,9 +5,10 @@
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
-This crate provides you with a small and simple embeddable scripting language. It's syntax
-gravitates around functions and argument composition for functions. A core concept is, that
-everything is callable. It could be viewed as Lisp without parenthesis.
+This crate provides you with a small and simple embeddable scripting language.
+It's syntax gravitates around functions and argument composition for functions.
+A core concept is, that everything is callable. It could be viewed as LISP
+without parenthesis.
 
 Here are some of it's properties:
 
@@ -19,6 +20,9 @@ Here are some of it's properties:
   about speed.
 - No garbage collector. Garbage collection relies only on reference counting.
 - Main data structures are Lists and Maps.
+- No exceptions, except panics. Error handling is accomplished
+by a specialized data type. It can be thought of as dynamic counterpart
+of Rust's Result type.
 - Closures can capture up values either by value, by reference
   or by weak reference. Giving you the ability to keep cyclic
   references in check.

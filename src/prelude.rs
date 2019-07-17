@@ -9,14 +9,21 @@ For an example, refer to [create_wlamba_prelude](fn.create_wlamba_prelude.html).
 
 # WLambda Reference
 
-WLambda is a functional programming language. The syntax gravitates around the
-concept that everything is callable like a function. There is special syntax
-for composing arguments of functions, to give the programmer the ability to
-express his thoughts as they see fit.
+WLambda is a functional programming language. The main goal of this
+implementation is the extension of Rust applications with dynamic scripting.
+The syntax gravitates around the concept that everything is callable like a
+function. There is special syntax for composing arguments of functions, to give
+the programmer the ability to express his thoughts as they see fit.
 
 You can use this document as reference or as cover to cover lecture. It starts
 out with functions and the base data types of WLambda, where I also explain
 some semantics of the language.
+
+Please note: I expect you to know how to program and be familiar with at least
+one other dynamic language like _JavaScript_, _Perl_ or at least _Python_. The
+syntax and semantics of WLambda are different from what you might know. Think
+of it more like a LISP without parenthesis. The syntax is loosely inspired from
+Smalltalk, LISP and Perl.
 
 ## Syntax
 
@@ -218,6 +225,34 @@ wl:assert_eq ret "all ok!";
 - symbols
 - lists/vectors
 - maps
+
+## Operators
+
+### Arithmetics
+
+- \+
+- \-
+- \*
+- /
+- %
+- ^
+
+### Comparison
+
+- ==
+- !=
+- \<
+- \>
+- \<=
+- \>=
+
+### Bitwise
+
+- &|
+- &
+- &^
+- \<<
+- \>>
 
 ## Functions (part 2/2)
 
