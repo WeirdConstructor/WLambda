@@ -38,6 +38,8 @@ error reporting.
 * Added 'not'.
 * Added re:map, str:len, str:join, fold and made lists do a map operation on calling.
 * Added take, drop, str:cat and re:replace_all.
+* Created an integration test for testing the WLambda code blocks in
+the prelude.rs reference documentation.
 
 0.1.1 (2019-05-23)
 ==================

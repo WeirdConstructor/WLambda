@@ -68,7 +68,8 @@ impl ModuleResolver for LocalFileModuleResolver {
     fn resolve(&mut self, _global: GlobalEnvRef, path: &Vec<String>) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError> {
         let global = create_wlamba_prelude();
         let mut ctx = EvalContext::new(global);
-        match ctx.eval_file(&(path[0].clone() + ".wl")) {
+        let pth = path.join("/");
+        match ctx.eval_file(&(pth.clone() + ".wl")) {
             Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
             Ok(_v) => Ok(ctx.get_exports()),
         }

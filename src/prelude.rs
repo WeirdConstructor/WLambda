@@ -54,6 +54,7 @@ very helpful for the control flow in wlambda in case of conditional execution.
 
 ```wlambda
 !some_func = \:outer {
+    !x = 10;
     # does stuff
 
     [x == 10] {
@@ -74,8 +75,8 @@ be executed. If you pass a function as second argument to `$false` then that
 will be executed.
 
 ```wlambda
-[10 == 10] { displayln "10 is 10" }         #=> prints "10 is 10"
-[10 != 10] { displayln "10 is not 10" }     #=> doesn't print anything
+[10 == 10] { displayln "10 is 10" };         #=> prints "10 is 10"
+[10 != 10] { displayln "10 is not 10" };     #=> doesn't print anything
 
 !x = 20;
 
@@ -83,7 +84,7 @@ will be executed.
     displayln "x is 20";
 } {
     displayln "x is 20";
-}; // Do not forget the ";"!
+}; # Do not forget the ";"!
 ```
 
 Actually, as the values `$true` and `$false` can be called like any other
@@ -91,9 +92,10 @@ function you may write it also like this, which is not the recommended
 syntax, but still works:
 
 ```wlambda
-[10 == 10]({ display "10 is 10" })
+[10 == 10]({ displayln "10 is 10" });
 
-[x == 20]({ displayln "x is 20" }, { displayln "x is 20" })
+!x = 21;
+[x == 20]({ displayln "x is 20" }, { displayln "x isn't 20" }); #=> print "x isn't 20"
 ```
 
 ### Lexical Scope and Variable assignment
@@ -116,7 +118,9 @@ syntax, but still works:
 
 ```wlambda
 
-!@export :symbol expr; # exports :symbol with value of expr
+!expr = { _ + 30 };
+
+!@export symbol expr; # exports symbol with value of expr (a function)
 
 ```
 
@@ -124,9 +128,9 @@ syntax, but still works:
 
 ```wlambda
 
-!@import :x :modixes; # prefixes everything from modixes with x:
+!@import x tests:test_mod; # prefixes everything from modixes with x:
 
-x:symbol foo; 
+wl:assert ~ [x:symbol 10] == 40;
 
 ```
 
@@ -138,9 +142,9 @@ Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
 You can pass an optional message as second parameter.
 
-```wlambda
-wl:assert $false #=> Panic
-wl:assert 120    #=> 120
+```norun_wlambda
+wl:assert $false; #=> Panic
+wl:assert 120;    #=> 120
 ```
 
 ## Optional Prelude
@@ -157,7 +161,8 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 
 ```wlambda
 !year_str = chrono:timestamp "%Y";
-wl:assert [year_str | int] == 2019
+displayln :XXXX ~ [year_str | int] == 2019;
+wl:assert ~ [year_str | int] == 2019;
 
 !now_str = chrono:timestamp();
 ```
