@@ -3,27 +3,39 @@
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
-This crate provides you with a small and simple embeddable
-scripting language. It's primary feature are functions and calling
-functions. It could be viewed as Lisp without parenthesis.
+This crate provides you with a small and simple embeddable scripting language.
+It's syntax gravitates around functions and argument composition for functions.
+A core concept is, that everything is callable. It could be viewed as LISP
+without parenthesis.
 
 Here are some of it's properties:
 
-- Simple syntax. For a reference look at the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
+- Simple syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
-- Performance in the ball park of Python.
-- Garbage collection relies only on reference counting.
+- It's about getting things done quickly, so performance is not a main priority.
+  Current performance is roughly in the ball park of (C)Python. Which means,
+  it's too slow if you need speed. But fast enough if you are not primarily concerned
+  about speed.
+- No garbage collector. Garbage collection relies only on reference counting.
 - Main data structures are Lists and Maps.
+- No exceptions, except panics. Error handling is accomplished
+by a specialized data type. It can be thought of as dynamic counterpart
+of Rust's Result type.
 - Closures can capture up values either by value, by reference
   or by weak reference. Giving you the ability to keep cyclic
   references in check.
 - Easy maintenance of the implementation.
 
-The API relies on a data structure made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
+The embedding API relies on a data structure made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
+
+Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 
 # Example WLambda Code
 
 Just a quick glance at the WLambda syntax and semantics.
+
+More details for the syntax and the provided global functions
+can be found in the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
 ```wlambda
 # This is a comment
@@ -72,6 +84,65 @@ range 0 10 1 { # This is a regular function.
     [_ == 5] { break 22 };
 };
 
+# Returning early from functions:
+!some_fun = \:some_fun_lbl { # \:xxx defines a function label for returning
+    !x = 10;
+    .x = do_something_to x;
+    [x > 20] {
+        return :some_fun_lbl 20; # explicit argument for return returns from
+                                 # the specified block.
+    }
+    .x = 20;
+    x
+};
+
+# `return` implicitly jumps to the topmost $nul label
+# you may specify the _ label to jump out some unnamed func:
+!some_fun = {
+    [x == 20] \:_{ return 30 } # returns from some_fun, not from the if-branch
+};
+
+# Error reporting:
+    # There are special error values, that will make the program panic
+    # if they are not handled correctly at statement block level:
+    !some_erroring_func = {
+        return $error "An error happened!"
+    };
+    !value = some_erroring_func();
+    # on_error calls the first argument if the second argument
+    #
+    on_error {
+        # handle error here, eg. report, or make a new error value
+    } value;
+
+    # with the ~ operator, you can chain it nicely:
+    on_error { handle_err(_) } ~ some_erroring_func();
+    # or without ~:
+    on_error { handle_err(_) } [some_erroring_func()];
+    # or with |
+    some_erroring_func() | on_error { handle_err(_) };
+
+    # _? transforms an error value, and returns it from the current
+    #    function. optionally jumping outwards.
+
+    _? $e "ok" # is with an error value the same as: `return $e "ok"`
+    _? 10 # passes the value through
+
+!some_erroring_func = {
+    on_error {
+        report_my_error _;
+    } block :outer {
+        # do something...
+        [_ != 10] {
+            return :from_outer $error "Something really failed"
+            # same as, with the difference, that _? only returns
+            # from :outer if it is an error value.
+            _? :outer $error "Something really failed"
+        }
+        # do more ...
+    }
+    # cleanup ...
+};
 
 # Basic OOP:
 !some_obj = ${};
@@ -103,7 +174,7 @@ WLambda. But I am currently working on making the language more
 complete for real world use. So my current goals are:
 
 - Add namespacing and importing for managing the global environment.
-- Make namespaces for ultility functions in the areas:
+- Make namespaces for utility functions in the areas:
     - List handling
     - Map handling
     - Iteration
@@ -111,9 +182,7 @@ complete for real world use. So my current goals are:
       (WLambda is for embedding, there are currently no goals
        to provide a binary beyond basic needs.)
 - Improve and further document the VVal API for interacting with WLambda.
-- Add `panic` and `assert` and also make the compiler aware of
-  the debugging positions that the parser augmented the AST with for
-  error reporting.
+- Make VVal::Sym hold an interned string instead of a `String` instance.
 
 Future plans could be:
 
