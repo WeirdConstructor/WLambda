@@ -375,7 +375,7 @@ impl EvalContext {
     /// let global  = wlambda::prelude::create_wlamba_prelude();
     /// let mut ctx = wlambda::compiler::EvalContext::new(global);
     ///
-    /// assert_eq!(ctx.eval("!:global XXX = 22 * 2").unwrap().i(), 44);
+    /// assert_eq!(ctx.eval("!:global XXX = 22 * 2; XXX").unwrap().i(), 44);
     /// ```
     pub fn get_global_var(&mut self, var: &str) -> Option<VVal> {
         self.global.borrow_mut().get_var(var)
@@ -709,7 +709,6 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                             }
                         }
                     }
-                    Ok(VVal::Lst(l))
                 },
                 VVal::Map(m) => {
                     for (i, vi) in poses.iter().enumerate() {
@@ -733,8 +732,6 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                             _ => {}
                         }
                     }
-
-                    Ok(VVal::Map(m))
                 },
                 _ => {
                     for vi in poses.iter() {
@@ -748,9 +745,10 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                             _ => {},
                         }
                     }
-                    Ok(v)
                 }
             }
+
+            Ok(VVal::Nul)
         }))
     } else {
         let pos = ce.borrow_mut().def(&vars.at(0).unwrap().s_raw(), is_global);
@@ -762,20 +760,20 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                         Ok(Box::new(move |e: &mut Env| {
                             let v = cv(e)?;
                             e.set_consume(vip, (&v).to_wref());
-                            Ok(v)
+                            Ok(VVal::Nul)
                         }))
                     } else {
                         Ok(Box::new(move |e: &mut Env| {
                             let v = cv(e)?;
                             e.set_consume(vip, (&v).to_ref());
-                            Ok(v)
+                            Ok(VVal::Nul)
                         }))
                     }
                 } else {
                     Ok(Box::new(move |e: &mut Env| {
                         let v = cv(e)?;
-                        e.set_local(vip, &v);
-                        Ok(v)
+                        e.set_consume(vip, v);
+                        Ok(VVal::Nul)
                     }))
                 }
             },
@@ -787,20 +785,20 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                         Ok(Box::new(move |e: &mut Env| {
                             let v = cv(e)?;
                             gref.set_ref(v.to_wref());
-                            Ok(v)
+                            Ok(VVal::Nul)
                         }))
                     } else {
                         Ok(Box::new(move |e: &mut Env| {
                             let v = cv(e)?;
                             gref.set_ref(v.to_ref());
-                            Ok(v)
+                            Ok(VVal::Nul)
                         }))
                     }
                 } else {
                     Ok(Box::new(move |e: &mut Env| {
                         let v = cv(e)?;
                         gref.set_ref(v.clone());
-                        Ok(v)
+                        Ok(VVal::Nul)
                     }))
                 }
             },
@@ -872,7 +870,6 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                             }
                         }
                     }
-                    Ok(VVal::Lst(l))
                 },
                 VVal::Map(m) => {
                     for (i, pos) in poses.iter().enumerate() {
@@ -880,15 +877,15 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                         let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
                         set_env_at_varpos(e, pos, &val);
                     }
-                    Ok(VVal::Map(m))
                 },
                 _ => {
                     for pos in poses.iter() {
                         set_env_at_varpos(e, pos, &v);
                     }
-                    Ok(v)
                 }
             }
+
+            Ok(VVal::Nul)
         }))
 
     } else {
@@ -900,14 +897,14 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                 Ok(Box::new(move |e: &mut Env| {
                     let v = cv(e)?;
                     e.set_up(i, &v);
-                    Ok(v)
+                    Ok(VVal::Nul)
                 }))
             },
             VarPos::Local(i) => {
                 Ok(Box::new(move |e: &mut Env| {
                     let v = cv(e)?;
-                    e.set_local(i, &v);
-                    Ok(v)
+                    e.set_consume(i, v);
+                    Ok(VVal::Nul)
                 }))
             },
             VarPos::Global(glob_v) => {
@@ -915,7 +912,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
                     Ok(Box::new(move |e: &mut Env| {
                         let v = cv(e)?;
                         glob_r.replace(v.clone());
-                        Ok(v)
+                        Ok(VVal::Nul)
                     }))
                 } else {
                     ast.to_compile_err(
@@ -1320,7 +1317,7 @@ mod tests {
         assert_eq!(s_eval("!x = 11; { 12; x }()"),                        "11");
         assert_eq!(s_eval("!x = 13; { .x = 12 }(); { x }() "),            "13");
         assert_eq!(s_eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), x]"),  "$[12,12]");
-        assert_eq!(s_eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), { .x = 15 }(), x]"), "$[12,15,15]");
+        assert_eq!(s_eval("!:ref x = 13; { .x = 12; x }(); $[{ x }(), { .x = 15; x }(), x]"), "$[12,15,15]");
         assert_eq!(s_eval("{ _ } 10"),                        "10");
         assert_eq!(s_eval("!:ref y = 0; { .y = _ } 10; y"),   "10");
         assert_eq!(s_eval("${:a = 10, :b = 20}"),             "${a=10,b=20}");
@@ -1403,10 +1400,10 @@ mod tests {
 
     #[test]
     fn check_range() {
-        assert_eq!(s_eval("!:ref x = 10; { .x = x + _ } 5"),                    "15");
-        assert_eq!(s_eval("!:ref x = 10; { .x = { x + 11 + _ }(2) + _ } 5"),    "28");
-        assert_eq!(s_eval("!:ref x = 10;   range 1 3 1     { .x = x + _ }; x"), "16");
-        assert_eq!(s_eval("!:ref x = 10.0; range 1.0 3 0.5 { .x = x + _ }; x"), "20");
+        assert_eq!(s_eval("!:ref x = 10; { .x = x + _; x } 5"),                    "15");
+        assert_eq!(s_eval("!:ref x = 10; { .x = { x + 11 + _ }(2) + _; x } 5"),    "28");
+        assert_eq!(s_eval("!:ref x = 10;   range 1 3 1     { .x = x + _; x }; x"), "16");
+        assert_eq!(s_eval("!:ref x = 10.0; range 1.0 3 0.5 { .x = x + _; x }; x"), "20");
     }
 
     #[test]

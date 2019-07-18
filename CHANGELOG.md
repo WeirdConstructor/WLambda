@@ -2,6 +2,8 @@
 ==================
 
 * Removed unprefixed destructuring syntax for a more consistent syntax.
+* Assignments and definitions no longer return the stored value because
+it mixes badly with $error values.
 
 0.2.0 (2019-07-18)
 ==================

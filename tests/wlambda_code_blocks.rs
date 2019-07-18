@@ -35,8 +35,7 @@ fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
     code_snippets
 }
 
-#[test]
-fn main() {
+fn execute_script(name: &str, snippet: &str) {
     use wlambda::prelude::create_wlamba_prelude;
     use wlambda::compiler::EvalContext;
 
@@ -45,16 +44,33 @@ fn main() {
             std::cell::RefCell::new(
                 wlambda::compiler::LocalFileModuleResolver::new()));
 
-    for (name, snip) in get_scripts_from_file("src/prelude.rs") {
-        let global = create_wlamba_prelude();
-        global.borrow_mut().set_resolver(lfmr.clone());
-        let mut ctx = EvalContext::new(global);
-        match ctx.eval(&snip) {
-            Ok(v) => { println!("result '{}': {}", name, v.s()); },
-            Err(e) => {
-                panic!(format!("Failed code snippet '{}': {}",
-                               name, e));
-            }
+    let global = create_wlamba_prelude();
+    global.borrow_mut().set_resolver(lfmr.clone());
+    let mut ctx = EvalContext::new(global);
+    match ctx.eval(snippet) {
+        Ok(v) => { println!("result '{}': {}", name, v.s()); },
+        Err(e) => {
+            panic!(format!("Failed code snippet '{}': {}", name, e));
         }
+    }
+}
+
+#[test]
+fn main() {
+
+    for (name, snip) in get_scripts_from_file("src/prelude.rs") {
+        execute_script(&name, &snip);
+    }
+
+    for (name, snip) in get_scripts_from_file("src/parser.rs") {
+        execute_script(&name, &snip);
+    }
+
+    for (name, snip) in get_scripts_from_file("src/compiler.rs") {
+        execute_script(&name, &snip);
+    }
+
+    for (name, snip) in get_scripts_from_file("src/lib.rs") {
+        execute_script(&name, &snip);
     }
 }
