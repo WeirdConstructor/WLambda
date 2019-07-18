@@ -104,9 +104,9 @@ In the following grammar, white space and comments are omitted:
                   | false
                   | err
                   ;
-    arity_def     = "|", (number | "@"), "<", (number | @), "|" (* set min/max *)
-                  | "|", (number | @), "|"                      (* set min and max *)
-                  | "|", "|"                                    (* no enforcement *)
+    arity_def     = "|", number, "<", number, "|" (* set min/max *)
+                  | "|", number, "|"              (* set min and max *)
+                  | "|", "|"                      (* no enforcement *)
                   ;
     function      = [ "\:", ident ], "{", [ arity_def ], block, "}"
                   | "\", [ arity_def ], statement
@@ -185,7 +185,7 @@ In the following grammar, white space and comments are omitted:
     export        = "!", "export", symbol, expr
                   ;
     statement     = "!" definition
-                  | "." assign
+                  | "." simple_assign
                   | destr_assign
                   | import
                   | export
