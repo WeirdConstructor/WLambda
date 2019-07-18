@@ -8,9 +8,21 @@ if exists("b:current_syntax")
   finish
 endif
 
+
+syn match wlIdentifier  /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/
+syn match wlAssignId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/ contained
+syn match wlMapKeyId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ contained
+
 syn match wlComment /#.*$/
-syn keyword wlKeywords  $true panic push take drop
-syn keyword wlRepeat    while repeat
+syn match wlIdentifier  /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/
+syn match wlAssignId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/ contained
+syn match wlMapKeyId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ contained
+
+syn match wlKeyword "_?"
+syn match wlKeyword "re:map"
+syn match wlKeyword "re:replace_all"
+syn keyword wlKeyword  panic push take drop not neg uneg block unwrap unwrap_err
+syn keyword wlRepeat   while repeat
 syn match wlValue     '$t'
 syn match wlValue     '$true'
 syn match wlValue     '$false'
@@ -32,40 +44,37 @@ syn match wlStringSpec  /\\x[a-f0-9A-F][a-f0-9A-F]/  contained
 syn match wlStringSpec  /\\["'\\nrt0]/               contained
 syn match wlStringSpec  /\\u[a-f0-9A-F]\+/           contained
 
-syn region wlQSymbol    start=+:"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
-syn region wlString     start=+"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
-syn region wlString     start=+$b"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
-
 syn region wlString     start="$q\z(.\)" end="\z1"
 syn region wlString     start="$q\["     end="\]"
 syn region wlString     start="$q("      end=")"
 syn region wlString     start="$q{"      end="}"
 
-syn match wlSymbol      ':[^[:space:]\.,;{}\[\]()~|=]\+'
+syn region wlQSymbol    start=+:"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
+syn region wlString     start=+"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
+syn region wlString     start=+$b"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 
-syn match wlIdentifier  /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/
-syn match wlAssignId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/ contained
-syn match wlMapKeyId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ contained
+syn match wlSymbol      ':[^[:space:]\.,;{}\[\]()~|="]\+'
 
 syn match wlAssign   '\.'       nextgroup=wlAssignId,wlDestr
 syn match wlDefine   '!'        nextgroup=wlDefTag,wlDestr
 syn match wlDefTag   ':ref'     contained
 syn match wlDefTag   ':wref'    contained
 syn match wlDefTag   ':global'  contained
-syn region wlDestr         matchgroup=wlDestrDelim start="(" end=")" transparent contained contains=wlIdentifier
-syn region wlDestrAssign   matchgroup=wlDestrDelim start="(" end=")" transparent contains=wlIdentifier
+syn region wlDestr         matchgroup=wlDestrDelim start="(" end=")" transparent contained contains=wlIdentifier,wlComment
 
 syn match wlArity     '|\s*\d\+\s*<\s*\d\+\s*|'
 syn match wlArity     '|\s*\d\+\s*|'
 syn match wlArity     '|\s*|'
 
-syn region wlMap       matchgroup=wlStruct start="${" end="}"     transparent contains=wlValue,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlIdentifier,wlShortFunc,wlMapKeyId
-syn region wlList      matchgroup=wlStruct start="$\[" end="\]"   transparent contains=wlValue,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlIdentifier,wlShortFunc
-syn region wlQuote     matchgroup=wlExprQuote start="\[" end="\]" transparent contains=wlValue,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlIdentifier,wlShortFunc
-syn region wlFunc      matchgroup=wlFuncDelims start="{" end="}"  transparent contains=wlValue,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlIdentifier,wlShortFunc,wlAssign,wlDefine,wlDestrAssign,wlArity
-syn match wlShortFunc  '\\'                                                  nextgroup=wlValue,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlIdentifier,wlShortFunc,wlAssign,wlDefine,wlDestrAssign,wlArity
+syn region wlMap       matchgroup=wlStruct start="${" end="}"     transparent contains=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc,wlMapKeyId
+syn region wlList      matchgroup=wlStruct start="$\[" end="\]"   transparent contains=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc
+syn region wlQuote     matchgroup=wlExprQuote start="\[" end="\]" transparent contains=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc
+syn region wlFunc      matchgroup=wlFuncDelims start="{" end="}"  transparent contains=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc,wlAssign,wlDefine,wlArity
+syn match wlShortFunc  '\\'                                                  nextgroup=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc,wlAssign,wlDefine,wlArity
 
-hi def link wlKeywords      Statement
+
+hi def link wlKeyword           Function
+hi def link wlKeyword2          Function
 
 hi def link wlFuncDelims        Function
 hi def link wlShortFunc         Function
@@ -76,7 +85,6 @@ hi def link wlRepeat        Repeat
 hi def link wlAssign        Statement
 hi def link wlDefine        Statement
 hi def link wlDestrDelim    Statement
-hi def link wlDestrAssign   Statement
 
 hi def link wlValue         Constant
 
