@@ -56,11 +56,14 @@ can be found in the [WLambda Language Reference](prelude/index.html#wlambda-refe
 
 # Function definition/assignment:
 !a_func = {
-    _ + _2  # Arguments are not named, they are put into _, _2, _3
+    _ + _1  # Arguments are not named, they are put into _, _1, _2
 };
 
 a_func(2, 3);   # Function call
 a_func 2 3;     # Equivalent function call
+
+# Shortened one statement function definition:
+!do_something_to = \_ * 2;
 
 # There is no `if` statement. Booleans can be called
 # with two arguments. The first one is called when the boolean
@@ -69,7 +72,7 @@ a_func 2 3;     # Equivalent function call
     # called if a == 10
 } {
     # called if a != 10
-}
+};
 
 # Counting loop:
 !:ref sum = 0; # Defining a reference that can be assignment
@@ -78,8 +81,8 @@ a_func 2 3;     # Equivalent function call
 # `range` calls the given function for each iteration
 # and passes the counter as first argument in `_`
 range 0 10 1 { # This is a regular function.
-    sum = sum + _;
-}
+    .sum = sum + _;
+};
 
 # `range` loop with `break`
 !break_value = range 0 10 1 {
@@ -101,6 +104,7 @@ range 0 10 1 { # This is a regular function.
 # `return` implicitly jumps to the topmost $nul label
 # you may specify the _ label to jump out some unnamed func:
 !some_fun = {
+    !(x) = @;
     [x == 20] \:_{ return 30 } # returns from some_fun, not from the if-branch
 };
 
@@ -115,20 +119,29 @@ range 0 10 1 { # This is a regular function.
     #
     on_error {
         # handle error here, eg. report, or make a new error value
+        !(err_value, line, col, file) = @;
+        displayln err_value;
     } value;
 
+    !handle_err = { displayln _ };
+
     # with the ~ operator, you can chain it nicely:
-    on_error { handle_err(_) } ~ some_erroring_func();
+    on_error {|| handle_err(_) } ~ some_erroring_func();
     # or without ~:
-    on_error { handle_err(_) } [some_erroring_func()];
+    on_error {|| handle_err(_) } [some_erroring_func()];
     # or with |
-    some_erroring_func() | on_error { handle_err(_) };
+    some_erroring_func() | on_error {|| handle_err(_) };
 
     # _? transforms an error value, and returns it from the current
     #    function. optionally jumping outwards.
 
-    _? $e "ok" # is with an error value the same as: `return $e "ok"`
-    _? 10 # passes the value through
+    wl:assert_eq [str {
+        _? ~ $e "ok"; # is with an error value the same as: `return $e "ok"`
+    }()] "$e \"ok\"";
+
+    _? 10; # passes the value through
+
+!report_my_error = { displayln _ };
 
 !some_erroring_func = {
     on_error {
@@ -190,9 +203,9 @@ Future plans could be:
 
 - Prototyped inheritance, sketched out like this:
 
-    ```wlambda
-        !proto = ${ print = { println _ }, };
-        !o = to_obj { _proto_ = proto };
+    ```norun_wlambda
+        !proto = ${ print = { displayln _ }, };
+        !o = to_obj ${ _proto_ = proto };
         o.print(123);
 
         # MetaMap(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
@@ -201,7 +214,7 @@ Future plans could be:
 
 - Augment functions with tagged values:
 
-    ```wlambda
+    ```norun_wlambda
         !tag = 123;
         !v = tag 10 tag;
         !fun = { println("not tagged!") };

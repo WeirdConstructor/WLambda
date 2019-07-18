@@ -8,58 +8,99 @@ if exists("b:current_syntax")
   finish
 endif
 
-syn keyword wlKeywords  $true panic push take drop
-syn keyword wlRepeat    while repeat
-syn match wlLiteral     '$t'
-syn match wlLiteral     '$true'
-syn match wlLiteral     '$false'
-syn match wlLiteral     '$f'
-syn match wlLiteral     '$n'
-syn match wlLiteral     '$nul'
-syn match wlError       '$e'
-syn match wlError       '$error'
-syn match wlNumber      '[-+]\?\d\+'
-syn match wlNumber      '[-+]\?\d\+\.\d\+'
-syn match wlNumber      '[-+]\?0x[a-fA-F0-9]\+\(\.[a-fA-F0-9]\+\)\?'
-syn match wlNumber      '[-+]\?0b[01]\+\(\.[01]\+\)\?'
-syn match wlNumber      '[-+]\?0o[0-8]\+\(\.[0-8]\+\)\?'
-syn match wlNumber      '[-+]\?[0-9]\+r[0-9a-zA-Z]\+\(\.[0-9a-zA-Z]\+\)\?'
 
-syn match wlIdentifier  '[a-zA-Z_@]\+[^\s\.,;{}\[\]()~|=]*'
+syn match wlIdentifier  /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/
+syn match wlAssignId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/ contained
+syn match wlMapKeyId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ contained
 
-syn match wlSymbol      ':[^\.,;{}\[\]()~|=]\+'
-syn region wlFunc       start="{" end="}"   transparent contains=wlNumber,wlLiteral,wlKeywords,wlRepeat
-syn match wlFuncDelims  "[{}\\()\[\]]"
-syn match wlDelims      "[\[\]]"
+syn match wlComment /#.*$/
+syn match wlIdentifier  /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/
+syn match wlAssignId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/ contained
+syn match wlMapKeyId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ contained
 
-syn match wlSymbolSpec  /\\x[a-f0-9A-F][a-f0-9A-F]/
-syn match wlSymbolSpec  /\\["'\\nrt0]/
-syn match wlSymbolSpec  /\\u[a-f0-9A-F]\+/
-syn match wlStringSpec  /\\x[a-f0-9A-F][a-f0-9A-F]/
-syn match wlStringSpec  /\\["'\\nrt0]/
-syn match wlStringSpec  /\\u[a-f0-9A-F]\+/
+syn match wlKeyword "_?"
+syn match wlKeyword "re:map"
+syn match wlKeyword "re:replace_all"
+syn keyword wlKeyword  panic push take drop not neg uneg block unwrap unwrap_err
+syn keyword wlRepeat   while repeat
+syn match wlValue     '$t'
+syn match wlValue     '$true'
+syn match wlValue     '$false'
+syn match wlValue     '$f'
+syn match wlValue     '$n'
+syn match wlValue     '$nul'
+syn match wlValue     '$e'
+syn match wlValue     '$error'
+syn match wlValue      '[-+]\?\d\+'
+syn match wlValue      '[-+]\?\d\+\.\d\+'
+syn match wlValue      '[-+]\?0x[a-fA-F0-9]\+\(\.[a-fA-F0-9]\+\)\?'
+syn match wlValue      '[-+]\?0b[01]\+\(\.[01]\+\)\?'
+syn match wlValue      '[-+]\?0o[0-8]\+\(\.[0-8]\+\)\?'
+syn match wlValue      '[-+]\?[0-9]\+r[0-9a-zA-Z]\+\(\.[0-9a-zA-Z]\+\)\?'
 
-syn region wlSymbol     start=+:"+		skip=+\\\\\|\\"+  end=+"+ contains=wlSymbolSpec
+syn match wlFuncCombinators '[|~]'
+
+syn match wlStringSpec  /\\x[a-f0-9A-F][a-f0-9A-F]/  contained
+syn match wlStringSpec  /\\["'\\nrt0]/               contained
+syn match wlStringSpec  /\\u[a-f0-9A-F]\+/           contained
+
+syn region wlString     start="$q\z(.\)" end="\z1"
+syn region wlString     start="$q\["     end="\]"
+syn region wlString     start="$q("      end=")"
+syn region wlString     start="$q{"      end="}"
+
+syn region wlQSymbol    start=+:"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 syn region wlString     start=+"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 syn region wlString     start=+$b"+		skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 
-syn region wlString     start="$q\z(.\)" end="\z1"
-syn region wlString     start="$q\[" end="\]"
-syn region wlString     start="$q(" end=")"
-syn region wlString     start="$q{" end="}"
+syn match wlSymbol      ':[^[:space:]\.,;{}\[\]()~|="]\+'
 
-hi def link wlKeywords      Statement
+syn match wlAssign   '\.'       nextgroup=wlAssignId,wlDestr
+syn match wlDefine   '!'        nextgroup=wlDefTag,wlDestr
+syn match wlDefTag   ':ref'     contained
+syn match wlDefTag   ':wref'    contained
+syn match wlDefTag   ':global'  contained
+syn region wlDestr         matchgroup=wlDestrDelim start="(" end=")" transparent contained contains=wlIdentifier,wlComment
+
+syn match wlArity     '|\s*\d\+\s*<\s*\d\+\s*|'
+syn match wlArity     '|\s*\d\+\s*|'
+syn match wlArity     '|\s*|'
+
+syn region wlMap       matchgroup=wlStruct start="${" end="}"     transparent contains=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc,wlMapKeyId
+syn region wlList      matchgroup=wlStruct start="$\[" end="\]"   transparent contains=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc
+syn region wlQuote     matchgroup=wlExprQuote start="\[" end="\]" transparent contains=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc
+syn region wlFunc      matchgroup=wlFuncDelims start="{" end="}"  transparent contains=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc,wlAssign,wlDefine,wlArity
+syn match wlShortFunc  '\\'                                                  nextgroup=wlComment,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlFunc,wlFuncCombinators,wlList,wlMap,wlQuote,wlShortFunc,wlAssign,wlDefine,wlArity
+
+
+hi def link wlKeyword           Function
+hi def link wlKeyword2          Function
+
+hi def link wlFuncDelims        Function
+hi def link wlShortFunc         Function
+hi def link wlFuncCombinators   Function
+hi def link wlExprQuote         Normal
+
 hi def link wlRepeat        Repeat
-hi def link wlFuncDelims    Function
-hi def link wlDelims        Normal
-hi def link wlNumber        Number
-hi def link wlLiteral       Constant
+hi def link wlAssign        Statement
+hi def link wlDefine        Statement
+hi def link wlDestrDelim    Statement
+
+hi def link wlValue         Constant
+
 hi def link wlError         PreProc
 hi def link wlString        String
 hi def link wlStringSpec    Special
 hi def link wlSymbol        Special
+hi def link wlQSymbol       Special
+hi def link wlAssignId      Special
+hi def link wlMapKeyId      Special
+hi def link wlStruct        Structure
+hi def link wlDefTag        Type
+hi def link wlArity         Type
 hi def link wlSymbolSpec    Constant
 hi def link wlIdentifier    Normal
+hi def link wlComment       Comment
 
 
 "" no '.'
@@ -548,7 +589,7 @@ hi def link wlIdentifier    Normal
 "
 "" sync on a line starting with a ( ... ) form
 "syn sync match matchPlace grouphere NONE "^("
-syn sync lines=200
+syn sync lines=500
 ""syn sync ccomment lalMultilineComment
 
 let b:current_syntax = "wlambda"

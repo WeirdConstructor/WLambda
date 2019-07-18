@@ -104,9 +104,9 @@ In the following grammar, white space and comments are omitted:
                   | false
                   | err
                   ;
-    arity_def     = "|", (number | "@"), "<", (number | @), "|" (* set min/max *)
-                  | "|", (number | @), "|"                      (* set min and max *)
-                  | "|", "|"                                    (* no enforcement *)
+    arity_def     = "|", number, "<", number, "|" (* set min/max *)
+                  | "|", number, "|"              (* set min and max *)
+                  | "|", "|"                      (* no enforcement *)
                   ;
     function      = [ "\:", ident ], "{", [ arity_def ], block, "}"
                   | "\", [ arity_def ], statement
@@ -176,17 +176,15 @@ In the following grammar, white space and comments are omitted:
                   ;
     destr_assign  = "(", [ qident, { ",", qident } ], ")", "=" expr
                   ;
-    definition    = [ ref_specifier ],
-                    ( simple_assign
-                    | destr_assign )
+    definition    = [ ref_specifier ], ( simple_assign | destr_assign )
                   ;
     import        = "!", "import", symbol, symbol
                   ;
     export        = "!", "export", symbol, expr
                   ;
     statement     = "!" definition
-                  | "." assign
-                  | destr_assign
+                  | "." simple_assign
+                  | "." destr_assign
                   | import
                   | export
                   | expr
@@ -1162,7 +1160,6 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                     }
                 },
                 '.' => { ps.consume_wsc(); parse_assignment(ps, false) },
-                '(' => { parse_assignment(ps, false) },
                 _   => { parse_expr(ps) },
             }
         },
@@ -1461,7 +1458,6 @@ mod tests {
         assert_eq!(parse("!:ref (a,b) = 10"),    "$[&Block,$[&DefRef,$[:\"a\",:\"b\"],10,$true]]");
         assert_eq!(parse("!:global (y,x) = @"),  "$[&Block,$[&DefGlobRef,$[:\"y\",:\"x\"],$[&Var,:\"@\"],$true]]");
         assert_eq!(parse(". (a,b) = 10"),        "$[&Block,$[&Assign,$[:\"a\",:\"b\"],10,$true]]");
-        assert_eq!(parse("(a,b)=10"),            "$[&Block,$[&Assign,$[:\"a\",:\"b\"],10,$true]]");
     }
 
     #[test]
