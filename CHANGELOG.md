@@ -1,4 +1,9 @@
-0.2.0 (unreleased)
+0.2.1 (2019-07-18)
+==================
+
+* Removed unprefixed destructuring syntax for a more consistent syntax.
+
+0.2.0 (2019-07-18)
 ==================
 
 * Completed string support in compiler.
