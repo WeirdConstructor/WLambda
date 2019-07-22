@@ -163,7 +163,16 @@ impl State {
     pub fn peek_op(&self) -> Option<String> {
         if self.at_eof { return None; }
         match self.peek_char {
-            '+' | '-' | '*' | '/' | '%' | '^'
+            '+' | '-'
+                => {
+                    if let Some(s) = self.peek2() {
+                        if s.chars().nth(1).unwrap_or(' ').is_digit(10) {
+                            return None;
+                        }
+                    }
+                    Some(self.peek_char.to_string())
+                },
+            '*' | '/' | '%' | '^'
                 => { Some(self.peek_char.to_string()) },
             '<' | '>' | '!' | '=' | '&' => {
                 if let Some(s) = self.peek4() {

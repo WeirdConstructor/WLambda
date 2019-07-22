@@ -1321,6 +1321,12 @@ mod tests {
     fn check_parse_sym() {
         assert_eq!(parse(":\"foo bar\""),
                    "$[&Block,\"foo bar\"]");
+        assert_eq!(parse("foo :bar -2.3 2.3"),
+                   "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&Key,:\"bar\"],-2.3,2.3]]");
+        assert_eq!(parse("foo :bar -x 2"),
+                   "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&Call,$[&Var,:\"-\"],$[&Key,:\"bar\"],$[&Var,:\"x\"]],2]]");
+        assert_eq!(parse("foo :bar -2 2"),
+                   "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&Key,:\"bar\"],-2,2]]");
     }
 
     #[test]
