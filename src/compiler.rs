@@ -903,7 +903,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
             VarPos::Local(i) => {
                 Ok(Box::new(move |e: &mut Env| {
                     let v = cv(e)?;
-                    e.set_consume(i, v);
+                    e.set_local(i, &v);
                     Ok(VVal::Nul)
                 }))
             },
@@ -1602,6 +1602,15 @@ mod tests {
                 &and f();
             $[x, b]
         "#),  "$[5,5]");
+
+        assert_eq!(s_eval(r#"
+            !:ref c = 0;
+            !:ref x = 10;
+            while { x > 0 } { .c = c + 1; .x = x - 1; };
+            .x = 20;
+            while { x > 0 } { .c = c + 1; .x = x - 1; };
+            c
+        "#), "30");
     }
 
     #[test]

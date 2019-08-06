@@ -4,6 +4,7 @@
 * `-` and `+` are not parsed as operator if a digit follows.
   `fun :bar -2 2` was parsed as operator call for `-`.
   Sometime in the future we should change to a proper tokenizer.
+* Bugfix: Assigning to a local variable cleared it's :ref state.
 
 0.2.1 (2019-07-18)
 ==================
