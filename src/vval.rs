@@ -1150,3 +1150,127 @@ impl VVal {
         }
     }
 }
+
+#[cfg(feature="serde")]
+impl serde::ser::Serialize for VVal {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::ser::Serializer {
+        use serde::ser::{SerializeSeq, SerializeMap};
+
+        match self {
+            VVal::Str(_)     => serializer.serialize_str(&self.s_raw()),
+            VVal::Sym(_)     => serializer.serialize_str(&self.s_raw()),
+            VVal::Byt(_)     => serializer.serialize_str(&self.s()),
+            VVal::Nul        => serializer.serialize_none(),
+            VVal::Err(_)     => serializer.serialize_str(&self.s()),
+            VVal::Bol(b)     => serializer.serialize_bool(*b),
+            VVal::Syn(_)     => serializer.serialize_str(&self.s()),
+            VVal::Int(i)     => serializer.serialize_i64(*i),
+            VVal::Flt(f)     => serializer.serialize_f64(*f),
+            VVal::Lst(l)     => {
+                let mut seq = serializer.serialize_seq(Some(l.borrow().len()))?;
+                for v in l.borrow().iter() {
+                    seq.serialize_element(v)?;
+                }
+                seq.end()
+            },
+            VVal::Map(l) => {
+                let hm = l.borrow();
+
+                let mut map = serializer.serialize_map(Some(l.borrow().len()))?;
+                for (k, v) in hm.iter() {
+                    map.serialize_entry(k, v)?;
+                }
+                map.end()
+            },
+            VVal::Fun(_)     => serializer.serialize_str(&self.s()),
+            VVal::DropFun(_) => serializer.serialize_str(&self.s()),
+            VVal::Ref(_)     => self.deref().serialize(serializer),
+            VVal::WRef(_)    => self.deref().serialize(serializer),
+            VVal::WWRef(_)   => self.deref().serialize(serializer),
+        }
+    }
+}
+
+#[cfg(feature="serde")]
+struct VValVisitor;
+
+#[cfg(feature="serde")]
+impl<'de> serde::de::Visitor<'de> for VValVisitor {
+    type Value = VVal;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a VVal")
+    }
+
+    fn visit_i128<E>(self, value: i128) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value)) }
+    fn visit_i32<E>(self, value: i32) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    fn visit_i16<E>(self, value: i16) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    fn visit_i8<E>(self, value: i8) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    fn visit_u128<E>(self, value: u128) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    fn visit_u16<E>(self, value: u16) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Flt(value)) }
+    fn visit_f32<E>(self, value: f32) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Flt(value as f64)) }
+
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Bol(value)) }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::new_str(value)) }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Nul) }
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::Nul) }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where A: serde::de::SeqAccess<'de> {
+
+        let v = VVal::vec();
+
+        while let Some(ve) = seq.next_element()? {
+            v.push(ve);
+        }
+
+        Ok(v)
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where A: serde::de::MapAccess<'de> {
+
+        let v = VVal::map();
+
+        while let Some((ke, ve)) = map.next_entry()? {
+            let k : VVal = ke;
+            v.set_key(&VVal::new_sym(&k.s_raw()), ve);
+        }
+
+        Ok(v)
+    }
+}
+
+#[cfg(feature="serde")]
+impl<'de> serde::de::Deserialize<'de> for VVal {
+    fn deserialize<D>(deserializer: D) -> Result<VVal, D::Error>
+        where D: serde::de::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(VValVisitor)
+    }
+}

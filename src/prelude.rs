@@ -1169,5 +1169,29 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }, Some(0), Some(1));
     }
 
+    if cfg!(feature="serde_json") {
+        g.borrow_mut().add_func("ser:json",
+            |env: &mut Env, _argc: usize| {
+                let v = env.arg(0).clone();
+
+                match serde_json::to_string_pretty(&v) {
+                    Ok(s) => Ok(VVal::new_str(&s)),
+                    Err(e) =>
+                        Ok(VVal::err_msg(&format!("ser:json failed: {}", e))),
+                }
+            }, Some(1), Some(1));
+
+        g.borrow_mut().add_func("deser:json",
+            |env: &mut Env, _argc: usize| {
+                let s = env.arg(0).s_raw();
+
+                match serde_json::from_str(&s) {
+                    Ok(v) => Ok(v),
+                    Err(e) =>
+                        Ok(VVal::err_msg(&format!("deser:json failed: {}", e))),
+                }
+            }, Some(1), Some(1));
+    }
+
     g
 }

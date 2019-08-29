@@ -12,9 +12,11 @@ categories   = ["parsing","config","parser-implementations"]
 exclude      = ["res/*"]
 
 [features]
-default = ["regex", "chrono"]
+default = ["regex", "chrono", "serde", "serde_json"]
 
 [dependencies]
 rustyline = "4.1.0"
-regex = { version = "1.1.9", optional = true }
-chrono = { version = "0.4.7", optional = true }
+regex     = { version = "1.1.9", optional = true }
+chrono    = { version = "0.4.7", optional = true }
+serde     = { version = "1.0.92", optional = true }
+serde_json = { version = "1.0.39", optional = true }
