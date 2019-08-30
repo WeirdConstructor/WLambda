@@ -102,7 +102,7 @@ range 0 10 1 { # This is a regular function.
 };
 
 # `return` implicitly jumps to the topmost $nul label
-# you may specify the _ label to jump out some unnamed func:
+# you may specify a small unused label like `_` to jump out some unnamed func:
 !some_fun = {
     !(x) = @;
     [x == 20] \:_{ return 30 } # returns from some_fun, not from the if-branch
@@ -116,7 +116,7 @@ range 0 10 1 { # This is a regular function.
     };
     !value = some_erroring_func();
     # on_error calls the first argument if the second argument
-    #
+    # is an error value.
     on_error {
         # handle error here, eg. report, or make a new error value
         !(err_value, line, col, file) = @;
@@ -149,7 +149,7 @@ range 0 10 1 { # This is a regular function.
     } block :outer {
         # do something...
         [_ != 10] {
-            return :from_outer $error "Something really failed"
+            return :outer $error "Something really failed"
             # same as, with the difference, that _? only returns
             # from :outer if it is an error value.
             _? :outer $error "Something really failed"
@@ -160,9 +160,12 @@ range 0 10 1 { # This is a regular function.
 };
 
 # Basic OOP:
-!some_obj = ${};
+# :wref to make any closure capture of some_obj a weak reference, so
+# we don't get any cyclic references:
+!:wref some_obj = ${};
 some_obj.do_something = {
-    # do something here
+    # do something here with some_obj captured (weakly)
+    # from the upper lexical scope.
 };
 some_obj.do_something(); # Method call
 ```
