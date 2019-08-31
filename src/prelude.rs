@@ -503,7 +503,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                     let val_type_name = val.type_name();
                     for i in match_vals.iter().skip(1) {
                         if env.arg(*i).s_raw() == val_type_name {
-                            return env.arg(fun_idx).call(env, &vec![val.clone()]);
+                            return env.arg(fun_idx).call(env, &[val.clone()]);
                         }
                     }
                 },
@@ -511,21 +511,21 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                     let val_s = val.s_raw();
                     for i in match_vals.iter().skip(1) {
                         if env.arg(*i).s_raw() == val_s {
-                            return env.arg(fun_idx).call(env, &vec![val.clone()]);
+                            return env.arg(fun_idx).call(env, &[val.clone()]);
                         }
                     }
                 },
                 "?e" => {
                     if let VVal::Err(e) = val {
-                        let err_val = e.borrow().0.at(0).unwrap_or(e.borrow().0.clone());
+                        let err_val = e.borrow().0.at(0).unwrap_or_else(|| e.borrow().0.clone());
 
                         for i in match_vals.iter().skip(1) {
                             if env.arg(*i).eqv(&err_val) {
                                 let args = vec![
                                     e.borrow().0.clone(),
-                                    VVal::Int(e.borrow().1.line as i64),
-                                    VVal::Int(e.borrow().1.col as i64),
-                                    VVal::Int(e.borrow().1.file as i64),
+                                    VVal::Int(i64::from(e.borrow().1.line)),
+                                    VVal::Int(i64::from(e.borrow().1.col)),
+                                    VVal::Int(i64::from(e.borrow().1.file)),
                                 ];
                                 return env.arg(fun_idx).call(env, &args);
                             }
@@ -536,12 +536,12 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                     if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
                     let fun_idx = fun_idx + 1;
 
-                    let pred_res = env.arg(arg_idx).call(env, &vec![val.clone()]);
+                    let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
                     match pred_res {
                         Ok(v) => {
                             arg_idx += 1;
                             if v.b() {
-                                return env.arg(fun_idx).call(env, &vec![val.clone()]);
+                                return env.arg(fun_idx).call(env, &[val.clone()]);
                             }
                         },
                         Err(sa) => { return Err(sa); }
@@ -554,7 +554,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
         } else {
             for i in match_vals.iter() {
                 if env.arg(*i).eqv(val) {
-                    return env.arg(fun_idx).call(env, &vec![val.clone()]);
+                    return env.arg(fun_idx).call(env, &[val.clone()]);
                 }
             }
         }
@@ -660,9 +660,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                     Ok(err_v.borrow().0.clone())
                 },
                 v => {
-                    return Err(StackAction::Panic(
+                    Err(StackAction::Panic(
                         VVal::new_str_mv(format!(
-                            "unwrap_err on non error value: {}", v.s())), None));
+                            "unwrap_err on non error value: {}", v.s())), None))
                 },
             }
         }, Some(1), Some(1));
@@ -671,13 +671,13 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |env: &mut Env, _argc: usize| {
             match env.arg(0) {
                 VVal::Err(err_v) => {
-                    return Err(StackAction::Panic(
+                    Err(StackAction::Panic(
                         VVal::new_str_mv(format!(
                             "unwrap error: {}@({},{}:{})",
                             err_v.borrow().0.s(),
                             err_v.borrow().1.line,
                             err_v.borrow().1.col,
-                            err_v.borrow().1.file)), None));
+                            err_v.borrow().1.file)), None))
                 },
                 v => Ok(v)
             }
@@ -688,13 +688,13 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             let err_fn = env.arg(0).clone();
             match env.arg(1) {
                 VVal::Err(err_v) => {
-                    return env.with_restore_sp(|e: &mut Env| {
+                    env.with_restore_sp(|e: &mut Env| {
                         e.push(VVal::Int(err_v.borrow().1.file as i64));
                         e.push(VVal::Int(err_v.borrow().1.col as i64));
                         e.push(VVal::Int(err_v.borrow().1.line as i64));
                         e.push(err_v.borrow().0.clone());
                         err_fn.call_internal(e, 4)
-                    });
+                    })
                 },
                 e => Ok(e)
             }
@@ -731,7 +731,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             let lst = env.arg(1);
             if let VVal::Lst(l) = lst {
                 let svec : Vec<VVal> =
-                    l.borrow_mut().iter().take(cnt).map(|v| v.clone()).collect();
+                    l.borrow_mut().iter().take(cnt).cloned().collect();
                 Ok(VVal::vec_mv(svec))
             } else {
                 Ok(VVal::err_msg(
@@ -747,7 +747,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             let lst = env.arg(1);
             if let VVal::Lst(l) = lst {
                 let svec : Vec<VVal> =
-                    l.borrow_mut().iter().skip(cnt).map(|v| v.clone()).collect();
+                    l.borrow_mut().iter().skip(cnt).cloned().collect();
                 Ok(VVal::vec_mv(svec))
             } else {
                 Ok(VVal::err_msg(
@@ -889,7 +889,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Ok(VVal::Nul); }
             if argc == 1 { return Ok(VVal::Nul) }
-            return match_next(env, &env.arg(0), 1, argc);
+            match_next(env, &env.arg(0), 1, argc)
         }, Some(1), None);
 
     g.borrow_mut().add_func("while",
@@ -1174,10 +1174,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             |env: &mut Env, _argc: usize| {
                 let v = env.arg(0).clone();
 
-                match serde_json::to_string_pretty(&v) {
+                match v.to_json() {
                     Ok(s) => Ok(VVal::new_str(&s)),
-                    Err(e) =>
-                        Ok(VVal::err_msg(&format!("ser:json failed: {}", e))),
+                    Err(e) => Ok(VVal::err_msg(&e)),
                 }
             }, Some(1), Some(1));
 
@@ -1185,10 +1184,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             |env: &mut Env, _argc: usize| {
                 let s = env.arg(0).s_raw();
 
-                match serde_json::from_str(&s) {
+                match VVal::from_json(&s) {
                     Ok(v) => Ok(v),
-                    Err(e) =>
-                        Ok(VVal::err_msg(&format!("deser:json failed: {}", e))),
+                    Err(e) => Ok(VVal::err_msg(&e)),
                 }
             }, Some(1), Some(1));
     }

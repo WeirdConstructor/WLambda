@@ -800,7 +800,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                     ps.skip_ws_and_comments();
                     let block = parse_block(ps, true)?;
                     block.set_at(0, ps.syn_raw(Syntax::Func));
-                    block.insert_at(1, VVal::Sym(String::from(block_name)));
+                    block.insert_at(1, VVal::Sym(block_name));
                     Ok(block)
                 } else {
                     let arity =

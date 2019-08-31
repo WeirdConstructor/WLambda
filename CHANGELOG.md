@@ -1,4 +1,4 @@
-0.2.2 (unreleased)
+0.2.2 (2019-09-01)
 ==================
 
 * `-` and `+` are not parsed as operator if a digit follows.

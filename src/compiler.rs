@@ -45,12 +45,12 @@ pub trait ModuleResolver {
     /// load them by executing another WLambda script or whatever you fancy.
     ///
     /// See LocalFileModuleResolver as example on how to implement this.
-    fn resolve(&mut self, global: GlobalEnvRef, path: &Vec<String>) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError>;
+    fn resolve(&mut self, global: GlobalEnvRef, path: &[String]) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError>;
 }
 
 /// This structure implements the ModuleResolver trait and is
 /// responsible for loading modules on `!@import` for WLambda.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LocalFileModuleResolver {
     loaded_modules: std::collections::HashMap<String, std::rc::Rc<std::collections::HashMap<String, VVal>>>,
 }
@@ -65,7 +65,7 @@ impl LocalFileModuleResolver {
 }
 
 impl ModuleResolver for LocalFileModuleResolver {
-    fn resolve(&mut self, _global: GlobalEnvRef, path: &Vec<String>) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError> {
+    fn resolve(&mut self, _global: GlobalEnvRef, path: &[String]) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError> {
         let global = create_wlamba_prelude();
         let mut ctx = EvalContext::new(global);
         let pth = path.join("/");
@@ -140,6 +140,7 @@ impl GlobalEnv {
     /// Sets a global variable to a value.
     ///
     /// See also [EvalContext::set_global_var()](struct.EvalContext.html#method.set_global_var)
+    #[allow(dead_code)]
     pub fn set_var(&mut self, var: &str, val: &VVal) {
         self.env.insert(String::from(var), val.to_ref());
     }
@@ -147,6 +148,7 @@ impl GlobalEnv {
     /// Returns the value of a global variable.
     ///
     /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
+    #[allow(dead_code)]
     pub fn get_var(&mut self, var: &str) -> Option<VVal> {
         match self.env.get(var) {
             Some(v) => Some(v.deref()),
@@ -224,7 +226,7 @@ impl EvalContext {
     }
 
     pub fn get_exports(&self) -> std::collections::HashMap<String, VVal> {
-        return self.local.borrow_mut().exports.clone();
+        self.local.borrow_mut().exports.clone()
     }
 
     #[allow(dead_code)]
@@ -363,6 +365,7 @@ impl EvalContext {
     ///
     /// assert_eq!(ctx.eval("XXX * 2").unwrap().i(), 400);
     /// ```
+    #[allow(dead_code)]
     pub fn set_global_var(&mut self, var: &str, val: &VVal) {
         self.global.borrow_mut().set_var(var, val);
     }
@@ -377,6 +380,7 @@ impl EvalContext {
     ///
     /// assert_eq!(ctx.eval("!:global XXX = 22 * 2; XXX").unwrap().i(), 44);
     /// ```
+    #[allow(dead_code)]
     pub fn get_global_var(&mut self, var: &str) -> Option<VVal> {
         self.global.borrow_mut().get_var(var)
     }
@@ -550,19 +554,16 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
     Ok(Box::new(move |e: &mut Env| {
         let mut res = VVal::Nul;
         for x in exprs.iter() {
-            match res {
-                VVal::Err(ev) => {
-                    let err_msg =
-                        format!("Error value '{}'(@{},{}:{}) dropped.",
-                                ev.borrow().0.s(),
-                                ev.borrow().1.line,
-                                ev.borrow().1.col,
-                                ev.borrow().1.file);
-                    return
-                        Err(StackAction::Panic(
-                            VVal::new_str(&err_msg), None));
-                },
-                _ => (),
+            if let VVal::Err(ev) = res {
+                let err_msg =
+                    format!("Error value '{}'(@{},{}:{}) dropped.",
+                            ev.borrow().0.s(),
+                            ev.borrow().1.line,
+                            ev.borrow().1.col,
+                            ev.borrow().1.file);
+                return
+                    Err(StackAction::Panic(
+                        VVal::new_str(&err_msg), None));
             }
 
             res = VVal::Nul;
@@ -673,11 +674,8 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                 VVal::Lst(l) => {
                     for (i, vi) in poses.iter().enumerate() {
                         if l.borrow().len() <= i {
-                            match vi {
-                                VarPos::Local(vip) => {
-                                    e.set_consume(*vip, VVal::Nul);
-                                },
-                                _ => {}
+                            if let VarPos::Local(vip) = vi {
+                                e.set_consume(*vip, VVal::Nul);
                             }
                         } else {
                             let val = &mut l.borrow_mut()[i];
@@ -803,7 +801,7 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                 }
             },
             _ => ast.to_compile_err(
-                    format!("Can't define badly positioned variable!")),
+                    "Can't define badly positioned variable!".to_string()),
         }
     }
 }
@@ -817,7 +815,7 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
                 r.replace(v.clone());
                 None
             } else {
-                Some(format!("Can't assign to global read only variable!"))
+                Some("Can't assign to global read only variable!".to_string())
             }
         },
         VarPos::NoPos => {
@@ -843,14 +841,11 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
         let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
 
         for (i, pos) in poses.iter().enumerate() {
-            match pos {
-                VarPos::NoPos => {
-                    return 
-                        ast.to_compile_err(
-                            format!("Can't assign to undefined local variable '{}'",
-                                    vars.at(i).unwrap_or(VVal::Nul).s_raw()));
-                },
-                _ => (),
+            if let VarPos::NoPos = pos {
+                return 
+                    ast.to_compile_err(
+                        format!("Can't assign to undefined local variable '{}'",
+                                vars.at(i).unwrap_or(VVal::Nul).s_raw()));
             }
         }
 
@@ -948,8 +943,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let name   = ast.at(2).unwrap();
                     let path : Vec<String> =
                         (&name.s_raw())
-                            .split(":")
-                            .map(|s| String::from(s))
+                            .split(':')
+                            .map(String::from)
                             .collect();
 
                     let glob_ref = ce.borrow_mut().global.clone();
@@ -1121,19 +1116,16 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
-                            match res {
-                                VVal::Err(ev) => {
-                                    let err_msg =
-                                        format!("Error value '{}'@({},{}:{}) dropped.",
-                                                ev.borrow().0.s(),
-                                                ev.borrow().1.line,
-                                                ev.borrow().1.col,
-                                                ev.borrow().1.file);
-                                    return
-                                        Err(StackAction::Panic(
-                                            VVal::new_str(&err_msg), None));
-                                },
-                                _ => (),
+                            if let VVal::Err(ev) = res {
+                                let err_msg =
+                                    format!("Error value '{}'@({},{}:{}) dropped.",
+                                            ev.borrow().0.s(),
+                                            ev.borrow().1.line,
+                                            ev.borrow().1.col,
+                                            ev.borrow().1.file);
+                                return
+                                    Err(StackAction::Panic(
+                                        VVal::new_str(&err_msg), None));
                             }
 
                             res = VVal::Nul;
@@ -1993,6 +1985,14 @@ mod tests {
                     $q/foobarbaaaarfoobaararar/
             "),
             "\"foob<ar>b<aaaar>foobaar<ar><ar>\"");
+        }
+    }
+
+    #[test]
+    fn check_json() {
+        if cfg!(feature="serde_json") {
+            assert_eq!(s_eval("ser:json $[1,1.2,$f,$t,$n,${a=1}]"), "\"[\\n  1,\\n  1.2,\\n  false,\\n  true,\\n  null,\\n  {\\n    \\\"a\\\": 1\\n  }\\n]\"");
+            assert_eq!(s_eval("deser:json $q$[1,2.3,true,null,{\"a\":10}]$"), "$[1,2.3,$true,$n,${a=10}]");
         }
     }
 }

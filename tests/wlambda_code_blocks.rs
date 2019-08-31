@@ -1,6 +1,6 @@
 use std::fs::File;
 use regex::Regex;
-use std::io::{BufRead, BufReader, Result};
+use std::io::{BufRead, BufReader};
 
 fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
     let f = File::open(filename).expect("Open file");

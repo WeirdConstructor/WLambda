@@ -555,7 +555,7 @@ impl VVal {
     }
 
     pub fn new_str_mv(s: String) -> VVal {
-        VVal::Str(Rc::new(RefCell::new(String::from(s))))
+        VVal::Str(Rc::new(RefCell::new(s)))
     }
 
     pub fn new_sym(s: &str) -> VVal {
@@ -634,11 +634,10 @@ impl VVal {
             VVal::Bol(b) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let idx = if *b { 0 } else { 1 };
-                    let ret = if argc > 0 {
+                    if argc > 0 {
                         let v = e.arg(idx).clone();
                         v.call_internal(e, 0)
-                    } else { Ok(self.clone()) };
-                    ret
+                    } else { Ok(self.clone()) }
                 })
             },
             VVal::Err(e) => {
@@ -649,15 +648,14 @@ impl VVal {
             },
             VVal::Sym(sym) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    let ret = if argc > 0 {
+                    if argc > 0 {
                         let v = e.arg(0);
                         match v {
                             VVal::Map(_) =>
                                 Ok(v.get_key(&sym).unwrap_or(VVal::Nul)),
                             _ => Ok(VVal::Nul)
                         }
-                    } else { Ok(self.clone()) };
-                    ret
+                    } else { Ok(self.clone()) }
                 })
             },
             VVal::Lst(l) => {
@@ -680,19 +678,19 @@ impl VVal {
                     Ok(ret)
                 })
             },
-            VVal::Str(s) => {
+            VVal::Str(vval_str) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    let ret = if argc > 0 {
-                        let v = e.arg(0);
-                        match v {
-                            VVal::Int(i) => {
+                    if argc > 0 {
+                        let first_arg = e.arg(0);
+                        match first_arg {
+                            VVal::Int(arg_int) => {
                                 if argc > 1 {
-                                    let from = i as usize;
+                                    let from = arg_int as usize;
                                     let cnt  = e.arg(1).i() as usize;
-                                    let r : String = s.borrow().chars().skip(from).take(cnt).collect();
+                                    let r : String = vval_str.borrow().chars().skip(from).take(cnt).collect();
                                     Ok(VVal::new_str_mv(r))
                                 } else {
-                                    let r = s.borrow().chars().nth(i as usize);
+                                    let r = vval_str.borrow().chars().nth(arg_int as usize);
                                     match r {
                                         None    => Ok(VVal::Nul),
                                         Some(c) => {
@@ -703,42 +701,40 @@ impl VVal {
                                 }
                             },
                             VVal::Lst(_) => {
-                                let from = v.at(0).unwrap_or(VVal::Int(0)).i() as usize;
-                                let cnt  = v.at(1).unwrap_or(VVal::Int((s.borrow().len() - from) as i64)).i() as usize;
-                                let r : String = s.borrow().chars().skip(from).take(cnt).collect();
+                                let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
+                                let cnt  = first_arg.at(1).unwrap_or_else(|| VVal::Int((vval_str.borrow().len() - from) as i64)).i() as usize;
+                                let r : String = vval_str.borrow().chars().skip(from).take(cnt).collect();
                                 Ok(VVal::new_str_mv(r))
                             },
                             VVal::Str(s2) => {
                                 if argc > 1 {
                                     // TODO: Fix the extra clone here:
-                                    let mut accum = s.borrow().clone() + &s2.borrow().clone();
+                                    let mut accum = vval_str.borrow().clone() + &s2.borrow().clone();
                                     for i in 2..argc {
                                         accum += &e.arg(i).s_raw();
                                     }
                                     Ok(VVal::new_str_mv(accum))
                                 } else {
                                     // TODO: Fix the extra clone here:
-                                    Ok(VVal::new_str_mv(s.borrow().clone() + &s2.borrow().clone()))
+                                    Ok(VVal::new_str_mv(vval_str.borrow().clone() + &s2.borrow().clone()))
                                 }
                             },
-                            VVal::Map(_) => Ok(v.get_key(&s.borrow()).unwrap_or(VVal::Nul)),
+                            VVal::Map(_) => Ok(first_arg.get_key(&vval_str.borrow()).unwrap_or(VVal::Nul)),
                             _ => Ok(VVal::Nul)
                         }
-                    } else { Ok(self.clone()) };
-                    ret
+                    } else { Ok(self.clone()) }
                 })
             },
             VVal::Int(i) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    let ret = if argc > 0 {
+                    if argc > 0 {
                         let v = e.arg(0);
                         match v {
                             VVal::Lst(_) =>
                                 Ok(v.at(*i as usize).unwrap_or(VVal::Nul)),
                             _ => Ok(VVal::Nul)
                         }
-                    } else { Ok(self.clone()) };
-                    ret
+                    } else { Ok(self.clone()) }
                 })
             }
             _ => { Ok(self.clone()) },
@@ -1149,6 +1145,24 @@ impl VVal {
             },
         }
     }
+
+    /// Serializes the VVal (non cyclic) structure to a JSON string.
+    #[cfg(feature="serde_json")]
+    pub fn to_json(&self) -> Result<String, String> {
+        match serde_json::to_string_pretty(self) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(format!("to_json failed: {}", e))
+        }
+    }
+
+    /// Creates a VVal structure from a JSON string.
+    #[cfg(feature="serde_json")]
+    pub fn from_json(s: &str) -> Result<VVal, String> {
+        match serde_json::from_str(&s) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(format!("from_json failed: {}", e)),
+        }
+    }
 }
 
 #[cfg(feature="serde")]
@@ -1208,26 +1222,26 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
     fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Int(value)) }
     fn visit_i32<E>(self, value: i32) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
     fn visit_i16<E>(self, value: i16) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
     fn visit_i8<E>(self, value: i8) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
     fn visit_u128<E>(self, value: u128) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
     fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
     fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
     fn visit_u16<E>(self, value: u16) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
     fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
 
     fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Flt(value)) }
     fn visit_f32<E>(self, value: f32) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Flt(value as f64)) }
+        where E: serde::de::Error { Ok(VVal::Flt(f64::from(value))) }
 
     fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Bol(value)) }
