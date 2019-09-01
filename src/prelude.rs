@@ -356,6 +356,18 @@ wl:assert ~ [x:symbol 10] == 40;
 
 ## Prelude
 
+### wl:eval _code-string_
+
+Evaluates _code-string_ in the current global environment and returns
+the generated value. If the code leads to any kind of evaluation error,
+an error object is returned.
+
+```wlambda
+wl:assert_eq [wl:eval "1 + 2"] 3;
+!:global X = 20;
+wl:assert_eq [wl:eval "1 + X"] 21;
+```
+
 ### wl:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
@@ -379,6 +391,29 @@ wl:assert_eq x 60 "30 * 2 == 60";
 ```
 
 ## Optional Prelude
+
+### serialization
+
+#### ser:json _data_ \[_no_pretty_]
+
+Serializes the _data_ and returns a JSON formatted (and pretty printed) string.
+Optionally not pretty printed if _no_pretty_ is a true value.
+
+```wlambda
+!str = ser:json $[1,2.3,${a=4}] $t;
+wl:assert_eq str "[1,2.3,{\"a\":4}]";
+```
+
+#### deser:json _string_
+
+Deserializes the JSON formatted _string_ into a data structure.
+
+```wlambda
+!data = deser:json ~ ser:json $[1,2.3,${a=4}];
+wl:assert_eq data.0 1;
+wl:assert_eq data.1 2.3;
+wl:assert_eq data.[2].a 4;
+```
 
 ### regex
 
@@ -1173,12 +1208,13 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         g.borrow_mut().add_func("ser:json",
             |env: &mut Env, _argc: usize| {
                 let v = env.arg(0).clone();
+                let pp = env.arg(1).b();
 
-                match v.to_json() {
+                match v.to_json(pp) {
                     Ok(s) => Ok(VVal::new_str(&s)),
                     Err(e) => Ok(VVal::err_msg(&e)),
                 }
-            }, Some(1), Some(1));
+            }, Some(1), Some(2));
 
         g.borrow_mut().add_func("deser:json",
             |env: &mut Env, _argc: usize| {

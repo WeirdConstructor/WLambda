@@ -131,6 +131,11 @@ impl Env {
         e
     }
 
+    /// Returns the passed in user context value.
+    pub fn get_user(&self) -> Rc<RefCell<std::any::Any>> {
+        self.user.clone()
+    }
+
     /// Easier access to the user data field in Env
     ///
     /// In the following example the user supplies a registry
@@ -1148,10 +1153,17 @@ impl VVal {
 
     /// Serializes the VVal (non cyclic) structure to a JSON string.
     #[cfg(feature="serde_json")]
-    pub fn to_json(&self) -> Result<String, String> {
-        match serde_json::to_string_pretty(self) {
-            Ok(s) => Ok(s),
-            Err(e) => Err(format!("to_json failed: {}", e))
+    pub fn to_json(&self, not_pretty: bool) -> Result<String, String> {
+        if not_pretty {
+            match serde_json::to_string(self) {
+                Ok(s) => Ok(s),
+                Err(e) => Err(format!("to_json failed: {}", e))
+            }
+        } else {
+            match serde_json::to_string_pretty(self) {
+                Ok(s) => Ok(s),
+                Err(e) => Err(format!("to_json failed: {}", e))
+            }
         }
     }
 

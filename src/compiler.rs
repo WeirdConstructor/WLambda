@@ -210,19 +210,27 @@ pub struct EvalContext {
 
 impl EvalContext {
     pub fn new(global: GlobalEnvRef) -> EvalContext {
-        EvalContext {
-            global: global.clone(),
-            local_compile: Rc::new(RefCell::new(CompileEnv {
-                parent:    None,
-                global:    global.clone(),
-                local_map: std::collections::HashMap::new(),
-                locals:    Vec::new(),
-                upvals:    Vec::new(),
-                implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-                explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-            })),
-            local: Rc::new(RefCell::new(Env::new())),
-        }
+        (Self::new_with_user_impl(global, Rc::new(RefCell::new(VVal::vec()))))
+        .register_self_eval()
+    }
+
+    fn register_self_eval(self) -> Self {
+        let ctx_clone =
+            Self::new_with_user_impl(
+                self.global.clone(),
+                self.local.borrow().get_user());
+
+        self.global.borrow_mut().add_func("wl:eval", move |env: &mut Env, _argc: usize| {
+            let code    = env.arg(0).s_raw();
+            let ctx     = ctx_clone.clone();
+            let mut ctx = ctx.register_self_eval();
+            match ctx.eval(&code) {
+                Ok(v)  => Ok(v),
+                Err(e) => Ok(VVal::err_msg(&format!("{}", e))),
+            }
+        }, Some(1), Some(2));
+
+        self
     }
 
     pub fn get_exports(&self) -> std::collections::HashMap<String, VVal> {
@@ -230,7 +238,7 @@ impl EvalContext {
     }
 
     #[allow(dead_code)]
-    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<std::any::Any>>) -> EvalContext {
+    fn new_with_user_impl(global: GlobalEnvRef, user: Rc<RefCell<std::any::Any>>) -> EvalContext {
         EvalContext {
             global: global.clone(),
             local_compile: Rc::new(RefCell::new(CompileEnv {
@@ -244,6 +252,11 @@ impl EvalContext {
             })),
             local: Rc::new(RefCell::new(Env::new_with_user(user))),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<std::any::Any>>) -> EvalContext {
+        (Self::new_with_user_impl(global, user)).register_self_eval()
     }
 
     /// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
@@ -1992,7 +2005,21 @@ mod tests {
     fn check_json() {
         if cfg!(feature="serde_json") {
             assert_eq!(s_eval("ser:json $[1,1.2,$f,$t,$n,${a=1}]"), "\"[\\n  1,\\n  1.2,\\n  false,\\n  true,\\n  null,\\n  {\\n    \\\"a\\\": 1\\n  }\\n]\"");
+            assert_eq!(s_eval("ser:json $[1,1.2,$f,$t,$n,${a=1}] $t"), "\"[1,1.2,false,true,null,{\\\"a\\\":1}]\"");
             assert_eq!(s_eval("deser:json $q$[1,2.3,true,null,{\"a\":10}]$"), "$[1,2.3,$true,$n,${a=10}]");
         }
+    }
+
+    #[test]
+    fn check_eval() {
+        let global = create_wlamba_prelude();
+        let mut ctx = EvalContext::new(global);
+
+        assert_eq!(ctx.eval("wl:eval $q$1 + 2$").unwrap().s(), "3");
+
+        ctx.set_global_var("XXX", &VVal::Int(1337));
+        assert_eq!(ctx.eval("wl:eval $q$XXX + 2$").unwrap().s(), "1339");
+
+        assert_eq!(ctx.eval("wl:eval $q/wl:eval $q$XXX + 2$/").unwrap().s(), "1339");
     }
 }

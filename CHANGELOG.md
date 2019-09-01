@@ -1,3 +1,11 @@
+0.2.3 (unreleased)
+=================
+
+* Feature: ser:json got a non-pretty print argument.
+* Doc: Documented ser:json and deser:json, with additional examples.
+* Feature: Implemented `wl:eval` for evaluating wlambda code from inside
+wlambda code, so you can evaluate code while you are evaluating code.
+
 0.2.2 (2019-09-01)
 ==================
 
