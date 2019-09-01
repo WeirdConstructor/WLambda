@@ -417,6 +417,12 @@ pub struct VValFun {
 }
 
 impl VValFun {
+    pub fn new_fun<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>) -> VVal
+        where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
+
+        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args)
+    }
+
     pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize, min_args: Option<usize>, max_args: Option<usize>) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalues,
@@ -583,6 +589,15 @@ impl VVal {
 
     pub fn vec() -> VVal {
         VVal::Lst(Rc::new(RefCell::new(Vec::new())))
+    }
+
+    pub fn to_vec(&self) -> Vec<VVal> {
+        if let VVal::Lst(l) = self {
+            let r : Vec<VVal> = l.borrow_mut().iter().cloned().collect();
+            r
+        } else {
+            vec![self.clone()]
+        }
     }
 
     pub fn vec_from(vl: &[VVal]) -> VVal {

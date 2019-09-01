@@ -134,7 +134,7 @@ impl GlobalEnv {
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
         self.env.insert(
             String::from(fnname),
-            VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args));
+            VValFun::new_fun(fun, min_args, max_args));
     }
 
     /// Sets a global variable to a value.

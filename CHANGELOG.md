@@ -5,6 +5,9 @@
 * Doc: Documented ser:json and deser:json, with additional examples.
 * Feature: Implemented `wl:eval` for evaluating wlambda code from inside
 wlambda code, so you can evaluate code while you are evaluating code.
+* Feature: Thread communication helpers implemented for connecting
+WLambda EvalContext instances accross threads and providing easy
+cross thread messaging and RPC. (TODO: async send).
 
 0.2.2 (2019-09-01)
 ==================
