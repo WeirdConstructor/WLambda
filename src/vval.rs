@@ -943,6 +943,14 @@ impl VVal {
         }
     }
 
+    pub fn pop(&self) -> VVal {
+        if let VVal::Lst(b) = &self {
+            b.borrow_mut().pop().unwrap_or(VVal::Nul)
+        } else {
+            VVal::Nul
+        }
+    }
+
     pub fn push(&self, val: VVal) -> &VVal {
         //d// println!("FN PUSH {} v {}", self.s(), val.s());
         if let VVal::Lst(b) = &self {

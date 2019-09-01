@@ -760,6 +760,12 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             Ok(v.clone())
         }, Some(2), Some(2));
 
+    g.borrow_mut().add_func("pop",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            Ok(v.pop())
+        }, Some(1), Some(1));
+
     g.borrow_mut().add_func("take",
         |env: &mut Env, _argc: usize| {
             let cnt = env.arg(0).i() as usize;

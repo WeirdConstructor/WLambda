@@ -45,9 +45,9 @@ let t = std::thread::spawn(move || {
 });
 
 // Calls the global `displayln` in the Worker thread with the supplied arguments.
-ctx.eval("worker :displayln \"hello world from worker thread!\";").unwrap();
+ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
 
-ctx.eval("wl:assert_eq [worker :wl:eval \"X\"] 123;").unwrap();
+ctx.eval("wl:assert_eq [worker_call :wl:eval \"X\"] 123;").unwrap();
 
 sender.call("thread:quit", VVal::Nul);
 
@@ -90,6 +90,7 @@ t.join();
 
 use crate::compiler::EvalContext;
 use crate::vval::*;
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, Condvar};
 
 /// The Sender sends RPC calls to the Receiver thread.
@@ -131,7 +132,7 @@ impl Sender {
     /// of the thread function you want to call and additional
     /// arguments to that function.
     ///
-    /// ```
+    /// ```no_run
     /// let global  = wlambda::prelude::create_wlamba_prelude();
     /// let mut ctx = wlambda::compiler::EvalContext::new(global);
     ///
@@ -144,7 +145,7 @@ impl Sender {
     /// ```
     pub fn register_on_as(&self, ctx: &mut EvalContext, variable_name: &str) {
         let sender = self.clone();
-        ctx.set_global_var(&format("{}_call", variable_name),
+        ctx.set_global_var(&format!("{}_call", variable_name),
             &VValFun::new_fun(
                 move |env: &mut Env, argc: usize| {
                     let args =
@@ -201,7 +202,13 @@ impl Sender {
         ret
     }
 
-    pub fn send(_var_name: &str, _args: VVal) {
+    pub fn send(&self, var_name: &str, args: VVal) {
+        let r = &*self.receiver;
+        let mut mx = r.mx.lock().unwrap();
+        mx.0 = RecvState::Msg;
+        mx.4.push_back((
+            var_name.to_string(),
+            args.to_json(true).unwrap().into_bytes()));
     }
 }
 
@@ -209,6 +216,7 @@ impl Sender {
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum RecvState {
     Open,
+    Msg,
     Call,
     Return,
 }
@@ -216,7 +224,7 @@ enum RecvState {
 #[derive(Debug)]
 #[cfg(feature="serde_json")]
 pub struct Receiver {
-    mx: Mutex<(RecvState, String, Vec<u8>, bool)>,
+    mx: Mutex<(RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>)>,
     cv: Condvar,
 }
 
@@ -224,14 +232,19 @@ pub struct Receiver {
 impl Receiver {
     fn new() -> Arc<Self> {
         Arc::new(Receiver {
-            mx: Mutex::new((RecvState::Open, String::from(""), vec![], false)),
+            mx: Mutex::new((
+                    RecvState::Open,
+                    String::from(""),
+                    vec![],
+                    false,
+                    VecDeque::new())),
             cv: Condvar::new(),
         })
     }
 }
 
 #[cfg(feature="serde_json")]
-fn mx_recv_error(mx: &mut (RecvState, String, Vec<u8>, bool), s: &str) {
+fn mx_recv_error(mx: &mut (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>), s: &str) {
     mx.0 = RecvState::Return;
     mx.2 =
         VVal::err_msg(&format!("return value serialization error: {}", s))
@@ -242,7 +255,7 @@ fn mx_recv_error(mx: &mut (RecvState, String, Vec<u8>, bool), s: &str) {
 }
 
 #[cfg(feature="serde_json")]
-fn mx_return(mx: &mut (RecvState, String, Vec<u8>, bool), v: &VVal) {
+fn mx_return(mx: &mut (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>), v: &VVal) {
     mx.0 = RecvState::Return;
     match v.to_json(true) {
         Ok(s) => {
@@ -316,44 +329,65 @@ impl MsgHandle {
 
         let mut mx = r.mx.lock().unwrap();
         loop {
-            if let RecvState::Call = mx.0 {
-                if let Some(v) = ctx.get_global_var(&mx.1) {
-                    match VVal::from_json(&String::from_utf8(mx.2.clone()).unwrap()) {
-                        Ok(args) => {
-                            let arg =
-                                if args.is_none() { vec![] }
-                                else { args.to_vec() };
-                            match ctx.call(&v, &arg) {
-                                Ok(vret) => {
-                                    mx_return(&mut *mx, &vret);
-                                },
-                                Err(sa) => {
-                                    mx_recv_error(&mut *mx,
-                                        &format!("uncaught stack action: {:?}", sa));
+            match mx.0 {
+                RecvState::Call => {
+                    if let Some(v) = ctx.get_global_var(&mx.1) {
+                        match VVal::from_json(&String::from_utf8(
+                                                mx.2.clone()).unwrap()) {
+                            Ok(args) => {
+                                let arg =
+                                    if args.is_none() { vec![] }
+                                    else { args.to_vec() };
+                                match ctx.call(&v, &arg) {
+                                    Ok(vret) => {
+                                        mx_return(&mut *mx, &vret);
+                                    },
+                                    Err(sa) => {
+                                        mx_recv_error(&mut *mx,
+                                            &format!("uncaught stack action: {:?}",
+                                                     sa));
+                                    }
                                 }
+                            },
+                            Err(s) => {
+                                mx_recv_error(&mut *mx,
+                                    &format!("deserialization error: {}", s));
                             }
-                        },
-                        Err(s) => {
-                            mx_recv_error(&mut *mx,
-                                &format!("deserialization error: {}", s));
                         }
+
+                    } else {
+                        let gvar = mx.1.clone();
+                        mx_recv_error(&mut *mx,
+                            &format!("no such global variable: {}", gvar));
                     }
 
-                } else {
-                    let gvar = mx.1.clone();
-                    mx_recv_error(&mut *mx,
-                        &format!("no such global variable: {}", gvar));
-                }
-
-                r.cv.notify_one();
-                break;
-            } else {
-                // FIXME: As soon as Rust is not nightly anymore,
-                //        use wait_timeout_until for more precise timeout.
-                let res = r.cv.wait_timeout(mx, *timeout).unwrap();
-                mx = res.0;
-                if res.1.timed_out() {
+                    r.cv.notify_one();
                     break;
+                },
+                RecvState::Msg => {
+                    while mx.4.len() > 0 {
+                        let (name, ser_val) = mx.4.pop_front().unwrap();
+                        if let Some(v) = ctx.get_global_var(&name) {
+                            if let Ok(args) = VVal::from_json(&String::from_utf8(
+                                                    ser_val).unwrap()) {
+                                let arg =
+                                    if args.is_none() { vec![] }
+                                    else { args.to_vec() };
+                                ctx.call(&v, &arg).unwrap_or(VVal::Nul);
+                            }
+                        }
+                    }
+                    r.cv.notify_one();
+                    break;
+                },
+                _ => {
+                    // FIXME: As soon as Rust is not nightly anymore,
+                    //        use wait_timeout_until for more precise timeout.
+                    let res = r.cv.wait_timeout(mx, *timeout).unwrap();
+                    mx = res.0;
+                    if res.1.timed_out() {
+                        break;
+                    }
                 }
             }
         }
@@ -398,8 +432,8 @@ mod tests {
             }
         });
 
-        ctx.eval("worker :displayln \"hello world from worker thread!\";").unwrap();
-        ctx.eval("wl:assert_eq [worker :wl:eval \"X\"] 123;").unwrap();
+        ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
+        ctx.eval("wl:assert_eq [worker_call :wl:eval \"X\"] 123;").unwrap();
 
         sender.call("thread:quit", VVal::Nul);
 
@@ -427,9 +461,56 @@ mod tests {
             msg_handle.run(&mut ctx);
         });
 
-        ctx.eval("wl:assert_eq [worker :wl:eval \"X\"] 123;").unwrap();
+        ctx.eval("wl:assert_eq [worker_call :wl:eval \"X\"] 123;").unwrap();
 
         sender.call("thread:quit", VVal::Nul);
+
+        t.join().unwrap();
+    }
+
+    #[cfg(feature="serde_json")]
+    #[test]
+    fn check_rpc_msgs() {
+        use crate::vval::*;
+
+        let r = std::sync::Arc::new(std::sync::Mutex::new(0));
+        let ri = r.clone();
+
+        // Get some random user thread:
+        let global  = crate::prelude::create_wlamba_prelude();
+        let mut ctx = crate::compiler::EvalContext::new(global);
+
+        let mut msg_handle = crate::threads::MsgHandle::new();
+        let sender = msg_handle.sender();
+        sender.register_on_as(&mut ctx, "worker");
+
+        let t = std::thread::spawn(move || {
+            let global_t = crate::prelude::create_wlamba_prelude();
+            let mut ctx = crate::compiler::EvalContext::new(global_t);
+
+            ctx.eval(r#"
+                !:global X = $[1,2,3,4];
+                !:global Y = { pop X };
+            "#).unwrap();
+            msg_handle.run(&mut ctx);
+
+            {
+                let mut i = ri.lock().unwrap();
+                std::mem::replace(
+                    &mut *i,
+                    ctx.eval("pop X").unwrap().i());
+            }
+        });
+
+        sender.send("Y",           VVal::Nul);
+        sender.send("Y",           VVal::Nul);
+        sender.send("Y",           VVal::Nul);
+        sender.send("thread:quit", VVal::Nul);
+
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        let i = r.lock().unwrap();
+        assert_eq!(*i, 1, "popping works");
 
         t.join().unwrap();
     }
