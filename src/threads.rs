@@ -202,6 +202,10 @@ impl Sender {
         ret
     }
 
+    /// With send you can asynchronously send messages in form of
+    /// method calls to the receiver. The Receiver will process all
+    /// received messages per `step()`. Multiple senders can send
+    /// messages, while multiple Receivers can process them.
     pub fn send(&self, var_name: &str, args: VVal) {
         let r = &*self.receiver;
         let mut mx = r.mx.lock().unwrap();
@@ -329,7 +333,8 @@ impl MsgHandle {
 
         let mut mx = r.mx.lock().unwrap();
         loop {
-            match mx.0 {
+            let state = mx.0;
+            match state {
                 RecvState::Call => {
                     if let Some(v) = ctx.get_global_var(&mx.1) {
                         match VVal::from_json(&String::from_utf8(
@@ -365,8 +370,13 @@ impl MsgHandle {
                     break;
                 },
                 RecvState::Msg => {
-                    while mx.4.len() > 0 {
+                    std::mem::drop(mx);
+                    loop {
+                        let mut mx = r.mx.lock().unwrap();
+                        if mx.4.len() <= 0 { break; }
                         let (name, ser_val) = mx.4.pop_front().unwrap();
+                        std::mem::drop(mx);
+
                         if let Some(v) = ctx.get_global_var(&name) {
                             if let Ok(args) = VVal::from_json(&String::from_utf8(
                                                     ser_val).unwrap()) {
