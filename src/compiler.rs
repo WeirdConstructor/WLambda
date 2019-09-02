@@ -2022,4 +2022,56 @@ mod tests {
 
         assert_eq!(ctx.eval("wl:eval $q/wl:eval $q$XXX + 2$/").unwrap().s(), "1339");
     }
+
+    #[test]
+    fn check_userdata() {
+        use std::rc::Rc;
+        use std::cell::RefCell;
+        let global_env = crate::prelude::create_wlamba_prelude();
+
+        #[derive(Clone, Debug)]
+        struct MyType {
+            x: Rc<RefCell<(i64, i64)>>,
+        }
+
+        impl crate::vval::VValUserData for MyType {
+            fn s(&self) -> String { format!("$<MyType({:?})>", self.x.borrow()) }
+            fn i(&self) -> i64    { self.x.borrow_mut().1 }
+            fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+            fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
+                Box::new(self.clone())
+            }
+        }
+
+        global_env.borrow_mut().add_func(
+            "new_mytype",
+            |_env: &mut Env, _argc: usize| {
+                Ok(VVal::Usr(Box::new(MyType { x: Rc::new(RefCell::new((13, 42))) })))
+            }, Some(0), Some(0));
+
+        global_env.borrow_mut().add_func(
+            "modify_mytype",
+            |env: &mut Env, _argc: usize| {
+                Ok(if let VVal::Usr(mut u) = env.arg(0) {
+                    if let Some(ud) = u.as_any().downcast_mut::<MyType>() {
+                        ud.x.borrow_mut().0 += 1;
+                        ud.x.borrow_mut().1 *= 2;
+                        VVal::Int(ud.x.borrow().0 + ud.x.borrow().1)
+                    } else {
+                        VVal::Nul
+                    }
+                } else { VVal::Nul })
+            }, Some(1), Some(1));
+
+        let mut ctx = crate::compiler::EvalContext::new(global_env);
+
+        let r = &mut ctx.eval(r#"
+            !x = new_mytype();
+            !i = modify_mytype x;
+            $[i, x]
+        "#).unwrap();
+
+        assert_eq!(
+            r.s(), "$[98,$<MyType((14, 84))>]", "Userdata implementation works");
+    }
 }

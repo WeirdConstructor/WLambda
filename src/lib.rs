@@ -27,6 +27,7 @@ of Rust's Result type.
   or by weak reference. Giving you the ability to keep cyclic
   references in check.
 - Easy maintenance of the implementation.
+- Custom user data implementation using [VValUserData](vval/trait.VValUserData.html).
 
 The embedding API relies on a data structure made of [VVal](vval/index.html) nodes.
 
@@ -172,17 +173,55 @@ some_obj.do_something(); # Method call
 
 Currently there are many more examples in the test cases in `compiler.rs`.
 
-# Basic API Usage
+# API Usage Examples
 
-The API is far from feature complete, but this is roughly
-how it looks currently:
+## Basic API Usage
+
+Here is how you can quickly evaluate a piece of WLambda code:
 
 ```
-use wlambda::prelude::create_wlamba_prelude;
-
 let s = "$[1,2,3]";
 let r = wlambda::compiler::eval(&s).unwrap();
 println!("Res: {}", r.s());
+```
+
+## More Advanced API Usage
+
+If you want to quickly add some of your own functions,
+you can use the GlobalEnv `add_func` method:
+
+```
+use wlambda::vval::{VVal, VValFun, Env};
+
+let global_env = wlambda::prelude::create_wlamba_prelude();
+global_env.borrow_mut().add_func(
+    "my_crazy_add",
+    |env: &mut Env, _argc: usize| {
+        Ok(VVal::Int(
+              env.arg(0).i() * 11
+            + env.arg(1).i() * 13
+        ))
+    }, Some(2), Some(2));
+
+let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+
+// Please note, you can also add functions later on,
+// but this time directly to the EvalContext:
+
+ctx.set_global_var(
+    "my_crazy_mul",
+    &VValFun::new_fun(|env: &mut Env, _argc: usize| {
+       Ok(VVal::Int(
+          (env.arg(0).i() + 11)
+        * (env.arg(1).i() + 13)))
+    }, Some(2), Some(2)));
+
+
+let res_add : VVal = ctx.eval("my_crazy_add 2 4").unwrap();
+assert_eq!(res_add.i(), 74);
+
+let res_mul : VVal = ctx.eval("my_crazy_mul 2 4").unwrap();
+assert_eq!(res_mul.i(), 221);
 ```
 
 # Possible Roadmap

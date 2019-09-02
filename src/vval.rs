@@ -452,6 +452,86 @@ impl VValFun {
     }
 }
 
+/// You can implement your own VVal data type and provide it
+/// via global functions:
+///
+///```
+/// use std::rc::Rc;
+/// use std::cell::RefCell;
+/// use wlambda::vval::Env;
+/// use wlambda::vval::VVal;
+/// let global_env = wlambda::prelude::create_wlamba_prelude();
+///
+/// #[derive(Clone, Debug)]
+/// struct MyType {
+///     x: Rc<RefCell<(i64, i64)>>,
+/// }
+///
+/// impl wlambda::vval::VValUserData for MyType {
+///     fn s(&self) -> String { format!("$<MyType({:?})>", self.x.borrow()) }
+///     fn i(&self) -> i64    { self.x.borrow_mut().1 }
+///     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+///     fn clone_ud(&self) -> Box<dyn wlambda::vval::VValUserData> {
+///         Box::new(self.clone())
+///     }
+/// }
+///
+/// global_env.borrow_mut().add_func(
+///     "new_mytype",
+///     |_env: &mut Env, _argc: usize| {
+///         Ok(VVal::Usr(Box::new(MyType { x: Rc::new(RefCell::new((13, 42))) })))
+///     }, Some(0), Some(0));
+///
+/// global_env.borrow_mut().add_func(
+///     "modify_mytype",
+///     |env: &mut Env, _argc: usize| {
+///         Ok(if let VVal::Usr(mut u) = env.arg(0) {
+///             if let Some(ud) = u.as_any().downcast_mut::<MyType>() {
+///                 ud.x.borrow_mut().0 += 1;
+///                 ud.x.borrow_mut().1 *= 2;
+///                 VVal::Int(ud.x.borrow().0 + ud.x.borrow().1)
+///             } else {
+///                 VVal::Nul
+///             }
+///         } else { VVal::Nul })
+///     }, Some(1), Some(1));
+///
+/// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+///
+/// let r = &mut ctx.eval(r#"
+///     !x = new_mytype();
+///     !i = modify_mytype x;
+///     $[i, x]
+/// "#).unwrap();
+///
+/// assert_eq!(
+///     r.s(), "$[98,$<MyType((14, 84))>]", "Userdata implementation works");
+///```
+pub trait VValUserData {
+    fn s_raw(&self) -> String { self.s() }
+    fn s(&self)     -> String { format!("$<userdata:{:p}>", self) }
+    fn i(&self)     -> i64    { -1 }
+    fn f(&self)     -> f64    { self.i() as f64 }
+    fn b(&self)     -> bool   { true }
+    fn eqv(&self, _other: &Box<dyn VValUserData>) -> bool { false }
+    fn clone_ud(&self) -> Box<dyn VValUserData>;
+    fn set_key(&self, _key: &VVal, _val: VVal) { }
+    fn get_key(&self, _key: &str) -> Option<VVal> { None }
+    fn as_any(&mut self) -> &mut dyn std::any::Any;
+}
+
+impl std::fmt::Debug for VValUserData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.s())
+    }
+}
+
+impl std::clone::Clone for Box<dyn VValUserData> {
+    fn clone(&self) -> Self {
+        (**self).clone_ud()
+    }
+}
+
 /// Handles calling of destructor functions.
 #[derive(Debug, Clone)]
 pub struct DropVVal {
@@ -515,6 +595,9 @@ pub enum VVal {
     WRef(Rc<RefCell<VVal>>),
     /// A weak reference to a VVal. Might turn VVal::Nul anytime.
     WWRef(Weak<RefCell<VVal>>),
+    /// A vval that can box some user data which can later be accessed
+    /// from inside user supplied Rust functions via std::any::Any.
+    Usr(Box<dyn VValUserData>),
 }
 
 impl std::fmt::Debug for VValFun {
@@ -824,7 +907,14 @@ impl VVal {
             VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return (ia - ib).abs() < std::f64::EPSILON; } else { return false; } },
             VVal::Sym(s)  => { if let VVal::Sym(ib) = v { return *s == *ib; } else { return false; } },
             VVal::Str(_)  => { self.s_raw() == v.s_raw() },
-            _             => { false }
+            VVal::Usr(u)  => {
+                if let VVal::Usr(u2) = v {
+                    u.eqv(u2)
+                } else {
+                    false
+                }
+            }
+            _             => false,
         }
     }
 
@@ -918,10 +1008,20 @@ impl VVal {
     }
 
     pub fn get_key(&self, key: &str) -> Option<VVal> {
-        if let VVal::Map(m) = &self {
-            m.borrow().get(&String::from(key)).cloned()
-        } else {
-            None
+        match self {
+            VVal::Map(m) => {
+                m.borrow().get(&String::from(key)).cloned()
+            },
+            VVal::Lst(l) => {
+                let idx = usize::from_str_radix(key, 10).unwrap_or(0);
+                if idx < l.borrow().len() {
+                    Some(l.borrow()[idx].clone())
+                } else {
+                    Some(VVal::Nul)
+                }
+            },
+            VVal::Usr(u) => u.get_key(key),
+            _ => None
         }
     }
 
@@ -939,6 +1039,7 @@ impl VVal {
                 }
                 v[idx] = val;
             },
+            VVal::Usr(u) => { u.set_key(key, val); },
             _ => {}
         }
     }
@@ -1054,6 +1155,7 @@ impl VVal {
             VVal::Flt(_)     => String::from("float"),
             VVal::Lst(_)     => String::from("vector"),
             VVal::Map(_)     => String::from("map"),
+            VVal::Usr(_)     => String::from("userdata"),
             VVal::Fun(_)     => String::from("function"),
             VVal::DropFun(_) => String::from("drop_function"),
             VVal::Ref(l)     => (*l).borrow().type_name(),
@@ -1081,6 +1183,7 @@ impl VVal {
             VVal::Flt(f)     => *f,
             VVal::Lst(l)     => l.borrow().len() as f64,
             VVal::Map(l)     => l.borrow().len() as f64,
+            VVal::Usr(u)     => u.f(),
             VVal::Fun(_)     => 1.0,
             VVal::DropFun(f) => f.v.f(),
             VVal::Ref(l)     => (*l).borrow().f(),
@@ -1108,6 +1211,7 @@ impl VVal {
             VVal::Flt(f)     => (*f as i64),
             VVal::Lst(l)     => l.borrow().len() as i64,
             VVal::Map(l)     => l.borrow().len() as i64,
+            VVal::Usr(u)     => u.i(),
             VVal::Fun(_)     => 1,
             VVal::DropFun(f) => f.v.i(),
             VVal::Ref(l)     => (*l).borrow().i(),
@@ -1135,6 +1239,7 @@ impl VVal {
             VVal::Flt(f)     => (*f as i64) != 0,
             VVal::Lst(l)     => (l.borrow().len() as i64) != 0,
             VVal::Map(l)     => (l.borrow().len() as i64) != 0,
+            VVal::Usr(u)     => u.b(),
             VVal::Fun(_)     => true,
             VVal::DropFun(f) => f.v.i() != 0,
             VVal::Ref(l)     => (*l).borrow().i() != 0,
@@ -1161,6 +1266,7 @@ impl VVal {
             VVal::Flt(f)     => f.to_string(),
             VVal::Lst(l)     => VVal::dump_vec_as_str(l),
             VVal::Map(l)     => VVal::dump_map_as_str(l), // VVal::dump_map_as_str(l),
+            VVal::Usr(u)     => u.s(),
             VVal::Fun(_)     => "&VValFun".to_string(),
             VVal::DropFun(f) => f.v.s(),
             VVal::Ref(l)     => format!("REF[{}]", (*l).borrow().s()),
@@ -1232,6 +1338,7 @@ impl serde::ser::Serialize for VVal {
                 }
                 map.end()
             },
+            VVal::Usr(_)     => serializer.serialize_str(&self.s()),
             VVal::Fun(_)     => serializer.serialize_str(&self.s()),
             VVal::DropFun(_) => serializer.serialize_str(&self.s()),
             VVal::Ref(_)     => self.deref().serialize(serializer),
