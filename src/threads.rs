@@ -142,6 +142,9 @@ impl Sender {
     /// sender.register_on_as(&mut ctx, "worker");
     ///
     /// ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
+    ///
+    /// // _send will not wait for the call to be finished or even started.
+    /// ctx.eval("worker_send :displayln \"hello world from worker thread!\";").unwrap();
     /// ```
     pub fn register_on_as(&self, ctx: &mut EvalContext, variable_name: &str) {
         let sender = self.clone();
@@ -158,6 +161,23 @@ impl Sender {
                             a
                         };
                     Ok(sender.call(&env.arg(0).s_raw(), args))
+                }, Some(1), None));
+
+        let sender = self.clone();
+        ctx.set_global_var(&format!("{}_send", variable_name),
+            &VValFun::new_fun(
+                move |env: &mut Env, argc: usize| {
+                    let args =
+                        if argc == 1 { VVal::Nul }
+                        else {
+                            let a = VVal::vec();
+                            for _ in 1..argc {
+                                a.push(env.arg(1).clone());
+                            }
+                            a
+                        };
+                    sender.send(&env.arg(0).s_raw(), args);
+                    Ok(VVal::Nul)
                 }, Some(1), None));
     }
 
@@ -209,6 +229,9 @@ impl Sender {
     pub fn send(&self, var_name: &str, args: VVal) {
         let r = &*self.receiver;
         let mut mx = r.mx.lock().unwrap();
+        while !(mx.0 == RecvState::Open || mx.0 == RecvState::Msg) {
+            mx = r.cv.wait(mx).unwrap();
+        }
         mx.0 = RecvState::Msg;
         mx.4.push_back((
             var_name.to_string(),
@@ -521,6 +544,54 @@ mod tests {
 
         let i = r.lock().unwrap();
         assert_eq!(*i, 1, "popping works");
+
+        t.join().unwrap();
+    }
+
+    #[cfg(feature="serde_json")]
+    #[test]
+    fn check_rpc_msgs_from_eval() {
+        let r = std::sync::Arc::new(std::sync::Mutex::new(0));
+        let ri = r.clone();
+
+        // Get some random user thread:
+        let global  = crate::prelude::create_wlamba_prelude();
+        let mut ctx = crate::compiler::EvalContext::new(global);
+
+        let mut msg_handle = crate::threads::MsgHandle::new();
+        let sender = msg_handle.sender();
+        sender.register_on_as(&mut ctx, "worker");
+
+        let t = std::thread::spawn(move || {
+            let global_t = crate::prelude::create_wlamba_prelude();
+            let mut ctx = crate::compiler::EvalContext::new(global_t);
+
+            ctx.eval(r#"
+                !:global X = $[13,2,3,4];
+                !:global Y = { pop X };
+            "#).unwrap();
+            msg_handle.run(&mut ctx);
+
+            {
+                let mut i = ri.lock().unwrap();
+                std::mem::replace(
+                    &mut *i,
+                    ctx.eval("pop X").unwrap().i());
+            }
+        });
+
+
+        ctx.eval(r#"
+            worker_send :Y;
+            worker_send :Y;
+            worker_send :Y;
+            worker_send :thread:quit;
+        "#).unwrap();
+
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        let i = r.lock().unwrap();
+        assert_eq!(*i, 13, "popping works");
 
         t.join().unwrap();
     }
