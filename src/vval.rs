@@ -417,12 +417,33 @@ pub struct VValFun {
 }
 
 impl VValFun {
+    /// Creates a new VVal containing the given closure with the given minimum
+    /// and maximum parameters (see also [`add_func` of GlobalEnv](compiler/struct.GlobalEnv.html#method.add_func)).
+    ///
+    /// This is usually useful if you want to add functions to the [EvalContext](compiler/struct.EvalContext.html).
+    /// at runtime.
+    ///
+    ///```rust
+    /// use wlambda::compiler::EvalContext;
+    /// use wlambda::vval::{VVal, VValFun, Env};
+    ///
+    /// let mut ctx = wlambda::compiler::EvalContext::new_empty_global_env();
+    ///
+    /// ctx.set_global_var("xyz",
+    ///     &VValFun::new_fun(
+    ///         move |env: &mut Env, argc: usize| {
+    ///             Ok(VVal::new_str("xyz"))
+    ///         }, None, None));
+    ///
+    /// assert_eq!(ctx.eval("xyz()").unwrap().s_raw(), "xyz")
+    ///```
     pub fn new_fun<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>) -> VVal
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
 
         VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args)
     }
 
+    /// Internal utility function. Use at your own risk, API might change.
     pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize, min_args: Option<usize>, max_args: Option<usize>) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalues,
@@ -433,6 +454,7 @@ impl VValFun {
         }))
     }
 
+    /// Returns a dummy function that does nothing.
     pub fn new_dummy() -> Rc<VValFun> {
         Rc::new(VValFun {
             fun:        Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) })),
@@ -443,6 +465,8 @@ impl VValFun {
         })
     }
 
+    /// Dumps captured up values of this function. Useful only if you want to
+    /// debug functions/closures creates by WLambda code.
     pub fn dump_upvals(&self) -> VVal {
         let v = VVal::vec();
         for uv in self.upvalues.iter() {
@@ -508,15 +532,42 @@ impl VValFun {
 ///     r.s(), "$[98,$<MyType((14, 84))>]", "Userdata implementation works");
 ///```
 pub trait VValUserData {
-    fn s_raw(&self) -> String { self.s() }
+    /// This method should return a human readable syntax representation
+    /// of your VValUserData.
     fn s(&self)     -> String { format!("$<userdata:{:p}>", self) }
+    /// If your data has a plain string representation,
+    /// you can return the string directly from here.
+    fn s_raw(&self) -> String { self.s() }
+    /// Returns the i64 representation of your data.
     fn i(&self)     -> i64    { -1 }
+    /// Returns the f64 representation of your data.
     fn f(&self)     -> f64    { self.i() as f64 }
+    /// Returns the boolean representation of your data. Can for instance
+    /// be used to check if your data is _valid_ or something.
     fn b(&self)     -> bool   { true }
+    /// Allows you to specify how two instances of your data
+    /// should be compared for equivalentness.
     fn eqv(&self, _other: &Box<dyn VValUserData>) -> bool { false }
+    /// Should clone your user data instance. Whether you are doing
+    /// a deep clone or a shallow cloen or something else is up to you.
     fn clone_ud(&self) -> Box<dyn VValUserData>;
+    /// Makes your user data act like a map. This can be useful
+    /// for implementing your own registries or data structures.
+    /// Implement this method for setting a key to a value.
     fn set_key(&self, _key: &VVal, _val: VVal) { }
+    /// This method returns some value that your user data
+    /// associates with the given key.
     fn get_key(&self, _key: &str) -> Option<VVal> { None }
+    /// This should be implemented simply by returning
+    /// a mutable reference to the concrete type self.
+    /// It allows you to access your data structure from inside
+    /// a function yourself.
+    ///
+    /// This is a good default implementation for your struct/type:
+    ///
+    ///```rust,no_run,compile_fail
+    /// fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    ///```
     fn as_any(&mut self) -> &mut dyn std::any::Any;
 }
 
@@ -1065,6 +1116,7 @@ impl VVal {
         match self {
             VVal::Str(s)  => s.borrow().clone(),
             VVal::Sym(s)  => s.clone(),
+            VVal::Usr(s)  => s.s_raw(),
             _             => self.s(),
         }
     }

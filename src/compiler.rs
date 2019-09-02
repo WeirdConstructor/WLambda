@@ -214,6 +214,12 @@ impl EvalContext {
         .register_self_eval()
     }
 
+    pub fn new_empty_global_env() -> EvalContext {
+        Self::new_with_user_impl(
+            GlobalEnv::new(),
+            Rc::new(RefCell::new(VVal::vec())))
+    }
+
     fn register_self_eval(self) -> Self {
         let ctx_clone =
             Self::new_with_user_impl(

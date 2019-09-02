@@ -1,5 +1,6 @@
 <img align="left" width="60" height="60" src="http://m8geil.de/data/git/wlambda/res/wlambda_logo_60.png">
 
+
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
@@ -10,7 +11,7 @@ without parenthesis.
 
 Here are some of it's properties:
 
-- Simple syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](parser/index.html).
+- Simple syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
 - It's about getting things done quickly, so performance is not a main priority.
   Current performance is roughly in the ball park of (C)Python. Which means,
@@ -25,6 +26,7 @@ of Rust's Result type.
   or by weak reference. Giving you the ability to keep cyclic
   references in check.
 - Easy maintenance of the implementation.
+- Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 
 The embedding API relies on a data structure made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
@@ -35,7 +37,7 @@ Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newes
 Just a quick glance at the WLambda syntax and semantics.
 
 More details for the syntax and the provided global functions
-can be found in the [WLambda Language Reference](prelude/index.html#wlambda-reference).
+can be found in the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 
 ```wlambda
 # This is a comment
@@ -54,11 +56,14 @@ can be found in the [WLambda Language Reference](prelude/index.html#wlambda-refe
 
 # Function definition/assignment:
 !a_func = {
-    _ + _2  # Arguments are not named, they are put into _, _2, _3
+    _ + _1  # Arguments are not named, they are put into _, _1, _2
 };
 
 a_func(2, 3);   # Function call
 a_func 2 3;     # Equivalent function call
+
+# Shortened one statement function definition:
+!do_something_to = \_ * 2;
 
 # There is no `if` statement. Booleans can be called
 # with two arguments. The first one is called when the boolean
@@ -67,7 +72,7 @@ a_func 2 3;     # Equivalent function call
     # called if a == 10
 } {
     # called if a != 10
-}
+};
 
 # Counting loop:
 !:ref sum = 0; # Defining a reference that can be assignment
@@ -76,8 +81,8 @@ a_func 2 3;     # Equivalent function call
 # `range` calls the given function for each iteration
 # and passes the counter as first argument in `_`
 range 0 10 1 { # This is a regular function.
-    sum = sum + _;
-}
+    .sum = sum + _;
+};
 
 # `range` loop with `break`
 !break_value = range 0 10 1 {
@@ -97,8 +102,9 @@ range 0 10 1 { # This is a regular function.
 };
 
 # `return` implicitly jumps to the topmost $nul label
-# you may specify the _ label to jump out some unnamed func:
+# you may specify a small unused label like `_` to jump out some unnamed func:
 !some_fun = {
+    !(x) = @;
     [x == 20] \:_{ return 30 } # returns from some_fun, not from the if-branch
 };
 
@@ -110,23 +116,32 @@ range 0 10 1 { # This is a regular function.
     };
     !value = some_erroring_func();
     # on_error calls the first argument if the second argument
-    #
+    # is an error value.
     on_error {
         # handle error here, eg. report, or make a new error value
+        !(err_value, line, col, file) = @;
+        displayln err_value;
     } value;
 
+    !handle_err = { displayln _ };
+
     # with the ~ operator, you can chain it nicely:
-    on_error { handle_err(_) } ~ some_erroring_func();
+    on_error {|| handle_err(_) } ~ some_erroring_func();
     # or without ~:
-    on_error { handle_err(_) } [some_erroring_func()];
+    on_error {|| handle_err(_) } [some_erroring_func()];
     # or with |
-    some_erroring_func() | on_error { handle_err(_) };
+    some_erroring_func() | on_error {|| handle_err(_) };
 
     # _? transforms an error value, and returns it from the current
     #    function. optionally jumping outwards.
 
-    _? $e "ok" # is with an error value the same as: `return $e "ok"`
-    _? 10 # passes the value through
+    wl:assert_eq [str {
+        _? ~ $e "ok"; # is with an error value the same as: `return $e "ok"`
+    }()] "$e \"ok\"";
+
+    _? 10; # passes the value through
+
+!report_my_error = { displayln _ };
 
 !some_erroring_func = {
     on_error {
@@ -134,7 +149,7 @@ range 0 10 1 { # This is a regular function.
     } block :outer {
         # do something...
         [_ != 10] {
-            return :from_outer $error "Something really failed"
+            return :outer $error "Something really failed"
             # same as, with the difference, that _? only returns
             # from :outer if it is an error value.
             _? :outer $error "Something really failed"
@@ -145,26 +160,67 @@ range 0 10 1 { # This is a regular function.
 };
 
 # Basic OOP:
-!some_obj = ${};
+# :wref to make any closure capture of some_obj a weak reference, so
+# we don't get any cyclic references:
+!:wref some_obj = ${};
 some_obj.do_something = {
-    # do something here
+    # do something here with some_obj captured (weakly)
+    # from the upper lexical scope.
 };
 some_obj.do_something(); # Method call
 ```
 
 Currently there are many more examples in the test cases in `compiler.rs`.
 
-# Basic API Usage
+# API Usage Examples
 
-The API is far from feature complete, but this is roughly
-how it looks currently:
+## Basic API Usage
+
+Here is how you can quickly evaluate a piece of WLambda code:
 
 ```
-use wlambda::prelude::create_wlamba_prelude;
-
 let s = "$[1,2,3]";
 let r = wlambda::compiler::eval(&s).unwrap();
 println!("Res: {}", r.s());
+```
+
+## More Advanced API Usage
+
+If you want to quickly add some of your own functions,
+you can use the GlobalEnv `add_func` method:
+
+```
+use wlambda::vval::{VVal, VValFun, Env};
+
+let global_env = wlambda::prelude::create_wlamba_prelude();
+global_env.borrow_mut().add_func(
+    "my_crazy_add",
+    |env: &mut Env, _argc: usize| {
+        Ok(VVal::Int(
+              env.arg(0).i() * 11
+            + env.arg(1).i() * 13
+        ))
+    }, Some(2), Some(2));
+
+let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+
+// Please note, you can also add functions later on,
+// but this time directly to the EvalContext:
+
+ctx.set_global_var(
+    "my_crazy_mul",
+    &VValFun::new_fun(|env: &mut Env, _argc: usize| {
+       Ok(VVal::Int(
+          (env.arg(0).i() + 11)
+        * (env.arg(1).i() + 13)))
+    }, Some(2), Some(2)));
+
+
+let res_add : VVal = ctx.eval("my_crazy_add 2 4").unwrap();
+assert_eq!(res_add.i(), 74);
+
+let res_mul : VVal = ctx.eval("my_crazy_mul 2 4").unwrap();
+assert_eq!(res_mul.i(), 221);
 ```
 
 # Possible Roadmap
@@ -188,9 +244,9 @@ Future plans could be:
 
 - Prototyped inheritance, sketched out like this:
 
-    ```wlambda
-        !proto = ${ print = { println _ }, };
-        !o = to_obj { _proto_ = proto };
+    ```norun_wlambda
+        !proto = ${ print = { displayln _ }, };
+        !o = to_obj ${ _proto_ = proto };
         o.print(123);
 
         # MetaMap(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
@@ -199,7 +255,7 @@ Future plans could be:
 
 - Augment functions with tagged values:
 
-    ```wlambda
+    ```norun_wlambda
         !tag = 123;
         !v = tag 10 tag;
         !fun = { println("not tagged!") };
