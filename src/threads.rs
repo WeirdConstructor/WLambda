@@ -155,8 +155,8 @@ impl Sender {
                         if argc == 1 { VVal::Nul }
                         else {
                             let a = VVal::vec();
-                            for _ in 1..argc {
-                                a.push(env.arg(1).clone());
+                            for i in 1..argc {
+                                a.push(env.arg(i).clone());
                             }
                             a
                         };
@@ -171,8 +171,8 @@ impl Sender {
                         if argc == 1 { VVal::Nul }
                         else {
                             let a = VVal::vec();
-                            for _ in 1..argc {
-                                a.push(env.arg(1).clone());
+                            for i in 1..argc {
+                                a.push(env.arg(i).clone());
                             }
                             a
                         };
@@ -396,7 +396,10 @@ impl MsgHandle {
                     std::mem::drop(mx);
                     loop {
                         let mut mx = r.mx.lock().unwrap();
-                        if mx.4.len() <= 0 { break; }
+                        if mx.4.len() <= 0 {
+                            mx.0 = RecvState::Open;
+                            break;
+                        }
                         let (name, ser_val) = mx.4.pop_front().unwrap();
                         std::mem::drop(mx);
 
@@ -506,7 +509,7 @@ mod tests {
     fn check_rpc_msgs() {
         use crate::vval::*;
 
-        let r = std::sync::Arc::new(std::sync::Mutex::new(0));
+        let r = std::sync::Arc::new(std::sync::Mutex::new(String::from("")));
         let ri = r.clone();
 
         // Get some random user thread:
@@ -524,6 +527,8 @@ mod tests {
             ctx.eval(r#"
                 !:global X = $[1,2,3,4];
                 !:global Y = { pop X };
+                !:global G = { push X [str $[_, _1]]; };
+                !:global H = { push X [_ + _1]; };
             "#).unwrap();
             msg_handle.run(&mut ctx);
 
@@ -531,19 +536,21 @@ mod tests {
                 let mut i = ri.lock().unwrap();
                 std::mem::replace(
                     &mut *i,
-                    ctx.eval("pop X").unwrap().i());
+                    ctx.eval("$[pop X, pop X]").unwrap().s());
             }
         });
 
         sender.send("Y",           VVal::Nul);
         sender.send("Y",           VVal::Nul);
         sender.send("Y",           VVal::Nul);
+        ctx.eval("worker_call :G 45 44").unwrap();
+        ctx.eval("worker_send :H 11 13").unwrap();
         sender.send("thread:quit", VVal::Nul);
 
         std::thread::sleep(std::time::Duration::from_secs(2));
 
         let i = r.lock().unwrap();
-        assert_eq!(*i, 1, "popping works");
+        assert_eq!(*i, "$[24,\"$[45,44]\"]", "popping works");
 
         t.join().unwrap();
     }
