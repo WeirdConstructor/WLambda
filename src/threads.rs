@@ -198,7 +198,7 @@ impl Sender {
             mx.2 = args.to_json(true).unwrap().into_bytes();
             mx.3 = false;
 
-            r.cv.notify_one();
+            r.cv.notify_all();
         }
 
         while mx.0 != RecvState::Return {
@@ -217,7 +217,7 @@ impl Sender {
         mx.2 = String::from("").into_bytes();
         mx.3 = false;
 
-        r.cv.notify_one();
+        r.cv.notify_all();
 
         ret
     }
@@ -389,7 +389,7 @@ impl MsgHandle {
                             &format!("no such global variable: {}", gvar));
                     }
 
-                    r.cv.notify_one();
+                    r.cv.notify_all();
                     break;
                 },
                 RecvState::Msg => {
@@ -413,7 +413,7 @@ impl MsgHandle {
                             }
                         }
                     }
-                    r.cv.notify_one();
+                    r.cv.notify_all();
                     break;
                 },
                 _ => {
