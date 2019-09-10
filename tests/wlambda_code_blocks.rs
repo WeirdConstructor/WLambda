@@ -73,4 +73,12 @@ fn main() {
     for (name, snip) in get_scripts_from_file("src/lib.rs") {
         execute_script(&name, &snip);
     }
+
+    for (name, snip) in get_scripts_from_file("src/vval.rs") {
+        execute_script(&name, &snip);
+    }
+
+    for (name, snip) in get_scripts_from_file("src/threads.rs") {
+        execute_script(&name, &snip);
+    }
 }
