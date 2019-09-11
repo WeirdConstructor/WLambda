@@ -832,6 +832,38 @@ impl VVal {
                     Ok(ret)
                 })
             },
+            VVal::Byt(vval_bytes) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    if argc > 0 {
+                        let first_arg = e.arg(0);
+                        match first_arg {
+                            VVal::Int(arg_int) => {
+                                if argc > 1 {
+                                    let from = arg_int as usize;
+                                    let cnt  = e.arg(1).i() as usize;
+                                    let r : Vec<u8> = vval_bytes.borrow().iter().skip(from).take(cnt).copied().collect();
+                                    Ok(VVal::new_byt(r))
+                                } else {
+                                    let r = vval_bytes.borrow();
+                                    if arg_int as usize >= r.len() {
+                                        Ok(VVal::Nul)
+                                    } else {
+                                        Ok(VVal::new_byt(vec![r[arg_int as usize]]))
+                                    }
+                                }
+                            },
+                            VVal::Lst(_) => {
+                                let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
+                                let cnt  = first_arg.at(1).unwrap_or_else(|| VVal::Int((vval_bytes.borrow().len() - from) as i64)).i() as usize;
+                                let r : Vec<u8> = vval_bytes.borrow().iter().skip(from).take(cnt).copied().collect();
+                                Ok(VVal::new_byt(r))
+                            },
+                            VVal::Map(_) => Ok(first_arg.get_key(&self.s_raw()).unwrap_or(VVal::Nul)),
+                            _ => Ok(VVal::Nul)
+                        }
+                    } else { Ok(self.clone()) }
+                })
+            },
             VVal::Str(vval_str) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     if argc > 0 {
@@ -958,6 +990,7 @@ impl VVal {
             VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return (ia - ib).abs() < std::f64::EPSILON; } else { return false; } },
             VVal::Sym(s)  => { if let VVal::Sym(ib) = v { return *s == *ib; } else { return false; } },
             VVal::Str(_)  => { self.s_raw() == v.s_raw() },
+            VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s.borrow()[..] == s2.borrow()[..] } else { false } },
             VVal::Usr(u)  => {
                 if let VVal::Usr(u2) = v {
                     u.eqv(u2)
@@ -1076,6 +1109,12 @@ impl VVal {
         }
     }
 
+    pub fn set_map_key(&self, key: String, val: VVal) {
+        if let VVal::Map(m) = self {
+            m.borrow_mut().insert(key, val);
+        }
+    }
+
     pub fn set_key(&self, key: &VVal, val: VVal) {
         match self {
             VVal::Map(m) => {
@@ -1112,11 +1151,33 @@ impl VVal {
         self
     }
 
+    pub fn len(&self) -> usize {
+        match self {
+            VVal::Lst(l) => l.borrow().len(),
+            VVal::Map(l) => l.borrow().len(),
+            VVal::Byt(l) => l.borrow().len(),
+            VVal::Str(l) => l.borrow().len(),
+            VVal::Sym(l) => l.len(),
+            _ => 0,
+        }
+    }
+
+    pub fn s_len(&self) -> usize {
+        match self {
+            VVal::Str(s)  => s.borrow().chars().count(),
+            VVal::Sym(s)  => s.chars().count(),
+            VVal::Usr(s)  => s.s_raw().chars().count(),
+            VVal::Byt(b)  => b.borrow().len(),
+            _             => self.s().chars().count(),
+        }
+    }
+
     pub fn s_raw(&self) -> String {
         match self {
             VVal::Str(s)  => s.borrow().clone(),
             VVal::Sym(s)  => s.clone(),
             VVal::Usr(s)  => s.s_raw(),
+            VVal::Byt(s)  => s.borrow().iter().map(|b| *b as char).collect(),
             _             => self.s(),
         }
     }
@@ -1168,6 +1229,14 @@ impl VVal {
             msg,
             pos: self.at(0).unwrap_or(VVal::Nul).get_syn_pos(),
         })
+    }
+
+    pub fn is_bool(&self) -> bool {
+        match self { VVal::Bol(_) => true, _ => false }
+    }
+
+    pub fn is_bytes(&self) -> bool {
+        match self { VVal::Byt(_) => true, _ => false }
     }
 
     pub fn is_str(&self) -> bool {
@@ -1332,6 +1401,24 @@ impl VVal {
         }
     }
 
+    /// Serializes the VVal (non cyclic) structure to a msgpack byte vector.
+    #[cfg(feature="rmp-serde")]
+    pub fn to_msgpack(&self) -> Result<Vec<u8>, String> {
+        match rmp_serde::to_vec(self) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(format!("to_msgpack failed: {}", e))
+        }
+    }
+
+    /// Creates a VVal structure from a msgpack byte vector.
+    #[cfg(feature="rmp-serde")]
+    pub fn from_msgpack(s: &[u8]) -> Result<VVal, String> {
+        match rmp_serde::from_read_ref(&s) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(format!("from_msgpack failed: {}", e)),
+        }
+    }
+
     /// Serializes the VVal (non cyclic) structure to a JSON string.
     #[cfg(feature="serde_json")]
     pub fn to_json(&self, not_pretty: bool) -> Result<String, String> {
@@ -1367,7 +1454,7 @@ impl serde::ser::Serialize for VVal {
         match self {
             VVal::Str(_)     => serializer.serialize_str(&self.s_raw()),
             VVal::Sym(_)     => serializer.serialize_str(&self.s_raw()),
-            VVal::Byt(_)     => serializer.serialize_str(&self.s()),
+            VVal::Byt(b)     => serializer.serialize_bytes(&b.borrow()[..]),
             VVal::Nul        => serializer.serialize_none(),
             VVal::Err(_)     => serializer.serialize_str(&self.s()),
             VVal::Bol(b)     => serializer.serialize_bool(*b),
@@ -1442,6 +1529,9 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::new_str(value)) }
+
+    fn visit_bytes<E>(self, value: &[u8]) -> Result<Self::Value, E>
+        where E: serde::de::Error { Ok(VVal::new_byt(value.to_vec())) }
 
     fn visit_none<E>(self) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Nul) }

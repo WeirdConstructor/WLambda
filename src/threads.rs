@@ -94,8 +94,8 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, Condvar};
 
 /// The Sender sends RPC calls to the Receiver thread.
-/// Any values passed by WLambda code are serialized into JSON (or some
-/// equivalent format) internally and transmitted to the thread
+/// Any values passed by WLambda code are serialized into msgpack
+/// internally and transmitted to the thread
 /// in String form.
 /// This means, your values must not be cyclic or contain non serializable
 /// data like external handles.
@@ -116,12 +116,12 @@ use std::sync::{Arc, Mutex, Condvar};
 /// // start thread here...
 ///```
 #[derive(Debug, Clone)]
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 pub struct Sender {
     receiver: Arc<Receiver>,
 }
 
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 impl Sender {
     fn new(receiver: Arc<Receiver>) -> Self {
         Sender { receiver }
@@ -195,7 +195,7 @@ impl Sender {
 
             mx.0 = RecvState::Call;
             mx.1 = var_name.to_string();
-            mx.2 = args.to_json(true).unwrap().into_bytes();
+            mx.2 = args.to_msgpack().unwrap();
             mx.3 = false;
 
             r.cv.notify_all();
@@ -209,7 +209,7 @@ impl Sender {
             if mx.3 {
                 VVal::err_msg(&String::from_utf8(mx.2.clone()).unwrap())
             } else {
-                VVal::from_json(&String::from_utf8(mx.2.clone()).unwrap()).unwrap()
+                VVal::from_msgpack(&mx.2).unwrap()
             };
 
         mx.0 = RecvState::Open;
@@ -235,11 +235,11 @@ impl Sender {
         mx.0 = RecvState::Msg;
         mx.4.push_back((
             var_name.to_string(),
-            args.to_json(true).unwrap().into_bytes()));
+            args.to_msgpack().unwrap()));
     }
 }
 
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum RecvState {
     Open,
@@ -249,13 +249,13 @@ enum RecvState {
 }
 
 #[derive(Debug)]
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 pub struct Receiver {
     mx: Mutex<(RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>)>,
     cv: Condvar,
 }
 
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 impl Receiver {
     fn new() -> Arc<Self> {
         Arc::new(Receiver {
@@ -270,30 +270,29 @@ impl Receiver {
     }
 }
 
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 fn mx_recv_error(mx: &mut (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>), s: &str) {
     mx.0 = RecvState::Return;
     mx.2 =
         VVal::err_msg(&format!("return value serialization error: {}", s))
-        .to_json(true)
-        .unwrap()
-        .into_bytes();
+        .to_msgpack()
+        .unwrap();
     mx.3 = true;
 }
 
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 fn mx_return(mx: &mut (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>), v: &VVal) {
     mx.0 = RecvState::Return;
-    match v.to_json(true) {
+    match v.to_msgpack() {
         Ok(s) => {
-            mx.2 = s.into_bytes();
+            mx.2 = s;
             mx.3 = false;
         },
         Err(s) => mx_recv_error(mx, &s),
     }
 }
 
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 #[derive(Clone)]
 pub struct MsgHandle {
     receiver: Arc<Receiver>,
@@ -303,8 +302,8 @@ pub struct MsgHandle {
 /// for the inter thread communication of WLambda instances.
 ///
 /// The communication is internally done either by RPC or by async
-/// message passing. The VVal or WLambda values are serialized as JSON
-/// (or some equivalent format) internally for transmission to the
+/// message passing. The VVal or WLambda values are serialized as msgpack
+/// internally for transmission to the
 /// other thread. This is not a high speed interface, as serialization
 /// and allocations are done.
 ///
@@ -315,7 +314,7 @@ pub struct MsgHandle {
 ///
 /// Pass this MsgHandle to the receiver thread or multiple threads.
 /// You can clone this handle if you want to use it in multiple threads.
-#[cfg(feature="serde_json")]
+#[cfg(feature="rmp-serde")]
 impl MsgHandle {
     pub fn new() -> Self {
         MsgHandle {
@@ -360,8 +359,7 @@ impl MsgHandle {
             match state {
                 RecvState::Call => {
                     if let Some(v) = ctx.get_global_var(&mx.1) {
-                        match VVal::from_json(&String::from_utf8(
-                                                mx.2.clone()).unwrap()) {
+                        match VVal::from_msgpack(&mx.2) {
                             Ok(args) => {
                                 let arg =
                                     if args.is_none() { vec![] }
@@ -404,8 +402,7 @@ impl MsgHandle {
                         std::mem::drop(mx);
 
                         if let Some(v) = ctx.get_global_var(&name) {
-                            if let Ok(args) = VVal::from_json(&String::from_utf8(
-                                                    ser_val).unwrap()) {
+                            if let Ok(args) = VVal::from_msgpack(&ser_val) {
                                 let arg =
                                     if args.is_none() { vec![] }
                                     else { args.to_vec() };
@@ -434,7 +431,7 @@ impl MsgHandle {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature="serde_json")]
+    #[cfg(feature="rmp-serde")]
     #[test]
     fn check_rpc() {
         use crate::vval::*;
@@ -476,7 +473,7 @@ mod tests {
         t.join().unwrap();
     }
 
-    #[cfg(feature="serde_json")]
+    #[cfg(feature="rmp-serde")]
     #[test]
     fn check_rpc_quit() {
         use crate::vval::*;
@@ -504,7 +501,7 @@ mod tests {
         t.join().unwrap();
     }
 
-    #[cfg(feature="serde_json")]
+    #[cfg(feature="rmp-serde")]
     #[test]
     fn check_rpc_msgs() {
         use crate::vval::*;
@@ -555,7 +552,7 @@ mod tests {
         t.join().unwrap();
     }
 
-    #[cfg(feature="serde_json")]
+    #[cfg(feature="rmp-serde")]
     #[test]
     fn check_rpc_msgs_from_eval() {
         let r = std::sync::Arc::new(std::sync::Mutex::new(0));
@@ -599,6 +596,52 @@ mod tests {
 
         let i = r.lock().unwrap();
         assert_eq!(*i, 13, "popping works");
+
+        t.join().unwrap();
+    }
+
+
+    #[cfg(feature="rmp-serde")]
+    #[test]
+    fn check_rpc_msgs_bytes() {
+        let r = std::sync::Arc::new(std::sync::Mutex::new(String::from("")));
+        let ri = r.clone();
+
+        // Get some random user thread:
+        let global  = crate::prelude::create_wlamba_prelude();
+        let mut ctx = crate::compiler::EvalContext::new(global);
+
+        let mut msg_handle = crate::threads::MsgHandle::new();
+        let sender = msg_handle.sender();
+        sender.register_on_as(&mut ctx, "worker");
+
+        let t = std::thread::spawn(move || {
+            let global_t = crate::prelude::create_wlamba_prelude();
+            let mut ctx = crate::compiler::EvalContext::new(global_t);
+
+            ctx.eval(r#"
+                !:global X = $[13,2,3,4];
+                !:global Y = { .X = _; };
+            "#).unwrap();
+            msg_handle.run(&mut ctx);
+
+            {
+                let mut i = ri.lock().unwrap();
+                std::mem::replace(
+                    &mut *i, ctx.eval("X").unwrap().s());
+            }
+        });
+
+
+        ctx.eval(r#"
+            worker_send :Y $b"ABC";
+            worker_send :thread:quit;
+        "#).unwrap();
+
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        let i = r.lock().unwrap();
+        assert_eq!(*i, "$b\"ABC\"", "transmitting bytes works");
 
         t.join().unwrap();
     }

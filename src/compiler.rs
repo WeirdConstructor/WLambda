@@ -1926,15 +1926,36 @@ mod tests {
 
     #[test]
     fn check_test_funs() {
-        assert_eq!(s_eval("is_none $n"),   "$true");
-        assert_eq!(s_eval("is_err $e $n"), "$true");
-        assert_eq!(s_eval("is_map ${}"),   "$true");
-        assert_eq!(s_eval("is_vec $[]"),   "$true");
-        assert_eq!(s_eval("is_sym :f"),    "$true");
-        assert_eq!(s_eval("is_str \"f\""), "$true");
-        assert_eq!(s_eval("is_int 1"),     "$true");
-        assert_eq!(s_eval("is_float 1.2"), "$true");
-        assert_eq!(s_eval("is_fun {}"),    "$true");
+        assert_eq!(s_eval("is_none $n"),        "$true");
+        assert_eq!(s_eval("is_err $e $n"),      "$true");
+        assert_eq!(s_eval("is_map ${}"),        "$true");
+        assert_eq!(s_eval("is_vec $[]"),        "$true");
+        assert_eq!(s_eval("is_sym :f"),         "$true");
+        assert_eq!(s_eval("is_bool $n"),        "$false");
+        assert_eq!(s_eval("is_bool $f"),        "$true");
+        assert_eq!(s_eval("is_bytes $f"),       "$false");
+        assert_eq!(s_eval("is_bytes \"f\""),    "$false");
+        assert_eq!(s_eval("is_bytes $b\"f\""),  "$true");
+        assert_eq!(s_eval("is_bytes $Q'f'"),    "$true");
+        assert_eq!(s_eval("is_str \"f\""),      "$true");
+        assert_eq!(s_eval("is_int 1"),          "$true");
+        assert_eq!(s_eval("is_float 1.2"),      "$true");
+        assert_eq!(s_eval("is_fun {}"),         "$true");
+    }
+
+    #[test]
+    fn check_len_fun() {
+        assert_eq!(s_eval("len $[]"),            "0");
+        assert_eq!(s_eval("len $[1,2,3]"),       "3");
+        assert_eq!(s_eval("len ${a=1,b=20}"),    "2");
+        assert_eq!(s_eval("len ${}"),            "0");
+        assert_eq!(s_eval("str:len ${}"),        "3");
+        assert_eq!(s_eval("len $q abcdef "),     "6");
+        assert_eq!(s_eval("len $q abcüdef "),    "8");
+        assert_eq!(s_eval("str:len $q abcüdef "),"7");
+        assert_eq!(s_eval("len $Q abcdef "),     "6");
+        assert_eq!(s_eval("len $Q abcüdef "),    "8");
+        assert_eq!(s_eval("str:len $Q abcüdef "),"8");
     }
 
     #[test]
@@ -2017,6 +2038,18 @@ mod tests {
     }
 
     #[test]
+    fn check_msgpack() {
+        if cfg!(feature="rmp-serde") {
+            assert_eq!(s_eval("deser:msgpack ~ ser:msgpack $[1,1.2,$f,$t,$n,${a=1},\"abcä\",$b\"abcä\"]"),
+                       "$[1,1.2,$false,$true,$n,${a=1},\"abcä\",$b\"abc\\xC3\\xA4\"]");
+            assert_eq!(s_eval("ser:msgpack $b\"abc\""), "$b\"\\xC4\\x03abc\"");
+            assert_eq!(s_eval("ser:msgpack $[1,$n,16.22]"), "$b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\"");
+            assert_eq!(s_eval("deser:msgpack $b\"\\xC4\\x03abc\""), "$b\"abc\"");
+            assert_eq!(s_eval("deser:msgpack $b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\""), "$[1,$n,16.22]");
+        }
+    }
+
+    #[test]
     fn check_eval() {
         let global = create_wlamba_prelude();
         let mut ctx = EvalContext::new(global);
@@ -2079,5 +2112,38 @@ mod tests {
 
         assert_eq!(
             r.s(), "$[98,$<MyType((14, 84))>]", "Userdata implementation works");
+    }
+
+    #[test]
+    fn check_bytes_impl() {
+        assert_eq!(s_eval("ser:json $b\"abc\""),                         "\"[\\n  97,\\n  98,\\n  99\\n]\"", "JSON serializer for bytes ok");
+        assert_eq!(s_eval("str $b\"abc\""),                              "\"abc\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
+        assert_eq!(s_eval("str $b\"äbcß\""),                             "\"Ã¤bcÃ\\u{9f}\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
+        assert_eq!(s_eval("str:from_utf8 $b\"äbcß\""),                   "\"äbcß\"", "Bytes to String from UTF8");
+        assert_eq!(s_eval("str:from_utf8 $b\"\\xC4\\xC3\""),             "$e \"str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0\"", "Bytes to String from invalid UTF8");
+        assert_eq!(s_eval("str:from_utf8_lossy $b\"\\xC4\\xC3\""),       "\"��\"", "Bytes to String from invalid UTF8 lossy");
+        assert_eq!(s_eval("str:to_bytes \"aäß\""),                       "$b\"a\\xC3\\xA4\\xC3\\x9F\"", "Bytes from String as UTF8");
+        assert_eq!(s_eval("str:from_utf8 ~ str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
+        assert_eq!(s_eval("$b\"abc\" 1"),                                "$b\"b\"", "Get single byte from bytes");
+        assert_eq!(s_eval("$b\"abcdef\" 0 2"),                           "$b\"ab\"", "Substring bytes operation");
+        assert_eq!(s_eval("$b\"abcdef\" 3 3"),                           "$b\"def\"", "Substring bytes operation");
+        assert_eq!(s_eval("$b\"abcdef\" $[3, 3]"),                       "$b\"def\"", "Substring bytes operation");
+        assert_eq!(s_eval("$b\"abcdef\" $[3]"),                          "$b\"def\"", "Substring bytes operation");
+        assert_eq!(s_eval("$b\"abcdef\" ${abcdef = 10}"),                "10", "Bytes as map key");
+        assert_eq!(s_eval("bytes:to_vec $b\"abcdef\""),                  "$[97,98,99,100,101,102]", "bytes:to_vec");
+        assert_eq!(s_eval("bytes:from_vec ~ bytes:to_vec $b\"abcdef\""), "$b\"abcdef\"", "bytes:from_vec");
+        assert_eq!(s_eval("bytes:from_vec $[]"),                         "$b\"\"", "bytes:from_vec");
+        assert_eq!(s_eval("bytes:from_vec $[1,2,3]"),                    "$b\"\\x01\\x02\\x03\"", "bytes:from_vec");
+
+        assert_eq!(s_eval("bytes:to_hex $b\"abc\\xFF\""),                  "\"616263FF\"");
+        assert_eq!(s_eval("bytes:to_hex $b\"abc\\xFF\" 6"),                "\"616263 FF\"");
+        assert_eq!(s_eval("bytes:to_hex $b\"abc\\xFF\" 6 \":\""),          "\"616263:FF\"");
+        assert_eq!(s_eval("bytes:to_hex $b\"abc\\xFF\" 1 \":\""),          "\"6:1:6:2:6:3:F:F\"");
+
+        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\""),         "$b\"abc\\xFF\"");
+        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\" 6"),       "$b\"abc\\xFF\"");
+        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\" 6 \":\""), "$b\"abc\\xFF\"");
+        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\" 1 \":\""), "$b\"abc\\xFF\"");
+        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"\\x00abc\\xFF\" 1 \":\""), "$b\"\\0abc\\xFF\"");
     }
 }

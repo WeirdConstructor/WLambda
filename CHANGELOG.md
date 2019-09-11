@@ -7,8 +7,14 @@
 wlambda code, so you can evaluate code while you are evaluating code.
 * Feature: Thread communication helpers implemented for connecting
 WLambda EvalContext instances accross threads and providing easy
-cross thread messaging and RPC. (TODO: async send).
+cross thread messaging and RPC.
 * Feature: Custom userdata can be implemented using the VValUserData trait.
+* Feature: Added more bytes related functions and call properties.
+`bytes:to_vec`, `bytes:from_vec`, `bytes:to_hex`, `bytes:from_hex`,
+`str:to_utf8`, `str:from_utf8`, `str:from_utf8_lossy`.
+* Feature: Added `len` function to get the length of vectors and other
+sequential data structures. `str:len` returns the length in unicode characters
+now.
 
 0.2.2 (2019-09-01)
 ==================

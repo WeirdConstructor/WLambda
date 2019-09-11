@@ -217,14 +217,104 @@ wl:assert_eq x "this failed!";
 wl:assert_eq ret "all ok!";
 ```
 
-- bool
-- int
-- floats
-- string
-- bytes
-- symbols
-- lists/vectors
-- maps
+### Booleans
+
+### 64-Bit Integers
+
+### 64-Bit Floats
+
+### Strings
+
+### Bytes (or Byte Vectors)
+
+Bytes are a special kind of strings. Their literal form is:
+
+```wlambda
+$b"abc";
+$b"\xFF\xFD\x00";
+$Q/ABCDEF\xFD/;      # \xFD is not an excape sequence here!
+```
+
+#### Call Properties oy Bytes
+
+You can index inside a byte array by calling it with an integer:
+
+```wlambda
+wl:assert_eq [$b"ABC" 1] $b"B";
+```
+
+You can extract a whole range when calling with 2 integers:
+
+```wlambda
+wl:assert_eq [$b"ABCDEF" 2 3] $b"CDE";
+```
+
+If you call a bytes value with a map as argument, the bytes value is
+converted to a string internally using `str` and the value from the map
+is returned:
+
+```wlambda
+!some_map = ${ a = 20, b = 30 };
+
+wl:assert_eq [$b"a" some_map] 20;
+wl:assert_eq [$b"b" some_map] 30;
+
+wl:assert_eq some_map.$b"a" 20;   # with method call syntax
+```
+
+#### Byte Conversion Functions
+
+You can convert bytes to strings in a multitude of ways:
+
+- str _bytes_
+  ```wlambda
+  wl:assert_eq [str $b"abc"]        "abc";
+  wl:assert_eq [str $b"abc\xFF"]    "abcÿ";
+  wl:assert_eq [str $Q/ABCDEF\xFD/] "ABCDEF\\xFD";
+  ```
+- bytes:to_hex _bytes_ \[_group-len_ \[_group-sep_]]
+  ```wlambda
+  wl:assert_eq [bytes:to_hex $b"\xFF\x0A\xBE\xEF"]
+               "FF0ABEEF";
+  wl:assert_eq [bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2]
+               "FF 0A BE EF";
+  wl:assert_eq [bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2 ":"]
+               "FF:0A:BE:EF";
+  ```
+- str:from_utf8 _bytes_
+  ```wlambda
+  wl:assert_eq [str:from_utf8 $b"\xC3\xA4\xC3\x9F\xC3\xBF"] "äßÿ";
+  wl:assert_eq [str:from_utf8 [str:to_bytes "äßÿ"]]         "äßÿ";
+  # broken UTF8 will result in an error:
+  wl:assert ~ is_err [str:from_utf8 $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF"];
+  ```
+- str:from_utf8_lossy _bytes_
+  ```wlambda
+  wl:assert_eq [str:from_utf8_lossy $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF"] "�äßÿ";
+  ```
+
+You can even convert bytes to vectors of integers back and forth:
+
+```wlambda
+!v = bytes:to_vec $b"ABC";
+wl:assert_eq [str v] [str $[65, 66, 67]];
+
+push v 64;
+!b = bytes:from_vec v;
+wl:assert_eq b $b"ABC@";
+```
+
+There is also an invese operation to `bytes:to_hex`:
+
+```wlambda
+wl:assert_eq [bytes:from_hex ~ bytes:to_hex $b"ABC"] $b"ABC";
+```
+
+### Symbols
+
+### Vectors (or Lists)
+
+### Associative Maps (or String to Value mappings)
 
 ## Operators
 
@@ -413,6 +503,22 @@ Deserializes the JSON formatted _string_ into a data structure.
 wl:assert_eq data.0 1;
 wl:assert_eq data.1 2.3;
 wl:assert_eq data.[2].a 4;
+```
+
+#### ser:msgpack _data_
+
+Serializes the _data_ and returns a msgpack bytes value.
+
+```wlambda
+    wl:assert_eq [ser:msgpack $b"abc"] $b"\xC4\x03abc";
+```
+
+#### deser:msgpack _bytes_
+
+Deserializes the msgpack bytes value into a data structure.
+
+```wlambda
+    wl:assert_eq [deser:msgpack $b"\xC4\x03abc"] $b"abc";
 ```
 
 ### regex
@@ -831,6 +937,12 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     g.borrow_mut().add_func("is_str",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_str())) },
         Some(1), Some(1));
+    g.borrow_mut().add_func("is_bool",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_bool())) },
+        Some(1), Some(1));
+    g.borrow_mut().add_func("is_bytes",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_bytes())) },
+        Some(1), Some(1));
     g.borrow_mut().add_func("is_sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_sym())) },
         Some(1), Some(1));
@@ -841,7 +953,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) },
         Some(1), Some(1));
     g.borrow_mut().add_func("str:len",
-        |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_raw().len() as i64)) },
+        |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_len() as i64)) },
         Some(1), Some(1));
     g.borrow_mut().add_func("str:to_lowercase",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_lowercase())) },
@@ -904,6 +1016,124 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                         lst.s())))
             }
         }, Some(2), Some(2));
+    g.borrow_mut().add_func("str:from_utf8_lossy",
+        |env: &mut Env, _argc: usize| {
+            let b = env.arg(0);
+            Ok(
+                if let VVal::Byt(u) = b {
+                    VVal::new_str_mv(String::from_utf8_lossy(&u.borrow()).to_string())
+                } else {
+                    VVal::Nul
+                })
+        }, Some(1), Some(1));
+    g.borrow_mut().add_func("str:from_utf8",
+        |env: &mut Env, _argc: usize| {
+            let b = env.arg(0);
+            if let VVal::Byt(u) = b {
+                match String::from_utf8(u.borrow().to_vec()) {
+                    Ok(s) => Ok(VVal::new_str_mv(s)),
+                    Err(e) => {
+                        Ok(VVal::err_msg(
+                            &format!("str:from_utf8 decoding error: {}", e)))
+                    }
+                }
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, Some(1), Some(1));
+
+    g.borrow_mut().add_func("str:to_bytes",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_byt(env.arg(0).s_raw().as_bytes().to_vec()))
+        }, Some(1), Some(1));
+
+    g.borrow_mut().add_func("bytes:from_vec",
+        |env: &mut Env, _argc: usize| {
+            if let VVal::Lst(u) = env.arg(0) {
+                Ok(VVal::new_byt(u.borrow().iter().map(|v| v.i() as u8).collect()))
+
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, Some(1), Some(1));
+
+    g.borrow_mut().add_func("bytes:to_vec",
+        |env: &mut Env, _argc: usize| {
+            if let VVal::Byt(u) = env.arg(0) {
+                Ok(VVal::vec_mv(
+                    u.borrow().iter().map(|u| VVal::Int(*u as i64))
+                        .collect()))
+
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, Some(1), Some(1));
+
+    g.borrow_mut().add_func("bytes:from_hex",
+        |env: &mut Env, _argc: usize| {
+            let s = env.arg(0).s_raw();
+            let out : Vec<u8> = Vec::with_capacity((s.len() + 1) / 2);
+            Ok(VVal::new_byt(
+                s.chars()
+                 .map(|c|
+                     match c { '0'..='9' => ( 9 - (('9' as u8) - (c as u8))) as i16,
+                               'a'..='f' => (15 - (('f' as u8) - (c as u8))) as i16,
+                               'A'..='F' => (15 - (('F' as u8) - (c as u8))) as i16,
+                               _ => -1 })
+                 .fold((256, out), |(last, mut out), c: i16|
+                     if c == -1 { (last, out) }
+                     else if last == 256 { (c, out) }
+                     else {
+                         out.push((((last << 4) | (c & 0x0F)) & 0xFF) as u8);
+                         (256, out)
+                     }).1))
+        }, Some(1), Some(1));
+
+    g.borrow_mut().add_func("bytes:to_hex",
+        |env: &mut Env, argc: usize| {
+            static HEXCHARS : &'static [char] =
+                &['0', '1', '2', '3', '4', '5', '6', '7',
+                  '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+
+            if let VVal::Byt(u) = env.arg(0) {
+                let mut out : String = String::with_capacity(u.borrow().len() * 2);
+
+                if argc == 1 {
+                    for (a, b) in u.borrow().iter().map(|u|
+                                        (HEXCHARS[(u >> 4) as usize],
+                                         HEXCHARS[(u & 0x0F) as usize])) {
+                        out.push(a);
+                        out.push(b);
+                    }
+                } else {
+                    let group_len = env.arg(1).i();
+                    let group_sep =
+                        if env.arg(2).is_none() { String::from(" ") }
+                        else { env.arg(2).s_raw() };
+
+                    let mut len_counter = 0;
+                    for (a, b) in u.borrow().iter().map(|u|
+                                        (HEXCHARS[(u >> 4) as usize],
+                                         HEXCHARS[(u & 0x0F) as usize])) {
+                        if len_counter >= group_len { out.push_str(&group_sep); len_counter = 0; }
+                        out.push(a);
+                        len_counter += 1;
+                        if len_counter >= group_len { out.push_str(&group_sep); len_counter = 0; }
+                        out.push(b);
+                        len_counter += 1;
+                    }
+                }
+
+                Ok(VVal::new_str_mv(out))
+
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, Some(1), Some(3));
+
+    g.borrow_mut().add_func("len",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).len() as i64)) },
+        Some(1), Some(1));
 
     g.borrow_mut().add_func("type",
         |env: &mut Env, _argc: usize| {
@@ -1217,7 +1447,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 let pp = env.arg(1).b();
 
                 match v.to_json(pp) {
-                    Ok(s) => Ok(VVal::new_str(&s)),
+                    Ok(s) => Ok(VVal::new_str_mv(s)),
                     Err(e) => Ok(VVal::err_msg(&e)),
                 }
             }, Some(1), Some(2));
@@ -1229,6 +1459,29 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 match VVal::from_json(&s) {
                     Ok(v) => Ok(v),
                     Err(e) => Ok(VVal::err_msg(&e)),
+                }
+            }, Some(1), Some(1));
+    }
+
+    if cfg!(feature="rmp-serde") {
+        g.borrow_mut().add_func("ser:msgpack",
+            |env: &mut Env, _argc: usize| {
+                let v = env.arg(0).clone();
+                match v.to_msgpack() {
+                    Ok(s) => Ok(VVal::new_byt(s)),
+                    Err(e) => Ok(VVal::err_msg(&e)),
+                }
+            }, Some(1), Some(1));
+
+        g.borrow_mut().add_func("deser:msgpack",
+            |env: &mut Env, _argc: usize| {
+                if let VVal::Byt(u) = env.arg(0) {
+                    match VVal::from_msgpack(&u.borrow()[..]) {
+                        Ok(v) => Ok(v),
+                        Err(e) => Ok(VVal::err_msg(&e)),
+                    }
+                } else {
+                    Ok(VVal::err_msg("deser:msgpack expects bytes"))
                 }
             }, Some(1), Some(1));
     }
