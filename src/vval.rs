@@ -293,10 +293,17 @@ impl Env {
     }
 
     pub fn get_up(&mut self, i: usize) -> VVal {
-        if let VVal::Ref(r) = &self.fun.upvalues[i] {
-            r.borrow().clone()
-        } else {
-            self.fun.upvalues[i].clone()
+        match &self.fun.upvalues[i] {
+            VVal::Ref(r)   => r.borrow().clone(),
+            VVal::WRef(r)  => r.borrow().clone(),
+            VVal::WWRef(r) => {
+                if let Some(v) = r.upgrade() {
+                    v.borrow().clone()
+                } else {
+                    VVal::Nul
+                }
+            },
+            x => x.clone(),
         }
     }
 

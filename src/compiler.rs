@@ -1351,11 +1351,13 @@ mod tests {
 
     #[test]
     fn check_ref_closures() {
-        assert_eq!(s_eval("!c1 = { !:ref a = 1.2; { a } }; c1()()"),  "1.2");
-        assert_eq!(s_eval("!c1 = { !:wref a = 1.2; { a } }; c1()()"), "$n");
-        assert_eq!(s_eval("!c1 = { !:wref a = 1.2; { a }() }; c1()"), "$n");
+        assert_eq!(s_eval("!c1 = { !:ref a = 1.2; { a } }; c1()()"),            "1.2");
+        assert_eq!(s_eval("!c1 = { !:wref a = 1.2; { a } }; c1()()"),           "$n");
+        assert_eq!(s_eval("!c1 = { !:wref a = 1.2; { a }() }; c1()"),           "1.2");
+        assert_eq!(s_eval("!c1 = { !:wref a = 1.2; !a = $n; { a }() }; c1()"),  "$n");
         assert_eq!(s_eval("!:wref outer_a = 2.3; !c1 = { !:ref a = 1.2; { a + outer_a } }; c1()()"), "3.5");
         assert_eq!(s_eval("!:wref outer_a = 2.3; !c1 = { !:wref a = 1.2; { outer_a + a } }; c1()()"), "2.3");
+        assert_eq!(s_eval("!:wref outer_a = 2.3; !c1 = { !:wref a = 1.2; { outer_a + a } }; !outer_a = $n; c1()()"), "0");
     }
 
     #[test]

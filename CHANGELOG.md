@@ -15,6 +15,8 @@ cross thread messaging and RPC.
 * Feature: Added `len` function to get the length of vectors and other
 sequential data structures. `str:len` returns the length in unicode characters
 now.
+* Bugfix: Weak upvalue references were not properly handled and directly returned
+by variable accesses.
 
 0.2.2 (2019-09-01)
 ==================
