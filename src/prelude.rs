@@ -353,6 +353,17 @@ wl:assert_eq [bytes:from_hex ~ bytes:to_hex $b"ABC"] $b"ABC";
 - ~ syntax
 - | syntax
 - || syntax
+  ```
+  >> $[] || push 10
+  > $[10]
+  >> $[] || push 10 || push 20
+  > $[10,20]
+  >> !x = { push _1 _ };
+  > $n
+  >> $[] | x 10 | x 20
+  > $[10,20]
+  >>
+  ```
 - [...] syntax
 
 ### Control Flow - Returning
