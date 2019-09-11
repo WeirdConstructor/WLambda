@@ -17,6 +17,9 @@ sequential data structures. `str:len` returns the length in unicode characters
 now.
 * Bugfix: Weak upvalue references were not properly handled and directly returned
 by variable accesses.
+* Incompatible Change: Removed :wref and :ref definition labels in favor of
+proper $& and $\* reference handling. Added `wl:weaken` and `wl:set_ref` and
+`.*x = ...` syntax for even more reference handling.
 
 0.2.2 (2019-09-01)
 ==================

@@ -95,6 +95,11 @@ In the following grammar, white space and comments are omitted:
     none          = "n" | "none
                   ;
     err           = ("e" | "error"), expr
+                  ;
+    ref           = "&", value
+                  ;
+    deref         = "*", value
+                  ;
     special_value = byte_string
                   | quote_string
                   | list
@@ -103,6 +108,7 @@ In the following grammar, white space and comments are omitted:
                   | true
                   | false
                   | err
+                  | ref
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
@@ -692,6 +698,18 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             err.push(parse_expr(ps)?);
             Ok(err)
         },
+        '*' => {
+            ps.consume_wsc();
+            let r = ps.syn(Syntax::Deref);
+            r.push(parse_value(ps)?);
+            Ok(r)
+        },
+        '&' => {
+            ps.consume_wsc();
+            let r = ps.syn(Syntax::Ref);
+            r.push(parse_value(ps)?);
+            Ok(r)
+        },
         _   => Ok(VVal::Flt(0.2)),
     }
 }
@@ -1074,13 +1092,13 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     if is_def {
         if ps.consume_if_eq_wsc(':') {
             let key = parse_identifier(ps);
-            if key == "ref" {
-                assign = ps.syn(Syntax::DefRef);
-            } else if key == "wref" {
-                assign = ps.syn(Syntax::DefWRef);
-            } else if key == "global" {
+            if key == "global" {
                 assign = ps.syn(Syntax::DefGlobRef);
             }
+        }
+    } else {
+        if ps.consume_if_eq_wsc('*') {
+            assign = ps.syn(Syntax::AssignRef);
         }
     }
 
@@ -1460,8 +1478,6 @@ mod tests {
         assert_eq!(parse("!x=10;"),              "$[&Block,$[&Def,$[:\"x\"],10]]");
         assert_eq!(parse("! x = 10 ;"),          "$[&Block,$[&Def,$[:\"x\"],10]]");
         assert_eq!(parse("! x = 10"),            "$[&Block,$[&Def,$[:\"x\"],10]]");
-        assert_eq!(parse("!:ref x = 10"),        "$[&Block,$[&DefRef,$[:\"x\"],10]]");
-        assert_eq!(parse("!:ref (a,b) = 10"),    "$[&Block,$[&DefRef,$[:\"a\",:\"b\"],10,$true]]");
         assert_eq!(parse("!:global (y,x) = @"),  "$[&Block,$[&DefGlobRef,$[:\"y\",:\"x\"],$[&Var,:\"@\"],$true]]");
         assert_eq!(parse(". (a,b) = 10"),        "$[&Block,$[&Assign,$[:\"a\",:\"b\"],10,$true]]");
     }
@@ -1516,5 +1532,15 @@ mod tests {
     fn check_err_val() {
         assert_eq!(parse("$e 10 20 30"),        "$[&Block,$[&Err,$[&Call,10,20,30]]]");
         assert_eq!(parse("$e 10 20 30 | 20"),   "$[&Block,$[&Err,$[&Call,20,$[&Call,10,20,30]]]]");
+    }
+
+    #[test]
+    fn check_parse_ref_deref() {
+        assert_eq!(parse("$& 1"),         "$[&Block,$[&Ref,1]]");
+        assert_eq!(parse("$&$[1,2]"),     "$[&Block,$[&Ref,$[&Lst,1,2]]]");
+        assert_eq!(parse("$&${z=1}"),     "$[&Block,$[&Ref,$[&Map,$[:\"z\",1]]]]");
+        assert_eq!(parse("$*${z=1}.f=1"), "$[&Block,$[&SetKey,$[&Deref,$[&Map,$[:\"z\",1]]],$[&Key,:\"f\"],1]]");
+        assert_eq!(parse("$*xxx.f=1"),    "$[&Block,$[&SetKey,$[&Deref,$[&Var,:\"xxx\"]],$[&Key,:\"f\"],1]]");
+        assert_eq!(parse("$*xxx.f"),      "$[&Block,$[&Call,$[&Key,:\"f\"],$[&Deref,$[&Var,:\"xxx\"]]]]");
     }
 }

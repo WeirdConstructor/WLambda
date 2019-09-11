@@ -506,18 +506,14 @@ impl CompileEnv {
     fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
         //d// println!("COPY UPVALS: {:?}", self.upvals);
         for p in self.upvals.iter() {
-            let mut v = match p {
-                VarPos::UpValue(i) => e.get_up_raw(*i),
-                VarPos::Local(i)   => e.get_local_raw(*i),
+            let v = match p {
+                VarPos::UpValue(i) => e.get_up(*i),
+                VarPos::Local(i)   => e.get_local(*i),
                 VarPos::Global(v)  => v.clone(), // Will probably be never used, as upvalues are
                                                  // always defined on the base of local variables.
                 VarPos::NoPos      => VVal::Nul,
             };
-            //d// println!("COPY AN UPVAL! {:?}({})", p, v.s());
-            if let VVal::WRef(_) = v {
-                v = v.downgrade().unwrap_or(VVal::Nul);
-            }
-            upvalues.push(v.clone());
+            upvalues.push(v.to_ref());
         }
     }
 
@@ -669,7 +665,7 @@ fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut
     }
 }
 
-fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_ref: bool, is_global: bool) -> Result<EvalNode, CompileError> {
+fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) -> Result<EvalNode, CompileError> {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
     let vars    = ast.at(1).unwrap();
@@ -699,23 +695,10 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                         } else {
                             let val = &mut l.borrow_mut()[i];
 
-                            let set_val = if is_ref {
-                                if weak_ref {
-                                    (&val).to_wref()
-                                } else {
-                                    (&val).to_ref()
-                                }
-                            } else {
-                                val.clone()
-                            };
-
+                            let set_val = val.clone();
                             match vi {
                                 VarPos::Local(vip) => {
-                                    if is_ref {
-                                        e.set_consume(*vip, set_val);
-                                    } else {
-                                        e.set_local(*vip, &set_val);
-                                    }
+                                    e.set_local(*vip, &set_val);
                                 },
                                 VarPos::Global(r) => {
                                     if let VVal::Ref(gr) = r {
@@ -730,14 +713,7 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
                 VVal::Map(m) => {
                     for (i, vi) in poses.iter().enumerate() {
                         let vname = vars.at(i).unwrap().s_raw();
-                        let mut val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-                        if is_ref {
-                            if weak_ref {
-                                val = (&val).to_wref();
-                            } else {
-                                val = (&val).to_ref();
-                            }
-                        }
+                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
 
                         match vi {
                             VarPos::Local(vip) => e.set_consume(*vip, val),
@@ -772,55 +748,40 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, weak_
 
         match pos {
             VarPos::Local(vip) => {
-                if is_ref {
-                    if weak_ref {
-                        Ok(Box::new(move |e: &mut Env| {
-                            let v = cv(e)?;
-                            e.set_consume(vip, (&v).to_wref());
-                            Ok(VVal::Nul)
-                        }))
-                    } else {
-                        Ok(Box::new(move |e: &mut Env| {
-                            let v = cv(e)?;
-                            e.set_consume(vip, (&v).to_ref());
-                            Ok(VVal::Nul)
-                        }))
-                    }
-                } else {
-                    Ok(Box::new(move |e: &mut Env| {
-                        let v = cv(e)?;
-                        e.set_consume(vip, v);
-                        Ok(VVal::Nul)
-                    }))
-                }
+                Ok(Box::new(move |e: &mut Env| {
+                    let v = cv(e)?;
+                    e.set_consume(vip, v);
+                    Ok(VVal::Nul)
+                }))
             },
             VarPos::Global(r) => {
                 let gref = r.clone();
-
-                if is_ref {
-                    if weak_ref {
-                        Ok(Box::new(move |e: &mut Env| {
-                            let v = cv(e)?;
-                            gref.set_ref(v.to_wref());
-                            Ok(VVal::Nul)
-                        }))
-                    } else {
-                        Ok(Box::new(move |e: &mut Env| {
-                            let v = cv(e)?;
-                            gref.set_ref(v.to_ref());
-                            Ok(VVal::Nul)
-                        }))
-                    }
-                } else {
-                    Ok(Box::new(move |e: &mut Env| {
-                        let v = cv(e)?;
-                        gref.set_ref(v.clone());
-                        Ok(VVal::Nul)
-                    }))
-                }
+                Ok(Box::new(move |e: &mut Env| {
+                    let v = cv(e)?;
+                    gref.set_ref(v.clone());
+                    Ok(VVal::Nul)
+                }))
             },
             _ => ast.to_compile_err(
                     "Can't define badly positioned variable!".to_string()),
+        }
+    }
+}
+
+fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
+    match pos {
+        VarPos::UpValue(d) => { e.get_up(*d).set_ref(v.clone()); None },
+        VarPos::Local(d)   => { e.get_local(*d).set_ref(v.clone()); None },
+        VarPos::Global(d)  => {
+            if let VVal::Ref(r) = d {
+                r.borrow().set_ref(v.clone());
+                None
+            } else {
+                Some("Can't assign to global read only variable!".to_string())
+            }
+        },
+        VarPos::NoPos => {
+            Some(format!("Unknown pos to assign value '{}' to!", v.s()))
         }
     }
 }
@@ -829,8 +790,8 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
     match pos {
         VarPos::UpValue(d) => { e.set_up(*d, v); None },
         VarPos::Local(d)   => { e.set_local(*d, v); None },
-        VarPos::Global(v)  => {
-            if let VVal::Ref(r) = v {
+        VarPos::Global(d)  => {
+            if let VVal::Ref(r) = d {
                 r.replace(v.clone());
                 None
             } else {
@@ -843,7 +804,7 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
     }
 }
 
-fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
+fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) -> Result<EvalNode, CompileError> {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
     let syn  = ast.at(0).unwrap_or(VVal::Nul);
@@ -868,75 +829,146 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNo
             }
         }
 
-        Ok(Box::new(move |e: &mut Env| {
-            let v = cv(e)?;
-            match v {
-                VVal::Lst(l) => {
-                    for (i, pos) in poses.iter().enumerate() {
-                        let val = &mut l.borrow_mut()[i];
-                        match set_env_at_varpos(e, pos, val) {
-                            None => (),
-                            Some(err) => {
-                                return
-                                    Err(StackAction::Panic(
-                                        VVal::new_str_mv(err),
-                                        Some(vec![spos.clone()])));
+        if is_ref {
+            Ok(Box::new(move |e: &mut Env| {
+                let v = cv(e)?;
+                match v {
+                    VVal::Lst(l) => {
+                        for (i, pos) in poses.iter().enumerate() {
+                            let val = &mut l.borrow_mut()[i];
+                            match set_ref_at_varpos(e, pos, val) {
+                                None => (),
+                                Some(err) => {
+                                    return
+                                        Err(StackAction::Panic(
+                                            VVal::new_str_mv(err),
+                                            Some(vec![spos.clone()])));
+                                }
                             }
                         }
-                    }
-                },
-                VVal::Map(m) => {
-                    for (i, pos) in poses.iter().enumerate() {
-                        let vname = vars.at(i).unwrap().s_raw();
-                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-                        set_env_at_varpos(e, pos, &val);
-                    }
-                },
-                _ => {
-                    for pos in poses.iter() {
-                        set_env_at_varpos(e, pos, &v);
+                    },
+                    VVal::Map(m) => {
+                        for (i, pos) in poses.iter().enumerate() {
+                            let vname = vars.at(i).unwrap().s_raw();
+                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+                            set_ref_at_varpos(e, pos, &val);
+                        }
+                    },
+                    _ => {
+                        for pos in poses.iter() {
+                            set_ref_at_varpos(e, pos, &v);
+                        }
                     }
                 }
-            }
 
-            Ok(VVal::Nul)
-        }))
+                Ok(VVal::Nul)
+            }))
+        } else {
+            Ok(Box::new(move |e: &mut Env| {
+                let v = cv(e)?;
+                match v {
+                    VVal::Lst(l) => {
+                        for (i, pos) in poses.iter().enumerate() {
+                            let val = &mut l.borrow_mut()[i];
+                            match set_env_at_varpos(e, pos, val) {
+                                None => (),
+                                Some(err) => {
+                                    return
+                                        Err(StackAction::Panic(
+                                            VVal::new_str_mv(err),
+                                            Some(vec![spos.clone()])));
+                                }
+                            }
+                        }
+                    },
+                    VVal::Map(m) => {
+                        for (i, pos) in poses.iter().enumerate() {
+                            let vname = vars.at(i).unwrap().s_raw();
+                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+                            set_env_at_varpos(e, pos, &val);
+                        }
+                    },
+                    _ => {
+                        for pos in poses.iter() {
+                            set_env_at_varpos(e, pos, &v);
+                        }
+                    }
+                }
+
+                Ok(VVal::Nul)
+            }))
+        }
 
     } else {
         let s   = &vars.at(0).unwrap().s_raw();
         let pos = ce.borrow_mut().get(s);
 
-        match pos {
-            VarPos::UpValue(i) => {
-                Ok(Box::new(move |e: &mut Env| {
-                    let v = cv(e)?;
-                    e.set_up(i, &v);
-                    Ok(VVal::Nul)
-                }))
-            },
-            VarPos::Local(i) => {
-                Ok(Box::new(move |e: &mut Env| {
-                    let v = cv(e)?;
-                    e.set_local(i, &v);
-                    Ok(VVal::Nul)
-                }))
-            },
-            VarPos::Global(glob_v) => {
-                if let VVal::Ref(glob_r) = glob_v {
+        if is_ref {
+            match pos {
+                VarPos::UpValue(i) => {
                     Ok(Box::new(move |e: &mut Env| {
                         let v = cv(e)?;
-                        glob_r.replace(v.clone());
+                        e.get_up(i).set_ref(v);
                         Ok(VVal::Nul)
                     }))
-                } else {
+                },
+                VarPos::Local(i) => {
+                    Ok(Box::new(move |e: &mut Env| {
+                        let v = cv(e)?;
+                        e.get_local(i).set_ref(v);
+                        Ok(VVal::Nul)
+                    }))
+                },
+                VarPos::Global(glob_v) => {
+                    if let VVal::Ref(glob_r) = glob_v {
+                        Ok(Box::new(move |e: &mut Env| {
+                            let v = cv(e)?;
+                            glob_r.borrow().set_ref(v);
+                            Ok(VVal::Nul)
+                        }))
+                    } else {
+                        ast.to_compile_err(
+                            format!("Can't assign to read only global variable '{}'",
+                                    s))
+                    }
+                },
+                VarPos::NoPos =>
                     ast.to_compile_err(
-                        format!("Can't assign to read only global variable '{}'",
-                                s))
-                }
-            },
-            VarPos::NoPos =>
-                ast.to_compile_err(
-                    format!("Can't assign to undefined local variable '{}'", s)),
+                        format!("Can't assign to undefined local variable '{}'", s)),
+            }
+        } else {
+            match pos {
+                VarPos::UpValue(i) => {
+                    Ok(Box::new(move |e: &mut Env| {
+                        let v = cv(e)?;
+                        e.set_up(i, &v);
+                        Ok(VVal::Nul)
+                    }))
+                },
+                VarPos::Local(i) => {
+                    Ok(Box::new(move |e: &mut Env| {
+                        let v = cv(e)?;
+                        e.set_local(i, &v);
+                        Ok(VVal::Nul)
+                    }))
+                },
+                VarPos::Global(glob_v) => {
+                    if let VVal::Ref(glob_r) = glob_v {
+                        Ok(Box::new(move |e: &mut Env| {
+                            let v = cv(e)?;
+                            glob_r.replace(v.clone());
+                            Ok(VVal::Nul)
+                        }))
+                    } else {
+                        ast.to_compile_err(
+                            format!("Can't assign to read only global variable '{}'",
+                                    s))
+                    }
+                },
+                VarPos::NoPos =>
+                    ast.to_compile_err(
+                        format!("Can't assign to undefined local variable '{}'", s)),
+            }
         }
     }
 }
@@ -952,11 +984,10 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
             match syn {
                 Syntax::Block       => { compile_block(ast, ce)       },
                 Syntax::Var         => { compile_var(ast, ce)         },
-                Syntax::Def         => { compile_def(ast, ce, false, false, false)  },
-                Syntax::DefRef      => { compile_def(ast, ce, true, false, false)   },
-                Syntax::DefWRef     => { compile_def(ast, ce, true, true, false)    },
-                Syntax::DefGlobRef  => { compile_def(ast, ce, false, false, true)   },
-                Syntax::Assign => { compile_assign(ast, ce) },
+                Syntax::Def         => { compile_def(ast, ce, false)  },
+                Syntax::DefGlobRef  => { compile_def(ast, ce, true)   },
+                Syntax::Assign      => { compile_assign(ast, ce, false) },
+                Syntax::AssignRef   => { compile_assign(ast, ce, true) },
                 Syntax::Import => {
                     let prefix = ast.at(1).unwrap();
                     let name   = ast.at(2).unwrap();
@@ -1010,12 +1041,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         Ok(value)
                     }))
                 },
-                Syntax::Err    => {
+                Syntax::Err => {
                     let err_val = compile(&ast.at(1).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env|
                                     Ok(VVal::err(err_val(e)?.clone(), spos.clone()))))
                 },
-                Syntax::Key    => {
+                Syntax::Key => {
                     let sym = ast.at(1).unwrap();
                     Ok(Box::new(move |_: &mut Env| Ok(sym.clone())))
                 },
@@ -1035,7 +1066,19 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         Ok(v)
                     }))
                 },
-                Syntax::Lst    => {
+                Syntax::Ref => {
+                    let val = compile(&ast.at(1).unwrap(), ce)?;
+                    Ok(Box::new(move |e: &mut Env| {
+                        Ok(val(e)?.to_ref())
+                    }))
+                },
+                Syntax::Deref => {
+                    let val = compile(&ast.at(1).unwrap(), ce)?;
+                    Ok(Box::new(move |e: &mut Env| {
+                        Ok(val(e)?.deref())
+                    }))
+                },
+                Syntax::Lst => {
                     let list_elems : Vec<EvalNode> =
                         ast.map_skip(|e| compile(e, ce), 1)?; 
 
@@ -1324,10 +1367,10 @@ mod tests {
         assert_eq!(s_eval("{ 10 }"),                  "&VValFun");
         assert_eq!(s_eval("{ 10 }()"),                "10");
         assert_eq!(s_eval("{ 10; 20 }()"),            "20");
-        assert_eq!(s_eval("!:ref x = 11; { 12; x }()"),                   "11");
+        assert_eq!(s_eval("!x = $&11; { 12; $*x }()"),                    "11");
         assert_eq!(s_eval("!x = 11; { 12; x }()"),                        "11");
         assert_eq!(s_eval("!x = 13; { .x = 12 }(); { x }() "),            "13");
-        assert_eq!(s_eval("!:ref x = 13; { .x = 12 }(); $[{ x }(), x]"),  "$[12,12]");
+        assert_eq!(s_eval("!x = $&13; { .x = 12 }(); $[{ x }(), x]"),  "$[12,12]");
         assert_eq!(s_eval("!:ref x = 13; { .x = 12; x }(); $[{ x }(), { .x = 15; x }(), x]"), "$[12,15,15]");
         assert_eq!(s_eval("{ _ } 10"),                        "10");
         assert_eq!(s_eval("!:ref y = 0; { .y = _ } 10; y"),   "10");
@@ -2147,5 +2190,44 @@ mod tests {
         assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\" 6 \":\""), "$b\"abc\\xFF\"");
         assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\" 1 \":\""), "$b\"abc\\xFF\"");
         assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"\\x00abc\\xFF\" 1 \":\""), "$b\"\\0abc\\xFF\"");
+    }
+
+    #[test]
+    fn check_ref() {
+        assert_eq!(s_eval("!x = $&1; $*x"),             "1");
+        assert_eq!(s_eval("!x = $&1; .*x = 2; $*x"),    "2");
+        assert_eq!(s_eval("!(x, y) = $[$&1, $&2]; $[$*x, $*y]"), "$[1,2]");
+        assert_eq!(s_eval("!(x, y) = $[$&1, $&2]; $[x, y]"), "$[$&1,$&2]");
+        assert_eq!(s_eval("!(x, y) = $[$&1, $&2]; .*(x, y) = $[33, 34]; $[x, y]"), "$[$&33,$&34]");
+        assert_eq!(s_eval(r#"
+                !:global (x, y) = $[$&1, $&2];
+                .*(x, y) = $[33, 34];
+                $[x, y]
+            "#), "$[$&33,$&34]");
+        assert_eq!(s_eval(r#"
+                !(x, y) = $[$&1, $&2];
+                !z = wl:weaken y;
+                !f = { .*x = $*x + 1; .*z = $*z + 2; $[x, z] };
+                !r = $[];
+                push r ~ str f();
+                .x = $n;
+                .y = $n;
+                push r ~ str f();
+                $[r, z]
+            "#), "$[$[\"$[$&2,$&4]\",\"$[$&3,$n]\"],$n]");
+        assert_eq!(s_eval(r#"
+            !self = $&${};
+            !wself = wl:weaken self;
+            self.x = { wself.g = 10; wself.g };
+            self.y = { wself.g * 10 };
+            !r = $[];
+            push r self.x();
+            push r self.y();
+            !f = self.y;
+            .self = $n;
+            push r f();
+            push r wself;
+            r
+        "#), "$[10,100,0,$n]");
     }
 }

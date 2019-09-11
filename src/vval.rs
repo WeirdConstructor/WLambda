@@ -59,8 +59,9 @@ pub enum Syntax {
     Or,
     Assign,
     Def,
-    DefRef,
-    DefWRef,
+    Ref,
+    Deref,
+    AssignRef,
     DefGlobRef,
     Import,
     Export,
@@ -288,23 +289,8 @@ impl Env {
         VVal::vec_from(&self.args[(self.bp - self.argc)..self.bp])
     }
 
-    pub fn get_up_raw(&mut self, i: usize) -> VVal {
-        self.fun.upvalues[i].clone()
-    }
-
     pub fn get_up(&mut self, i: usize) -> VVal {
-        match &self.fun.upvalues[i] {
-            VVal::Ref(r)   => r.borrow().clone(),
-            VVal::WRef(r)  => r.borrow().clone(),
-            VVal::WWRef(r) => {
-                if let Some(v) = r.upgrade() {
-                    v.borrow().clone()
-                } else {
-                    VVal::Nul
-                }
-            },
-            x => x.clone(),
-        }
+        self.fun.upvalues[i].deref()
     }
 
     pub fn set_arg(&mut self, i: usize, v: VVal) {
@@ -318,72 +304,34 @@ impl Env {
         let v = &self.args[self.bp - (i + 1)];
         //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
         match v {
-            VVal::Ref(r)     => r.borrow().clone(),
             VVal::DropFun(r) => r.v.clone(),
-            VVal::WRef(r)    => r.borrow().clone(),
-            VVal::WWRef(r)   => if let Some(v) = r.upgrade() { v.borrow().clone() } else { VVal::Nul },
             v                => v.clone(),
         }
-    }
-
-    pub fn get_local_raw(&mut self, i: usize) -> VVal {
-        let idx = self.bp + i;
-        //d// println!("GET_LOCAL_RAW [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
-        //d// self.dump_stack();
-        self.args[idx].clone()
     }
 
     pub fn get_local(&mut self, i: usize) -> VVal {
         let idx = self.bp + i;
-        //d// println!("GET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
-        //d// self.dump_stack();
-        match &self.args[idx] {
-            VVal::Ref(r)     => r.borrow().clone(),
-            VVal::DropFun(r) => r.v.clone(),
-            VVal::WRef(r)    => r.borrow().clone(),
-            VVal::WWRef(r)   => if let Some(v) = r.upgrade() { v.borrow().clone() } else { VVal::Nul },
-            v                => v.clone(),
-        }
+        self.args[idx].clone()
     }
 
     pub fn set_up(&mut self, index: usize, value: &VVal) {
         let fun = self.fun.clone();
-        //d// println!("SET_UP [{}] ({})=({})", index, fun.upvalues[index].s(), value.s());
         let upv = &fun.upvalues[index];
 
         match upv {
-            VVal::Ref(r)     => { r.replace(value.clone()); }
-            VVal::WRef(r)    => { r.replace(value.clone()); }
-            VVal::WWRef(r)   => {
+            VVal::Ref(r)   => { r.replace(value.clone()); }
+            VVal::WWRef(r) => {
                 if let Some(r) = Weak::upgrade(r) {
                     r.replace(value.clone());
                 }
             },
             _ => {}
         }
-        // Will not mutate non ref upvalue!
-        // panic!(format!("Cannot mutate a non ref upvalue {} = {}", index, value.s()));
-        // But also not panic here.
-        return;
     }
 
     pub fn set_local(&mut self, i: usize, value: &VVal) {
         let idx = self.bp + i;
-        //
-        match &self.args[idx] {
-            VVal::Ref(r)     => { r.replace(value.clone()); }
-            VVal::WRef(r)    => { r.replace(value.clone()); }
-            VVal::WWRef(r)   => {
-                if let Some(r) = Weak::upgrade(r) {
-                    r.replace(value.clone());
-                }
-            },
-            _ => {
-                self.args[idx] = value.clone();
-            }
-        }
-        //d// println!("SET_LOCAL [{}] {} =~> {} ({})", self.sp, i, idx, self.args[idx].s());
-        //d// self.dump_stack();
+        self.args[idx] = value.clone();
     }
 
     pub fn set_consume(&mut self, i: usize, value: VVal) {
@@ -647,11 +595,7 @@ pub enum VVal {
     DropFun(Rc<DropVVal>),
     /// A (strong) reference to a VVal.
     Ref(Rc<RefCell<VVal>>),
-    /// A (strong) reference to a VVal, which is cloned
-    /// as weak reference when copied into a `VValFun`
-    /// as up value.
-    WRef(Rc<RefCell<VVal>>),
-    /// A weak reference to a VVal. Might turn VVal::Nul anytime.
+    /// A (weak) reference to a VVal. Might turn VVal::Nul anytime.
     WWRef(Weak<RefCell<VVal>>),
     /// A vval that can box some user data which can later be accessed
     /// from inside user supplied Rust functions via std::any::Any.
@@ -812,7 +756,7 @@ impl VVal {
                     if argc > 0 {
                         let v = e.arg(0);
                         match v {
-                            VVal::Map(_) =>
+                            VVal::Ref(_) | VVal::WWRef(_) | VVal::Map(_) =>
                                 Ok(v.get_key(&sym).unwrap_or(VVal::Nul)),
                             _ => Ok(VVal::Nul)
                         }
@@ -938,20 +882,23 @@ impl VVal {
         VVal::Ref(Rc::new(RefCell::new(self.clone())))
     }
 
-    pub fn set_ref(&self, v: VVal) {
-        if let VVal::Ref(r) = self {
-            r.replace(v);
+    pub fn set_ref(&self, v: VVal) -> VVal {
+        match self {
+            VVal::Ref(r)     => r.replace(v),
+            VVal::WWRef(l)   => {
+                if let Some(r) = l.upgrade() {
+                    r.replace(v)
+                } else {
+                    VVal::Nul
+                }
+            },
+            _ => VVal::Nul
         }
-    }
-
-    pub fn to_wref(&self) -> VVal {
-        VVal::WRef(Rc::new(RefCell::new(self.clone())))
     }
 
     pub fn deref(&self) -> VVal {
         match self {
             VVal::Ref(l)     => (*l).borrow().clone(),
-            VVal::WRef(l)    => (*l).borrow().clone(),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => v.borrow().clone(),
@@ -962,23 +909,11 @@ impl VVal {
         }
     }
 
-    pub fn downgrade(&mut self) -> Option<VVal> {
-        if let VVal::WRef(f) = &self {
-            Some(VVal::WWRef(Rc::downgrade(f)))
+    pub fn downgrade(self) -> VVal {
+        if let VVal::Ref(f) = self {
+            VVal::WWRef(Rc::downgrade(&f))
         } else {
-            None
-        }
-    }
-
-    pub fn upgrade(&mut self) -> Option<VVal> {
-        if let VVal::WWRef(f) = &self {
-            if let Some(r) = Weak::upgrade(f) {
-                Some(VVal::WRef(r))
-            } else {
-                None
-            }
-        } else {
-            None
+            self
         }
     }
 
@@ -1100,6 +1035,8 @@ impl VVal {
 
     pub fn get_key(&self, key: &str) -> Option<VVal> {
         match self {
+            VVal::Ref(r)   => self.deref().get_key(key),
+            VVal::WWRef(r) => self.deref().get_key(key),
             VVal::Map(m) => {
                 m.borrow().get(&String::from(key)).cloned()
             },
@@ -1117,13 +1054,18 @@ impl VVal {
     }
 
     pub fn set_map_key(&self, key: String, val: VVal) {
-        if let VVal::Map(m) = self {
-            m.borrow_mut().insert(key, val);
+        match self {
+            VVal::Ref(_)   => self.deref().set_map_key(key, val),
+            VVal::WWRef(_) => self.deref().set_map_key(key, val),
+            VVal::Map(m)   => { m.borrow_mut().insert(key, val); },
+            _ => (),
         }
     }
 
     pub fn set_key(&self, key: &VVal, val: VVal) {
         match self {
+            VVal::Ref(_)   => self.deref().set_key(key, val),
+            VVal::WWRef(_) => self.deref().set_key(key, val),
             VVal::Map(m) => {
                 let ks = key.s_raw();
                 m.borrow_mut().insert(ks, val);
@@ -1238,6 +1180,14 @@ impl VVal {
         })
     }
 
+    pub fn is_ref(&self) -> bool {
+        match self { VVal::Ref(_) => true, VVal::WWRef(_) => true, _ => false }
+    }
+
+    pub fn is_wref(&self) -> bool {
+        match self { VVal::WWRef(_) => true, _ => false }
+    }
+
     pub fn is_bool(&self) -> bool {
         match self { VVal::Bol(_) => true, _ => false }
     }
@@ -1286,14 +1236,8 @@ impl VVal {
             VVal::Usr(_)     => String::from("userdata"),
             VVal::Fun(_)     => String::from("function"),
             VVal::DropFun(_) => String::from("drop_function"),
-            VVal::Ref(l)     => (*l).borrow().type_name(),
-            VVal::WRef(l)    => (*l).borrow().type_name(),
-            VVal::WWRef(l)   => {
-                match l.upgrade() {
-                    Some(v) => v.borrow().type_name(),
-                    None => String::from("none"),
-                }
-            },
+            VVal::Ref(l)     => String::from("ref"),
+            VVal::WWRef(l)   => String::from("wref"),
         }
     }
 
@@ -1315,7 +1259,6 @@ impl VVal {
             VVal::Fun(_)     => 1.0,
             VVal::DropFun(f) => f.v.f(),
             VVal::Ref(l)     => (*l).borrow().f(),
-            VVal::WRef(l)    => (*l).borrow().f(),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => v.borrow().f(),
@@ -1343,7 +1286,6 @@ impl VVal {
             VVal::Fun(_)     => 1,
             VVal::DropFun(f) => f.v.i(),
             VVal::Ref(l)     => (*l).borrow().i(),
-            VVal::WRef(l)    => (*l).borrow().i(),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => v.borrow().i(),
@@ -1371,7 +1313,6 @@ impl VVal {
             VVal::Fun(_)     => true,
             VVal::DropFun(f) => f.v.i() != 0,
             VVal::Ref(l)     => (*l).borrow().i() != 0,
-            VVal::WRef(l)    => (*l).borrow().i() != 0,
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => v.borrow().i() != 0,
@@ -1397,11 +1338,10 @@ impl VVal {
             VVal::Usr(u)     => u.s(),
             VVal::Fun(_)     => "&VValFun".to_string(),
             VVal::DropFun(f) => f.v.s(),
-            VVal::Ref(l)     => format!("REF[{}]", (*l).borrow().s()),
-            VVal::WRef(l)    => format!("wREF[{}]", (*l).borrow().s()),
+            VVal::Ref(l)     => format!("$&{}", (*l).borrow().s()),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
-                    Some(v) => format!("WREF[{}]", v.borrow().s()),
+                    Some(v) => format!("$&{}", v.borrow().s()),
                     None => "$n".to_string(),
                 }
             },
@@ -1488,7 +1428,6 @@ impl serde::ser::Serialize for VVal {
             VVal::Fun(_)     => serializer.serialize_str(&self.s()),
             VVal::DropFun(_) => serializer.serialize_str(&self.s()),
             VVal::Ref(_)     => self.deref().serialize(serializer),
-            VVal::WRef(_)    => self.deref().serialize(serializer),
             VVal::WWRef(_)   => self.deref().serialize(serializer),
         }
     }

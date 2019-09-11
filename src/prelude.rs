@@ -948,6 +948,12 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     g.borrow_mut().add_func("is_str",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_str())) },
         Some(1), Some(1));
+    g.borrow_mut().add_func("is_wref",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_wref())) },
+        Some(1), Some(1));
+    g.borrow_mut().add_func("is_ref",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_ref())) },
+        Some(1), Some(1));
     g.borrow_mut().add_func("is_bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_bool())) },
         Some(1), Some(1));
@@ -1330,6 +1336,16 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 Ok(VVal::Bol(true))
             }
         }, Some(2), Some(3));
+
+    g.borrow_mut().add_func("wl:set_ref",
+        |env: &mut Env, _argc: usize| {
+            Ok(env.arg(0).set_ref(env.arg(1).clone()))
+        }, Some(2), Some(2));
+
+    g.borrow_mut().add_func("wl:weaken",
+        |env: &mut Env, _argc: usize| {
+            Ok(env.arg(0).downgrade())
+        }, Some(1), Some(1));
 
     g.borrow_mut().add_func("wl:assert",
         |env: &mut Env, _argc: usize| {
