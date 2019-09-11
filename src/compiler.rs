@@ -507,13 +507,18 @@ impl CompileEnv {
         //d// println!("COPY UPVALS: {:?}", self.upvals);
         for p in self.upvals.iter() {
             let v = match p {
-                VarPos::UpValue(i) => e.get_up(*i),
+                VarPos::UpValue(i) => e.get_up_raw(*i),
                 VarPos::Local(i)   => e.get_local(*i),
                 VarPos::Global(v)  => v.clone(), // Will probably be never used, as upvalues are
                                                  // always defined on the base of local variables.
                 VarPos::NoPos      => VVal::Nul,
             };
-            upvalues.push(v.to_ref());
+
+            if let VVal::WRef(_) = v {
+                upvalues.push(v.downgrade());
+            } else {
+                upvalues.push(v.to_ref());
+            }
         }
     }
 
@@ -1072,6 +1077,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         Ok(val(e)?.to_ref())
                     }))
                 },
+                Syntax::WRef => {
+                    let val = compile(&ast.at(1).unwrap(), ce)?;
+                    Ok(Box::new(move |e: &mut Env| {
+                        Ok(val(e)?.to_wref())
+                    }))
+                },
                 Syntax::Deref => {
                     let val = compile(&ast.at(1).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env| {
@@ -1479,37 +1490,37 @@ mod tests {
 
     #[test]
     fn check_range_next() {
-        assert_eq!(s_eval("!:ref x = 0; range 0 10 1 { [_ == 4] { next() }; .x = x + _; }; x"), "51");
-        assert_eq!(s_eval("!:ref x = 0; range 0 10 1 { next(); .x = x + _; }; x"), "0");
+        assert_eq!(s_eval("!x = $&0; range 0 10 1 { [_ == 4] { next() }; .*x = $*x + _; }; $*x"), "51");
+        assert_eq!(s_eval("!x = $&0; range 0 10 1 { next(); .*x = $*x + _; }; $*x"), "0");
     }
 
     #[test]
     fn check_while() {
         assert_eq!(s_eval(r#"
-            !:ref x = 0;
-            while { x == 0 } {
-                .x = x + 1;
+            !x = $& 0;
+            while { $*x == 0 } {
+                .*x = $*x + 1;
             };
-            x
+            $*x
         "#),
         "1");
 
         assert_eq!(s_eval(r#"
-            !:ref x = 0;
-            while { x == 0 } {
+            !x = $&0;
+            while { $*x == 0 } {
                 break 10;
-                .x = x + 1;
+                .*x = $*x + 1;
             }
         "#),
         "10");
 
         assert_eq!(s_eval(r#"
-            !:ref x = 0;
-            while { x == 0 } {
+            !x = $&0;
+            while { $*x == 0 } {
                 next;
-                .x = x + 1;
+                .*x = $*x + 1;
             };
-            x
+            $*x
         "#),
         "1");
 
@@ -1908,37 +1919,37 @@ mod tests {
                    "$e \"EXEC ERR: Caught Panic(Int(102), Some([SynPos { syn: Call, line: 1, col: 13, file: 0 }]))\"");
 
         assert_eq!(s_eval_no_panic("
-            !:ref x = 10;
+            !x = $&10;
             {
-                .x = x + 1;
-                block :outer { .x = x + 1; };
-                .x = x + 1;
+                .*x = $*x + 1;
+                block :outer { .*x = $*x + 1; };
+                .*x = $*x + 1;
             }();
-            x
+            $*x
         "), "13");
         assert_eq!(s_eval_no_panic("
             !gen_err = { $e $q$something_failed!$ };
-            !:ref x = 10;
-            !:ref msg = $q'all ok';
+            !x = $&10;
+            !msg = $&$q'all ok';
             {
-                .x = x + 1;
-                on_error {|4| .x = x * 2; .msg = _; }
-                    [block :outer { _? :outer gen_err(); .x = x + 1; }];
-                .x = x + 1;
+                .*x = $*x + 1;
+                on_error {|4| .*x = $*x * 2; .*msg = _; }
+                    [block :outer { _? :outer gen_err(); .*x = $*x + 1; }];
+                .*x = $*x + 1;
             }();
-            $[x, msg]
+            $[$*x, $*msg]
         "), "$[23,\"something_failed!\"]");
         assert_eq!(s_eval_no_panic("
             !gen_ok = { 99 };
-            !:ref x = 10;
-            !:ref msg = $q'all ok';
+            !x = $&10;
+            !msg = $&$q'all ok';
             {
-                .x = x + 1;
-                on_error { .x = x * 2; .msg = _; }
-                    ~ block :outer { _? :outer gen_ok(); .x = x + 1; };
-                .x = x + 1;
+                .*x = $*x + 1;
+                on_error { .*x = $*x * 2; .*msg = _; }
+                    ~ block :outer { _? :outer gen_ok(); .*x = $*x + 1; };
+                .*x = $*x + 1;
             }();
-            $[x, msg]
+            $[$*x, $*msg]
         "), "$[13,\"all ok\"]");
 
         assert_eq!(s_eval_no_panic("{ $e 23 }() | on_error {|4| _ + 21 }"), "44");
@@ -1962,10 +1973,10 @@ mod tests {
     fn check_oop() {
         assert_eq!(s_eval(r#"
             !obj = ${};
-            !:ref x = 0;
-            obj.a = { .x = 10 };
+            !x = $&0;
+            obj.a = { .*x = 10 };
             obj.a();
-            x
+            $*x
         "#),
         "10");
     }

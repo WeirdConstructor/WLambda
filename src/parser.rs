@@ -96,7 +96,9 @@ In the following grammar, white space and comments are omitted:
                   ;
     err           = ("e" | "error"), expr
                   ;
-    ref           = "&", value
+    ref           = "&&", value
+                  ;
+    wref          = "&", value
                   ;
     deref         = "*", value
                   ;
@@ -705,10 +707,17 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             Ok(r)
         },
         '&' => {
-            ps.consume_wsc();
-            let r = ps.syn(Syntax::Ref);
-            r.push(parse_value(ps)?);
-            Ok(r)
+            if ps.consume_lookahead("&&") {
+                ps.skip_ws_and_comments();
+                let r = ps.syn(Syntax::Ref);
+                r.push(parse_value(ps)?);
+                Ok(r)
+            } else {
+                ps.consume_wsc();
+                let r = ps.syn(Syntax::WRef);
+                r.push(parse_value(ps)?);
+                Ok(r)
+            }
         },
         _   => Ok(VVal::Flt(0.2)),
     }
