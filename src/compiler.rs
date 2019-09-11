@@ -1450,8 +1450,8 @@ mod tests {
 
     #[test]
     fn check_bool() {
-        assert_eq!(s_eval("!:ref a = 0; $t { .a = 1 } { .a = 2 }; a"), "1");
-        assert_eq!(s_eval("!:ref a = 0; $f { .a = 1 } { .a = 2 }; a"), "2");
+        assert_eq!(s_eval("!a = $&0; $t { .*a = 1 } { .*a = 2 }; $*a"), "1");
+        assert_eq!(s_eval("!a = $&0; $f { .*a = 1 } { .*a = 2 }; $*a"), "2");
     }
 
     #[test]
@@ -1684,11 +1684,11 @@ mod tests {
             "!(a, b) = ${b = 20, c = 30}; $[a, b]"),
             "$[$n,20]");
 
-        assert_eq!(s_eval("!:ref(a, b) = $[10, 20]; { .a = 33; }(); $[a, b]"), "$[33,20]");
+        assert_eq!(s_eval("!(a, b) = $[$&10, $&20]; { .*a = 33; }(); $[$*a, $*b]"), "$[33,20]");
         assert_eq!(s_eval(r#"
             !fun = {
-                !:ref(a, b) = $[10, 20];
-                $[{a}, { .a = 33; }];
+                !(a, b) = $[$&10, $&20];
+                $[{$*a}, { .*a = 33; }];
             }();
             [1 fun]();
             [0 fun]()
@@ -1696,8 +1696,9 @@ mod tests {
         "33");
         assert_eq!(s_eval(r#"
             !fun = {
-                !:wref(a, b) = $[10, 20];
-                $[{$[a, b]}, { .a = 33; }];
+                !(a, b) = $[$&10, $&20];
+                !(wa, wb) = $[wl:weaken a, wl:weaken b];
+                $[{$[$*wa, $*wb]}, { .*wa = 33; }];
             }();
             [1 fun]();
             [0 fun]()
@@ -1705,8 +1706,8 @@ mod tests {
         "$[$n,$n]");
         assert_eq!(s_eval(r#"
             !fun = {
-                !:ref(a, b) = $[10, 20];
-                $[{$[a, b]}, { .a = 33; }];
+                !(a, b) = $[$&10, $&20];
+                $[{$[$*a, $*b]}, { .*a = 33; }];
             }();
             [1 fun]();
             [0 fun]()
