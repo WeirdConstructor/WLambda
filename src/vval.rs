@@ -407,7 +407,7 @@ impl VValFun {
     ///             Ok(VVal::new_str("xyz"))
     ///         }, None, None));
     ///
-    /// assert_eq!(ctx.eval("xyz()").unwrap().s_raw(), "xyz")
+    /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
     ///```
     pub fn new_fun<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>) -> VVal
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
@@ -495,7 +495,7 @@ impl VValFun {
 /// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
 ///
 /// let r = &mut ctx.eval(r#"
-///     !x = new_mytype();
+///     !x = new_mytype[];
 ///     !i = modify_mytype x;
 ///     $[i, x]
 /// "#).unwrap();

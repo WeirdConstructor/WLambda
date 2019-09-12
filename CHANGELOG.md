@@ -1,6 +1,14 @@
 0.2.3 (unreleased)
 =================
 
+* Incompatible Change: Removed :wref and :ref definition labels in favor of
+proper $&&, $& and $\* reference handling. Added `wl:weaken` and `wl:set_ref` and
+`.*x = ...` syntax for even more reference handling.
+* Incompatible Change: Replaced [] with () parenthesis. This means function calls
+are now having the [] brackets as argument list delimiters and
+regular arithmetics and expression grouping/delimiting is done with the more
+traditional () parenthesis. This is hopefully the last big incompatible syntax change
+before the 1.0 release.
 * Feature: ser:json got a non-pretty print argument.
 * Doc: Documented ser:json and deser:json, with additional examples.
 * Feature: Implemented `wl:eval` for evaluating wlambda code from inside
@@ -17,9 +25,6 @@ sequential data structures. `str:len` returns the length in unicode characters
 now.
 * Bugfix: Weak upvalue references were not properly handled and directly returned
 by variable accesses.
-* Incompatible Change: Removed :wref and :ref definition labels in favor of
-proper $& and $\* reference handling. Added `wl:weaken` and `wl:set_ref` and
-`.*x = ...` syntax for even more reference handling.
 
 0.2.2 (2019-09-01)
 ==================

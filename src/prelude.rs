@@ -37,8 +37,8 @@ the `!_name_ = _expr_` syntax.
 
 To call functions, you have at least 2 alternatives. First is the bare
 `_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the delimiter
-full variant: `_expr_ (arg1, arg2, arg3, ...)`. You can always delimit the first
-variant using the `[ ... ]` brackets.
+full variant: `_expr_ [arg1, arg2, arg3, ...]`. You can always delimit the first
+variant using the `( ... )` parenthesis.
 
 The arguments passed to the function are accessible using the `_`, `_1`, `_2`, ..., `_9`
 variables. If you need to access more arguments the `@` variable holds a list of all
@@ -47,15 +47,15 @@ arguments.
 ```wlambda
 !twoify = { _ * 2 };
 
-wl:assert_eq twoify(2) 4;
+wl:assert_eq twoify[2] 4;
 
 !twoify2 = \_ * 2;
 
-wl:assert_eq twoify2(2) 4;
+wl:assert_eq twoify2[2] 4;
 
 # You may also call them directly, notice the bracket [ ... ] syntax
 # for delimiting the inner function call:
-wl:assert_eq [{ _ * 2 } 2] 4;
+wl:assert_eq ({ _ * 2 } 2) 4;
 ```
 
 If you want to name arguments, you can use the destructuring assignment
@@ -66,7 +66,7 @@ syntax:
     a + b
 };
 
-wl:assert_eq add(1, 2) 3;
+wl:assert_eq add[1, 2] 3;
 ```
 
 ### Function arity checks
@@ -98,11 +98,11 @@ Here an example:
     # the arms of the conditional below have
     # their own set of arguments.
 
-    [is_none c] { a + b } { a * b + c * d }
+    (is_none c) { a + b } { a * b + c * d }
 };
 
-wl:assert_eq dosomething(1, 2)         3;
-wl:assert_eq dosomething(2, 2, 3, 4)  16;
+wl:assert_eq dosomething[1, 2]         3;
+wl:assert_eq dosomething[2, 2, 3, 4]  16;
 ```
 
 ## Data Types
@@ -118,10 +118,10 @@ return a `$none` but an `$error` value.
 
 ```wlambda
 wl:assert ~ $n        == $none;
-wl:assert ~ int($n)   == 0;
-wl:assert ~ float($n) == 0.0;
-wl:assert ~ str($n)   == "$n";
-wl:assert ~ is_none($n);
+wl:assert ~ int[$n]   == 0;
+wl:assert ~ float[$n] == 0.0;
+wl:assert ~ str[$n]   == "$n";
+wl:assert ~ is_none[$n];
 ```
 
 ### Error values: `$e expr` or `$error expr`
@@ -159,7 +159,7 @@ an error value.
 !other = {
     # some code ...
 
-    _? func(); # If you would not catch the error value here,
+    _? func[]; # If you would not catch the error value here,
                # the program would panic, as an error value
                # must not be ignored!
 
@@ -170,7 +170,7 @@ an error value.
     # something here...
 };
 
-wl:assert ~ [unwrap_err other()] == "this failed!";
+wl:assert ~ (unwrap_err other[]) == "this failed!";
 ```
 
 `_?` can take up to 2 arguments. If so, the first argument is interpreted
@@ -180,26 +180,26 @@ as jump label. That is handy if you want to jump up multiple call frames:
 !failing_func = { $e :FAIL };
 
 !func = \:some_unique_label {
-    [ _ == 42 ] {
+    ( _ == 42 ) {
         displayln "We got 42!";
 
         # The `then` branch we are currently in is a call frame.
         # To jump further up the call stack, we need the label
         # we defined for the function above.
-        !val = _? :some_unique_label failing_func();
+        !val = _? :some_unique_label failing_func[];
 
         displayln "Returned:" val;
     }
 };
 
-wl:assert_eq [unwrap_err ~ func 42] :FAIL;
+wl:assert_eq (unwrap_err ~ func 42) :FAIL;
 ```
 
 #### Handle errors with `on_error`
 
 ```wlambda
 !func = {
-    [_ == 13] {
+    (_ == 13) {
         $e "this failed!"
     } {
         "all ok!"
@@ -240,13 +240,13 @@ $Q/ABCDEF\xFD/;      # \xFD is not an excape sequence here!
 You can index inside a byte array by calling it with an integer:
 
 ```wlambda
-wl:assert_eq [$b"ABC" 1] $b"B";
+wl:assert_eq ($b"ABC" 1) $b"B";
 ```
 
 You can extract a whole range when calling with 2 integers:
 
 ```wlambda
-wl:assert_eq [$b"ABCDEF" 2 3] $b"CDE";
+wl:assert_eq ($b"ABCDEF" 2 3) $b"CDE";
 ```
 
 If you call a bytes value with a map as argument, the bytes value is
@@ -256,8 +256,8 @@ is returned:
 ```wlambda
 !some_map = ${ a = 20, b = 30 };
 
-wl:assert_eq [$b"a" some_map] 20;
-wl:assert_eq [$b"b" some_map] 30;
+wl:assert_eq ($b"a" some_map) 20;
+wl:assert_eq ($b"b" some_map) 30;
 
 wl:assert_eq some_map.$b"a" 20;   # with method call syntax
 ```
@@ -268,36 +268,36 @@ You can convert bytes to strings in a multitude of ways:
 
 - str _bytes_
   ```wlambda
-  wl:assert_eq [str $b"abc"]        "abc";
-  wl:assert_eq [str $b"abc\xFF"]    "abcÿ";
-  wl:assert_eq [str $Q/ABCDEF\xFD/] "ABCDEF\\xFD";
+  wl:assert_eq (str $b"abc")        "abc";
+  wl:assert_eq (str $b"abc\xFF")    "abcÿ";
+  wl:assert_eq (str $Q/ABCDEF\xFD/) "ABCDEF\\xFD";
   ```
 - bytes:to_hex _bytes_ \[_group-len_ \[_group-sep_]]
   ```wlambda
-  wl:assert_eq [bytes:to_hex $b"\xFF\x0A\xBE\xEF"]
+  wl:assert_eq (bytes:to_hex $b"\xFF\x0A\xBE\xEF")
                "FF0ABEEF";
-  wl:assert_eq [bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2]
+  wl:assert_eq (bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2)
                "FF 0A BE EF";
-  wl:assert_eq [bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2 ":"]
+  wl:assert_eq (bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2 ":")
                "FF:0A:BE:EF";
   ```
 - str:from_utf8 _bytes_
   ```wlambda
-  wl:assert_eq [str:from_utf8 $b"\xC3\xA4\xC3\x9F\xC3\xBF"] "äßÿ";
-  wl:assert_eq [str:from_utf8 [str:to_bytes "äßÿ"]]         "äßÿ";
+  wl:assert_eq (str:from_utf8 $b"\xC3\xA4\xC3\x9F\xC3\xBF") "äßÿ";
+  wl:assert_eq (str:from_utf8 [str:to_bytes "äßÿ"])         "äßÿ";
   # broken UTF8 will result in an error:
-  wl:assert ~ is_err [str:from_utf8 $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF"];
+  wl:assert ~ is_err (str:from_utf8 $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF");
   ```
 - str:from_utf8_lossy _bytes_
   ```wlambda
-  wl:assert_eq [str:from_utf8_lossy $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF"] "�äßÿ";
+  wl:assert_eq (str:from_utf8_lossy $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF") "�äßÿ";
   ```
 
 You can even convert bytes to vectors of integers back and forth:
 
 ```wlambda
 !v = bytes:to_vec $b"ABC";
-wl:assert_eq [str v] [str $[65, 66, 67]];
+wl:assert_eq (str v) (str $[65, 66, 67]);
 
 push v 64;
 !b = bytes:from_vec v;
@@ -307,7 +307,7 @@ wl:assert_eq b $b"ABC@";
 There is also an invese operation to `bytes:to_hex`:
 
 ```wlambda
-wl:assert_eq [bytes:from_hex ~ bytes:to_hex $b"ABC"] $b"ABC";
+wl:assert_eq (bytes:from_hex ~ bytes:to_hex $b"ABC") $b"ABC";
 ```
 
 ### Symbols
@@ -378,7 +378,7 @@ very helpful for the control flow in wlambda in case of conditional execution.
     !x = 10;
     # does stuff
 
-    [x == 10] {
+    (x == 10) {
         return :outer 20
     }
 
@@ -396,12 +396,12 @@ be executed. If you pass a function as second argument to `$false` then that
 will be executed.
 
 ```wlambda
-[10 == 10] { displayln "10 is 10" };         #=> prints "10 is 10"
-[10 != 10] { displayln "10 is not 10" };     #=> doesn't print anything
+(10 == 10) { displayln "10 is 10" };         #=> prints "10 is 10"
+(10 != 10) { displayln "10 is not 10" };     #=> doesn't print anything
 
 !x = 20;
 
-[x == 20] {
+(x == 20) {
     displayln "x is 20";
 } {
     displayln "x is 20";
@@ -413,20 +413,19 @@ function you may write it also like this, which is not the recommended
 syntax, but still works:
 
 ```wlambda
-[10 == 10]({ displayln "10 is 10" });
+(10 == 10)[{ displayln "10 is 10" }];
 
 !x = 21;
-[x == 20]({ displayln "x is 20" }, { displayln "x isn't 20" }); #=> print "x isn't 20"
+(x == 20)[{ displayln "x is 20" }, { displayln "x isn't 20" }]; #=> print "x isn't 20"
 ```
 
 ## Lexical Scope and Variable assignment
 
-- !x = y        variable definition
-- .x = y        assignments
-- !:ref x = y   upvalue references
-- !:wref x = y  weak upvalue references
+- !x = y                  variable definition
+- .x = y                  assignments
+- !:ref x = y             upvalue references
+- !:wref x = y            weak upvalue references
 - !(x, y) = list / map    destructuring assignments
-- (x, y) = list / map    destructuring assignments
 
 ## Arithmetics
 
@@ -451,7 +450,7 @@ syntax, but still works:
 
 !@import x tests:test_mod; # prefixes everything from modixes with x:
 
-wl:assert ~ [x:symbol 10] == 40;
+wl:assert ~ (x:symbol 10) == 40;
 
 ```
 
@@ -464,9 +463,9 @@ the generated value. If the code leads to any kind of evaluation error,
 an error object is returned.
 
 ```wlambda
-wl:assert_eq [wl:eval "1 + 2"] 3;
+wl:assert_eq (wl:eval "1 + 2") 3;
 !:global X = 20;
-wl:assert_eq [wl:eval "1 + X"] 21;
+wl:assert_eq (wl:eval "1 + X") 21;
 ```
 
 ### wl:assert _bool_ \[_message_]
@@ -513,7 +512,7 @@ Deserializes the JSON formatted _string_ into a data structure.
 !data = deser:json ~ ser:json $[1,2.3,${a=4}];
 wl:assert_eq data.0 1;
 wl:assert_eq data.1 2.3;
-wl:assert_eq data.[2].a 4;
+wl:assert_eq data.(2).a 4;
 ```
 
 #### ser:msgpack _data_
@@ -521,7 +520,7 @@ wl:assert_eq data.[2].a 4;
 Serializes the _data_ and returns a msgpack bytes value.
 
 ```wlambda
-    wl:assert_eq [ser:msgpack $b"abc"] $b"\xC4\x03abc";
+    wl:assert_eq (ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
 #### deser:msgpack _bytes_
@@ -529,7 +528,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 Deserializes the msgpack bytes value into a data structure.
 
 ```wlambda
-    wl:assert_eq [deser:msgpack $b"\xC4\x03abc"] $b"abc";
+    wl:assert_eq (deser:msgpack $b"\xC4\x03abc") $b"abc";
 ```
 
 ### regex
@@ -544,10 +543,10 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 
 ```wlambda
 !year_str = chrono:timestamp "%Y";
-displayln :XXXX ~ [year_str | int] == 2019;
-wl:assert ~ [year_str | int] == 2019;
+displayln :XXXX ~ (year_str | int) == 2019;
+wl:assert ~ (year_str | int) == 2019;
 
-!now_str = chrono:timestamp();
+!now_str = chrono:timestamp[];
 ```
 
 */

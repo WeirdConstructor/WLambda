@@ -1,11 +1,6 @@
 // Copyright (c) 2019 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
-
-// TODO:
-//  - WRef semantics fixes all around the documentation and tests.
-//  - Change [] to () in the parser.
-
 use crate::parser::{self};
 use crate::prelude::*;
 use crate::vval::VVal;
@@ -1386,21 +1381,21 @@ mod tests {
         assert_eq!(s_eval("!x = 10; x"),              "10");
         assert_eq!(s_eval("!x = $true; x"),           "$true");
         assert_eq!(s_eval("{ 10 }"),                  "&VValFun");
-        assert_eq!(s_eval("{ 10 }()"),                "10");
-        assert_eq!(s_eval("{ 10; 20 }()"),            "20");
-        assert_eq!(s_eval("!x = $&11; { 12; x }()"),                    "11");
-        assert_eq!(s_eval("!x = 11; { 12; x }()"),                        "11");
-        assert_eq!(s_eval("!x = 13; { .x = 12 }(); { x }() "),            "13");
-        assert_eq!(s_eval("!x = $&13; { .x = 12 }(); $[{ x }(), $*x]"),  "$[12,12]");
-        assert_eq!(s_eval("!x = $&13; { .x = 12; x }(); $[{ x }(), { .x = 15; x }(), $*x]"), "$[12,15,15]");
+        assert_eq!(s_eval("{ 10 }[]"),                "10");
+        assert_eq!(s_eval("{ 10; 20 }[]"),            "20");
+        assert_eq!(s_eval("!x = $&11; { 12; x }[]"),                    "11");
+        assert_eq!(s_eval("!x = 11; { 12; x }[]"),                        "11");
+        assert_eq!(s_eval("!x = 13; { .x = 12 }[]; { x }[] "),            "13");
+        assert_eq!(s_eval("!x = $&13; { .x = 12 }[]; $[{ x }[], $*x]"),  "$[12,12]");
+        assert_eq!(s_eval("!x = $&13; { .x = 12; x }[]; $[{ x }[], { .x = 15; x }[], $*x]"), "$[12,15,15]");
         assert_eq!(s_eval("{ _ } 10"),                        "10");
         assert_eq!(s_eval("!y = $&0; { .y = _ } 10; $*y"),   "10");
         assert_eq!(s_eval("${:a = 10, :b = 20}"),             "${a=10,b=20}");
         assert_eq!(s_eval("${:b = 20, :a = 10}"),             "${a=10,b=20}");
         assert_eq!(s_eval("${a = 10, b = 20}"),               "${a=10,b=20}");
         assert_eq!(s_eval("${b = 20, a = 10}"),               "${a=10,b=20}");
-        assert_eq!(s_eval("${[:a] = 10, b = 20}"),            "${a=10,b=20}");
-        assert_eq!(s_eval("${[:b] = 20, a = 10}"),            "${a=10,b=20}");
+        assert_eq!(s_eval("${(:a) = 10, b = 20}"),            "${a=10,b=20}");
+        assert_eq!(s_eval("${(:b) = 20, a = 10}"),            "${a=10,b=20}");
         assert_eq!(s_eval("!x = ${:b = 20, :a = 10}; x"),     "${a=10,b=20}");
         assert_eq!(s_eval("!x = ${:b = 20, :a = 10}; x.a"),   "10");
         assert_eq!(s_eval("!x = ${:b = 20, :a = 11}; :a x"),  "11");
@@ -1415,25 +1410,25 @@ mod tests {
 
     #[test]
     fn check_ref_closures() {
-        assert_eq!(s_eval("!c1 = { !a = $&& 1.2; { $*a } }; c1()()"),            "1.2");
-        assert_eq!(s_eval("!c1 = { !a = $& 1.2; { a } }; c1()()"),           "$n");
-        assert_eq!(s_eval("!c1 = { !a = $& 1.2; { a }() }; c1()"),           "1.2");
-        assert_eq!(s_eval("!c1 = { !a = $& 1.2; !a = $n; { a }() }; c1()"),  "$n");
-        assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&&1.2; { $*a + outer_a } }; c1()()"), "3.5");
-        assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; c1()()"), "2.3");
-        assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; !outer_a = $n; c1()()"), "0");
+        assert_eq!(s_eval("!c1 = { !a = $&& 1.2; { $*a } }; c1[][]"),            "1.2");
+        assert_eq!(s_eval("!c1 = { !a = $& 1.2; { a } }; c1[][]"),           "$n");
+        assert_eq!(s_eval("!c1 = { !a = $& 1.2; { a }[] }; c1[]"),           "1.2");
+        assert_eq!(s_eval("!c1 = { !a = $& 1.2; !a = $n; { a }[] }; c1[]"),  "$n");
+        assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&&1.2; { $*a + outer_a } }; c1[][]"), "3.5");
+        assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; c1[][]"), "2.3");
+        assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; !outer_a = $n; c1[][]"), "0");
     }
 
     #[test]
     fn check_arithmetics() {
         assert_eq!(s_eval("12 + 23"),         "35");
-        assert_eq!(s_eval("+(12, 23)"),       "35");
+        assert_eq!(s_eval("+[12, 23]"),       "35");
         assert_eq!(s_eval("+ 12 23"),         "35");
         assert_eq!(s_eval("+ 12 ~ - 24 23"),  "13");
-        assert_eq!(s_eval("[+ 12 ~ - 24 23] + 1"),    "14");
-        assert_eq!(s_eval("[12 + 1] == 13"),          "$true");
-        assert_eq!(s_eval("[+ 12 ~ - 24 23] == 13"),  "$true");
-        assert_eq!(s_eval("[+ 12 ~ - 24 23] == 14"),  "$false");
+        assert_eq!(s_eval("(+ 12 ~ - 24 23) + 1"),    "14");
+        assert_eq!(s_eval("(12 + 1) == 13"),          "$true");
+        assert_eq!(s_eval("(+ 12 ~ - 24 23) == 13"),  "$true");
+        assert_eq!(s_eval("(+ 12 ~ - 24 23) == 14"),  "$false");
         assert_eq!(s_eval("12.12 + 23.23"),           "35.35");
 
         // coertion of strings and keys to numbers:
@@ -1495,15 +1490,15 @@ mod tests {
     fn check_range_break() {
         assert_eq!(s_eval("4 == 4"), "$true");
         assert_eq!(s_eval("range 0 10 1 {|1| break 14 }"), "14");
-        assert_eq!(s_eval("range 0 10 1 { !i = _; [i == 4] { break ~ i + 10 } }"), "14");
+        assert_eq!(s_eval("range 0 10 1 { !i = _; (i == 4) { break ~ i + 10 } }"), "14");
     }
 
     #[test]
     fn check_range_next() {
-        assert_eq!(s_eval("!x = $&&0; range 0 10 1 { [_ == 4] { next() }; .*x = $*x + _; }; $*x"), "51");
-        assert_eq!(s_eval("!x = $&&0; range 0 10 1 { next(); .*x = $*x + _; }; $*x"), "0");
-        assert_eq!(s_eval("!x = $&0; range 0 10 1 { [_ == 4] { next() }; .x = x + _; }; $*x"), "51");
-        assert_eq!(s_eval("!x = $&0; range 0 10 1 { next(); .x = x + _; }; $*x"), "0");
+        assert_eq!(s_eval("!x = $&&0; range 0 10 1 { (_ == 4) { next[] }; .*x = $*x + _; }; $*x"), "51");
+        assert_eq!(s_eval("!x = $&&0; range 0 10 1 { next[]; .*x = $*x + _; }; $*x"), "0");
+        assert_eq!(s_eval("!x = $&0; range 0 10 1 { (_ == 4) { next[] }; .x = x + _; }; $*x"), "51");
+        assert_eq!(s_eval("!x = $&0; range 0 10 1 { next[]; .x = x + _; }; $*x"), "0");
     }
 
     #[test]
@@ -1548,18 +1543,18 @@ mod tests {
 
     #[test]
     fn check_args() {
-        assert_eq!(s_eval("{ $[_, _1, _2] }(1, 2, 3)"),       "$[1,2,3]");
-        assert_eq!(s_eval("{ @ }(1, 2, 3)"),                  "$[1,2,3]");
-        assert_eq!(s_eval("{|3<4| $[_, _1, _2, _3] }(1, 2, 3)"),   "$[1,2,3,$n]");
+        assert_eq!(s_eval("{ $[_, _1, _2] }[1, 2, 3]"),       "$[1,2,3]");
+        assert_eq!(s_eval("{ @ }[1, 2, 3]"),                  "$[1,2,3]");
+        assert_eq!(s_eval("{|3<4| $[_, _1, _2, _3] }[1, 2, 3]"),   "$[1,2,3,$n]");
     }
 
     #[test]
     fn check_to_drop() {
-        assert_eq!(s_eval("!x = $&1; { .x = 2; }(); $*x"), "2");
-        assert_eq!(s_eval("!x = $&1; { !d = { .x = 2; }; d }()(); $*x"), "2");
+        assert_eq!(s_eval("!x = $&1; { .x = 2; }[]; $*x"), "2");
+        assert_eq!(s_eval("!x = $&1; { !d = { .x = 2; }; d }[][]; $*x"), "2");
         assert_eq!(s_eval(r#"
             !x = $&0;
-            { !d = to_drop 10 {|| .x = 17; } }();
+            { !d = to_drop 10 {|| .x = 17; } }[];
             $*x
         "#),
         "17");
@@ -1567,8 +1562,8 @@ mod tests {
 
     #[test]
     fn check_call_primitives() {
-        assert_eq!(s_eval("13()"), "13");
-        assert_eq!(s_eval("$t()"), "$true");
+        assert_eq!(s_eval("13[]"), "13");
+        assert_eq!(s_eval("$t[]"), "$true");
         assert_eq!(s_eval(":foo"), ":\"foo\"");
     }
 
@@ -1577,9 +1572,9 @@ mod tests {
         assert_eq!(s_eval("
             !:global x = 120;
             !f = { x };
-            !l = f();
+            !l = f[];
             .x = 30;
-            !l2 = f();
+            !l2 = f[];
             $[l, l2, x]
         "), "$[120,30,30]");
         assert_eq!(s_eval("
@@ -1589,9 +1584,9 @@ mod tests {
                 .x = x + 2;
                 $[x, b]
             };
-            !l = f(1, 2);
+            !l = f[1, 2];
             .x = 30;
-            !l2 = f(3, 4);
+            !l2 = f[3, 4];
             $[l, l2, x]
         "), "$[$[3,2],$[5,4],30]");
         assert_eq!(s_eval("
@@ -1601,16 +1596,16 @@ mod tests {
                 .x = x + 2;
                 $[y, x, b]
             };
-            !l = f(1, 2);
+            !l = f[1, 2];
             .x = x + 30;
-            !l2 = f(3, 4);
+            !l2 = f[3, 4];
             $[l, l2, x]
         "), "$[$[1,122,2],$[3,154,4],154]");
         assert_eq!(s_eval("
             !f = { !:global (a, b, c) = @; };
             .b = 20;
             !x1 = $[a, b, c];
-            f(13, 17, 43);
+            f[13, 17, 43];
             !x2 = $[a, b, c];
             $[x1, x2]
         "), "$[$[$n,20,$n],$[13,17,43]]");
@@ -1660,25 +1655,25 @@ mod tests {
         assert_eq!(s_eval("uneg 0x1"),    "4294967294");
         assert_eq!(s_eval("uneg 0x0"),    "4294967295");
 
-        assert_eq!(s_eval("[0x10 &| 0x01] == 0x11"), "$true");
-        assert_eq!(s_eval("[0x0f &  0x33] == 0x3"),  "$true");
-        assert_eq!(s_eval("[0x11 &^ 0x01] == 0x10"), "$true");
-        assert_eq!(s_eval("[0b1 << 1] == 0b10"),     "$true");
-        assert_eq!(s_eval("[0b1 << 2] == 0b100"),    "$true");
-        assert_eq!(s_eval("[0b1 >> 1] == 0x0"),      "$true");
+        assert_eq!(s_eval("(0x10 &| 0x01) == 0x11"), "$true");
+        assert_eq!(s_eval("(0x0f &  0x33) == 0x3"),  "$true");
+        assert_eq!(s_eval("(0x11 &^ 0x01) == 0x10"), "$true");
+        assert_eq!(s_eval("(0b1 << 1) == 0b10"),     "$true");
+        assert_eq!(s_eval("(0b1 << 2) == 0b100"),    "$true");
+        assert_eq!(s_eval("(0b1 >> 1) == 0x0"),      "$true");
 
-        assert_eq!(s_eval("!x = $&0; !b = { $t }() &and { .x = 1; 10 }(); $[$*x, b]"), "$[1,10]");
-        assert_eq!(s_eval("!x = $&0; !b = { $f }() &and { .x = 1; 10 }(); $[$*x, b]"), "$[0,$false]");
-        assert_eq!(s_eval("!x = $&0; !b = { $f }() &or { .x = 1; 10 }(); $[$*x, b]"),  "$[1,10]");
-        assert_eq!(s_eval("!x = $&0; !b = { 12 }() &or { .x = 1; 10 }(); $[$*x, b]"),  "$[0,12]");
+        assert_eq!(s_eval("!x = $&0; !b = { $t }[] &and { .x = 1; 10 }[]; $[$*x, b]"), "$[1,10]");
+        assert_eq!(s_eval("!x = $&0; !b = { $f }[] &and { .x = 1; 10 }[]; $[$*x, b]"), "$[0,$false]");
+        assert_eq!(s_eval("!x = $&0; !b = { $f }[] &or { .x = 1; 10 }[]; $[$*x, b]"),  "$[1,10]");
+        assert_eq!(s_eval("!x = $&0; !b = { 12 }[] &or { .x = 1; 10 }[]; $[$*x, b]"),  "$[0,12]");
         assert_eq!(s_eval(r#"
             !x = $&0;
-            !f = { yay(x); .x = x + 1; x };
-            !b = f()
-                &and f()
-                &and f()
-                &and f()
-                &and f();
+            !f = { yay[x]; .x = x + 1; x };
+            !b = f[]
+                &and f[]
+                &and f[]
+                &and f[]
+                &and f[];
             $[$*x, b]
         "#),  "$[5,5]");
 
@@ -1707,23 +1702,23 @@ mod tests {
             "!(a, b) = ${b = 20, c = 30}; $[a, b]"),
             "$[$n,20]");
 
-        assert_eq!(s_eval("!(a, b) = $[$&10, $&20]; { .a = 33; }(); $[$*a, $*b]"), "$[33,20]");
+        assert_eq!(s_eval("!(a, b) = $[$&10, $&20]; { .a = 33; }[]; $[$*a, $*b]"), "$[33,20]");
         assert_eq!(s_eval(r#"
             !fun = {
                 !(a, b) = $[$&&10, $&&20];
                 $[{$*a}, { .*a = 33; }];
-            }();
-            [1 fun]();
-            [0 fun]()
+            }[];
+            (1 fun)[];
+            (0 fun)[]
         "#),
         "33");
         assert_eq!(s_eval(r#"
             !fun = {
                 !(a, b) = $[$&10, $&20];
                 $[{$[a, b]}, { .a = 33; }];
-            }();
-            [1 fun]();
-            [0 fun]()
+            }[];
+            (1 fun)[];
+            (0 fun)[]
         "#),
         "$[$n,$n]");
         assert_eq!(s_eval(r#"
@@ -1731,18 +1726,18 @@ mod tests {
                 !(a, b) = $[$&10, $&20];
                 !(wa, wb) = $[wl:weaken a, wl:weaken b];
                 $[{$[wa, wb]}, { .wa = 33; }];
-            }();
-            [1 fun]();
-            [0 fun]()
+            }[];
+            (1 fun)[];
+            (0 fun)[]
         "#),
         "$[$n,$n]");
         assert_eq!(s_eval(r#"
             !fun = {
                 !(a, b) = $[$&&10, $&&20];
                 $[{$[$*a, $*b]}, { .*a = 33; }];
-            }();
-            [1 fun]();
-            [0 fun]()
+            }[];
+            (1 fun)[];
+            (0 fun)[]
         "#),
         "$[33,20]");
 
@@ -1759,7 +1754,7 @@ mod tests {
     fn check_field() {
         assert_eq!(s_eval("!v = $[]; v.0 = 10; v"), "$[10]");
         assert_eq!(s_eval("!v = $[]; v.2 = 10; v"), "$[$n,$n,10]");
-        assert_eq!(s_eval("!i = 2; !v = $[]; v.[i] = 10; v"), "$[$n,$n,10]");
+        assert_eq!(s_eval("!i = 2; !v = $[]; v.(i) = 10; v"), "$[$n,$n,10]");
     }
 
     #[test]
@@ -1781,11 +1776,11 @@ mod tests {
         assert_eq!(s_eval("\"foo\"(0)"),                       "\"f\"");
         assert_eq!(s_eval("\"foo\" 0"),                        "\"f\"");
         assert_eq!(s_eval("\"foobar\" 1 3"),                   "\"oob\"");
-        assert_eq!(s_eval("\"foobar\"(1, 3)"),                 "\"oob\"");
+        assert_eq!(s_eval("\"foobar\"[1, 3]"),                 "\"oob\"");
         assert_eq!(s_eval("\"foobar\" $[1, 3]"),               "\"oob\"");
         assert_eq!(s_eval("\"foobar\" $q/xyz/"),               "\"foobarxyz\"");
         assert_eq!(s_eval("\"foobar\" ${ foobar = 12 }"),       "12");
-        assert_eq!(s_eval("\"foobar\" ${ [\"foobar\"] = 12 }"), "12");
+        assert_eq!(s_eval("\"foobar\" ${ (\"foobar\") = 12 }"), "12");
     }
 
     #[test]
@@ -1800,22 +1795,22 @@ mod tests {
         assert_eq!(s_eval("match $q x9 :?p { yay _; _ == $q|xx| } {|| 181 } {|| 19 }"), "19");
         assert_eq!(s_eval("match 10"),                           "$n");
         assert_eq!(s_eval("
-            match [$e $[:foo, 1, 2, 3]]
+            match ($e $[:foo, 1, 2, 3])
                 :?e :foo {|| 19 }
                 :?e :bar {|| 19.2 }
                 :?e :sna :snu {|| 19.4 }
                 { :nothin }
         "), "19");
         assert_eq!(s_eval("
-            match [
-                $e $[:bar, 1, 2, 3] ]
+            match (
+                $e $[:bar, 1, 2, 3] )
                 :?e :foo {|| 19 }
-                :?e :bar {|4| $[[2 _] + 19.2, _1] }
+                :?e :bar {|4| $[(2 _) + 19.2, _1] }
                 :?e :sna :snu {|| 19.4 }
                 { :nothin }
         "), "$[21,3]");
         assert_eq!(s_eval("
-            match [$e $[:snu, 1, 2, 3]]
+            match ($e $[:snu, 1, 2, 3])
                 :?e :foo {|| 19 }
                 :?e :bar {|| 19.2 }
                 :?e :sna :snu {|| 19.4 + _.3 }
@@ -1864,30 +1859,30 @@ mod tests {
     #[test]
     fn check_return() {
         assert_eq!(s_eval("block {
-            !x = { return 11; 20 }();
+            !x = { return 11; 20 }[];
             .x = x + 20;
             x
         }"), "31");
         assert_eq!(s_eval("block {
-            !x = { 13 }();
+            !x = { 13 }[];
             .x = 20;
             x
         }"), "20");
         assert_eq!(s_eval("block :x {
-            !x = { return :x 10; 20 }();
+            !x = { return :x 10; 20 }[];
             .x = x + 20;
             x
         }"), "10");
         assert_eq!(s_eval("\\:x {
-                !x = { return :x 10; 20 }();
+                !x = { return :x 10; 20 }[];
                 .x = x + 20;
                 x
-            }()
+            }[]
         "), "10");
-        assert_eq!(s_eval("{ 10; 20 }()"), "20");
+        assert_eq!(s_eval("{ 10; 20 }[]"), "20");
         assert_eq!(s_eval("!g = { _1 }; g :x 10"), "10");
         assert_eq!(s_eval("block {
-            !x = { block :x { return :x 13; 20 } }();
+            !x = { block :x { return :x 13; 20 } }[];
             yay x;
             .x = x + 12;
             x
@@ -1896,47 +1891,47 @@ mod tests {
 
     #[test]
     fn check_arity() {
-        assert_eq!(s_eval_no_panic("{}(1,2,3)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 0 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 3, file: 0 }]))\"");
-        assert_eq!(s_eval("{|3| _1 }(1,2,3)"), "2");
-        assert_eq!(s_eval_no_panic("{|3| _1 }(2,3)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at least 3 arguments, got 2\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{|3| _1 }(2,3,4,5)"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
-        assert_eq!(s_eval("{|0<4| _1 }()"), "$n");
-        assert_eq!(s_eval("{|0<4| _1 }(1)"), "$n");
-        assert_eq!(s_eval("{|0<4| _1 }(1,2)"), "2");
-        assert_eq!(s_eval("{|0<4| _1 }(1,2,3)"), "2");
-        assert_eq!(s_eval("[\\|0<4| _1](1,2,3)"), "2");
-        assert_eq!(s_eval("{|0<4| _1 }(1,2,3,4)"), "2");
-        assert_eq!(s_eval_no_panic("{|0<4| _1 }(1,2,3,4,5)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 12, file: 0 }]))\"");
-        assert_eq!(s_eval("{ @ }(1,2,3,4,5)"), "$[1,2,3,4,5]");
-        assert_eq!(s_eval("{|2| @ }(1,2)"), "$[1,2]");
-        assert_eq!(s_eval_no_panic("{|2| @ }(1)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at least 2 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{|2| @ }(1,2,3)"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 2 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{}[1,2,3]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 0 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 3, file: 0 }]))\"");
+        assert_eq!(s_eval("{|3| _1 }[1,2,3]"), "2");
+        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at least 3 arguments, got 2\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3,4,5]"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
+        assert_eq!(s_eval("{|0<4| _1 }[]"), "$n");
+        assert_eq!(s_eval("{|0<4| _1 }[1]"), "$n");
+        assert_eq!(s_eval("{|0<4| _1 }[1,2]"), "2");
+        assert_eq!(s_eval("{|0<4| _1 }[1,2,3]"), "2");
+        assert_eq!(s_eval("(\\|0<4| _1)[1,2,3]"), "2");
+        assert_eq!(s_eval("{|0<4| _1 }[1,2,3,4]"), "2");
+        assert_eq!(s_eval_no_panic("{|0<4| _1 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 12, file: 0 }]))\"");
+        assert_eq!(s_eval("{ @ }[1,2,3,4,5]"), "$[1,2,3,4,5]");
+        assert_eq!(s_eval("{|2| @ }[1,2]"), "$[1,2]");
+        assert_eq!(s_eval_no_panic("{|2| @ }[1]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at least 2 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|2| @ }[1,2,3]"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 2 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
 
-        assert_eq!(s_eval_no_panic("{!(a,b,c) = @;}(1,2,3,4)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 16, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{_3; !(a,b,c) = @; }(1,2,3,4,5)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 21, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{!(a,b,c) = @; _3 }(1,2,3,4,5)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
-        assert_eq!(s_eval("{!(a,b,c) = @; b }(1,2,3)"), "2");
-        assert_eq!(s_eval("{!(a,b,c) = @; _3 }(1,2,3,5)"), "5");
-        assert_eq!(s_eval("{!:global (a,b,c) = @; _3 }(1,2,3,5)"), "5");
-        assert_eq!(s_eval_no_panic("{!:global (a,b,c) = @; _3 }(1,2,3,4,5)"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 28, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{!(a,b,c) = @;}[1,2,3,4]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 16, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{_3; !(a,b,c) = @; }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 21, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{!(a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
+        assert_eq!(s_eval("{!(a,b,c) = @; b }[1,2,3]"), "2");
+        assert_eq!(s_eval("{!(a,b,c) = @; _3 }[1,2,3,5]"), "5");
+        assert_eq!(s_eval("{!:global (a,b,c) = @; _3 }[1,2,3,5]"), "5");
+        assert_eq!(s_eval_no_panic("{!:global (a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 28, file: 0 }]))\"");
     }
 
     #[test]
     fn check_error() {
         assert_eq!(s_eval_no_panic("$e 10; 14"),
                    "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\'(@1,4:0) dropped.\\\" }), None)\"");
-        assert_eq!(s_eval_no_panic("{ { { { $e 10; 14 }(); 3 }(); 9 }(); 10 }()"),
+        assert_eq!(s_eval_no_panic("{ { { { $e 10; 14 }[]; 3 }[]; 9 }[]; 10 }[]"),
                    "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\'@(1,12:0) dropped.\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
         assert_eq!(s_eval_no_panic("_? $e 10"),
                    "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: (Int(10), SynPos { syn: Err, line: 1, col: 7, file: 0 }) })))\"");
-        assert_eq!(s_eval_no_panic("_? { return $e 10; 10 }()"),
+        assert_eq!(s_eval_no_panic("_? { return $e 10; 10 }[]"),
                    "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: (Int(10), SynPos { syn: Err, line: 1, col: 16, file: 0 }) })))\"");
         assert_eq!(s_eval_no_panic("unwrap $e 1"),
                    "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"unwrap error: 1@(1,11:0)\\\" }), Some([SynPos { syn: Call, line: 1, col: 8, file: 0 }]))\"");
         assert_eq!(s_eval_no_panic("unwrap 1.1"), "1.1");
         assert_eq!(s_eval_no_panic("on_error {|4| _ + 20 } $e 19.9"), "39.9");
 
-        assert_eq!(s_eval_no_panic("{ { { panic 102 }(); 20 }(); return 20 }(); 49"),
+        assert_eq!(s_eval_no_panic("{ { { panic 102 }[]; 20 }[]; return 20 }[]; 49"),
                    "$e \"EXEC ERR: Caught Panic(Int(102), Some([SynPos { syn: Call, line: 1, col: 13, file: 0 }]))\"");
 
         assert_eq!(s_eval_no_panic("
@@ -1945,7 +1940,7 @@ mod tests {
                 .x = x + 1;
                 block :outer { .x = x + 1; };
                 .x = x + 1;
-            }();
+            }[];
             $*x
         "), "13");
         assert_eq!(s_eval_no_panic("
@@ -1955,9 +1950,9 @@ mod tests {
             {
                 .x = x + 1;
                 on_error {|4| .x = x * 2; .msg = _; }
-                    [block :outer { _? :outer gen_err(); .x = x + 1; }];
+                    (block :outer { _? :outer gen_err[]; .x = x + 1; });
                 .x = x + 1;
-            }();
+            }[];
             $[$*x, $*msg]
         "), "$[23,\"something_failed!\"]");
         assert_eq!(s_eval_no_panic("
@@ -1967,13 +1962,13 @@ mod tests {
             {
                 .x = x + 1;
                 on_error { .x = x * 2; .msg = _; }
-                    ~ block :outer { _? :outer gen_ok(); .x = x + 1; };
+                    ~ block :outer { _? :outer gen_ok[]; .x = x + 1; };
                 .x = x + 1;
-            }();
+            }[];
             $[$*x, $*msg]
         "), "$[13,\"all ok\"]");
 
-        assert_eq!(s_eval_no_panic("{ $e 23 }() | on_error {|4| _ + 21 }"), "44");
+        assert_eq!(s_eval_no_panic("{ $e 23 }[] | on_error {|4| _ + 21 }"), "44");
     }
 
     #[test]
@@ -1984,7 +1979,7 @@ mod tests {
         assert_eq!(s_eval("str 10.3"),          "\"10.3\"");
         assert_eq!(s_eval("sym \"foo\""),       ":\"foo\"");
         assert_eq!(s_eval("sym 10.4"),          ":\"10.4\"");
-        assert_eq!(s_eval("[bool $e :fail] { 10 } { 20 }"), "20");
+        assert_eq!(s_eval("(bool $e :fail) { 10 } { 20 }"), "20");
         assert_eq!(s_eval("fold 1 { _ + _1 } $[1,2,3,4]"), "11");
         assert_eq!(s_eval("take 2 $[1,2,3,4,5,6]"), "$[1,2]");
         assert_eq!(s_eval("drop 2 $[1,2,3,4,5,6]"), "$[3,4,5,6]");
@@ -2001,17 +1996,17 @@ mod tests {
                 obj
             };
             !v = $[];
-            !o = new();
+            !o = new[];
             !ext_add = o.add;
             !ext_get = o.get;
             o.set 10;
-            push v o.add();
-            push v o.get();
-            push v ext_add();
-            push v ext_get();
+            push v o.add[];
+            push v o.get[];
+            push v ext_add[];
+            push v ext_get[];
             .o = $n;
-            push v ext_add();
-            push v ext_get();
+            push v ext_add[];
+            push v ext_get[];
             v
         "#),
         "$[20,\"map\",20,\"map\",10,\"none\"]");
@@ -2019,7 +2014,7 @@ mod tests {
             !obj = ${};
             !x = $&&0;
             obj.a = { .*x = 10 };
-            obj.a();
+            obj.a[];
             $*x
         "#),
         "10");
@@ -2069,7 +2064,7 @@ mod tests {
 
     #[test]
     fn check_prelude_assert() {
-        assert_eq!(s_eval("wl:assert ~ [type \"2019\".[int]] == $q int "), "$true");
+        assert_eq!(s_eval("wl:assert ~ (type \"2019\".(int)) == $q int "), "$true");
     }
 
     #[test]
@@ -2109,10 +2104,10 @@ mod tests {
             assert_eq!(s_eval("
                 re:replace_all $q/a+r/
                     {
-                        [str:len(_.0) == 3] {
+                        (str:len[_.0] == 3) {
                             break \"XX\"
                         };
-                        [str:cat \"<\" _.0 \">\"]
+                        (str:cat \"<\" _.0 \">\")
                     }
                     $q/foobarbaaaarfoobaararar/
             "),
@@ -2120,8 +2115,8 @@ mod tests {
             assert_eq!(s_eval("
                 re:replace_all $q/a+r/
                     {
-                        [str:len(_.0) == 3] { next() };
-                        [str:cat \"<\" _.0 \">\"]
+                        (str:len[_.0] == 3) { next[] };
+                        (str:cat \"<\" _.0 \">\")
                     }
                     $q/foobarbaaaarfoobaararar/
             "),
@@ -2206,7 +2201,7 @@ mod tests {
         let mut ctx = crate::compiler::EvalContext::new(global_env);
 
         let r = &mut ctx.eval(r#"
-            !x = new_mytype();
+            !x = new_mytype[];
             !i = modify_mytype x;
             $[i, x]
         "#).unwrap();
@@ -2265,10 +2260,10 @@ mod tests {
                 !z = wl:weaken y;
                 !f = { .*x = $*x + 1; .*z = $*z + 2; $[x, z] };
                 !r = $[];
-                push r ~ str f();
+                push r ~ str f[];
                 .x = $n;
                 .y = $n;
-                push r ~ str f();
+                push r ~ str f[];
                 $[r, z]
             "#), "$[$[\"$[$&&2,$(&)4]\",\"$[$&&3,$n]\"],$n]");
         assert_eq!(s_eval(r#"
@@ -2277,11 +2272,11 @@ mod tests {
             self.x = { wself.g = 10; wself.g };
             self.y = { wself.g * 10 };
             !r = $[];
-            push r self.x();
-            push r self.y();
+            push r self.x[];
+            push r self.y[];
             !f = self.y;
             .self = $n;
-            push r f();
+            push r f[];
             push r wself;
             r
         "#), "$[10,100,0,$n]");

@@ -47,7 +47,7 @@ let t = std::thread::spawn(move || {
 // Calls the global `displayln` in the Worker thread with the supplied arguments.
 ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
 
-ctx.eval("wl:assert_eq [worker_call :wl:eval \"X\"] 123;").unwrap();
+ctx.eval("wl:assert_eq (worker_call :wl:eval \"X\") 123;").unwrap();
 
 sender.call("thread:quit", VVal::Nul);
 
@@ -466,7 +466,7 @@ mod tests {
         });
 
         ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
-        ctx.eval("wl:assert_eq [worker_call :wl:eval \"X\"] 123;").unwrap();
+        ctx.eval("wl:assert_eq (worker_call :wl:eval \"X\") 123;").unwrap();
 
         sender.call("thread:quit", VVal::Nul);
 
@@ -494,7 +494,7 @@ mod tests {
             msg_handle.run(&mut ctx);
         });
 
-        ctx.eval("wl:assert_eq [worker_call :wl:eval \"X\"] 123;").unwrap();
+        ctx.eval("wl:assert_eq (worker_call :wl:eval \"X\") 123;").unwrap();
 
         sender.call("thread:quit", VVal::Nul);
 
@@ -524,8 +524,8 @@ mod tests {
             ctx.eval(r#"
                 !:global X = $[1,2,3,4];
                 !:global Y = { pop X };
-                !:global G = { push X [str $[_, _1]]; };
-                !:global H = { push X [_ + _1]; };
+                !:global G = { push X (str $[_, _1]); };
+                !:global H = { push X (_ + _1); };
             "#).unwrap();
             msg_handle.run(&mut ctx);
 

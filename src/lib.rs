@@ -113,7 +113,7 @@ range 0 10 1 { # This is a regular function.
     !some_erroring_func = {
         return $error "An error happened!"
     };
-    !value = some_erroring_func();
+    !value = some_erroring_func[];
     # on_error calls the first argument if the second argument
     # is an error value.
     on_error {
@@ -129,7 +129,7 @@ range 0 10 1 { # This is a regular function.
     # or without ~:
     on_error {|| handle_err[_] } (some_erroring_func[]);
     # or with |
-    some_erroring_func() | on_error {|| handle_err[_] };
+    some_erroring_func[] | on_error {|| handle_err[_] };
 
     # _? transforms an error value, and returns it from the current
     #    function. optionally jumping outwards.
