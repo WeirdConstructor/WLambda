@@ -1409,6 +1409,41 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 Ok(ret_str)
             }, Some(3), Some(3));
 
+        g.borrow_mut().add_func("re:match",
+            |env: &mut Env, _argc: usize| {
+                let re   = env.arg(0).s_raw();
+                let text = env.arg(1).s_raw();
+                let f    = env.arg(2);
+
+                let rx = Regex::new(&re);
+                if let Err(e) = rx {
+                    return Ok(VVal::err_msg(
+                        &format!("Regex '{}' did not compile: {}", re, e)));
+                }
+                let rx = rx.unwrap();
+
+                match rx.captures(&text) {
+                    Some(c) => {
+                        let captures = VVal::vec();
+                        for cap in c.iter() {
+                            match cap {
+                                None    => { captures.push(VVal::Nul); },
+                                Some(c) => {
+                                    captures.push(VVal::new_str(c.as_str()));
+                                }
+                            }
+                        }
+                        env.push(captures);
+                        let rv = f.call_internal(env, 1);
+                        env.popn(1);
+                        rv
+                    },
+                    None => {
+                        Ok(VVal::Nul)
+                    }
+                }
+            }, Some(3), Some(3));
+
         g.borrow_mut().add_func("re:map",
             |env: &mut Env, _argc: usize| {
                 let re   = env.arg(0).s_raw();

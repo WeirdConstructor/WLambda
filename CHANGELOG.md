@@ -1,3 +1,9 @@
+0.3.1 (unreleased)
+==================
+
+* Feature: re:match added.
+* Bugfix: Errors weren't properly propagated by the threads::MsgHandle.
+
 0.3.0 (2019-09-13)
 ==================
 

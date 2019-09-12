@@ -278,8 +278,7 @@ fn mx_recv_error(mx: &mut RecvData, s: &str) {
     mx.0 = RecvState::Return;
     mx.2 =
         VVal::err_msg(&format!("return value serialization error: {}", s))
-        .to_msgpack()
-        .unwrap();
+        .s().as_bytes().to_vec();
     mx.3 = true;
 }
 
