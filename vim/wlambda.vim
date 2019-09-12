@@ -82,9 +82,11 @@ syn region wlQSymbol    start=+:"+      skip=+\\\\\|\\"+  end=+"+ contains=wlStr
 syn region wlString     start=+"+       skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 syn region wlString     start=+\$b"+    skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 
-syn match wlAssign   '\(^\|\s\+\|{\|;\)\@<=\.'       nextgroup=wlAssignId,wlDestr
-syn match wlDefine   '!'        nextgroup=wlDefTag,wlAssignId,wlDestr
-syn match wlDefTag   ':global'  contained
+syn match wlAssign   '\(^\|\s\+\|{\|;\)\@<=\.' nextgroup=wlAssignId,wlDestr
+syn match wlDefine   '!'                       nextgroup=wlImport,wlExport,wlDefTag,wlAssignId,wlDestr
+syn match wlDefTag   ':global' skipwhite skipnl nextgroup=wlAssignId contained
+syn match wlImport   '@import' skipwhite skipnl nextgroup=wlAssignId contained
+syn match wlExport   '@export' skipwhite skipnl nextgroup=wlAssignId contained
 syn region wlDestr         matchgroup=wlDestrDelim start="(" end=")" transparent contained contains=wlIdentifier,wlComment
 syn match wlArity     '|\s*\d\+\s*<\s*\d\+\s*|'
 syn match wlArity     '|\s*\d\+\s*|'
@@ -114,6 +116,8 @@ hi def link wlDestrDelim    Statement
 hi def link wlValue         Constant
 
 hi def link wlError         PreProc
+hi def link wlImport        PreProc
+hi def link wlExport        PreProc
 hi def link wlString        String
 hi def link wlStringSpec    Special
 hi def link wlSymbol        Special
