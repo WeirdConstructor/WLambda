@@ -11,6 +11,7 @@ traditional () parenthesis. This is hopefully the last big incompatible syntax c
 before the 1.0 release.
 * Feature: ser:json got a non-pretty print argument.
 * Doc: Documented ser:json and deser:json, with additional examples.
+* Feature: ser:msgpack and deser:msgpack added.
 * Feature: Implemented `wl:eval` for evaluating wlambda code from inside
 wlambda code, so you can evaluate code while you are evaluating code.
 * Feature: Thread communication helpers implemented for connecting
