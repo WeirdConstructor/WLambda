@@ -162,9 +162,8 @@ range 0 10 1 { # This is a regular function.
 # wl:weaken to make any closure capture of some_obj a weak reference, so
 # we don't get any cyclic references:
 !some_obj = $&${};
-!wsome_obj = wl:weaken some_obj;
 some_obj.do_something = {
-    # do something here with wsome_obj captured (weakly)
+    # do something here with some_obj captured (weakly)
     # from the upper lexical scope.
 };
 some_obj.do_something[]; # Method call

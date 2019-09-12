@@ -1545,9 +1545,12 @@ mod tests {
 
     #[test]
     fn check_parse_ref_deref() {
-        assert_eq!(parse("$& 1"),         "$[&Block,$[&Ref,1]]");
-        assert_eq!(parse("$&$[1,2]"),     "$[&Block,$[&Ref,$[&Lst,1,2]]]");
-        assert_eq!(parse("$&${z=1}"),     "$[&Block,$[&Ref,$[&Map,$[:\"z\",1]]]]");
+        assert_eq!(parse("$& 1"),         "$[&Block,$[&WRef,1]]");
+        assert_eq!(parse("$&$[1,2]"),     "$[&Block,$[&WRef,$[&Lst,1,2]]]");
+        assert_eq!(parse("$&${z=1}"),     "$[&Block,$[&WRef,$[&Map,$[:\"z\",1]]]]");
+        assert_eq!(parse("$&& 1"),        "$[&Block,$[&Ref,1]]");
+        assert_eq!(parse("$&&$[1,2]"),    "$[&Block,$[&Ref,$[&Lst,1,2]]]");
+        assert_eq!(parse("$&&${z=1}"),    "$[&Block,$[&Ref,$[&Map,$[:\"z\",1]]]]");
         assert_eq!(parse("$*${z=1}.f=1"), "$[&Block,$[&SetKey,$[&Deref,$[&Map,$[:\"z\",1]]],$[&Key,:\"f\"],1]]");
         assert_eq!(parse("$*xxx.f=1"),    "$[&Block,$[&SetKey,$[&Deref,$[&Var,:\"xxx\"]],$[&Key,:\"f\"],1]]");
         assert_eq!(parse("$*xxx.f"),      "$[&Block,$[&Call,$[&Key,:\"f\"],$[&Deref,$[&Var,:\"xxx\"]]]]");

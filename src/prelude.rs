@@ -206,12 +206,12 @@ wl:assert_eq [unwrap_err ~ func 42] :FAIL;
     }
 };
 
-!:ref x = $n;
+!x = $&$n;
 
 # The first function of on_error will be called with the unwrapped
 # error if an error occured.
 on_error {|4| .x = _; } ~ func 13;
-wl:assert_eq x "this failed!";
+wl:assert_eq $*x "this failed!";
 
 !ret = on_error {|4| .x = _; } ~ func 1;
 wl:assert_eq ret "all ok!";
