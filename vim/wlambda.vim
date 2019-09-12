@@ -7,7 +7,8 @@
 "if exists("b:current_syntax")
 "  finish
 "endif
-"
+
+syn match wlSymbol      ':[^[:space:]\.,;{}\[\]()~|="]\+'
 
 syn match wlIdentifier  /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/
 syn match wlAssignId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*/ contained
@@ -15,6 +16,11 @@ syn match wlMapKeyId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ contai
 
 syn match wlComment /#.*$/
 
+syn keyword wlRepeat    while range return break next match
+syn keyword wlKeyword   panic push take drop not neg uneg block unwrap unwrap_err
+syn keyword wlKeyword   sym is_none is_err is_map is_vec is_fun is_str is_sym
+syn keyword wlKeyword   is_ref is_wref is_bool is_bytes is_float is_int len type to_drop
+syn keyword wlKeyword   fold displayln pop bool float int on_error
 syn match wlKeyword "_?"
 syn match wlKeyword "re:map"
 syn match wlKeyword "re:replace_all"
@@ -28,6 +34,7 @@ syn match wlKeyword "wl:assert_eq"
 syn match wlKeyword "wl:dump_func"
 syn match wlKeyword "wl:set_ref"
 syn match wlKeyword "wl:weaken"
+syn match wlKeyword "str"
 syn match wlKeyword "str:len"
 syn match wlKeyword "str:to_lowercase"
 syn match wlKeyword "str:to_uppercase"
@@ -42,11 +49,6 @@ syn match wlKeyword "bytes:to_vec"
 syn match wlKeyword "bytes:from_vec"
 syn match wlKeyword "bytes:from_hex"
 syn match wlKeyword "bytes:to_hex"
-syn keyword wlRepeat    while range return break next match
-syn keyword wlKeyword   panic push take drop not neg uneg block unwrap unwrap_err
-syn keyword wlKeyword   str sym is_none is_err is_map is_vec is_fun is_str is_sym
-syn keyword wlKeyword   is_ref is_wref is_bool is_bytes is_float is_int len type to_drop
-syn keyword wlKeyword   fold displayln pop bool float int on_error
 syn match wlValue     '\$t'
 syn match wlValue     '\$true'
 syn match wlValue     '\$false'
@@ -79,8 +81,6 @@ syn region wlString     start="\$q{"      end="}"
 syn region wlQSymbol    start=+:"+      skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 syn region wlString     start=+"+       skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 syn region wlString     start=+\$b"+    skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
-
-syn match wlSymbol      ':[^[:space:]\.,;{}\[\]()~|="]\+'
 
 syn match wlAssign   '\(^\|\s\+\|{\|;\)\@<=\.'       nextgroup=wlAssignId,wlDestr
 syn match wlDefine   '!'        nextgroup=wlDefTag,wlAssignId,wlDestr
