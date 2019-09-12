@@ -22,9 +22,6 @@ Here are some of it's properties:
 - No exceptions, except panics. Error handling is accomplished
 by a specialized data type. It can be thought of as dynamic counterpart
 of Rust's Result type.
-- Closures can capture up values either by value, by reference
-  or by weak reference. Giving you the ability to keep cyclic
-  references in check.
 - Easy maintenance of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 
@@ -59,7 +56,7 @@ can be found in the [WLambda Language Reference](https://docs.rs/wlambda/newest/
     _ + _1  # Arguments are not named, they are put into _, _1, _2
 };
 
-a_func(2, 3);   # Function call
+a_func[2, 3];   # Function call
 a_func 2 3;     # Equivalent function call
 
 # Shortened one statement function definition:
@@ -68,32 +65,33 @@ a_func 2 3;     # Equivalent function call
 # There is no `if` statement. Booleans can be called
 # with two arguments. The first one is called when the boolean
 # is true, the second one is called when the boolean is false.
-[a == 10] {
+(a == 10) {
     # called if a == 10
 } {
     # called if a != 10
 };
 
 # Counting loop:
-!:ref sum = 0; # Defining a reference that can be assignment
-               # from inside a function.
+!sum = $&0; # Defining a reference that can be assignment
+            # from inside a function.
 
 # `range` calls the given function for each iteration
 # and passes the counter as first argument in `_`
 range 0 10 1 { # This is a regular function.
-    .sum = sum + _;
+    .*sum = $*sum + _; # $* is a dereferencing operator
+                       # and .* starts a reference assignment
 };
 
 # `range` loop with `break`
 !break_value = range 0 10 1 {
-    [_ == 5] { break 22 };
+    (_ == 5) { break 22 };
 };
 
 # Returning early from functions:
 !some_fun = \:some_fun_lbl { # \:xxx defines a function label for returning
     !x = 10;
     .x = do_something_to x;
-    [x > 20] {
+    (x > 20) {
         return :some_fun_lbl 20; # explicit argument for return returns from
                                  # the specified block.
     }
@@ -105,7 +103,7 @@ range 0 10 1 { # This is a regular function.
 # you may specify a small unused label like `_` to jump out some unnamed func:
 !some_fun = {
     !(x) = @;
-    [x == 20] \:_{ return 30 } # returns from some_fun, not from the if-branch
+    (x == 20) \:_{ return 30 } # returns from some_fun, not from the if-branch
 };
 
 # Error reporting:
@@ -114,7 +112,7 @@ range 0 10 1 { # This is a regular function.
     !some_erroring_func = {
         return $error "An error happened!"
     };
-    !value = some_erroring_func();
+    !value = some_erroring_func[];
     # on_error calls the first argument if the second argument
     # is an error value.
     on_error {
@@ -126,18 +124,18 @@ range 0 10 1 { # This is a regular function.
     !handle_err = { displayln _ };
 
     # with the ~ operator, you can chain it nicely:
-    on_error {|| handle_err(_) } ~ some_erroring_func();
+    on_error {|| handle_err[_] } ~ some_erroring_func[];
     # or without ~:
-    on_error {|| handle_err(_) } [some_erroring_func()];
+    on_error {|| handle_err[_] } (some_erroring_func[]);
     # or with |
-    some_erroring_func() | on_error {|| handle_err(_) };
+    some_erroring_func[] | on_error {|| handle_err[_] };
 
     # _? transforms an error value, and returns it from the current
     #    function. optionally jumping outwards.
 
-    wl:assert_eq [str {
+    wl:assert_eq (str {
         _? ~ $e "ok"; # is with an error value the same as: `return $e "ok"`
-    }()] "$e \"ok\"";
+    }[]) "$e \"ok\"";
 
     _? 10; # passes the value through
 
@@ -148,7 +146,7 @@ range 0 10 1 { # This is a regular function.
         report_my_error _;
     } block :outer {
         # do something...
-        [_ != 10] {
+        (_ != 10) {
             return :outer $error "Something really failed"
             # same as, with the difference, that _? only returns
             # from :outer if it is an error value.
@@ -160,14 +158,14 @@ range 0 10 1 { # This is a regular function.
 };
 
 # Basic OOP:
-# :wref to make any closure capture of some_obj a weak reference, so
+# wl:weaken to make any closure capture of some_obj a weak reference, so
 # we don't get any cyclic references:
-!:wref some_obj = ${};
+!some_obj = $&${};
 some_obj.do_something = {
     # do something here with some_obj captured (weakly)
     # from the upper lexical scope.
 };
-some_obj.do_something(); # Method call
+some_obj.do_something[]; # Method call
 ```
 
 Currently there are many more examples in the test cases in `compiler.rs`.
@@ -260,8 +258,8 @@ Future plans could be:
         !v = tag 10 tag;
         !fun = { println("not tagged!") };
         .fun = add_tag fun tag { println("tagged with 123"); }
-        fun(v); # prints "tagged with 123"
-        fun(10); # prints "not tagged!"
+        fun[v]; # prints "tagged with 123"
+        fun[10]; # prints "not tagged!"
 
         # TagFun(Rc<RefCell<std::collections::HashMap<String, Rc<VValFun>>>>),
     ```
