@@ -1,5 +1,5 @@
-0.2.3 (unreleased)
-=================
+0.3.0 (2019-09-13)
+==================
 
 * Incompatible Change: Removed :wref and :ref definition labels in favor of
 proper $&&, $& and $\* reference handling. Added `wl:weaken` and `wl:set_ref` and

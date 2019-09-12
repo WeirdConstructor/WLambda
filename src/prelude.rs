@@ -1092,9 +1092,9 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             Ok(VVal::new_byt(
                 s.chars()
                  .map(|c|
-                     match c { '0'..='9' => ( 9 - (('9' as u8) - (c as u8))) as i16,
-                               'a'..='f' => (15 - (('f' as u8) - (c as u8))) as i16,
-                               'A'..='F' => (15 - (('F' as u8) - (c as u8))) as i16,
+                     match c { '0'..='9' => ( 9 - (b'9' - (c as u8))) as i16,
+                               'a'..='f' => (15 - (b'f' - (c as u8))) as i16,
+                               'A'..='F' => (15 - (b'F' - (c as u8))) as i16,
                                _ => -1 })
                  .fold((256, out), |(last, mut out), c: i16|
                      if c == -1 { (last, out) }

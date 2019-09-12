@@ -503,6 +503,7 @@ impl VValFun {
 /// assert_eq!(
 ///     r.s(), "$[98,$<MyType((14, 84))>]", "Userdata implementation works");
 ///```
+#[allow(clippy::borrowed_box)]
 pub trait VValUserData {
     /// This method should return a human readable syntax representation
     /// of your VValUserData.
@@ -961,7 +962,7 @@ impl VVal {
             VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s.borrow()[..] == s2.borrow()[..] } else { false } },
             VVal::Usr(u)  => {
                 if let VVal::Usr(u2) = v {
-                    u.eqv(u2)
+                    u.eqv(&u2)
                 } else {
                     false
                 }
@@ -1128,6 +1129,8 @@ impl VVal {
         }
         self
     }
+
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
 
     pub fn len(&self) -> usize {
         match self {

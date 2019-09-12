@@ -248,10 +248,13 @@ enum RecvState {
     Return,
 }
 
+type RecvData = (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>);
+type RecvMutex = Mutex<RecvData>;
+
 #[derive(Debug)]
 #[cfg(feature="rmp-serde")]
 pub struct Receiver {
-    mx: Mutex<(RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>)>,
+    mx: RecvMutex,
     cv: Condvar,
 }
 
@@ -271,7 +274,7 @@ impl Receiver {
 }
 
 #[cfg(feature="rmp-serde")]
-fn mx_recv_error(mx: &mut (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>), s: &str) {
+fn mx_recv_error(mx: &mut RecvData, s: &str) {
     mx.0 = RecvState::Return;
     mx.2 =
         VVal::err_msg(&format!("return value serialization error: {}", s))
@@ -281,7 +284,7 @@ fn mx_recv_error(mx: &mut (RecvState, String, Vec<u8>, bool, VecDeque<(String, V
 }
 
 #[cfg(feature="rmp-serde")]
-fn mx_return(mx: &mut (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>), v: &VVal) {
+fn mx_return(mx: &mut RecvData, v: &VVal) {
     mx.0 = RecvState::Return;
     match v.to_msgpack() {
         Ok(s) => {
@@ -394,7 +397,7 @@ impl MsgHandle {
                     std::mem::drop(mx);
                     loop {
                         let mut mx = r.mx.lock().unwrap();
-                        if mx.4.len() <= 0 {
+                        if mx.4.is_empty() {
                             mx.0 = RecvState::Open;
                             break;
                         }
@@ -426,6 +429,12 @@ impl MsgHandle {
         }
 
         Some(())
+    }
+}
+
+impl Default for MsgHandle {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

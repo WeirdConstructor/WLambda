@@ -23,12 +23,12 @@ $q" fefei fwof w
 
 "
 
-feoofw@fe(fei)
+feoofw@fe[fei]
 _d
 
 :foo :ba@fo_-
 :"fo @ [] \xFFAA { \u39f9e \t \r \n \" \0 \x00 } fe"
-$e foobar [ 120 3 ]
+$e foobar ( 120 3 )
 panic "foobar" $t $true 3023 403.439 -32 +32 $n $nul
 $b"feofeo"
 while foo
