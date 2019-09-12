@@ -122,7 +122,7 @@ In the following grammar, white space and comments are omitted:
                   ;
     var           = ident
                   ;
-    symbol        = ":" qident
+    symbol        = ":", qident
                   | ":", "\"", (? any char, quoted \\ and \" ?), "\""
                   (*
                      symbols are usually used to specify
@@ -187,9 +187,9 @@ In the following grammar, white space and comments are omitted:
                   ;
     definition    = [ ref_specifier ], ( simple_assign | destr_assign )
                   ;
-    import        = "!", "import", symbol, symbol
+    import        = "!", "@import", symbol, symbol
                   ;
-    export        = "!", "export", symbol, expr
+    export        = "!", "@export", symbol, expr
                   ;
     statement     = "!" definition
                   | "." simple_assign
@@ -815,8 +815,9 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(expr)
             },
             '{' => {
+                let syn = ps.syn_raw(Syntax::Func);
                 let block = parse_block(ps, true)?;
-                block.set_at(0, ps.syn_raw(Syntax::Func));
+                block.set_at(0, syn);
                 block.insert_at(1, VVal::Nul);
                 Ok(block)
             },
@@ -824,19 +825,23 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
 
                 if ps.consume_if_eq_wsc(':') {
+                    let syn = ps.syn_raw(Syntax::Func);
+
                     let block_name = parse_identifier(ps);
                     ps.skip_ws_and_comments();
                     let block = parse_block(ps, true)?;
-                    block.set_at(0, ps.syn_raw(Syntax::Func));
+
+                    block.set_at(0, syn);
                     block.insert_at(1, VVal::Sym(block_name));
                     Ok(block)
                 } else {
+                    let block = ps.syn(Syntax::Func);
+
                     let arity =
                         if ps.lookahead("|") { parse_arity(ps)? }
                         else { VVal::Nul };
 
                     let next_stmt = parse_stmt(ps)?;
-                    let block = ps.syn(Syntax::Func);
                     block.push(VVal::Nul);
                     block.push(arity);
                     block.push(next_stmt);

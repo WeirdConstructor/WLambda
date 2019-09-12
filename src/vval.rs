@@ -382,10 +382,12 @@ pub struct VValFun {
     ///
     /// This value is used to reserve stack space for storing them.
     pub local_size: usize,
-    /// Min number of arguments this functions requires:
+    /// Min number of arguments this functions requires.
     pub min_args:   Option<usize>,
-    /// Max number of arguments this functions requires:
+    /// Max number of arguments this functions requires.
     pub max_args:   Option<usize>,
+    /// The location of the definition of this function.
+    pub syn_pos:    Option<SynPos>,
 }
 
 impl VValFun {
@@ -412,17 +414,26 @@ impl VValFun {
     pub fn new_fun<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>) -> VVal
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
 
-        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args)
+        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, None)
+    }
+
+    pub fn new_fun_with_pos<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>, spos: SynPos) -> VVal
+        where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
+
+        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, Some(spos))
     }
 
     /// Internal utility function. Use at your own risk, API might change.
-    pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>, env_size: usize, min_args: Option<usize>, max_args: Option<usize>) -> VVal {
+    pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>,
+                   env_size: usize, min_args: Option<usize>,
+                   max_args: Option<usize>, syn_pos: Option<SynPos>) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalues,
             fun,
             local_size: env_size,
             min_args,
             max_args,
+            syn_pos,
         }))
     }
 
@@ -434,6 +445,7 @@ impl VValFun {
             local_size: 0,
             min_args: None,
             max_args: None,
+            syn_pos: None,
         })
     }
 
@@ -737,18 +749,26 @@ impl VVal {
             VVal::Fun(fu) => {
                 if let Some(i) = fu.min_args {
                     if argc < i {
+                        let line = if let Some(sp) = &fu.syn_pos { sp.line } else { 0 };
+                        let col  = if let Some(sp) = &fu.syn_pos { sp.col } else { 0 };
+                        let file = if let Some(sp) = &fu.syn_pos { sp.file } else { 0 };
                         return Err(StackAction::Panic(
                             VVal::new_str_mv(format!(
-                                "function expects at least {} arguments, got {}",
+                                "function[{}:{}/{}] expects at least {} arguments, got {}",
+                                line, col, file,
                                 i, argc)), None));
                     }
                 }
 
                 if let Some(i) = fu.max_args {
                     if argc > i {
+                        let line = if let Some(sp) = &fu.syn_pos { sp.line } else { 0 };
+                        let col  = if let Some(sp) = &fu.syn_pos { sp.col } else { 0 };
+                        let file = if let Some(sp) = &fu.syn_pos { sp.file } else { 0 };
                         return Err(StackAction::Panic(
                             VVal::new_str_mv(format!(
-                                "function expects at most {} arguments, got {}",
+                                "function[{}:{}/{}] expects at most {} arguments, got {}",
+                                line, col, file,
                                 i, argc)), None));
                     }
                 }

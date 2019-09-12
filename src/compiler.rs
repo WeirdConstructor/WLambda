@@ -1263,7 +1263,10 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     Ok(Box::new(move |e: &mut Env| {
                         let mut v = Vec::new();
                         ce_sub.borrow_mut().copy_upvals(e, &mut v);
-                        Ok(VValFun::new_val(fun_ref.clone(), v, env_size, min_args, max_args))
+                        Ok(VValFun::new_val(
+                            fun_ref.clone(),
+                            v, env_size, min_args, max_args,
+                            Some(spos.clone())))
                     }))
                 },
                 _ => { ast.to_compile_err(format!("bad input: {}", ast.s())) }
@@ -1891,29 +1894,43 @@ mod tests {
 
     #[test]
     fn check_arity() {
-        assert_eq!(s_eval_no_panic("{}[1,2,3]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 0 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 3, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{}[1,2,3]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 0 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 3, file: 0 }]))\"");
         assert_eq!(s_eval("{|3| _1 }[1,2,3]"), "2");
-        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at least 3 arguments, got 2\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3,4,5]"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at least 3 arguments, got 2\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3,4,5]"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
         assert_eq!(s_eval("{|0<4| _1 }[]"), "$n");
         assert_eq!(s_eval("{|0<4| _1 }[1]"), "$n");
         assert_eq!(s_eval("{|0<4| _1 }[1,2]"), "2");
         assert_eq!(s_eval("{|0<4| _1 }[1,2,3]"), "2");
         assert_eq!(s_eval("(\\|0<4| _1)[1,2,3]"), "2");
         assert_eq!(s_eval("{|0<4| _1 }[1,2,3,4]"), "2");
-        assert_eq!(s_eval_no_panic("{|0<4| _1 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 12, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|0<4| _1 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 12, file: 0 }]))\"");
         assert_eq!(s_eval("{ @ }[1,2,3,4,5]"), "$[1,2,3,4,5]");
         assert_eq!(s_eval("{|2| @ }[1,2]"), "$[1,2]");
-        assert_eq!(s_eval_no_panic("{|2| @ }[1]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at least 2 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{|2| @ }[1,2,3]"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 2 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|2| @ }[1]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at least 2 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|2| @ }[1,2,3]"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 2 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
 
-        assert_eq!(s_eval_no_panic("{!(a,b,c) = @;}[1,2,3,4]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 16, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{_3; !(a,b,c) = @; }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 21, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{!(a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{!(a,b,c) = @;}[1,2,3,4]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 16, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{_3; !(a,b,c) = @; }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 21, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{!(a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
         assert_eq!(s_eval("{!(a,b,c) = @; b }[1,2,3]"), "2");
         assert_eq!(s_eval("{!(a,b,c) = @; _3 }[1,2,3,5]"), "5");
         assert_eq!(s_eval("{!:global (a,b,c) = @; _3 }[1,2,3,5]"), "5");
-        assert_eq!(s_eval_no_panic("{!:global (a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 28, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{!:global (a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 28, file: 0 }]))\"");
+    }
+
+    #[test]
+    fn check_error_fn_pos() {
+        assert_eq!(s_eval_no_panic(r#"
+
+            !x = {
+
+            };
+
+            !l = { x 10 };
+            l[];
+        "#),
+        "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[3:18/0] expects at most 0 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 7, col: 22, file: 0 }]))\"");
     }
 
     #[test]
@@ -2096,7 +2113,7 @@ mod tests {
             assert_eq!(s_eval_no_panic("
                 re:replace_all $q/ar/ { \"mak\" } $q/foobarbarfoobararar/
             "),
-            "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function expects at most 0 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 2, col: 32, file: 0 }]))\"");
+            "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[2:39/0] expects at most 0 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 2, col: 32, file: 0 }]))\"");
             assert_eq!(s_eval("
                 re:replace_all $q/a+r/ { str:cat \"mak\" ~ str:len _.0 } $q/foobarbaaaarfoobaararar/
             "),

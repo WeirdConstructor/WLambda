@@ -3,6 +3,8 @@
 
 * Feature: re:match added.
 * Bugfix: Errors weren't properly propagated by the threads::MsgHandle.
+* Change: Error reporting for arity mismatch contains the position of the
+function definition and the position of the call site.
 
 0.3.0 (2019-09-13)
 ==================
