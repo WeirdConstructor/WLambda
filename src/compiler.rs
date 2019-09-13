@@ -1103,11 +1103,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let mut gr = glob_ref.borrow_mut();
                         let mm = gr.mem_modules.clone();
                         let e  = &mut gr.env;
-                        let hm = &gr.borrow();
+                        let hm = &mm.borrow();
                         if let Some(stbl) = hm.get(&name.s_raw()) {
                             for (k, v) in stbl {
                                 e.insert(s_prefix.clone() + &k, v.clone());
                             }
+                            return Ok(Box::new(move |_e: &mut Env| { Ok(VVal::Nul) }));
                         }
                     }
 
