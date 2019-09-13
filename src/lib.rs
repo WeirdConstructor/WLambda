@@ -267,8 +267,8 @@ Future plans could be:
 
 - There are currently no plans to change the internal evaluator
 from a closure tree to a VM and/or JIT speedup.
-However, if someone is able to significantly speed up the
-evaluation this can be changed.
+However, help is appreachiated if someone is able to significantly speed up the
+evaluation without too much breakage.
 
 # License
 

@@ -2,6 +2,21 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 #![allow(clippy::collapsible_if)]
 
+// TODO: add vec.@1.foo
+// TODO: add func [[@]] for applying/expanding a vector to an argument vector
+// TODO: add "append" "prepend" functions to prelude (future std module)
+// TODO: Add set_module(name, std::collection::HashMap<String, VVal>) to GlobalEnv
+//       for "always available" modules.
+// TODO: scrap create_wlamba_prelude() and replace it with "!@import s std;"
+//       replace the prelude with a create_std_module()
+//       that returns std::collection::HashMap<String, VVal>.
+//       Replace all documentation for create_wlamba_prelude() with
+//       create_default_global_env() that also hooks in the LocalFileModuleResolver,
+//       create_std_global_env() and offer create_empty_global_env().
+// TODO: For the sake of progress, instead of file numbers use
+//       an std::rc::Rc<String>, should be still small enough and shared across the
+//       compilation of a whole unit.
+
 /*!
 This is the grammar parser for WLambda.
 
@@ -47,7 +62,9 @@ In the following grammar, white space and comments are omitted:
     digit         = "0" | "1" | "2" | "3" | "4" | "5"
                   | "6" | "7" | "8" | "9"
                   ;
-    radix         = digit, { digit }
+    integer       = digit, { digit }
+                  ;
+    radix         = integer
                   ;
     radix_digits  = (* digits in the radix specified
                        earlier in the number.
@@ -156,8 +173,9 @@ In the following grammar, white space and comments are omitted:
                                                    in a Pratt parser style *)
                   ;
     arg_list      = "[", [ expr, { ",", expr }, [ "," ] ], "]"
+                  | "[[", expr, "]]"  (* apply result vector of expr as argument list *)
                   ;
-    field         = ".", ( ident | value ), [ field ]
+    field         = ".", ( ( "@", integer ) | ident | value ), [ field ]
                   ;
     field_access  = field, "=", expr
                   | field, arg_list
