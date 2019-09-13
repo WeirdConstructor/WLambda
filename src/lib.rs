@@ -191,7 +191,7 @@ you can use the GlobalEnv `add_func` method:
 ```
 use wlambda::vval::{VVal, VValFun, Env};
 
-let global_env = wlambda::prelude::create_wlamba_prelude();
+let global_env = wlambda::GlobalEnv::new_default();
 global_env.borrow_mut().add_func(
     "my_crazy_add",
     |env: &mut Env, _argc: usize| {
@@ -346,3 +346,8 @@ pub mod parser;
 pub mod compiler;
 pub mod prelude;
 pub mod threads;
+
+pub use vval::VVal;
+pub use compiler::GlobalEnv;
+pub use compiler::EvalContext;
+pub use compiler::eval;

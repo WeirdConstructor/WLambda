@@ -7,12 +7,23 @@
 // TODO: add "append" "prepend" functions to prelude (future std module)
 // TODO: Add set_module(name, std::collection::HashMap<String, VVal>) to GlobalEnv
 //       for "always available" modules.
+// TODO: Add enable_core_language() to GlobalEnv, that allows code to use !@wlambda;
+// TODO: Make the actual prelude much much smaller, just the binary ops and
+//       "not", "panic", "block", "_?", "unwrap_err", "unwrap", "on_error",
+//       "return", "break", "next", "bool", "type", "len", "while", "range",
+//       "float", "int", "str", "sym",
+//       "is_none", "is_err", "is_map", "is_vec", "is_fun", "is_str",
+//       "is_wref", "is_ref", "is_bool", "is_bytes", "is_sym", "is_float",
+//       "is_int"
 // TODO: scrap create_wlamba_prelude() and replace it with "!@import s std;"
 //       replace the prelude with a create_std_module()
 //       that returns std::collection::HashMap<String, VVal>.
-//       Replace all documentation for create_wlamba_prelude() with
-//       create_default_global_env() that also hooks in the LocalFileModuleResolver,
-//       create_std_global_env() and offer create_empty_global_env().
+// TODO: Replace all documentation for create_wlamba_prelude() with
+//       create_default_global_env() that also hooks in the LocalFileModuleResolver
+//       loads std as std and imports the core.
+//       Also add create_std_global_env() with just import_core() and available std module
+//       and offer create_empty_global_env().
+//       Only empty_global_env comes without import_core and set_module("std"...).
 // TODO: For the sake of progress, instead of file numbers use
 //       an std::rc::Rc<String>, should be still small enough and shared across the
 //       compilation of a whole unit.
@@ -206,6 +217,7 @@ In the following grammar, white space and comments are omitted:
     definition    = [ ref_specifier ], ( simple_assign | destr_assign )
                   ;
     import        = "!", "@import", symbol, symbol
+                  | "!", "@wlambda"
                   ;
     export        = "!", "@export", symbol, expr
                   ;
@@ -1188,12 +1200,28 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                         if ps.at_eof { return ps.err_eof("special assignment"); }
                         let id = parse_identifier(ps);
                         match &id[..] {
-                            "import" => {
-                                let prefix = parse_identifier(ps);
-                                let name   = parse_identifier(ps);
+                            "wlambda" => {
                                 let imp = ps.syn(Syntax::Import);
-                                imp.push(VVal::new_sym(&prefix));
-                                imp.push(VVal::new_sym(&name));
+                                imp.push(VVal::Nul);
+                                imp.push(VVal::new_sym("wlambda"));
+                                Ok(imp)
+                            },
+                            "import" => {
+                                let mut prefix =
+                                    VVal::new_sym(&parse_identifier(ps));
+                                ps.skip_ws_and_comments();
+                                let name =
+                                    if ps.peek().unwrap_or(';') == ';' {
+                                        let p = prefix;
+                                        prefix = VVal::Nul;
+                                        p
+                                    } else {
+                                        VVal::new_sym(&parse_identifier(ps))
+                                    };
+
+                                let imp = ps.syn(Syntax::Import);
+                                imp.push(prefix);
+                                imp.push(name);
                                 Ok(imp)
                             },
                             "export" => {

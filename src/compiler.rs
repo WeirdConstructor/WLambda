@@ -64,10 +64,11 @@ impl LocalFileModuleResolver {
     }
 }
 
+type SymbolTable = std::collections::HashMap<String, VVal>;
+
 impl ModuleResolver for LocalFileModuleResolver {
-    fn resolve(&mut self, _global: GlobalEnvRef, path: &[String]) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError> {
-        let global = create_wlamba_prelude();
-        let mut ctx = EvalContext::new(global);
+    fn resolve(&mut self, _global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError> {
+        let mut ctx = EvalContext::new(GlobalEnv::new_empty_default());
         let pth = path.join("/");
         match ctx.eval_file(&(pth.clone() + ".wl")) {
             Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
@@ -92,6 +93,7 @@ impl ModuleResolver for LocalFileModuleResolver {
 #[derive(Clone)]
 pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
+    mem_modules: std::collections::HashMap<String, SymbolTable>,
     resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
 }
 
@@ -156,16 +158,71 @@ impl GlobalEnv {
         }
     }
 
+    /// Sets a symbol table for a module before a module asks for it.
+    /// Modules set via this function have precedence over resolved modules
+    /// via set_resolver().
+    #[allow(dead_code)]
+    pub fn set_module(&mut self, mod_name: &str, symtbl: SymbolTable) {
+        self.mem_modules.insert(mod_name.to_string(), symtbl);
+    }
+
+    /// Sets the module resolver. There is a LocalFileModuleResolver available
+    /// which loads the modules relative to the current working directory.
+    ///
+    /// Please note that modules made available using `set_module` have priority
+    /// over modules that are provided by the resolver.
+    ///
+    ///```
+    /// use std::rc::Rc;
+    /// use std::cell::RefCell;
+    ///
+    /// let global = wlambda::compiler::GlobalEnv::new_default();
+    ///
+    /// let lfmr = Rc::new(RefCell::new(
+    ///     wlambda::compiler::LocalFileModuleResolver::new()));
+    ///
+    /// global.borrow_mut().set_resolver(lfmr);
+    ///```
     pub fn set_resolver(&mut self, res: Rc<RefCell<dyn ModuleResolver>>) {
         self.resolver = Some(res.clone());
     }
 
-    /// Creates a new GlobalEnv.
+    /// Creates a new completely empty GlobalEnv.
+    ///
+    /// There is no core language, no std lib. You have
+    /// to add all that on your own via `set_var` and `set_module`.
     pub fn new() -> GlobalEnvRef {
         Rc::new(RefCell::new(GlobalEnv {
             env: std::collections::HashMap::new(),
+            mem_modules: std::collections::HashMap::new(),
             resolver: None,
         }))
+    }
+
+    /// Returns a default global environment. Where default means what
+    /// the author of WLambda decided what is default at the moment.
+    /// For more precise global environment, that is not a completely
+    /// moving target consider the alternate constructor variants.
+    ///
+    /// Global environments constructed with this typically contain:
+    ///
+    /// - `set_module("wlambda", wlambda::prelude::core_symbol_table())`
+    /// - `set_module("std",     wlambda::prelude::std_symbol_table())`
+    /// - `set_resolver(Rc::new(RefCell::new(wlambda::compiler::LocalFileModuleResolver::new()))`
+    /// - `import_module("wlambda", "")`
+    /// - `import_module("std", "std")`
+    ///
+    /// On top of that, the `WLambda` module has been imported without a prefix
+    /// and the `std` module has been loaded with an `std:` prefix.
+    /// This means you can load and eval scripts you see all over this documentation.
+    pub fn new_default() -> GlobalEnvRef {
+        create_wlamba_prelude()
+    }
+
+    /// This is like `new_default` but does not import anything, neither the
+    /// core language nor the std module.
+    pub fn new_empty_default() -> GlobalEnvRef {
+        create_wlamba_prelude()
     }
 }
 
@@ -221,6 +278,19 @@ impl EvalContext {
             Rc::new(RefCell::new(VVal::vec())))
     }
 
+    /// A shortcut: This creates a new EvalContext with a GlobalEnv::new_default()
+    /// global environment.
+    ///
+    /// This is a shorthand for:
+    ///```
+    /// wlambda::compiler::EvalContext::new(
+    ///     wlambda::compiler::GlobalEnv::new_default());
+    ///```
+    #[allow(dead_code)]
+    pub fn new_default() -> EvalContext {
+        Self::new(GlobalEnv::new_default())
+    }
+
     fn register_self_eval(self) -> Self {
         let ctx_clone =
             Self::new_with_user_impl(
@@ -269,12 +339,8 @@ impl EvalContext {
     /// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
     ///
     /// ```
-    /// use wlambda::compiler;
     /// use wlambda::parser;
-    /// use wlambda::prelude::create_wlamba_prelude;
-    ///
-    /// let global_env = create_wlamba_prelude();
-    /// let mut ctx = compiler::EvalContext::new(global_env);
+    /// let mut ctx = wlambda::EvalContext::new_default();
     ///
     /// let s = "$[1,2,3]";
     /// let ast = parser::parse(s, 0).unwrap();
@@ -312,10 +378,7 @@ impl EvalContext {
     /// Evaluates a piece of WLambda code with the given `EvalContext`.
     ///
     /// ```
-    /// use wlambda::prelude::create_wlamba_prelude;
-    ///
-    /// let global_env = create_wlamba_prelude();
-    /// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+    /// let mut ctx = wlambda::EvalContext::new_default();
     ///
     /// let r = &mut ctx.eval("$[1,2,3]").unwrap();
     /// println!("Res: {}", r.s());
@@ -331,10 +394,7 @@ impl EvalContext {
     /// Evaluates a WLambda code in a file with the given `EvalContext`.
     ///
     /// ```
-    /// use wlambda::prelude::create_wlamba_prelude;
-    ///
-    /// let global_env = create_wlamba_prelude();
-    /// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+    /// let mut ctx = wlambda::EvalContext::new_default();
     ///
     /// let r = &mut ctx.eval_file("examples/read_test.wl").unwrap();
     /// assert_eq!(r.i(), 403, "matches contents!");
@@ -355,11 +415,8 @@ impl EvalContext {
     /// Calls a wlambda function with the given `EvalContext`.
     ///
     /// ```
-    /// use wlambda::prelude::create_wlamba_prelude;
-    /// use wlambda::vval::VVal;
-    ///
-    /// let global_env = create_wlamba_prelude();
-    /// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
     ///
     /// let returned_func = &mut ctx.eval("{ _ + _1 }").unwrap();
     /// assert_eq!(
@@ -376,10 +433,8 @@ impl EvalContext {
     /// Sets a global variable for the scripts to access.
     ///
     /// ```
-    /// use wlambda::vval::VVal;
-    ///
-    /// let global  = wlambda::prelude::create_wlamba_prelude();
-    /// let mut ctx = wlambda::compiler::EvalContext::new(global);
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
     ///
     /// ctx.set_global_var("XXX", &VVal::Int(200));
     ///
@@ -393,10 +448,8 @@ impl EvalContext {
     /// Gets the value of a global variable from the script:
     ///
     /// ```
-    /// use wlambda::vval::VVal;
-    ///
-    /// let global  = wlambda::prelude::create_wlamba_prelude();
-    /// let mut ctx = wlambda::compiler::EvalContext::new(global);
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
     ///
     /// assert_eq!(ctx.eval("!:global XXX = 22 * 2; XXX").unwrap().i(), 44);
     /// ```
@@ -984,7 +1037,6 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
 }
 
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
-
     match ast {
         VVal::Lst(_l) => {
             let syn  = ast.at(0).unwrap_or(VVal::Nul);
@@ -1001,15 +1053,25 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::Import => {
                     let prefix = ast.at(1).unwrap();
                     let name   = ast.at(2).unwrap();
+                    let s_prefix = if prefix.is_none() { String::from("") }
+                                   else { prefix.s_raw() + ":" };
+
+                    let glob_ref = ce.borrow_mut().global.clone();
+                    if let Some(stbl) = glob_ref.borrow().mem_modules.get(&name.s_raw()) {
+                        for (k, v) in stbl {
+                            glob_ref.borrow_mut().env.insert(
+                                s_prefix.clone() + &k, v.clone());
+                        }
+                    }
+
+                    let resolver : Option<Rc<RefCell<dyn ModuleResolver>>> =
+                        glob_ref.borrow_mut().resolver.clone();
+
                     let path : Vec<String> =
                         (&name.s_raw())
                             .split(':')
                             .map(String::from)
                             .collect();
-
-                    let glob_ref = ce.borrow_mut().global.clone();
-                    let resolver : Option<Rc<RefCell<dyn ModuleResolver>>> =
-                        glob_ref.borrow_mut().resolver.clone();
 
                     if resolver.is_some() {
                         let exports = resolver.unwrap().borrow_mut().resolve(glob_ref.clone(), &path);
@@ -1028,9 +1090,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             },
                             Ok(map) => {
                                 for (k, v) in map {
-                                    ce.borrow_mut().global.borrow_mut().env.insert(
-                                        prefix.s_raw() + ":" + &k,
-                                        v.clone());
+                                    glob_ref.borrow_mut().env.insert(
+                                        s_prefix.clone() + &k, v.clone());
                                 }
 
                                 Ok(Box::new(move |_e: &mut Env| { Ok(VVal::Nul) }))
@@ -1333,7 +1394,7 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
 /// This functions is mainly existing for testing purposes.
 #[allow(dead_code)]
 pub fn s_eval(s: &str) -> String {
-    let global = create_wlamba_prelude();
+    let global = GlobalEnv::new_default();
     match parser::parse(s, 0) {
         Ok(ast) => bench_eval_ast(ast, global, 1).s(),
         Err(e)  => { panic!(format!("EVAL ERROR: {}", e)); },
@@ -1348,7 +1409,7 @@ pub fn s_eval(s: &str) -> String {
 /// This functions is mainly existing for testing purposes.
 #[allow(dead_code)]
 pub fn s_eval_no_panic(s: &str) -> String {
-    let global = create_wlamba_prelude();
+    let global = GlobalEnv::new_default();
     match parser::parse(s, 0) {
         Ok(ast) => bench_eval_ast(ast, global, 1).s(),
         Err(e)  => { format!("EVAL ERROR: {}", e) },
@@ -1358,13 +1419,11 @@ pub fn s_eval_no_panic(s: &str) -> String {
 /// Evaluates a piece of WLambda code in a default global environment.
 ///
 /// ```
-/// println!("> {}", wlambda::compiler::eval("${a = 10, b = 20}").unwrap().s());
+/// println!("> {}", wlambda::eval("${a = 10, b = 20}").unwrap().s());
 /// ```
 #[allow(dead_code)]
 pub fn eval(s: &str) -> Result<VVal, EvalError>  {
-    let global = create_wlamba_prelude();
-    let mut ctx = EvalContext::new(global);
-
+    let mut ctx = EvalContext::new_default();
     ctx.eval(s)
 }
 
@@ -1823,7 +1882,7 @@ mod tests {
 
     #[test]
     fn check_callbacks() {
-        let global = create_wlamba_prelude();
+        let global = GlobalEnv::new_default();
         global.borrow_mut().add_func("reg", |env: &mut Env, _argc: usize| {
             let fun = env.arg(0);
             env.with_user_do(|v: &mut Vec<VVal>| v.push(fun.clone()));
@@ -1841,8 +1900,7 @@ mod tests {
 
     #[test]
     fn check_returned_functions() {
-        let global = create_wlamba_prelude();
-        let mut ctx = EvalContext::new(global);
+        let mut ctx = EvalContext::new_default();
         let n = ctx.eval("{ _ + 11 }").unwrap();
         let ret = ctx.call(&n, &vec![VVal::Int(11)]).unwrap();
         assert_eq!(ret.i(), 22);
@@ -1850,8 +1908,7 @@ mod tests {
 
     #[test]
     fn check_global_var_api() {
-        let global = create_wlamba_prelude();
-        let mut ctx = EvalContext::new(global);
+        let mut ctx = EvalContext::new_default();
         ctx.set_global_var("XXX", &VVal::Int(210));
         ctx.set_global_var("YYY", &VVal::Nul);
         let n = ctx.eval("{ .YYY = _ + 11; XXX + _ } 20").unwrap();
@@ -2164,8 +2221,7 @@ mod tests {
 
     #[test]
     fn check_eval() {
-        let global = create_wlamba_prelude();
-        let mut ctx = EvalContext::new(global);
+        let mut ctx = EvalContext::new_default();
 
         assert_eq!(ctx.eval("wl:eval $q$1 + 2$").unwrap().s(), "3");
 
@@ -2179,7 +2235,7 @@ mod tests {
     fn check_userdata() {
         use std::rc::Rc;
         use std::cell::RefCell;
-        let global_env = crate::prelude::create_wlamba_prelude();
+        let global_env = GlobalEnv::new_default();
 
         #[derive(Clone, Debug)]
         struct MyType {

@@ -5,7 +5,10 @@
 This module defines some default functions and operations
 available in the WLambda language.
 
-For an example, refer to [create_wlamba_prelude](fn.create_wlamba_prelude.html).
+You there are two WLambda modules provided by this module:
+
+- [core_symbol_table()](fn.core_symbol_table.html)
+- [std_symbol_table()](fn.std_symbol_table.html)
 
 # WLambda Reference
 
