@@ -5,8 +5,7 @@ Threading API:
 use wlambda::vval::*;
 
 // Get some random user thread:
-let global  = wlambda::prelude::create_wlamba_prelude();
-let mut ctx = wlambda::compiler::EvalContext::new(global);
+let mut ctx = wlambda::EvalContext::new_default();
 
 let mut msg_handle = wlambda::threads::MsgHandle::new();
 // You may register on multiple threads, but only one thread can use it at a time.
@@ -16,7 +15,7 @@ sender.register_on_as(&mut ctx, "worker");
 let t = std::thread::spawn(move || {
     let quit = std::rc::Rc::new(std::cell::RefCell::new(false));
 
-    let global_t = wlambda::prelude::create_wlamba_prelude();
+    let global_t = wlambda::GlobalEnv::new_default();
 
     let qr = quit.clone();
     global_t.borrow_mut()
@@ -25,7 +24,7 @@ let t = std::thread::spawn(move || {
             Ok(VVal::Nul)
         }, Some(0), Some(0));
 
-    let mut ctx = wlambda::compiler::EvalContext::new(global_t);
+    let mut ctx = wlambda::EvalContext::new(global_t);
 
     ctx.eval("!:global X = 123");
 
@@ -47,7 +46,7 @@ let t = std::thread::spawn(move || {
 // Calls the global `displayln` in the Worker thread with the supplied arguments.
 ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
 
-ctx.eval("wl:assert_eq (worker_call :wl:eval \"X\") 123;").unwrap();
+ctx.eval("std:assert_eq (worker_call :std:eval \"X\") 123;").unwrap();
 
 sender.call("thread:quit", VVal::Nul);
 
@@ -63,8 +62,7 @@ for a two way communication.
 use wlambda::vval::*;
 
 // Get some random user thread:
-let global  = wlambda::prelude::create_wlamba_prelude();
-let mut ctx = wlambda::compiler::EvalContext::new(global);
+let mut ctx = wlambda::EvalContext::new_default();
 
 let mut msg_handle = wlambda::threads::MsgHandle::new();
 
@@ -74,8 +72,7 @@ let sender = msg_handle.sender();
 sender.register_on_as(&mut ctx, "worker");
 
 let t = std::thread::spawn(move || {
-    let global_t = wlambda::prelude::create_wlamba_prelude();
-    let mut ctx  = wlambda::compiler::EvalContext::new(global_t);
+    let mut ctx  = wlambda::EvalContext::new_default();
 
     // This also implicitly defines a thread:quit:
     msg_handle.run(&mut ctx);
@@ -104,8 +101,7 @@ use std::sync::{Arc, Mutex, Condvar};
 /// in the global variables for the EvalContext.
 ///
 ///```
-/// let global  = wlambda::prelude::create_wlamba_prelude();
-/// let mut ctx = wlambda::compiler::EvalContext::new(global);
+/// let mut ctx = wlambda::compiler::EvalContext::new_default();
 ///
 /// let mut msg_handle = wlambda::threads::MsgHandle::new();
 /// let sender = msg_handle.sender();
@@ -133,8 +129,7 @@ impl Sender {
     /// arguments to that function.
     ///
     /// ```no_run
-    /// let global  = wlambda::prelude::create_wlamba_prelude();
-    /// let mut ctx = wlambda::compiler::EvalContext::new(global);
+    /// let mut ctx = wlambda::compiler::EvalContext::new_default();
     ///
     /// let mut msg_handle = wlambda::threads::MsgHandle::new();
     /// let sender = msg_handle.sender();
@@ -445,8 +440,7 @@ mod tests {
         use crate::vval::*;
 
         // Get some random user thread:
-        let global  = crate::prelude::create_wlamba_prelude();
-        let mut ctx = crate::compiler::EvalContext::new(global);
+        let mut ctx = crate::compiler::EvalContext::new_default();
 
         let mut msg_handle = crate::threads::MsgHandle::new();
         let sender = msg_handle.sender();
@@ -455,7 +449,7 @@ mod tests {
         let t = std::thread::spawn(move || {
             let quit = std::rc::Rc::new(std::cell::RefCell::new(false));
 
-            let global_t = crate::prelude::create_wlamba_prelude();
+            let global_t = crate::compiler::GlobalEnv::new_default();
 
             let qr = quit.clone();
             global_t.borrow_mut().add_func("thread:quit", move |_env: &mut Env, _argc: usize| {
@@ -474,7 +468,7 @@ mod tests {
         });
 
         ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
-        ctx.eval("wl:assert_eq (worker_call :wl:eval \"X\") 123;").unwrap();
+        ctx.eval("std:assert_eq (worker_call :std:eval \"X\") 123;").unwrap();
 
         sender.call("thread:quit", VVal::Nul);
 
@@ -487,22 +481,20 @@ mod tests {
         use crate::vval::*;
 
         // Get some random user thread:
-        let global  = crate::prelude::create_wlamba_prelude();
-        let mut ctx = crate::compiler::EvalContext::new(global);
+        let mut ctx = crate::compiler::EvalContext::new_default();
 
         let mut msg_handle = crate::threads::MsgHandle::new();
         let sender = msg_handle.sender();
         sender.register_on_as(&mut ctx, "worker");
 
         let t = std::thread::spawn(move || {
-            let global_t = crate::prelude::create_wlamba_prelude();
-            let mut ctx = crate::compiler::EvalContext::new(global_t);
+            let mut ctx = crate::compiler::EvalContext::new_default();
 
             ctx.eval("!:global X = 123").unwrap();
             msg_handle.run(&mut ctx);
         });
 
-        ctx.eval("wl:assert_eq (worker_call :wl:eval \"X\") 123;").unwrap();
+        ctx.eval("std:assert_eq (worker_call :std:eval \"X\") 123;").unwrap();
 
         sender.call("thread:quit", VVal::Nul);
 
@@ -518,22 +510,20 @@ mod tests {
         let ri = r.clone();
 
         // Get some random user thread:
-        let global  = crate::prelude::create_wlamba_prelude();
-        let mut ctx = crate::compiler::EvalContext::new(global);
+        let mut ctx = crate::compiler::EvalContext::new_default();
 
         let mut msg_handle = crate::threads::MsgHandle::new();
         let sender = msg_handle.sender();
         sender.register_on_as(&mut ctx, "worker");
 
         let t = std::thread::spawn(move || {
-            let global_t = crate::prelude::create_wlamba_prelude();
-            let mut ctx = crate::compiler::EvalContext::new(global_t);
+            let mut ctx = crate::compiler::EvalContext::new_default();
 
             ctx.eval(r#"
                 !:global X = $[1,2,3,4];
-                !:global Y = { pop X };
-                !:global G = { push X (str $[_, _1]); };
-                !:global H = { push X (_ + _1); };
+                !:global Y = { std:pop X };
+                !:global G = { std:push X (str $[_, _1]); };
+                !:global H = { std:push X (_ + _1); };
             "#).unwrap();
             msg_handle.run(&mut ctx);
 
@@ -541,7 +531,7 @@ mod tests {
                 let mut i = ri.lock().unwrap();
                 std::mem::replace(
                     &mut *i,
-                    ctx.eval("$[pop X, pop X]").unwrap().s());
+                    ctx.eval("$[std:pop X, std:pop X]").unwrap().s());
             }
         });
 
@@ -567,20 +557,18 @@ mod tests {
         let ri = r.clone();
 
         // Get some random user thread:
-        let global  = crate::prelude::create_wlamba_prelude();
-        let mut ctx = crate::compiler::EvalContext::new(global);
+        let mut ctx = crate::compiler::EvalContext::new_default();
 
         let mut msg_handle = crate::threads::MsgHandle::new();
         let sender = msg_handle.sender();
         sender.register_on_as(&mut ctx, "worker");
 
         let t = std::thread::spawn(move || {
-            let global_t = crate::prelude::create_wlamba_prelude();
-            let mut ctx = crate::compiler::EvalContext::new(global_t);
+            let mut ctx = crate::compiler::EvalContext::new_default();
 
             ctx.eval(r#"
                 !:global X = $[13,2,3,4];
-                !:global Y = { pop X };
+                !:global Y = { std:pop X };
             "#).unwrap();
             msg_handle.run(&mut ctx);
 
@@ -588,7 +576,7 @@ mod tests {
                 let mut i = ri.lock().unwrap();
                 std::mem::replace(
                     &mut *i,
-                    ctx.eval("pop X").unwrap().i());
+                    ctx.eval("std:pop X").unwrap().i());
             }
         });
 
@@ -616,16 +604,14 @@ mod tests {
         let ri = r.clone();
 
         // Get some random user thread:
-        let global  = crate::prelude::create_wlamba_prelude();
-        let mut ctx = crate::compiler::EvalContext::new(global);
+        let mut ctx = crate::compiler::EvalContext::new_default();
 
         let mut msg_handle = crate::threads::MsgHandle::new();
         let sender = msg_handle.sender();
         sender.register_on_as(&mut ctx, "worker");
 
         let t = std::thread::spawn(move || {
-            let global_t = crate::prelude::create_wlamba_prelude();
-            let mut ctx = crate::compiler::EvalContext::new(global_t);
+            let mut ctx = crate::compiler::EvalContext::new_default();
 
             ctx.eval(r#"
                 !:global X = $[13,2,3,4];
@@ -639,7 +625,6 @@ mod tests {
                     &mut *i, ctx.eval("X").unwrap().s());
             }
         });
-
 
         ctx.eval(r#"
             worker_send :Y $b"ABC";

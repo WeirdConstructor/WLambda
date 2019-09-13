@@ -36,17 +36,9 @@ fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
 }
 
 fn execute_script(name: &str, snippet: &str) {
-    use wlambda::prelude::create_wlamba_prelude;
-    use wlambda::compiler::EvalContext;
+    use wlambda::EvalContext;
 
-    let lfmr =
-        std::rc::Rc::new(
-            std::cell::RefCell::new(
-                wlambda::compiler::LocalFileModuleResolver::new()));
-
-    let global = create_wlamba_prelude();
-    global.borrow_mut().set_resolver(lfmr.clone());
-    let mut ctx = EvalContext::new(global);
+    let mut ctx = EvalContext::new_default();
     match ctx.eval(snippet) {
         Ok(v) => { println!("result '{}': {}", name, v.s()); },
         Err(e) => {

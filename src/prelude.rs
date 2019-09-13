@@ -50,15 +50,15 @@ arguments.
 ```wlambda
 !twoify = { _ * 2 };
 
-wl:assert_eq twoify[2] 4;
+std:assert_eq twoify[2] 4;
 
 !twoify2 = \_ * 2;
 
-wl:assert_eq twoify2[2] 4;
+std:assert_eq twoify2[2] 4;
 
 # You may also call them directly, notice the bracket [ ... ] syntax
 # for delimiting the inner function call:
-wl:assert_eq ({ _ * 2 } 2) 4;
+std:assert_eq ({ _ * 2 } 2) 4;
 ```
 
 If you want to name arguments, you can use the destructuring assignment
@@ -69,7 +69,7 @@ syntax:
     a + b
 };
 
-wl:assert_eq add[1, 2] 3;
+std:assert_eq add[1, 2] 3;
 ```
 
 ### Function arity checks
@@ -104,8 +104,8 @@ Here an example:
     (is_none c) { a + b } { a * b + c * d }
 };
 
-wl:assert_eq dosomething[1, 2]         3;
-wl:assert_eq dosomething[2, 2, 3, 4]  16;
+std:assert_eq dosomething[1, 2]         3;
+std:assert_eq dosomething[2, 2, 3, 4]  16;
 ```
 
 ## Data Types
@@ -120,11 +120,11 @@ Please note for API design: In case of errornous states you should not
 return a `$none` but an `$error` value.
 
 ```wlambda
-wl:assert ~ $n        == $none;
-wl:assert ~ int[$n]   == 0;
-wl:assert ~ float[$n] == 0.0;
-wl:assert ~ str[$n]   == "$n";
-wl:assert ~ is_none[$n];
+std:assert ~ $n        == $none;
+std:assert ~ int[$n]   == 0;
+std:assert ~ float[$n] == 0.0;
+std:assert ~ str[$n]   == "$n";
+std:assert ~ is_none[$n];
 ```
 
 ### Error values: `$e expr` or `$error expr`
@@ -141,7 +141,7 @@ The error value wraps any value you pass to the `$error` or `$e`
 constructor syntax.
 
 ```wlambda
-wl:assert ~ is_err ~ $e "something went wrong!"
+std:assert ~ is_err ~ $e "something went wrong!"
 ```
 
 There are more routines except `is_err` to handle an error.
@@ -173,7 +173,7 @@ an error value.
     # something here...
 };
 
-wl:assert ~ (unwrap_err other[]) == "this failed!";
+std:assert ~ (unwrap_err other[]) == "this failed!";
 ```
 
 `_?` can take up to 2 arguments. If so, the first argument is interpreted
@@ -184,18 +184,18 @@ as jump label. That is handy if you want to jump up multiple call frames:
 
 !func = \:some_unique_label {
     ( _ == 42 ) {
-        displayln "We got 42!";
+        std:displayln "We got 42!";
 
         # The `then` branch we are currently in is a call frame.
         # To jump further up the call stack, we need the label
         # we defined for the function above.
         !val = _? :some_unique_label failing_func[];
 
-        displayln "Returned:" val;
+        std:displayln "Returned:" val;
     }
 };
 
-wl:assert_eq (unwrap_err ~ func 42) :FAIL;
+std:assert_eq (unwrap_err ~ func 42) :FAIL;
 ```
 
 #### Handle errors with `on_error`
@@ -214,10 +214,10 @@ wl:assert_eq (unwrap_err ~ func 42) :FAIL;
 # The first function of on_error will be called with the unwrapped
 # error if an error occured.
 on_error {|4| .x = _; } ~ func 13;
-wl:assert_eq $*x "this failed!";
+std:assert_eq $*x "this failed!";
 
 !ret = on_error {|4| .x = _; } ~ func 1;
-wl:assert_eq ret "all ok!";
+std:assert_eq ret "all ok!";
 ```
 
 ### Booleans
@@ -243,13 +243,13 @@ $Q/ABCDEF\xFD/;      # \xFD is not an excape sequence here!
 You can index inside a byte array by calling it with an integer:
 
 ```wlambda
-wl:assert_eq ($b"ABC" 1) $b"B";
+std:assert_eq ($b"ABC" 1) $b"B";
 ```
 
 You can extract a whole range when calling with 2 integers:
 
 ```wlambda
-wl:assert_eq ($b"ABCDEF" 2 3) $b"CDE";
+std:assert_eq ($b"ABCDEF" 2 3) $b"CDE";
 ```
 
 If you call a bytes value with a map as argument, the bytes value is
@@ -259,10 +259,10 @@ is returned:
 ```wlambda
 !some_map = ${ a = 20, b = 30 };
 
-wl:assert_eq ($b"a" some_map) 20;
-wl:assert_eq ($b"b" some_map) 30;
+std:assert_eq ($b"a" some_map) 20;
+std:assert_eq ($b"b" some_map) 30;
 
-wl:assert_eq some_map.$b"a" 20;   # with method call syntax
+std:assert_eq some_map.$b"a" 20;   # with method call syntax
 ```
 
 #### Byte Conversion Functions
@@ -271,46 +271,46 @@ You can convert bytes to strings in a multitude of ways:
 
 - str _bytes_
   ```wlambda
-  wl:assert_eq (str $b"abc")        "abc";
-  wl:assert_eq (str $b"abc\xFF")    "abcÿ";
-  wl:assert_eq (str $Q/ABCDEF\xFD/) "ABCDEF\\xFD";
+  std:assert_eq (str $b"abc")        "abc";
+  std:assert_eq (str $b"abc\xFF")    "abcÿ";
+  std:assert_eq (str $Q/ABCDEF\xFD/) "ABCDEF\\xFD";
   ```
-- bytes:to_hex _bytes_ \[_group-len_ \[_group-sep_]]
+- std:bytes:to_hex _bytes_ \[_group-len_ \[_group-sep_]]
   ```wlambda
-  wl:assert_eq (bytes:to_hex $b"\xFF\x0A\xBE\xEF")
-               "FF0ABEEF";
-  wl:assert_eq (bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2)
-               "FF 0A BE EF";
-  wl:assert_eq (bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2 ":")
-               "FF:0A:BE:EF";
+  std:assert_eq (std:bytes:to_hex $b"\xFF\x0A\xBE\xEF")
+                "FF0ABEEF";
+  std:assert_eq (std:bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2)
+                "FF 0A BE EF";
+  std:assert_eq (std:bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2 ":")
+                "FF:0A:BE:EF";
   ```
-- str:from_utf8 _bytes_
+- std:str:from_utf8 _bytes_
   ```wlambda
-  wl:assert_eq (str:from_utf8 $b"\xC3\xA4\xC3\x9F\xC3\xBF") "äßÿ";
-  wl:assert_eq (str:from_utf8 [str:to_bytes "äßÿ"])         "äßÿ";
+  std:assert_eq (std:str:from_utf8 $b"\xC3\xA4\xC3\x9F\xC3\xBF") "äßÿ";
+  std:assert_eq (std:str:from_utf8 [std:str:to_bytes "äßÿ"])         "äßÿ";
   # broken UTF8 will result in an error:
-  wl:assert ~ is_err (str:from_utf8 $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF");
+  std:assert ~ is_err (std:str:from_utf8 $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF");
   ```
-- str:from_utf8_lossy _bytes_
+- std:str:from_utf8_lossy _bytes_
   ```wlambda
-  wl:assert_eq (str:from_utf8_lossy $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF") "�äßÿ";
+  std:assert_eq (std:str:from_utf8_lossy $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF") "�äßÿ";
   ```
 
 You can even convert bytes to vectors of integers back and forth:
 
 ```wlambda
-!v = bytes:to_vec $b"ABC";
-wl:assert_eq (str v) (str $[65, 66, 67]);
+!v = std:bytes:to_vec $b"ABC";
+std:assert_eq (str v) (str $[65, 66, 67]);
 
-push v 64;
-!b = bytes:from_vec v;
-wl:assert_eq b $b"ABC@";
+std:push v 64;
+!b = std:bytes:from_vec v;
+std:assert_eq b $b"ABC@";
 ```
 
 There is also an invese operation to `bytes:to_hex`:
 
 ```wlambda
-wl:assert_eq (bytes:from_hex ~ bytes:to_hex $b"ABC") $b"ABC";
+std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 ```
 
 ### Symbols
@@ -399,15 +399,15 @@ be executed. If you pass a function as second argument to `$false` then that
 will be executed.
 
 ```wlambda
-(10 == 10) { displayln "10 is 10" };         #=> prints "10 is 10"
-(10 != 10) { displayln "10 is not 10" };     #=> doesn't print anything
+(10 == 10) { std:displayln "10 is 10" };         #=> prints "10 is 10"
+(10 != 10) { std:displayln "10 is not 10" };     #=> doesn't print anything
 
 !x = 20;
 
 (x == 20) {
-    displayln "x is 20";
+    std:displayln "x is 20";
 } {
-    displayln "x is 20";
+    std:displayln "x is 20";
 }; # Do not forget the ";"!
 ```
 
@@ -416,10 +416,10 @@ function you may write it also like this, which is not the recommended
 syntax, but still works:
 
 ```wlambda
-(10 == 10)[{ displayln "10 is 10" }];
+(10 == 10)[{ std:displayln "10 is 10" }];
 
 !x = 21;
-(x == 20)[{ displayln "x is 20" }, { displayln "x isn't 20" }]; #=> print "x isn't 20"
+(x == 20)[{ std:displayln "x is 20" }, { std:displayln "x isn't 20" }]; #=> print "x isn't 20"
 ```
 
 ## Lexical Scope and Variable assignment
@@ -453,36 +453,45 @@ syntax, but still works:
 
 !@import x tests:test_mod; # prefixes everything from modixes with x:
 
-wl:assert ~ (x:symbol 10) == 40;
+std:assert ~ (x:symbol 10) == 40;
 
+```
+
+You can also skip the prefix:
+
+```wlambda
+!@import std;
+!v = $[];
+push v 10; push v 20;
+std:assert_eq (str v) "$[10,20]";
 ```
 
 ## Prelude
 
-### wl:eval _code-string_
+### std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
 an error object is returned.
 
 ```wlambda
-wl:assert_eq (wl:eval "1 + 2") 3;
+std:assert_eq (std:eval "1 + 2") 3;
 !:global X = 20;
-wl:assert_eq (wl:eval "1 + X") 21;
+std:assert_eq (std:eval "1 + X") 21;
 ```
 
-### wl:assert _bool_ \[_message_]
+### std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
 You can pass an optional message as second parameter.
 
 ```norun_wlambda
-wl:assert $false; #=> Panic
-wl:assert 120;    #=> 120
+std:assert $false; #=> Panic
+std:assert 120;    #=> 120
 ```
 
-### wl:assert_eq _actual_ _expected_ \[_message_]
+### std:assert_eq _actual_ _expected_ \[_message_]
 
 This function check if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -490,7 +499,7 @@ passed in the panic for reference.
 
 ```wlambda
 !x = 30 * 2;
-wl:assert_eq x 60 "30 * 2 == 60";
+std:assert_eq x 60 "30 * 2 == 60";
 ```
 
 ## Optional Prelude
@@ -504,7 +513,7 @@ Optionally not pretty printed if _no_pretty_ is a true value.
 
 ```wlambda
 !str = ser:json $[1,2.3,${a=4}] $t;
-wl:assert_eq str "[1,2.3,{\"a\":4}]";
+std:assert_eq str "[1,2.3,{\"a\":4}]";
 ```
 
 #### deser:json _string_
@@ -513,9 +522,9 @@ Deserializes the JSON formatted _string_ into a data structure.
 
 ```wlambda
 !data = deser:json ~ ser:json $[1,2.3,${a=4}];
-wl:assert_eq data.0 1;
-wl:assert_eq data.1 2.3;
-wl:assert_eq data.(2).a 4;
+std:assert_eq data.0 1;
+std:assert_eq data.1 2.3;
+std:assert_eq data.(2).a 4;
 ```
 
 #### ser:msgpack _data_
@@ -523,7 +532,7 @@ wl:assert_eq data.(2).a 4;
 Serializes the _data_ and returns a msgpack bytes value.
 
 ```wlambda
-    wl:assert_eq (ser:msgpack $b"abc") $b"\xC4\x03abc";
+    std:assert_eq (ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
 #### deser:msgpack _bytes_
@@ -531,7 +540,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 Deserializes the msgpack bytes value into a data structure.
 
 ```wlambda
-    wl:assert_eq (deser:msgpack $b"\xC4\x03abc") $b"abc";
+    std:assert_eq (deser:msgpack $b"\xC4\x03abc") $b"abc";
 ```
 
 ### regex
@@ -545,9 +554,9 @@ For the documentation of _format_ please consule the
 chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
 
 ```wlambda
-!year_str = chrono:timestamp "%Y";
-displayln :XXXX ~ (year_str | int) == 2019;
-wl:assert ~ (year_str | int) == 2019;
+!year_str = std:chrono:timestamp "%Y";
+std:displayln :XXXX ~ (year_str | int) == 2019;
+std:assert ~ (year_str | int) == 2019;
 
 !now_str = chrono:timestamp[];
 ```
@@ -557,12 +566,17 @@ wl:assert ~ (year_str | int) == 2019;
 use crate::compiler::*;
 use crate::vval::*;
 use std::rc::Rc;
-//use std::cell::RefCell;
+
+macro_rules! func {
+    ($g: ident, $name: expr, $cb: expr, $min: expr, $max: expr) => {
+        symtbl_func(&mut $g, $name, $cb, $min, $max);
+    }
+}
 
 macro_rules! add_func {
     ($g: ident, $op: tt, $env: ident, $argc: ident, $b: block, $min: expr, $max: expr) => {
-        $g.borrow_mut().add_func(
-            stringify!($op), |$env: &mut Env, $argc: usize| $b, $min, $max);
+        symtbl_func(
+            &mut $g, stringify!($op), |$env: &mut Env, $argc: usize| $b, $min, $max);
     }
 }
 
@@ -619,7 +633,7 @@ macro_rules! add_bin_op {
 
 macro_rules! add_sbin_op {
     ($g: ident, $op: literal, $a: ident, $b: ident, $e: expr) => {
-        $g.borrow_mut().add_func(
+        func!($g,
             $op, |env: &mut Env, argc: usize| {
                 if argc < 2 { return Ok(VVal::Nul); }
                 let $a = env.arg(0);
@@ -719,67 +733,51 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
     Ok(VVal::Nul)
 }
 
-/// Defines a new global Environment for running the `compiler`.
-///
-/// The global Environment `GlobalEnvRef` can be reused in different
-/// compilations. Keep in mind, that the compiler might add/remove/change
-/// global definitions.
-///
-/// For an example see also [compiler::eval](../compiler/fn.eval.html)
+/// Returns a SymbolTable with all WLambda core language symbols.
 #[allow(clippy::cast_lossless,clippy::assign_op_pattern)]
-pub fn create_wlamba_prelude() -> GlobalEnvRef {
-    let g = GlobalEnv::new();
+pub fn core_symbol_table() -> SymbolTable {
+    let mut st = SymbolTable::new();
 
-    add_multi_op!(g, +);
-    add_multi_op!(g, -);
-    add_multi_op!(g, *);
-    add_multi_op!(g, /);
-    add_multi_op!(g, %);
+    add_multi_op!(st, +);
+    add_multi_op!(st, -);
+    add_multi_op!(st, *);
+    add_multi_op!(st, /);
+    add_multi_op!(st, %);
 
-    add_bool_bin_op!(g, <);
-    add_bool_bin_op!(g, >);
-    add_bool_bin_op!(g, <=);
-    add_bool_bin_op!(g, >=);
+    add_bool_bin_op!(st, <);
+    add_bool_bin_op!(st, >);
+    add_bool_bin_op!(st, <=);
+    add_bool_bin_op!(st, >=);
 
-    add_bin_op!(g, ==, a, b, Ok(VVal::Bol(a.eqv(&b))));
-    add_bin_op!(g, !=, a, b, Ok(VVal::Bol(!a.eqv(&b))));
+    add_bin_op!(st, ==, a, b, Ok(VVal::Bol(a.eqv(&b))));
+    add_bin_op!(st, !=, a, b, Ok(VVal::Bol(!a.eqv(&b))));
 
-    add_sbin_op!(g, "&|", a, b,
+    add_sbin_op!(st, "&|", a, b,
         Ok(VVal::Int(((a.i() as u32) | (b.i() as u32)) as i64)));
-    add_sbin_op!(g, "&", a, b,
+    add_sbin_op!(st, "&", a, b,
         Ok(VVal::Int(((a.i() as u32) & (b.i() as u32)) as i64)));
-    add_sbin_op!(g, "&^", a, b,
+    add_sbin_op!(st, "&^", a, b,
         Ok(VVal::Int(((a.i() as u32) ^ (b.i() as u32)) as i64)));
-    add_sbin_op!(g, "<<", a, b,
+    add_sbin_op!(st, "<<", a, b,
         Ok(VVal::Int(((a.i() as u32) << (b.i() as u32)) as i64)));
-    add_sbin_op!(g, ">>", a, b,
+    add_sbin_op!(st, ">>", a, b,
         Ok(VVal::Int(((a.i() as u32) >> (b.i() as u32)) as i64)));
 
-    add_fi_bin_op!(g, ^, a, b,
+    add_fi_bin_op!(st, ^, a, b,
         Ok(VVal::Flt(a.f().powf(b.f()))),
         Ok(VVal::Int(a.i().pow(b.i() as u32))));
 
-    g.borrow_mut().add_func("not",
+    func!(st, "not",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Bol(!env.arg(0).b()))
         }, Some(1), Some(1));
 
-    g.borrow_mut().add_func("neg",
-        |env: &mut Env, _argc: usize| {
-            Ok(VVal::Int(!env.arg(0).i()))
-        }, Some(1), Some(1));
-
-    g.borrow_mut().add_func("uneg",
-        |env: &mut Env, _argc: usize| {
-            Ok(VVal::Int((!(env.arg(0).i() as u32)) as i64))
-        }, Some(1), Some(1));
-
-    g.borrow_mut().add_func("panic",
+    func!(st, "panic",
         |env: &mut Env, _argc: usize| {
             Err(StackAction::Panic(env.arg(0).clone(), None))
         }, Some(1), Some(1));
 
-    g.borrow_mut().add_func("block",
+    func!(st, "block",
         |env: &mut Env, argc: usize| {
             let mut label = VVal::Nul;
             let fn_arg_idx = if argc <= 1 { 0 } else { label = env.arg(0); 1 };
@@ -793,7 +791,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(1), Some(2));
 
-    g.borrow_mut().add_func("_?",
+    func!(st, "_?",
         |env: &mut Env, argc: usize| {
             let mut lbl = VVal::Nul;
             let err_val = if argc > 1 {
@@ -807,7 +805,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(1), Some(2));
 
-    g.borrow_mut().add_func("unwrap_err",
+    func!(st, "unwrap_err",
         |env: &mut Env, _argc: usize| {
             match env.arg(0) {
                 VVal::Err(err_v) => {
@@ -821,7 +819,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(1), Some(1));
 
-    g.borrow_mut().add_func("unwrap",
+    func!(st, "unwrap",
         |env: &mut Env, _argc: usize| {
             match env.arg(0) {
                 VVal::Err(err_v) => {
@@ -837,7 +835,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(1), Some(1));
 
-    g.borrow_mut().add_func("on_error",
+    func!(st, "on_error",
         |env: &mut Env, _argc: usize| {
             let err_fn = env.arg(0).clone();
             match env.arg(1) {
@@ -854,335 +852,96 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(2), Some(2));
 
-    g.borrow_mut().add_func("return",
+    func!(st, "return",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Return((VVal::Nul, VVal::Nul))); }
             if argc < 2 { return Err(StackAction::Return((VVal::Nul, env.arg(0).clone()))); }
             Err(StackAction::Return((env.arg(0).clone(), env.arg(1).clone())))
         }, Some(1), Some(2));
 
-    g.borrow_mut().add_func("break",
+    func!(st, "break",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
             Err(StackAction::Break(env.arg(0).clone()))
         }, Some(0), Some(1));
 
-    g.borrow_mut().add_func("next",
+    func!(st, "next",
         |_env: &mut Env, _argc: usize| {
             Err(StackAction::Next)
         }, Some(0), Some(0));
 
-    g.borrow_mut().add_func("push",
-        |env: &mut Env, _argc: usize| {
-            let v = env.arg(0);
-            v.push(env.arg(1).clone());
-            Ok(v.clone())
-        }, Some(2), Some(2));
-
-    g.borrow_mut().add_func("pop",
-        |env: &mut Env, _argc: usize| {
-            let v = env.arg(0);
-            Ok(v.pop())
-        }, Some(1), Some(1));
-
-    g.borrow_mut().add_func("take",
-        |env: &mut Env, _argc: usize| {
-            let cnt = env.arg(0).i() as usize;
-            let lst = env.arg(1);
-            if let VVal::Lst(l) = lst {
-                let svec : Vec<VVal> =
-                    l.borrow_mut().iter().take(cnt).cloned().collect();
-                Ok(VVal::vec_mv(svec))
-            } else {
-                Ok(VVal::err_msg(
-                    &format!(
-                        "drop only works with a list as second argument, got '{}'",
-                        lst.s())))
-            }
-        }, Some(2), Some(2));
-
-    g.borrow_mut().add_func("drop",
-        |env: &mut Env, _argc: usize| {
-            let cnt = env.arg(0).i() as usize;
-            let lst = env.arg(1);
-            if let VVal::Lst(l) = lst {
-                let svec : Vec<VVal> =
-                    l.borrow_mut().iter().skip(cnt).cloned().collect();
-                Ok(VVal::vec_mv(svec))
-            } else {
-                Ok(VVal::err_msg(
-                    &format!(
-                        "drop only works with a list as second argument, got '{}'",
-                        lst.s())))
-            }
-        }, Some(2), Some(2));
-
-    g.borrow_mut().add_func("bool",
+    func!(st, "bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).b())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("float",
+    func!(st, "float",
         |env: &mut Env, _argc: usize| { Ok(VVal::Flt(env.arg(0).f())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("int",
+    func!(st, "int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).i())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("str",
+    func!(st, "str",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("sym",
+    func!(st, "sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_sym(&env.arg(0).s_raw())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_none",
+    func!(st, "is_none",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_none())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_err",
+    func!(st, "is_err",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_err())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_map",
+    func!(st, "is_map",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_map())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_vec",
+    func!(st, "is_vec",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_vec())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_fun",
+    func!(st, "is_fun",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_fun())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_str",
+    func!(st, "is_str",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_str())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_wref",
+    func!(st, "is_wref",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_wref())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_ref",
+    func!(st, "is_ref",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_ref())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_bool",
+    func!(st, "is_bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_bool())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_bytes",
+    func!(st, "is_bytes",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_bytes())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_sym",
+    func!(st, "is_sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_sym())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_float",
+    func!(st, "is_float",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_float())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("is_int",
+    func!(st, "is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) },
         Some(1), Some(1));
-    g.borrow_mut().add_func("str:len",
-        |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_len() as i64)) },
-        Some(1), Some(1));
-    g.borrow_mut().add_func("str:to_lowercase",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_lowercase())) },
-        Some(1), Some(1));
-    g.borrow_mut().add_func("str:to_uppercase",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_uppercase())) },
-        Some(1), Some(1));
-    g.borrow_mut().add_func("str:padl",
-        |env: &mut Env, _argc: usize| {
-            let len = env.arg(0).i() as usize;
-            let pads = env.arg(1).s_raw();
-            let mut s = env.arg(2).s_raw();
 
-            while s.len() < len {
-                s = pads.to_string() + &s;
-            }
-
-            Ok(VVal::new_str_mv(s))
-        }, Some(3), Some(3));
-
-    g.borrow_mut().add_func("str:padr",
-        |env: &mut Env, _argc: usize| {
-            let len = env.arg(0).i() as usize;
-            let pads = env.arg(1).s_raw();
-            let mut s = env.arg(2).s_raw();
-
-            while s.len() < len {
-                s += &pads;
-            }
-
-            Ok(VVal::new_str_mv(s))
-        }, Some(3), Some(3));
-    g.borrow_mut().add_func("str:cat",
-        |env: &mut Env, argc: usize| {
-            let lst = env.arg(0);
-            if let VVal::Lst(l) = lst {
-                let svec : Vec<String> = l.borrow_mut().iter().map(|v| v.s_raw()).collect();
-                Ok(VVal::new_str_mv((&svec).concat()))
-
-            } else {
-                let mut s = String::from("");
-                for i in 0..argc {
-                    s += &env.arg(i).s_raw();
-                }
-                Ok(VVal::new_str_mv(s))
-            }
-        }, None, None);
-    g.borrow_mut().add_func("str:join",
-        |env: &mut Env, _argc: usize| {
-            let sep = env.arg(0).s_raw();
-            let lst = env.arg(1);
-            if let VVal::Lst(l) = lst {
-                let svec : Vec<String> = l.borrow_mut().iter().map(|v| v.s_raw()).collect();
-                Ok(VVal::new_str_mv((&svec).join(&sep)))
-
-            } else {
-                Ok(VVal::err_msg(
-                    &format!(
-                        "str:join only works with lists as second argument, got '{}'",
-                        lst.s())))
-            }
-        }, Some(2), Some(2));
-    g.borrow_mut().add_func("str:from_utf8_lossy",
-        |env: &mut Env, _argc: usize| {
-            let b = env.arg(0);
-            Ok(
-                if let VVal::Byt(u) = b {
-                    VVal::new_str_mv(String::from_utf8_lossy(&u.borrow()).to_string())
-                } else {
-                    VVal::Nul
-                })
-        }, Some(1), Some(1));
-    g.borrow_mut().add_func("str:from_utf8",
-        |env: &mut Env, _argc: usize| {
-            let b = env.arg(0);
-            if let VVal::Byt(u) = b {
-                match String::from_utf8(u.borrow().to_vec()) {
-                    Ok(s) => Ok(VVal::new_str_mv(s)),
-                    Err(e) => {
-                        Ok(VVal::err_msg(
-                            &format!("str:from_utf8 decoding error: {}", e)))
-                    }
-                }
-            } else {
-                Ok(VVal::Nul)
-            }
-        }, Some(1), Some(1));
-
-    g.borrow_mut().add_func("str:to_bytes",
-        |env: &mut Env, _argc: usize| {
-            Ok(VVal::new_byt(env.arg(0).s_raw().as_bytes().to_vec()))
-        }, Some(1), Some(1));
-
-    g.borrow_mut().add_func("bytes:from_vec",
-        |env: &mut Env, _argc: usize| {
-            if let VVal::Lst(u) = env.arg(0) {
-                Ok(VVal::new_byt(u.borrow().iter().map(|v| v.i() as u8).collect()))
-
-            } else {
-                Ok(VVal::Nul)
-            }
-        }, Some(1), Some(1));
-
-    g.borrow_mut().add_func("bytes:to_vec",
-        |env: &mut Env, _argc: usize| {
-            if let VVal::Byt(u) = env.arg(0) {
-                Ok(VVal::vec_mv(
-                    u.borrow().iter().map(|u| VVal::Int(*u as i64))
-                        .collect()))
-
-            } else {
-                Ok(VVal::Nul)
-            }
-        }, Some(1), Some(1));
-
-    g.borrow_mut().add_func("bytes:from_hex",
-        |env: &mut Env, _argc: usize| {
-            let s = env.arg(0).s_raw();
-            let out : Vec<u8> = Vec::with_capacity((s.len() + 1) / 2);
-            Ok(VVal::new_byt(
-                s.chars()
-                 .map(|c|
-                     match c { '0'..='9' => ( 9 - (b'9' - (c as u8))) as i16,
-                               'a'..='f' => (15 - (b'f' - (c as u8))) as i16,
-                               'A'..='F' => (15 - (b'F' - (c as u8))) as i16,
-                               _ => -1 })
-                 .fold((256, out), |(last, mut out), c: i16|
-                     if c == -1 { (last, out) }
-                     else if last == 256 { (c, out) }
-                     else {
-                         out.push((((last << 4) | (c & 0x0F)) & 0xFF) as u8);
-                         (256, out)
-                     }).1))
-        }, Some(1), Some(1));
-
-    g.borrow_mut().add_func("bytes:to_hex",
-        |env: &mut Env, argc: usize| {
-            static HEXCHARS : &'static [char] =
-                &['0', '1', '2', '3', '4', '5', '6', '7',
-                  '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
-
-            if let VVal::Byt(u) = env.arg(0) {
-                let mut out : String = String::with_capacity(u.borrow().len() * 2);
-
-                if argc == 1 {
-                    for (a, b) in u.borrow().iter().map(|u|
-                                        (HEXCHARS[(u >> 4) as usize],
-                                         HEXCHARS[(u & 0x0F) as usize])) {
-                        out.push(a);
-                        out.push(b);
-                    }
-                } else {
-                    let group_len = env.arg(1).i();
-                    let group_sep =
-                        if env.arg(2).is_none() { String::from(" ") }
-                        else { env.arg(2).s_raw() };
-
-                    let mut len_counter = 0;
-                    for (a, b) in u.borrow().iter().map(|u|
-                                        (HEXCHARS[(u >> 4) as usize],
-                                         HEXCHARS[(u & 0x0F) as usize])) {
-                        if len_counter >= group_len { out.push_str(&group_sep); len_counter = 0; }
-                        out.push(a);
-                        len_counter += 1;
-                        if len_counter >= group_len { out.push_str(&group_sep); len_counter = 0; }
-                        out.push(b);
-                        len_counter += 1;
-                    }
-                }
-
-                Ok(VVal::new_str_mv(out))
-
-            } else {
-                Ok(VVal::Nul)
-            }
-        }, Some(1), Some(3));
-
-    g.borrow_mut().add_func("len",
+    func!(st, "len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).len() as i64)) },
         Some(1), Some(1));
 
-    g.borrow_mut().add_func("type",
+    func!(st, "type",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::new_str_mv(env.arg(0).type_name()))
         }, Some(1), Some(1));
 
-    g.borrow_mut().add_func("yay",
-        |env: &mut Env, _argc: usize| {
-            println!("YAAAAY {}", env.arg(0).s());
-            env.dump_stack();
-            Ok(VVal::Nul)
-        }, None, None);
-
-    g.borrow_mut().add_func("to_drop",
-        |env: &mut Env, _argc: usize| {
-            let fun = env.arg(1);
-            let v   = env.arg(0);
-
-            Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
-        }, Some(2), Some(2));
-
-
-    g.borrow_mut().add_func("match",
+    func!(st, "match",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Ok(VVal::Nul); }
             if argc == 1 { return Ok(VVal::Nul) }
             match_next(env, &env.arg(0), 1, argc)
         }, Some(1), None);
 
-    g.borrow_mut().add_func("while",
+    func!(st, "while",
         |env: &mut Env, _argc: usize| {
             let test = env.arg(0);
             let f    = env.arg(1);
@@ -1205,37 +964,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(2), Some(2));
 
-    g.borrow_mut().add_func("fold",
-        |env: &mut Env, _argc: usize| {
-            let mut acc = env.arg(0);
-            let f       = env.arg(1);
-            let lst     = env.arg(2);
-
-            if let VVal::Lst(l) = lst {
-                for i in l.borrow_mut().iter() {
-                    env.push(acc.clone());
-                    env.push(i.clone());
-                    let rv = f.call_internal(env, 2);
-                    env.popn(2);
-
-                    match rv {
-                        Ok(v)                      => { acc = v;  },
-                        Err(StackAction::Break(v)) => { acc = v; break; },
-                        Err(StackAction::Next)     => { },
-                        Err(e)                     => { return Err(e); },
-                    }
-                }
-            } else {
-                return Ok(VVal::err_msg(
-                    &format!(
-                        "fold only works with lists as argument, got '{}'",
-                        lst.s())));
-            }
-
-            Ok(acc)
-        }, Some(3), Some(3));
-
-    g.borrow_mut().add_func("range",
+    func!(st, "range",
         |env: &mut Env, _argc: usize| {
             let from     = env.arg(0);
             let to       = env.arg(1);
@@ -1286,7 +1015,293 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(4), Some(4));
 
-    g.borrow_mut().add_func("displayln",
+    st
+}
+
+/// Returns a SymbolTable with all WLambda standard library language symbols.
+pub fn std_symbol_table() -> SymbolTable {
+    let mut st = SymbolTable::new();
+
+    func!(st, "neg",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Int(!env.arg(0).i()))
+        }, Some(1), Some(1));
+
+    func!(st, "uneg",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Int((!(env.arg(0).i() as u32)) as i64))
+        }, Some(1), Some(1));
+
+    func!(st, "push",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            v.push(env.arg(1).clone());
+            Ok(v.clone())
+        }, Some(2), Some(2));
+
+    func!(st, "pop",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            Ok(v.pop())
+        }, Some(1), Some(1));
+
+    func!(st, "take",
+        |env: &mut Env, _argc: usize| {
+            let cnt = env.arg(0).i() as usize;
+            let lst = env.arg(1);
+            if let VVal::Lst(l) = lst {
+                let svec : Vec<VVal> =
+                    l.borrow_mut().iter().take(cnt).cloned().collect();
+                Ok(VVal::vec_mv(svec))
+            } else {
+                Ok(VVal::err_msg(
+                    &format!(
+                        "drop only works with a list as second argument, got '{}'",
+                        lst.s())))
+            }
+        }, Some(2), Some(2));
+
+    func!(st, "drop",
+        |env: &mut Env, _argc: usize| {
+            let cnt = env.arg(0).i() as usize;
+            let lst = env.arg(1);
+            if let VVal::Lst(l) = lst {
+                let svec : Vec<VVal> =
+                    l.borrow_mut().iter().skip(cnt).cloned().collect();
+                Ok(VVal::vec_mv(svec))
+            } else {
+                Ok(VVal::err_msg(
+                    &format!(
+                        "drop only works with a list as second argument, got '{}'",
+                        lst.s())))
+            }
+        }, Some(2), Some(2));
+
+    func!(st, "str:len",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_len() as i64)) },
+        Some(1), Some(1));
+    func!(st, "str:to_lowercase",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_lowercase())) },
+        Some(1), Some(1));
+    func!(st, "str:to_uppercase",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_uppercase())) },
+        Some(1), Some(1));
+    func!(st, "str:padl",
+        |env: &mut Env, _argc: usize| {
+            let len = env.arg(0).i() as usize;
+            let pads = env.arg(1).s_raw();
+            let mut s = env.arg(2).s_raw();
+
+            while s.len() < len {
+                s = pads.to_string() + &s;
+            }
+
+            Ok(VVal::new_str_mv(s))
+        }, Some(3), Some(3));
+
+    func!(st, "str:padr",
+        |env: &mut Env, _argc: usize| {
+            let len = env.arg(0).i() as usize;
+            let pads = env.arg(1).s_raw();
+            let mut s = env.arg(2).s_raw();
+
+            while s.len() < len {
+                s += &pads;
+            }
+
+            Ok(VVal::new_str_mv(s))
+        }, Some(3), Some(3));
+    func!(st, "str:cat",
+        |env: &mut Env, argc: usize| {
+            let lst = env.arg(0);
+            if let VVal::Lst(l) = lst {
+                let svec : Vec<String> = l.borrow_mut().iter().map(|v| v.s_raw()).collect();
+                Ok(VVal::new_str_mv((&svec).concat()))
+
+            } else {
+                let mut s = String::from("");
+                for i in 0..argc {
+                    s += &env.arg(i).s_raw();
+                }
+                Ok(VVal::new_str_mv(s))
+            }
+        }, None, None);
+    func!(st, "str:join",
+        |env: &mut Env, _argc: usize| {
+            let sep = env.arg(0).s_raw();
+            let lst = env.arg(1);
+            if let VVal::Lst(l) = lst {
+                let svec : Vec<String> = l.borrow_mut().iter().map(|v| v.s_raw()).collect();
+                Ok(VVal::new_str_mv((&svec).join(&sep)))
+
+            } else {
+                Ok(VVal::err_msg(
+                    &format!(
+                        "str:join only works with lists as second argument, got '{}'",
+                        lst.s())))
+            }
+        }, Some(2), Some(2));
+    func!(st, "str:from_utf8_lossy",
+        |env: &mut Env, _argc: usize| {
+            let b = env.arg(0);
+            Ok(
+                if let VVal::Byt(u) = b {
+                    VVal::new_str_mv(String::from_utf8_lossy(&u.borrow()).to_string())
+                } else {
+                    VVal::Nul
+                })
+        }, Some(1), Some(1));
+    func!(st, "str:from_utf8",
+        |env: &mut Env, _argc: usize| {
+            let b = env.arg(0);
+            if let VVal::Byt(u) = b {
+                match String::from_utf8(u.borrow().to_vec()) {
+                    Ok(s) => Ok(VVal::new_str_mv(s)),
+                    Err(e) => {
+                        Ok(VVal::err_msg(
+                            &format!("str:from_utf8 decoding error: {}", e)))
+                    }
+                }
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, Some(1), Some(1));
+
+    func!(st, "str:to_bytes",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_byt(env.arg(0).s_raw().as_bytes().to_vec()))
+        }, Some(1), Some(1));
+
+    func!(st, "bytes:from_vec",
+        |env: &mut Env, _argc: usize| {
+            if let VVal::Lst(u) = env.arg(0) {
+                Ok(VVal::new_byt(u.borrow().iter().map(|v| v.i() as u8).collect()))
+
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, Some(1), Some(1));
+
+    func!(st, "bytes:to_vec",
+        |env: &mut Env, _argc: usize| {
+            if let VVal::Byt(u) = env.arg(0) {
+                Ok(VVal::vec_mv(
+                    u.borrow().iter().map(|u| VVal::Int(*u as i64))
+                        .collect()))
+
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, Some(1), Some(1));
+
+    func!(st, "bytes:from_hex",
+        |env: &mut Env, _argc: usize| {
+            let s = env.arg(0).s_raw();
+            let out : Vec<u8> = Vec::with_capacity((s.len() + 1) / 2);
+            Ok(VVal::new_byt(
+                s.chars()
+                 .map(|c|
+                     match c { '0'..='9' => ( 9 - (b'9' - (c as u8))) as i16,
+                               'a'..='f' => (15 - (b'f' - (c as u8))) as i16,
+                               'A'..='F' => (15 - (b'F' - (c as u8))) as i16,
+                               _ => -1 })
+                 .fold((256, out), |(last, mut out), c: i16|
+                     if c == -1 { (last, out) }
+                     else if last == 256 { (c, out) }
+                     else {
+                         out.push((((last << 4) | (c & 0x0F)) & 0xFF) as u8);
+                         (256, out)
+                     }).1))
+        }, Some(1), Some(1));
+
+    func!(st, "bytes:to_hex",
+        |env: &mut Env, argc: usize| {
+            static HEXCHARS : &'static [char] =
+                &['0', '1', '2', '3', '4', '5', '6', '7',
+                  '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+
+            if let VVal::Byt(u) = env.arg(0) {
+                let mut out : String = String::with_capacity(u.borrow().len() * 2);
+
+                if argc == 1 {
+                    for (a, b) in u.borrow().iter().map(|u|
+                                        (HEXCHARS[(u >> 4) as usize],
+                                         HEXCHARS[(u & 0x0F) as usize])) {
+                        out.push(a);
+                        out.push(b);
+                    }
+                } else {
+                    let group_len = env.arg(1).i();
+                    let group_sep =
+                        if env.arg(2).is_none() { String::from(" ") }
+                        else { env.arg(2).s_raw() };
+
+                    let mut len_counter = 0;
+                    for (a, b) in u.borrow().iter().map(|u|
+                                        (HEXCHARS[(u >> 4) as usize],
+                                         HEXCHARS[(u & 0x0F) as usize])) {
+                        if len_counter >= group_len { out.push_str(&group_sep); len_counter = 0; }
+                        out.push(a);
+                        len_counter += 1;
+                        if len_counter >= group_len { out.push_str(&group_sep); len_counter = 0; }
+                        out.push(b);
+                        len_counter += 1;
+                    }
+                }
+
+                Ok(VVal::new_str_mv(out))
+
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, Some(1), Some(3));
+
+    func!(st, "yay",
+        |env: &mut Env, _argc: usize| {
+            println!("YAAAAY {}", env.arg(0).s());
+            env.dump_stack();
+            Ok(VVal::Nul)
+        }, None, None);
+
+    func!(st, "to_drop",
+        |env: &mut Env, _argc: usize| {
+            let fun = env.arg(1);
+            let v   = env.arg(0);
+
+            Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
+        }, Some(2), Some(2));
+
+    func!(st, "fold",
+        |env: &mut Env, _argc: usize| {
+            let mut acc = env.arg(0);
+            let f       = env.arg(1);
+            let lst     = env.arg(2);
+
+            if let VVal::Lst(l) = lst {
+                for i in l.borrow_mut().iter() {
+                    env.push(acc.clone());
+                    env.push(i.clone());
+                    let rv = f.call_internal(env, 2);
+                    env.popn(2);
+
+                    match rv {
+                        Ok(v)                      => { acc = v;  },
+                        Err(StackAction::Break(v)) => { acc = v; break; },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { return Err(e); },
+                    }
+                }
+            } else {
+                return Ok(VVal::err_msg(
+                    &format!(
+                        "fold only works with lists as argument, got '{}'",
+                        lst.s())));
+            }
+
+            Ok(acc)
+        }, Some(3), Some(3));
+
+    func!(st, "displayln",
         |env: &mut Env, argc: usize| {
             for i in 0..argc {
                 if i == (argc - 1) {
@@ -1304,7 +1319,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, None, None);
 
-    g.borrow_mut().add_func("wl:dump_func",
+    func!(st, "dump_func",
         |env: &mut Env, _argc: usize| {
             if let VVal::Fun(f) = env.arg(0) {
                 return Ok(f.dump_upvals());
@@ -1312,7 +1327,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             Ok(VVal::Nul)
         }, Some(1), Some(1));
 
-    g.borrow_mut().add_func("wl:assert_eq",
+    func!(st, "assert_eq",
         |env: &mut Env, _argc: usize| {
             let a = env.arg(0);
             let b = env.arg(1);
@@ -1339,17 +1354,17 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }
         }, Some(2), Some(3));
 
-    g.borrow_mut().add_func("wl:set_ref",
+    func!(st, "set_ref",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).set_ref(env.arg(1).clone()))
         }, Some(2), Some(2));
 
-    g.borrow_mut().add_func("wl:weaken",
+    func!(st, "weaken",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).downgrade())
         }, Some(1), Some(1));
 
-    g.borrow_mut().add_func("wl:assert",
+    func!(st, "assert",
         |env: &mut Env, _argc: usize| {
             if !env.arg(0).b() {
                 if env.arg(1).is_none() {
@@ -1364,7 +1379,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
 
     if cfg!(feature="regex") {
         use regex::Regex;
-        g.borrow_mut().add_func("re:replace_all",
+        func!(st, "re:replace_all",
             |env: &mut Env, _argc: usize| {
                 let re   = env.arg(0).s_raw();
                 let f    = env.arg(1);
@@ -1412,7 +1427,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 Ok(ret_str)
             }, Some(3), Some(3));
 
-        g.borrow_mut().add_func("re:match",
+        func!(st, "re:match",
             |env: &mut Env, _argc: usize| {
                 let re   = env.arg(0).s_raw();
                 let text = env.arg(1).s_raw();
@@ -1447,7 +1462,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 }
             }, Some(3), Some(3));
 
-        g.borrow_mut().add_func("re:map",
+        func!(st, "re:map",
             |env: &mut Env, _argc: usize| {
                 let re   = env.arg(0).s_raw();
                 let f    = env.arg(1);
@@ -1487,7 +1502,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     }
 
     if cfg!(feature="chrono") {
-        g.borrow_mut().add_func("chrono:timestamp",
+        func!(st, "chrono:timestamp",
             |env: &mut Env, _argc: usize| {
                 use chrono::prelude::*;
                 let dt = Local::now();
@@ -1505,7 +1520,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     }
 
     if cfg!(feature="serde_json") {
-        g.borrow_mut().add_func("ser:json",
+        func!(st, "ser:json",
             |env: &mut Env, _argc: usize| {
                 let v = env.arg(0).clone();
                 let pp = env.arg(1).b();
@@ -1516,7 +1531,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 }
             }, Some(1), Some(2));
 
-        g.borrow_mut().add_func("deser:json",
+        func!(st, "deser:json",
             |env: &mut Env, _argc: usize| {
                 let s = env.arg(0).s_raw();
 
@@ -1528,7 +1543,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
     }
 
     if cfg!(feature="rmp-serde") {
-        g.borrow_mut().add_func("ser:msgpack",
+        func!(st, "ser:msgpack",
             |env: &mut Env, _argc: usize| {
                 let v = env.arg(0).clone();
                 match v.to_msgpack() {
@@ -1537,7 +1552,7 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
                 }
             }, Some(1), Some(1));
 
-        g.borrow_mut().add_func("deser:msgpack",
+        func!(st, "deser:msgpack",
             |env: &mut Env, _argc: usize| {
                 if let VVal::Byt(u) = env.arg(0) {
                     match VVal::from_msgpack(&u.borrow()[..]) {
@@ -1550,5 +1565,5 @@ pub fn create_wlamba_prelude() -> GlobalEnvRef {
             }, Some(1), Some(1));
     }
 
-    g
+    st
 }

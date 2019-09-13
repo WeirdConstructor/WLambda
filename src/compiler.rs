@@ -64,7 +64,24 @@ impl LocalFileModuleResolver {
     }
 }
 
-type SymbolTable = std::collections::HashMap<String, VVal>;
+pub type SymbolTable = std::collections::HashMap<String, VVal>;
+
+/// Helper function for building symbol tables.
+///
+///```
+/// let mut st = wlambda::compiler::SymbolTable::new();
+/// wlamdba::compiler::symtbl_func(
+///     &mut st, "nothing", |e: &mut Env| Ok(VVal::Nul), None, None);
+///```
+pub fn symtbl_func<T>(
+    st: &mut SymbolTable, fnname: &str, fun: T,
+    min_args: Option<usize>,
+    max_args: Option<usize>)
+    where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
+
+    st.insert(
+        String::from(fnname), VValFun::new_fun(fun, min_args, max_args));
+}
 
 impl ModuleResolver for LocalFileModuleResolver {
     fn resolve(&mut self, _global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError> {
@@ -93,7 +110,8 @@ impl ModuleResolver for LocalFileModuleResolver {
 #[derive(Clone)]
 pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
-    mem_modules: std::collections::HashMap<String, SymbolTable>,
+    mem_modules:
+        std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, SymbolTable>>>,
     resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
 }
 
@@ -163,7 +181,21 @@ impl GlobalEnv {
     /// via set_resolver().
     #[allow(dead_code)]
     pub fn set_module(&mut self, mod_name: &str, symtbl: SymbolTable) {
-        self.mem_modules.insert(mod_name.to_string(), symtbl);
+        self.mem_modules.borrow_mut().insert(mod_name.to_string(), symtbl);
+    }
+
+    /// Imports all symbols from the designated module with the specified
+    /// prefix applied. This does not call out to the resolver and
+    /// only works on previously `set_module` modules.
+    pub fn import_module_as(&mut self, mod_name: &str, prefix: &str) {
+        let prefix =
+            if !prefix.is_empty() { prefix.to_string() + ":" }
+            else { String::from("") };
+        if let Some(st) = self.mem_modules.borrow_mut().get(mod_name) {
+            for (k, v) in st {
+                self.env.insert(prefix.clone() + &k, v.clone());
+            }
+        }
     }
 
     /// Sets the module resolver. There is a LocalFileModuleResolver available
@@ -194,7 +226,9 @@ impl GlobalEnv {
     pub fn new() -> GlobalEnvRef {
         Rc::new(RefCell::new(GlobalEnv {
             env: std::collections::HashMap::new(),
-            mem_modules: std::collections::HashMap::new(),
+            mem_modules:
+                std::rc::Rc::new(std::cell::RefCell::new(
+                    std::collections::HashMap::new())),
             resolver: None,
         }))
     }
@@ -209,20 +243,28 @@ impl GlobalEnv {
     /// - `set_module("wlambda", wlambda::prelude::core_symbol_table())`
     /// - `set_module("std",     wlambda::prelude::std_symbol_table())`
     /// - `set_resolver(Rc::new(RefCell::new(wlambda::compiler::LocalFileModuleResolver::new()))`
-    /// - `import_module("wlambda", "")`
-    /// - `import_module("std", "std")`
+    /// - `import_module_as("wlambda", "")`
+    /// - `import_module_as("std", "std")`
     ///
     /// On top of that, the `WLambda` module has been imported without a prefix
     /// and the `std` module has been loaded with an `std:` prefix.
     /// This means you can load and eval scripts you see all over this documentation.
     pub fn new_default() -> GlobalEnvRef {
-        create_wlamba_prelude()
+        let g = Self::new_empty_default();
+        g.borrow_mut().import_module_as("wlambda", "");
+        g.borrow_mut().import_module_as("std",     "std");
+        g
     }
 
     /// This is like `new_default` but does not import anything, neither the
     /// core language nor the std module.
     pub fn new_empty_default() -> GlobalEnvRef {
-        create_wlamba_prelude()
+        let g = GlobalEnv::new();
+        g.borrow_mut().set_module("wlambda", core_symbol_table());
+        g.borrow_mut().set_module("std",     std_symbol_table());
+        g.borrow_mut().set_resolver(
+            Rc::new(RefCell::new(LocalFileModuleResolver::new())));
+        g
     }
 }
 
@@ -297,7 +339,7 @@ impl EvalContext {
                 self.global.clone(),
                 self.local.borrow().get_user());
 
-        self.global.borrow_mut().add_func("wl:eval", move |env: &mut Env, _argc: usize| {
+        self.global.borrow_mut().add_func("std:eval", move |env: &mut Env, _argc: usize| {
             let code    = env.arg(0).s_raw();
             let ctx     = ctx_clone.clone();
             let mut ctx = ctx.register_self_eval();
@@ -1057,10 +1099,14 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                    else { prefix.s_raw() + ":" };
 
                     let glob_ref = ce.borrow_mut().global.clone();
-                    if let Some(stbl) = glob_ref.borrow().mem_modules.get(&name.s_raw()) {
-                        for (k, v) in stbl {
-                            glob_ref.borrow_mut().env.insert(
-                                s_prefix.clone() + &k, v.clone());
+                    {
+                        let mut gr = glob_ref.borrow_mut();
+                        let mm = gr.mem_modules.clone();
+                        let e  = &mut gr.env;
+                        if let Some(stbl) = mm.get(&name.s_raw()) {
+                            for (k, v) in stbl {
+                                e.insert(s_prefix.clone() + &k, v.clone());
+                            }
                         }
                     }
 
@@ -1543,9 +1589,9 @@ mod tests {
     #[test]
     fn check_push() {
         assert_eq!(s_eval("!a = 10; !x = $[1]; !y = 20; x"), "$[1]");
-        assert_eq!(s_eval("!x = $&&$[]; push $*x 12; $*x"), "$[12]");
-        assert_eq!(s_eval("!a = 10; !x = $[]; !y = 20; push x 10; push x 30; x"), "$[10,30]");
-        assert_eq!(s_eval("!x = $&&$[]; push $*x 10; push $*x 20; $*x"), "$[10,20]");
+        assert_eq!(s_eval("!x = $&&$[]; std:push $*x 12; $*x"), "$[12]");
+        assert_eq!(s_eval("!a = 10; !x = $[]; !y = 20; std:push x 10; std:push x 30; x"), "$[10,30]");
+        assert_eq!(s_eval("!x = $&&$[]; std:push $*x 10; std:push $*x 20; $*x"), "$[10,20]");
     }
 
     #[test]
@@ -1616,7 +1662,7 @@ mod tests {
         assert_eq!(s_eval("!x = $&1; { !d = { .x = 2; }; d }[][]; $*x"), "2");
         assert_eq!(s_eval(r#"
             !x = $&0;
-            { !d = to_drop 10 {|| .x = 17; } }[];
+            { !d = std:to_drop 10 {|| .x = 17; } }[];
             $*x
         "#),
         "17");
@@ -1712,10 +1758,10 @@ mod tests {
         assert_eq!(s_eval("4.4 % 5.5"),   "4.4");
         assert_eq!(s_eval("5.5 % 5.5"),   "0");
 
-        assert_eq!(s_eval("neg 0xFF"),    "-256");
-        assert_eq!(s_eval("uneg 0xFF"),   "4294967040");
-        assert_eq!(s_eval("uneg 0x1"),    "4294967294");
-        assert_eq!(s_eval("uneg 0x0"),    "4294967295");
+        assert_eq!(s_eval("std:neg 0xFF"),    "-256");
+        assert_eq!(s_eval("std:uneg 0xFF"),   "4294967040");
+        assert_eq!(s_eval("std:uneg 0x1"),    "4294967294");
+        assert_eq!(s_eval("std:uneg 0x0"),    "4294967295");
 
         assert_eq!(s_eval("(0x10 &| 0x01) == 0x11"), "$true");
         assert_eq!(s_eval("(0x0f &  0x33) == 0x3"),  "$true");
@@ -1730,7 +1776,7 @@ mod tests {
         assert_eq!(s_eval("!x = $&0; !b = { 12 }[] &or { .x = 1; 10 }[]; $[$*x, b]"),  "$[0,12]");
         assert_eq!(s_eval(r#"
             !x = $&0;
-            !f = { yay[x]; .x = x + 1; x };
+            !f = { std:displayln[x]; .x = x + 1; x };
             !b = f[]
                 &and f[]
                 &and f[]
@@ -1786,7 +1832,7 @@ mod tests {
         assert_eq!(s_eval(r#"
             !fun = {
                 !(a, b) = $[$&10, $&20];
-                !(wa, wb) = $[wl:weaken a, wl:weaken b];
+                !(wa, wb) = $[std:weaken a, std:weaken b];
                 $[{$[wa, wb]}, { .wa = 33; }];
             }[];
             (1 fun)[];
@@ -1854,7 +1900,7 @@ mod tests {
         assert_eq!(s_eval("match $q xx :?s :yx :xx  {|| 16 }"),    "16");
         assert_eq!(s_eval("match $q zx :?s :yx :xx  {|| 16 } {|| 17 }"), "17");
         assert_eq!(s_eval("match $q xx :?p { _ == $q|xx| } {|| 18 }"),    "18");
-        assert_eq!(s_eval("match $q x9 :?p { yay _; _ == $q|xx| } {|| 181 } {|| 19 }"), "19");
+        assert_eq!(s_eval("match $q x9 :?p { _ == $q|xx| } {|| 181 } {|| 19 }"), "19");
         assert_eq!(s_eval("match 10"),                           "$n");
         assert_eq!(s_eval("
             match ($e $[:foo, 1, 2, 3])
@@ -1943,7 +1989,6 @@ mod tests {
         assert_eq!(s_eval("!g = { _1 }; g :x 10"), "10");
         assert_eq!(s_eval("block {
             !x = { block :x { return :x 13; 20 } }[];
-            yay x;
             .x = x + 12;
             x
         }"), "25");
@@ -2054,9 +2099,9 @@ mod tests {
         assert_eq!(s_eval("sym \"foo\""),       ":\"foo\"");
         assert_eq!(s_eval("sym 10.4"),          ":\"10.4\"");
         assert_eq!(s_eval("(bool $e :fail) { 10 } { 20 }"), "20");
-        assert_eq!(s_eval("fold 1 { _ + _1 } $[1,2,3,4]"), "11");
-        assert_eq!(s_eval("take 2 $[1,2,3,4,5,6]"), "$[1,2]");
-        assert_eq!(s_eval("drop 2 $[1,2,3,4,5,6]"), "$[3,4,5,6]");
+        assert_eq!(s_eval("std:fold 1 { _ + _1 } $[1,2,3,4]"), "11");
+        assert_eq!(s_eval("std:take 2 $[1,2,3,4,5,6]"), "$[1,2]");
+        assert_eq!(s_eval("std:drop 2 $[1,2,3,4,5,6]"), "$[3,4,5,6]");
     }
 
     #[test]
@@ -2074,13 +2119,13 @@ mod tests {
             !ext_add = o.add;
             !ext_get = o.get;
             o.set 10;
-            push v o.add[];
-            push v o.get[];
-            push v ext_add[];
-            push v ext_get[];
+            std:push v o.add[];
+            std:push v o.get[];
+            std:push v ext_add[];
+            std:push v ext_get[];
             .o = $n;
-            push v ext_add[];
-            push v ext_get[];
+            std:push v ext_add[];
+            std:push v ext_get[];
             v
         "#),
         "$[20,\"map\",20,\"map\",10,\"none\"]");
@@ -2119,78 +2164,86 @@ mod tests {
         assert_eq!(s_eval("len $[1,2,3]"),       "3");
         assert_eq!(s_eval("len ${a=1,b=20}"),    "2");
         assert_eq!(s_eval("len ${}"),            "0");
-        assert_eq!(s_eval("str:len ${}"),        "3");
+        assert_eq!(s_eval("std:str:len ${}"),        "3");
         assert_eq!(s_eval("len $q abcdef "),     "6");
         assert_eq!(s_eval("len $q abcüdef "),    "8");
-        assert_eq!(s_eval("str:len $q abcüdef "),"7");
+        assert_eq!(s_eval("std:str:len $q abcüdef "),"7");
         assert_eq!(s_eval("len $Q abcdef "),     "6");
         assert_eq!(s_eval("len $Q abcüdef "),    "8");
-        assert_eq!(s_eval("str:len $Q abcüdef "),"8");
+        assert_eq!(s_eval("std:str:len $Q abcüdef "),"8");
     }
 
     #[test]
     fn check_lst_map() {
-        assert_eq!(s_eval("$[12,1,30] \\_ * 2"),        "$[24,2,60]");
-        assert_eq!(s_eval("$[12,1,304] str:len"),       "$[2,1,3]");
-        assert_eq!(s_eval("$[123,22,4304] str:len"),    "$[3,2,4]");
-        assert_eq!(s_eval("$[123,22,4304] str:len | fold 1 \\_ * _1"), "24");
+        assert_eq!(s_eval("$[12,1,30] \\_ * 2"),            "$[24,2,60]");
+        assert_eq!(s_eval("$[12,1,304] std:str:len"),       "$[2,1,3]");
+        assert_eq!(s_eval("$[123,22,4304] std:str:len"),    "$[3,2,4]");
+        assert_eq!(s_eval("$[123,22,4304] std:str:len | std:fold 1 \\_ * _1"), "24");
     }
 
     #[test]
     fn check_prelude_assert() {
-        assert_eq!(s_eval("wl:assert ~ (type \"2019\".(int)) == $q int "), "$true");
+        assert_eq!(s_eval("std:assert ~ (type \"2019\".(int)) == $q int "), "$true");
     }
 
     #[test]
     fn check_prelude_str() {
-        assert_eq!(s_eval("str:to_uppercase $q foo "), "\"FOO\"");
-        assert_eq!(s_eval("str:to_lowercase $q FOO "), "\"foo\"");
-        assert_eq!(s_eval("str:join \",\" $[1,2,3,${a=:x}]"), "\"1,2,3,${a=:\\\"x\\\"}\"");
-        assert_eq!(s_eval("str:cat $[1,2,3,${a=:x}]"), "\"123${a=:\\\"x\\\"}\"");
+        assert_eq!(s_eval("std:str:to_uppercase $q foo "), "\"FOO\"");
+        assert_eq!(s_eval("std:str:to_lowercase $q FOO "), "\"foo\"");
+        assert_eq!(s_eval("std:str:join \",\" $[1,2,3,${a=:x}]"), "\"1,2,3,${a=:\\\"x\\\"}\"");
+        assert_eq!(s_eval("std:str:cat $[1,2,3,${a=:x}]"), "\"123${a=:\\\"x\\\"}\"");
     }
 
     #[test]
     fn check_prelude_chrono() {
         if cfg!(feature="chrono") {
-            assert_eq!(s_eval("chrono:timestamp $q$%Y$ | int"), "2019");
+            assert_eq!(s_eval("std:chrono:timestamp $q$%Y$ | int"), "2019");
         }
     }
 
     #[test]
     fn check_prelude_regex() {
         if cfg!(feature="regex") {
-            assert_eq!(s_eval("$q$fofoaaaaofefoeaafefeoaaaa$ | re:map $q{(a+)} { _.1 } | str:join $q$,$"),
+            assert_eq!(s_eval("$q$fofoaaaaofefoeaafefeoaaaa$ | std:re:map $q{(a+)} { _.1 } | std:str:join $q$,$"),
                        "\"aaaa,aa,aaaa\"");
             assert_eq!(s_eval("
                 $q$fofoaaaofefoeaaaaafefeoaaaaaaa$
-                | re:map $q{(a+)} { str:len _.1 }
-                | fold 1 \\_ * _1"),
+                | std:re:map $q{(a+)} { std:str:len _.1 }
+                | std:fold 1 \\_ * _1"),
                 "105");
 
-            assert_eq!(s_eval_no_panic("
-                re:replace_all $q/ar/ { \"mak\" } $q/foobarbarfoobararar/
-            "),
-            "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[2:39/0] expects at most 0 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 2, col: 32, file: 0 }]))\"");
             assert_eq!(s_eval("
-                re:replace_all $q/a+r/ { str:cat \"mak\" ~ str:len _.0 } $q/foobarbaaaarfoobaararar/
+                !x = $&$n;
+                std:re:match $q/(a)\\s+(b)/ $q$a     b$ {
+                    .x = @;
+                };
+                $*x"),
+                "$[$[\"a     b\",\"a\",\"b\"]]");
+
+            assert_eq!(s_eval_no_panic("
+                std:re:replace_all $q/ar/ { \"mak\" } $q/foobarbarfoobararar/
+            "),
+            "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[2:43/0] expects at most 0 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 2, col: 36, file: 0 }]))\"");
+            assert_eq!(s_eval("
+                std:re:replace_all $q/a+r/ { std:str:cat \"mak\" ~ std:str:len _.0 } $q/foobarbaaaarfoobaararar/
             "),
             "\"foobmak2bmak5foobmak3mak2mak2\"");
             assert_eq!(s_eval("
-                re:replace_all $q/a+r/
+                std:re:replace_all $q/a+r/
                     {
-                        (str:len[_.0] == 3) {
+                        (std:str:len[_.0] == 3) {
                             break \"XX\"
                         };
-                        (str:cat \"<\" _.0 \">\")
+                        (std:str:cat \"<\" _.0 \">\")
                     }
                     $q/foobarbaaaarfoobaararar/
             "),
             "\"foob<ar>b<aaaar>foobXXarar\"");
             assert_eq!(s_eval("
-                re:replace_all $q/a+r/
+                std:re:replace_all $q/a+r/
                     {
-                        (str:len[_.0] == 3) { next[] };
-                        (str:cat \"<\" _.0 \">\")
+                        (std:str:len[_.0] == 3) { next[] };
+                        (std:str:cat \"<\" _.0 \">\")
                     }
                     $q/foobarbaaaarfoobaararar/
             "),
@@ -2201,21 +2254,21 @@ mod tests {
     #[test]
     fn check_json() {
         if cfg!(feature="serde_json") {
-            assert_eq!(s_eval("ser:json $[1,1.2,$f,$t,$n,${a=1}]"), "\"[\\n  1,\\n  1.2,\\n  false,\\n  true,\\n  null,\\n  {\\n    \\\"a\\\": 1\\n  }\\n]\"");
-            assert_eq!(s_eval("ser:json $[1,1.2,$f,$t,$n,${a=1}] $t"), "\"[1,1.2,false,true,null,{\\\"a\\\":1}]\"");
-            assert_eq!(s_eval("deser:json $q$[1,2.3,true,null,{\"a\":10}]$"), "$[1,2.3,$true,$n,${a=10}]");
+            assert_eq!(s_eval("std:ser:json $[1,1.2,$f,$t,$n,${a=1}]"), "\"[\\n  1,\\n  1.2,\\n  false,\\n  true,\\n  null,\\n  {\\n    \\\"a\\\": 1\\n  }\\n]\"");
+            assert_eq!(s_eval("std:ser:json $[1,1.2,$f,$t,$n,${a=1}] $t"), "\"[1,1.2,false,true,null,{\\\"a\\\":1}]\"");
+            assert_eq!(s_eval("std:deser:json $q$[1,2.3,true,null,{\"a\":10}]$"), "$[1,2.3,$true,$n,${a=10}]");
         }
     }
 
     #[test]
     fn check_msgpack() {
         if cfg!(feature="rmp-serde") {
-            assert_eq!(s_eval("deser:msgpack ~ ser:msgpack $[1,1.2,$f,$t,$n,${a=1},\"abcä\",$b\"abcä\"]"),
+            assert_eq!(s_eval("std:deser:msgpack ~ std:ser:msgpack $[1,1.2,$f,$t,$n,${a=1},\"abcä\",$b\"abcä\"]"),
                        "$[1,1.2,$false,$true,$n,${a=1},\"abcä\",$b\"abc\\xC3\\xA4\"]");
-            assert_eq!(s_eval("ser:msgpack $b\"abc\""), "$b\"\\xC4\\x03abc\"");
-            assert_eq!(s_eval("ser:msgpack $[1,$n,16.22]"), "$b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\"");
-            assert_eq!(s_eval("deser:msgpack $b\"\\xC4\\x03abc\""), "$b\"abc\"");
-            assert_eq!(s_eval("deser:msgpack $b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\""), "$[1,$n,16.22]");
+            assert_eq!(s_eval("std:ser:msgpack $b\"abc\""), "$b\"\\xC4\\x03abc\"");
+            assert_eq!(s_eval("std:ser:msgpack $[1,$n,16.22]"), "$b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\"");
+            assert_eq!(s_eval("std:deser:msgpack $b\"\\xC4\\x03abc\""), "$b\"abc\"");
+            assert_eq!(s_eval("std:deser:msgpack $b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\""), "$[1,$n,16.22]");
         }
     }
 
@@ -2223,12 +2276,12 @@ mod tests {
     fn check_eval() {
         let mut ctx = EvalContext::new_default();
 
-        assert_eq!(ctx.eval("wl:eval $q$1 + 2$").unwrap().s(), "3");
+        assert_eq!(ctx.eval("std:eval $q$1 + 2$").unwrap().s(), "3");
 
         ctx.set_global_var("XXX", &VVal::Int(1337));
-        assert_eq!(ctx.eval("wl:eval $q$XXX + 2$").unwrap().s(), "1339");
+        assert_eq!(ctx.eval("std:eval $q$XXX + 2$").unwrap().s(), "1339");
 
-        assert_eq!(ctx.eval("wl:eval $q/wl:eval $q$XXX + 2$/").unwrap().s(), "1339");
+        assert_eq!(ctx.eval("std:eval $q/std:eval $q$XXX + 2$/").unwrap().s(), "1339");
     }
 
     #[test]
@@ -2285,35 +2338,35 @@ mod tests {
 
     #[test]
     fn check_bytes_impl() {
-        assert_eq!(s_eval("ser:json $b\"abc\""),                         "\"[\\n  97,\\n  98,\\n  99\\n]\"", "JSON serializer for bytes ok");
+        assert_eq!(s_eval("std:ser:json $b\"abc\""),                         "\"[\\n  97,\\n  98,\\n  99\\n]\"", "JSON serializer for bytes ok");
         assert_eq!(s_eval("str $b\"abc\""),                              "\"abc\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
         assert_eq!(s_eval("str $b\"äbcß\""),                             "\"Ã¤bcÃ\\u{9f}\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
-        assert_eq!(s_eval("str:from_utf8 $b\"äbcß\""),                   "\"äbcß\"", "Bytes to String from UTF8");
-        assert_eq!(s_eval("str:from_utf8 $b\"\\xC4\\xC3\""),             "$e \"str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0\"", "Bytes to String from invalid UTF8");
-        assert_eq!(s_eval("str:from_utf8_lossy $b\"\\xC4\\xC3\""),       "\"��\"", "Bytes to String from invalid UTF8 lossy");
-        assert_eq!(s_eval("str:to_bytes \"aäß\""),                       "$b\"a\\xC3\\xA4\\xC3\\x9F\"", "Bytes from String as UTF8");
-        assert_eq!(s_eval("str:from_utf8 ~ str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
+        assert_eq!(s_eval("std:str:from_utf8 $b\"äbcß\""),                   "\"äbcß\"", "Bytes to String from UTF8");
+        assert_eq!(s_eval("std:str:from_utf8 $b\"\\xC4\\xC3\""),             "$e \"str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0\"", "Bytes to String from invalid UTF8");
+        assert_eq!(s_eval("std:str:from_utf8_lossy $b\"\\xC4\\xC3\""),       "\"��\"", "Bytes to String from invalid UTF8 lossy");
+        assert_eq!(s_eval("std:str:to_bytes \"aäß\""),                       "$b\"a\\xC3\\xA4\\xC3\\x9F\"", "Bytes from String as UTF8");
+        assert_eq!(s_eval("std:str:from_utf8 ~ std:str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
         assert_eq!(s_eval("$b\"abc\" 1"),                                "$b\"b\"", "Get single byte from bytes");
         assert_eq!(s_eval("$b\"abcdef\" 0 2"),                           "$b\"ab\"", "Substring bytes operation");
         assert_eq!(s_eval("$b\"abcdef\" 3 3"),                           "$b\"def\"", "Substring bytes operation");
         assert_eq!(s_eval("$b\"abcdef\" $[3, 3]"),                       "$b\"def\"", "Substring bytes operation");
         assert_eq!(s_eval("$b\"abcdef\" $[3]"),                          "$b\"def\"", "Substring bytes operation");
         assert_eq!(s_eval("$b\"abcdef\" ${abcdef = 10}"),                "10", "Bytes as map key");
-        assert_eq!(s_eval("bytes:to_vec $b\"abcdef\""),                  "$[97,98,99,100,101,102]", "bytes:to_vec");
-        assert_eq!(s_eval("bytes:from_vec ~ bytes:to_vec $b\"abcdef\""), "$b\"abcdef\"", "bytes:from_vec");
-        assert_eq!(s_eval("bytes:from_vec $[]"),                         "$b\"\"", "bytes:from_vec");
-        assert_eq!(s_eval("bytes:from_vec $[1,2,3]"),                    "$b\"\\x01\\x02\\x03\"", "bytes:from_vec");
+        assert_eq!(s_eval("std:bytes:to_vec $b\"abcdef\""),                  "$[97,98,99,100,101,102]", "bytes:to_vec");
+        assert_eq!(s_eval("std:bytes:from_vec ~ std:bytes:to_vec $b\"abcdef\""), "$b\"abcdef\"", "bytes:from_vec");
+        assert_eq!(s_eval("std:bytes:from_vec $[]"),                         "$b\"\"", "bytes:from_vec");
+        assert_eq!(s_eval("std:bytes:from_vec $[1,2,3]"),                    "$b\"\\x01\\x02\\x03\"", "bytes:from_vec");
 
-        assert_eq!(s_eval("bytes:to_hex $b\"abc\\xFF\""),                  "\"616263FF\"");
-        assert_eq!(s_eval("bytes:to_hex $b\"abc\\xFF\" 6"),                "\"616263 FF\"");
-        assert_eq!(s_eval("bytes:to_hex $b\"abc\\xFF\" 6 \":\""),          "\"616263:FF\"");
-        assert_eq!(s_eval("bytes:to_hex $b\"abc\\xFF\" 1 \":\""),          "\"6:1:6:2:6:3:F:F\"");
+        assert_eq!(s_eval("std:bytes:to_hex $b\"abc\\xFF\""),                  "\"616263FF\"");
+        assert_eq!(s_eval("std:bytes:to_hex $b\"abc\\xFF\" 6"),                "\"616263 FF\"");
+        assert_eq!(s_eval("std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""),          "\"616263:FF\"");
+        assert_eq!(s_eval("std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""),          "\"6:1:6:2:6:3:F:F\"");
 
-        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\""),         "$b\"abc\\xFF\"");
-        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\" 6"),       "$b\"abc\\xFF\"");
-        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\" 6 \":\""), "$b\"abc\\xFF\"");
-        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"abc\\xFF\" 1 \":\""), "$b\"abc\\xFF\"");
-        assert_eq!(s_eval("bytes:from_hex ~ bytes:to_hex $b\"\\x00abc\\xFF\" 1 \":\""), "$b\"\\0abc\\xFF\"");
+        assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\""),         "$b\"abc\\xFF\"");
+        assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6"),       "$b\"abc\\xFF\"");
+        assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""), "$b\"abc\\xFF\"");
+        assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""), "$b\"abc\\xFF\"");
+        assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"\\x00abc\\xFF\" 1 \":\""), "$b\"\\0abc\\xFF\"");
     }
 
     #[test]
@@ -2330,27 +2383,27 @@ mod tests {
             "#), "$[$&&33,$&&34]");
         assert_eq!(s_eval(r#"
                 !(x, y) = $[$&&1, $&&2];
-                !z = wl:weaken y;
+                !z = std:weaken y;
                 !f = { .*x = $*x + 1; .*z = $*z + 2; $[x, z] };
                 !r = $[];
-                push r ~ str f[];
+                std:push r ~ str f[];
                 .x = $n;
                 .y = $n;
-                push r ~ str f[];
+                std:push r ~ str f[];
                 $[r, z]
             "#), "$[$[\"$[$&&2,$(&)4]\",\"$[$&&3,$n]\"],$n]");
         assert_eq!(s_eval(r#"
             !self = $&&${};
-            !wself = wl:weaken self;
+            !wself = std:weaken self;
             self.x = { wself.g = 10; wself.g };
             self.y = { wself.g * 10 };
             !r = $[];
-            push r self.x[];
-            push r self.y[];
+            std:push r self.x[];
+            std:push r self.y[];
             !f = self.y;
             .self = $n;
-            push r f[];
-            push r wself;
+            std:push r f[];
+            std:push r wself;
             r
         "#), "$[10,100,0,$n]");
     }

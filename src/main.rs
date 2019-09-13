@@ -8,20 +8,18 @@ mod prelude;
 
 use vval::Env;
 use vval::VVal;
-use crate::prelude::create_wlamba_prelude;
+use crate::compiler::{GlobalEnv, EvalContext};
 
 fn main() {
-    let global = create_wlamba_prelude();
+    let global = GlobalEnv::new_default();
     global.borrow_mut().add_func(
         "dump_stack",
         move |env: &mut Env, _argc: usize| {
             env.dump_stack();
             Ok(VVal::Nul)
         }, Some(0), Some(0));
-    let lfmr = std::rc::Rc::new(std::cell::RefCell::new(compiler::LocalFileModuleResolver::new()));
-    global.borrow_mut().set_resolver(lfmr);
 
-    let mut ctx = compiler::EvalContext::new(global);
+    let mut ctx = EvalContext::new(global);
 
     let mut rl = rustyline::Editor::<()>::new();
     if rl.load_history("wlambda.history").is_ok() {
