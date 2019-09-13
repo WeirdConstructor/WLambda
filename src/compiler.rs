@@ -1103,7 +1103,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let mut gr = glob_ref.borrow_mut();
                         let mm = gr.mem_modules.clone();
                         let e  = &mut gr.env;
-                        if let Some(stbl) = mm.get(&name.s_raw()) {
+                        let hm = &gr.borrow();
+                        if let Some(stbl) = hm.get(&name.s_raw()) {
                             for (k, v) in stbl {
                                 e.insert(s_prefix.clone() + &k, v.clone());
                             }
