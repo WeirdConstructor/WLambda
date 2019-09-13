@@ -512,7 +512,7 @@ Serializes the _data_ and returns a JSON formatted (and pretty printed) string.
 Optionally not pretty printed if _no_pretty_ is a true value.
 
 ```wlambda
-!str = ser:json $[1,2.3,${a=4}] $t;
+!str = std:ser:json $[1,2.3,${a=4}] $t;
 std:assert_eq str "[1,2.3,{\"a\":4}]";
 ```
 
@@ -521,7 +521,7 @@ std:assert_eq str "[1,2.3,{\"a\":4}]";
 Deserializes the JSON formatted _string_ into a data structure.
 
 ```wlambda
-!data = deser:json ~ ser:json $[1,2.3,${a=4}];
+!data = std:deser:json ~ std:ser:json $[1,2.3,${a=4}];
 std:assert_eq data.0 1;
 std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
@@ -532,7 +532,7 @@ std:assert_eq data.(2).a 4;
 Serializes the _data_ and returns a msgpack bytes value.
 
 ```wlambda
-    std:assert_eq (ser:msgpack $b"abc") $b"\xC4\x03abc";
+    std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
 #### deser:msgpack _bytes_
@@ -540,7 +540,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 Deserializes the msgpack bytes value into a data structure.
 
 ```wlambda
-    std:assert_eq (deser:msgpack $b"\xC4\x03abc") $b"abc";
+    std:assert_eq (std:deser:msgpack $b"\xC4\x03abc") $b"abc";
 ```
 
 ### regex
@@ -558,7 +558,7 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 std:displayln :XXXX ~ (year_str | int) == 2019;
 std:assert ~ (year_str | int) == 2019;
 
-!now_str = chrono:timestamp[];
+!now_str = std:chrono:timestamp[];
 ```
 
 */
@@ -569,14 +569,13 @@ use std::rc::Rc;
 
 macro_rules! func {
     ($g: ident, $name: expr, $cb: expr, $min: expr, $max: expr) => {
-        symtbl_func(&mut $g, $name, $cb, $min, $max);
+        $g.fun($name, $cb, $min, $max);
     }
 }
 
 macro_rules! add_func {
     ($g: ident, $op: tt, $env: ident, $argc: ident, $b: block, $min: expr, $max: expr) => {
-        symtbl_func(
-            &mut $g, stringify!($op), |$env: &mut Env, $argc: usize| $b, $min, $max);
+        $g.fun(stringify!($op), |$env: &mut Env, $argc: usize| $b, $min, $max);
     }
 }
 
@@ -1038,6 +1037,62 @@ pub fn std_symbol_table() -> SymbolTable {
             v.push(env.arg(1).clone());
             Ok(v.clone())
         }, Some(2), Some(2));
+
+    func!(st, "prepend",
+        |env: &mut Env, argc: usize| {
+            let v = env.arg(0);
+            let mut v =
+                if v.is_vec() { v }
+                else {
+                    let r = VVal::vec();
+                    r.push(v);
+                    r
+                };
+
+            if let VVal::Lst(l) = &mut v {
+                let mut o = l.borrow_mut();
+                for i in 1..argc {
+                    match env.arg(i) {
+                        VVal::Lst(b) => {
+                            for item in b.borrow().iter() {
+                                o.insert(0, item.clone());
+                            }
+                        },
+                        item => { o.insert(0, item.clone()); }
+                    }
+                }
+            }
+
+            Ok(v)
+        }, Some(1), None);
+
+    func!(st, "append",
+        |env: &mut Env, argc: usize| {
+            let v = env.arg(0);
+            let mut v =
+                if v.is_vec() { v }
+                else {
+                    let r = VVal::vec();
+                    r.push(v);
+                    r
+                };
+
+            if let VVal::Lst(l) = &mut v {
+                let mut o = l.borrow_mut();
+                for i in 1..argc {
+                    match env.arg(i) {
+                        VVal::Lst(b) => {
+                            for item in b.borrow().iter() {
+                                o.push(item.clone());
+                            }
+                        },
+                        item => { o.push(item.clone()); }
+                    }
+                }
+            }
+
+            Ok(v)
+        }, Some(1), None);
 
     func!(st, "pop",
         |env: &mut Env, _argc: usize| {

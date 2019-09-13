@@ -145,14 +145,12 @@ impl Env {
     /// then later executed.
     ///
     /// ```
-    /// use wlambda::prelude::create_wlamba_prelude;
-    /// use wlambda::vval::VVal;
+    /// use wlambda::{VVal, EvalContext, GlobalEnv};
     /// use wlambda::vval::Env;
-    /// use wlambda::compiler::EvalContext;
     /// use std::rc::Rc;
     /// use std::cell::RefCell;
     ///
-    /// let global = create_wlamba_prelude();
+    /// let global = GlobalEnv::new_default();
     ///
     /// global.borrow_mut().add_func("reg", |env: &mut Env, _argc: usize| {
     ///     let fun = env.arg(0);
@@ -467,8 +465,7 @@ impl VValFun {
 /// use std::rc::Rc;
 /// use std::cell::RefCell;
 /// use wlambda::vval::Env;
-/// use wlambda::vval::VVal;
-/// let global_env = wlambda::prelude::create_wlamba_prelude();
+/// use wlambda::{VVal, GlobalEnv};
 ///
 /// #[derive(Clone, Debug)]
 /// struct MyType {
@@ -484,6 +481,7 @@ impl VValFun {
 ///     }
 /// }
 ///
+/// let global_env = GlobalEnv::new_default();
 /// global_env.borrow_mut().add_func(
 ///     "new_mytype",
 ///     |_env: &mut Env, _argc: usize| {
@@ -1392,7 +1390,21 @@ impl VVal {
             VVal::Lst(l)     => VVal::dump_vec_as_str(l),
             VVal::Map(l)     => VVal::dump_map_as_str(l), // VVal::dump_map_as_str(l),
             VVal::Usr(u)     => u.s(),
-            VVal::Fun(_)     => "&VValFun".to_string(),
+            VVal::Fun(f)     => {
+                let min = if f.min_args.is_none() { "any".to_string() }
+                          else { format!("{}", f.min_args.unwrap()) };
+                let max = if f.max_args.is_none() { "any".to_string() }
+                          else { format!("{}", f.max_args.unwrap()) };
+                let upvalues : String = f.upvalues.iter().map(|v| v.s()).collect::<Vec<String>>().join(",");
+                if let Some(ref sp) = f.syn_pos {
+                    format!("&F{{@[{}:{}/{}],amin={},amax={},locals={},upvalues=$[{}]}}",
+                            sp.line, sp.col, sp.file,
+                            min, max, f.local_size, upvalues)
+                } else {
+                    format!("&F{{@[0:0/],amin={},amax={},locals={},upvalues=$[{}]}}",
+                            min, max, f.local_size, upvalues)
+                }
+            },
             VVal::DropFun(f) => f.v.s(),
             VVal::Ref(l)     => format!("$&&{}", (*l).borrow().s()),
             VVal::CRef(l)    => format!("$&{}", (*l).borrow().s()),

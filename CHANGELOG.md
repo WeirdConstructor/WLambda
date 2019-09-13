@@ -5,6 +5,13 @@
 * Bugfix: Errors weren't properly propagated by the threads::MsgHandle.
 * Change: Error reporting for arity mismatch contains the position of the
 function definition and the position of the call site.
+* Incompatible Change: Removed create_wlamba_prelude() and added proper
+module support instead. Splitted up the prelude into a core part and the
+standard library utility functions. With `!@wlambda` you can import the core
+language globals. With `!@import std std` you import the standard library.
+* Enhanced documentation.
+* Added std:append and std:prepend.
+* Enhanced stringified version of a function.
 
 0.3.0 (2019-09-13)
 ==================

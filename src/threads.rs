@@ -289,12 +289,6 @@ fn mx_return(mx: &mut RecvData, v: &VVal) {
     }
 }
 
-#[cfg(feature="rmp-serde")]
-#[derive(Clone)]
-pub struct MsgHandle {
-    receiver: Arc<Receiver>,
-}
-
 /// This a messaging handle for providing receiver and sender handles
 /// for the inter thread communication of WLambda instances.
 ///
@@ -311,6 +305,14 @@ pub struct MsgHandle {
 ///
 /// Pass this MsgHandle to the receiver thread or multiple threads.
 /// You can clone this handle if you want to use it in multiple threads.
+///
+/// **See also** [threads module](index.html)
+#[cfg(feature="rmp-serde")]
+#[derive(Clone)]
+pub struct MsgHandle {
+    receiver: Arc<Receiver>,
+}
+
 #[cfg(feature="rmp-serde")]
 impl MsgHandle {
     pub fn new() -> Self {

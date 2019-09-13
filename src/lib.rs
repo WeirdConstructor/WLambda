@@ -119,10 +119,10 @@ range 0 10 1 { # This is a regular function.
     on_error {
         # handle error here, eg. report, or make a new error value
         !(err_value, line, col, file) = @;
-        displayln err_value;
+        std:displayln err_value;
     } value;
 
-    !handle_err = { displayln _ };
+    !handle_err = { std:displayln _ };
 
     # with the ~ operator, you can chain it nicely:
     on_error {|| handle_err[_] } ~ some_erroring_func[];
@@ -134,13 +134,13 @@ range 0 10 1 { # This is a regular function.
     # _? transforms an error value, and returns it from the current
     #    function. optionally jumping outwards.
 
-    wl:assert_eq (str {
+    std:assert_eq (str {
         _? ~ $e "ok"; # is with an error value the same as: `return $e "ok"`
     }[]) "$e \"ok\"";
 
     _? 10; # passes the value through
 
-!report_my_error = { displayln _ };
+!report_my_error = { std:displayln _ };
 
 !some_erroring_func = {
     on_error {
@@ -159,7 +159,7 @@ range 0 10 1 { # This is a regular function.
 };
 
 # Basic OOP:
-# wl:weaken to make any closure capture of some_obj a weak reference, so
+# std:weaken to make any closure capture of some_obj a weak reference, so
 # we don't get any cyclic references:
 !some_obj = $&${};
 some_obj.do_something = {
@@ -244,7 +244,7 @@ Future plans could be:
 - Prototyped inheritance, sketched out like this:
 
     ```norun_wlambda
-        !proto = ${ print = { displayln _ }, };
+        !proto = ${ print = { std:displayln _ }, };
         !o = to_obj ${ _proto_ = proto };
         o.print(123);
 
@@ -348,6 +348,8 @@ pub mod prelude;
 pub mod threads;
 
 pub use vval::VVal;
+pub use vval::Env;
 pub use compiler::GlobalEnv;
 pub use compiler::EvalContext;
 pub use compiler::eval;
+pub use compiler::SymbolTable;

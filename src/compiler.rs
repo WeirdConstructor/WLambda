@@ -45,7 +45,7 @@ pub trait ModuleResolver {
     /// load them by executing another WLambda script or whatever you fancy.
     ///
     /// See LocalFileModuleResolver as example on how to implement this.
-    fn resolve(&mut self, global: GlobalEnvRef, path: &[String]) -> Result<std::collections::HashMap<String, VVal>, ModuleLoadError>;
+    fn resolve(&mut self, global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError>;
 }
 
 /// This structure implements the ModuleResolver trait and is
@@ -64,23 +64,61 @@ impl LocalFileModuleResolver {
     }
 }
 
-pub type SymbolTable = std::collections::HashMap<String, VVal>;
-
-/// Helper function for building symbol tables.
+/// Stores symbols and values for a WLambda module that can be added to a `GlobalEnv` with `set_module`.
 ///
 ///```
-/// let mut st = wlambda::compiler::SymbolTable::new();
-/// wlamdba::compiler::symtbl_func(
-///     &mut st, "nothing", |e: &mut Env| Ok(VVal::Nul), None, None);
+/// use wlambda::{SymbolTable, GlobalEnv, EvalContext, Env};
+///
+/// let mut st = SymbolTable::new();
+///
+/// let outbuf = std::rc::Rc::new(std::cell::RefCell::new(String::from("")));
+///
+/// let captured_outbuf = outbuf.clone();
+///
+/// st.fun("print", move |e: &mut Env, _argc: usize| {
+///     std::mem::replace(&mut *captured_outbuf.borrow_mut(), e.arg(0).s());
+///     println!("MY PRINT: {}", e.arg(0).s());
+///     Ok(e.arg(0).clone())
+/// }, Some(1), Some(1));
+///
+/// let global_env = GlobalEnv::new_default();
+/// global_env.borrow_mut().set_module("my", st);
+///
+/// let mut ctx = EvalContext::new(global_env);
+/// ctx.eval("!@import my my; my:print 1337");
+///
+/// assert_eq!(outbuf.borrow().clone(), "1337");
 ///```
-pub fn symtbl_func<T>(
-    st: &mut SymbolTable, fnname: &str, fun: T,
-    min_args: Option<usize>,
-    max_args: Option<usize>)
-    where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
+#[derive(Debug, Clone)]
+pub struct SymbolTable {
+    symbols: std::collections::HashMap<String, VVal>,
+}
 
-    st.insert(
-        String::from(fnname), VValFun::new_fun(fun, min_args, max_args));
+impl SymbolTable {
+    pub fn new() -> Self {
+        SymbolTable {
+            symbols: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Helper function for building symbol tables with functions in them.
+    ///
+    ///```
+    /// use wlambda::VVal;
+    /// let mut st = wlambda::compiler::SymbolTable::new();
+    /// st.fun("nothing",
+    ///        |e: &mut wlambda::vval::Env, _argc: usize| Ok(VVal::Nul),
+    ///        None, None);
+    ///```
+    pub fn fun<T>(
+        &mut self, fnname: &str, fun: T,
+        min_args: Option<usize>,
+        max_args: Option<usize>)
+        where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
+
+        self.symbols.insert(
+            String::from(fnname), VValFun::new_fun(fun, min_args, max_args));
+    }
 }
 
 impl ModuleResolver for LocalFileModuleResolver {
@@ -103,10 +141,13 @@ impl ModuleResolver for LocalFileModuleResolver {
 /// which augments it for calling the compiler and allows evaluation
 /// of the code.
 ///
-/// See also [GlobalEnv::add_func()](#method.add_func) of how to create a function and put it
+/// **See also:**
+/// - [GlobalEnv::add_func()](#method.add_func) of how to create a function and put it
 /// into the global variable.
-/// And [GlobalEnv::set_var()](#method.set_var).
-/// And [GlobalEnv::get_var()](#method.get_var).
+/// - And [GlobalEnv::set_module()](#method.set_module) of how to supply your own importable
+/// modules. See also [SymbolTable](struct.SymbolTable.html) has a good example how that could work.
+/// - And [GlobalEnv::set_var()](#method.set_var).
+/// - And [GlobalEnv::get_var()](#method.get_var).
 #[derive(Clone)]
 pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
@@ -179,6 +220,14 @@ impl GlobalEnv {
     /// Sets a symbol table for a module before a module asks for it.
     /// Modules set via this function have precedence over resolved modules
     /// via set_resolver().
+    ///
+    /// Here is an example how to setup your own module:
+    ///```
+    /// use wlambda::{VVal, EvalContext, GlobalEnv, SymbolTable};
+    ///
+    /// let my_mod = SymbolTable::new();
+    ///
+    ///```
     #[allow(dead_code)]
     pub fn set_module(&mut self, mod_name: &str, symtbl: SymbolTable) {
         self.mem_modules.borrow_mut().insert(mod_name.to_string(), symtbl);
@@ -192,7 +241,7 @@ impl GlobalEnv {
             if !prefix.is_empty() { prefix.to_string() + ":" }
             else { String::from("") };
         if let Some(st) = self.mem_modules.borrow_mut().get(mod_name) {
-            for (k, v) in st {
+            for (k, v) in &st.symbols {
                 self.env.insert(prefix.clone() + &k, v.clone());
             }
         }
@@ -300,10 +349,57 @@ impl Display for EvalError {
     }
 }
 
+/// This context holds all the data to compile and execute a piece of WLambda code.
+/// The context is not shareable between threads. For inter thread communication
+/// I suggest to look at [wlambda::threads::MsgHandle](../threads/struct.MsgHandle.html).
+///
+/// It can be this easy to create a context:
+///
+///```
+/// let mut ctx = wlambda::EvalContext::new_default();
+/// let ret = ctx.eval("10 + 20").unwrap().i();
+///
+/// assert_eq!(ret, 30);
+///
+/// // Also works beyond differnt eval() calls:
+/// ctx.eval("!:global X = 10").unwrap();
+///
+/// let ret = ctx.eval("X").unwrap().i();
+/// assert_eq!(ret, 10);
+///
+/// // You can access the global environment later too:
+/// assert_eq!(ctx.get_global_var("X").unwrap().i(),
+///            10);
+///
+/// // You can even store top level local variables beyond one eval():
+/// ctx.eval("!toplevel_var = { _ + 20 }").unwrap();
+/// let ret = ctx.eval("toplevel_var 11").unwrap().i();
+///
+/// assert_eq!(ret, 31);
+///```
+///
+/// You can also explicitly setup a global environment:
+///
+///```
+/// use wlambda::{GlobalEnv, EvalContext, VVal};
+///
+/// let genv = GlobalEnv::new_default();
+///
+/// genv.borrow_mut().set_var("xyz", &VVal::Int(31347));
+///
+/// let mut ctx = EvalContext::new(genv);
+/// let ret = ctx.eval("xyz - 10").unwrap().i();
+///
+/// assert_eq!(ret, 31337);
+///```
 #[derive(Debug, Clone)]
 pub struct EvalContext {
+    /// Holds the reference to the supplied or internally created
+    /// GlobalEnv.
     pub global:        GlobalEnvRef,
     local_compile:     Rc<RefCell<CompileEnv>>,
+    /// Holds the top level environment data accross multiple eval()
+    /// invocations.
     pub local:         Rc<RefCell<Env>>,
 }
 
@@ -352,8 +448,8 @@ impl EvalContext {
         self
     }
 
-    pub fn get_exports(&self) -> std::collections::HashMap<String, VVal> {
-        self.local.borrow_mut().exports.clone()
+    pub fn get_exports(&self) -> SymbolTable {
+        SymbolTable { symbols: self.local.borrow_mut().exports.clone() }
     }
 
     #[allow(dead_code)]
@@ -1105,7 +1201,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let e  = &mut gr.env;
                         let hm = &mm.borrow();
                         if let Some(stbl) = hm.get(&name.s_raw()) {
-                            for (k, v) in stbl {
+                            for (k, v) in &stbl.symbols {
                                 e.insert(s_prefix.clone() + &k, v.clone());
                             }
                             return Ok(Box::new(move |_e: &mut Env| { Ok(VVal::Nul) }));
@@ -1136,8 +1232,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                 ast.to_compile_err(
                                     format!("Error on resolving module '{}': {}", name.s_raw(), s))
                             },
-                            Ok(map) => {
-                                for (k, v) in map {
+                            Ok(symtbl) => {
+                                for (k, v) in symtbl.symbols {
                                     glob_ref.borrow_mut().env.insert(
                                         s_prefix.clone() + &k, v.clone());
                                 }
@@ -1490,7 +1586,9 @@ mod tests {
         assert_eq!(s_eval("10; 20; 30"),              "30");
         assert_eq!(s_eval("!x = 10; x"),              "10");
         assert_eq!(s_eval("!x = $true; x"),           "$true");
-        assert_eq!(s_eval("{ 10 }"),                  "&VValFun");
+        assert_eq!(s_eval("{ 10 }"),                  "&F{@[1:1/0],amin=0,amax=0,locals=0,upvalues=$[]}");
+        assert_eq!(s_eval("!upv1 = \"lol!\"; {|1<3| !x = 1; !g = 2; upv1}"),
+                   "&F{@[1:17/0],amin=1,amax=3,locals=2,upvalues=$[$&&\"lol!\"]}");
         assert_eq!(s_eval("{ 10 }[]"),                "10");
         assert_eq!(s_eval("{ 10; 20 }[]"),            "20");
         assert_eq!(s_eval("!x = $&11; { 12; x }[]"),                    "11");
@@ -2408,5 +2506,20 @@ mod tests {
             std:push r wself;
             r
         "#), "$[10,100,0,$n]");
+    }
+
+    #[test]
+    fn check_append_prepend() {
+        assert_eq!(s_eval("std:append 1 2"),                    "$[1,2]");
+        assert_eq!(s_eval("std:append $[1, 2] 3"),              "$[1,2,3]");
+        assert_eq!(s_eval("std:append $[1, 2] 3 4 $[5]"),       "$[1,2,3,4,5]");
+        assert_eq!(s_eval("std:append 1 2 3 4 $[5, 6, 7, 8]"),  "$[1,2,3,4,5,6,7,8]");
+        assert_eq!(s_eval("std:append 1"),                      "$[1]");
+
+        assert_eq!(s_eval("std:prepend 1 2"),                   "$[2,1]");
+        assert_eq!(s_eval("std:prepend $[1, 2] 3"),             "$[3,1,2]");
+        assert_eq!(s_eval("std:prepend $[1, 2] 3 4 $[5]"),      "$[5,4,3,1,2]");
+        assert_eq!(s_eval("std:prepend 1 2 3 4 $[5, 6, 7, 8]"), "$[8,7,6,5,4,3,2,1]");
+        assert_eq!(s_eval("std:prepend 1"),                     "$[1]");
     }
 }
