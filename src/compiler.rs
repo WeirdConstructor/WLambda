@@ -1359,6 +1359,41 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         Ok(ret)
                     }))
                 },
+                Syntax::Apply => {
+                    let mut call_argv = compile(&ast.at(0).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let f = call_argv(e)?;
+                        let mut argv = call_argv(e)?;
+                        let argc =
+                            if let VVal::Lst(l) = &argv {
+                                l.borrow().len()
+                            } else {
+                                let a = VVal::vec();
+                                a.push(argv);
+                                argv = a;
+                                1
+                            };
+
+                        e.with_pushed_sp(argc, |e: &mut Env| {
+                            for i in 0..argc {
+                                let v = argv.at(i).unwrap_or(VVal::Nul);
+                                e.set_arg(argc - (i + 1), v);
+                            }
+
+                            let ret = f.call_internal(e, argc);
+                            if let Err(StackAction::Panic(msg, synpos)) = ret {
+                                if synpos.is_none() {
+                                    return Err(StackAction::Panic(msg, Some(vec![spos.clone()])));
+                                } else {
+                                    return Err(StackAction::Panic(msg, synpos));
+                                }
+                            } else {
+                                ret
+                            }
+                        })
+                    }))
+                },
                 Syntax::Call => {
                     let mut call_args : Vec<EvalNode> =
                         ast.map_skip(|e| compile(e, ce), 1)?;

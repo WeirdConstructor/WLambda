@@ -2,7 +2,6 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 #![allow(clippy::collapsible_if)]
 
-// TODO: add vec.@1.foo
 // TODO: add func [[@]] for applying/expanding a vector to an argument vector
 // TODO: For the sake of progress, instead of file numbers use
 //       an std::rc::Rc<String>, should be still small enough and shared across the
@@ -166,7 +165,7 @@ In the following grammar, white space and comments are omitted:
     arg_list      = "[", [ expr, { ",", expr }, [ "," ] ], "]"
                   | "[[", expr, "]]"  (* apply result vector of expr as argument list *)
                   ;
-    field         = ".", ( ( "@", integer ) | ident | value ), [ field ]
+    field         = ".", ( integer | ident | value ), [ field ]
                   ;
     field_access  = field, "=", expr
                   | field, arg_list
@@ -896,13 +895,25 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
             return ps.err_eof("field access");
         };
 
-        let value = if is_ident_start(c) {
-            let id = ps.syn(Syntax::Key);
-            id.push(VVal::Sym(parse_identifier(ps)));
-            id
-        } else {
-            parse_value(ps)?
-        };
+        let value =
+            if c.is_digit(10) {
+                let idx : String =
+                    ps.take_while(|c| c.is_digit(10)).iter().collect();
+                if let Ok(idx_num) = i64::from_str_radix(&idx, 10) {
+                    ps.skip_ws_and_comments();
+                    VVal::Int(idx_num)
+                } else {
+                    return ps.err_bad_number(
+                        &format!("Invalid index digits {}", idx));
+                }
+
+            } else if is_ident_start(c) {
+                let id = ps.syn(Syntax::Key);
+                id.push(VVal::Sym(parse_identifier(ps)));
+                id
+            } else {
+                parse_value(ps)?
+            };
 
         if let Some(c) = ps.peek() {
             match c {
@@ -942,20 +953,37 @@ fn parse_arg_list<'a>(call: &'a mut VVal, ps: &mut State) -> Result<&'a mut VVal
         return Err(ps.err_unexpected_token('[', "At start of call arguments.").unwrap_err());
     }
 
-    while let Some(c) = ps.peek() {
-        if c == ']' { break; }
+    let is_apply = ps.consume_if_eq_wsc('[');
 
-        let call_arg = parse_expr(ps)?;
-        call.push(call_arg);
+    if is_apply {
+        if let VVal::Syn(ref mut sp) = call.at(0).unwrap_or(VVal::Nul) {
+            sp.syn = Syntax::Apply;
+        }
+        let call_argv = parse_expr(ps)?;
+        call.push(call_argv);
 
-        if !ps.consume_if_eq_wsc(',') {
-            break;
+    } else {
+        while let Some(c) = ps.peek() {
+            if c == ']' { break; }
+
+            let call_arg = parse_expr(ps)?;
+            call.push(call_arg);
+
+            if !ps.consume_if_eq_wsc(',') {
+                break;
+            }
         }
     }
 
     if ps.at_eof {
         return Err(ps.err_eof("call args").unwrap_err());
     }
+
+    if is_apply && !ps.consume_if_eq_wsc(']') {
+        return Err(ps.err_unexpected_token(']',
+            "While reading apply arguments").unwrap_err());
+    }
+
     if !ps.consume_if_eq_wsc(']') {
         return Err(ps.err_unexpected_token(']',
             "While reading call arguments").unwrap_err());
@@ -1595,5 +1623,11 @@ mod tests {
         assert_eq!(parse("$*${z=1}.f=1"), "$[&Block,$[&SetKey,$[&Deref,$[&Map,$[:\"z\",1]]],$[&Key,:\"f\"],1]]");
         assert_eq!(parse("$*xxx.f=1"),    "$[&Block,$[&SetKey,$[&Deref,$[&Var,:\"xxx\"]],$[&Key,:\"f\"],1]]");
         assert_eq!(parse("$*xxx.f"),      "$[&Block,$[&Call,$[&Key,:\"f\"],$[&Deref,$[&Var,:\"xxx\"]]]]");
+    }
+
+    #[test]
+    fn check_apply() {
+        assert_eq!(parse("fo[[@]]"), "");
+        assert_eq!(parse("fo[[$[1,2,3]]]"), "");
     }
 }

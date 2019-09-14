@@ -55,6 +55,7 @@ pub enum Syntax {
     Block,
     Err,
     Call,
+    Apply,
     And,
     Or,
     Assign,
@@ -908,7 +909,8 @@ impl VVal {
                         match v {
                             VVal::Lst(_) =>
                                 Ok(v.at(*i as usize).unwrap_or(VVal::Nul)),
-                            _ => Ok(VVal::Nul)
+                            _ => Ok(v.get_key(&format!("{}", *i))
+                                     .unwrap_or(VVal::Nul)),
                         }
                     } else { Ok(self.clone()) }
                 })
