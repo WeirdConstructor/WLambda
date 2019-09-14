@@ -313,6 +313,12 @@ impl Env {
         self.args[self.sp - (i + 1)] = v;
     }
 
+    pub fn arg_ref(&self, i: usize) -> Option<&VVal> {
+        if i >= self.argc { return None; }
+        Some(&self.args[self.bp - (i + 1)])
+    }
+
+
     pub fn arg(&self, i: usize) -> VVal {
         //d// println!("GET ARGC [{}] = {}", i, self.argc);
         if i >= self.argc { return VVal::Nul; }
@@ -970,6 +976,30 @@ impl VVal {
 
     pub fn sym(s: &str) -> VVal {
         VVal::Sym(String::from(s))
+    }
+
+    pub fn ref_id(&self) -> i64 {
+        match self {
+            VVal::Nul    => { self as *const VVal as i64 },
+            VVal::Err(r) => { &*r.borrow() as *const (VVal, SynPos) as i64 },
+            VVal::Sym(s) => { s as *const String as i64 },
+//            VVal::Bol(bool) => { },
+//            VVal::Sym(String) => { },
+//            VVal::Str(Rc<RefCell<String>>) => { },
+//            VVal::Byt(Rc<RefCell<Vec<u8>>>) => { },
+//            VVal::Int(i64) => { },
+//            VVal::Flt(f64) => { },
+//            VVal::Syn(SynPos) => { },
+//            VVal::Lst(Rc<RefCell<std::vec::Vec<VVal>>>) => { },
+//            VVal::Map(Rc<RefCell<std::collections::HashMap<String => { }, VVal>>>),
+            VVal::Fun(f) => { (&**f) as *const VValFun as i64 },
+//            VVal::DropFun(Rc<DropVVal>) => { },
+//            VVal::Ref(Rc<RefCell<VVal>>) => { },
+//            VVal::CRef(Rc<RefCell<VVal>>) => { },
+//            VVal::WWRef(Weak<RefCell<VVal>>) => { },
+//            VVal::Usr(Box<dyn VValUserData>) => { },
+            _ => 0,
+        }
     }
 
     pub fn eqv(&self, v: &VVal) -> bool {
