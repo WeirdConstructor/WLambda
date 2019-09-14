@@ -11,10 +11,14 @@ language globals. With `!@import std std` you import the standard library.
 function definition and the position of the call site.
 * Feature: Added std:append and std:prepend.
 * Change: Enhanced stringified version of a function.
-* Feature: Added apply [[@]] syntax for applying a function to a vector of arguments directly.
+* Feature: Added apply `[[@]]` syntax for applying a function to a vector of arguments directly.
 * Change: Defined equality with == for everything.
 * Doc: Documented bool data type.
 * Bugfix: Fixed evaluation order of function arguments.
+* Feature: Implemented VVal::ref\_id and `std:ref_id` which returns a
+unique 64bit signed integer dependent on the memory ID of the value.
+This is only useful for reference types, where the storage location of a
+value doesn't depend on the stack.
 
 0.3.0 (2019-09-13)
 ==================

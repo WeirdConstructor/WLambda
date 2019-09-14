@@ -1482,7 +1482,7 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(env.arg(0).set_ref(env.arg(1).clone()))
         }, Some(2), Some(2));
 
-    func!(st, "id",
+    func!(st, "ref_id",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Int(env.arg_ref(0).unwrap_or(&VVal::Nul).ref_id()))
         }, Some(1), Some(1));

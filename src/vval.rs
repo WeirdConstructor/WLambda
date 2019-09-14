@@ -980,25 +980,30 @@ impl VVal {
 
     pub fn ref_id(&self) -> i64 {
         match self {
-            VVal::Nul    => { self as *const VVal as i64 },
+            VVal::Int(_)
+            | VVal::Flt(_)
+            | VVal::Bol(_)
+            | VVal::Nul
+            | VVal::Syn(_)
+                => { self as *const VVal as i64 },
             VVal::Err(r) => { &*r.borrow() as *const (VVal, SynPos) as i64 },
             VVal::Sym(s) => { s as *const String as i64 },
-//            VVal::Bol(bool) => { },
-//            VVal::Sym(String) => { },
-//            VVal::Str(Rc<RefCell<String>>) => { },
-//            VVal::Byt(Rc<RefCell<Vec<u8>>>) => { },
-//            VVal::Int(i64) => { },
-//            VVal::Flt(f64) => { },
-//            VVal::Syn(SynPos) => { },
-//            VVal::Lst(Rc<RefCell<std::vec::Vec<VVal>>>) => { },
-//            VVal::Map(Rc<RefCell<std::collections::HashMap<String => { }, VVal>>>),
-            VVal::Fun(f) => { (&**f) as *const VValFun as i64 },
-//            VVal::DropFun(Rc<DropVVal>) => { },
-//            VVal::Ref(Rc<RefCell<VVal>>) => { },
-//            VVal::CRef(Rc<RefCell<VVal>>) => { },
-//            VVal::WWRef(Weak<RefCell<VVal>>) => { },
-//            VVal::Usr(Box<dyn VValUserData>) => { },
-            _ => 0,
+            VVal::Str(s) => { &*s.borrow() as *const String as i64 },
+            VVal::Byt(s) => { &*s.borrow() as *const Vec<u8> as i64 },
+            VVal::Lst(v) => { &*v.borrow() as *const Vec<VVal> as i64 },
+            VVal::Map(v) => { &*v.borrow() as *const std::collections::HashMap<String, VVal> as i64 },
+            VVal::Fun(f) => { &**f as *const VValFun as i64 },
+            VVal::DropFun(f) => { &**f as *const DropVVal as i64 },
+            VVal::Ref(v) => { &*v.borrow() as *const VVal as i64 },
+            VVal::CRef(v) => { &*v.borrow() as *const VVal as i64 },
+            VVal::Usr(b) /* Box<dyn VValUserData>) */ => { &**b as *const VValUserData as *const usize as i64 },
+            VVal::WWRef(r) => {
+                if let Some(l) = r.upgrade() {
+                    &*l.borrow() as *const VVal as i64
+                } else {
+                    0
+                }
+            },
         }
     }
 
