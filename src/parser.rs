@@ -2,7 +2,10 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 #![allow(clippy::collapsible_if)]
 
-// TODO: add func [[@]] for applying/expanding a vector to an argument vector
+// TODO: Make VVal::ref_id() return the current address of something.
+// TODO: Make VVal::s() check for cycles, otherwise everything will instantly
+//       loop if we ever print a map with functions that print the
+//       upvalues (which is the map itself sometimes).
 // TODO: For the sake of progress, instead of file numbers use
 //       an std::rc::Rc<String>, should be still small enough and shared across the
 //       compilation of a whole unit.
