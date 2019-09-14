@@ -975,11 +975,68 @@ impl VVal {
     pub fn eqv(&self, v: &VVal) -> bool {
         match self {
             VVal::Nul     => { if let VVal::Nul = v { return true; } else { return false; } },
+            VVal::Bol(ia) => { if let VVal::Bol(ib) = v { return ia == ib; } else { return false; } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { return ia == ib; } else { return false; } },
             VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return (ia - ib).abs() < std::f64::EPSILON; } else { return false; } },
             VVal::Sym(s)  => { if let VVal::Sym(ib) = v { return *s == *ib; } else { return false; } },
-            VVal::Str(_)  => { self.s_raw() == v.s_raw() },
+            VVal::Syn(s)  => { if let VVal::Syn(ib) = v { return *s == *ib; } else { return false; } },
+            VVal::Str(s)  => { if let VVal::Str(ib) = v { return *s == *ib; } else { return false; } },
             VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s.borrow()[..] == s2.borrow()[..] } else { false } },
+            VVal::Lst(l)  => {
+                if let VVal::Lst(l2) = v { Rc::ptr_eq(l, l2) } else { false }
+            },
+            VVal::Map(l)  => {
+                if let VVal::Map(l2) = v { Rc::ptr_eq(l, l2) } else { false }
+            },
+            VVal::Fun(l)  => {
+                if let VVal::Fun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
+            },
+            VVal::DropFun(l)  => {
+                if let VVal::DropFun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
+            },
+            VVal::Err(l)  => {
+                if let VVal::Err(l2) = v { Rc::ptr_eq(l, l2) } else { false }
+            },
+            VVal::Ref(l)  => {
+                match v {
+                    VVal::Ref(r2) => Rc::ptr_eq(l, r2),
+                    VVal::CRef(r2) => Rc::ptr_eq(l, r2),
+                    VVal::WWRef(r2) =>
+                        match r2.upgrade() {
+                            Some(v2) => Rc::ptr_eq(l, &v2),
+                            None => false,
+                        },
+                    _ => false,
+                }
+            },
+            VVal::CRef(l)  => {
+                match v {
+                    VVal::Ref(r2) => Rc::ptr_eq(l, r2),
+                    VVal::CRef(r2) => Rc::ptr_eq(l, r2),
+                    VVal::WWRef(r2) =>
+                        match r2.upgrade() {
+                            Some(v2) => Rc::ptr_eq(l, &v2),
+                            None => false,
+                        },
+                    _ => false,
+                }
+            },
+            VVal::WWRef(lw)  => {
+                if let Some(l) = lw.upgrade() {
+                    match v {
+                        VVal::Ref(r2) => Rc::ptr_eq(&l, r2),
+                        VVal::CRef(r2) => Rc::ptr_eq(&l, r2),
+                        VVal::WWRef(r2) =>
+                            match r2.upgrade() {
+                                Some(v2) => Rc::ptr_eq(&l, &v2),
+                                None => false,
+                            },
+                        _ => false,
+                    }
+                } else {
+                    false
+                }
+            },
             VVal::Usr(u)  => {
                 if let VVal::Usr(u2) = v {
                     u.eqv(&u2)
@@ -987,7 +1044,6 @@ impl VVal {
                     false
                 }
             }
-            _             => false,
         }
     }
 
@@ -1366,7 +1422,7 @@ impl VVal {
             VVal::Map(l)     => (l.borrow().len() as i64) != 0,
             VVal::Usr(u)     => u.b(),
             VVal::Fun(_)     => true,
-            VVal::DropFun(f) => f.v.i() != 0,
+            VVal::DropFun(f) => f.v.b(),
             VVal::Ref(l)     => (*l).borrow().i() != 0,
             VVal::CRef(l)    => (*l).borrow().i() != 0,
             VVal::WWRef(l)   => {

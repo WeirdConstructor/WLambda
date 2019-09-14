@@ -956,8 +956,9 @@ fn parse_arg_list<'a>(call: &'a mut VVal, ps: &mut State) -> Result<&'a mut VVal
     let is_apply = ps.consume_if_eq_wsc('[');
 
     if is_apply {
-        if let VVal::Syn(ref mut sp) = call.at(0).unwrap_or(VVal::Nul) {
+        if let VVal::Syn(mut sp) = call.at(0).unwrap_or(VVal::Nul) {
             sp.syn = Syntax::Apply;
+            call.set_at(0, VVal::Syn(sp));
         }
         let call_argv = parse_expr(ps)?;
         call.push(call_argv);
@@ -1627,7 +1628,8 @@ mod tests {
 
     #[test]
     fn check_apply() {
-        assert_eq!(parse("fo[[@]]"), "");
-        assert_eq!(parse("fo[[$[1,2,3]]]"), "");
+        assert_eq!(parse("fo[[@]]"),            "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Var,:\"@\"]]]");
+        assert_eq!(parse("fo[[$[1,2,3]]]"),     "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Lst,1,2,3]]]");
+        assert_eq!(parse("obj.1.field[[_]]"),   "$[&Block,$[&Apply,$[&Call,$[&Key,:\"field\"],$[&Call,1,$[&Var,:\"obj\"]]],$[&Var,:\"_\"]]]");
     }
 }

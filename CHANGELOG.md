@@ -1,17 +1,20 @@
 0.3.1 (unreleased)
 ==================
 
-* Feature: re:match added.
-* Bugfix: Errors weren't properly propagated by the threads::MsgHandle.
-* Change: Error reporting for arity mismatch contains the position of the
-function definition and the position of the call site.
 * Incompatible Change: Removed create_wlamba_prelude() and added proper
 module support instead. Splitted up the prelude into a core part and the
 standard library utility functions. With `!@wlambda` you can import the core
 language globals. With `!@import std std` you import the standard library.
-* Enhanced documentation.
-* Added std:append and std:prepend.
-* Enhanced stringified version of a function.
+* Feature: re:match added.
+* Bugfix: Errors weren't properly propagated by the threads::MsgHandle.
+* Change: Error reporting for arity mismatch contains the position of the
+function definition and the position of the call site.
+* Feature: Added std:append and std:prepend.
+* Change: Enhanced stringified version of a function.
+* Feature: Added apply [[@]] syntax for applying a function to a vector of arguments directly.
+* Change: Defined equality with == for everything.
+* Doc: Documented bool data type.
+* Bugfix: Fixed evaluation order of function arguments.
 
 0.3.0 (2019-09-13)
 ==================

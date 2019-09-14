@@ -1360,10 +1360,11 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     }))
                 },
                 Syntax::Apply => {
-                    let mut call_argv = compile(&ast.at(0).unwrap(), ce)?;
+                    let call_argv = compile(&ast.at(2).unwrap(), ce)?;
+                    let func      = compile(&ast.at(1).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let f = call_argv(e)?;
+                        let f = func(e)?;
                         let mut argv = call_argv(e)?;
                         let argc =
                             if let VVal::Lst(l) = &argv {
@@ -1378,7 +1379,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         e.with_pushed_sp(argc, |e: &mut Env| {
                             for i in 0..argc {
                                 let v = argv.at(i).unwrap_or(VVal::Nul);
-                                e.set_arg(argc - (i + 1), v);
+                                e.set_arg(i, v);
                             }
 
                             let ret = f.call_internal(e, argc);
@@ -1399,6 +1400,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         ast.map_skip(|e| compile(e, ce), 1)?;
                     call_args.reverse();
                     let func = call_args.pop().expect("function in evaluation args list");
+                    call_args.reverse();
 
                     Ok(Box::new(move |e: &mut Env| {
                         let f    = func(e)?;
@@ -1406,8 +1408,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         e.with_pushed_sp(argc, |e: &mut Env| {
                             for (i, x) in call_args.iter().enumerate() {
                                 let v = x(e)?;
-                                //d// println!("SETARGC: {} => {:?}", i, v);
-                                e.set_arg(argc - (i + 1), v);
+                                e.set_arg(i, v);
                             }
                             let ret = f.call_internal(e, argc);
                             if let Err(StackAction::Panic(msg, synpos)) = ret {
@@ -2011,6 +2012,59 @@ mod tests {
     }
 
     #[test]
+    fn check_eqv() {
+        assert_eq!(s_eval("1 == 1"),            "$true");
+        assert_eq!(s_eval("1 == 2"),            "$false");
+        assert_eq!(s_eval("1.1 == 1.1"),        "$true");
+        assert_eq!(s_eval("1.1 == 1.2"),        "$false");
+        assert_eq!(s_eval("1.0 == 1"),          "$false");
+        assert_eq!(s_eval("1.0 == \"1\""),      "$false");
+        assert_eq!(s_eval("$true == $true"),    "$true");
+        assert_eq!(s_eval("$false == $true"),   "$false");
+        assert_eq!(s_eval("$none == $n"),       "$true");
+        assert_eq!(s_eval("$none == $false"),   "$false");
+        assert_eq!(s_eval("0 == $false"),       "$false");
+        assert_eq!(s_eval("\"abc\" == (std:str:cat \"a\" \"bc\")"),       "$true");
+        assert_eq!(s_eval("\"abc\" == (std:str:cat \"b\" \"bc\")"),       "$false");
+        assert_eq!(s_eval("$[] == $[]"),                    "$false");
+        assert_eq!(s_eval("$[1,2] == $[1,2]"),              "$false");
+        assert_eq!(s_eval("!a = $[1,2]; !b = a; a == b"),   "$true");
+        assert_eq!(s_eval("!a = $[1,2]; a == a"),           "$true");
+        assert_eq!(s_eval("!a = $[1,2]; a == $[1,2]"),      "$false");
+        assert_eq!(s_eval("!a = ${l=3}; !b = a; a == b"),   "$true");
+        assert_eq!(s_eval("!a = ${l=2}; a == a"),           "$true");
+        assert_eq!(s_eval("!a = ${l=2}; a == a"),           "$true");
+        assert_eq!(s_eval("!a = ${l=2}; a == ${l=2}"),      "$false");
+        assert_eq!(s_eval(":a == :b"),                      "$false");
+        assert_eq!(s_eval(":a == :a"),                      "$true");
+        assert_eq!(s_eval("\"a\" == :a"),                   "$false");
+        assert_eq!(s_eval("sym[\"a\"] == :a"),              "$true");
+        assert_eq!(s_eval("std:str:to_bytes[\"a\"] == $b\"a\""), "$true");
+        assert_eq!(s_eval("$b\"a\" == $b\"a\""),            "$true");
+        assert_eq!(s_eval("$b\"b\" == $b\"a\""),            "$false");
+        assert_eq!(s_eval("!f = {}; f == {}"),              "$false");
+        assert_eq!(s_eval("!f = {}; f == f"),               "$true");
+        assert_eq!(s_eval("($e :a) == ($e :b)"),            "$false");
+        assert_eq!(s_eval("!e = $e :a; e == e"),            "$true");
+        assert_eq!(s_eval(r#"
+            !r  = $&&0;
+            !b  = $&&0;
+            !c  = $&&$*r;
+            !r2 = r;
+            $[r == b, r == c, r2 == r, std:weaken[r] == r, r == std:weaken[r]]
+        "#),
+        "$[$false,$false,$true,$true,$true]");
+        assert_eq!(s_eval(r#"
+            !r  = $&0;
+            !b  = $&0;
+            !c  = $&$*r;
+            !r2 = r;
+            $[r == b, r == c, r2 == r, std:weaken[r] == r, r == std:weaken[r]]
+        "#),
+        "$[$false,$false,$true,$true,$true]");
+    }
+
+    #[test]
     fn check_string() {
         assert_eq!(s_eval("\"foo\""),   "\"foo\"");
         assert_eq!(s_eval("$q#foo#"),   "\"foo\"");
@@ -2556,5 +2610,45 @@ mod tests {
         assert_eq!(s_eval("std:prepend $[1, 2] 3 4 $[5]"),      "$[5,4,3,1,2]");
         assert_eq!(s_eval("std:prepend 1 2 3 4 $[5, 6, 7, 8]"), "$[8,7,6,5,4,3,2,1]");
         assert_eq!(s_eval("std:prepend 1"),                     "$[1]");
+    }
+
+    #[test]
+    fn check_apply() {
+        assert_eq!(s_eval("std:str:cat[[$[1,2,3]]]"), "\"123\"");
+        assert_eq!(s_eval("std:assert_eq std:str:cat[[$[1,2,3]]] \"123\""), "$true");
+        assert_eq!(s_eval("!a = $[4,5,6]; std:str:cat[[a]]"), "\"456\"");
+    }
+
+    #[test]
+    fn check_call_order() {
+        assert_eq!(s_eval(r#"
+            !v = $[];
+            std:push v ~ ({
+                std:push v 1;
+                { std:push v $[3, _]; 4 }
+            }[])[[$[{ std:push v 2; 3.5 }[]]]];
+            v
+        "#),
+        "$[1,2,$[3,3.5],4]");
+        assert_eq!(s_eval(r#"
+            !v = $[];
+            !get_func = {
+                std:push v 1;
+                {
+                    std:push v _;
+                    std:push v _1;
+                    std:push v _2;
+                    std:push v 5;
+                    6
+                }
+            };
+            std:push v ~
+                get_func[]
+                    {std:push v 2; 2.5}[]
+                    {std:push v 3; 3.5}[]
+                    {std:push v 4; 4.5}[];
+            v
+        "#),
+        "$[1,2,3,4,2.5,3.5,4.5,5,6]");
     }
 }

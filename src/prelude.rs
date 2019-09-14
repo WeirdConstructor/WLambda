@@ -38,10 +38,27 @@ A function can be defined using the `{ ... }` syntax and the `\ _statement_`
 syntax: To give functions a name, you need to assign them to a variable with
 the `!_name_ = _expr_` syntax.
 
-To call functions, you have at least 2 alternatives. First is the bare
+To call functions, you have at least 3 alternatives. First is the bare
 `_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the delimiter
-full variant: `_expr_ [arg1, arg2, arg3, ...]`. You can always delimit the first
-variant using the `( ... )` parenthesis.
+full variant: `_expr_[arg1, arg2, arg3, ...]`. You can always delimit the first
+variant using the `( ... )` parenthesis around the whole call.
+Third you can call a function with a vector as argument with `_expr_[[_expr_]]`,
+where the second expression should return a vector (if it doesn't it will use the
+value as first argument).
+
+Here are examples:
+
+```wlambda
+# All the second variant:
+std:assert_eq[std:str:cat[1, 2, 3], "123"];
+
+# Can also be written as:
+std:assert_eq (std:str:cat 1 2 3) "123";
+
+# As the third variant:
+!some_args = $[1, 2, 3];
+std:assert_eq std:str:cat[[some_args]] "123";
+```
 
 The arguments passed to the function are accessible using the `_`, `_1`, `_2`, ..., `_9`
 variables. If you need to access more arguments the `@` variable holds a list of all
@@ -56,7 +73,7 @@ std:assert_eq twoify[2] 4;
 
 std:assert_eq twoify2[2] 4;
 
-# You may also call them directly, notice the bracket [ ... ] syntax
+# You may also call them directly, notice the parenthesis ( ... ) syntax
 # for delimiting the inner function call:
 std:assert_eq ({ _ * 2 } 2) 4;
 ```
@@ -221,6 +238,57 @@ std:assert_eq ret "all ok!";
 ```
 
 ### Booleans
+
+True and false are represented by `$t` and `$f` or `$true` and `$false`,
+whatever suits your coding style better.
+
+You can either use a boolean value with two arguments, where `$true`
+will call the first argument, and `$false` the second argument. So to
+check for truthness you can just do:
+
+```wlambda
+!x = 10;
+!some_num =
+    (x == 10) { "it is ten" } { "it is not ten" };
+
+std:assert_eq some_num "it is ten";
+
+.x = 20;
+.some_num =
+    (x == 10) { "it is ten" } { "it is not ten" };
+std:assert_eq some_num "it is not ten";
+```
+
+You can cast other values into a boolean with the `bool` function:
+
+```wlambda
+std:assert_eq (bool 1)          $true;
+std:assert_eq (bool 0)          $false;
+std:assert_eq (bool $e :x)      $false;
+std:assert_eq (bool $n)         $false;
+std:assert_eq (bool "")         $false;
+std:assert_eq (bool "0")        $false;
+std:assert_eq (bool "1")        $true;
+std:assert_eq (bool :0)         $false;
+std:assert_eq (bool :1)         $true;
+std:assert_eq (bool 0.0)        $false;
+std:assert_eq (bool 0.1)        $false;
+std:assert_eq (bool 1.0)        $true;
+std:assert_eq (bool {})         $true;
+std:assert_eq (bool $b"")       $false;
+std:assert_eq (bool $b"\x00")   $false;
+std:assert_eq (bool $b"\x01")   $true;
+```
+
+You can also check if something is a boolean with `is_bool`:
+
+```wlambda
+std:assert ~ is_bool $true;
+std:assert ~ is_bool $false;
+std:assert ~ not[is_bool $n];
+std:assert ~ not[is_bool ""];
+std:assert ~ not[is_bool 0];
+```
 
 ### 64-Bit Integers
 
