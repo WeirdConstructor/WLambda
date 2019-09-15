@@ -2,13 +2,6 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 #![allow(clippy::collapsible_if)]
 
-// TODO: Make VVal::s() check for cycles, otherwise everything will instantly
-//       loop if we ever print a map with functions that print the
-//       upvalues (which is the map itself sometimes).
-// TODO: For the sake of progress, instead of file numbers use
-//       an std::rc::Rc<String>, should be still small enough and shared across the
-//       compilation of a whole unit.
-
 /*!
 This is the grammar parser for WLambda.
 
@@ -1305,7 +1298,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 /// use wlambda::parser::{State, parse_block};
 ///
 /// let code = "!a = 0; !b = 1; a + b";
-/// let mut ps = State::new(&code, 1);
+/// let mut ps = State::new(&code, "somefilename");
 ///
 /// // Parse a bare block without '{' ... '}' delimiters:
 /// match parse_block(&mut ps, false) {
@@ -1363,13 +1356,13 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
 /// ```rust
 /// use wlambda::parser::parse;
 ///
-/// match parse("123; 456", 0) {
+/// match parse("123; 456", "filenamehere") {
 ///     Ok(ast)  => println!("AST: {}", ast.s()),
 ///     Err(e) => { panic!(format!("ERROR: {}", e)); },
 /// }
 /// ```
-pub fn parse(s: &str, file_no: u32) -> Result<VVal, ParseError> {
-    let mut ps = State::new(s, file_no);
+pub fn parse(s: &str, filename: &str) -> Result<VVal, ParseError> {
+    let mut ps = State::new(s, filename);
    parse_block(&mut ps, false)
 }
 
@@ -1378,7 +1371,7 @@ mod tests {
     use super::*;
 
     fn parse(s: &str) -> String {
-        let mut ps = State::new(s, 1);
+        let mut ps = State::new(s, "<parser_test>");
         match parse_block(&mut ps, false) {
             Ok(v)  => v.s(),
             Err(e) => { panic!(format!("Parse error: {}", e)); },
@@ -1386,7 +1379,7 @@ mod tests {
     }
 
     fn parse_error(s: &str) -> String {
-        let mut ps = State::new(s, 1);
+        let mut ps = State::new(s,"<parser_test>");
         match parse_block(&mut ps, false) {
             Ok(v)  => panic!(format!("Expected error but got result: {} for input '{}'",
                                      v.s(), s)),
@@ -1505,7 +1498,7 @@ mod tests {
     #[test]
     fn check_expr_err() {
         assert_eq!(parse_error("foo.a[] = 10"),
-            "Parse error: error[1:9] Expected literal value, sub expression, block, key or identifier. at code \'= 10\'");
+            "Parse error: error[1,9:<parser_test>] Expected literal value, sub expression, block, key or identifier. at code \'= 10\'");
     }
 
     #[test]

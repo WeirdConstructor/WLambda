@@ -136,7 +136,7 @@ range 0 10 1 { # This is a regular function.
 
     std:assert_eq (str {
         _? ~ $e "ok"; # is with an error value the same as: `return $e "ok"`
-    }[]) "$e \"ok\"";
+    }[]) "$e[98,17:<wlambda::eval>(Err)] \"ok\"";
 
     _? 10; # passes the value through
 

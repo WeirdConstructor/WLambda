@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Weird Constructor <weirdconstructor@gmail.com>
+
 // This is a part of WLambda. See README.md and COPYING for details.
 
 /*!
@@ -12,16 +12,51 @@ use std::rc::Rc;
 use std::rc::Weak;
 use std::cell::RefCell;
 use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Debug, Formatter};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileRef {
+    s: Rc<String>,
+}
+
+impl Display for FileRef {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", *self.s)
+    }
+}
+
+impl FileRef {
+    pub fn new(s: &str) -> Self {
+        FileRef { s: Rc::new(String::from(s)) }
+    }
+    pub fn s(&self) -> &str { &(*self.s) }
+}
 
 /// Structure for holding information about origin
 /// of an AST node.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct SynPos {
     pub syn:        Syntax,
     pub line:       u32,
     pub col:        u32,
-    pub file:       u32,
+    pub file:       FileRef,
+}
+
+impl Display for SynPos {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        if self.line > 0 {
+            write!(f, "[{},{}:{}({:?})]",
+                   self.line, self.col, self.file.s(), self.syn)
+        } else {
+            write!(f, "")
+        }
+    }
+}
+
+impl Debug for SynPos {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -366,12 +401,62 @@ impl Env {
 ///
 /// As WLambda is not using a VM, it uses return values of the
 /// closure call tree to handle jumping up the stack.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum StackAction {
-    Panic(VVal, Option<Vec<SynPos>>),
+    Panic(VVal, Vec<Option<SynPos>>),
     Return((VVal, VVal)),
     Break(VVal),
     Next,
+}
+
+impl Display for StackAction {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            StackAction::Panic(v, spstk) => {
+                let stk : Vec<String> =
+                    spstk.iter().map(|s|
+                        if let Some(p) = s { format!("{}", p) }
+                        else { String::from("[?]") })
+                    .collect();
+                write!(f, "{} SA::Panic({})", stk.join("=>"), v.s())
+            },
+            StackAction::Return((l, v)) => write!(f, "SA::Return(lbl={},{})", l.s_raw(), v.s()),
+            StackAction::Break(v) => write!(f, "SA::Break({})", v.s()),
+            StackAction::Next     => write!(f, "SA::Next"),
+        }
+    }
+}
+
+impl Debug for StackAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl StackAction {
+    pub fn panic_msg(err: String) -> Self {
+        let v = Vec::new();
+        StackAction::Panic(VVal::new_str_mv(err), v)
+    }
+    pub fn panic_str(err: String, sp: Option<SynPos>) -> Self {
+        let mut v = Vec::new();
+        v.push(sp);
+        StackAction::Panic(VVal::new_str_mv(err), v)
+    }
+    pub fn panic(err: VVal, sp: Option<SynPos>) -> Self {
+        let mut v = Vec::new();
+        v.push(sp);
+        StackAction::Panic(err, v)
+    }
+    pub fn wrap_panic(self, sp: Option<SynPos>) -> Self {
+        match self {
+            StackAction::Panic(v, mut stk) => {
+                stk.push(sp);
+                StackAction::Panic(v, stk)
+            },
+            _ => self,
+        }
+    }
 }
 
 pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,StackAction>>;
@@ -682,6 +767,94 @@ pub fn format_vval_byt(v: &[u8]) -> String {
     format_vval_str(&s, true)
 }
 
+struct CycleCheck {
+    refs: std::collections::HashMap<i64, i64>,
+    backref_counter: i64,
+}
+
+impl CycleCheck {
+    fn new() -> Self {
+        CycleCheck {
+            refs: std::collections::HashMap::new(),
+            backref_counter: 1,
+        }
+    }
+
+    fn touch_walk(&mut self, v: &VVal) {
+        if let Some(_) = self.touch(v) { return; }
+
+        match v {
+            VVal::Err(e) => self.touch_walk(&(*e).borrow().0),
+            VVal::Lst(l) => {
+                for v in l.borrow().iter() { self.touch_walk(v); }
+            },
+            VVal::Map(l) => {
+                for (_k, v) in l.borrow().iter() { self.touch_walk(&v); }
+            },
+            VVal::DropFun(f) => { self.touch_walk(&f.v); },
+            VVal::Fun(f) => {
+                for v in f.upvalues.iter() {
+                    self.touch_walk(v);
+                }
+            },
+            VVal::Ref(l) => { self.touch_walk(&(*l).borrow()); },
+            VVal::CRef(l) => { self.touch_walk(&(*l).borrow()); },
+            VVal::WWRef(l) => {
+                if let Some(v) = l.upgrade() {
+                    self.touch_walk(&(*v).borrow());
+                }
+            },
+              VVal::Str(_)
+            | VVal::Byt(_)
+            | VVal::Nul
+            | VVal::Bol(_)
+            | VVal::Sym(_)
+            | VVal::Syn(_)
+            | VVal::Int(_)
+            | VVal::Flt(_)
+            | VVal::Usr(_) => {},
+        }
+    }
+
+    fn touch(&mut self, v: &VVal) -> Option<i64> {
+        let id =
+            if let Some(id) = v.ref_id() { id }
+            else { return None; };
+        if let Some(backref) = self.refs.get(&id) {
+            if *backref == 0 {
+                let bkr_count = self.backref_counter;
+                self.backref_counter += 1;
+                self.refs.insert(id, bkr_count);
+                Some(bkr_count)
+            } else {
+                Some(*backref)
+            }
+        } else {
+            self.refs.insert(id, 0);
+            None
+        }
+    }
+
+    fn backref(&mut self, v: &VVal) -> Option<(bool, String)> {
+        let id =
+            if let Some(id) = v.ref_id() { id }
+            else { return None; };
+        if let Some(backref) = self.refs.get(&id) {
+            if *backref > 0 {
+                let i = *backref;
+                self.refs.insert(id, -i);
+                Some((true, format!("$<{}=>", i)))
+            } else if *backref < 0 {
+                Some((false, format!("$<{}>", -*backref)))
+            } else /* == 0 */ {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
 #[allow(dead_code)]
 impl VVal {
     pub fn new_str(s: &str) -> VVal {
@@ -707,7 +880,7 @@ impl VVal {
     pub fn err_msg(s: &str) -> VVal {
         VVal::Err(Rc::new(RefCell::new(
             (VVal::new_str(s),
-             SynPos { syn: Syntax::Block, line: 0, col: 0, file: 0 }))))
+             SynPos { syn: Syntax::Block, line: 0, col: 0, file: FileRef::new("?") }))))
     }
 
     pub fn vec() -> VVal {
@@ -754,27 +927,21 @@ impl VVal {
             VVal::Fun(fu) => {
                 if let Some(i) = fu.min_args {
                     if argc < i {
-                        let line = if let Some(sp) = &fu.syn_pos { sp.line } else { 0 };
-                        let col  = if let Some(sp) = &fu.syn_pos { sp.col } else { 0 };
-                        let file = if let Some(sp) = &fu.syn_pos { sp.file } else { 0 };
-                        return Err(StackAction::Panic(
-                            VVal::new_str_mv(format!(
-                                "function[{}:{}/{}] expects at least {} arguments, got {}",
-                                line, col, file,
-                                i, argc)), None));
+                        return Err(StackAction::panic_str(
+                            format!(
+                                "function expects at least {} arguments, got {}",
+                                i, argc),
+                            fu.syn_pos.clone()));
                     }
                 }
 
                 if let Some(i) = fu.max_args {
                     if argc > i {
-                        let line = if let Some(sp) = &fu.syn_pos { sp.line } else { 0 };
-                        let col  = if let Some(sp) = &fu.syn_pos { sp.col } else { 0 };
-                        let file = if let Some(sp) = &fu.syn_pos { sp.file } else { 0 };
-                        return Err(StackAction::Panic(
-                            VVal::new_str_mv(format!(
-                                "function[{}:{}/{}] expects at most {} arguments, got {}",
-                                line, col, file,
-                                i, argc)), None));
+                        return Err(StackAction::panic_str(
+                            format!(
+                                "function expects at most {} arguments, got {}",
+                                i, argc),
+                            fu.syn_pos.clone()));
                     }
                 }
 
@@ -792,10 +959,8 @@ impl VVal {
                 })
             },
             VVal::Err(e) => {
-                Err(StackAction::Panic(
-                    VVal::new_str_mv(
-                        format!("Called an error value: {}",
-                                 e.borrow().0.s())), None))
+                Err(StackAction::panic_msg(
+                    format!("Called an error value: {}", e.borrow().0.s())))
             },
             VVal::Sym(sym) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
@@ -978,33 +1143,27 @@ impl VVal {
         VVal::Sym(String::from(s))
     }
 
-    pub fn ref_id(&self) -> i64 {
-        match self {
-            VVal::Int(_)
-            | VVal::Flt(_)
-            | VVal::Bol(_)
-            | VVal::Nul
-            | VVal::Syn(_)
-                => { self as *const VVal as i64 },
-            VVal::Err(r) => { &*r.borrow() as *const (VVal, SynPos) as i64 },
-            VVal::Sym(s) => { s as *const String as i64 },
-            VVal::Str(s) => { &*s.borrow() as *const String as i64 },
-            VVal::Byt(s) => { &*s.borrow() as *const Vec<u8> as i64 },
-            VVal::Lst(v) => { &*v.borrow() as *const Vec<VVal> as i64 },
-            VVal::Map(v) => { &*v.borrow() as *const std::collections::HashMap<String, VVal> as i64 },
-            VVal::Fun(f) => { &**f as *const VValFun as i64 },
+    pub fn ref_id(&self) -> Option<i64> {
+        Some(match self {
+            VVal::Err(r)     => { &*r.borrow() as *const (VVal, SynPos) as i64 },
+            VVal::Str(s)     => { &*s.borrow() as *const String as i64 },
+            VVal::Byt(s)     => { &*s.borrow() as *const Vec<u8> as i64 },
+            VVal::Lst(v)     => { &*v.borrow() as *const Vec<VVal> as i64 },
+            VVal::Map(v)     => { &*v.borrow() as *const std::collections::HashMap<String, VVal> as i64 },
+            VVal::Fun(f)     => { &**f as *const VValFun as i64 },
             VVal::DropFun(f) => { &**f as *const DropVVal as i64 },
-            VVal::Ref(v) => { &*v.borrow() as *const VVal as i64 },
-            VVal::CRef(v) => { &*v.borrow() as *const VVal as i64 },
-            VVal::Usr(b) /* Box<dyn VValUserData>) */ => { &**b as *const VValUserData as *const usize as i64 },
-            VVal::WWRef(r) => {
+            VVal::Ref(v)     => { &*v.borrow() as *const VVal as i64 },
+            VVal::CRef(v)    => { &*v.borrow() as *const VVal as i64 },
+            VVal::Usr(b)     => { &**b as *const VValUserData as *const usize as i64 },
+            VVal::WWRef(r)   => {
                 if let Some(l) = r.upgrade() {
                     &*l.borrow() as *const VVal as i64
                 } else {
-                    0
+                    return None;
                 }
             },
-        }
+            _ => return None,
+        })
     }
 
     pub fn eqv(&self, v: &VVal) -> bool {
@@ -1082,11 +1241,11 @@ impl VVal {
         }
     }
 
-    pub fn dump_vec_as_str(v: &Rc<RefCell<std::vec::Vec<VVal>>>) -> String {
+    fn dump_vec_as_str(v: &Rc<RefCell<std::vec::Vec<VVal>>>, c: &mut CycleCheck) -> String {
         let mut out : Vec<String> = Vec::new();
         let mut first = true;
         out.push(String::from("$["));
-        for s in v.borrow().iter().map(VVal::s) {
+        for s in v.borrow().iter().map(|v| v.s_cy(c)) {
             if !first { out.push(String::from(",")); }
             else { first = false; }
             out.push(s);
@@ -1095,7 +1254,7 @@ impl VVal {
         out.concat()
     }
 
-    pub fn dump_map_as_str(m: &Rc<RefCell<std::collections::HashMap<String,VVal>>>) -> String {
+    fn dump_map_as_str(m: &Rc<RefCell<std::collections::HashMap<String,VVal>>>, c: &mut CycleCheck) -> String {
         let mut out : Vec<String> = Vec::new();
         let mut first = true;
         out.push(String::from("${"));
@@ -1113,7 +1272,7 @@ impl VVal {
                 out.push(k.to_string());
             }
             out.push(String::from("="));
-            out.push(v.s());
+            out.push(v.s_cy(c));
         }
         out.push(String::from("}"));
         out.concat()
@@ -1296,7 +1455,7 @@ impl VVal {
         } else {
             SynPos {
                 syn: Syntax::Block,
-                line: 0, col: 0, file: 0
+                line: 0, col: 0, file: FileRef::new("?")
             }
         }
     }
@@ -1308,13 +1467,6 @@ impl VVal {
             Syntax::Block
         }
     }
-
-//    pub fn to_eval_panic(&self, msg: String) -> Result<VVal, StackAction> {
-//        Err(StackAction::Panic( {
-//            msg,
-//            pos: self.get_syn_pos(),
-//        })
-//    }
 
     pub fn to_compile_err(&self, msg: String) -> Result<EvalNode, CompileError> {
         Err(CompileError {
@@ -1469,45 +1621,62 @@ impl VVal {
         }
     }
 
-    pub fn s(&self) -> String {
-        match self {
+    fn s_cy(&self, c: &mut CycleCheck) -> String {
+        let br = if let Some((do_continue, backref_str)) = c.backref(self) {
+            if !do_continue { return backref_str; }
+            backref_str
+        } else {
+            String::from("")
+        };
+        let s = match self {
             VVal::Str(s)     => format_vval_str(&s.borrow(), false),
             VVal::Byt(s)     => format!("$b{}", format_vval_byt(&s.borrow())),
             VVal::Nul        => "$n".to_string(),
-            VVal::Err(e)     => format!("$e {}", (*e).borrow().0.s()),
+            VVal::Err(e)     => format!("$e{} {}", (*e).borrow().1, (*e).borrow().0.s_cy(c)),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
             VVal::Sym(s)     => format!(":\"{}\"", s),
             VVal::Syn(s)     => format!("&{:?}", s.syn),
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
-            VVal::Lst(l)     => VVal::dump_vec_as_str(l),
-            VVal::Map(l)     => VVal::dump_map_as_str(l), // VVal::dump_map_as_str(l),
+            VVal::Lst(l)     => VVal::dump_vec_as_str(l, c),
+            VVal::Map(l)     => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
             VVal::Usr(u)     => u.s(),
             VVal::Fun(f)     => {
                 let min = if f.min_args.is_none() { "any".to_string() }
                           else { format!("{}", f.min_args.unwrap()) };
                 let max = if f.max_args.is_none() { "any".to_string() }
                           else { format!("{}", f.max_args.unwrap()) };
-                let upvalues : String = f.upvalues.iter().map(|v| v.s()).collect::<Vec<String>>().join(",");
+                let upvalues : String =
+                    f.upvalues
+                     .iter()
+                     .map(|v| v.s_cy(c))
+                     .collect::<Vec<String>>()
+                     .join(",");
                 if let Some(ref sp) = f.syn_pos {
-                    format!("&F{{@[{}:{}/{}],amin={},amax={},locals={},upvalues=$[{}]}}",
-                            sp.line, sp.col, sp.file,
-                            min, max, f.local_size, upvalues)
+                    format!("&F{{@{},amin={},amax={},locals={},upvalues=$[{}]}}",
+                            sp, min, max, f.local_size, upvalues)
                 } else {
-                    format!("&F{{@[0:0/],amin={},amax={},locals={},upvalues=$[{}]}}",
+                    format!("&F{{@[0,0:?()],amin={},amax={},locals={},upvalues=$[{}]}}",
                             min, max, f.local_size, upvalues)
                 }
             },
-            VVal::DropFun(f) => f.v.s(),
-            VVal::Ref(l)     => format!("$&&{}", (*l).borrow().s()),
-            VVal::CRef(l)    => format!("$&{}", (*l).borrow().s()),
+            VVal::DropFun(f) => f.v.s_cy(c),
+            VVal::Ref(l)     => format!("$&&{}", (*l).borrow().s_cy(c)),
+            VVal::CRef(l)    => format!("$&{}", (*l).borrow().s_cy(c)),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
-                    Some(v) => format!("$(&){}", v.borrow().s()),
+                    Some(v) => format!("$(&){}", v.borrow().s_cy(c)),
                     None => "$n".to_string(),
                 }
             },
-        }
+        };
+        format!("{}{}", br, s)
+    }
+
+    pub fn s(&self) -> String {
+        let mut cc = CycleCheck::new();
+        cc.touch_walk(self);
+        self.s_cy(&mut cc)
     }
 
     /// Serializes the VVal (non cyclic) structure to a msgpack byte vector.

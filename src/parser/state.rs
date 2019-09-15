@@ -4,6 +4,7 @@
 use crate::vval::VVal;
 use crate::vval::Syntax;
 use crate::vval::SynPos;
+use crate::vval::FileRef;
 use std::fmt::{Display, Formatter};
 
 /// This is the parser state data structure. It holds the to be read source
@@ -15,8 +16,7 @@ use std::fmt::{Display, Formatter};
 /// use wlambda::parser::State;
 ///
 /// let code    = "{ 123 }";
-/// let file_no = 400;
-/// let mut ps  = State::new(code, file_no);
+/// let mut ps  = State::new(code, "filenamehere");
 ///
 /// // ...
 /// ```
@@ -26,7 +26,7 @@ pub struct State {
         peek_char:  char,
         line_no:    u32,
         col_no:     u32,
-        file_no:    u32,
+        file:       FileRef,
     pub at_eof:     bool,
 }
 
@@ -44,17 +44,17 @@ pub struct State {
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParseError {
-    UnexpectedToken((String, String, u32, u32, u32)),
-    BadEscape(      (String, String, u32, u32, u32)),
-    BadValue(       (String, String, u32, u32, u32)),
-    BadKeyword(     (String, String, u32, u32, u32)),
-    BadNumber(      (String, String, u32, u32, u32)),
-    BadCall(        (String, String, u32, u32, u32)),
-    EOF(            (String, String, u32, u32, u32)),
+    UnexpectedToken((String, String, u32, u32, FileRef)),
+    BadEscape(      (String, String, u32, u32, FileRef)),
+    BadValue(       (String, String, u32, u32, FileRef)),
+    BadKeyword(     (String, String, u32, u32, FileRef)),
+    BadNumber(      (String, String, u32, u32, FileRef)),
+    BadCall(        (String, String, u32, u32, FileRef)),
+    EOF(            (String, String, u32, u32, FileRef)),
 }
 
-fn tuple2str(tp: &(String, String, u32, u32, u32)) -> String {
-    format!("error[{}:{}] {} at code '{}'", tp.2, tp.3, tp.0, tp.1)
+fn tuple2str(tp: &(String, String, u32, u32, FileRef)) -> String {
+    format!("error[{},{}:{}] {} at code '{}'", tp.2, tp.3, tp.4.s(), tp.0, tp.1)
 }
 
 pub fn parse_error_to_string(pe: &ParseError) -> String {
@@ -78,31 +78,31 @@ impl Display for ParseError {
 #[allow(dead_code)]
 impl State {
     pub fn err_unexpected_token(&self, c: char, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::UnexpectedToken((format!("Unexpected token '{}'. {}", c, s), self.rest(), self.line_no, self.col_no, self.file_no)))
+        Err(ParseError::UnexpectedToken((format!("Unexpected token '{}'. {}", c, s), self.rest(), self.line_no, self.col_no, self.file.clone())))
     }
 
     pub fn err_bad_value(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadValue((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+        Err(ParseError::BadValue((String::from(s), self.rest(), self.line_no, self.col_no, self.file.clone())))
     }
 
     pub fn err_bad_keyword(&self, kw: &str, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadKeyword((format!("Got '{}', expected {}", kw, s), self.rest(), self.line_no, self.col_no, self.file_no)))
+        Err(ParseError::BadKeyword((format!("Got '{}', expected {}", kw, s), self.rest(), self.line_no, self.col_no, self.file.clone())))
     }
 
     pub fn err_bad_number(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadNumber((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+        Err(ParseError::BadNumber((String::from(s), self.rest(), self.line_no, self.col_no, self.file.clone())))
     }
 
     pub fn err_bad_call(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadCall((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+        Err(ParseError::BadCall((String::from(s), self.rest(), self.line_no, self.col_no, self.file.clone())))
     }
 
     pub fn err_eof(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::EOF((format!("EOF while parsing {}", s), self.rest(), self.line_no, self.col_no, self.file_no)))
+        Err(ParseError::EOF((format!("EOF while parsing {}", s), self.rest(), self.line_no, self.col_no, self.file.clone())))
     }
 
     pub fn err_bad_escape(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadEscape((String::from(s), self.rest(), self.line_no, self.col_no, self.file_no)))
+        Err(ParseError::BadEscape((String::from(s), self.rest(), self.line_no, self.col_no, self.file.clone())))
     }
 
     /// Creates a `VVal::Syn` annotated with the current parse head position.
@@ -111,7 +111,7 @@ impl State {
             syn:  s,
             line: self.line_no,
             col:  self.col_no,
-            file: self.file_no
+            file: self.file.clone(),
         })
     }
 
@@ -358,30 +358,23 @@ impl State {
 
     /// The constructor for the `parser::State`.
     ///
-    /// Instead of giving the filename you should provide the
-    /// `file_no`. It's up to you to keep track of the
-    /// mapping from `file_no` to an input file or input source.
-    /// That is, because WLambda might not come from files but
-    /// from other sources, that I can not anticipate here.
-    ///
     /// ```rust
     /// use wlambda::parser::State;
     ///
     /// let code    = "{ 123 }";
-    /// let file_no = 400;
-    /// let mut ps  = State::new(code, file_no);
+    /// let mut ps  = State::new(code, "filenamehere");
     /// // ...
     /// wlambda::parser::parse_block(&mut ps, true);
     /// // ...
     /// ```
-    pub fn new(code: &str, file_no: u32) -> State {
+    pub fn new(code: &str, filename: &str) -> State {
         let mut ps = State {
             chars:     code.chars().collect(),
             peek_char: ' ',
             at_eof:    false,
             line_no:   1,
             col_no:    1,
-            file_no,
+            file:      FileRef::new(filename),
         };
         ps.init();
         ps.skip_ws_and_comments();

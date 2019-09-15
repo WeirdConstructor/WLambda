@@ -481,7 +481,7 @@ impl EvalContext {
     /// let mut ctx = wlambda::EvalContext::new_default();
     ///
     /// let s = "$[1,2,3]";
-    /// let ast = parser::parse(s, 0).unwrap();
+    /// let ast = parser::parse(s, "somefilename").unwrap();
     /// let r = &mut ctx.eval_ast(&ast).unwrap();
     ///
     /// println!("Res: {}", r.s());
@@ -523,7 +523,7 @@ impl EvalContext {
     /// ```
     #[allow(dead_code)]
     pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
-        match parser::parse(s, 0) {
+        match parser::parse(s, "<wlambda::eval>") {
             Ok(ast) => { self.eval_ast(&ast) },
             Err(e) => { Err(EvalError::ParseError(e)) },
         }
@@ -544,7 +544,7 @@ impl EvalContext {
             return Err(EvalError::IOError(format!("file '{}': {}", filename, contents.unwrap_err())));
         }
         let contents = contents.unwrap();
-        match parser::parse(&contents, 0) {
+        match parser::parse(&contents, filename) {
             Ok(ast) => { self.eval_ast(&ast) },
             Err(e) => { Err(EvalError::ParseError(e)) },
         }
@@ -771,15 +771,10 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
         let mut res = VVal::Nul;
         for x in exprs.iter() {
             if let VVal::Err(ev) = res {
-                let err_msg =
-                    format!("Error value '{}'(@{},{}:{}) dropped.",
-                            ev.borrow().0.s(),
-                            ev.borrow().1.line,
-                            ev.borrow().1.col,
-                            ev.borrow().1.file);
                 return
-                    Err(StackAction::Panic(
-                        VVal::new_str(&err_msg), None));
+                    Err(StackAction::panic_str(
+                        format!("Error value dropped: {}", ev.borrow().0.s()),
+                        Some(ev.borrow().1.clone())))
             }
 
             res = VVal::Nul;
@@ -1037,14 +1032,9 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                     VVal::Lst(l) => {
                         for (i, pos) in poses.iter().enumerate() {
                             let val = &mut l.borrow_mut()[i];
-                            match set_ref_at_varpos(e, pos, val) {
-                                None => (),
-                                Some(err) => {
-                                    return
-                                        Err(StackAction::Panic(
-                                            VVal::new_str_mv(err),
-                                            Some(vec![spos.clone()])));
-                                }
+                            if let Some(err) = set_ref_at_varpos(e, pos, val) {
+                                return Err(
+                                    StackAction::panic_str(err, Some(spos.clone())));
                             }
                         }
                     },
@@ -1052,12 +1042,18 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                         for (i, pos) in poses.iter().enumerate() {
                             let vname = vars.at(i).unwrap().s_raw();
                             let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-                            set_ref_at_varpos(e, pos, &val);
+                            if let Some(err) = set_ref_at_varpos(e, pos, &val) {
+                                return Err(
+                                    StackAction::panic_str(err, Some(spos.clone())));
+                            }
                         }
                     },
                     _ => {
                         for pos in poses.iter() {
-                            set_ref_at_varpos(e, pos, &v);
+                            if let Some(err) = set_ref_at_varpos(e, pos, &v) {
+                                return Err(
+                                    StackAction::panic_str(err, Some(spos.clone())));
+                            }
                         }
                     }
                 }
@@ -1071,14 +1067,10 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                     VVal::Lst(l) => {
                         for (i, pos) in poses.iter().enumerate() {
                             let val = &mut l.borrow_mut()[i];
-                            match set_env_at_varpos(e, pos, val) {
-                                None => (),
-                                Some(err) => {
-                                    return
-                                        Err(StackAction::Panic(
-                                            VVal::new_str_mv(err),
-                                            Some(vec![spos.clone()])));
-                                }
+
+                            if let Some(err) = set_env_at_varpos(e, pos, val) {
+                                return Err(
+                                    StackAction::panic_str(err, Some(spos.clone())));
                             }
                         }
                     },
@@ -1086,12 +1078,19 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                         for (i, pos) in poses.iter().enumerate() {
                             let vname = vars.at(i).unwrap().s_raw();
                             let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-                            set_env_at_varpos(e, pos, &val);
+
+                            if let Some(err) = set_env_at_varpos(e, pos, &val) {
+                                return Err(
+                                    StackAction::panic_str(err, Some(spos.clone())));
+                            }
                         }
                     },
                     _ => {
                         for pos in poses.iter() {
-                            set_env_at_varpos(e, pos, &v);
+                            if let Some(err) = set_env_at_varpos(e, pos, &v) {
+                                return Err(
+                                    StackAction::panic_str(err, Some(spos.clone())));
+                            }
                         }
                     }
                 }
@@ -1383,12 +1382,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             }
 
                             let ret = f.call_internal(e, argc);
-                            if let Err(StackAction::Panic(msg, synpos)) = ret {
-                                if synpos.is_none() {
-                                    return Err(StackAction::Panic(msg, Some(vec![spos.clone()])));
-                                } else {
-                                    return Err(StackAction::Panic(msg, synpos));
-                                }
+                            if let Err(sa) = ret {
+                                Err(sa.wrap_panic(Some(spos.clone())))
                             } else {
                                 ret
                             }
@@ -1411,12 +1406,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                 e.set_arg(i, v);
                             }
                             let ret = f.call_internal(e, argc);
-                            if let Err(StackAction::Panic(msg, synpos)) = ret {
-                                if synpos.is_none() {
-                                    return Err(StackAction::Panic(msg, Some(vec![spos.clone()])));
-                                } else {
-                                    return Err(StackAction::Panic(msg, synpos));
-                                }
+                            if let Err(sa) = ret {
+                                Err(sa.wrap_panic(Some(spos.clone())))
                             } else {
                                 ret
                             }
@@ -1431,20 +1422,17 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let stmts : Vec<EvalNode> =
                         ast.map_skip(|e| compile(e, &mut ce_sub), 3)?;
 
+                    let spos_inner = spos.clone();
                     #[allow(unused_assignments)]
                     let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
                         let mut res = VVal::Nul;
                         for s in stmts.iter() {
                             if let VVal::Err(ev) = res {
-                                let err_msg =
-                                    format!("Error value '{}'@({},{}:{}) dropped.",
-                                            ev.borrow().0.s(),
-                                            ev.borrow().1.line,
-                                            ev.borrow().1.col,
-                                            ev.borrow().1.file);
                                 return
-                                    Err(StackAction::Panic(
-                                        VVal::new_str(&err_msg), None));
+                                    Err(StackAction::panic_str(
+                                        format!("Error value '{}' dropped.",
+                                                ev.borrow().0.s()),
+                                        Some(ev.borrow().1.clone())));
                             }
 
                             res = VVal::Nul;
@@ -1456,7 +1444,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                         if v_lbl.eqv(&label) { Ok(v) }
                                         else { Err(StackAction::Return((v_lbl, v))) }
                                 },
-                                Err(e) => { return Err(e); }
+                                Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
                             }
                         }
                         Ok(res)
@@ -1575,7 +1563,7 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
 #[allow(dead_code)]
 pub fn s_eval(s: &str) -> String {
     let global = GlobalEnv::new_default();
-    match parser::parse(s, 0) {
+    match parser::parse(s, "<compiler:s_eval>") {
         Ok(ast) => bench_eval_ast(ast, global, 1).s(),
         Err(e)  => { panic!(format!("EVAL ERROR: {}", e)); },
     }
@@ -1590,7 +1578,7 @@ pub fn s_eval(s: &str) -> String {
 #[allow(dead_code)]
 pub fn s_eval_no_panic(s: &str) -> String {
     let global = GlobalEnv::new_default();
-    match parser::parse(s, 0) {
+    match parser::parse(s, "<compiler:s_eval_no_panic>") {
         Ok(ast) => bench_eval_ast(ast, global, 1).s(),
         Err(e)  => { format!("EVAL ERROR: {}", e) },
     }
@@ -1622,9 +1610,9 @@ mod tests {
         assert_eq!(s_eval("10; 20; 30"),              "30");
         assert_eq!(s_eval("!x = 10; x"),              "10");
         assert_eq!(s_eval("!x = $true; x"),           "$true");
-        assert_eq!(s_eval("{ 10 }"),                  "&F{@[1:1/0],amin=0,amax=0,locals=0,upvalues=$[]}");
+        assert_eq!(s_eval("{ 10 }"),                  "&F{@[1,1:<compiler:s_eval>(Func)],amin=0,amax=0,locals=0,upvalues=$[]}");
         assert_eq!(s_eval("!upv1 = \"lol!\"; {|1<3| !x = 1; !g = 2; upv1}"),
-                   "&F{@[1:17/0],amin=1,amax=3,locals=2,upvalues=$[$&&\"lol!\"]}");
+                   "&F{@[1,17:<compiler:s_eval>(Func)],amin=1,amax=3,locals=2,upvalues=$[$&&\"lol!\"]}");
         assert_eq!(s_eval("{ 10 }[]"),                "10");
         assert_eq!(s_eval("{ 10; 20 }[]"),            "20");
         assert_eq!(s_eval("!x = $&11; { 12; x }[]"),                    "11");
@@ -2185,29 +2173,29 @@ mod tests {
 
     #[test]
     fn check_arity() {
-        assert_eq!(s_eval_no_panic("{}[1,2,3]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 0 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 3, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{}[1,2,3]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,3:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 3\\\")\"");
         assert_eq!(s_eval("{|3| _1 }[1,2,3]"), "2");
-        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at least 3 arguments, got 2\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3,4,5]"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 10, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,10:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at least 3 arguments, got 2\\\")\"");
+        assert_eq!(s_eval_no_panic("{|3| _1 }[2,3,4,5]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,10:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 3 arguments, got 4\\\")\"");
         assert_eq!(s_eval("{|0<4| _1 }[]"), "$n");
         assert_eq!(s_eval("{|0<4| _1 }[1]"), "$n");
         assert_eq!(s_eval("{|0<4| _1 }[1,2]"), "2");
         assert_eq!(s_eval("{|0<4| _1 }[1,2,3]"), "2");
         assert_eq!(s_eval("(\\|0<4| _1)[1,2,3]"), "2");
         assert_eq!(s_eval("{|0<4| _1 }[1,2,3,4]"), "2");
-        assert_eq!(s_eval_no_panic("{|0<4| _1 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 12, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|0<4| _1 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,12:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 4 arguments, got 5\\\")\"");
         assert_eq!(s_eval("{ @ }[1,2,3,4,5]"), "$[1,2,3,4,5]");
         assert_eq!(s_eval("{|2| @ }[1,2]"), "$[1,2]");
-        assert_eq!(s_eval_no_panic("{|2| @ }[1]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at least 2 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{|2| @ }[1,2,3]"),  "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 2 arguments, got 3\\\" }), Some([SynPos { syn: Call, line: 1, col: 9, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{|2| @ }[1]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,9:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at least 2 arguments, got 1\\\")\"");
+        assert_eq!(s_eval_no_panic("{|2| @ }[1,2,3]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,9:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 2 arguments, got 3\\\")\"");
 
-        assert_eq!(s_eval_no_panic("{!(a,b,c) = @;}[1,2,3,4]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 3 arguments, got 4\\\" }), Some([SynPos { syn: Call, line: 1, col: 16, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{_3; !(a,b,c) = @; }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 21, file: 0 }]))\"");
-        assert_eq!(s_eval_no_panic("{!(a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{!(a,b,c) = @;}[1,2,3,4]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,16:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 3 arguments, got 4\\\")\"");
+        assert_eq!(s_eval_no_panic("{_3; !(a,b,c) = @; }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,21:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 4 arguments, got 5\\\")\"");
+        assert_eq!(s_eval_no_panic("{!(a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,20:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 4 arguments, got 5\\\")\"");
         assert_eq!(s_eval("{!(a,b,c) = @; b }[1,2,3]"), "2");
         assert_eq!(s_eval("{!(a,b,c) = @; _3 }[1,2,3,5]"), "5");
         assert_eq!(s_eval("{!:global (a,b,c) = @; _3 }[1,2,3,5]"), "5");
-        assert_eq!(s_eval_no_panic("{!:global (a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[1:1/0] expects at most 4 arguments, got 5\\\" }), Some([SynPos { syn: Call, line: 1, col: 28, file: 0 }]))\"");
+        assert_eq!(s_eval_no_panic("{!:global (a,b,c) = @; _3 }[1,2,3,4,5]"), "$e \"EXEC ERR: Caught [1,1:<compiler:s_eval_no_panic>(Func)]=>[1,28:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 4 arguments, got 5\\\")\"");
     }
 
     #[test]
@@ -2221,26 +2209,41 @@ mod tests {
             !l = { x 10 };
             l[];
         "#),
-        "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[3:18/0] expects at most 0 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 7, col: 22, file: 0 }]))\"");
+        "$e \"EXEC ERR: Caught [3,18:<compiler:s_eval_no_panic>(Func)]=>[7,22:<compiler:s_eval_no_panic>(Call)]=>[7,18:<compiler:s_eval_no_panic>(Func)]=>[8,14:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
     }
 
     #[test]
     fn check_error() {
         assert_eq!(s_eval_no_panic("$e 10; 14"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\'(@1,4:0) dropped.\\\" }), None)\"");
+                   "$e \"EXEC ERR: Caught [1,4:<compiler:s_eval_no_panic>(Err)] SA::Panic(\\\"Error value dropped: 10\\\")\"");
         assert_eq!(s_eval_no_panic("{ { { { $e 10; 14 }[]; 3 }[]; 9 }[]; 10 }[]"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"Error value \\\\\\\'10\\\\\\\'@(1,12:0) dropped.\\\" }), Some([SynPos { syn: Call, line: 1, col: 20, file: 0 }]))\"");
+            "$e \"EXEC ERR: Caught [1,12:<compiler:s_eval_no_panic>(Err)]=>\
+             [1,20:<compiler:s_eval_no_panic>(Call)]=>\
+             [1,5:<compiler:s_eval_no_panic>(Func)]=>\
+             [1,27:<compiler:s_eval_no_panic>(Call)]=>\
+             [1,3:<compiler:s_eval_no_panic>(Func)]=>\
+             [1,34:<compiler:s_eval_no_panic>(Call)]=>\
+             [1,1:<compiler:s_eval_no_panic>(Func)]=>\
+             [1,42:<compiler:s_eval_no_panic>(Call)] \
+             SA::Panic(\\\"Error value \\\\\\\'10\\\\\\\' dropped.\\\")\"");
         assert_eq!(s_eval_no_panic("_? $e 10"),
-                   "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: (Int(10), SynPos { syn: Err, line: 1, col: 7, file: 0 }) })))\"");
+                   "$e \"EXEC ERR: Caught SA::Return(lbl=$n,$e[1,7:<compiler:s_eval_no_panic>(Err)] 10)\"");
         assert_eq!(s_eval_no_panic("_? { return $e 10; 10 }[]"),
-                   "$e \"EXEC ERR: Caught Return((Nul, Err(RefCell { value: (Int(10), SynPos { syn: Err, line: 1, col: 16, file: 0 }) })))\"");
+                   "$e \"EXEC ERR: Caught SA::Return(lbl=$n,$e[1,16:<compiler:s_eval_no_panic>(Err)] 10)\"");
         assert_eq!(s_eval_no_panic("unwrap $e 1"),
-                   "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"unwrap error: 1@(1,11:0)\\\" }), Some([SynPos { syn: Call, line: 1, col: 8, file: 0 }]))\"");
+                   "$e \"EXEC ERR: Caught [1,11:<compiler:s_eval_no_panic>(Err)]=>[1,8:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"unwrap error: 1\\\")\"");
         assert_eq!(s_eval_no_panic("unwrap 1.1"), "1.1");
         assert_eq!(s_eval_no_panic("on_error {|4| _ + 20 } $e 19.9"), "39.9");
 
         assert_eq!(s_eval_no_panic("{ { { panic 102 }[]; 20 }[]; return 20 }[]; 49"),
-                   "$e \"EXEC ERR: Caught Panic(Int(102), Some([SynPos { syn: Call, line: 1, col: 13, file: 0 }]))\"");
+                   "$e \"EXEC ERR: Caught [?]=>\
+                    [1,13:<compiler:s_eval_no_panic>(Call)]=>\
+                    [1,5:<compiler:s_eval_no_panic>(Func)]=>\
+                    [1,18:<compiler:s_eval_no_panic>(Call)]=>\
+                    [1,3:<compiler:s_eval_no_panic>(Func)]=>\
+                    [1,26:<compiler:s_eval_no_panic>(Call)]=>\
+                    [1,1:<compiler:s_eval_no_panic>(Func)]=>\
+                    [1,41:<compiler:s_eval_no_panic>(Call)] SA::Panic(102)\"");
 
         assert_eq!(s_eval_no_panic("
             !x = $&10;
@@ -2412,7 +2415,7 @@ mod tests {
             assert_eq!(s_eval_no_panic("
                 std:re:replace_all $q/ar/ { \"mak\" } $q/foobarbarfoobararar/
             "),
-            "$e \"EXEC ERR: Caught Panic(Str(RefCell { value: \\\"function[2:43/0] expects at most 0 arguments, got 1\\\" }), Some([SynPos { syn: Call, line: 2, col: 36, file: 0 }]))\"");
+            "$e \"EXEC ERR: Caught [2,43:<compiler:s_eval_no_panic>(Func)]=>[2,36:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
             assert_eq!(s_eval("
                 std:re:replace_all $q/a+r/ { std:str:cat \"mak\" ~ std:str:len _.0 } $q/foobarbaaaarfoobaararar/
             "),
@@ -2650,5 +2653,48 @@ mod tests {
             v
         "#),
         "$[1,2,3,4,2.5,3.5,4.5,5,6]");
+    }
+
+    #[test]
+    fn check_cyclic_str_write() {
+        assert_eq!(s_eval(r#"!x = $&&0; .*x = x; x"#), "$<1=>$&&$<1>");
+        assert_eq!(s_eval(r#"!x = $&0; .*x = x; x"#), "$<1=>$&$<1>");
+        assert_eq!(s_eval(r#"!x = $&0; .*x = x; !y = std:weaken x; y"#), "$<1=>$(&)$<1>");
+        assert_eq!(s_eval(r#"
+            !x = $[1,2];
+            !y = ${};
+            y.x = x;
+            std:push x y;
+            x
+        "#),
+        "$<1=>$[1,2,${x=$<1>}]");
+        assert_eq!(s_eval(r#"
+            !x = $[1,2];
+            !y = ${};
+            !f = $[];
+            std:push f f;
+            std:push f x;
+            y.x = x;
+            std:push x y;
+            std:push x x;
+            std:push x f;
+            x
+        "#),
+        "$<1=>$[1,2,${x=$<1>},$<1>,$<2=>$[$<2>,$<1>]]");
+
+        assert_eq!(s_eval(r#"!x = $[]; std:push x $&&x; $[x.0, x]"#), "$[$<1=>$&&$<2=>$[$<1>],$<2>]");
+        assert_eq!(s_eval(r#"
+            !x = ${};
+            x.f = { x.b };
+            $[x.f, x]
+        "#),
+        "$[$<1=>&F{@[3,19:<compiler:s_eval>(Func)],amin=0,amax=0,locals=0,upvalues=$[$&&$<2=>${f=$<1>}]},$<2>]");
+
+        assert_eq!(s_eval(r#"
+            !x = $[];
+            std:push x ~ $e x;
+            x
+        "#),
+        "$<1=>$[$e[3,29:<compiler:s_eval>(Err)] $<1>]");
     }
 }

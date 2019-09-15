@@ -760,7 +760,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                                     e.borrow().0.clone(),
                                     VVal::Int(i64::from(e.borrow().1.line)),
                                     VVal::Int(i64::from(e.borrow().1.col)),
-                                    VVal::Int(i64::from(e.borrow().1.file)),
+                                    VVal::new_str(e.borrow().1.file.s()),
                                 ];
                                 return env.arg(fun_idx).call(env, &args);
                             }
@@ -841,7 +841,7 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "panic",
         |env: &mut Env, _argc: usize| {
-            Err(StackAction::Panic(env.arg(0).clone(), None))
+            Err(StackAction::panic(env.arg(0).clone(), None))
         }, Some(1), Some(1));
 
     func!(st, "block",
@@ -879,9 +879,8 @@ pub fn core_symbol_table() -> SymbolTable {
                     Ok(err_v.borrow().0.clone())
                 },
                 v => {
-                    Err(StackAction::Panic(
-                        VVal::new_str_mv(format!(
-                            "unwrap_err on non error value: {}", v.s())), None))
+                    Err(StackAction::panic_msg(
+                        format!("unwrap_err on non error value: {}", v.s())))
                 },
             }
         }, Some(1), Some(1));
@@ -890,13 +889,9 @@ pub fn core_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             match env.arg(0) {
                 VVal::Err(err_v) => {
-                    Err(StackAction::Panic(
-                        VVal::new_str_mv(format!(
-                            "unwrap error: {}@({},{}:{})",
-                            err_v.borrow().0.s(),
-                            err_v.borrow().1.line,
-                            err_v.borrow().1.col,
-                            err_v.borrow().1.file)), None))
+                    Err(StackAction::panic_str(
+                        format!("unwrap error: {}", err_v.borrow().0.s()),
+                        Some(err_v.borrow().1.clone())))
                 },
                 v => Ok(v)
             }
@@ -908,7 +903,7 @@ pub fn core_symbol_table() -> SymbolTable {
             match env.arg(1) {
                 VVal::Err(err_v) => {
                     env.with_restore_sp(|e: &mut Env| {
-                        e.push(VVal::Int(err_v.borrow().1.file as i64));
+                        e.push(VVal::new_str(err_v.borrow().1.file.s()));
                         e.push(VVal::Int(err_v.borrow().1.col as i64));
                         e.push(VVal::Int(err_v.borrow().1.line as i64));
                         e.push(err_v.borrow().0.clone());
@@ -1456,21 +1451,15 @@ pub fn std_symbol_table() -> SymbolTable {
             let b = env.arg(1);
             if !a.eqv(&b) {
                 if env.arg(2).is_none() {
-                    Err(
-                        StackAction::Panic(
-                            VVal::new_str_mv(
-                                format!(
-                                    "assertion failed: expected: '{}', got: '{}'",
-                                    b.s(), a.s())),
-                            None))
+                    Err(StackAction::panic_msg(
+                        format!(
+                            "assertion failed: expected: '{}', got: '{}'",
+                            b.s(), a.s())))
                 } else {
-                    Err(
-                        StackAction::Panic(
-                            VVal::new_str_mv(
-                                format!(
-                                    "assertion '{}' failed: expected: '{}', got: '{}'",
-                                    env.arg(2).s_raw(), b.s(), a.s())),
-                            None))
+                    Err(StackAction::panic_msg(
+                        format!(
+                            "assertion '{}' failed: expected: '{}', got: '{}'",
+                            env.arg(2).s_raw(), b.s(), a.s())))
                 }
             } else {
                 Ok(VVal::Bol(true))
@@ -1484,7 +1473,11 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "ref_id",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::Int(env.arg_ref(0).unwrap_or(&VVal::Nul).ref_id()))
+            if let Some(id) = env.arg_ref(0).unwrap_or(&VVal::Nul).ref_id() {
+                Ok(VVal::Int(id))
+            } else {
+                Ok(VVal::Nul)
+            }
         }, Some(1), Some(1));
 
     func!(st, "weaken",
@@ -1496,9 +1489,9 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             if !env.arg(0).b() {
                 if env.arg(1).is_none() {
-                    Err(StackAction::Panic(VVal::new_str("assertion failed"), None))
+                    Err(StackAction::panic_msg(format!("assertion failed")))
                 } else {
-                    Err(StackAction::Panic(VVal::new_str_mv(format!("assertion failed '{}'", env.arg(1).s_raw())), None))
+                    Err(StackAction::panic_msg(format!("assertion failed '{}'", env.arg(1).s_raw())))
                 }
             } else {
                 Ok(env.arg(0).clone())

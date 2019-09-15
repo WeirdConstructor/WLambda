@@ -1,7 +1,7 @@
-0.3.1 (unreleased)
+0.3.1 (2019-09-16)
 ==================
 
-* Incompatible Change: Removed create_wlamba_prelude() and added proper
+* Incompatible Change: Removed create\_wlamba\_prelude() and added proper
 module support instead. Splitted up the prelude into a core part and the
 standard library utility functions. With `!@wlambda` you can import the core
 language globals. With `!@import std std` you import the standard library.
@@ -19,6 +19,11 @@ function definition and the position of the call site.
 unique 64bit signed integer dependent on the memory ID of the value.
 This is only useful for reference types, where the storage location of a
 value doesn't depend on the stack.
+* Feature: Made stringifying of WLambda data cope properly with cyclic data
+structures, this makes printing objects with closures work without
+locking up your script.
+* Change: Greatly enhanced error message file position reporting and
+panics have better backtraces now.
 
 0.3.0 (2019-09-13)
 ==================
