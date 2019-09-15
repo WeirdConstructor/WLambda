@@ -1091,7 +1091,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "uneg",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::Int((!(env.arg(0).i() as u32)) as i64))
+            Ok(VVal::Int(i64::from(!(env.arg(0).i() as u32))))
         }, Some(1), Some(1));
 
     func!(st, "push",
@@ -1304,7 +1304,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             if let VVal::Byt(u) = env.arg(0) {
                 Ok(VVal::vec_mv(
-                    u.borrow().iter().map(|u| VVal::Int(*u as i64))
+                    u.borrow().iter().map(|u| VVal::Int(i64::from(*u)))
                         .collect()))
 
             } else {
@@ -1319,9 +1319,9 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::new_byt(
                 s.chars()
                  .map(|c|
-                     match c { '0'..='9' => ( 9 - (b'9' - (c as u8))) as i16,
-                               'a'..='f' => (15 - (b'f' - (c as u8))) as i16,
-                               'A'..='F' => (15 - (b'F' - (c as u8))) as i16,
+                     match c { '0'..='9' => i16::from( 9 - (b'9' - (c as u8))),
+                               'a'..='f' => i16::from(15 - (b'f' - (c as u8))),
+                               'A'..='F' => i16::from(15 - (b'F' - (c as u8))),
                                _ => -1 })
                  .fold((256, out), |(last, mut out), c: i16|
                      if c == -1 { (last, out) }
@@ -1489,7 +1489,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             if !env.arg(0).b() {
                 if env.arg(1).is_none() {
-                    Err(StackAction::panic_msg(format!("assertion failed")))
+                    Err(StackAction::panic_msg("assertion failed".to_string()))
                 } else {
                     Err(StackAction::panic_msg(format!("assertion failed '{}'", env.arg(1).s_raw())))
                 }

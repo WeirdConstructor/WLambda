@@ -781,7 +781,7 @@ impl CycleCheck {
     }
 
     fn touch_walk(&mut self, v: &VVal) {
-        if let Some(_) = self.touch(v) { return; }
+        if self.touch(v).is_some() { return; }
 
         match v {
             VVal::Err(e) => self.touch_walk(&(*e).borrow().0),
@@ -1143,6 +1143,7 @@ impl VVal {
         VVal::Sym(String::from(s))
     }
 
+    #[allow(clippy::cast_ptr_alignment)]
     pub fn ref_id(&self) -> Option<i64> {
         Some(match self {
             VVal::Err(r)     => { &*r.borrow() as *const (VVal, SynPos) as i64 },

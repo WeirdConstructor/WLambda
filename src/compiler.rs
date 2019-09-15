@@ -89,7 +89,7 @@ impl LocalFileModuleResolver {
 ///
 /// assert_eq!(outbuf.borrow().clone(), "1337");
 ///```
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct SymbolTable {
     symbols: std::collections::HashMap<String, VVal>,
 }
