@@ -20,35 +20,35 @@ syn keyword wlRepeat    while range return break next match
 syn keyword wlKeyword   panic push take drop not neg uneg block unwrap unwrap_err
 syn keyword wlKeyword   sym is_none is_err is_map is_vec is_fun is_str is_sym
 syn keyword wlKeyword   is_ref is_wref is_bool is_bytes is_float is_int len type to_drop
-syn keyword wlKeyword   fold displayln pop bool float int on_error
+syn keyword wlKeyword   std:fold std:displayln std:pop std:bool float int on_error
 syn match wlKeyword "_?"
-syn match wlKeyword "re:map"
-syn match wlKeyword "re:replace_all"
-syn match wlKeyword "chrono:timestamp"
-syn match wlKeyword "ser:json"
-syn match wlKeyword "deser:json"
-syn match wlKeyword "ser:msgpack"
-syn match wlKeyword "deser:msgpack"
-syn match wlKeyword "wl:assert"
-syn match wlKeyword "wl:assert_eq"
-syn match wlKeyword "wl:dump_func"
-syn match wlKeyword "wl:set_ref"
-syn match wlKeyword "wl:weaken"
+syn match wlKeyword "std:re:map"
+syn match wlKeyword "std:re:replace_all"
+syn match wlKeyword "std:chrono:timestamp"
+syn match wlKeyword "std:ser:json"
+syn match wlKeyword "std:deser:json"
+syn match wlKeyword "std:ser:msgpack"
+syn match wlKeyword "std:deser:msgpack"
+syn match wlKeyword "std:wl:assert"
+syn match wlKeyword "std:wl:assert_eq"
+syn match wlKeyword "std:wl:dump_func"
+syn match wlKeyword "std:wl:set_ref"
+syn match wlKeyword "std:wl:weaken"
 syn match wlKeyword "str"
-syn match wlKeyword "str:len"
-syn match wlKeyword "str:to_lowercase"
-syn match wlKeyword "str:to_uppercase"
-syn match wlKeyword "str:padl"
-syn match wlKeyword "str:padr"
-syn match wlKeyword "str:cat"
-syn match wlKeyword "str:join"
-syn match wlKeyword "str:from_utf8_lossy"
-syn match wlKeyword "str:from_utf8"
-syn match wlKeyword "str:to_bytes"
-syn match wlKeyword "bytes:to_vec"
-syn match wlKeyword "bytes:from_vec"
-syn match wlKeyword "bytes:from_hex"
-syn match wlKeyword "bytes:to_hex"
+syn match wlKeyword "std:str:len"
+syn match wlKeyword "std:str:to_lowercase"
+syn match wlKeyword "std:str:to_uppercase"
+syn match wlKeyword "std:str:padl"
+syn match wlKeyword "std:str:padr"
+syn match wlKeyword "std:str:cat"
+syn match wlKeyword "std:str:join"
+syn match wlKeyword "std:str:from_utf8_lossy"
+syn match wlKeyword "std:str:from_utf8"
+syn match wlKeyword "std:str:to_bytes"
+syn match wlKeyword "std:bytes:to_vec"
+syn match wlKeyword "std:bytes:from_vec"
+syn match wlKeyword "std:bytes:from_hex"
+syn match wlKeyword "std:bytes:to_hex"
 syn match wlValue     '\$t'
 syn match wlValue     '\$true'
 syn match wlValue     '\$false'
@@ -60,12 +60,12 @@ syn match wlRefData   '$&'
 syn match wlRefData   '$&&'
 syn match wlRefData   '$\*'
 syn match wlValue     '\$error'
-syn match wlValue      '[-+]\?\d\+'
-syn match wlValue      '[-+]\?\d\+\.\d\+'
-syn match wlValue      '[-+]\?0x[a-fA-F0-9]\+\(\.[a-fA-F0-9]\+\)\?'
-syn match wlValue      '[-+]\?0b[01]\+\(\.[01]\+\)\?'
-syn match wlValue      '[-+]\?0o[0-8]\+\(\.[0-8]\+\)\?'
-syn match wlValue      '[-+]\?[0-9]\+r[0-9a-zA-Z]\+\(\.[0-9a-zA-Z]\+\)\?'
+syn match wlValue     '[-+]\?\d\+'
+syn match wlValue     '[-+]\?\d\+\.\d\+'
+syn match wlValue     '[-+]\?0x[a-fA-F0-9]\+\(\.[a-fA-F0-9]\+\)\?'
+syn match wlValue     '[-+]\?0b[01]\+\(\.[01]\+\)\?'
+syn match wlValue     '[-+]\?0o[0-8]\+\(\.[0-8]\+\)\?'
+syn match wlValue     '[-+]\?[0-9]\+r[0-9a-zA-Z]\+\(\.[0-9a-zA-Z]\+\)\?'
 
 syn match wlFuncCombinators '|\?[|~]'
 
