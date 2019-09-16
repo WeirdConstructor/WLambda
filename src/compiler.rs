@@ -2697,4 +2697,20 @@ mod tests {
         "#),
         "$<1=>$[$e[3,29:<compiler:s_eval>(Err)] $<1>]");
     }
+
+    #[test]
+    fn check_byte_str_index() {
+        assert_eq!(s_eval("$q$abc$ 0"), "\"a\"");
+        assert_eq!(s_eval("$q$abc$ 2"), "\"c\"");
+        assert_eq!(s_eval("0 $q$abc$"), "\"a\"");
+        assert_eq!(s_eval("2 $q$abc$"), "\"c\"");
+        assert_eq!(s_eval("$q$abc$.0"), "\"a\"");
+        assert_eq!(s_eval("$q$abc$.2"), "\"c\"");
+        assert_eq!(s_eval("$Q$abc$ 0"), "$b\"a\"");
+        assert_eq!(s_eval("$Q$abc$ 2"), "$b\"c\"");
+        assert_eq!(s_eval("0 $Q$abc$"), "$b\"a\"");
+        assert_eq!(s_eval("2 $Q$abc$"), "$b\"c\"");
+        assert_eq!(s_eval("$Q$abc$.0"), "$b\"a\"");
+        assert_eq!(s_eval("$Q$abc$.2"), "$b\"c\"");
+    }
 }

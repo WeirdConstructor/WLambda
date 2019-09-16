@@ -1078,6 +1078,24 @@ impl VVal {
                     if argc > 0 {
                         let v = e.arg(0);
                         match v {
+                            VVal::Byt(vval_bytes) => {
+                                let r = vval_bytes.borrow();
+                                if *i as usize >= r.len() {
+                                    Ok(VVal::Nul)
+                                } else {
+                                    Ok(VVal::new_byt(vec![r[*i as usize]]))
+                                }
+                            },
+                            VVal::Str(vval_str) => {
+                                let r = vval_str.borrow().chars().nth(*i as usize);
+                                match r {
+                                    None    => Ok(VVal::Nul),
+                                    Some(c) => {
+                                        let mut b = [0; 4];
+                                        Ok(VVal::new_str(c.encode_utf8(&mut b)))
+                                    },
+                                }
+                            },
                             VVal::Lst(_) =>
                                 Ok(v.at(*i as usize).unwrap_or(VVal::Nul)),
                             _ => Ok(v.get_key(&format!("{}", *i))

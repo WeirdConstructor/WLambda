@@ -1,3 +1,11 @@
+0.3.2 (unreleased)
+==================
+
+* Feature: Calling numbers with strings and byte vectors returns the
+character or byte substring at that index (based on 0). This is symmetrical,
+you can also call a string or a byte vector with an integer to get the
+same result.
+
 0.3.1 (2019-09-16)
 ==================
 
