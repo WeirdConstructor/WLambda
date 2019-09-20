@@ -272,7 +272,7 @@ impl Receiver {
 fn mx_recv_error(mx: &mut RecvData, s: &str) {
     mx.0 = RecvState::Return;
     mx.2 =
-        VVal::err_msg(&format!("return value serialization error: {}", s))
+        VVal::err_msg(&format!("return value serialization error ({}): {}", mx.1, s))
         .s().as_bytes().to_vec();
     mx.3 = true;
 }
@@ -369,8 +369,7 @@ impl MsgHandle {
                                     },
                                     Err(sa) => {
                                         mx_recv_error(&mut *mx,
-                                            &format!("uncaught stack action: {:?}",
-                                                     sa));
+                                            &format!("uncaught stack action calling: {}", sa));
                                     }
                                 }
                             },

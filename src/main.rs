@@ -21,6 +21,17 @@ fn main() {
 
     let mut ctx = EvalContext::new(global);
 
+    let argv : Vec<String> = std::env::args().collect();
+    if argv.len() > 1 {
+        match ctx.eval_file(&argv[1]) {
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("ERROR: {}", e);
+            }
+        }
+        return;
+    }
+
     let mut rl = rustyline::Editor::<()>::new();
     if rl.load_history("wlambda.history").is_ok() {
         println!("Loaded history from 'wlambda.history' file.");
@@ -33,12 +44,8 @@ fn main() {
                 rl.add_history_entry(line.as_str());
 
                 match ctx.eval(&line) {
-                    Ok(v) => {
-                        println!("> {}", v.s());
-                    },
-                    Err(e) => {
-                        println!("*** {}", e);
-                    }
+                    Ok(v)  => { println!("> {}", v.s()); },
+                    Err(e) => { println!("*** {}", e); }
                 }
             },
             Err(_) => { break; },
