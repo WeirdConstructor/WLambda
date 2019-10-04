@@ -18,12 +18,13 @@ syn match wlComment /#.*$/
 
 syn keyword wlRepeat    while range return break next match
 syn keyword wlKeyword   panic push take drop not neg uneg block unwrap unwrap_err
-syn keyword wlKeyword   sym is_none is_err is_map is_vec is_fun is_str is_sym
+syn keyword wlKeyword   sym is_some is_none is_err is_map is_vec is_fun is_str is_sym
 syn keyword wlKeyword   is_ref is_wref is_bool is_bytes is_float is_int len type to_drop
 syn keyword wlKeyword   std:fold std:displayln std:pop std:bool float int on_error
 syn match wlKeyword "_?"
 syn match wlKeyword "std:re:map"
 syn match wlKeyword "std:re:replace_all"
+syn match wlKeyword "std:re:match"
 syn match wlKeyword "std:chrono:timestamp"
 syn match wlKeyword "std:ser:json"
 syn match wlKeyword "std:deser:json"
