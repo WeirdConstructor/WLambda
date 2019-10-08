@@ -5,6 +5,8 @@
 character or byte substring at that index (based on 0). This is symmetrical,
 you can also call a string or a byte vector with an integer to get the
 same result.
+* Feature: Added std:io:file:read\_text, std:io:file:read, std:io:file:write\_safe
+and std:io:file:append.
 
 0.3.1 (2019-09-16)
 ==================

@@ -534,9 +534,9 @@ push v 10; push v 20;
 std:assert_eq (str v) "$[10,20]";
 ```
 
-## Prelude
+## Standard Library
 
-### std:eval _code-string_
+#### std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -548,7 +548,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-### std:assert _bool_ \[_message_]
+#### std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -559,7 +559,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-### std:assert_eq _actual_ _expected_ \[_message_]
+#### std:assert_eq _actual_ _expected_ \[_message_]
 
 This function check if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -570,7 +570,44 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-## Optional Prelude
+### I/O
+
+#### std:io:file:read_text _filename_
+
+Opens the file _filename_ and returns it's contents interpreted as UTF8
+text as string.
+
+```wlambda
+std:io:file:write_safe "prelude_test.txt" "abcäöü";
+
+!t = std:io:file:read_text "prelude_test.txt";
+std:assert_eq t "abcäöü" "reading text from file works";
+```
+
+#### std:io:file:read _filename_
+
+Opens the file _filename_ and returns it's contents as byte buffer.
+
+```wlambda
+std:io:file:write_safe "prelude_test.txt" "abcäöü";
+
+!t = std:io:file:read "prelude_test.txt";
+.t = std:str:from_utf8 t;
+std:assert_eq t "abcäöü" "reading binary from file works";
+```
+
+#### std:io:file:write_safe _filename_ _bytes-or-string_
+
+Creates a new file with the given filename but with a "~" appended
+and writes the contents into it. After successful write, it renames
+the file to the given filename.
+
+#### std:io:file:append _filename_ _bytes-or-string_
+
+Opens the given filename in append mode and appends _bytes-or-string_ to the
+end of the file.
+
+## Optional Standarf Library
 
 ### serialization
 
@@ -1421,6 +1458,160 @@ pub fn std_symbol_table() -> SymbolTable {
 
             Ok(acc)
         }, Some(3), Some(3));
+
+    func!(st, "io:file:read_text",
+        |env: &mut Env, _argc: usize| {
+            let filename = env.arg(0).s_raw();
+
+            use std::io::prelude::*;
+            use std::fs::OpenOptions;
+
+            let file =
+                OpenOptions::new()
+                .write(false)
+                .create(false)
+                .read(true)
+                .open(&filename);
+
+            match file {
+                Err(e) => {
+                    return Ok(VVal::err_msg(
+                        &format!(
+                            "Couldn't open file '{}': {}",
+                            filename, e)));
+                },
+                Ok(mut f) => {
+                    let mut contents = String::new();
+                    if let Err(e) = f.read_to_string(&mut contents) {
+                        return Ok(VVal::err_msg(
+                            &format!(
+                                "Couldn't read text from file '{}': {}",
+                                filename, e)));
+                    }
+                    Ok(VVal::new_str_mv(contents))
+                },
+            }
+        }, Some(1), Some(1));
+
+    func!(st, "io:file:read",
+        |env: &mut Env, _argc: usize| {
+            let filename = env.arg(0).s_raw();
+
+            use std::io::prelude::*;
+            use std::fs::OpenOptions;
+
+            let file =
+                OpenOptions::new()
+                .write(false)
+                .create(false)
+                .read(true)
+                .open(&filename);
+
+            match file {
+                Err(e) => {
+                    return Ok(VVal::err_msg(
+                        &format!(
+                            "Couldn't open file '{}': {}",
+                            filename, e)));
+                },
+                Ok(mut f) => {
+                    let mut contents : Vec<u8> = Vec::new();
+                    if let Err(e) = f.read_to_end(&mut contents) {
+                        return Ok(VVal::err_msg(
+                            &format!(
+                                "Couldn't read text from file '{}': {}",
+                                filename, e)));
+                    }
+                    Ok(VVal::new_byt(contents))
+                },
+            }
+        }, Some(1), Some(1));
+
+    func!(st, "io:file:write_safe",
+        |env: &mut Env, _argc: usize| {
+            let filename     = env.arg(0).s_raw();
+            let tmp_filename = format!("{}~", filename);
+            let contents     = env.arg(1);
+            let buf = match contents {
+                VVal::Byt(b) => b.borrow().clone(),
+                v => v.s_raw().as_bytes().to_vec(),
+            };
+
+            use std::io::prelude::*;
+            use std::fs::OpenOptions;
+
+            let file =
+                OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&tmp_filename);
+
+            match file {
+                Err(e) => {
+                    return Ok(VVal::err_msg(
+                        &format!(
+                            "Couldn't open file '{}': {}",
+                            filename, e)));
+                },
+                Ok(mut f) => {
+                    if let Err(e) = f.write_all(&buf) {
+                        return Ok(VVal::err_msg(
+                            &format!(
+                                "Couldn't write to file '{}': {}",
+                                tmp_filename, e)));
+                    }
+
+                    if let Err(e) = std::fs::rename(&tmp_filename, &filename) {
+                        return Ok(VVal::err_msg(
+                            &format!(
+                                "Couldn't rename file '{}' to file '{}': {}",
+                                tmp_filename, filename, e)));
+                    }
+
+                    return Ok(VVal::Bol(true));
+                },
+            }
+        }, Some(2), Some(2));
+
+    func!(st, "io:file:append",
+        |env: &mut Env, _argc: usize| {
+            let filename     = env.arg(0).s_raw();
+            let contents     = env.arg(1);
+            let buf = match contents {
+                VVal::Byt(b) => b.borrow().clone(),
+                v => v.s_raw().as_bytes().to_vec(),
+            };
+
+            use std::io::prelude::*;
+            use std::fs::OpenOptions;
+
+            let file =
+                OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(&filename);
+
+            match file {
+                Err(e) => {
+                    return Ok(VVal::err_msg(
+                        &format!(
+                            "Couldn't open file '{}': {}",
+                            filename, e)));
+                },
+                Ok(mut f) => {
+                    if let Err(e) = f.write_all(&buf) {
+                        return Ok(VVal::err_msg(
+                            &format!(
+                                "Couldn't write to file '{}': {}",
+                                filename, e)));
+                    }
+
+                    return Ok(VVal::Bol(true));
+                },
+            }
+        }, Some(2), Some(2));
 
     func!(st, "displayln",
         |env: &mut Env, argc: usize| {
