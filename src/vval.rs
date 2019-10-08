@@ -353,6 +353,13 @@ impl Env {
         Some(&self.args[self.bp - (i + 1)])
     }
 
+    pub fn arg_err_internal(&self, i: usize) -> Option<VVal> {
+        let v = &self.args[self.bp - (i + 1)];
+        match v {
+            VVal::Err(_) => Some(v.clone()),
+            _            => None,
+        }
+    }
 
     pub fn arg(&self, i: usize) -> VVal {
         //d// println!("GET ARGC [{}] = {}", i, self.argc);
@@ -476,6 +483,10 @@ pub struct VValFun {
     pub min_args:   Option<usize>,
     /// Max number of arguments this functions requires.
     pub max_args:   Option<usize>,
+    /// If true, then this function accepts error values without panic.
+    /// Functions by default don't accept errors as argument. It needs to be
+    /// explicitly enabled.
+    pub err_arg_ok: bool,
     /// The location of the definition of this function.
     pub syn_pos:    Option<SynPos>,
 }
@@ -483,6 +494,10 @@ pub struct VValFun {
 impl VValFun {
     /// Creates a new VVal containing the given closure with the given minimum
     /// and maximum parameters (see also [`add_func` of GlobalEnv](compiler/struct.GlobalEnv.html#method.add_func)).
+    ///
+    /// The `err_arg_ok` parameter specifies whether the function accepts
+    /// error values as arguments. If it doesn't, the program will panic
+    /// once an error value is encountered. This makes programs more maintainable.
     ///
     /// This is usually useful if you want to add functions to the [EvalContext](compiler/struct.EvalContext.html).
     /// at runtime.
@@ -497,32 +512,33 @@ impl VValFun {
     ///     &VValFun::new_fun(
     ///         move |env: &mut Env, argc: usize| {
     ///             Ok(VVal::new_str("xyz"))
-    ///         }, None, None));
+    ///         }, None, None, false));
     ///
     /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
     ///```
-    pub fn new_fun<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>) -> VVal
+    pub fn new_fun<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool) -> VVal
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
 
-        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, None)
+        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, err_arg_ok, None)
     }
 
-    pub fn new_fun_with_pos<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>, spos: SynPos) -> VVal
+    pub fn new_fun_with_pos<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool, spos: SynPos) -> VVal
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
 
-        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, Some(spos))
+        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, err_arg_ok, Some(spos))
     }
 
     /// Internal utility function. Use at your own risk, API might change.
     pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>,
                    env_size: usize, min_args: Option<usize>,
-                   max_args: Option<usize>, syn_pos: Option<SynPos>) -> VVal {
+                   max_args: Option<usize>, err_arg_ok: bool, syn_pos: Option<SynPos>) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalues,
             fun,
             local_size: env_size,
             min_args,
             max_args,
+            err_arg_ok,
             syn_pos,
         }))
     }
@@ -535,6 +551,7 @@ impl VValFun {
             local_size: 0,
             min_args: None,
             max_args: None,
+            err_arg_ok: false,
             syn_pos: None,
         })
     }
@@ -946,6 +963,19 @@ impl VVal {
                 }
 
                 env.with_fun_info(fu.clone(), argc, |e: &mut Env| {
+                    if !(*fu).err_arg_ok {
+                        for i in 0..argc {
+                            if let Some(VVal::Err(ev)) = e.arg_err_internal(i) {
+
+                                return
+                                    Err(StackAction::panic_str(
+                                        format!("Error value in parameter list: {}",
+                                                ev.borrow().0.s()),
+                                        Some(ev.borrow().1.clone())));
+                            }
+                        }
+                    }
+
                     ((*fu).fun.borrow())(e, argc)
                 })
             },

@@ -79,7 +79,7 @@ impl LocalFileModuleResolver {
 ///     std::mem::replace(&mut *captured_outbuf.borrow_mut(), e.arg(0).s());
 ///     println!("MY PRINT: {}", e.arg(0).s());
 ///     Ok(e.arg(0).clone())
-/// }, Some(1), Some(1));
+/// }, Some(1), Some(1), false);
 ///
 /// let global_env = GlobalEnv::new_default();
 /// global_env.borrow_mut().set_module("my", st);
@@ -103,21 +103,24 @@ impl SymbolTable {
 
     /// Helper function for building symbol tables with functions in them.
     ///
+    /// See also `VValFun::new_fun` for more details.
+    ///
     ///```
     /// use wlambda::VVal;
     /// let mut st = wlambda::compiler::SymbolTable::new();
     /// st.fun("nothing",
     ///        |e: &mut wlambda::vval::Env, _argc: usize| Ok(VVal::Nul),
-    ///        None, None);
+    ///        None, None, false);
     ///```
     pub fn fun<T>(
         &mut self, fnname: &str, fun: T,
         min_args: Option<usize>,
-        max_args: Option<usize>)
+        max_args: Option<usize>,
+        err_arg_ok: bool)
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
 
         self.symbols.insert(
-            String::from(fnname), VValFun::new_fun(fun, min_args, max_args));
+            String::from(fnname), VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
     }
 }
 
@@ -188,14 +191,12 @@ impl GlobalEnv {
     ///         v.push(env.arg(1).clone());
     ///         Ok(v.clone())
     ///     }, Some(2), Some(2));
-    ///
-    /// 
     /// ```
     pub fn add_func<T>(&mut self, fnname: &str, fun: T, min_args: Option<usize>, max_args: Option<usize>)
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
         self.env.insert(
             String::from(fnname),
-            VValFun::new_fun(fun, min_args, max_args));
+            VValFun::new_fun(fun, min_args, max_args, false));
     }
 
     /// Sets a global variable to a value.
@@ -1494,7 +1495,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         ce_sub.borrow_mut().copy_upvals(e, &mut v);
                         Ok(VValFun::new_val(
                             fun_ref.clone(),
-                            v, env_size, min_args, max_args,
+                            v, env_size, min_args, max_args, false,
                             Some(spos.clone())))
                     }))
                 },
@@ -2692,10 +2693,10 @@ mod tests {
 
         assert_eq!(s_eval(r#"
             !x = $[];
-            std:push x ~ $e x;
+            std:push x ~ $&$e x;
             x
         "#),
-        "$<1=>$[$e[3,29:<compiler:s_eval>(Err)] $<1>]");
+        "$<1=>$[$&$e[3,31:<compiler:s_eval>(Err)] $<1>]");
     }
 
     #[test]

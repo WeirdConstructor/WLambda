@@ -171,6 +171,44 @@ will be passed through. And `unwrap_err` unwraps an error value, it's
 the opposite of `unwrap` because it will cause a panic if you don't pass
 an error value.
 
+Most functions don't accept errors in their arguments.
+If an error is encountered, a panic will occur. There are only
+a few functions that accept error values in their arguments:
+
+- panic
+- `_?`
+- unwrap_err
+- error_to_str
+- unwrap
+- on_error
+- return
+- break
+- bool
+- type
+- match
+- assert
+- assert_eq
+- is_some
+- is_none
+- is_err
+- is_map
+- is_vec
+- is_fun
+- is_str
+- is_wref
+- is_ref
+- is_bool
+- is_bytes
+- is_sym
+- is_float
+- is_int
+- ==
+- !=
+- std:to_ref
+- std:ref_id
+
+All other functions don't accept errors as their argument.
+
 #### Return on error with `_?`
 
 ```wlambda
@@ -425,15 +463,15 @@ std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 - | syntax
 - || syntax
 
-    >> $[] || push 10
-    > $[10]
-    >> $[] || push 10 || push 20
-    > $[10,20]
-    >> !x = { push _1 _ };
-    > $n
-    >> $[] | x 10 | x 20
-    > $[10,20]
-    >>
+>> $[] || push 10
+> $[10]
+>> $[] || push 10 || push 20
+> $[10,20]
+>> !x = { push _1 _ };
+> $n
+>> $[] | x 10 | x 20
+> $[10,20]
+>>
 
 - [...] syntax
 
@@ -447,13 +485,13 @@ very helpful for the control flow in wlambda in case of conditional execution.
 ```wlambda
 !some_func = \:outer {
     !x = 10;
-    # does stuff
+# does stuff
 
     (x == 10) {
-        return :outer 20
+return :outer 20
     }
 
-    # more stuff that is not executed if x == 10.
+# more stuff that is not executed if x == 10.
 }
 ```
 
@@ -473,9 +511,9 @@ will be executed.
 !x = 20;
 
 (x == 20) {
-    std:displayln "x is 20";
+std:displayln "x is 20";
 } {
-    std:displayln "x is 20";
+std:displayln "x is 20";
 }; # Do not forget the ";"!
 ```
 
@@ -637,7 +675,7 @@ std:assert_eq data.(2).a 4;
 Serializes the _data_ and returns a msgpack bytes value.
 
 ```wlambda
-    std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
+std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
 #### deser:msgpack _bytes_
@@ -645,7 +683,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 Deserializes the msgpack bytes value into a data structure.
 
 ```wlambda
-    std:assert_eq (std:deser:msgpack $b"\xC4\x03abc") $b"abc";
+std:assert_eq (std:deser:msgpack $b"\xC4\x03abc") $b"abc";
 ```
 
 ### regex
@@ -673,77 +711,77 @@ use crate::vval::*;
 use std::rc::Rc;
 
 macro_rules! func {
-    ($g: ident, $name: expr, $cb: expr, $min: expr, $max: expr) => {
-        $g.fun($name, $cb, $min, $max);
+    ($g: ident, $name: expr, $cb: expr, $min: expr, $max: expr, $err_arg_ok: expr) => {
+        $g.fun($name, $cb, $min, $max, $err_arg_ok);
     }
 }
 
 macro_rules! add_func {
-    ($g: ident, $op: tt, $env: ident, $argc: ident, $b: block, $min: expr, $max: expr) => {
-        $g.fun(stringify!($op), |$env: &mut Env, $argc: usize| $b, $min, $max);
+    ($g: ident, $op: tt, $env: ident, $argc: ident, $b: block, $min: expr, $max: expr, $err_arg_ok: expr) => {
+        $g.fun(stringify!($op), |$env: &mut Env, $argc: usize| $b, $min, $max, $err_arg_ok);
     }
 }
 
 macro_rules! add_multi_op {
     ($g: ident, $op: tt) => {
         add_func!($g, $op, env, argc, {
-            if argc <= 0 { return Ok(VVal::Nul); }
-            if let VVal::Flt(f) = env.arg(0) {
+                if argc <= 0 { return Ok(VVal::Nul); }
+                if let VVal::Flt(f) = env.arg(0) {
                 let mut accum = f;
                 for i in 1..argc { accum = accum $op env.arg(i).f() }
                 Ok(VVal::Flt(accum))
-            } else {
+                } else {
                 let mut accum = env.arg(0).i();
                 for i in 1..argc { accum = accum $op env.arg(i).i() }
                 Ok(VVal::Int(accum))
-            }
-        }, Some(2), None)
+                }
+                }, Some(2), None, false)
     }
 }
 
 macro_rules! add_bool_bin_op {
     ($g: ident, $op: tt) => {
         add_func!($g, $op, env, argc, {
-            if argc < 2 { return Ok(VVal::Nul); }
-            let a = env.arg(0);
-            if let VVal::Flt(af) = a { Ok(VVal::Bol(af $op env.arg(1).f())) }
-            else { Ok(VVal::Bol(a.i() $op env.arg(1).i())) }
-        }, Some(2), Some(2))
+                if argc < 2 { return Ok(VVal::Nul); }
+                let a = env.arg(0);
+                if let VVal::Flt(af) = a { Ok(VVal::Bol(af $op env.arg(1).f())) }
+                else { Ok(VVal::Bol(a.i() $op env.arg(1).i())) }
+                }, Some(2), Some(2), false)
     }
 }
 
 macro_rules! add_fi_bin_op {
     ($g: ident, $op: tt, $a: ident, $b: ident, $ef: expr, $ei: expr) => {
         add_func!($g, $op, env, argc, {
-            if argc < 2 { return Ok(VVal::Nul); }
-            let $a = env.arg(0);
-            let $b = env.arg(1);
-            if let VVal::Flt(_) = $a { $ef }
-            else { $ei }
-        }, Some(2), Some(2))
+                if argc < 2 { return Ok(VVal::Nul); }
+                let $a = env.arg(0);
+                let $b = env.arg(1);
+                if let VVal::Flt(_) = $a { $ef }
+                else { $ei }
+                }, Some(2), Some(2), false)
     }
 }
 
-macro_rules! add_bin_op {
+macro_rules! add_bin_op_err_ok {
     ($g: ident, $op: tt, $a: ident, $b: ident, $e: expr) => {
         add_func!($g, $op, env, argc, {
-            if argc < 2 { return Ok(VVal::Nul); }
-            let $a = env.arg(0);
-            let $b = env.arg(1);
-            $e
-        }, Some(2), Some(2))
+                if argc < 2 { return Ok(VVal::Nul); }
+                let $a = env.arg(0);
+                let $b = env.arg(1);
+                $e
+                }, Some(2), Some(2), true)
     }
 }
 
 macro_rules! add_sbin_op {
     ($g: ident, $op: literal, $a: ident, $b: ident, $e: expr) => {
         func!($g,
-            $op, |env: &mut Env, argc: usize| {
+                $op, |env: &mut Env, argc: usize| {
                 if argc < 2 { return Ok(VVal::Nul); }
                 let $a = env.arg(0);
                 let $b = env.arg(1);
                 $e
-            }, Some(2), Some(2));
+                }, Some(2), Some(2), false);
     }
 }
 
@@ -751,9 +789,9 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
     while arg_idx < argc {
         if env.arg(arg_idx).is_fun() {
             return env.with_restore_sp(|e: &mut Env| {
-                e.push(val.clone());
-                e.arg(arg_idx).call_internal(e, 1)
-            });
+                    e.push(val.clone());
+                    e.arg(arg_idx).call_internal(e, 1)
+                    });
         }
 
         let mut match_vals = vec![arg_idx];
@@ -768,66 +806,66 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
         let fun_idx = arg_idx;
 
         if    env.arg(match_vals[0]).is_sym()
-           && env.arg(match_vals[0]).s_raw().chars().nth(0).unwrap_or('_') == '?' {
+            && env.arg(match_vals[0]).s_raw().chars().nth(0).unwrap_or('_') == '?' {
 
-            match &env.arg(match_vals[0]).s_raw()[..] {
-                "?t" => {
-                    let val_type_name = val.type_name();
-                    for i in match_vals.iter().skip(1) {
-                        if env.arg(*i).s_raw() == val_type_name {
-                            return env.arg(fun_idx).call(env, &[val.clone()]);
-                        }
-                    }
-                },
-                "?s" => {
-                    let val_s = val.s_raw();
-                    for i in match_vals.iter().skip(1) {
-                        if env.arg(*i).s_raw() == val_s {
-                            return env.arg(fun_idx).call(env, &[val.clone()]);
-                        }
-                    }
-                },
-                "?e" => {
-                    if let VVal::Err(e) = val {
-                        let err_val = e.borrow().0.at(0).unwrap_or_else(|| e.borrow().0.clone());
-
+                match &env.arg(match_vals[0]).s_raw()[..] {
+                    "?t" => {
+                        let val_type_name = val.type_name();
                         for i in match_vals.iter().skip(1) {
-                            if env.arg(*i).eqv(&err_val) {
-                                let args = vec![
-                                    e.borrow().0.clone(),
-                                    VVal::Int(i64::from(e.borrow().1.line)),
-                                    VVal::Int(i64::from(e.borrow().1.col)),
-                                    VVal::new_str(e.borrow().1.file.s()),
-                                ];
-                                return env.arg(fun_idx).call(env, &args);
-                            }
-                        }
-                    }
-                },
-                "?p" => {
-                    if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
-                    let fun_idx = fun_idx + 1;
-
-                    let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
-                    match pred_res {
-                        Ok(v) => {
-                            arg_idx += 1;
-                            if v.b() {
+                            if env.arg(*i).s_raw() == val_type_name {
                                 return env.arg(fun_idx).call(env, &[val.clone()]);
                             }
+                        }
+                    },
+                        "?s" => {
+                            let val_s = val.s_raw();
+                            for i in match_vals.iter().skip(1) {
+                                if env.arg(*i).s_raw() == val_s {
+                                    return env.arg(fun_idx).call(env, &[val.clone()]);
+                                }
+                            }
                         },
-                        Err(sa) => { return Err(sa); }
+                        "?e" => {
+                            if let VVal::Err(e) = val {
+                                let err_val = e.borrow().0.at(0).unwrap_or_else(|| e.borrow().0.clone());
+
+                                for i in match_vals.iter().skip(1) {
+                                    if env.arg(*i).eqv(&err_val) {
+                                        let args = vec![
+                                            e.borrow().0.clone(),
+                                            VVal::Int(i64::from(e.borrow().1.line)),
+                                            VVal::Int(i64::from(e.borrow().1.col)),
+                                            VVal::new_str(e.borrow().1.file.s()),
+                                        ];
+                                        return env.arg(fun_idx).call(env, &args);
+                                    }
+                                }
+                            }
+                        },
+                        "?p" => {
+                            if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
+                            let fun_idx = fun_idx + 1;
+
+                            let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
+                            match pred_res {
+                                Ok(v) => {
+                                    arg_idx += 1;
+                                    if v.b() {
+                                        return env.arg(fun_idx).call(env, &[val.clone()]);
+                                    }
+                                },
+                                    Err(sa) => { return Err(sa); }
+                            }
+                        },
+                        _ => {
+                            // TODO: Usually we should bail out with an error here.
+                        }
+                }
+            } else {
+                for i in match_vals.iter() {
+                    if env.arg(*i).eqv(val) {
+                        return env.arg(fun_idx).call(env, &[val.clone()]);
                     }
-                },
-                _ => {
-                    // TODO: Usually we should bail out with an error here.
-                }
-            }
-        } else {
-            for i in match_vals.iter() {
-                if env.arg(*i).eqv(val) {
-                    return env.arg(fun_idx).call(env, &[val.clone()]);
-                }
             }
         }
 
@@ -853,8 +891,8 @@ pub fn core_symbol_table() -> SymbolTable {
     add_bool_bin_op!(st, <=);
     add_bool_bin_op!(st, >=);
 
-    add_bin_op!(st, ==, a, b, Ok(VVal::Bol(a.eqv(&b))));
-    add_bin_op!(st, !=, a, b, Ok(VVal::Bol(!a.eqv(&b))));
+    add_bin_op_err_ok!(st, ==, a, b, Ok(VVal::Bol(a.eqv(&b))));
+    add_bin_op_err_ok!(st, !=, a, b, Ok(VVal::Bol(!a.eqv(&b))));
 
     add_sbin_op!(st, "&|", a, b,
         Ok(VVal::Int(((a.i() as u32) | (b.i() as u32)) as i64)));
@@ -874,12 +912,12 @@ pub fn core_symbol_table() -> SymbolTable {
     func!(st, "not",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Bol(!env.arg(0).b()))
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "panic",
         |env: &mut Env, _argc: usize| {
             Err(StackAction::panic(env.arg(0).clone(), None))
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), true);
 
     func!(st, "block",
         |env: &mut Env, argc: usize| {
@@ -893,7 +931,7 @@ pub fn core_symbol_table() -> SymbolTable {
                 },
                 Err(e)  => Err(e),
             }
-        }, Some(1), Some(2));
+        }, Some(1), Some(2), false);
 
     func!(st, "_?",
         |env: &mut Env, argc: usize| {
@@ -907,7 +945,20 @@ pub fn core_symbol_table() -> SymbolTable {
                 VVal::Err(e) => Err(StackAction::Return((lbl, VVal::Err(e)))),
                 v            => Ok(v),
             }
-        }, Some(1), Some(2));
+        }, Some(1), Some(2), true);
+
+    func!(st, "error_to_str",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0) {
+                VVal::Err(_) => {
+                    Ok(VVal::new_str_mv(env.arg(0).s()))
+                },
+                v => {
+                    Err(StackAction::panic_msg(
+                        format!("error_to_str on non error value: {}", v.s())))
+                },
+            }
+        }, Some(1), Some(1), true);
 
     func!(st, "unwrap_err",
         |env: &mut Env, _argc: usize| {
@@ -920,7 +971,7 @@ pub fn core_symbol_table() -> SymbolTable {
                         format!("unwrap_err on non error value: {}", v.s())))
                 },
             }
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), true);
 
     func!(st, "unwrap",
         |env: &mut Env, _argc: usize| {
@@ -932,7 +983,7 @@ pub fn core_symbol_table() -> SymbolTable {
                 },
                 v => Ok(v)
             }
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), true);
 
     func!(st, "on_error",
         |env: &mut Env, _argc: usize| {
@@ -949,99 +1000,99 @@ pub fn core_symbol_table() -> SymbolTable {
                 },
                 e => Ok(e)
             }
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), true);
 
     func!(st, "return",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Return((VVal::Nul, VVal::Nul))); }
             if argc < 2 { return Err(StackAction::Return((VVal::Nul, env.arg(0).clone()))); }
             Err(StackAction::Return((env.arg(0).clone(), env.arg(1).clone())))
-        }, Some(1), Some(2));
+        }, Some(1), Some(2), true);
 
     func!(st, "break",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
             Err(StackAction::Break(env.arg(0).clone()))
-        }, Some(0), Some(1));
+        }, Some(0), Some(1), true);
 
     func!(st, "next",
         |_env: &mut Env, _argc: usize| {
             Err(StackAction::Next)
-        }, Some(0), Some(0));
+        }, Some(0), Some(0), false);
 
     func!(st, "bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).b())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "float",
         |env: &mut Env, _argc: usize| { Ok(VVal::Flt(env.arg(0).f())) },
-        Some(1), Some(1));
+        Some(1), Some(1), false);
     func!(st, "int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).i())) },
-        Some(1), Some(1));
+        Some(1), Some(1), false);
     func!(st, "str",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw())) },
-        Some(1), Some(1));
+        Some(1), Some(1), false);
     func!(st, "sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_sym(&env.arg(0).s_raw())) },
-        Some(1), Some(1));
+        Some(1), Some(1), false);
     func!(st, "is_some",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(!env.arg(0).is_none())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_none",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_none())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_err",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_err())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_map",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_map())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_vec",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_vec())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_fun",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_fun())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_str",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_str())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_wref",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_wref())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_ref",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_ref())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_bool())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_bytes",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_bytes())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_sym",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_sym())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_float",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_float())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
     func!(st, "is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) },
-        Some(1), Some(1));
+        Some(1), Some(1), true);
 
     func!(st, "len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).len() as i64)) },
-        Some(1), Some(1));
+        Some(1), Some(1), false);
 
     func!(st, "type",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::new_str_mv(env.arg(0).type_name()))
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), true);
 
     func!(st, "match",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Ok(VVal::Nul); }
             if argc == 1 { return Ok(VVal::Nul) }
             match_next(env, &env.arg(0), 1, argc)
-        }, Some(1), None);
+        }, Some(1), None, true);
 
     func!(st, "while",
         |env: &mut Env, _argc: usize| {
@@ -1064,7 +1115,7 @@ pub fn core_symbol_table() -> SymbolTable {
                     Err(e)                     => { return Err(e); }
                 }
             }
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
 
     func!(st, "range",
         |env: &mut Env, _argc: usize| {
@@ -1115,7 +1166,7 @@ pub fn core_symbol_table() -> SymbolTable {
                 }
                 Ok(ret)
             }
-        }, Some(4), Some(4));
+        }, Some(4), Some(4), false);
 
     st
 }
@@ -1127,19 +1178,19 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "neg",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Int(!env.arg(0).i()))
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "uneg",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Int(i64::from(!(env.arg(0).i() as u32))))
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "push",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
             v.push(env.arg(1).clone());
             Ok(v.clone())
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
 
     func!(st, "prepend",
         |env: &mut Env, argc: usize| {
@@ -1167,7 +1218,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
 
             Ok(v)
-        }, Some(1), None);
+        }, Some(1), None, false);
 
     func!(st, "append",
         |env: &mut Env, argc: usize| {
@@ -1195,13 +1246,13 @@ pub fn std_symbol_table() -> SymbolTable {
             }
 
             Ok(v)
-        }, Some(1), None);
+        }, Some(1), None, false);
 
     func!(st, "pop",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
             Ok(v.pop())
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "take",
         |env: &mut Env, _argc: usize| {
@@ -1217,7 +1268,7 @@ pub fn std_symbol_table() -> SymbolTable {
                         "drop only works with a list as second argument, got '{}'",
                         lst.s())))
             }
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
 
     func!(st, "drop",
         |env: &mut Env, _argc: usize| {
@@ -1233,17 +1284,17 @@ pub fn std_symbol_table() -> SymbolTable {
                         "drop only works with a list as second argument, got '{}'",
                         lst.s())))
             }
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
 
     func!(st, "str:len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_len() as i64)) },
-        Some(1), Some(1));
+        Some(1), Some(1), false);
     func!(st, "str:to_lowercase",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_lowercase())) },
-        Some(1), Some(1));
+        Some(1), Some(1), false);
     func!(st, "str:to_uppercase",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_uppercase())) },
-        Some(1), Some(1));
+        Some(1), Some(1), false);
     func!(st, "str:padl",
         |env: &mut Env, _argc: usize| {
             let len = env.arg(0).i() as usize;
@@ -1255,7 +1306,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
 
             Ok(VVal::new_str_mv(s))
-        }, Some(3), Some(3));
+        }, Some(3), Some(3), false);
 
     func!(st, "str:padr",
         |env: &mut Env, _argc: usize| {
@@ -1268,7 +1319,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
 
             Ok(VVal::new_str_mv(s))
-        }, Some(3), Some(3));
+        }, Some(3), Some(3), false);
     func!(st, "str:cat",
         |env: &mut Env, argc: usize| {
             let lst = env.arg(0);
@@ -1283,7 +1334,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 }
                 Ok(VVal::new_str_mv(s))
             }
-        }, None, None);
+        }, None, None, false);
     func!(st, "str:join",
         |env: &mut Env, _argc: usize| {
             let sep = env.arg(0).s_raw();
@@ -1298,7 +1349,7 @@ pub fn std_symbol_table() -> SymbolTable {
                         "str:join only works with lists as second argument, got '{}'",
                         lst.s())))
             }
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
     func!(st, "str:from_utf8_lossy",
         |env: &mut Env, _argc: usize| {
             let b = env.arg(0);
@@ -1308,7 +1359,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 } else {
                     VVal::Nul
                 })
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
     func!(st, "str:from_utf8",
         |env: &mut Env, _argc: usize| {
             let b = env.arg(0);
@@ -1323,12 +1374,12 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 Ok(VVal::Nul)
             }
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "str:to_bytes",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::new_byt(env.arg(0).s_raw().as_bytes().to_vec()))
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "bytes:from_vec",
         |env: &mut Env, _argc: usize| {
@@ -1338,7 +1389,7 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 Ok(VVal::Nul)
             }
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "bytes:to_vec",
         |env: &mut Env, _argc: usize| {
@@ -1350,7 +1401,7 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 Ok(VVal::Nul)
             }
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "bytes:from_hex",
         |env: &mut Env, _argc: usize| {
@@ -1370,7 +1421,7 @@ pub fn std_symbol_table() -> SymbolTable {
                          out.push((((last << 4) | (c & 0x0F)) & 0xFF) as u8);
                          (256, out)
                      }).1))
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "bytes:to_hex",
         |env: &mut Env, argc: usize| {
@@ -1412,14 +1463,14 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 Ok(VVal::Nul)
             }
-        }, Some(1), Some(3));
+        }, Some(1), Some(3), false);
 
     func!(st, "yay",
         |env: &mut Env, _argc: usize| {
             println!("YAAAAY {}", env.arg(0).s());
             env.dump_stack();
             Ok(VVal::Nul)
-        }, None, None);
+        }, None, None, false);
 
     func!(st, "to_drop",
         |env: &mut Env, _argc: usize| {
@@ -1427,7 +1478,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let v   = env.arg(0);
 
             Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
 
     func!(st, "fold",
         |env: &mut Env, _argc: usize| {
@@ -1457,7 +1508,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
 
             Ok(acc)
-        }, Some(3), Some(3));
+        }, Some(3), Some(3), false);
 
     func!(st, "io:file:read_text",
         |env: &mut Env, _argc: usize| {
@@ -1491,7 +1542,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     Ok(VVal::new_str_mv(contents))
                 },
             }
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "io:file:read",
         |env: &mut Env, _argc: usize| {
@@ -1525,7 +1576,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     Ok(VVal::new_byt(contents))
                 },
             }
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "io:file:write_safe",
         |env: &mut Env, _argc: usize| {
@@ -1572,7 +1623,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     return Ok(VVal::Bol(true));
                 },
             }
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
 
     func!(st, "io:file:append",
         |env: &mut Env, _argc: usize| {
@@ -1611,7 +1662,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     return Ok(VVal::Bol(true));
                 },
             }
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
 
     func!(st, "displayln",
         |env: &mut Env, argc: usize| {
@@ -1629,7 +1680,7 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 Ok(VVal::Nul)
             }
-        }, None, None);
+        }, None, None, false);
 
     func!(st, "dump_func",
         |env: &mut Env, _argc: usize| {
@@ -1637,7 +1688,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 return Ok(f.dump_upvals());
             }
             Ok(VVal::Nul)
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "assert_eq",
         |env: &mut Env, _argc: usize| {
@@ -1658,12 +1709,17 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 Ok(VVal::Bol(true))
             }
-        }, Some(2), Some(3));
+        }, Some(2), Some(3), true);
 
     func!(st, "set_ref",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).set_ref(env.arg(1).clone()))
-        }, Some(2), Some(2));
+        }, Some(2), Some(2), false);
+
+    func!(st, "to_ref",
+        |env: &mut Env, _argc: usize| {
+            Ok(env.arg(0).to_ref())
+        }, Some(1), Some(1), true);
 
     func!(st, "ref_id",
         |env: &mut Env, _argc: usize| {
@@ -1672,12 +1728,12 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 Ok(VVal::Nul)
             }
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), true);
 
     func!(st, "weaken",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).downgrade())
-        }, Some(1), Some(1));
+        }, Some(1), Some(1), false);
 
     func!(st, "assert",
         |env: &mut Env, _argc: usize| {
@@ -1690,7 +1746,7 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 Ok(env.arg(0).clone())
             }
-        }, Some(1), Some(2));
+        }, Some(1), Some(2), true);
 
     if cfg!(feature="regex") {
         use regex::Regex;
@@ -1740,7 +1796,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 })));
                 if ret.is_err() { return ret; }
                 Ok(ret_str)
-            }, Some(3), Some(3));
+            }, Some(3), Some(3), false);
 
         func!(st, "re:match",
             |env: &mut Env, _argc: usize| {
@@ -1775,7 +1831,7 @@ pub fn std_symbol_table() -> SymbolTable {
                         Ok(VVal::Nul)
                     }
                 }
-            }, Some(3), Some(3));
+            }, Some(3), Some(3), false);
 
         func!(st, "re:map",
             |env: &mut Env, _argc: usize| {
@@ -1813,7 +1869,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     }
                 }
                 Ok(ret)
-            }, Some(3), Some(3));
+            }, Some(3), Some(3), false);
     }
 
     if cfg!(feature="chrono") {
@@ -1831,7 +1887,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 };
 
                 Ok(VVal::new_str_mv(dt.format(&fmt).to_string()))
-            }, Some(0), Some(1));
+            }, Some(0), Some(1), false);
     }
 
     if cfg!(feature="serde_json") {
@@ -1844,7 +1900,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     Ok(s) => Ok(VVal::new_str_mv(s)),
                     Err(e) => Ok(VVal::err_msg(&e)),
                 }
-            }, Some(1), Some(2));
+            }, Some(1), Some(2), false);
 
         func!(st, "deser:json",
             |env: &mut Env, _argc: usize| {
@@ -1854,7 +1910,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     Ok(v) => Ok(v),
                     Err(e) => Ok(VVal::err_msg(&e)),
                 }
-            }, Some(1), Some(1));
+            }, Some(1), Some(1), false);
     }
 
     if cfg!(feature="rmp-serde") {
@@ -1865,7 +1921,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     Ok(s) => Ok(VVal::new_byt(s)),
                     Err(e) => Ok(VVal::err_msg(&e)),
                 }
-            }, Some(1), Some(1));
+            }, Some(1), Some(1), false);
 
         func!(st, "deser:msgpack",
             |env: &mut Env, _argc: usize| {
@@ -1877,7 +1933,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 } else {
                     Ok(VVal::err_msg("deser:msgpack expects bytes"))
                 }
-            }, Some(1), Some(1));
+            }, Some(1), Some(1), false);
     }
 
     st

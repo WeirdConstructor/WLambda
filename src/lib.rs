@@ -134,9 +134,9 @@ range 0 10 1 { # This is a regular function.
     # _? transforms an error value, and returns it from the current
     #    function. optionally jumping outwards.
 
-    std:assert_eq (str {
+    std:assert_eq (str ~ std:to_ref ~ {
         _? ~ $e "ok"; # is with an error value the same as: `return $e "ok"`
-    }[]) "$e[98,17:<wlambda::eval>(Err)] \"ok\"";
+    }[]) "$&&$e[98,17:<wlambda::eval>(Err)] \"ok\"";
 
     _? 10; # passes the value through
 
@@ -212,7 +212,7 @@ ctx.set_global_var(
        Ok(VVal::Int(
           (env.arg(0).i() + 11)
         * (env.arg(1).i() + 13)))
-    }, Some(2), Some(2)));
+    }, Some(2), Some(2), false));
 
 
 let res_add : VVal = ctx.eval("my_crazy_add 2 4").unwrap();

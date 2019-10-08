@@ -156,7 +156,7 @@ impl Sender {
                             a
                         };
                     Ok(sender.call(&env.arg(0).s_raw(), args))
-                }, Some(1), None));
+                }, Some(1), None, false));
 
         let sender = self.clone();
         ctx.set_global_var(&format!("{}_send", variable_name),
@@ -173,7 +173,7 @@ impl Sender {
                         };
                     sender.send(&env.arg(0).s_raw(), args);
                     Ok(VVal::Nul)
-                }, Some(1), None));
+                }, Some(1), None, false));
     }
 
     /// Calls the global variable in the receiver thread
@@ -338,7 +338,7 @@ impl MsgHandle {
             &VValFun::new_fun(move |_env: &mut Env, _argc: usize| {
                 *qr.borrow_mut() = true;
                 Ok(VVal::Nul)
-            }, Some(0), Some(0)));
+            }, Some(0), Some(0), false));
 
         loop {
             self.step(ctx, &std::time::Duration::from_secs(1));

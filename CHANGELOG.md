@@ -1,6 +1,10 @@
 0.3.2 (unreleased)
 ==================
 
+* Incompatible Change: Error values are no longer allowed as function arguments.
+This greatly improves the situation where error values linger around in
+data structures or get written out unintentionally. With this the risk of
+unintentionally ignoring an error is mitigated.
 * Feature: Calling numbers with strings and byte vectors returns the
 character or byte substring at that index (based on 0). This is symmetrical,
 you can also call a string or a byte vector with an integer to get the
