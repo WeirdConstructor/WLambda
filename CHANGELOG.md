@@ -11,6 +11,8 @@ you can also call a string or a byte vector with an integer to get the
 same result.
 * Feature: Added std:io:file:read\_text, std:io:file:read, std:io:file:write\_safe
 and std:io:file:append.
+* Bugfix: VValUserData get_key() was never called.
+* Feature: Added VValUserData::call() to make VValUserData callable.
 
 0.3.1 (2019-09-16)
 ==================

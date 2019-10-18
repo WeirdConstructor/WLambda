@@ -2492,6 +2492,12 @@ mod tests {
             fn s(&self) -> String { format!("$<MyType({:?})>", self.x.borrow()) }
             fn i(&self) -> i64    { self.x.borrow_mut().1 }
             fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+            fn get_key(&self, key: &str) -> Option<VVal> {
+                Some(VVal::new_str(key))
+            }
+            fn call(&self, args: &[VVal]) -> Result<VVal, StackAction> {
+                Ok(args[0].clone())
+            }
             fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
                 Box::new(self.clone())
             }
@@ -2522,11 +2528,11 @@ mod tests {
         let r = &mut ctx.eval(r#"
             !x = new_mytype[];
             !i = modify_mytype x;
-            $[i, x]
+            $[i, x, x.foo, x :foo2]
         "#).unwrap();
 
         assert_eq!(
-            r.s(), "$[98,$<MyType((14, 84))>]", "Userdata implementation works");
+            r.s(), "$[98,$<MyType((14, 84))>,\"foo\",:\"foo2\"]", "Userdata implementation works");
     }
 
     #[test]

@@ -574,7 +574,7 @@ impl VValFun {
 /// use std::rc::Rc;
 /// use std::cell::RefCell;
 /// use wlambda::vval::Env;
-/// use wlambda::{VVal, GlobalEnv};
+/// use wlambda::{VVal, GlobalEnv, StackAction};
 ///
 /// #[derive(Clone, Debug)]
 /// struct MyType {
@@ -584,6 +584,16 @@ impl VValFun {
 /// impl wlambda::vval::VValUserData for MyType {
 ///     fn s(&self) -> String { format!("$<MyType({:?})>", self.x.borrow()) }
 ///     fn i(&self) -> i64    { self.x.borrow_mut().1 }
+///     fn get_key(&self, key: &str) -> Option<VVal> {
+///         Some(VVal::new_str(key))
+///     }
+///     fn call(&self, args: &[VVal]) -> Result<VVal, StackAction> {
+///         if args.len() < 0 {
+///             return Err(StackAction::panic_msg(
+///                 format!("{} called with too few arguments", self.s())));
+///         }
+///         Ok(args[0].clone())
+///     }
 ///     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
 ///     fn clone_ud(&self) -> Box<dyn wlambda::vval::VValUserData> {
 ///         Box::new(self.clone())
@@ -622,6 +632,41 @@ impl VValFun {
 /// assert_eq!(
 ///     r.s(), "$[98,$<MyType((14, 84))>]", "Userdata implementation works");
 ///```
+
+/// Sometimes, if your UserData is a Rc<RefCell<...>>, it can pay off defining
+/// some wrapper and From/Into traits for easier handling:
+///
+/// Here an example from a game I worked on:
+///```
+/// use wlambda::vval::{VVal, StackAction, VValUserData};
+/// use std::rc::Rc;
+/// use std::cell::RefCell;
+///
+/// #[derive(Clone)]
+/// struct Ship { }
+///
+/// #[derive(Clone)]
+/// struct ShipWlWrapper(Rc<RefCell<Ship>>);
+///
+/// impl From<Rc<RefCell<Ship>>> for ShipWlWrapper {
+///     fn from(r: Rc<RefCell<Ship>>) -> ShipWlWrapper {
+///         ShipWlWrapper(r)
+///     }
+/// }
+///
+/// impl Into<VVal> for ShipWlWrapper {
+///     fn into(self) -> VVal { VVal::Usr(Box::new(self)) }
+/// }
+///
+/// impl VValUserData for ShipWlWrapper {
+///     // ...
+///     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+///     fn clone_ud(&self) -> Box<dyn wlambda::vval::VValUserData> {
+///         Box::new(self.clone())
+///     }
+/// }
+///```
+
 #[allow(clippy::borrowed_box)]
 pub trait VValUserData {
     /// This method should return a human readable syntax representation
@@ -650,6 +695,8 @@ pub trait VValUserData {
     /// This method returns some value that your user data
     /// associates with the given key.
     fn get_key(&self, _key: &str) -> Option<VVal> { None }
+    /// This method is called when the user data is called.
+    fn call(&self, _args: &[VVal]) -> Result<VVal, StackAction> { Ok(VVal::Nul) }
     /// This should be implemented simply by returning
     /// a mutable reference to the concrete type self.
     /// It allows you to access your data structure from inside
@@ -997,7 +1044,7 @@ impl VVal {
                     if argc > 0 {
                         let v = e.arg(0);
                         match v {
-                            VVal::Ref(_) | VVal::CRef(_) | VVal::WWRef(_) | VVal::Map(_) =>
+                            VVal::Ref(_) | VVal::CRef(_) | VVal::WWRef(_) | VVal::Map(_) | VVal::Usr(_) =>
                                 Ok(v.get_key(&sym).unwrap_or(VVal::Nul)),
                             _ => Ok(VVal::Nul)
                         }
@@ -1133,7 +1180,14 @@ impl VVal {
                         }
                     } else { Ok(self.clone()) }
                 })
-            }
+            },
+            VVal::Usr(ud) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    let mut args = vec![];
+                    for i in 0..argc { args.push(e.arg(i)) }
+                    ud.call(&args)
+                })
+            },
             _ => { Ok(self.clone()) },
         }
     }
