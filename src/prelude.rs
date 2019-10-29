@@ -808,64 +808,64 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
         if    env.arg(match_vals[0]).is_sym()
             && env.arg(match_vals[0]).s_raw().chars().nth(0).unwrap_or('_') == '?' {
 
-                match &env.arg(match_vals[0]).s_raw()[..] {
-                    "?t" => {
-                        let val_type_name = val.type_name();
+            match &env.arg(match_vals[0]).s_raw()[..] {
+                "?t" => {
+                    let val_type_name = val.type_name();
+                    for i in match_vals.iter().skip(1) {
+                        if env.arg(*i).s_raw() == val_type_name {
+                            return env.arg(fun_idx).call(env, &[val.clone()]);
+                        }
+                    }
+                },
+                "?s" => {
+                    let val_s = val.s_raw();
+                    for i in match_vals.iter().skip(1) {
+                        if env.arg(*i).s_raw() == val_s {
+                            return env.arg(fun_idx).call(env, &[val.clone()]);
+                        }
+                    }
+                },
+                "?e" => {
+                    if let VVal::Err(e) = val {
+                        let err_val = e.borrow().0.at(0).unwrap_or_else(|| e.borrow().0.clone());
+
                         for i in match_vals.iter().skip(1) {
-                            if env.arg(*i).s_raw() == val_type_name {
+                            if env.arg(*i).eqv(&err_val) {
+                                let args = vec![
+                                    e.borrow().0.clone(),
+                                    VVal::Int(i64::from(e.borrow().1.line)),
+                                    VVal::Int(i64::from(e.borrow().1.col)),
+                                    VVal::new_str(e.borrow().1.file.s()),
+                                ];
+                                return env.arg(fun_idx).call(env, &args);
+                            }
+                        }
+                    }
+                },
+                "?p" => {
+                    if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
+                    let fun_idx = fun_idx + 1;
+
+                    let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
+                    match pred_res {
+                        Ok(v) => {
+                            arg_idx += 1;
+                            if v.b() {
                                 return env.arg(fun_idx).call(env, &[val.clone()]);
                             }
-                        }
-                    },
-                        "?s" => {
-                            let val_s = val.s_raw();
-                            for i in match_vals.iter().skip(1) {
-                                if env.arg(*i).s_raw() == val_s {
-                                    return env.arg(fun_idx).call(env, &[val.clone()]);
-                                }
-                            }
                         },
-                        "?e" => {
-                            if let VVal::Err(e) = val {
-                                let err_val = e.borrow().0.at(0).unwrap_or_else(|| e.borrow().0.clone());
-
-                                for i in match_vals.iter().skip(1) {
-                                    if env.arg(*i).eqv(&err_val) {
-                                        let args = vec![
-                                            e.borrow().0.clone(),
-                                            VVal::Int(i64::from(e.borrow().1.line)),
-                                            VVal::Int(i64::from(e.borrow().1.col)),
-                                            VVal::new_str(e.borrow().1.file.s()),
-                                        ];
-                                        return env.arg(fun_idx).call(env, &args);
-                                    }
-                                }
-                            }
-                        },
-                        "?p" => {
-                            if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
-                            let fun_idx = fun_idx + 1;
-
-                            let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
-                            match pred_res {
-                                Ok(v) => {
-                                    arg_idx += 1;
-                                    if v.b() {
-                                        return env.arg(fun_idx).call(env, &[val.clone()]);
-                                    }
-                                },
-                                    Err(sa) => { return Err(sa); }
-                            }
-                        },
-                        _ => {
-                            // TODO: Usually we should bail out with an error here.
-                        }
-                }
-            } else {
-                for i in match_vals.iter() {
-                    if env.arg(*i).eqv(val) {
-                        return env.arg(fun_idx).call(env, &[val.clone()]);
+                        Err(sa) => { return Err(sa); }
                     }
+                },
+                _ => {
+                    // TODO: Usually we should bail out with an error here.
+                }
+            }
+        } else {
+            for i in match_vals.iter() {
+                if env.arg(*i).eqv(val) {
+                    return env.arg(fun_idx).call(env, &[val.clone()]);
+                }
             }
         }
 
