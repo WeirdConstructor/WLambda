@@ -101,6 +101,12 @@ impl SymbolTable {
         }
     }
 
+    /// Sets the entry `name` to the `value`. So that the
+    /// value can be imported.
+    pub fn set(&mut self, name: &str, value: VVal) {
+        self.symbols.insert(String::from(name), value);
+    }
+
     /// Helper function for building symbol tables with functions in them.
     ///
     /// See also `VValFun::new_fun` for more details.
@@ -125,8 +131,10 @@ impl SymbolTable {
 }
 
 impl ModuleResolver for LocalFileModuleResolver {
-    fn resolve(&mut self, _global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError> {
-        let mut ctx = EvalContext::new(GlobalEnv::new_empty_default());
+    fn resolve(&mut self, global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError> {
+        let genv = GlobalEnv::new_empty_default();
+        genv.borrow_mut().import_modules_from(&*global.borrow());
+        let mut ctx = EvalContext::new(genv);
         let pth = path.join("/");
         match ctx.eval_file(&(pth.clone() + ".wl")) {
             Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
@@ -304,6 +312,14 @@ impl GlobalEnv {
         g.borrow_mut().import_module_as("wlambda", "");
         g.borrow_mut().import_module_as("std",     "std");
         g
+    }
+
+    /// This function adds the modules that were loaded into memory
+    /// from the given `parent_global_env` to the current environment.
+    pub fn import_modules_from(&mut self, parent_global_env: &GlobalEnv) {
+        for (mod_name, symtbl) in parent_global_env.mem_modules.borrow().iter() {
+            self.set_module(mod_name, symtbl.clone());
+        }
     }
 
     /// This is like `new_default` but does not import anything, neither the

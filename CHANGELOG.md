@@ -13,6 +13,10 @@ same result.
 and std:io:file:append.
 * Bugfix: VValUserData get_key() was never called.
 * Feature: Added VValUserData::call() to make VValUserData callable.
+* Bugfix: LocalFileModuleResolver now properly inherits the loaded modules from the
+parent GlobalEnv.
+* Feature: Added SymbolTable::set() for setting variables that are provided by a module
+from Rust.
 
 0.3.1 (2019-09-16)
 ==================
