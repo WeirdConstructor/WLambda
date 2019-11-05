@@ -103,6 +103,7 @@ impl SymbolTable {
 
     /// Sets the entry `name` to the `value`. So that the
     /// value can be imported.
+    #[allow(dead_code)]
     pub fn set(&mut self, name: &str, value: VVal) {
         self.symbols.insert(String::from(name), value);
     }
@@ -2735,5 +2736,83 @@ mod tests {
         assert_eq!(s_eval("2 $Q$abc$"), "$b\"c\"");
         assert_eq!(s_eval("$Q$abc$.0"), "$b\"a\"");
         assert_eq!(s_eval("$Q$abc$.2"), "$b\"c\"");
+    }
+
+    #[test]
+    fn check_num_funs() {
+        assert_eq!(s_eval("std:num:ceil  1.0"), "1");
+        assert_eq!(s_eval("std:num:ceil  1.1"), "2");
+        assert_eq!(s_eval("std:num:ceil  1.5"), "2");
+        assert_eq!(s_eval("std:num:ceil  1.9"), "2");
+        assert_eq!(s_eval("std:num:floor  1.0"), "1");
+        assert_eq!(s_eval("std:num:floor  1.1"), "1");
+        assert_eq!(s_eval("std:num:floor  1.5"), "1");
+        assert_eq!(s_eval("std:num:floor  1.9"), "1");
+        assert_eq!(s_eval("std:num:round  1.0"), "1");
+        assert_eq!(s_eval("std:num:round  1.1"), "1");
+        assert_eq!(s_eval("std:num:round  1.5"), "2");
+        assert_eq!(s_eval("std:num:round  1.9"), "2");
+        assert_eq!(s_eval("std:num:sqrt   2"),   "1.4142135623730951");
+        assert_eq!(s_eval("std:num:cbrt   2"),   "1.259921049894873");
+        assert_eq!(s_eval("std:num:to_degrees   2"),   "114.59155902616465");
+        assert_eq!(s_eval("std:num:to_radians   2"),   "0.03490658503988659");
+        assert_eq!(s_eval("std:num:tan   2"),      "-2.185039863261519");
+        assert_eq!(s_eval("std:num:tanh  2"),      "0.9640275800758169");
+        assert_eq!(s_eval("std:num:sin   2"),      "0.9092974268256817");
+        assert_eq!(s_eval("std:num:sinh  2"),      "3.6268604078470186");
+        assert_eq!(s_eval("std:num:cos   2"),      "-0.4161468365471424");
+        assert_eq!(s_eval("std:num:cosh  2"),      "3.7621956910836314");
+        assert_eq!(s_eval("std:num:atan   2"),     "1.1071487177940904");
+        assert_eq!(s_eval("std:num:atanh  0.5"),   "0.5493061443340549");
+        assert_eq!(s_eval("std:num:asin   0.5"),   "0.5235987755982989");
+        assert_eq!(s_eval("std:num:asinh  0.5"),   "0.48121182505960347");
+        assert_eq!(s_eval("std:num:acos   0.5"),   "1.0471975511965979");
+        assert_eq!(s_eval("std:num:acosh  2.1"),   "1.37285914424258");
+
+        assert_eq!(s_eval("std:num:ln     200"),   "5.298317366548036");
+        assert_eq!(s_eval("std:num:log2   200"),   "7.643856189774724");
+        assert_eq!(s_eval("std:num:log10  200"),   "2.3010299956639813");
+        assert_eq!(s_eval("std:num:exp_m1   2"),   "6.38905609893065");
+        assert_eq!(s_eval("std:num:exp      2"),   "7.38905609893065");
+        assert_eq!(s_eval("std:num:exp2   10"),    "1024");
+        assert_eq!(s_eval("std:num:log   100 3"),   "4.19180654857877");
+        assert_eq!(s_eval("std:num:pow   100 3"),   "1000000");
+        assert_eq!(s_eval("std:num:pow   100 3.1"), "1584893.1924611141");
+        assert_eq!(s_eval("std:num:abs   -1.2"),    "1.2");
+        assert_eq!(s_eval("(std:num:abs  -1) * 2"), "2");
+    }
+
+    #[test]
+    fn check_hash_fnv1() {
+        assert_eq!(s_eval("std:hash:fnv1a 123123123"), "3905796366342510356");
+        assert_eq!(s_eval("std:hash:fnv1a 231.2"), "-1882808912766899311");
+        assert_eq!(s_eval("std:hash:fnv1a 231.1"), "4682567979461110603");
+        assert_eq!(s_eval("std:hash:fnv1a :123123123"), "-7308283643128320213");
+        assert_eq!(s_eval("(std:hash:fnv1a \"a\") - 0xaf63dc4c8601ec8c"), "0");
+        assert_eq!(s_eval("(std:hash:fnv1a \"foo\") - 0xdcb27518fed9d577"), "0");
+        assert_eq!(s_eval("(std:hash:fnv1a \"fo\" :o) - 0xdcb27518fed9d577"), "0");
+        assert_eq!(s_eval("(std:hash:fnv1a \"f\" :o :o) - 0xdcb27518fed9d577"), "0");
+        assert_eq!(s_eval("(std:hash:fnv1a \"\")  - 0xcbf29ce484222325"), "0");
+        assert_eq!(s_eval("(std:hash:fnv1a \"http://www.isthe.com/chongo/tech/math/prime/mersenne.html#largest\")  - 0x8e87d7e7472b3883"), "0");
+    }
+
+    #[test]
+    fn check_splitmix64() {
+        assert_eq!(s_eval(r"
+            !s = std:rand:split_mix64_new_from 120312302310;
+            std:rand:split_mix64_next s
+        "), "4473449133009263371");
+        assert_eq!(s_eval(r"
+            !s = std:rand:split_mix64_new_from 120312302310;
+            std:rand:split_mix64_next s 4
+        "), "$[4473449133009263371,-9009341174627168353,7739434774028954414,-453282142843114385]");
+        assert_eq!(s_eval(r"
+            !s = std:rand:split_mix64_new_from 120312302310;
+            std:rand:split_mix64_next_open01 s 4
+        "), "$[0.24250616342560194,0.5116026362903058,0.41955559979060253,0.9754275257990305]");
+        assert_eq!(s_eval(r"
+            !s = std:rand:split_mix64_new_from 120312302310;
+            std:rand:split_mix64_next_open01 s
+        "), "0.24250616342560194");
     }
 }

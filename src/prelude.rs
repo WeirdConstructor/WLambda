@@ -704,10 +704,43 @@ std:assert ~ (year_str | int) == 2019;
 !now_str = std:chrono:timestamp[];
 ```
 
+### hash
+
+#### hash:fnv1a _arg1_ ...
+
+Hashes all the arguments as FNV1a and returns an integer.
+
+### rand
+
+#### rand:split_mix64_new
+
+Initializes the _sm_state_ from the current time (seconds) and returns it.
+The time is retrieved in seconds, so don't expect different seed states
+if you call this multiple times in the same wall clock second.
+The returned value is supposed to be passed to `rand:split_mix64_next`
+or `rand:split_mix64_next_open01`.
+
+#### rand:split_mix64_new_from _seed_
+
+Initializes the _sm_state_ from the given _seed_ and returns it.
+The returned value is supposed to be passed to `rand:split_mix64_next`
+or `rand:split_mix64_next_open01`.
+
+#### rand:split_mix64_next _sm_state_ \[_count_]
+
+Returns the _count_ next integer values generated from the given
+_sm_state_.
+
+#### rand:split_mix64_next_open01 _sm_state_ \[_count_]
+
+Returns the _count_ next float values (in an open [0, 1) interval)
+generated from the given _sm_state_.
+
 */
 
 use crate::compiler::*;
 use crate::vval::*;
+use crate::util;
 use std::rc::Rc;
 
 macro_rules! func {
@@ -782,6 +815,24 @@ macro_rules! add_sbin_op {
                 let $b = env.arg(1);
                 $e
                 }, Some(2), Some(2), false);
+    }
+}
+
+macro_rules! add_num_fun_flt {
+    ($g: ident, $op: literal, $e: tt) => {
+        func!($g, $op,
+            |env: &mut Env, _argc: usize| {
+                Ok(VVal::Flt(env.arg(0).f().$e()))
+            }, Some(1), Some(1), false);
+    }
+}
+
+macro_rules! add_num_fun_flt2 {
+    ($g: ident, $op: literal, $e: tt) => {
+        func!($g, $op,
+            |env: &mut Env, _argc: usize| {
+                Ok(VVal::Flt(env.arg(0).f().$e(env.arg(1).f())))
+            }, Some(2), Some(2), false);
     }
 }
 
@@ -1510,6 +1561,49 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(acc)
         }, Some(3), Some(3), false);
 
+    add_num_fun_flt!(st, "num:ceil",       ceil);
+    add_num_fun_flt!(st, "num:sqrt",       sqrt);
+    add_num_fun_flt!(st, "num:cbrt",       cbrt);
+    add_num_fun_flt!(st, "num:floor",      floor);
+    add_num_fun_flt!(st, "num:round",      round);
+    add_num_fun_flt!(st, "num:trunc",      trunc);
+    add_num_fun_flt!(st, "num:to_degrees", to_degrees);
+    add_num_fun_flt!(st, "num:to_radians", to_radians);
+    add_num_fun_flt!(st, "num:tan",        tan);
+    add_num_fun_flt!(st, "num:tanh",       tanh);
+    add_num_fun_flt!(st, "num:sin",        sin);
+    add_num_fun_flt!(st, "num:sinh",       sinh);
+    add_num_fun_flt!(st, "num:cos",        cos);
+    add_num_fun_flt!(st, "num:cosh",       cosh);
+    add_num_fun_flt!(st, "num:asin",       asin);
+    add_num_fun_flt!(st, "num:asinh",      asinh);
+    add_num_fun_flt!(st, "num:acos",       acos);
+    add_num_fun_flt!(st, "num:acosh",      acosh);
+    add_num_fun_flt!(st, "num:recip",      recip);
+    add_num_fun_flt!(st, "num:log2",       log2);
+    add_num_fun_flt!(st, "num:log10",      log10);
+    add_num_fun_flt!(st, "num:ln",         ln);
+    add_num_fun_flt!(st, "num:exp_m1",     exp_m1);
+    add_num_fun_flt!(st, "num:exp",        exp);
+    add_num_fun_flt!(st, "num:exp2",       exp2);
+    add_num_fun_flt!(st, "num:atan",       atan);
+    add_num_fun_flt!(st, "num:atanh",      atanh);
+
+    add_num_fun_flt2!(st, "num:log",        log);
+    add_num_fun_flt2!(st, "num:atan2",      atan2);
+    add_num_fun_flt2!(st, "num:hypot",      hypot);
+    add_num_fun_flt2!(st, "num:pow",        powf);
+
+    func!(st, "num:abs",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::Int(i) => VVal::Int(i.abs()),
+                VVal::Flt(i) => VVal::Flt(i.abs()),
+                _ => VVal::Int(env.arg(0).i().abs())
+            })
+        }, Some(1), Some(1), false);
+
+
     func!(st, "io:file:read_text",
         |env: &mut Env, _argc: usize| {
             let filename = env.arg(0).s_raw();
@@ -1935,6 +2029,79 @@ pub fn std_symbol_table() -> SymbolTable {
                 }
             }, Some(1), Some(1), false);
     }
+
+    func!(st, "hash:fnv1a",
+        |env: &mut Env, argc: usize| {
+            let mut hash = util::FnvHasher::default();
+            for i in 0..argc {
+                match env.arg(i) {
+                    VVal::Int(i) => hash.write_i64(i),
+                    VVal::Flt(f) => hash.write_f64(f),
+                    _ => {
+                        let s = env.arg(i).s_raw();
+                        hash.write(&s.into_bytes()[..]);
+                    }
+                }
+            }
+            Ok(VVal::Int(hash.finish_i64()))
+        }, Some(1), None, false);
+
+    func!(st, "rand:split_mix64_new",
+        |_env: &mut Env, _argc: usize| {
+            let v = VVal::vec();
+            v.push(VVal::Int(util::now_timestamp() as i64));
+            Ok(v)
+        }, Some(0), Some(0), false);
+
+    func!(st, "rand:split_mix64_new_from",
+        |env: &mut Env, _argc: usize| {
+            let v = VVal::vec();
+            v.push(VVal::Int(env.arg(0).i()));
+            Ok(v)
+        }, Some(1), Some(1), false);
+
+    func!(st, "rand:split_mix64_next",
+        |env: &mut Env, argc: usize| {
+            let state : u64 =
+                u64::from_be_bytes(
+                    env.arg(0).at(0).unwrap_or(VVal::Int(0)).i().to_be_bytes());
+            let mut sm = util::SplitMix64::new(state);
+
+            let ret =
+                if argc == 2 {
+                    let v = VVal::vec();
+                    for _i in 0..env.arg(1).i() {
+                        v.push(VVal::Int(sm.next_i64()));
+                    }
+                    v
+                } else {
+                    VVal::Int(sm.next_i64())
+                };
+            env.arg(0).set_at(0,
+                VVal::Int(i64::from_be_bytes(sm.0.to_be_bytes())));
+            Ok(ret)
+        }, Some(1), Some(2), false);
+
+    func!(st, "rand:split_mix64_next_open01",
+        |env: &mut Env, argc: usize| {
+            let state : u64 =
+                env.arg(0).at(0).unwrap_or(VVal::Int(0)).i() as u64;
+            let mut sm = util::SplitMix64::new(state);
+            let ret =
+                if argc == 2 {
+                    let v = VVal::vec();
+                    for _i in 0..env.arg(1).i() {
+                        v.push(VVal::Flt(util::u64_to_open01(sm.next_u64())));
+                    }
+                    v
+                } else {
+                    VVal::Flt(util::u64_to_open01(sm.next_u64()))
+                };
+            env.arg(0).set_at(0,
+                VVal::Int(i64::from_be_bytes(sm.0.to_be_bytes())));
+            Ok(ret)
+        }, Some(1), Some(2), false);
+
 
     st
 }
