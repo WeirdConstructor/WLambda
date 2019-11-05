@@ -346,7 +346,7 @@ pub mod parser;
 pub mod compiler;
 pub mod prelude;
 pub mod threads;
-mod util;
+pub mod util;
 
 pub use vval::VVal;
 pub use vval::Env;
