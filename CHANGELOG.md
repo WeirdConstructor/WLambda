@@ -17,8 +17,8 @@ and std:io:file:append.
 parent GlobalEnv.
 * Feature: Added SymbolTable::set() for setting variables that are provided by a module
 from Rust.
-* Feature: Added many num:\* functions (still undocumented)
-* Feature: Added hash:fnv1a, and rand:split\_mix64\_\* functions.
+* Feature: Added many std:num:\* functions (still undocumented)
+* Feature: Added std:hash:fnv1a, and std:rand:split\_mix64\_\* functions.
 
 0.3.1 (2019-09-16)
 ==================
