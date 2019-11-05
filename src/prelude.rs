@@ -1476,7 +1476,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "bytes:to_hex",
         |env: &mut Env, argc: usize| {
-            static HEXCHARS : &'static [char] =
+            static HEXCHARS : &[char] =
                 &['0', '1', '2', '3', '4', '5', '6', '7',
                   '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
 
@@ -1620,20 +1620,21 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match file {
                 Err(e) => {
-                    return Ok(VVal::err_msg(
+                    Ok(VVal::err_msg(
                         &format!(
                             "Couldn't open file '{}': {}",
-                            filename, e)));
+                            filename, e)))
                 },
                 Ok(mut f) => {
                     let mut contents = String::new();
                     if let Err(e) = f.read_to_string(&mut contents) {
-                        return Ok(VVal::err_msg(
+                        Ok(VVal::err_msg(
                             &format!(
                                 "Couldn't read text from file '{}': {}",
-                                filename, e)));
+                                filename, e)))
+                    } else {
+                        Ok(VVal::new_str_mv(contents))
                     }
-                    Ok(VVal::new_str_mv(contents))
                 },
             }
         }, Some(1), Some(1), false);
@@ -1654,20 +1655,21 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match file {
                 Err(e) => {
-                    return Ok(VVal::err_msg(
+                    Ok(VVal::err_msg(
                         &format!(
                             "Couldn't open file '{}': {}",
-                            filename, e)));
+                            filename, e)))
                 },
                 Ok(mut f) => {
                     let mut contents : Vec<u8> = Vec::new();
                     if let Err(e) = f.read_to_end(&mut contents) {
-                        return Ok(VVal::err_msg(
+                        Ok(VVal::err_msg(
                             &format!(
                                 "Couldn't read text from file '{}': {}",
-                                filename, e)));
+                                filename, e)))
+                    } else {
+                        Ok(VVal::new_byt(contents))
                     }
-                    Ok(VVal::new_byt(contents))
                 },
             }
         }, Some(1), Some(1), false);
@@ -1694,10 +1696,10 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match file {
                 Err(e) => {
-                    return Ok(VVal::err_msg(
+                    Ok(VVal::err_msg(
                         &format!(
                             "Couldn't open file '{}': {}",
-                            filename, e)));
+                            filename, e)))
                 },
                 Ok(mut f) => {
                     if let Err(e) = f.write_all(&buf) {
@@ -1714,7 +1716,7 @@ pub fn std_symbol_table() -> SymbolTable {
                                 tmp_filename, filename, e)));
                     }
 
-                    return Ok(VVal::Bol(true));
+                    Ok(VVal::Bol(true))
                 },
             }
         }, Some(2), Some(2), false);
@@ -1740,20 +1742,20 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match file {
                 Err(e) => {
-                    return Ok(VVal::err_msg(
+                    Ok(VVal::err_msg(
                         &format!(
                             "Couldn't open file '{}': {}",
-                            filename, e)));
+                            filename, e)))
                 },
                 Ok(mut f) => {
                     if let Err(e) = f.write_all(&buf) {
-                        return Ok(VVal::err_msg(
+                        Ok(VVal::err_msg(
                             &format!(
                                 "Couldn't write to file '{}': {}",
-                                filename, e)));
+                                filename, e)))
+                    } else {
+                        Ok(VVal::Bol(true))
                     }
-
-                    return Ok(VVal::Bol(true));
                 },
             }
         }, Some(2), Some(2), false);

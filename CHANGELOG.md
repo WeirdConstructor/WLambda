@@ -1,4 +1,4 @@
-0.3.2 (unreleased)
+0.3.2 (2019-11-05)
 ==================
 
 * Incompatible Change: Error values are no longer allowed as function arguments.

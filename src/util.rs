@@ -28,10 +28,10 @@ impl SplitMix64 {
 
     #[inline]
     pub fn next_u64(&mut self) -> u64 {
-        let mut z = w(self.0) + w(0x9E3779B97F4A7C15_u64);
+        let mut z = w(self.0) + w(0x9E37_79B9_7F4A_7C15_u64);
         self.0 = z.0;
-        z = (z ^ (z >> 30)) * w(0xBF58476D1CE4E5B9_u64);
-        z = (z ^ (z >> 27)) * w(0x94D049BB133111EB_u64);
+        z = (z ^ (z >> 30)) * w(0xBF58_476D_1CE4_E5B9_u64);
+        z = (z ^ (z >> 27)) * w(0x94D0_49BB_1331_11EB_u64);
         (z ^ (z >> 31)).0
     }
 
@@ -66,7 +66,7 @@ pub struct FnvHasher(u64);
 impl Default for FnvHasher {
     #[inline]
     fn default() -> FnvHasher {
-        FnvHasher(0xcbf29ce484222325)
+        FnvHasher(0xcbf2_9ce4_8422_2325)
     }
 }
 
@@ -78,12 +78,12 @@ impl FnvHasher {
     }
 
     #[inline]
-    fn finish(&self) -> u64 {
+    fn finish(self) -> u64 {
         self.0
     }
 
     #[inline]
-    pub fn finish_i64(&self) -> i64 {
+    pub fn finish_i64(self) -> i64 {
         i64::from_be_bytes(
             self.finish().to_be_bytes())
     }
@@ -99,12 +99,13 @@ impl FnvHasher {
     }
 
     #[inline]
+    #[allow(clippy::cast_lossless)]
     pub fn write(&mut self, bytes: &[u8]) {
         let FnvHasher(mut hash) = *self;
 
         for byte in bytes.iter() {
-            hash = hash ^ (*byte as u64);
-            hash = hash.wrapping_mul(0x100000001b3);
+            hash ^= *byte as u64;
+            hash = hash.wrapping_mul(0x0100_0000_01b3);
         }
 
         *self = FnvHasher(hash);

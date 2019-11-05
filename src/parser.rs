@@ -807,7 +807,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
     //println!("parse_value [{}]", ps.rest());
     if let Some(c) = ps.peek() {
         match c {
-            '0' ... '9' | '+' | '-' => parse_num(ps),
+            '0' ..= '9' | '+' | '-' => parse_num(ps),
             '"' => parse_string(ps, false),
             '$' => { ps.consume_wsc(); parse_special_value(ps) },
             '(' => {

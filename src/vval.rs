@@ -155,7 +155,7 @@ impl Env {
         e
     }
 
-    pub fn new_with_user(user: Rc<RefCell<std::any::Any>>) -> Env {
+    pub fn new_with_user(user: Rc<RefCell<dyn std::any::Any>>) -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             fun:                VValFun::new_dummy(),
@@ -170,7 +170,7 @@ impl Env {
     }
 
     /// Returns the passed in user context value.
-    pub fn get_user(&self) -> Rc<RefCell<std::any::Any>> {
+    pub fn get_user(&self) -> Rc<RefCell<dyn std::any::Any>> {
         self.user.clone()
     }
 
@@ -466,8 +466,8 @@ impl StackAction {
     }
 }
 
-pub type EvalNode = Box<Fn(&mut Env) -> Result<VVal,StackAction>>;
-pub type ClosNodeRef = Rc<RefCell<Fn(&mut Env, usize) -> Result<VVal,StackAction>>>;
+pub type EvalNode = Box<dyn Fn(&mut Env) -> Result<VVal,StackAction>>;
+pub type ClosNodeRef = Rc<RefCell<dyn Fn(&mut Env, usize) -> Result<VVal,StackAction>>>;
 
 /// This structure is the runtime representation of a WLambda function value.
 pub struct VValFun {
@@ -710,7 +710,7 @@ pub trait VValUserData {
     fn as_any(&mut self) -> &mut dyn std::any::Any;
 }
 
-impl std::fmt::Debug for VValUserData {
+impl std::fmt::Debug for dyn VValUserData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.s())
     }
@@ -1156,20 +1156,20 @@ impl VVal {
                         let v = e.arg(0);
                         match v {
                             VVal::Byt(vval_bytes) => {
-                                let r = vval_bytes.borrow();
-                                if *i as usize >= r.len() {
+                                let bytes = vval_bytes.borrow();
+                                if *i as usize >= bytes.len() {
                                     Ok(VVal::Nul)
                                 } else {
-                                    Ok(VVal::new_byt(vec![r[*i as usize]]))
+                                    Ok(VVal::new_byt(vec![bytes[*i as usize]]))
                                 }
                             },
                             VVal::Str(vval_str) => {
-                                let r = vval_str.borrow().chars().nth(*i as usize);
-                                match r {
+                                let opt_char = vval_str.borrow().chars().nth(*i as usize);
+                                match opt_char {
                                     None    => Ok(VVal::Nul),
-                                    Some(c) => {
-                                        let mut b = [0; 4];
-                                        Ok(VVal::new_str(c.encode_utf8(&mut b)))
+                                    Some(char) => {
+                                        let mut buf = [0; 4];
+                                        Ok(VVal::new_str(char.encode_utf8(&mut buf)))
                                     },
                                 }
                             },
@@ -1257,7 +1257,7 @@ impl VVal {
             VVal::DropFun(f) => { &**f as *const DropVVal as i64 },
             VVal::Ref(v)     => { &*v.borrow() as *const VVal as i64 },
             VVal::CRef(v)    => { &*v.borrow() as *const VVal as i64 },
-            VVal::Usr(b)     => { &**b as *const VValUserData as *const usize as i64 },
+            VVal::Usr(b)     => { &**b as *const dyn VValUserData as *const usize as i64 },
             VVal::WWRef(r)   => {
                 if let Some(l) = r.upgrade() {
                     &*l.borrow() as *const VVal as i64
@@ -1271,13 +1271,13 @@ impl VVal {
 
     pub fn eqv(&self, v: &VVal) -> bool {
         match self {
-            VVal::Nul     => { if let VVal::Nul = v { return true; } else { return false; } },
-            VVal::Bol(ia) => { if let VVal::Bol(ib) = v { return ia == ib; } else { return false; } },
-            VVal::Int(ia) => { if let VVal::Int(ib) = v { return ia == ib; } else { return false; } },
-            VVal::Flt(ia) => { if let VVal::Flt(ib) = v { return (ia - ib).abs() < std::f64::EPSILON; } else { return false; } },
-            VVal::Sym(s)  => { if let VVal::Sym(ib) = v { return *s == *ib; } else { return false; } },
-            VVal::Syn(s)  => { if let VVal::Syn(ib) = v { return *s == *ib; } else { return false; } },
-            VVal::Str(s)  => { if let VVal::Str(ib) = v { return *s == *ib; } else { return false; } },
+            VVal::Nul     => { if let VVal::Nul = v { true } else { false } },
+            VVal::Bol(ia) => { if let VVal::Bol(ib) = v { ia == ib } else { false } },
+            VVal::Int(ia) => { if let VVal::Int(ib) = v { ia == ib } else { false } },
+            VVal::Flt(ia) => { if let VVal::Flt(ib) = v { (ia - ib).abs() < std::f64::EPSILON } else { false } },
+            VVal::Sym(s)  => { if let VVal::Sym(ib) = v { *s == *ib } else { false } },
+            VVal::Syn(s)  => { if let VVal::Syn(ib) = v { *s == *ib } else { false } },
+            VVal::Str(s)  => { if let VVal::Str(ib) = v { *s == *ib } else { false } },
             VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s.borrow()[..] == s2.borrow()[..] } else { false } },
             VVal::Lst(l)  => {
                 if let VVal::Lst(l2) = v { Rc::ptr_eq(l, l2) } else { false }

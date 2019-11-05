@@ -1,6 +1,6 @@
 [package]
 name         = "wlambda"
-version      = "0.3.1"
+version      = "0.3.2"
 authors      = ["Weird Constructor <weirdconstructor@gmail.com>"]
 license      = "GPL-3.0-or-later"
 edition      = "2018"

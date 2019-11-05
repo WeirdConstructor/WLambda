@@ -471,7 +471,9 @@ impl EvalContext {
     }
 
     #[allow(dead_code)]
-    fn new_with_user_impl(global: GlobalEnvRef, user: Rc<RefCell<std::any::Any>>) -> EvalContext {
+    fn new_with_user_impl(
+        global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> EvalContext {
+
         EvalContext {
             global: global.clone(),
             local_compile: Rc::new(RefCell::new(CompileEnv {
@@ -488,7 +490,7 @@ impl EvalContext {
     }
 
     #[allow(dead_code)]
-    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<std::any::Any>>) -> EvalContext {
+    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> EvalContext {
         (Self::new_with_user_impl(global, user)).register_self_eval()
     }
 
@@ -558,13 +560,14 @@ impl EvalContext {
     #[allow(dead_code)]
     pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
         let contents = std::fs::read_to_string(filename);
-        if contents.is_err() {
-            return Err(EvalError::IOError(format!("file '{}': {}", filename, contents.unwrap_err())));
-        }
-        let contents = contents.unwrap();
-        match parser::parse(&contents, filename) {
-            Ok(ast) => { self.eval_ast(&ast) },
-            Err(e) => { Err(EvalError::ParseError(e)) },
+        if let Err(err) = contents {
+            Err(EvalError::IOError(format!("file '{}': {}", filename, err)))
+        } else {
+            let contents = contents.unwrap();
+            match parser::parse(&contents, filename) {
+                Ok(ast) => { self.eval_ast(&ast) },
+                Err(e)  => { Err(EvalError::ParseError(e)) },
+            }
         }
     }
 
@@ -1234,8 +1237,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             .map(String::from)
                             .collect();
 
-                    if resolver.is_some() {
-                        let exports = resolver.unwrap().borrow_mut().resolve(glob_ref.clone(), &path);
+                    if let Some(resolver) = resolver {
+                        let exports = resolver.borrow_mut().resolve(glob_ref.clone(), &path);
                         match exports {
                             Err(ModuleLoadError::NoSuchModule) => {
                                 ast.to_compile_err(
@@ -2752,33 +2755,82 @@ mod tests {
         assert_eq!(s_eval("std:num:round  1.1"), "1");
         assert_eq!(s_eval("std:num:round  1.5"), "2");
         assert_eq!(s_eval("std:num:round  1.9"), "2");
-        assert_eq!(s_eval("std:num:sqrt   2"),   "1.4142135623730951");
-        assert_eq!(s_eval("std:num:cbrt   2"),   "1.259921049894873");
-        assert_eq!(s_eval("std:num:to_degrees   2"),   "114.59155902616465");
-        assert_eq!(s_eval("std:num:to_radians   2"),   "0.03490658503988659");
-        assert_eq!(s_eval("std:num:tan   2"),      "-2.185039863261519");
-        assert_eq!(s_eval("std:num:tanh  2"),      "0.9640275800758169");
-        assert_eq!(s_eval("std:num:sin   2"),      "0.9092974268256817");
-        assert_eq!(s_eval("std:num:sinh  2"),      "3.6268604078470186");
-        assert_eq!(s_eval("std:num:cos   2"),      "-0.4161468365471424");
-        assert_eq!(s_eval("std:num:cosh  2"),      "3.7621956910836314");
-        assert_eq!(s_eval("std:num:atan   2"),     "1.1071487177940904");
-        assert_eq!(s_eval("std:num:atanh  0.5"),   "0.5493061443340549");
-        assert_eq!(s_eval("std:num:asin   0.5"),   "0.5235987755982989");
-        assert_eq!(s_eval("std:num:asinh  0.5"),   "0.48121182505960347");
-        assert_eq!(s_eval("std:num:acos   0.5"),   "1.0471975511965979");
-        assert_eq!(s_eval("std:num:acosh  2.1"),   "1.37285914424258");
-
-        assert_eq!(s_eval("std:num:ln     200"),   "5.298317366548036");
-        assert_eq!(s_eval("std:num:log2   200"),   "7.643856189774724");
-        assert_eq!(s_eval("std:num:log10  200"),   "2.3010299956639813");
-        assert_eq!(s_eval("std:num:exp_m1   2"),   "6.38905609893065");
-        assert_eq!(s_eval("std:num:exp      2"),   "7.38905609893065");
-        assert_eq!(s_eval("std:num:exp2   10"),    "1024");
-        assert_eq!(s_eval("std:num:log   100 3"),   "4.19180654857877");
-        assert_eq!(s_eval("std:num:pow   100 3"),   "1000000");
-        assert_eq!(s_eval("std:num:pow   100 3.1"), "1584893.1924611141");
-        assert_eq!(s_eval("std:num:abs   -1.2"),    "1.2");
+        assert_eq!(s_eval(
+            "std:num:sqrt   2       | (\\_ * 10000000) | std:num:round"),
+            "14142136");
+        assert_eq!(s_eval(
+            "std:num:cbrt   2       | (\\_ * 10000000) | std:num:round"),
+            "12599210");
+        assert_eq!(s_eval(
+            "std:num:to_degrees   2 | (\\_ * 10000000) | std:num:round"),
+            "1145915590");
+        assert_eq!(s_eval(
+            "std:num:to_radians   2 | (\\_ * 10000000) | std:num:round"),
+            "349066");
+        assert_eq!(s_eval(
+            "std:num:tan   2        | (\\_ * 10000000) | std:num:round"),
+            "-21850399");
+        assert_eq!(s_eval(
+            "std:num:tanh  2        | (\\_ * 10000000) | std:num:round"),
+            "9640276");
+        assert_eq!(s_eval(
+            "std:num:sin   2        | (\\_ * 10000000) | std:num:round"),
+            "9092974");
+        assert_eq!(s_eval(
+            "std:num:sinh  2        | (\\_ * 10000000) | std:num:round"),
+            "36268604");
+        assert_eq!(s_eval(
+            "std:num:cos   2        | (\\_ * 10000000) | std:num:round"),
+            "-4161468");
+        assert_eq!(s_eval(
+            "std:num:cosh  2        | (\\_ * 10000000) | std:num:round"),
+            "37621957");
+        assert_eq!(s_eval(
+            "std:num:atan   2       | (\\_ * 10000000) | std:num:round"),
+            "11071487");
+        assert_eq!(s_eval(
+            "std:num:atanh  0.5     | (\\_ * 10000000) | std:num:round"),
+            "5493061");
+        assert_eq!(s_eval(
+            "std:num:asin   0.5     | (\\_ * 10000000) | std:num:round"),
+            "5235988");
+        assert_eq!(s_eval(
+            "std:num:asinh  0.5     | (\\_ * 10000000) | std:num:round"),
+            "4812118");
+        assert_eq!(s_eval(
+            "std:num:acos   0.5     | (\\_ * 10000000) | std:num:round"),
+            "10471976");
+        assert_eq!(s_eval(
+            "std:num:acosh  2.1     | (\\_ * 10000000) | std:num:round"),
+            "13728591");
+        assert_eq!(s_eval(
+            "std:num:ln     200     | (\\_ * 10000000) | std:num:round"),
+            "52983174");
+        assert_eq!(s_eval(
+            "std:num:log2   200     | (\\_ * 10000000) | std:num:round"),
+            "76438562");
+        assert_eq!(s_eval(
+            "std:num:log10  200     | (\\_ * 10000000) | std:num:round"),
+            "23010300");
+        assert_eq!(s_eval(
+            "std:num:exp_m1   2     | (\\_ * 10000000) | std:num:round"),
+            "63890561");
+        assert_eq!(s_eval(
+            "std:num:exp      2     | (\\_ * 10000000) | std:num:round"),
+            "73890561");
+        assert_eq!(s_eval(
+            "std:num:exp2   10"),
+            "1024");
+        assert_eq!(s_eval(
+            "std:num:log   100 3    | (\\_ * 10000000) | std:num:round"),
+            "41918065");
+        assert_eq!(s_eval("std:num:pow   100 3"), "1000000");
+        assert_eq!(s_eval(
+            "std:num:pow   100 3.1  | (\\_ * 10000000) | std:num:round"),
+            "15848931924611");
+        assert_eq!(s_eval(
+            "std:num:abs   -1.2"),
+            "1.2");
         assert_eq!(s_eval("(std:num:abs  -1) * 2"), "2");
     }
 
