@@ -3,6 +3,8 @@
 
 * Feature: If a string or byte vector is called with a function as first
 argument, the function is called for each character or byte.
+* Feature: You can iterate and map over a map now by calling it with a
+function as first argument.
 
 0.3.2 (2019-11-05)
 ==================

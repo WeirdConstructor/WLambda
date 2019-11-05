@@ -1051,6 +1051,27 @@ impl VVal {
                     } else { Ok(self.clone()) }
                 })
             },
+            VVal::Map(m) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    let f = e.arg(0);
+
+                    let ret = VVal::vec();
+                    for (k, v) in m.borrow_mut().iter() {
+                        e.push(VVal::new_str(k));
+                        e.push(v.clone());
+                        let el = f.call_internal(e, 2);
+                        e.popn(2);
+
+                        match el {
+                            Ok(v)                      => { ret.push(v); },
+                            Err(StackAction::Break(v)) => { ret.push(v); break; },
+                            Err(StackAction::Next)     => { },
+                            Err(e)                     => { return Err(e); },
+                        }
+                    }
+                    Ok(ret)
+                })
+            },
             VVal::Lst(l) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let f = e.arg(0);
