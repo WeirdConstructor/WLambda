@@ -1080,7 +1080,9 @@ impl VVal {
                                 if argc > 1 {
                                     let from = arg_int as usize;
                                     let cnt  = e.arg(1).i() as usize;
-                                    let r : Vec<u8> = vval_bytes.borrow().iter().skip(from).take(cnt).copied().collect();
+                                    let r : Vec<u8> =
+                                        vval_bytes.borrow().iter().skip(from)
+                                                  .take(cnt).copied().collect();
                                     Ok(VVal::new_byt(r))
                                 } else {
                                     let r = vval_bytes.borrow();
@@ -1091,10 +1093,32 @@ impl VVal {
                                     }
                                 }
                             },
+                            VVal::Fun(_) => {
+                                let ret = VVal::vec();
+                                for c in vval_bytes.borrow().iter() {
+                                    e.push(VVal::new_byt(vec![*c]));
+                                    let el = first_arg.call_internal(e, 1);
+                                    e.popn(1);
+                                    match el {
+                                        Ok(v)                      => { ret.push(v); },
+                                        Err(StackAction::Break(v)) => { ret.push(v); break; },
+                                        Err(StackAction::Next)     => { },
+                                        Err(e)                     => { return Err(e); },
+                                    }
+                                }
+                                Ok(ret)
+                            },
                             VVal::Lst(_) => {
-                                let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
-                                let cnt  = first_arg.at(1).unwrap_or_else(|| VVal::Int((vval_bytes.borrow().len() - from) as i64)).i() as usize;
-                                let r : Vec<u8> = vval_bytes.borrow().iter().skip(from).take(cnt).copied().collect();
+                                let from =
+                                    first_arg.at(0).unwrap_or(VVal::Int(0))
+                                             .i() as usize;
+                                let cnt  =
+                                    first_arg.at(1).unwrap_or_else(
+                                        || VVal::Int((vval_bytes.borrow().len() - from) as i64))
+                                    .i() as usize;
+                                let r : Vec<u8> =
+                                    vval_bytes.borrow().iter().skip(from)
+                                              .take(cnt).copied().collect();
                                 Ok(VVal::new_byt(r))
                             },
                             VVal::Map(_) => Ok(first_arg.get_key(&self.s_raw()).unwrap_or(VVal::Nul)),
@@ -1124,6 +1148,21 @@ impl VVal {
                                         },
                                     }
                                 }
+                            },
+                            VVal::Fun(_) => {
+                                let ret = VVal::vec();
+                                for c in vval_str.borrow().chars() {
+                                    e.push(VVal::new_str_mv(c.to_string()));
+                                    let el = first_arg.call_internal(e, 1);
+                                    e.popn(1);
+                                    match el {
+                                        Ok(v)                      => { ret.push(v); },
+                                        Err(StackAction::Break(v)) => { ret.push(v); break; },
+                                        Err(StackAction::Next)     => { },
+                                        Err(e)                     => { return Err(e); },
+                                    }
+                                }
+                                Ok(ret)
                             },
                             VVal::Lst(_) => {
                                 let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
