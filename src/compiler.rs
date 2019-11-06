@@ -2087,6 +2087,10 @@ mod tests {
         assert_eq!(s_eval("\"foobar\" $q/xyz/"),               "\"foobarxyz\"");
         assert_eq!(s_eval("\"foobar\" ${ foobar = 12 }"),       "12");
         assert_eq!(s_eval("\"foobar\" ${ (\"foobar\") = 12 }"), "12");
+        assert_eq!(s_eval("\"foobar\" 2 -1"),                  "\"obar\"");
+        assert_eq!(s_eval("\"\" 2 -1"),                        "\"\"");
+        assert_eq!(s_eval("\"foobar\" 6 -1"),                  "\"\"");
+        assert_eq!(s_eval("\"foobar\" 6"),                     "\"\"");
     }
 
     #[test]
@@ -2846,6 +2850,19 @@ mod tests {
         assert_eq!(s_eval("(std:hash:fnv1a \"f\" :o :o) - 0xdcb27518fed9d577"), "0");
         assert_eq!(s_eval("(std:hash:fnv1a \"\")  - 0xcbf29ce484222325"), "0");
         assert_eq!(s_eval("(std:hash:fnv1a \"http://www.isthe.com/chongo/tech/math/prime/mersenne.html#largest\")  - 0x8e87d7e7472b3883"), "0");
+    }
+
+    #[test]
+    fn string_map_with_function() {
+        assert_eq!(s_eval("$q$abcdef$   { _ }"), "$[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\"]");
+        assert_eq!(s_eval("$b\"abcdef\" { _ }"), "$[$b\"a\",$b\"b\",$b\"c\",$b\"d\",$b\"e\",$b\"f\"]");
+    }
+
+    #[test]
+    fn map_over_map() {
+        assert_eq!(s_eval(
+            "!sum = $&0; ${a=10, b=20, c=30} {|2| .sum = sum + _; }; $*sum"),
+            "60");
     }
 
     #[test]
