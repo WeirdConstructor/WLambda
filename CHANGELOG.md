@@ -1,4 +1,4 @@
-0.3.3 (unreleased)
+0.3.3 (2019-11-06)
 ==================
 
 * Feature: If a string or byte vector is called with a function as first
