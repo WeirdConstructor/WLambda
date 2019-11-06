@@ -1,3 +1,9 @@
+0.3.4 (unreleased)
+==================
+
+* Feature: Version of WLambda is printed to stderr in the executable
+and is available with the `std:wlambda:version` function at runtime.
+
 0.3.3 (2019-11-06)
 ==================
 

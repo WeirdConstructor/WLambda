@@ -738,6 +738,8 @@ generated from the given _sm_state_.
 
 */
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 use crate::compiler::*;
 use crate::vval::*;
 use crate::util;
@@ -1790,6 +1792,11 @@ pub fn std_symbol_table() -> SymbolTable {
             }
             Ok(VVal::Nul)
         }, Some(1), Some(1), false);
+
+    func!(st, "wlambda:version",
+        |_env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str(VERSION))
+        }, Some(0), Some(0), false);
 
     func!(st, "assert_eq",
         |env: &mut Env, _argc: usize| {

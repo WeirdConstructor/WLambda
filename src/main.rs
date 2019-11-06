@@ -11,6 +11,8 @@ use vval::Env;
 use vval::VVal;
 use crate::compiler::{GlobalEnv, EvalContext};
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 fn main() {
     let global = GlobalEnv::new_default();
     global.borrow_mut().add_func(
@@ -38,6 +40,7 @@ fn main() {
         println!("Loaded history from 'wlambda.history' file.");
     }
 
+    eprintln!("WLambda Version {}", VERSION);
     loop {
         let readline = rl.readline(">> ");
         match readline {
