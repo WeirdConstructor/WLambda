@@ -1162,7 +1162,7 @@ impl VVal {
                                 } else {
                                     let r = vval_str.borrow().chars().nth(arg_int as usize);
                                     match r {
-                                        None    => Ok(VVal::Nul),
+                                        None    => Ok(VVal::new_str("")),
                                         Some(c) => {
                                             let mut b = [0; 4];
                                             Ok(VVal::new_str(c.encode_utf8(&mut b)))

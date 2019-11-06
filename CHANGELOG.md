@@ -5,6 +5,10 @@
 argument, the function is called for each character or byte.
 * Feature: You can iterate and map over a map now by calling it with a
 function as first argument.
+* Change: If a string is called with index/len, and it's outside the range,
+an empty string is returned and not `$none`.
+* Bugfix: Fixed std:displayln space placement and emitting empty lines with
+no parameters.
 
 0.3.2 (2019-11-05)
 ==================
@@ -19,7 +23,7 @@ you can also call a string or a byte vector with an integer to get the
 same result.
 * Feature: Added std:io:file:read\_text, std:io:file:read, std:io:file:write\_safe
 and std:io:file:append.
-* Bugfix: VValUserData get_key() was never called.
+* Bugfix: VValUserData get\_key() was never called.
 * Feature: Added VValUserData::call() to make VValUserData callable.
 * Bugfix: LocalFileModuleResolver now properly inherits the loaded modules from the
 parent GlobalEnv.

@@ -1764,13 +1764,18 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, argc: usize| {
             for i in 0..argc {
                 if i == (argc - 1) {
-                    println!("{}", env.arg(i).s_raw());
+                    if i > 0 {
+                        println!(" {}", env.arg(i).s_raw());
+                    } else {
+                        println!("{}", env.arg(i).s_raw());
+                    }
                 } else if i > 0 {
                     print!(" {}", env.arg(i).s_raw());
                 } else {
                     print!("{}", env.arg(i).s_raw());
                 }
             }
+            if argc == 0 { println!(""); }
             if argc > 0 {
                 Ok(env.arg(argc - 1).clone())
             } else {
