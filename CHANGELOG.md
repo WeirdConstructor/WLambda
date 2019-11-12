@@ -3,6 +3,9 @@
 
 * Feature: Version of WLambda is printed to stderr in the executable
 and is available with the `std:wlambda:version` function at runtime.
+* Bugfix: The arguments passed on the stack weren't cleared properly
+after the call. This affected std:to_drop functions, which weren't
+called when expected.
 
 0.3.3 (2019-11-06)
 ==================
