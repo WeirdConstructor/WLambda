@@ -273,6 +273,7 @@ impl Env {
     pub fn with_pushed_sp<T>(&mut self, n: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
 
+        //d// println!("PUSHSP {}", n);
         self.push_sp(n);
         let ret = f(self);
         self.popn(n);
@@ -295,8 +296,9 @@ impl Env {
             panic!(format!("Stack pointer underflow {} {}", self.sp, n));
         }
         if n > 0 {
-            for i in (self.sp - 1)..=(self.sp - n) {
-                //d// println!("POP[{}] {}", i, self.args[i].s());
+            //d// println!("SP={}, N={}", self.sp, n);
+            for i in (self.sp - n)..=(self.sp - 1) {
+                //d// println!("POP[{}] {} [of {}]", i, self.args[i].s(), n);
                 self.args[i] = VVal::Nul;
             }
         }

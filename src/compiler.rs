@@ -518,12 +518,21 @@ impl EvalContext {
                 Ok(prog_closures) => {
                     l_env.sp = 0;
                     l_env.set_bp(local_env_size);
-                    match prog_closures(l_env) {
+                    //d// println!("*** PRECALL");
+                    //d// l_env.dump_stack();
+                    //d// println!("*** PRECALL");
+                    let r = match l_env.with_restore_sp(
+                            |e: &mut Env| { prog_closures(e) })
+                    {
                         Ok(v)   => Ok(v.clone()),
                         Err(je) =>
                             Err(EvalError::ExecError(
                                 format!("Jumped out of execution: {:?}", je))),
-                    }
+                    };
+                    //d// println!("*** POSTCALL");
+                    //d// l_env.dump_stack();
+                    //d// println!("*** POSTCALL");
+                    r
                 },
                 Err(e) => { Err(EvalError::CompileError(e)) },
             };
@@ -1830,6 +1839,16 @@ mod tests {
             $*x
         "#),
         "17");
+        assert_eq!(s_eval(r#"
+            !k = 10;
+            !j = 20;
+            !x = $&0;
+            !f = std:to_drop 33 {|| .x = 18; };
+            f + 20;
+            .f = $n;
+            $*x
+        "#),
+        "18");
     }
 
     #[test]
