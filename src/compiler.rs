@@ -571,6 +571,25 @@ impl EvalContext {
         }
     }
 
+    /// Evaluates a WLambda code with the corresponding filename
+    /// in the given `EvalContext`.
+    ///
+    /// ```
+    /// let mut ctx = wlambda::EvalContext::new_default();
+    ///
+    /// let r = &mut ctx.eval_string("403", "examples/read_test.wl").unwrap();
+    /// assert_eq!(r.i(), 403, "matches contents!");
+    /// ```
+    #[allow(dead_code)]
+    pub fn eval_string(&mut self, code: &str, filename: &str)
+        -> Result<VVal, EvalError>
+    {
+        match parser::parse(code, filename) {
+            Ok(ast) => { self.eval_ast(&ast) },
+            Err(e)  => { Err(EvalError::ParseError(e)) },
+        }
+    }
+
     /// Calls a wlambda function with the given `EvalContext`.
     ///
     /// ```
