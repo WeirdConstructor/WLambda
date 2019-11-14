@@ -4,6 +4,7 @@
 * Feature: Version of WLambda is printed to stderr in the executable
 and is available with the `std:wlambda:version` function at runtime.
 * Feature: EvalContext::eval_string() implemented.
+* Feature: added set_vval_method! macro for providing an OO API more easily.
 * Bugfix: The arguments passed on the stack weren't cleared properly
 after the call. This affected std:to_drop functions, which weren't
 called when expected.
