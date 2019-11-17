@@ -1,4 +1,3 @@
-#[macro_export]
 /// This macro helps with exporting something with a more OO interface
 /// instead of using a VValUserData trait implementation.
 ///
@@ -21,12 +20,13 @@
 /// *some_ref.borrow_mut() += 11;
 /// assert_eq!(ctx.eval("I.get_it[]").unwrap().s(), "21");
 ///```
+#[macro_export]
 macro_rules! set_vval_method {
     ($vv: expr, $obj: ident, $method: tt, $min: expr, $max: expr, $env: ident, $argc: ident, $b: block) => {
         {
             let $obj = $obj.clone();
             $vv.set_map_key_fun(stringify!($method).to_string(),
-                move |$env: &mut Env, $argc: usize| $b, $min, $max, false);
+                move |$env: &mut $crate::Env, $argc: usize| $b, $min, $max, false);
         }
     }
 }
