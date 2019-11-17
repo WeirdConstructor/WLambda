@@ -25,8 +25,8 @@ macro_rules! set_vval_method {
     ($vv: expr, $obj: ident, $method: tt, $min: expr, $max: expr, $env: ident, $argc: ident, $b: block) => {
         {
             let $obj = $obj.clone();
-            $vv.set_map_key(stringify!($method).to_string(), wlambda::vval::VValFun::new_fun(
-                move |$env: &mut Env, $argc: usize| $b, $min, $max, false));
+            $vv.set_map_key_fun(stringify!($method).to_string(),
+                move |$env: &mut Env, $argc: usize| $b, $min, $max, false);
         }
     }
 }

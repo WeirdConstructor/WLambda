@@ -6,6 +6,7 @@ mod parser;
 mod compiler;
 mod prelude;
 mod util;
+mod vval_user_obj;
 
 use vval::Env;
 use vval::VVal;

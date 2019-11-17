@@ -2930,8 +2930,8 @@ mod tests {
         let o = VVal::map();
         let oo = VVal::vec();
         oo.push(VVal::Int(10));
-        set_vval_method!(o, oo, get_it,   None, None, env, argc, { Ok(oo.at(0).unwrap_or(VVal::Int(99))) });
-        set_vval_method!(o, oo, get_it2x, None, None, env, argc, { Ok(VVal::Int(oo.at(0).unwrap_or(VVal::Int(99)).i() * 2)) });
+        set_vval_method!(o, oo, get_it,   None, None, _env, _argc, { Ok(oo.at(0).unwrap_or(VVal::Int(99))) });
+        set_vval_method!(o, oo, get_it2x, None, None, _env, _argc, { Ok(VVal::Int(oo.at(0).unwrap_or(VVal::Int(99)).i() * 2)) });
 
         let mut ctx = EvalContext::new_default();
         ctx.set_global_var("O", &o);

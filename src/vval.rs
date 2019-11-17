@@ -1516,6 +1516,11 @@ impl VVal {
         }
     }
 
+    pub fn set_map_key_fun<T>(&self, key: String, fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool)
+        where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
+        self.set_map_key(key, VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
+    }
+
     pub fn set_map_key(&self, key: String, val: VVal) {
         match self {
             VVal::Ref(_)   => self.deref().set_map_key(key, val),
@@ -1699,6 +1704,124 @@ impl VVal {
             VVal::Ref(_)     => String::from("ref"),
             VVal::CRef(_)    => String::from("cref"),
             VVal::WWRef(_)   => String::from("wref"),
+        }
+    }
+
+    /// Quick access method for retrieving the VVal at index `idx`.
+    /// Returns VVal::Nul if the VVal is not a VVal::Lst or no such index exists.
+    /// See also the shorthands `v_i`, `v_f`, `v_s` and `v_s_raw`.
+    ///
+    ///```
+    /// use wlambda::VVal;
+    /// let v = VVal::vec();
+    /// v.push(VVal::Int(10));
+    /// v.push(VVal::Int(11));
+    ///
+    /// assert_eq!(v.v_(1).i(), 11);
+    /// assert_eq!(v.v_i(1),    11);
+    ///```
+    pub fn v_(&self, idx: usize) -> VVal { self.at(idx).unwrap_or(VVal::Nul) }
+
+    /// Quick access method for retrieving the VVal at key `idx`.
+    /// Returns VVal::Nul if the VVal is not a VVal::Map or no such index exists.
+    /// See also the shorthands `v_ik`, `v_fk`, `v_sk` and `v_s_rawk`.
+    ///
+    ///```
+    /// use wlambda::VVal;
+    /// let v = VVal::map();
+    /// v.set_map_key(String::from("aaa"), VVal::Int(12));
+    /// v.set_map_key(String::from("abc"), VVal::Int(13));
+    /// v.set_map_key(String::from("zyy"), VVal::Int(14));
+    ///
+    /// assert_eq!(v.v_k("abc").i(), 13);
+    /// assert_eq!(v.v_ik("aaa"),    12);
+    /// assert_eq!(v.v_ik("zyy"),    14);
+    ///```
+    pub fn v_k(&self, key: &str) -> VVal { self.get_key(key).unwrap_or(VVal::Nul) }
+    /// Quick access of an integer at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::Int(11));
+    /// assert_eq!(v.v_i(0),    11);
+    ///```
+    pub fn v_i(&self, idx: usize)     -> i64 { self.v_(idx).i() }
+    /// Quick access of the integer at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_map_key(String::from("aaa"), wlambda::VVal::new_str("10"));
+    /// assert_eq!(v.v_ik("aaa"), 10);
+    ///```
+    pub fn v_ik(&self, key: &str)     -> i64 { self.v_k(key).i() }
+    /// Quick access of a raw string at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::Int(12));
+    /// assert_eq!(v.v_s_raw(0), "12");
+    ///```
+    pub fn v_s_raw(&self, idx: usize) -> String { self.v_(idx).s_raw() }
+    /// Quick access of the string at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_map_key(String::from("aaa"), wlambda::VVal::new_str("XYX"));
+    /// assert_eq!(v.v_s_rawk("aaa"), "XYX");
+    ///```
+    pub fn v_s_rawk(&self, key: &str) -> String { self.v_k(key).s_raw() }
+    /// Quick access of the string representation at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::Int(13));
+    /// assert_eq!(v.v_s(0), "13");
+    ///```
+    pub fn v_s(&self, idx: usize)     -> String { self.v_(idx).s() }
+    /// Quick access of the string represenation at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_map_key(String::from("aaa"), wlambda::VVal::Flt(12.2));
+    /// assert_eq!(v.v_sk("aaa"), "12.2");
+    ///```
+    pub fn v_sk(&self, key: &str)     -> String { self.v_k(key).s() }
+    /// Quick access of the float at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::Flt(13.2));
+    /// assert_eq!(v.v_f(0), 13.2);
+    ///```
+    pub fn v_f(&self, idx: usize)     -> f64 { self.v_(idx).f() }
+    /// Quick access of the float at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_map_key(String::from("aaa"), wlambda::VVal::Flt(12.2));
+    /// assert_eq!(v.v_fk("aaa"), 12.2);
+    ///```
+    pub fn v_fk(&self, key: &str)     -> f64 { self.v_k(key).f() }
+
+    pub fn for_each<T>(&self, mut op: T)
+        where T: FnMut(&VVal) -> () {
+        if let VVal::Lst(b) = &self {
+            for i in b.borrow().iter() { op(i); }
+        }
+    }
+
+    pub fn for_eachk<T>(&self, mut op: T)
+        where T: FnMut(&str, &VVal) -> () {
+        if let VVal::Map(b) = &self {
+            for (k, v) in b.borrow().iter() { op(&k, v); }
         }
     }
 
