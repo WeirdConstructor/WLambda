@@ -1004,7 +1004,7 @@ impl VVal {
     ///
     /// assert_eq!(sum, 68);
     /// ```
-    pub fn iter(&self) -> std::iter::FromFn<Box<FnMut() -> Option<VVal>>> {
+    pub fn iter(&self) -> std::iter::FromFn<Box<dyn FnMut() -> Option<VVal>>> {
         match self {
             VVal::Lst(l) => {
                 let l = l.clone();
