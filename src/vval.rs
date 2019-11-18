@@ -983,6 +983,27 @@ impl VVal {
         })
     }
 
+    /// This function returns you an iterator over the VVal.
+    /// It will iterate over data such as VVal::Str, VVal::Sym, VVal::Lst,
+    /// VVal::Map and VVal::Byt.
+    ///
+    /// This functionality provides the `for` keyword/function in WLambda.
+    ///
+    /// ```
+    /// use wlambda::*;
+    ///
+    /// let some_vec = VVal::vec();
+    /// some_vec.push(VVal::Int(10));
+    /// some_vec.push(VVal::Int(22));
+    /// some_vec.push(VVal::Int(36));
+    ///
+    /// let mut sum = 0;
+    /// for v in some_vec.iter() {
+    ///     sum += v.i();
+    /// }
+    ///
+    /// assert_eq!(sum, 68);
+    /// ```
     pub fn iter(&self) -> std::iter::FromFn<Box<FnMut() -> Option<VVal>>> {
         match self {
             VVal::Lst(l) => {
