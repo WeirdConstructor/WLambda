@@ -983,6 +983,80 @@ impl VVal {
         })
     }
 
+    pub fn iter(&self) -> std::iter::FromFn<Box<FnMut() -> Option<VVal>>> {
+        match self {
+            VVal::Lst(l) => {
+                let l = l.clone();
+                let mut idx = 0;
+                std::iter::from_fn(Box::new(move || {
+                    if idx >= l.borrow().len() { return None; }
+                    let r = Some(l.borrow()[idx].clone());
+                    idx += 1;
+                    r
+                }))
+            },
+            VVal::Map(m) => {
+                let m = m.clone();
+                let mut idx = 0;
+                std::iter::from_fn(Box::new(move || {
+                    let r = match m.borrow().iter().nth(idx) {
+                        Some((k, v)) => {
+                            let l = VVal::vec();
+                            l.push(VVal::new_str(&k));
+                            l.push(v.clone());
+                            Some(l)
+                        },
+                        None => None,
+                    };
+                    idx += 1;
+                    r
+                }))
+            },
+            VVal::Byt(b) => {
+                let b = b.clone();
+                let mut idx = 0;
+                std::iter::from_fn(Box::new(move || {
+                    if idx >= b.borrow().len() { return None; }
+                    let r = Some(VVal::new_byt(vec![b.borrow()[idx]]));
+                    idx += 1;
+                    r
+                }))
+            },
+            VVal::Str(s) => {
+                let s = s.clone();
+                let mut idx = 0;
+                std::iter::from_fn(Box::new(move || {
+                    let r = match s.borrow().chars().nth(idx) {
+                        Some(chr) => Some(VVal::new_str_mv(chr.to_string())),
+                        None      => None,
+                    };
+                    idx += 1;
+                    r
+                }))
+            },
+            VVal::Sym(s) => {
+                let s = s.clone();
+                let mut idx = 0;
+                std::iter::from_fn(Box::new(move || {
+                    let r = match s.chars().nth(idx) {
+                        Some(chr) => Some(VVal::new_str_mv(chr.to_string())),
+                        None      => None,
+                    };
+                    idx += 1;
+                    r
+                }))
+            },
+            VVal::DropFun(v) => v.v.iter(),
+            VVal::Ref(v)     => v.borrow_mut().iter(),
+            VVal::CRef(v)    => v.borrow_mut().iter(),
+            VVal::WWRef(v)   =>
+                if let Some(r) = v.upgrade() {
+                    r.borrow_mut().iter()
+                } else { std::iter::from_fn(Box::new(|| { None })) },
+            _ => std::iter::from_fn(Box::new(|| { None })),
+        }
+    }
+
     pub fn call_no_args(&self, env: &mut Env) -> Result<VVal, StackAction> {
         self.call_internal(env, 0)
     }
@@ -1099,6 +1173,28 @@ impl VVal {
                     if argc > 0 {
                         let first_arg = e.arg(0);
                         match first_arg {
+                            VVal::Byt(b2) => {
+                                if argc > 1 {
+                                    // TODO: Fix the extra clone here:
+                                    let mut accum = vval_bytes.borrow().clone();
+                                    accum.extend_from_slice(&b2.borrow());
+                                    for i in 2..argc {
+                                        match e.arg(i) {
+                                            VVal::Byt(b3) =>
+                                                accum.extend_from_slice(
+                                                    &b3.borrow()),
+                                            _ =>
+                                                accum.extend_from_slice(
+                                                    &e.arg(i).as_bytes()),
+                                        }
+                                    }
+                                    Ok(VVal::new_byt(accum))
+                                } else {
+                                    let mut accum = vval_bytes.borrow().clone();
+                                    accum.extend_from_slice(&b2.borrow());
+                                    Ok(VVal::new_byt(accum))
+                                }
+                            },
                             VVal::Int(arg_int) => {
                                 if argc > 1 {
                                     let from = arg_int as usize;
@@ -1250,6 +1346,13 @@ impl VVal {
                     ud.call(&args)
                 })
             },
+            VVal::DropFun(v) => v.v.call_internal(env, argc),
+            VVal::Ref(v)     => v.borrow_mut().call_internal(env, argc),
+            VVal::CRef(v)    => v.borrow_mut().call_internal(env, argc),
+            VVal::WWRef(v)   =>
+                if let Some(r) = v.upgrade() {
+                    r.borrow_mut().call_internal(env, argc)
+                } else { Ok(VVal::Nul) },
             _ => { Ok(self.clone()) },
         }
     }
@@ -1959,6 +2062,22 @@ impl VVal {
             },
         };
         format!("{}{}", br, s)
+    }
+
+    pub fn as_bytes(&self) -> std::vec::Vec<u8> {
+        match self {
+            VVal::Byt(b)     => b.borrow().clone(),
+            VVal::DropFun(f) => f.v.as_bytes(),
+            VVal::Ref(l)     => (*l).borrow().as_bytes(),
+            VVal::CRef(l)    => (*l).borrow().as_bytes(),
+            VVal::WWRef(l)   => {
+                match l.upgrade() {
+                    Some(v) => v.borrow().as_bytes(),
+                    None    => std::vec::Vec::new(),
+                }
+            },
+            _ => self.s_raw().as_bytes().to_vec(),
+        }
     }
 
     pub fn s(&self) -> String {

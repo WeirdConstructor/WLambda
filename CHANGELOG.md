@@ -7,9 +7,14 @@ and is available with the `std:wlambda:version` function at runtime.
 * Feature: Added set\_vval\_method! macro for providing an OO API more easily.
 * Feature: Expanded the VVal API with quick access methods, for
 example `self.v_i(idx)` or `self.v_ik(key)`.
+* Feature: Added `for` function, to iterate over lists, maps, bytes and strings.
+* Feature: Added VVal::iter() for nicer iteration over VVal lists/maps from Rust.
+* Feature: Added `std:str:to_char_vec` to convert a string to/from a list of it's unicode code points.
 * Bugfix: The arguments passed on the stack weren't cleared properly
 after the call. This affected std:to\_drop functions, which weren't
 called when expected.
+* Bugfix: Calling references (including VVal::DropVVal) now resolves
+to the inner values of them.
 
 0.3.3 (2019-11-06)
 ==================

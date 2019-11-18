@@ -1698,6 +1698,12 @@ mod tests {
         assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&&1.2; { $*a + outer_a } }; c1[][]"), "3.5");
         assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; c1[][]"), "2.3");
         assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; !outer_a = $n; c1[][]"), "0");
+        assert_eq!(s_eval(r"
+            !x = $&$[1,2,3];
+            !y = $&&$[1,2,3];
+            !z = std:weaken y;
+            $[x \_ * 2, y \_ * 2, z \_ * 2]
+        "), "$[$[2,4,6],$[2,4,6],$[2,4,6]]");
     }
 
     #[test]
@@ -1849,6 +1855,12 @@ mod tests {
             $*x
         "#),
         "18");
+        assert_eq!(s_eval(r"
+            !l = $&0;
+            !x = std:to_drop $[1,2,3] {|| .l = 18; };
+            .x = x { _ * 2 };
+            $[$*l, x]
+        "), "$[18,$[2,4,6]]");
     }
 
     #[test]
@@ -2628,6 +2640,9 @@ mod tests {
         assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""), "$b\"abc\\xFF\"");
         assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""), "$b\"abc\\xFF\"");
         assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"\\x00abc\\xFF\" 1 \":\""), "$b\"\\0abc\\xFF\"");
+
+        assert_eq!(s_eval("std:str:to_char_vec $q ABC "), "$[65,66,67]");
+        assert_eq!(s_eval("$q ABC | std:str:to_char_vec | std:str:from_char_vec"), "\"ABC\"");
     }
 
     #[test]
@@ -2938,5 +2953,42 @@ mod tests {
         assert_eq!(ctx.eval("O.get_it[]").unwrap().s(), "10");
         oo.set_at(0, VVal::Int(11));
         assert_eq!(ctx.eval("O.get_it2x[]").unwrap().s(), "22");
+    }
+
+    #[test]
+    fn check_for() {
+        assert_eq!(
+            s_eval("!o = $&$q 1 ; for :XYZ \\.o = _ o; $*o"),
+            "\"ZYX1\"");
+        assert_eq!(
+            s_eval("!r = $&:XYZ; !o = $&$q 1 ; for (std:weaken r) \\.o = _ o; $*o"),
+            "\"ZYX1\"");
+        assert_eq!(
+            s_eval("!o = $&$q 1 ; for $&:XYZ \\.o = _ o; $*o"),
+            "\"ZYX1\"");
+        assert_eq!(
+            s_eval("!o = $&$q 1 ; for $&&:XYZ \\.o = _ o; $*o"),
+            "\"ZYX1\"");
+        assert_eq!(
+            s_eval("!o = $&$q 1 ; for (std:to_drop :XYZ {||}) \\.o = _ o; $*o"),
+            "\"ZYX1\"");
+        assert_eq!(
+            s_eval("!o = $&$q 1 ; for \"XYZ\" \\.o = _ o; $*o"),
+            "\"ZYX1\"");
+        assert_eq!(
+            s_eval("!o = $&$b\"L\"; for $b\"@XZ\" \\.o = _ o; $*o"),
+            "$b\"ZX@L\"");
+        assert_eq!(
+            s_eval("!o = $&0; for $[1,2,3] \\.o = o + _; $*o"), "6");
+        assert_eq!(
+            s_eval(r"
+                !x = $&0;
+                !o = $&0;
+                for ${a=3, b=2, c=4} {
+                    .x = x + (_ | 0 | std:bytes:to_vec | 0);
+                    .o = _.1 + o;
+                };
+                $[$*x, $*o]
+            "), "$[294,9]");
     }
 }
