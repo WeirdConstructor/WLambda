@@ -61,7 +61,7 @@ std:assert_eq std:str:cat[[some_args]] "123";
 ```
 
 The arguments passed to the function are accessible using the `_`, `_1`, `_2`, ..., `_9`
-variables. If you need to access more arguments the `@` variable holds a list of all
+variables. If you need to access more arguments the `@` variable holds a vector of all
 arguments.
 
 ```wlambda
@@ -527,6 +527,26 @@ syntax, but still works:
 !x = 21;
 (x == 20)[{ std:displayln "x is 20" }, { std:displayln "x isn't 20" }]; #=> print "x isn't 20"
 ```
+
+### Iteration
+
+WLambda has many ways to iterate:
+
+- Counting loop with `repeat`
+- While some condition is `$true` with `while`
+- Over the items in a vector with either `for` or by calling the vector
+with a function as first argument.
+- Over the items in a map with either `for` or by calling the map
+with a function as first argument.
+- Over the characters in a string with either `for` or by calling it
+with a function.
+- Over the bytes in a byte vector with either `for` or by calling it
+with a function.
+
+`for` just iterates through the value and provides the individual items as first argument to the
+iteration function. But if you call the value with a function as first argument a mapping iteration
+is done. That means, the return value of the operation is a list with the return values of the
+iteration function. If you don't need that list you should use `for`.
 
 ## Lexical Scope and Variable assignment
 
