@@ -1,4 +1,4 @@
-0.3.4 (unreleased)
+0.3.4 (2019-11-20)
 ==================
 
 * Feature: Version of WLambda is printed to stderr in the executable

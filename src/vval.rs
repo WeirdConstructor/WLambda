@@ -297,7 +297,7 @@ impl Env {
         }
         if n > 0 {
             //d// println!("SP={}, N={}", self.sp, n);
-            for i in (self.sp - n)..=(self.sp - 1) {
+            for i in (self.sp - n)..self.sp {
                 //d// println!("POP[{}] {} [of {}]", i, self.args[i].s(), n);
                 self.args[i] = VVal::Nul;
             }

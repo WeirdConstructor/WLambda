@@ -758,7 +758,7 @@ generated from the given _sm_state_.
 
 */
 
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use crate::compiler::*;
 use crate::vval::*;
@@ -1474,7 +1474,7 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::vec_mv(
                 env.arg(0).s_raw()
                     .chars()
-                    .map(|c| VVal::Int(c as u32 as i64))
+                    .map(|c| VVal::Int(i64::from(c as u32)))
                     .collect()))
         }, Some(1), Some(1), false);
 

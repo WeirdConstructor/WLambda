@@ -12,7 +12,7 @@ use vval::Env;
 use vval::VVal;
 use crate::compiler::{GlobalEnv, EvalContext};
 
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let global = GlobalEnv::new_default();
