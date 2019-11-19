@@ -1,0 +1,5 @@
+max_width=80
+newline_style="Unix"
+edition="2018"
+brace_style="SameLineWhere"
+disable_all_formatting=true
