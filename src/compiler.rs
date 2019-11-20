@@ -51,16 +51,12 @@ pub trait ModuleResolver {
 /// This structure implements the ModuleResolver trait and is
 /// responsible for loading modules on `!@import` for WLambda.
 #[derive(Debug, Clone, Default)]
-pub struct LocalFileModuleResolver {
-    loaded_modules: std::collections::HashMap<String, std::rc::Rc<std::collections::HashMap<String, VVal>>>,
-}
+pub struct LocalFileModuleResolver { }
 
 #[allow(dead_code)]
 impl LocalFileModuleResolver {
     pub fn new() -> LocalFileModuleResolver {
-        LocalFileModuleResolver {
-            loaded_modules: std::collections::HashMap::new(),
-        }
+        LocalFileModuleResolver { }
     }
 }
 
@@ -132,11 +128,15 @@ impl SymbolTable {
 }
 
 impl ModuleResolver for LocalFileModuleResolver {
-    fn resolve(&mut self, global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError> {
+    fn resolve(&mut self, global: GlobalEnvRef, path: &[String])
+        -> Result<SymbolTable, ModuleLoadError>
+    {
         let genv = GlobalEnv::new_empty_default();
         genv.borrow_mut().import_modules_from(&*global.borrow());
+
         let mut ctx = EvalContext::new(genv);
         let pth = path.join("/");
+
         match ctx.eval_file(&(pth.clone() + ".wl")) {
             Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
             Ok(_v) => Ok(ctx.get_exports()),
@@ -318,6 +318,10 @@ impl GlobalEnv {
     /// This function adds the modules that were loaded into memory
     /// from the given `parent_global_env` to the current environment.
     pub fn import_modules_from(&mut self, parent_global_env: &GlobalEnv) {
+        if parent_global_env.resolver.is_some() {
+            self.set_resolver(
+                parent_global_env.resolver.as_ref().unwrap().clone());
+        }
         for (mod_name, symtbl) in parent_global_env.mem_modules.borrow().iter() {
             self.set_module(mod_name, symtbl.clone());
         }
@@ -1241,8 +1245,15 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let mm = gr.mem_modules.clone();
                         let e  = &mut gr.env;
                         let hm = &mm.borrow();
-                        if let Some(stbl) = hm.get(&name.s_raw()) {
+                        let mod_name = name.s_raw();
+//                        println!("FFFFFFFFFFFFFFF ***** '{}'", mod_name);
+//                        for (k, v) in hm.iter() {
+//                            println!("MODULE MEM: '{}': {:?} => {:?}/{:?}", k, v, hm.get(&mod_name).is_some(), hm.get(k).is_some());
+//                        }
+//                        println!("GET NAME: {:?}", hm.get(&mod_name));
+                        if let Some(stbl) = hm.get(&mod_name) {
                             for (k, v) in &stbl.symbols {
+//                                println!("IMPORT: {}", k);
                                 e.insert(s_prefix.clone() + &k, v.clone());
                             }
                             return Ok(Box::new(move |_e: &mut Env| { Ok(VVal::Nul) }));
