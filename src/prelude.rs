@@ -532,7 +532,7 @@ syntax, but still works:
 
 WLambda has many ways to iterate:
 
-- Counting loop with `repeat`
+- Counting loop with `range`
 - While some condition is `$true` with `while`
 - Over the items in a vector with either `for` or by calling the vector
 with a function as first argument.
@@ -861,10 +861,11 @@ macro_rules! add_num_fun_flt2 {
 fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Result<VVal, StackAction> {
     while arg_idx < argc {
         if env.arg(arg_idx).is_fun() {
-            return env.with_restore_sp(|e: &mut Env| {
+            return
+                env.with_restore_sp(|e: &mut Env| {
                     e.push(val.clone());
                     e.arg(arg_idx).call_internal(e, 1)
-                    });
+                });
         }
 
         let mut match_vals = vec![arg_idx];
@@ -1858,6 +1859,28 @@ pub fn std_symbol_table() -> SymbolTable {
         |_env: &mut Env, _argc: usize| {
             Ok(VVal::new_str(VERSION))
         }, Some(0), Some(0), false);
+
+    func!(st, "measure_time",
+        |env: &mut Env, _argc: usize| {
+            use std::convert::TryFrom;
+            let t = std::time::Instant::now();
+            let unit = env.arg(0).s_raw();
+            match env.arg(1).call_no_args(env) {
+                Ok(v) => {
+                    let ret = VVal::vec();
+                    match &unit[..] {
+                        "s"  => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_secs())  .unwrap_or(0))); },
+                        "ms" => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_millis()).unwrap_or(0))); },
+                        "us" => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_micros()).unwrap_or(0))); },
+                        "ns" => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_nanos()) .unwrap_or(0))); },
+                        _    => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_millis()).unwrap_or(0))); },
+                    }
+                    ret.push(v);
+                    Ok(ret)
+                },
+                Err(e) => Err(e),
+            }
+        }, Some(2), Some(2), false);
 
     func!(st, "assert_eq",
         |env: &mut Env, _argc: usize| {
