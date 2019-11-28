@@ -1606,7 +1606,7 @@ impl VVal {
 
     pub fn set(&self, index: usize, val: VVal) {
         if let VVal::Lst(b) = &self {
-            if index >= b.borrow().len {
+            if index >= b.borrow().len() {
                 b.borrow_mut().resize(index + 1, VVal::Nul);
             }
             b.borrow_mut()[index] = val;
