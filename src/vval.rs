@@ -1660,6 +1660,7 @@ impl VVal {
             VVal::Ref(_)   => self.deref().set_key(key, val),
             VVal::CRef(_)  => self.deref().set_key(key, val),
             VVal::WWRef(_) => self.deref().set_key(key, val),
+            VVal::DropFun(f) => f.v.set_key(key, val),
             VVal::Map(m) => {
                 let ks = key.s_raw();
                 m.borrow_mut().insert(ks, val);

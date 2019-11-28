@@ -1219,6 +1219,16 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
     }
 }
 
+fn check_error_value(v: VVal, at: &str) -> Result<VVal, StackAction> {
+    if let VVal::Err(ev) = v {
+        return
+            Err(StackAction::panic_str(
+                format!("Error value in {}: {}", at, ev.borrow().0.s()),
+                Some(ev.borrow().1.clone())))
+    }
+    Ok(v)
+}
+
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     match ast {
         VVal::Lst(_l) => {
@@ -1327,8 +1337,10 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let val = compile(&ast.at(3).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env| {
                         let m = map(e)?;
-                        let s = sym(e)?;
-                        let v = val(e)?;
+                        let s = check_error_value(sym(e)?,
+                                                  "field assignment key")?;
+                        let v = check_error_value(val(e)?,
+                                                  "field assignment value")?;
                         m.set_key(&s, v.clone());
                         Ok(v)
                     }))
@@ -1357,7 +1369,10 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 
                     Ok(Box::new(move |e: &mut Env| {
                         let v = VVal::vec();
-                        for x in list_elems.iter() { v.push(x(e)?); }
+                        for x in list_elems.iter() {
+                            let av = check_error_value(x(e)?, "list")?;
+                            v.push(av);
+                        }
                         Ok(v)
                     }))
                 },
@@ -1376,8 +1391,9 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     Ok(Box::new(move |e: &mut Env| {
                         let v = VVal::map();
                         for x in map_elems.iter() {
-                            let ke = x.0(e)?;
-                            v.set_key(&ke, x.1(e)?);
+                            let ke = check_error_value(x.0(e)?, "map key")?;
+                            let kv = check_error_value(x.1(e)?, "map value")?;
+                            v.set_key(&ke, kv);
                         }
                         Ok(v)
                     }))
@@ -1865,6 +1881,8 @@ mod tests {
             .x = x { _ * 2 };
             $[$*l, x]
         "), "$[18,$[2,4,6]]");
+        assert_eq!(s_eval("!x = std:to_drop $[1,2] {||}; x.1 = 3; x"), "$[1,3]");
+        assert_eq!(s_eval("!x = std:to_drop ${a=2} {||}; x.a = 3; x"), "${a=3}");
     }
 
     #[test]
@@ -2359,6 +2377,19 @@ mod tests {
         "), "$[13,\"all ok\"]");
 
         assert_eq!(s_eval_no_panic("{ $e 23 }[] | on_error {|4| _ + 21 }"), "44");
+
+        assert_eq!(s_eval_no_panic("!x = $[$e 181];"),
+            "$e \"EXEC ERR: Caught [1,11:<compiler:s_eval_no_panic>(Err)] SA::Panic(\\\"Error value in list: 181\\\")\"");
+        assert_eq!(s_eval_no_panic("!x = ${a=$e 182};"),
+            "$e \"EXEC ERR: Caught [1,13:<compiler:s_eval_no_panic>(Err)] SA::Panic(\\\"Error value in map value: 182\\\")\"");
+        assert_eq!(s_eval_no_panic("!x = $[]; x.0 = $e 183;"),
+            "$e \"EXEC ERR: Caught [1,20:<compiler:s_eval_no_panic>(Err)] SA::Panic(\\\"Error value in field assignment value: 183\\\")\"");
+        assert_eq!(s_eval_no_panic("!x = ${}; x.a = $e 184;"),
+            "$e \"EXEC ERR: Caught [1,20:<compiler:s_eval_no_panic>(Err)] SA::Panic(\\\"Error value in field assignment value: 184\\\")\"");
+        assert_eq!(s_eval_no_panic("!x = $[]; x.($e 185) = 5;"),
+            "$e \"EXEC ERR: Caught [1,17:<compiler:s_eval_no_panic>(Err)] SA::Panic(\\\"Error value in field assignment key: 185\\\")\"");
+        assert_eq!(s_eval_no_panic("!x = ${}; x.($e 186) = 4;"),
+            "$e \"EXEC ERR: Caught [1,17:<compiler:s_eval_no_panic>(Err)] SA::Panic(\\\"Error value in field assignment key: 186\\\")\"");
     }
 
     #[test]
