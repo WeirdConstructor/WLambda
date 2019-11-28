@@ -6,7 +6,7 @@
 * Incompatible Change: Error values are not directly assignable to data
 structure fields anymore. So that your data structures don't end up with
 errors in it, without knowing where they were actually assigned.
-* Bugfix: Assigning to lists and maps inside a std:to_drop marked value
+* Bugfix: Assigning to lists and maps inside a std:to\_drop marked value
 works now too.
 
 0.3.4 (2019-11-20)
