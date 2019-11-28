@@ -2,6 +2,7 @@
 ==================
 
 * Feature: Added `std:measure_time _unit_ _function_` for simple benchmarking.
+* Feature: Made optional '=' in `!@export` and `!@import` statements.
 
 0.3.4 (2019-11-20)
 ==================

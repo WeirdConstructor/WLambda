@@ -190,10 +190,10 @@ In the following grammar, white space and comments are omitted:
                   ;
     definition    = [ ref_specifier ], ( simple_assign | destr_assign )
                   ;
-    import        = "!", "@import", symbol, symbol
+    import        = "!", "@import", symbol, [ "=" ], symbol
                   | "!", "@wlambda"
                   ;
-    export        = "!", "@export", symbol, expr
+    export        = "!", "@export", symbol, [ "=" ], expr
                   ;
     statement     = "!" definition
                   | "." simple_assign
@@ -1220,6 +1220,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                         prefix = VVal::Nul;
                                         p
                                     } else {
+                                        ps.consume_if_eq_wsc('=');
                                         VVal::new_sym(&parse_identifier(ps))
                                     };
 
@@ -1230,6 +1231,8 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                             },
                             "export" => {
                                 let name = parse_identifier(ps);
+                                ps.skip_ws_and_comments();
+                                ps.consume_if_eq_wsc('=');
                                 let expr = parse_expr(ps)?;
                                 let exp = ps.syn(Syntax::Export);
                                 exp.push(VVal::new_sym(&name));
