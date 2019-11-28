@@ -17,10 +17,10 @@ syn match wlMapKeyId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ contai
 syn match wlComment /#.*$/
 
 syn keyword wlRepeat    for while range return break next match
-syn keyword wlKeyword   panic not block unwrap unwrap_err
+syn keyword wlKeyword   panic not block unwrap unwrap_err error_to_str
 syn keyword wlKeyword   sym is_some is_none is_err is_map is_vec is_fun is_str is_sym
 syn keyword wlKeyword   is_ref is_wref is_bool is_bytes is_float is_int len type to_drop
-syn keyword wlKeyword   float int on_error
+syn keyword wlKeyword   float bool int on_error
 syn match wlKeyword "_?"
 syn match wlKeyword "std:displayln"
 syn match wlKeyword "std:fold"
@@ -55,6 +55,8 @@ syn match wlKeyword "std:str:cat"
 syn match wlKeyword "std:str:join"
 syn match wlKeyword "std:str:from_utf8_lossy"
 syn match wlKeyword "std:str:from_utf8"
+syn match wlKeyword "std:str:to_char_vec"
+syn match wlKeyword "std:str:from_char_vec"
 syn match wlKeyword "std:str:to_bytes"
 syn match wlKeyword "std:bytes:to_vec"
 syn match wlKeyword "std:bytes:from_vec"
@@ -62,15 +64,15 @@ syn match wlKeyword "std:bytes:from_hex"
 syn match wlKeyword "std:bytes:to_hex"
 syn match wlValue     '\$t'
 syn match wlValue     '\$true'
-syn match wlValue     '\$false'
 syn match wlValue     '\$f'
+syn match wlValue     '\$false'
 syn match wlValue     '\$n'
 syn match wlValue     '\$nul'
 syn match wlValue     '\$e'
+syn match wlValue     '\$error'
 syn match wlRefData   '$&'
 syn match wlRefData   '$&&'
 syn match wlRefData   '$\*'
-syn match wlValue     '\$error'
 syn match wlValue     '[-+]\?\d\+'
 syn match wlValue     '[-+]\?\d\+\.\d\+'
 syn match wlValue     '[-+]\?0x[a-fA-F0-9]\+\(\.[a-fA-F0-9]\+\)\?'
