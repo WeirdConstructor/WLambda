@@ -11,7 +11,7 @@ works now too.
 * Doc: Documented closures briefly, reference data types and how to do
 object oriented programming.
 * Doc: Documented more reference handling.
-* Feature: Added `std:write\_str` and added std:to_drop string representation.
+* Feature: Added `std:write\_str` and added std:to\_drop string representation.
 
 0.3.4 (2019-11-20)
 ==================
