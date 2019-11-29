@@ -38,6 +38,114 @@ A function can be defined using the `{ ... }` syntax and the `\ _statement_`
 syntax: To give functions a name, you need to assign them to a variable with
 the `!_name_ = _expr_` syntax.
 
+### Closures
+
+Functions take values from the outer scope by copying their value:
+
+```wlambda
+!a = 10;
+!b = 20;
+
+!add_a_and_b = { a + b }; # function copies the values 10 and 20
+
+!result = add_a_and_b[];
+
+std:assert_eq result 30;
+```
+
+This also means, that functions can not modify the values of
+the scope they were created in. To do that, you need a referencial
+data type, that is described further down this document.
+
+Here is an example how we would write the above example by mutating
+the value in the `result` variable:
+
+```wlambda
+!a = 10;
+!b = 20;
+!result = $& $none; # Create a weakly captured reference
+
+# function copies the values 10 and 20
+# but result is captured by reference. As the weakable reference
+# type `$&` is used, it's only weakly captured.
+!add_a_and_b = { .result = a + b; };
+
+add_a_and_b[];
+
+std:assert_eq $*result 30; # $* dereferences referencial types
+```
+
+About the weakly capturing of `result`:
+It means, that if the outer reference value in `result` goes
+out of scope, the reference in the closure does
+not keep it alive. This is important to prevent cyclic refences
+where closures keep captured values unneccessarily alive.
+
+You will also need this to make refencial types such as maps `${ }`
+and vectors `$[ ]` weakly referenced by closures for OOP.
+
+#### Object Oriented Programming with Closures
+
+This is how you can use a map data type as object which stores
+methods:
+
+```wlambda
+!new_Cat = {!(name) = @;
+
+    # Notice the weakable reference `$&` to prevent
+    # reference cylces:
+
+    !self = $& ${
+        name = name,
+    };
+
+    self.meow = { std:displayln self.name " meows!"; };
+    self.get_name = { self.name };
+
+    self
+};
+
+!my_cat = new_Cat "Spot";
+
+my_cat.meow[]; # Prints 'Spot meows!'
+
+std:assert_eq my_cat.get_name[] "Spot";
+```
+
+Alternatively you can just make the cat name private:
+
+```wlambda
+!new_Cat = {!(name) = @;
+
+    # Notice the weakable reference `$&` to prevent
+    # reference cylces:
+
+    !self = ${}; # Just holds the methods
+
+    # Make a strong reference, so the closures DO keep cat_name alive!
+    !cat_name = $&& name;
+
+    self.meow = { std:displayln cat_name " meows!"; };
+
+    self.get_name = { $*cat_name };
+    self.set_name = { .*cat_name = _; };
+
+    self
+};
+
+!my_cat = new_Cat "Spot";
+
+my_cat.meow[]; # Prints 'Spot meows!'
+
+std:assert_eq my_cat.get_name[] "Spot";
+
+my_cat.set_name "Spotty";
+
+std:assert_eq my_cat.get_name[] "Spotty";
+```
+
+### Function calling
+
 To call functions, you have at least 3 alternatives. First is the bare
 `_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the delimiter
 full variant: `_expr_[arg1, arg2, arg3, ...]`. You can always delimit the first
@@ -425,6 +533,49 @@ std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 
 ### Associative Maps (or String to Value mappings)
 
+### References
+
+Some data structures already have reference characteristics, such as strings,
+vectors and maps. There are 3 types of references in WLambda that handle
+different usecases. These referencial types are neccessary to mutate lexical
+variables from a parent scope. To give an example:
+
+```wlambda
+!x = 10;
+{ .x = 20; }[];
+std:assert_eq x 10; # Yes, this is still 10!
+```
+
+To explain what is going on: Closures take captured values by copy.
+See also the section about closures at the start of this document.
+To mutate the outer you need a reference. There are two types of references:
+
+- `$&` - A _weakable_ reference, that is captured weakly by closures.
+- `$&&` - A _strong_ reference, that is captured stongly by closures.
+
+The weakable reference is captured weakly by closures and not keep the
+referenced value alive if the value reference count drops to zero.
+The strong references are staying strong and need explicit care to handle:
+
+```wlambda
+!x = $& 10;
+
+{ .x = 20; }[]; # Closures implicitly handle weak references
+
+std:assert_eq $*x 20;
+```
+
+And the same with strong references:
+
+```wlambda
+!x = $&& 10;
+
+# Explicit handling via reference assignment `.*<var> = <expr>`
+{ .*x = 20; }[];
+
+std:assert_eq $*x 20;
+```
+
 ## Operators
 
 ### Arithmetics
@@ -569,7 +720,7 @@ iteration function. If you don't need that list you should use `for`.
 
 !expr = { _ + 30 };
 
-!@export symbol expr; # exports symbol with value of expr (a function)
+!@export symbol = expr; # exports symbol with value of expr (a function)
 
 ```
 
@@ -577,7 +728,7 @@ iteration function. If you don't need that list you should use `for`.
 
 ```wlambda
 
-!@import x tests:test_mod; # prefixes everything from modixes with x:
+!@import x = tests:test_mod; # prefixes everything from modixes with x:
 
 std:assert ~ (x:symbol 10) == 40;
 
