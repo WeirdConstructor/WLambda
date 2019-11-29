@@ -316,7 +316,7 @@ impl Env {
             if !mark.is_empty() { mark = format!("{} ->", mark); }
 
             println!("    {:9} [{:3}] = {}", mark, i, v.s());
-            if i >= self.sp { break; }
+            if i >= (10 + self.sp) { break; }
         }
         for (i, u) in self.fun.upvalues.iter().enumerate() {
             println!("  UP[{:3}] = {}", i, u.s());
@@ -2082,7 +2082,7 @@ impl VVal {
                             min, max, f.local_size, upvalues)
                 }
             },
-            VVal::DropFun(f) => f.v.s_cy(c),
+            VVal::DropFun(f) => format!("std:to_drop[{}]", f.v.s_cy(c)),
             VVal::Ref(l)     => format!("$&&{}", (*l).borrow().s_cy(c)),
             VVal::CRef(l)    => format!("$&{}", (*l).borrow().s_cy(c)),
             VVal::WWRef(l)   => {

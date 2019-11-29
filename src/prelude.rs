@@ -314,6 +314,7 @@ a few functions that accept error values in their arguments:
 - !=
 - std:to_ref
 - std:ref_id
+- std:write_str
 
 All other functions don't accept errors as their argument.
 
@@ -576,6 +577,41 @@ And the same with strong references:
 std:assert_eq $*x 20;
 ```
 
+Strong references can also be created using the `std:to_ref` function:
+
+```wlambda
+!x = std:to_ref 10;
+std:assert_eq (std:write_str x) "$&&10";
+```
+
+#### Weaken References
+
+You can weaken any of those two types of references manually using the
+`std:weaken` function.
+
+```wlambda
+!drop_check = $& $f;
+
+# Make a reference to the value 10 and set `drop_check` to $true
+# when all (non weak) references to it are gone.
+!x = $&& (std:to_drop 10 {|| .drop_check = $true });
+
+# Create a weakened reference to the value referred to by x:
+!y = std:weaken x;
+
+# Deref y gives you 10:
+std:assert_eq $*y 10;
+
+# The reference to 10 is removed and this means that the weak reference
+# in y is invalidated and returns $n in future.
+.x = $n;
+
+# Deref y now gives you $n:
+std:assert_eq $*y $n;
+
+std:assert drop_check;
+```
+
 ## Operators
 
 ### Arithmetics
@@ -662,9 +698,9 @@ will be executed.
 !x = 20;
 
 (x == 20) {
-std:displayln "x is 20";
+    std:displayln "x is 20";
 } {
-std:displayln "x is 20";
+    std:displayln "x is 20";
 }; # Do not forget the ";"!
 ```
 
@@ -1730,6 +1766,11 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::Nul)
             }
         }, Some(1), Some(3), false);
+
+    func!(st, "write_str",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str_mv(env.arg(0).s()))
+        }, Some(1), Some(1), true);
 
     func!(st, "yay",
         |env: &mut Env, _argc: usize| {

@@ -1881,8 +1881,10 @@ mod tests {
             .x = x { _ * 2 };
             $[$*l, x]
         "), "$[18,$[2,4,6]]");
-        assert_eq!(s_eval("!x = std:to_drop $[1,2] {||}; x.1 = 3; x"), "$[1,3]");
-        assert_eq!(s_eval("!x = std:to_drop ${a=2} {||}; x.a = 3; x"), "${a=3}");
+        assert_eq!(s_eval("!x = std:to_drop $[1,2] {||}; x.1 = 3; x"),
+                   "std:to_drop[$[1,3]]");
+        assert_eq!(s_eval("!x = std:to_drop ${a=2} {||}; x.a = 3; x"),
+                   "std:to_drop[${a=3}]");
     }
 
     #[test]
