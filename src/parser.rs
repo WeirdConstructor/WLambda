@@ -856,7 +856,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
                 if ps.lookahead("\"") {
                     let s = parse_string(ps, false)?;
-                    Ok(s.at(1).unwrap())
+                    Ok(make_sym(ps, &s.at(1).unwrap().s_raw()))
                 } else {
                     let id = parse_identifier(ps);
                     Ok(make_sym(ps, &id))
@@ -1406,7 +1406,7 @@ mod tests {
     #[test]
     fn check_parse_sym() {
         assert_eq!(parse(":\"foo bar\""),
-                   "$[&Block,\"foo bar\"]");
+                   "$[&Block,$[&Key,:\"foo bar\"]]");
         assert_eq!(parse("foo :bar -2.3 2.3"),
                    "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&Key,:\"bar\"],-2.3,2.3]]");
         assert_eq!(parse("foo :bar -x 2"),

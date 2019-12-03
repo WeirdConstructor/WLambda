@@ -6,14 +6,19 @@
 * Incompatible Change: Error values are not directly assignable to data
 structure fields anymore. So that your data structures don't end up with
 errors in it, without knowing where they were actually assigned.
+* Change: `VVal::s_raw()` returns an empty string now for VVal::Nul instead of `$n`.
 * Bugfix: Assigning to lists and maps inside a std:to\_drop marked value
 works now too.
+* Bugfix: The parser didn't handle quoted symbols (`:"foo"`) not correct and
+just returned them as string.
 * Doc: Documented closures briefly, reference data types and how to do
 object oriented programming.
 * Doc: Documented more reference handling.
 * Feature: Added `std:write\_str` and added std:to\_drop string representation.
 * Feature: Added `std:deser:csv` simple but working CSV parser that copes
 also with multiline Excel-CSV exports. It deserves it's own crate probably.
+* Feature: Added `std:ser:csv` which is a simple but working VVal table
+to CSV serializer that also handles quoting `"` in CSV files correctly.
 
 0.3.4 (2019-11-20)
 ==================

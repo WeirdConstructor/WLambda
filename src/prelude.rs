@@ -241,14 +241,19 @@ This is a special sentinel value that is returned by functions and
 when a non existing field of a datastructure is accessed. It's semantic
 meaning is that there is no value.
 
+Most functions that expect a string value will turn a `$none` into an
+empty string. If you need an unambigous representation use `std:str:write`
+for dumping WLambda data structures.
+
 Please note for API design: In case of errornous states you should not
 return a `$none` but an `$error` value.
 
 ```wlambda
-std:assert ~ $n        == $none;
-std:assert ~ int[$n]   == 0;
-std:assert ~ float[$n] == 0.0;
-std:assert ~ str[$n]   == "$n";
+std:assert ~ $n                == $none;
+std:assert ~ int[$n]           == 0;
+std:assert ~ float[$n]         == 0.0;
+std:assert ~ str[$n]           == "";
+std:assert ~ std:str:write[$n] == "$n";
 std:assert ~ is_none[$n];
 ```
 
@@ -781,6 +786,51 @@ std:assert_eq (str v) "$[10,20]";
 
 ## Standard Library
 
+#### std:displayln _arg1_ ...
+
+This function writes a humand readable version of all the arguments
+(with a space inbetween) to the standard output. This means that:
+
+```text
+std:displayln "foo"
+```
+
+Will just print `foo` and a newline.
+
+If you need a less ambigous form, use `std:writeln`, which
+handles it's argument like written via `std:str:write` instead of `str`.
+
+#### std:writeln _arg1_ ...
+
+This function writes the WLambda representation of it's arguments
+(with a space inbetween) to standard output. This means that:
+
+```text
+std:displayln "foo"
+```
+
+Will print `"foo"` and a newline.
+
+See also the description of `std:str:write`.
+
+If you need a more human readable form use `std:displayln`.
+
+#### std:str:write _arg_
+
+Returns the WLambda representation of the value _arg_ as string.
+
+Most values have the same represenation like a WLambda literal,
+but there are other values that don't have a literal representation.
+
+Warning: Consider all values that don't have a fixed literal representation
+in the WLambda syntax as debug output that might change in future versions.
+
+```wlambda
+std:assert_eq (std:str:write "foo") $q|"foo"|;
+std:assert_eq (std:str:write $none) $q|$n|;
+std:assert_eq (std:str:write $[1,:a]) $q|$[1,:"a"]|;
+```
+
 #### std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
@@ -856,7 +906,7 @@ end of the file.
 
 ### serialization
 
-#### ser:json _data_ \[_no_pretty_]
+#### std:ser:json _data_ \[_no_pretty_]
 
 Serializes the _data_ and returns a JSON formatted (and pretty printed) string.
 Optionally not pretty printed if _no_pretty_ is a true value.
@@ -866,7 +916,7 @@ Optionally not pretty printed if _no_pretty_ is a true value.
 std:assert_eq str "[1,2.3,{\"a\":4}]";
 ```
 
-#### deser:json _string_
+#### std:deser:json _string_
 
 Deserializes the JSON formatted _string_ into a data structure.
 
@@ -877,7 +927,29 @@ std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
 ```
 
-#### deser:csv _field_delim_ _row_separator_ _data_
+#### std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
+
+This serializes the _table_ as CSV with the given _field_delim_
+and _row_separator_. If _escape_all_ is `$true` all fields will be
+put into '"'.
+
+```wlambda
+!csv_str =
+    std:ser:csv
+        ";" "|" $f
+        $[ $[1,2,3,4,$q/foo"bar/],
+           $[44,55],
+           $[]]
+    | std:displayln;
+
+std:assert_eq csv_str $q/1;2;3;4;"foo""bar"|44;55||/;
+
+std:assert_eq
+    (std:ser:csv ";" "|" $f $[$[:a,$q/;/, $q/|/, $q/ /]])
+    "a;\";\";\"|\";\" \"|";
+```
+
+#### std:deser:csv _field_delim_ _row_separator_ _data_
 
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
@@ -889,7 +961,7 @@ std:assert_eq table.0.1 "bar";
 std:assert_eq table.1.1 "y";
 ```
 
-#### ser:msgpack _data_
+#### std:ser:msgpack _data_
 
 Serializes the _data_ and returns a msgpack bytes value.
 
@@ -897,7 +969,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
-#### deser:msgpack _bytes_
+#### std:deser:msgpack _bytes_
 
 Deserializes the msgpack bytes value into a data structure.
 
@@ -910,7 +982,7 @@ std:assert_eq (std:deser:msgpack $b"\xC4\x03abc") $b"abc";
 
 ### chrono
 
-#### chrono:timestamp \[_format_]
+#### std:chrono:timestamp \[_format_]
 
 For the documentation of _format_ please consule the
 chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
@@ -925,13 +997,13 @@ std:assert ~ (year_str | int) == 2019;
 
 ### hash
 
-#### hash:fnv1a _arg1_ ...
+#### std:hash:fnv1a _arg1_ ...
 
 Hashes all the arguments as FNV1a and returns an integer.
 
 ### rand
 
-#### rand:split_mix64_new
+#### std:rand:split_mix64_new
 
 Initializes the _sm_state_ from the current time (seconds) and returns it.
 The time is retrieved in seconds, so don't expect different seed states
@@ -939,18 +1011,18 @@ if you call this multiple times in the same wall clock second.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### rand:split_mix64_new_from _seed_
+#### std:rand:split_mix64_new_from _seed_
 
 Initializes the _sm_state_ from the given _seed_ and returns it.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### rand:split_mix64_next _sm_state_ \[_count_]
+#### std:rand:split_mix64_next _sm_state_ \[_count_]
 
 Returns the _count_ next integer values generated from the given
 _sm_state_.
 
-#### rand:split_mix64_next_open01 _sm_state_ \[_count_]
+#### std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
 
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
@@ -1579,6 +1651,9 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(2), Some(2), false);
 
+    func!(st, "str:write",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s())) },
+        Some(1), Some(1), false);
     func!(st, "str:len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_len() as i64)) },
         Some(1), Some(1), false);
@@ -2028,6 +2103,30 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(2), Some(2), false);
 
+    func!(st, "writeln",
+        |env: &mut Env, argc: usize| {
+            for i in 0..argc {
+                if i == (argc - 1) {
+                    if i > 0 {
+                        println!(" {}", env.arg(i).s());
+                    } else {
+                        println!("{}", env.arg(i).s());
+                    }
+                } else if i > 0 {
+                    print!(" {}", env.arg(i).s());
+                } else {
+                    print!("{}", env.arg(i).s());
+                }
+            }
+            if argc == 0 { println!(""); }
+            if argc > 0 {
+                Ok(env.arg(argc - 1).clone())
+            } else {
+                Ok(VVal::Nul)
+            }
+        }, None, None, false);
+
+
     func!(st, "displayln",
         |env: &mut Env, argc: usize| {
             for i in 0..argc {
@@ -2143,6 +2242,31 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(env.arg(0).clone())
             }
         }, Some(1), Some(2), true);
+
+    func!(st, "ser:csv",
+        |env: &mut Env, _argc: usize| {
+            use crate::csv;
+            let delim =
+                if env.arg(0).is_none() {
+                    ",".to_string()
+                } else {
+                    env.arg(0).s_raw()
+                };
+            let row_sep =
+                if env.arg(1).is_none() {
+                    "\r\n".to_string()
+                } else {
+                    env.arg(1).s_raw()
+                };
+            let escape_all = env.arg(2).b();
+            let val = env.arg(3);
+
+            Ok(VVal::new_str_mv(csv::to_csv(
+                delim.chars().nth(0).unwrap_or(','),
+                &row_sep,
+                escape_all,
+                val)))
+        }, Some(4), Some(4), false);
 
     func!(st, "deser:csv",
         |env: &mut Env, _argc: usize| {

@@ -429,7 +429,7 @@ impl Display for StackAction {
                     .collect();
                 write!(f, "{} SA::Panic({})", stk.join("=>"), v.s())
             },
-            StackAction::Return((l, v)) => write!(f, "SA::Return(lbl={},{})", l.s_raw(), v.s()),
+            StackAction::Return((l, v)) => write!(f, "SA::Return(lbl={},{})", l.s(), v.s()),
             StackAction::Break(v) => write!(f, "SA::Break({})", v.s()),
             StackAction::Next     => write!(f, "SA::Next"),
         }
@@ -1723,16 +1723,32 @@ impl VVal {
             VVal::Sym(s)  => s.chars().count(),
             VVal::Usr(s)  => s.s_raw().chars().count(),
             VVal::Byt(b)  => b.borrow().len(),
+            VVal::Nul     => 0,
             _             => self.s().chars().count(),
         }
     }
 
+    /// Returns string data unescaped and also turns VVal::Nul into an empty string.
+    ///
+    /// Use this if you need the raw unescaped contents of VVal::Str, VVal::Sym,
+    /// VVal::Byt and other VVals.
+    ///
+    /// As this is used usually for generating output a VVal::Nul is
+    /// turned into an empty string
+    ///
+    /// ```
+    /// use wlambda::VVal;
+    ///
+    /// assert_eq!(VVal::Nul.s_raw(), "");
+    /// assert_eq!(VVal::new_str("Test").s_raw(), "Test");
+    /// ```
     pub fn s_raw(&self) -> String {
         match self {
             VVal::Str(s)  => s.borrow().clone(),
             VVal::Sym(s)  => s.clone(),
             VVal::Usr(s)  => s.s_raw(),
             VVal::Byt(s)  => s.borrow().iter().map(|b| *b as char).collect(),
+            VVal::Nul     => String::from(""),
             _             => self.s(),
         }
     }
@@ -2111,6 +2127,22 @@ impl VVal {
         }
     }
 
+    /// Returns a string representation of the VVal data structure.
+    /// It handles cyclic data structures fine.
+    /// The purpose is to return an unambigous represenation of the data
+    /// structure. That means strings are quoted and VVal::Nul becomes `$n`
+    /// for instance.
+    ///
+    /// If you need strings in pure form, use the `s_raw()` method.
+    ///
+    /// ```
+    /// use wlambda::VVal;
+    ///
+    /// let v = VVal::Nul;
+    /// assert_eq!(v.s(), "$n");
+    ///
+    /// assert_eq!(VVal::new_str("Foo").s(), "\"Foo\"");
+    /// ```
     pub fn s(&self) -> String {
         let mut cc = CycleCheck::new();
         cc.touch_walk(self);

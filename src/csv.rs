@@ -187,6 +187,41 @@ pub fn parse_csv(delim: char, row_sep: &str, data: &str) -> Result<VVal, String>
     csvp.parse(data.to_string())
 }
 
+pub fn to_csv(delim: char, row_sep: &str, escape_all: bool, table: VVal) -> String {
+    let mut ret = String::new();
+    let need_escape_chars = format!("\t\r\n \"{}{}", delim, row_sep);
+
+    for row in table.iter() {
+        let mut first_field = true;
+
+        for cell in row.iter() {
+            if !first_field { ret.push(delim); }
+            else { first_field = false; }
+
+            let field = cell.s_raw();
+
+            if escape_all
+               || field.find(|c| need_escape_chars.find(c).is_some()).is_some()
+            {
+                ret.push('"');
+                for c in field.chars() {
+                    match c {
+                        '"' => { ret += "\"\""; }
+                        _   => { ret.push(c); }
+                    }
+                }
+                ret.push('"');
+            } else {
+                ret += &field;
+            }
+        }
+
+        ret += row_sep;
+    }
+
+    ret
+}
+
 //string to_csv(const VVal::VV &table, char sep, const string &row_sep, bool wrapAll)
 //{
 //    regex re("[\t\r\n " + string(&sep, 1) + "]");
