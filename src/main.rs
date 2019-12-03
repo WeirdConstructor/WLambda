@@ -7,6 +7,7 @@ mod compiler;
 mod prelude;
 mod util;
 mod vval_user_obj;
+mod csv;
 
 use vval::Env;
 use vval::VVal;

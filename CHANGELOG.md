@@ -12,6 +12,8 @@ works now too.
 object oriented programming.
 * Doc: Documented more reference handling.
 * Feature: Added `std:write\_str` and added std:to\_drop string representation.
+* Feature: Added `std:deser:csv` simple but working CSV parser that copes
+also with multiline Excel-CSV exports. It deserves it's own crate probably.
 
 0.3.4 (2019-11-20)
 ==================

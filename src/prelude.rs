@@ -877,6 +877,18 @@ std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
 ```
 
+#### deser:csv _field_delim_ _row_separator_ _data_
+
+Parses the string _data_ as CSV. With the field delimiter _field_delim_
+and the _row_separator_ for the data rows.
+
+```wlambda
+!table = std:deser:csv ";" "\r\n" "foo;bar\r\nx;y\r\n";
+std:assert_eq table.0.0 "foo";
+std:assert_eq table.0.1 "bar";
+std:assert_eq table.1.1 "y";
+```
+
 #### ser:msgpack _data_
 
 Serializes the _data_ and returns a msgpack bytes value.
@@ -2131,6 +2143,33 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(env.arg(0).clone())
             }
         }, Some(1), Some(2), true);
+
+    func!(st, "deser:csv",
+        |env: &mut Env, _argc: usize| {
+            use crate::csv;
+            let delim =
+                if env.arg(0).is_none() {
+                    ",".to_string()
+                } else {
+                    env.arg(0).s_raw()
+                };
+            let row_sep =
+                if env.arg(1).is_none() {
+                    "\r\n".to_string()
+                } else {
+                    env.arg(1).s_raw()
+                };
+            let data = env.arg(2).s_raw();
+
+            match csv::parse_csv(
+                    delim.chars().nth(0).unwrap_or(','),
+                    &row_sep,
+                    &data)
+            {
+                Ok(v) => Ok(v),
+                Err(e) => Ok(VVal::err_msg(&e)),
+            }
+        }, Some(3), Some(3), false);
 
     if cfg!(feature="regex") {
         use regex::Regex;
