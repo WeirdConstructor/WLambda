@@ -33,12 +33,12 @@ impl CSVParser {
     fn skip_char(&mut self, count: usize) { self.pos += count; }
 
     fn check_char(&mut self, c: char) -> bool {
-        if self.rest_len() <= 0 { return false; }
+        if self.rest_len() == 0 { return false; }
         self.next_char() == c
     }
 
     fn next_char(&mut self) -> char {
-        if self.rest_len() <= 0 { return '\0'; }
+        if self.rest_len() == 0 { return '\0'; }
         self.data[self.pos]
     }
 
@@ -52,10 +52,8 @@ impl CSVParser {
         let sep = &self.row_sep;
         if self.rest_len() < sep.len() { return false; }
 
-        let mut i = 0;
-        for c in sep.chars() {
+        for (i, c) in sep.chars().enumerate() {
             if self.data[self.pos + i] != c { return false; }
-            i += 1;
         }
 
         true
@@ -100,11 +98,11 @@ impl CSVParser {
             }
         }
 
-        if self.rest_len() <= 0 { end_found = true; }
+        if self.rest_len() == 0 { end_found = true; }
 
         let mut row_end = false;
 
-        if self.rest_len() <= 0
+        if self.rest_len() == 0
            || self.check_row_sep()
         {
             self.skip_char(self.row_sep.len());
@@ -145,7 +143,7 @@ impl CSVParser {
             }
         }
 
-        if self.rest_len() <= 0 {
+        if self.rest_len() == 0 {
             end_found = true;
             row_end   = true;
         }
@@ -174,7 +172,7 @@ impl CSVParser {
 
         while self.rest_len() > 0 {
             if !self.parse_field()? {
-                return Err(format!("Couldn't find end."));
+                return Err("Couldn't find end.".to_string());
             }
         }
 
