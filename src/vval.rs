@@ -102,6 +102,8 @@ pub enum Syntax {
     DefGlobRef,
     Import,
     Export,
+    MapSplice,
+    VecSplice,
 }
 
 /// The maximum stack size.
@@ -1661,6 +1663,28 @@ impl VVal {
             VVal::WWRef(_) => self.deref().set_map_key(key, val),
             VVal::Map(m)   => { m.borrow_mut().insert(key, val); },
             _ => (),
+        }
+    }
+
+    pub fn set_key_mv(&self, key: String, val: VVal) {
+        match self {
+            VVal::Ref(_)   => self.deref().set_key_mv(key, val),
+            VVal::CRef(_)  => self.deref().set_key_mv(key, val),
+            VVal::WWRef(_) => self.deref().set_key_mv(key, val),
+            VVal::DropFun(f) => f.v.set_key_mv(key, val),
+            VVal::Map(m) => {
+                m.borrow_mut().insert(key, val);
+            },
+            VVal::Lst(l) => {
+                let idx = key.parse::<usize>().unwrap_or(0);
+                let mut v = l.borrow_mut();
+                if v.len() <= idx {
+                    v.resize(idx + 1, VVal::Nul);
+                }
+                v[idx] = val;
+            },
+            VVal::Usr(u) => { u.set_key(&VVal::new_str_mv(key), val); },
+            _ => {}
         }
     }
 

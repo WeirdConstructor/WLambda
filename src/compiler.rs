@@ -4,6 +4,7 @@
 use crate::parser::{self};
 use crate::prelude::*;
 use crate::vval::VVal;
+use crate::vval::SynPos;
 use crate::vval::Syntax;
 use crate::vval::Env;
 use crate::vval::VValFun;
@@ -1364,26 +1365,44 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     }))
                 },
                 Syntax::Lst => {
-                    let list_elems : Vec<EvalNode> =
-                        ast.map_skip(|e| compile(e, ce), 1)?; 
+                    let list_elems : Vec<(bool, EvalNode)> =
+                        ast.map_skip(|e| {
+                            if e.is_vec() {
+                                if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
+                                    e.at(0).unwrap_or(VVal::Nul)
+                                {
+                                    return Ok((true, compile(&e.at(1).unwrap(), ce)?));
+                                }
+                            }
+                            Ok((false, compile(e, ce)?))
+                        }, 1)?;
 
                     Ok(Box::new(move |e: &mut Env| {
                         let v = VVal::vec();
-                        for x in list_elems.iter() {
+                        for (is_splice, x) in list_elems.iter() {
                             let av = check_error_value(x(e)?, "list")?;
-                            v.push(av);
+                            if *is_splice {
+                                av.for_each(|e| { v.push(e.clone()); });
+                            } else {
+                                v.push(av);
+                            }
                         }
                         Ok(v)
                     }))
                 },
                 Syntax::Map    => {
-                    let map_elems : Result<Vec<(EvalNode,EvalNode)>, CompileError> =
+                    let map_elems : Result<Vec<(EvalNode,Option<EvalNode>)>, CompileError> =
                         ast.map_skip(|e| {
                                 let k = e.at(0).unwrap();
                                 let v = e.at(1).unwrap();
-                                let kc = compile(&k, ce)?;
-                                let vc = compile(&v, ce)?;
-                                Ok((kc, vc))
+                                if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
+                                    let sc = compile(&v, ce)?;
+                                    Ok((sc, None))
+                                } else {
+                                    let kc = compile(&k, ce)?;
+                                    let vc = compile(&v, ce)?;
+                                    Ok((kc, Some(vc)))
+                                }
                             }, 1);
                     if let Err(e) = map_elems { return Err(e); }
                     let map_elems = map_elems.unwrap();
@@ -1392,8 +1411,15 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let v = VVal::map();
                         for x in map_elems.iter() {
                             let ke = check_error_value(x.0(e)?, "map key")?;
-                            let kv = check_error_value(x.1(e)?, "map value")?;
-                            v.set_key(&ke, kv);
+                            if let Some(ref kv) = x.1 {
+                                let kv = check_error_value(kv(e)?, "map value")?;
+                                v.set_key(&ke, kv);
+                            } else {
+                                let splice_map = ke;
+                                splice_map.for_eachk(|sk, sv| {
+                                    v.set_key_mv(sk.to_string(), sv.clone());
+                                });
+                            }
                         }
                         Ok(v)
                     }))
@@ -3028,4 +3054,14 @@ mod tests {
                 $[$*x, $*o]
             "), "$[294,9]");
     }
+
+    #[test]
+    fn check_splices() {
+        assert_eq!(s_eval("${ a = 10, *${ b = 2 }}.b"), "2");
+        assert_eq!(s_eval("!a = ${a=10}; !b = ${b = 3}; ${*a, *b}.b"), "3");
+        assert_eq!(s_eval("$[1,2,*$[3,4]].2"), "3");
+        assert_eq!(s_eval("!a = $[1,2]; !b = $[3,4]; $[*a, *b].2"), "3");
+    }
+
+
 }

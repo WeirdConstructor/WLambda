@@ -537,7 +537,105 @@ std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 
 ### Vectors (or Lists)
 
+The literal syntax for vectors (or sometimes also called lists in WLambda)
+is `$[...]`. You may write any kind of expression in it and you will get
+a vector from it.
+
+To access the elements of a vector you have to call a number with a vector
+as first argument. The field syntax is a more convenient shorthand syntax.
+The following example demonstrates it:
+
+```wlambda
+!add20 = { _ + 20 };
+
+!some_vec = $[1, 2 * 10, add20 10]; 
+
+# Index calling:
+std:assert_eq (0 some_vec) 1;
+std:assert_eq (1 some_vec) 20;
+std:assert_eq (2 some_vec) 30;
+
+# Field syntax:
+std:assert_eq some_vec.0 1;
+std:assert_eq some_vec.1 20;
+std:assert_eq some_vec.2 30;
+```
+
+#### Splicing
+
+You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
+syntax. Here is an example:
+
+```wlambda
+!make_some = { $[_ + 1, _ + 2] };
+
+!some_vec = $[ 0, *make_some 1 ];
+
+std:assert_eq some_vec.1 2;
+std:assert_eq some_vec.2 3;
+
+# There can be any expression after the `.` if you wrap it into `(...)`:
+std:assert_eq some_vec.(1 + 1) 3;
+
+# A more direct example:
+std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
+```
+
 ### Associative Maps (or String to Value mappings)
+
+Aside from vectors there are associative maps in WLambda. Their syntax is
+`${ key = expr, ... }`. The keys of these maps have to be strings,
+the values in the literals can be any expression.
+
+You can call a symbol or a string with an associative map to get the value in
+the map with the string value as key. There is also, like vectors, the field
+calling syntax. Here are some examples:
+
+```wlambda
+!some_map = ${ a = 1, b = 2 };
+
+# Symbol calling:
+std:assert_eq (:a some_map) 1;
+std:assert_eq (:b some_map) 2;
+std:assert_eq ("a" some_map) 1;
+std:assert_eq ("b" some_map) 2;
+
+# Field syntax:
+std:assert_eq some_map.a 1;
+std:assert_eq some_map.b 2;
+
+# There can be any expression after the `.` if you wrap it into `(...)`,
+# also strings:
+std:assert_eq some_map.("a") 1;
+std:assert_eq some_map.("b") 2;
+```
+
+Keys can also be computed at runtime in the literal form:
+
+```wlambda
+!some_map = ${ (std:str:cat "a" "b") = 10 };
+
+std:assert_eq (str some_map) "${ab=10}";
+```
+
+#### Splicing
+
+Like vectors you can splice map values directly into map literals:
+
+```wlambda
+!map_gen = { ${ (std:str:cat "_" _) = _ } };
+
+!some_map = ${ a = 10, *map_gen "x" };
+
+std:assert_eq some_map.a 10;
+std:assert_eq some_map._x "x";
+
+std:assert_eq (str ${*${a=10}}) "${a=10}";
+
+# As a reminder, a full expression can come after the '*':
+
+std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
+```
 
 ### References
 

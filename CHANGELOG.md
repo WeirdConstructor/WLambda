@@ -19,6 +19,8 @@ object oriented programming.
 also with multiline Excel-CSV exports. It deserves it's own crate probably.
 * Feature: Added `std:ser:csv` which is a simple but working VVal table
 to CSV serializer that also handles quoting `"` in CSV files correctly.
+* Feature: Added splice syntax for splicing vectors and maps into literals:
+`$[1,2,*$[3,4]]` and `${a = 1, b = 2, *${c = 3}, d = 4}`.
 
 0.3.4 (2019-11-20)
 ==================

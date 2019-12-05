@@ -83,13 +83,17 @@ In the following grammar, white space and comments are omitted:
                   ;
     quote_string  = "q", ?any character as quote?, { ?any character? }, ?any character as quote?
                   ;
-    list          = "[", [ expr, { ",", expr }, [ "," ] ],"]"
+    list_expr     = "*", expr   (* splices the vector result of 'expr'
+                                   into the currently parsed list *)
+                  | expr
                   ;
-    map           = "{", [
-                        (ident | expr), "=", expr,
-                        { ",", (ident | expr), "=", expr },
-                        , [ "," ]
-                    ], "}"
+    list          = "[", [ list_expr, { ",", list_expr }, [ "," ] ],"]"
+                  ;
+    map_expr      = (ident | expr), "=", expr
+                  | "*" expr    (* splices the map result of 'expr'
+                                   into the currently parsed map *)
+                  ;
+    map           = "{", [ map_expr, { ",", map_expr }, [ "," ] ], "}"
                   ;
     true          = "t" | "true"
                   ;
@@ -114,6 +118,8 @@ In the following grammar, white space and comments are omitted:
                   | false
                   | err
                   | ref
+                  | wref
+                  | deref
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
@@ -612,8 +618,13 @@ fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
     let list = ps.syn(Syntax::Lst);
 
     while ps.peek().unwrap() != ']' {
-        let atom = parse_expr(ps)?;
-        list.push(atom);
+        if ps.consume_if_eq_wsc('*') {
+            let r = ps.syn(Syntax::VecSplice);
+            r.push(parse_expr(ps)?);
+            list.push(r);
+        } else {
+            list.push(parse_expr(ps)?);
+        }
         if !ps.consume_if_eq_wsc(',') { break; }
     }
 
@@ -634,20 +645,28 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
     while ps.peek().unwrap() != '}' {
         let c = ps.peek().unwrap();
-        let key = if is_ident_start(c) {
-            VVal::Sym(parse_identifier(ps))
-        } else {
-            parse_expr(ps)?
-        };
-        if !ps.consume_if_eq_wsc('=') {
-            return ps.err_unexpected_token('=', "After reading map key");
-        }
-        let value = parse_expr(ps)?;
 
-        let elem = VVal::vec();
-        elem.push(key);
-        elem.push(value);
-        map.push(elem);
+        map.push(
+            if ps.consume_if_eq_wsc('*') {
+                let r = ps.syn(Syntax::MapSplice);
+                r.push(parse_expr(ps)?);
+                r
+
+            } else {
+                let key = if is_ident_start(c) {
+                    VVal::Sym(parse_identifier(ps))
+                } else {
+                    parse_expr(ps)?
+                };
+                if !ps.consume_if_eq_wsc('=') {
+                    return ps.err_unexpected_token('=', "After reading map key");
+                }
+
+                let elem = VVal::vec();
+                elem.push(key);
+                elem.push(parse_expr(ps)?);
+                elem
+            });
 
         if !ps.consume_if_eq_wsc(',') { break; }
     }
