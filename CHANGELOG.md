@@ -1,4 +1,4 @@
-0.3.5 (unreleased)
+0.3.5 (2019-12-06)
 ==================
 
 * Feature: Added `std:measure_time _unit_ _function_` for simple benchmarking.
