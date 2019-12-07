@@ -3063,5 +3063,13 @@ mod tests {
         assert_eq!(s_eval("!a = $[1,2]; !b = $[3,4]; $[*a, *b].2"), "3");
     }
 
+    #[test]
+    fn check_shuffle() {
+        assert_eq!(s_eval(r"
+            !sm = std:rand:split_mix64_new_from 1234;
+            std:shuffle { std:rand:split_mix64_next sm }
+                $[1,2,3,4,5,6,7,8];
+        "), "$[2,1,7,4,8,5,3,6]");
+    }
 
 }

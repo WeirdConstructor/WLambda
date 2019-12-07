@@ -25,6 +25,9 @@ pub struct SplitMix64(pub u64);
 
 impl SplitMix64 {
     pub fn new(seed: u64) -> Self { Self(seed) }
+    pub fn new_from_i64(seed: i64) -> Self {
+        Self::new(u64::from_be_bytes(seed.to_be_bytes()))
+    }
 
     #[inline]
     pub fn next_u64(&mut self) -> u64 {

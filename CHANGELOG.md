@@ -1,3 +1,8 @@
+0.3.6 (unreleased)
+==================
+
+* Feature: Added `std:shuffle` implementing fisher yates shuffle.
+
 0.3.5 (2019-12-06)
 ==================
 

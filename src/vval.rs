@@ -985,6 +985,21 @@ impl VVal {
         })
     }
 
+    pub fn fisher_yates_shuffle<I>(&mut self, mut rand: I)
+        where I: FnMut() -> i64
+    {
+        if let VVal::Lst(v) = self {
+            let mut list = v.borrow_mut();
+            if list.len() <= 1 { return; }
+
+            for k in 1..list.len() {
+                let i = list.len() - k;
+                let j = rand().abs() as usize % (i + 1);
+                list.swap(j, i);
+            }
+        }
+    }
+
     /// This function returns you an iterator over the VVal.
     /// It will iterate over data such as VVal::Str, VVal::Sym, VVal::Lst,
     /// VVal::Map and VVal::Byt.

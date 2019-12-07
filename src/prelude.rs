@@ -884,6 +884,19 @@ std:assert_eq (str v) "$[10,20]";
 
 ## Standard Library
 
+#### std:shuffle _rand_func_ _vec_
+
+Shuffles the _vec_ in place. The function _rand_func_ needs to return
+a random 64 bit integer on each call. Here is an example:
+
+```wlambda
+!sm  = std:rand:split_mix64_new_from 1234;
+!vec = $[1,2,3,4,5,6,7,8];
+std:shuffle { std:rand:split_mix64_next sm } vec;
+
+std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
+```
+
 #### std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
@@ -2581,6 +2594,16 @@ pub fn std_symbol_table() -> SymbolTable {
             }, Some(1), Some(1), false);
     }
 
+    func!(st, "shuffle",
+        |env: &mut Env, argc: usize| {
+            let fun = env.arg(0);
+            let mut list = env.arg(1);
+            list.fisher_yates_shuffle(|| {
+                fun.call_no_args(env).unwrap_or(VVal::Nul).i()
+            });
+            Ok(list)
+        }, Some(2), Some(2), false);
+
     func!(st, "hash:fnv1a",
         |env: &mut Env, argc: usize| {
             let mut hash = util::FnvHasher::default();
@@ -2613,10 +2636,9 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "rand:split_mix64_next",
         |env: &mut Env, argc: usize| {
-            let state : u64 =
-                u64::from_be_bytes(
-                    env.arg(0).at(0).unwrap_or(VVal::Int(0)).i().to_be_bytes());
-            let mut sm = util::SplitMix64::new(state);
+            let mut sm =
+                util::SplitMix64::new_from_i64(
+                    env.arg(0).at(0).unwrap_or(VVal::Int(0)).i());
 
             let ret =
                 if argc == 2 {
@@ -2635,9 +2657,9 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "rand:split_mix64_next_open01",
         |env: &mut Env, argc: usize| {
-            let state : u64 =
-                env.arg(0).at(0).unwrap_or(VVal::Int(0)).i() as u64;
-            let mut sm = util::SplitMix64::new(state);
+            let mut sm =
+                util::SplitMix64::new_from_i64(
+                    env.arg(0).at(0).unwrap_or(VVal::Int(0)).i());
             let ret =
                 if argc == 2 {
                     let v = VVal::vec();
