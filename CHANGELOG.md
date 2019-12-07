@@ -2,6 +2,8 @@
 ==================
 
 * Feature: Added `std:shuffle` implementing fisher yates shuffle.
+* Feature: Added `std:sort`, `std:cmp:num` and `std:cmp:str`.
+* Feature: Added `std:copy` for shallow copies.
 
 0.3.5 (2019-12-06)
 ==================

@@ -3072,4 +3072,22 @@ mod tests {
         "), "$[2,1,7,4,8,5,3,6]");
     }
 
+    #[test]
+    fn check_sort() {
+        assert_eq!(s_eval("std:sort std:cmp:str:asc  $[:c, :x, :a, :b]"),    "$[:\"a\",:\"b\",:\"c\",:\"x\"]");
+        assert_eq!(s_eval("std:sort std:cmp:str:desc $[:c, :x, :a, :b]"),    "$[:\"x\",:\"c\",:\"b\",:\"a\"]");
+        assert_eq!(s_eval("std:sort std:cmp:str:asc  $[3, 2, 5, 9, 0, -1]"), "$[-1,0,2,3,5,9]");
+        assert_eq!(s_eval("std:sort std:cmp:str:desc $[3, 2, 5, 9, 0, -1]"), "$[9,5,3,2,0,-1]");
+        assert_eq!(s_eval("std:sort std:cmp:num:asc  $[3, 2, 5, 9, 0, -1]"), "$[-1,0,2,3,5,9]");
+        assert_eq!(s_eval("std:sort std:cmp:num:desc $[3, 2, 5, 9, 0, -1]"), "$[9,5,3,2,0,-1]");
+    }
+
+    #[test]
+    fn check_copy() {
+        assert_eq!(s_eval("!a = $[1,2,3]; a.0 = 10; !b = std:copy a; b.1 = 20; $[a,b]"),
+                   "$[$[10,2,3],$[10,20,3]]");
+        assert_eq!(s_eval("!a = ${a=1}; a.a = 10; !b = std:copy a; b.a = 20; $[a,b]"),
+                   "$[${a=10},${a=20}]");
+    }
+
 }

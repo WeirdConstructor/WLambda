@@ -985,6 +985,55 @@ impl VVal {
         })
     }
 
+    pub fn compare_str(&self, b: &VVal) -> std::cmp::Ordering {
+        self.s_raw().cmp(&b.s_raw())
+    }
+
+    pub fn shallow_clone(&self) -> VVal {
+        match self {
+            VVal::Lst(l) => {
+                let out = VVal::vec();
+                for v in l.borrow().iter() { out.push(v.clone()); }
+                out
+            },
+            VVal::Map(m) => {
+                let out = VVal::map();
+                for (k, v) in m.borrow_mut().iter() {
+                    out.set_map_key(k.to_string(), v.clone())
+                }
+                out
+            },
+            VVal::Str(s) => {
+                VVal::new_str_mv(s.borrow_mut().clone())
+            },
+            VVal::DropFun(v) => v.v.shallow_clone(),
+            VVal::Ref(v)     => v.borrow_mut().shallow_clone(),
+            VVal::CRef(v)    => v.borrow_mut().shallow_clone(),
+            VVal::WWRef(v)   =>
+                if let Some(r) = v.upgrade() {
+                    r.borrow().shallow_clone()
+                } else { VVal::Nul },
+            _ => self.clone()
+        }
+    }
+
+    pub fn compare_num(&self, b: &VVal) -> std::cmp::Ordering {
+        if self.is_float() {
+            self.f().partial_cmp(&b.f())
+                .unwrap_or(std::cmp::Ordering::Greater)
+        } else {
+            self.i().cmp(&b.i())
+        }
+    }
+
+    pub fn sort<F>(&mut self, compare: F)
+        where F: FnMut(&VVal, &VVal) -> std::cmp::Ordering
+    {
+        if let VVal::Lst(v) = self {
+            v.borrow_mut().sort_by(compare);
+        }
+    }
+
     pub fn fisher_yates_shuffle<I>(&mut self, mut rand: I)
         where I: FnMut() -> i64
     {

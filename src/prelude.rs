@@ -897,6 +897,44 @@ std:shuffle { std:rand:split_mix64_next sm } vec;
 std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
 ```
 
+#### std:copy _vec_or_map_
+
+Makes a shallow copy of the given vector or map.
+
+```wlambda
+!a = $[1,2,3];
+!b = std:copy a;
+b.0 = 10;
+
+std:assert_eq a.0 1;
+std:assert_eq b.0 10;
+```
+
+#### std:sort [_compare_fun_] _vec_
+
+Sorts the given _vec_ in place. The comparison function _compare_fun_ gets the
+two values a and b and needs to return -1 if a < b, 0 if a = b and 1 if a > b.
+
+There are four functions that implement numeric and lexicographic ordering:
+
+- `std:cmp:num:asc`
+- `std:cmp:num:desc`
+- `std:cmp:str:asc`
+- `std:cmp:str:desc`
+
+If no _compare_fun_ is given, the ordering will be ascending and lexicographic
+vs. numeric will be chosen by the type of the `a` value (if it is an integer or
+float it will be numeric, otherwise lexicographic).
+
+```wlambda
+!v = $[$[1], $[-1], $[3]];
+std:sort { std:cmp:num:desc _.0 _1.0 } v;
+
+std:assert_eq v.0.0 3;
+std:assert_eq v.1.0 1;
+std:assert_eq v.2.0 -1;
+```
+
 #### std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
@@ -2594,8 +2632,83 @@ pub fn std_symbol_table() -> SymbolTable {
             }, Some(1), Some(1), false);
     }
 
-    func!(st, "shuffle",
+    func!(st, "copy",
+        |env: &mut Env, _argc: usize| {
+            Ok(env.arg(0).shallow_clone())
+        }, Some(1), Some(1), false);
+
+    func!(st, "cmp:num:asc",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0).compare_num(&env.arg(1)) {
+                std::cmp::Ordering::Greater => Ok(VVal::Int(-1)),
+                std::cmp::Ordering::Less    => Ok(VVal::Int(1)),
+                std::cmp::Ordering::Equal   => Ok(VVal::Int(0)),
+            }
+        }, Some(2), Some(2), false);
+
+    func!(st, "cmp:num:desc",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0).compare_num(&env.arg(1)) {
+                std::cmp::Ordering::Greater => Ok(VVal::Int(1)),
+                std::cmp::Ordering::Less    => Ok(VVal::Int(-1)),
+                std::cmp::Ordering::Equal   => Ok(VVal::Int(0)),
+            }
+        }, Some(2), Some(2), false);
+
+    func!(st, "cmp:str:asc",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0).compare_str(&env.arg(1)) {
+                std::cmp::Ordering::Greater => Ok(VVal::Int(-1)),
+                std::cmp::Ordering::Less    => Ok(VVal::Int(1)),
+                std::cmp::Ordering::Equal   => Ok(VVal::Int(0)),
+            }
+        }, Some(2), Some(2), false);
+
+    func!(st, "cmp:str:desc",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0).compare_str(&env.arg(1)) {
+                std::cmp::Ordering::Greater => Ok(VVal::Int(1)),
+                std::cmp::Ordering::Less    => Ok(VVal::Int(-1)),
+                std::cmp::Ordering::Equal   => Ok(VVal::Int(0)),
+            }
+        }, Some(2), Some(2), false);
+
+    func!(st, "sort",
         |env: &mut Env, argc: usize| {
+            if argc == 1 {
+                let mut list = env.arg(0);
+                list.sort(|a: &VVal, b: &VVal| {
+                    if a.is_int() || a.is_float() {
+                        a.compare_num(b)
+                    } else {
+                        a.compare_str(b)
+                    }
+                });
+                Ok(list)
+            } else {
+                let fun = env.arg(0);
+                let mut list = env.arg(1);
+                let mut ret = Ok(VVal::Nul);
+                list.sort(|a: &VVal, b: &VVal| {
+                    env.push(a.clone());
+                    env.push(b.clone());
+                    let i =
+                        match fun.call_internal(env, 2) {
+                            Ok(v)  => { v.i() },
+                            Err(e) => { ret = Err(e); 1 },
+                        };
+                    env.popn(2);
+                    if i == 0     { std::cmp::Ordering::Equal }
+                    else if i > 0 { std::cmp::Ordering::Greater }
+                    else          { std::cmp::Ordering::Less }
+                });
+                if ret.is_ok() { ret = Ok(list); }
+                ret
+            }
+        }, Some(1), Some(2), false);
+
+    func!(st, "shuffle",
+        |env: &mut Env, _argc: usize| {
             let fun = env.arg(0);
             let mut list = env.arg(1);
             list.fisher_yates_shuffle(|| {
