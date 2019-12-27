@@ -445,6 +445,10 @@ impl Debug for StackAction {
 }
 
 impl StackAction {
+    pub fn panic_borrow(v: &VVal) -> Self {
+        Self::panic_msg(format!("Can't mutate borrowed value: {}", v.s()))
+    }
+
     pub fn panic_msg(err: String) -> Self {
         let v = Vec::new();
         StackAction::Panic(VVal::new_str_mv(err), v)
@@ -695,7 +699,7 @@ pub trait VValUserData {
     /// Makes your user data act like a map. This can be useful
     /// for implementing your own registries or data structures.
     /// Implement this method for setting a key to a value.
-    fn set_key(&self, _key: &VVal, _val: VVal) { }
+    fn set_key(&self, _key: &VVal, _val: VVal) -> Result<(), StackAction> { Ok(()) }
     /// This method returns some value that your user data
     /// associates with the given key.
     fn get_key(&self, _key: &str) -> Option<VVal> { None }
@@ -1134,11 +1138,11 @@ impl VVal {
                 }))
             },
             VVal::DropFun(v) => v.v.iter(),
-            VVal::Ref(v)     => v.borrow_mut().iter(),
-            VVal::CRef(v)    => v.borrow_mut().iter(),
+            VVal::Ref(v)     => v.borrow().iter(),
+            VVal::CRef(v)    => v.borrow().iter(),
             VVal::WWRef(v)   =>
                 if let Some(r) = v.upgrade() {
-                    r.borrow_mut().iter()
+                    r.borrow().iter()
                 } else { std::iter::from_fn(Box::new(|| { None })) },
             _ => std::iter::from_fn(Box::new(|| { None })),
         }
@@ -1219,7 +1223,7 @@ impl VVal {
                     let f = e.arg(0);
 
                     let ret = VVal::vec();
-                    for (k, v) in m.borrow_mut().iter() {
+                    for (k, v) in m.borrow().iter() {
                         e.push(VVal::new_str(k));
                         e.push(v.clone());
                         let el = f.call_internal(e, 2);
@@ -1240,7 +1244,7 @@ impl VVal {
                     let f = e.arg(0);
 
                     let ret = VVal::vec();
-                    for i in l.borrow_mut().iter() {
+                    for i in l.borrow().iter() {
                         e.push(i.clone());
                         let el = f.call_internal(e, 1);
                         e.popn(1);
@@ -1434,11 +1438,11 @@ impl VVal {
                 })
             },
             VVal::DropFun(v) => v.v.call_internal(env, argc),
-            VVal::Ref(v)     => v.borrow_mut().call_internal(env, argc),
-            VVal::CRef(v)    => v.borrow_mut().call_internal(env, argc),
+            VVal::Ref(v)     => v.borrow().call_internal(env, argc),
+            VVal::CRef(v)    => v.borrow().call_internal(env, argc),
             VVal::WWRef(v)   =>
                 if let Some(r) = v.upgrade() {
-                    r.borrow_mut().call_internal(env, argc)
+                    r.borrow().call_internal(env, argc)
                 } else { Ok(VVal::Nul) },
             _ => { Ok(self.clone()) },
         }
@@ -1470,7 +1474,7 @@ impl VVal {
     pub fn deref(&self) -> VVal {
         match self {
             VVal::Ref(l)     => (*l).borrow().clone(),
-            VVal::CRef(l)     => (*l).borrow().clone(),
+            VVal::CRef(l)    => (*l).borrow().clone(),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => v.borrow().clone(),
@@ -1638,7 +1642,7 @@ impl VVal {
 
         let mut res : Vec<R> = Vec::new();
         if let VVal::Lst(b) = &self {
-            for i in b.borrow_mut().iter().skip(skip) {
+            for i in b.borrow().iter().skip(skip) {
                 res.push(op(i));
             }
         }
@@ -1650,7 +1654,7 @@ impl VVal {
 
         let mut res : Vec<R> = Vec::new();
         if let VVal::Lst(b) = &self {
-            for i in b.borrow_mut().iter().skip(skip) {
+            for i in b.borrow().iter().skip(skip) {
                 res.push(op(i)?);
             }
         }
@@ -1747,12 +1751,34 @@ impl VVal {
                 }
                 v[idx] = val;
             },
-            VVal::Usr(u) => { u.set_key(&VVal::new_str_mv(key), val); },
+            VVal::Usr(u) => { u.set_key(&VVal::new_str_mv(key), val).unwrap(); },
             _ => {}
         }
     }
 
-    pub fn set_key(&self, key: &VVal, val: VVal) {
+    pub fn list_operation<O, R>(&self, mut op: O) -> Result<R, StackAction>
+        where O: FnMut(&mut std::cell::RefMut<std::vec::Vec<VVal>>) -> R
+    {
+        match self {
+            VVal::Ref(_)   => self.deref().list_operation(op),
+            VVal::CRef(_)  => self.deref().list_operation(op),
+            VVal::WWRef(_) => self.deref().list_operation(op),
+            VVal::DropFun(f) => f.v.list_operation(op),
+            VVal::Lst(l) => {
+                match l.try_borrow_mut() {
+                    Ok(mut v) => { Ok(op(&mut v)) },
+                    Err(_) => Err(StackAction::panic_borrow(self)),
+                }
+            },
+            _ => {
+                Err(StackAction::panic_msg(format!(
+                    "Can't do list operation with non list value: {}",
+                    self.s())))
+            }
+        }
+    }
+
+    pub fn set_key(&self, key: &VVal, val: VVal) -> Result<(), StackAction> {
         match self {
             VVal::Ref(_)   => self.deref().set_key(key, val),
             VVal::CRef(_)  => self.deref().set_key(key, val),
@@ -1760,18 +1786,26 @@ impl VVal {
             VVal::DropFun(f) => f.v.set_key(key, val),
             VVal::Map(m) => {
                 let ks = key.s_raw();
-                m.borrow_mut().insert(ks, val);
+                match m.try_borrow_mut() {
+                    Ok(mut r)  => { r.insert(ks, val); Ok(()) },
+                    Err(_) => return Err(StackAction::panic_borrow(self)),
+                }
             },
             VVal::Lst(l) => {
                 let idx = key.i() as usize;
-                let mut v = l.borrow_mut();
-                if v.len() <= idx {
-                    v.resize(idx + 1, VVal::Nul);
+                match l.try_borrow_mut() {
+                    Ok(mut v) => {
+                        if v.len() <= idx {
+                            v.resize(idx + 1, VVal::Nul);
+                        }
+                        v[idx] = val;
+                        Ok(())
+                    },
+                    Err(_) => return Err(StackAction::panic_borrow(self)),
                 }
-                v[idx] = val;
             },
-            VVal::Usr(u) => { u.set_key(key, val); },
-            _ => {}
+            VVal::Usr(u) => u.set_key(key, val),
+            _ => Ok(())
         }
     }
 
@@ -2393,7 +2427,7 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
 
         while let Some((ke, ve)) = map.next_entry()? {
             let k : VVal = ke;
-            v.set_key(&VVal::new_sym(&k.s_raw()), ve);
+            v.set_key(&VVal::new_sym(&k.s_raw()), ve).unwrap();
         }
 
         Ok(v)

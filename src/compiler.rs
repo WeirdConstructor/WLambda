@@ -1322,7 +1322,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::Err => {
                     let err_val = compile(&ast.at(1).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env|
-                                    Ok(VVal::err(err_val(e)?.clone(), spos.clone()))))
+                        Ok(VVal::err(err_val(e)?.clone(), spos.clone()))))
                 },
                 Syntax::Key => {
                     let sym = ast.at(1).unwrap();
@@ -1342,8 +1342,10 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                                   "field assignment key")?;
                         let v = check_error_value(val(e)?,
                                                   "field assignment value")?;
-                        m.set_key(&s, v.clone());
-                        Ok(v)
+                        match m.set_key(&s, v.clone()) {
+                            Ok(()) => Ok(v),
+                            Err(sa) => Err(sa.wrap_panic(Some(spos.clone()))),
+                        }
                     }))
                 },
                 Syntax::Ref => {
@@ -1413,7 +1415,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             let ke = check_error_value(x.0(e)?, "map key")?;
                             if let Some(ref kv) = x.1 {
                                 let kv = check_error_value(kv(e)?, "map value")?;
-                                v.set_key(&ke, kv);
+                                v.set_key(&ke, kv).unwrap();
                             } else {
                                 let splice_map = ke;
                                 splice_map.for_eachk(|sk, sv| {
@@ -3088,6 +3090,39 @@ mod tests {
                    "$[$[10,2,3],$[10,20,3]]");
         assert_eq!(s_eval("!a = ${a=1}; a.a = 10; !b = std:copy a; b.a = 20; $[a,b]"),
                    "$[${a=10},${a=20}]");
+    }
+
+    #[test]
+    fn check_borrow_error() {
+        assert_eq!(s_eval_no_panic(r"
+            !x = $[1,2,3];
+            x { x.1 = _; }
+        "),
+        "$e \"EXEC ERR: Caught [3,23:<compiler:s_eval_no_panic>(SetKey)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
+
+        assert_eq!(s_eval_no_panic(r"
+            !x = ${a=1};
+            x { x.a = $[_, _1]; }
+        "),
+        "$e \"EXEC ERR: Caught [3,23:<compiler:s_eval_no_panic>(SetKey)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: ${a=1}\\\")\"");
+
+        assert_eq!(s_eval_no_panic(r"
+            !x = $[1,2,3];
+            x { std:prepend x $[_] }
+        "),
+        "$e \"EXEC ERR: Caught [3,29:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
+
+        assert_eq!(s_eval_no_panic(r"
+            !x = $[1,2,3];
+            x { std:append x $[_] }
+        "),
+        "$e \"EXEC ERR: Caught [3,28:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
+
+        assert_eq!(s_eval_no_panic(r"
+            !x = $[1,2,3];
+            x { std:take 2 x; _ }
+        "),
+        "$e \"EXEC ERR: Caught [3,26:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
     }
 
 }

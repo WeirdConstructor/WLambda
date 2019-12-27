@@ -1709,7 +1709,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "prepend",
         |env: &mut Env, argc: usize| {
             let v = env.arg(0);
-            let mut v =
+            let v =
                 if v.is_vec() { v }
                 else {
                     let r = VVal::vec();
@@ -1717,17 +1717,20 @@ pub fn std_symbol_table() -> SymbolTable {
                     r
                 };
 
-            if let VVal::Lst(l) = &mut v {
-                let mut o = l.borrow_mut();
-                for i in 1..argc {
-                    match env.arg(i) {
-                        VVal::Lst(b) => {
-                            for item in b.borrow().iter() {
-                                o.insert(0, item.clone());
-                            }
-                        },
-                        item => { o.insert(0, item.clone()); }
-                    }
+            for i in 1..argc {
+                match env.arg(i) {
+                    VVal::Lst(b) => {
+                        for item in b.borrow().iter() {
+                            v.list_operation(|r: &mut std::cell::RefMut<Vec<VVal>>| {
+                                r.insert(0, item.clone());
+                            })?;
+                        }
+                    },
+                    item => {
+                        v.list_operation(|r: &mut std::cell::RefMut<Vec<VVal>>| {
+                            r.insert(0, item.clone());
+                        })?;
+                    },
                 }
             }
 
@@ -1737,7 +1740,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "append",
         |env: &mut Env, argc: usize| {
             let v = env.arg(0);
-            let mut v =
+            let v =
                 if v.is_vec() { v }
                 else {
                     let r = VVal::vec();
@@ -1745,16 +1748,19 @@ pub fn std_symbol_table() -> SymbolTable {
                     r
                 };
 
-            if let VVal::Lst(l) = &mut v {
-                let mut o = l.borrow_mut();
-                for i in 1..argc {
-                    match env.arg(i) {
-                        VVal::Lst(b) => {
-                            for item in b.borrow().iter() {
-                                o.push(item.clone());
-                            }
-                        },
-                        item => { o.push(item.clone()); }
+            for i in 1..argc {
+                match env.arg(i) {
+                    VVal::Lst(b) => {
+                        for item in b.borrow().iter() {
+                            v.list_operation(|r: &mut std::cell::RefMut<Vec<VVal>>| {
+                                r.push(item.clone());
+                            })?;
+                        }
+                    },
+                    item => {
+                        v.list_operation(|r: &mut std::cell::RefMut<Vec<VVal>>| {
+                            r.push(item.clone());
+                        })?;
                     }
                 }
             }
@@ -1772,32 +1778,24 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let cnt = env.arg(0).i() as usize;
             let lst = env.arg(1);
-            if let VVal::Lst(l) = lst {
+
+            lst.list_operation(|r: &mut std::cell::RefMut<Vec<VVal>>| {
                 let svec : Vec<VVal> =
-                    l.borrow_mut().iter().take(cnt).cloned().collect();
-                Ok(VVal::vec_mv(svec))
-            } else {
-                Ok(VVal::err_msg(
-                    &format!(
-                        "drop only works with a list as second argument, got '{}'",
-                        lst.s())))
-            }
+                    r.iter().take(cnt).cloned().collect();
+                VVal::vec_mv(svec)
+            })
         }, Some(2), Some(2), false);
 
     func!(st, "drop",
         |env: &mut Env, _argc: usize| {
             let cnt = env.arg(0).i() as usize;
             let lst = env.arg(1);
-            if let VVal::Lst(l) = lst {
+
+            lst.list_operation(|r: &mut std::cell::RefMut<Vec<VVal>>| {
                 let svec : Vec<VVal> =
-                    l.borrow_mut().iter().skip(cnt).cloned().collect();
-                Ok(VVal::vec_mv(svec))
-            } else {
-                Ok(VVal::err_msg(
-                    &format!(
-                        "drop only works with a list as second argument, got '{}'",
-                        lst.s())))
-            }
+                    r.iter().skip(cnt).cloned().collect();
+                VVal::vec_mv(svec)
+            })
         }, Some(2), Some(2), false);
 
     func!(st, "str:write",
@@ -1841,7 +1839,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, argc: usize| {
             let lst = env.arg(0);
             if let VVal::Lst(l) = lst {
-                let svec : Vec<String> = l.borrow_mut().iter().map(|v| v.s_raw()).collect();
+                let svec : Vec<String> = l.borrow().iter().map(|v| v.s_raw()).collect();
                 Ok(VVal::new_str_mv((&svec).concat()))
 
             } else {
@@ -1857,7 +1855,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let sep = env.arg(0).s_raw();
             let lst = env.arg(1);
             if let VVal::Lst(l) = lst {
-                let svec : Vec<String> = l.borrow_mut().iter().map(|v| v.s_raw()).collect();
+                let svec : Vec<String> = l.borrow().iter().map(|v| v.s_raw()).collect();
                 Ok(VVal::new_str_mv((&svec).join(&sep)))
 
             } else {
@@ -2030,7 +2028,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let lst     = env.arg(2);
 
             if let VVal::Lst(l) = lst {
-                for i in l.borrow_mut().iter() {
+                for i in l.borrow().iter() {
                     env.push(acc.clone());
                     env.push(i.clone());
                     let rv = f.call_internal(env, 2);
