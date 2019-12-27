@@ -24,7 +24,8 @@ of Rust's Result type.
 - Easy maintenance of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 
-The embedding API relies on a data structure made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
+The embedding API and all internal operations rely on a data structure
+made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
 Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 

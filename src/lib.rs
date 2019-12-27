@@ -12,7 +12,7 @@ without parenthesis. Or as a mixture of Perl, JavaScript and LISP/Scheme.
 
 Here are some of it's properties:
 
-- Simple syntax. For a reference look at the [WLambda Language Reference](prelude/index.html#wlambda-reference) and the [parser](parser/index.html).
+- Simple syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
 - It's about getting things done quickly, so performance is not a main priority.
   Current performance is roughly in the ball park of (C)Python. Which means,
@@ -24,9 +24,10 @@ Here are some of it's properties:
 by a specialized data type. It can be thought of as dynamic counterpart
 of Rust's Result type.
 - Easy maintenance of the implementation.
-- Custom user data implementation using [VValUserData](vval/trait.VValUserData.html).
+- Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 
-The embedding API relies on a data structure made of [VVal](vval/index.html) nodes.
+The embedding API and all internal operations rely on a data structure
+made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
 Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
