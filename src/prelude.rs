@@ -1699,6 +1699,13 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::Int(i64::from(!(env.arg(0).i() as u32))))
         }, Some(1), Some(1), false);
 
+    func!(st, "unshift",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            v.unshift(env.arg(1).clone());
+            Ok(v.clone())
+        }, Some(2), Some(2), false);
+
     func!(st, "push",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
