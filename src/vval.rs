@@ -1155,6 +1155,9 @@ impl VVal {
     pub fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         //d// env.dump_stack();
         match self {
+            VVal::Nul => {
+                Err(StackAction::panic_msg(format!("Calling $none is invalid")))
+            },
             VVal::Fun(fu) => {
                 if let Some(i) = fu.min_args {
                     if argc < i {
@@ -1198,7 +1201,11 @@ impl VVal {
                     let idx = if *b { 0 } else { 1 };
                     if argc > 0 {
                         let v = e.arg(idx).clone();
-                        v.call_internal(e, 0)
+                        if !v.is_none() {
+                            v.call_internal(e, 0)
+                        } else {
+                            Ok(VVal::Nul)
+                        }
                     } else { Ok(self.clone()) }
                 })
             },

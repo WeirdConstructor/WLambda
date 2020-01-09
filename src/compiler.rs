@@ -1920,6 +1920,8 @@ mod tests {
         assert_eq!(s_eval("13[]"), "13");
         assert_eq!(s_eval("$t[]"), "$true");
         assert_eq!(s_eval(":foo"), ":\"foo\"");
+        assert_eq!(s_eval_no_panic("$n[]"),
+            "$e \"EXEC ERR: Caught [1,3:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Calling $none is invalid\\\")\"");
     }
 
     #[test]
@@ -2529,7 +2531,7 @@ mod tests {
     #[test]
     fn check_prelude_chrono() {
         if cfg!(feature="chrono") {
-            assert_eq!(s_eval("std:chrono:timestamp $q$%Y$ | int"), "2019");
+            assert_eq!(s_eval("std:chrono:timestamp $q$%Y$ | int"), "2020");
         }
     }
 

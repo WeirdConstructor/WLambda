@@ -1138,8 +1138,8 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 
 ```wlambda
 !year_str = std:chrono:timestamp "%Y";
-std:displayln :XXXX ~ (year_str | int) == 2019;
-std:assert ~ (year_str | int) == 2019;
+std:displayln :XXXX ~ (year_str | int) == 2020;
+std:assert ~ (year_str | int) == 2020;
 
 !now_str = std:chrono:timestamp[];
 ```
