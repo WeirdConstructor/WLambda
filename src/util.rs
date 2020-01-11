@@ -130,17 +130,18 @@ pub struct Sampled3DNoise {
 
 pub fn smoothstep_f64(a: f64, b: f64, x: f64) -> f64
 {
-    let x = ((x - a) / (b - a)).max(0.0).min(1.0);
-    let x2 = x * x;
-    (3.0 * x2) - (2.0 * x2 * x)
+    let x = x.max(0.0).min(1.0);
+    let x = x * x * (3.0 - 2.0 * x);
+    let r = a * (1.0 - x) + b * x;
+    r
 }
 
 impl Sampled3DNoise {
-    pub fn new(size: usize, seed: u64) -> Self {
+    pub fn new(size: usize, seed: i64) -> Self {
         let size = size + 1;
         let mut data = vec![];
         data.resize(size * size * size, 0.0);
-        let mut sm = SplitMix64::new(seed);
+        let mut sm = SplitMix64::new_from_i64(seed);
         for i in 0..(size * size * size) {
             data[i] = u64_to_open01(sm.next_u64());
         }
@@ -154,15 +155,16 @@ impl Sampled3DNoise {
     {
         let mut amp_correction : f64 = 0.0;
         let mut res = 0.0;
-        for o in 0..(octaves + 1) {
+        for o in 0..octaves {
             let scale = factor.powi((octaves - o) as i32);
-            let amp   = persistence.powi(o as i32);
+            let amp   = persistence.powi((o as i32) + 1);
             amp_correction += amp;
 
             res += self.at(x / scale, y / scale, z / scale) * amp;
         }
 
-        (res / amp_correction).max(0.0).min(1.0)
+        let r = (res / amp_correction).max(0.0).min(1.0);
+        r
     }
 
     pub fn at(&self, x: f64, y: f64, z: f64) -> f64 {
