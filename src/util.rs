@@ -148,32 +148,42 @@ impl Sampled3DNoise {
         Self { size, data }
     }
 
-    pub fn at_octaved(&self, x: f64, y: f64, z: f64,
-                      octaves: usize,
-                      factor: f64,
-                      persistence: f64) -> f64
+    pub fn at_fbm(&self, x: f64, y: f64, z: f64,
+                  octaves: usize,
+                  lacunarity: f64,
+                  gain: f64) -> f64
     {
-        let mut amp_correction : f64 = 0.0;
+        let mut noise_size = (self.size - 1) as f64;
+        let mut freq = 1.0;
+        let mut amp = 0.5;
         let mut res = 0.0;
+        let mut amp_cor = 0.0;
         for o in 0..octaves {
-            let scale = factor.powi((octaves - o) as i32);
-            let amp   = persistence.powi((o as i32) + 1);
-            amp_correction += amp;
+            let v = self.at(
+                x * freq,
+                y * freq,
+                z * freq);
 
-            res += self.at(x / scale, y / scale, z / scale) * amp;
+            println!("AT FBM: x={}, y={}, z={}, freq={}, ns={}, v={}",
+                     x, y, z, freq, noise_size, v);
+
+            res     += amp * v;
+            amp_cor += amp;
+
+            freq *= lacunarity;
+            amp  *= gain;
         }
-
-        let r = (res / amp_correction).max(0.0).min(1.0);
-        r
+        println!("FBMOUT: res={}, ac={} => {}", res, amp_cor, res / amp_cor);
+        res / amp_cor
     }
 
     pub fn at(&self, x: f64, y: f64, z: f64) -> f64 {
         let xf = x.fract();
         let yf = y.fract();
         let zf = z.fract();
-        let x = x.floor() as usize;
-        let y = y.floor() as usize;
-        let z = z.floor() as usize;
+        let x = x.floor() as usize % (self.size - 1);
+        let y = y.floor() as usize % (self.size - 1);
+        let z = z.floor() as usize % (self.size - 1);
 
         let s = self.size;
         let mut samples : [f64; 8] = [0.0; 8];
