@@ -121,3 +121,81 @@ pub fn now_timestamp() -> u64 {
     .unwrap()
     .as_secs() as u64
 }
+
+#[derive(Clone, Debug)]
+pub struct Sampled3DNoise {
+    data: std::vec::Vec<f64>,
+    size: usize,
+}
+
+pub fn smoothstep_f64(a: f64, b: f64, x: f64) -> f64
+{
+    let x = ((x - a) / (b - a)).max(0.0).min(1.0);
+    let x2 = x * x;
+    (3.0 * x2) - (2.0 * x2 * x)
+}
+
+impl Sampled3DNoise {
+    pub fn new(size: usize, seed: u64) -> Self {
+        let size = size + 1;
+        let mut data = vec![];
+        data.resize(size * size * size, 0.0);
+        let mut sm = SplitMix64::new(seed);
+        for i in 0..(size * size * size) {
+            data[i] = u64_to_open01(sm.next_u64());
+        }
+        Self { size, data }
+    }
+
+    pub fn at_octaved(&self, x: f64, y: f64, z: f64,
+                      octaves: usize,
+                      factor: f64,
+                      persistence: f64) -> f64
+    {
+        let mut amp_correction : f64 = 0.0;
+        let mut res = 0.0;
+        for o in 0..(octaves + 1) {
+            let scale = factor.powi((octaves - o) as i32);
+            let amp   = persistence.powi(o as i32);
+            amp_correction += amp;
+
+            res += self.at(x / scale, y / scale, z / scale) * amp;
+        }
+
+        (res / amp_correction).max(0.0).min(1.0)
+    }
+
+    pub fn at(&self, x: f64, y: f64, z: f64) -> f64 {
+        let xf = x.fract();
+        let yf = y.fract();
+        let zf = z.fract();
+        let x = x.floor() as usize;
+        let y = y.floor() as usize;
+        let z = z.floor() as usize;
+
+        let s = self.size;
+        let mut samples : [f64; 8] = [0.0; 8];
+
+        samples[0] = self.data[z * s * s       + y * s       + x];
+        samples[1] = self.data[z * s * s       + y * s       + x + 1];
+
+        samples[2] = self.data[z * s * s       + (y + 1) * s + x];
+        samples[3] = self.data[z * s * s       + (y + 1) * s + x + 1];
+
+        samples[4] = self.data[(z + 1) * s * s + y * s       + x];
+        samples[5] = self.data[(z + 1) * s * s + y * s       + x + 1];
+
+        samples[6] = self.data[(z + 1) * s * s + (y + 1) * s + x];
+        samples[7] = self.data[(z + 1) * s * s + (y + 1) * s + x + 1];
+
+        samples[0] = smoothstep_f64(samples[0], samples[1], xf);
+        samples[1] = smoothstep_f64(samples[2], samples[3], xf);
+        samples[2] = smoothstep_f64(samples[4], samples[5], xf);
+        samples[3] = smoothstep_f64(samples[6], samples[7], xf);
+
+        samples[0] = smoothstep_f64(samples[0], samples[1], yf);
+        samples[1] = smoothstep_f64(samples[2], samples[3], yf);
+
+        smoothstep_f64(samples[0], samples[1], zf)
+    }
+}
