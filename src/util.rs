@@ -164,8 +164,8 @@ impl Sampled3DNoise {
                 y * freq,
                 z * freq);
 
-            println!("AT FBM: x={}, y={}, z={}, freq={}, ns={}, v={}",
-                     x, y, z, freq, noise_size, v);
+//            println!("AT FBM: x={}, y={}, z={}, freq={}, ns={}, v={}",
+//                     x, y, z, freq, noise_size, v);
 
             res     += amp * v;
             amp_cor += amp;
@@ -173,7 +173,7 @@ impl Sampled3DNoise {
             freq *= lacunarity;
             amp  *= gain;
         }
-        println!("FBMOUT: res={}, ac={} => {}", res, amp_cor, res / amp_cor);
+//        println!("FBMOUT: res={}, ac={} => {}", res, amp_cor, res / amp_cor);
         res / amp_cor
     }
 
