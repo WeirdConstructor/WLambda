@@ -46,7 +46,7 @@ pub trait ModuleResolver {
     /// load them by executing another WLambda script or whatever you fancy.
     ///
     /// See LocalFileModuleResolver as example on how to implement this.
-    fn resolve(&mut self, global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError>;
+    fn resolve(&self, global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError>;
 }
 
 /// This structure implements the ModuleResolver trait and is
@@ -129,7 +129,7 @@ impl SymbolTable {
 }
 
 impl ModuleResolver for LocalFileModuleResolver {
-    fn resolve(&mut self, global: GlobalEnvRef, path: &[String])
+    fn resolve(&self, global: GlobalEnvRef, path: &[String])
         -> Result<SymbolTable, ModuleLoadError>
     {
         let genv = GlobalEnv::new_empty_default();
@@ -1281,7 +1281,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             .collect();
 
                     if let Some(resolver) = resolver {
-                        let exports = resolver.borrow_mut().resolve(glob_ref.clone(), &path);
+                        let exports = resolver.borrow().resolve(glob_ref.clone(), &path);
                         match exports {
                             Err(ModuleLoadError::NoSuchModule) => {
                                 ast.to_compile_err(
@@ -3125,6 +3125,14 @@ mod tests {
             x { std:take 2 x; _ }
         "),
         "$e \"EXEC ERR: Caught [3,26:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
+    }
+
+    #[test]
+    fn check_test_import() {
+        assert_eq!(s_eval(r"
+            !@import x tests:test_mod_r1;
+            x:f[10]
+        "), "40");
     }
 
 }

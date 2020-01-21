@@ -153,7 +153,6 @@ impl Sampled3DNoise {
                   lacunarity: f64,
                   gain: f64) -> f64
     {
-        let noise_size = (self.size - 1) as f64;
         let mut freq = 1.0;
         let mut amp = 0.5;
         let mut res = 0.0;

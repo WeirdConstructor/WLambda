@@ -9,6 +9,7 @@
 * Bugfix: Correctly handle modification of lists or maps that are being
 iterated over. They cause a WLambda panic now with a backtrace instead of
 panicing on borrow\_mut() in the host application.
+* Bugfix: Fixed recursive module loading, as borrow_mut() prevented it.
 
 0.3.5 (2019-12-06)
 ==================
