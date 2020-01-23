@@ -1410,7 +1410,7 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "panic",
         |env: &mut Env, _argc: usize| {
-            Err(StackAction::panic(env.arg(0).clone(), None))
+            Err(StackAction::panic(env.arg(0), None))
         }, Some(1), Some(1), true);
 
     func!(st, "block",
@@ -1481,7 +1481,7 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "on_error",
         |env: &mut Env, _argc: usize| {
-            let err_fn = env.arg(0).clone();
+            let err_fn = env.arg(0);
             match env.arg(1) {
                 VVal::Err(err_v) => {
                     env.with_restore_sp(|e: &mut Env| {
@@ -1499,14 +1499,14 @@ pub fn core_symbol_table() -> SymbolTable {
     func!(st, "return",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Return((VVal::Nul, VVal::Nul))); }
-            if argc < 2 { return Err(StackAction::Return((VVal::Nul, env.arg(0).clone()))); }
-            Err(StackAction::Return((env.arg(0).clone(), env.arg(1).clone())))
+            if argc < 2 { return Err(StackAction::Return((VVal::Nul, env.arg(0)))); }
+            Err(StackAction::Return((env.arg(0), env.arg(1))))
         }, Some(1), Some(2), true);
 
     func!(st, "break",
         |env: &mut Env, argc: usize| {
             if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
-            Err(StackAction::Break(env.arg(0).clone()))
+            Err(StackAction::Break(env.arg(0)))
         }, Some(0), Some(1), true);
 
     func!(st, "next",
@@ -1702,14 +1702,14 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "unshift",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
-            v.unshift(env.arg(1).clone());
+            v.unshift(env.arg(1));
             Ok(v.clone())
         }, Some(2), Some(2), false);
 
     func!(st, "push",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
-            v.push(env.arg(1).clone());
+            v.push(env.arg(1));
             Ok(v.clone())
         }, Some(2), Some(2), false);
 
@@ -2274,7 +2274,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
             if argc == 0 { println!(""); }
             if argc > 0 {
-                Ok(env.arg(argc - 1).clone())
+                Ok(env.arg(argc - 1))
             } else {
                 Ok(VVal::Nul)
             }
@@ -2298,7 +2298,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
             if argc == 0 { println!(""); }
             if argc > 0 {
-                Ok(env.arg(argc - 1).clone())
+                Ok(env.arg(argc - 1))
             } else {
                 Ok(VVal::Nul)
             }
@@ -2362,7 +2362,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "set_ref",
         |env: &mut Env, _argc: usize| {
-            Ok(env.arg(0).set_ref(env.arg(1).clone()))
+            Ok(env.arg(0).set_ref(env.arg(1)))
         }, Some(2), Some(2), false);
 
     func!(st, "to_ref",
@@ -2393,7 +2393,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     Err(StackAction::panic_msg(format!("assertion failed '{}'", env.arg(1).s_raw())))
                 }
             } else {
-                Ok(env.arg(0).clone())
+                Ok(env.arg(0))
             }
         }, Some(1), Some(2), true);
 
@@ -2594,7 +2594,7 @@ pub fn std_symbol_table() -> SymbolTable {
     if cfg!(feature="serde_json") {
         func!(st, "ser:json",
             |env: &mut Env, _argc: usize| {
-                let v = env.arg(0).clone();
+                let v = env.arg(0);
                 let pp = env.arg(1).b();
 
                 match v.to_json(pp) {
@@ -2617,7 +2617,7 @@ pub fn std_symbol_table() -> SymbolTable {
     if cfg!(feature="rmp-serde") {
         func!(st, "ser:msgpack",
             |env: &mut Env, _argc: usize| {
-                let v = env.arg(0).clone();
+                let v = env.arg(0);
                 match v.to_msgpack() {
                     Ok(s) => Ok(VVal::new_byt(s)),
                     Err(e) => Ok(VVal::err_msg(&e)),
