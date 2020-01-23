@@ -173,9 +173,9 @@ In the following grammar, white space and comments are omitted:
                   | field
                   (* please note, that a field access like:
                      `obj.field` is equivalent to the call:
-                     `field(obj)`. That also means that
-                     `obj.field(...)` is transformed into
-                     `field(obj)(...)`.
+                     `field[obj]`. That also means that
+                     `obj.field[...]` is transformed into
+                     `field[obj][...]`.
                      The exception is "=" which assigns
                      the field as specified.
                      BUT: There is a special case, when you specify
