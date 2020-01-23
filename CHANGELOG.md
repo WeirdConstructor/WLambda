@@ -1,15 +1,18 @@
-0.3.6 (unreleased)
+0.3.6 (2020-01-24)
 ==================
 
 * Feature: Added `std:shuffle` implementing fisher yates shuffle.
 * Feature: Added `std:sort`, `std:cmp:num` and `std:cmp:str`.
 * Feature: Added `std:copy` for shallow copies.
 * Feature: Added `std:unshift`.
+* Feature: The `LocalFileModuleResolver` now also searches relative
+to the file where the `!@import` statement is evaluated. And custom
+resolvers are passed the file path.
 * Change: Made calling `$none` an invalid action that causes a panic.
 * Bugfix: Correctly handle modification of lists or maps that are being
 iterated over. They cause a WLambda panic now with a backtrace instead of
 panicing on borrow\_mut() in the host application.
-* Bugfix: Fixed recursive module loading, as borrow_mut() prevented it.
+* Bugfix: Fixed recursive module loading, as borrow\_mut() prevented it.
 
 0.3.5 (2019-12-06)
 ==================

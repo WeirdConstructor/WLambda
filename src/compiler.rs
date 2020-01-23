@@ -25,7 +25,7 @@ struct CompileLocal {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub enum ModuleLoadError {
-    NoSuchModule,
+    NoSuchModule(String),
     ModuleEvalError(EvalError),
     Other(String),
 }
@@ -46,7 +46,7 @@ pub trait ModuleResolver {
     /// load them by executing another WLambda script or whatever you fancy.
     ///
     /// See LocalFileModuleResolver as example on how to implement this.
-    fn resolve(&self, global: GlobalEnvRef, path: &[String]) -> Result<SymbolTable, ModuleLoadError>;
+    fn resolve(&self, global: GlobalEnvRef, path: &[String], import_file_path: Option<&str>) -> Result<SymbolTable, ModuleLoadError>;
 }
 
 /// This structure implements the ModuleResolver trait and is
@@ -129,19 +129,46 @@ impl SymbolTable {
 }
 
 impl ModuleResolver for LocalFileModuleResolver {
-    fn resolve(&self, global: GlobalEnvRef, path: &[String])
+    fn resolve(&self, global: GlobalEnvRef, path: &[String], import_file_path: Option<&str>)
         -> Result<SymbolTable, ModuleLoadError>
     {
         let genv = GlobalEnv::new_empty_default();
         genv.borrow_mut().import_modules_from(&*global.borrow());
 
         let mut ctx = EvalContext::new(genv);
-        let pth = path.join("/");
+        let pth = format!("{}.wl", path.join("/"));
+        let mut check_paths = vec![pth];
 
-        match ctx.eval_file(&(pth.clone() + ".wl")) {
-            Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
-            Ok(_v) => Ok(ctx.get_exports()),
+        if let Some(ifp) = import_file_path {
+            let impfp = std::path::Path::new(ifp);
+
+            let import_dir_path =
+                if impfp.is_file() {
+                    impfp.parent()
+                } else {
+                    Some(impfp)
+                };
+
+            if let Some(idp) = import_dir_path {
+                let mut pb = idp.to_path_buf();
+                for p in path { pb.push(p); }
+
+                if let Some(p) = pb.as_path().to_str() {
+                    check_paths.push(format!("{}.wl", p));
+                }
+            }
         }
+
+        for pth in check_paths.iter() {
+            if std::path::Path::new(pth).exists() {
+                return match ctx.eval_file(pth) {
+                    Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
+                    Ok(_v) => Ok(ctx.get_exports()),
+                }
+            }
+        }
+
+        Err(ModuleLoadError::NoSuchModule(check_paths.join(";")))
     }
 }
 
@@ -1280,12 +1307,15 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             .map(String::from)
                             .collect();
 
+                    let import_file_path = if spos.file.s() == "?" { None } else { Some(spos.file.s()) };
+
                     if let Some(resolver) = resolver {
-                        let exports = resolver.borrow().resolve(glob_ref.clone(), &path);
+
+                        let exports = resolver.borrow().resolve(glob_ref.clone(), &path, import_file_path);
                         match exports {
-                            Err(ModuleLoadError::NoSuchModule) => {
+                            Err(ModuleLoadError::NoSuchModule(p)) => {
                                 ast.to_compile_err(
-                                    format!("Couldn't find module '{}'", name.s_raw()))
+                                    format!("Couldn't find module '{}' in paths: {}", name.s_raw(), p))
                             },
                             Err(ModuleLoadError::ModuleEvalError(e)) => {
                                 ast.to_compile_err(
@@ -3133,6 +3163,10 @@ mod tests {
             !@import x tests:test_mod_r1;
             x:f[10]
         "), "40");
+        assert_eq!(s_eval(r"
+            !@import x tests:test_paths_mod;
+            x:xxx[]
+        "), "123");
     }
 
 }

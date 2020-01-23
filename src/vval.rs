@@ -1156,7 +1156,7 @@ impl VVal {
         //d// env.dump_stack();
         match self {
             VVal::Nul => {
-                Err(StackAction::panic_msg(format!("Calling $none is invalid")))
+                Err(StackAction::panic_msg("Calling $none is invalid".to_string()))
             },
             VVal::Fun(fu) => {
                 if let Some(i) = fu.min_args {
@@ -1795,7 +1795,7 @@ impl VVal {
                 let ks = key.s_raw();
                 match m.try_borrow_mut() {
                     Ok(mut r)  => { r.insert(ks, val); Ok(()) },
-                    Err(_) => return Err(StackAction::panic_borrow(self)),
+                    Err(_)     => Err(StackAction::panic_borrow(self)),
                 }
             },
             VVal::Lst(l) => {
@@ -1808,7 +1808,7 @@ impl VVal {
                         v[idx] = val;
                         Ok(())
                     },
-                    Err(_) => return Err(StackAction::panic_borrow(self)),
+                    Err(_) => Err(StackAction::panic_borrow(self)),
                 }
             },
             VVal::Usr(u) => u.set_key(key, val),
