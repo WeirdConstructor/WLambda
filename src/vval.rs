@@ -102,6 +102,7 @@ pub enum Syntax {
     DefGlobRef,
     Import,
     Export,
+    DumpStack,
     MapSplice,
     VecSplice,
 }
@@ -228,7 +229,8 @@ impl Env {
         for i in self.bp..self.sp {
             self.args[i] = VVal::Nul;
         }
-        self.sp -= env_size;
+//        self.sp -= env_size;
+        self.popn(env_size);
         self.bp = oldbp;
     }
 
@@ -1153,7 +1155,7 @@ impl VVal {
     }
 
     pub fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
-        //d// env.dump_stack();
+//        env.dump_stack();
         match self {
             VVal::Nul => {
                 Err(StackAction::panic_msg("Calling $none is invalid".to_string()))
@@ -1214,6 +1216,8 @@ impl VVal {
                     format!("Called an error value: {}", e.borrow().0.s())))
             },
             VVal::Sym(sym) => {
+//                env.dump_stack();
+                let r = 
                 env.with_local_call_info(argc, |e: &mut Env| {
                     if argc > 0 {
                         let v = e.arg(0);
@@ -1223,7 +1227,9 @@ impl VVal {
                             _ => Ok(VVal::Nul)
                         }
                     } else { Ok(self.clone()) }
-                })
+                });
+//                env.dump_stack();
+                r
             },
             VVal::Map(m) => {
                 env.with_local_call_info(argc, |e: &mut Env| {

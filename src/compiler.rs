@@ -1339,6 +1339,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             format!("Couldn't resolve module '{}'", name.s_raw()))
                     }
                 },
+                Syntax::DumpStack => {
+                    Ok(Box::new(move |e: &mut Env| {
+                        println!("DUMPSTACK@{}", spos);
+                        e.dump_stack();
+                        Ok(VVal::Nul)
+                    }))
+                },
                 Syntax::Export => {
                     let name = ast.at(1).unwrap();
                     let val = compile(&ast.at(2).unwrap(), ce)?;
@@ -2470,6 +2477,19 @@ mod tests {
 
     #[test]
     fn check_oop() {
+        assert_eq!(s_eval(r#"
+            !new = {
+                #!o = $&${};
+                !self = $&${};
+                self.x = { !@dump_stack; self.y[] };
+                self.y = { 10 };
+                $*self
+            };
+
+            !c = new[];
+            !@dump_stack;
+            c.x[];
+        "#), "\"X\"");
         assert_eq!(s_eval(r#"
             !new = {
                 !obj = $&${};

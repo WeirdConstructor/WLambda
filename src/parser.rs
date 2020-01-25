@@ -1258,6 +1258,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                 exp.push(expr);
                                 Ok(exp)
                             },
+                            "dump_stack" => { Ok(ps.syn(Syntax::DumpStack)) },
                             _ => { ps.err_bad_keyword(&id, "import or export") }
                         }
                     } else {
@@ -1622,6 +1623,7 @@ mod tests {
     #[test]
     fn check_parse_field_access() {
         assert_eq!(parse("foo.(bar) == 2019"), "$[&Block,$[&Call,$[&Var,:\"==\"],$[&Call,$[&Var,:\"bar\"],$[&Var,:\"foo\"]],2019]]");
+        assert_eq!(parse("o.x[]"), "$[&Block,$[&Call,$[&Call,$[&Key,:\"x\"],$[&Var,:\"o\"]]]]");
     }
 
     #[test]
