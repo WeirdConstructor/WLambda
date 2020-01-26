@@ -479,6 +479,7 @@ impl StackAction {
 pub type EvalNode = Box<dyn Fn(&mut Env) -> Result<VVal,StackAction>>;
 pub type ClosNodeRef = Rc<RefCell<dyn Fn(&mut Env, usize) -> Result<VVal,StackAction>>>;
 
+#[derive(Clone)]
 /// This structure is the runtime representation of a WLambda function value.
 pub struct VValFun {
     /// The closure that runs the function.
@@ -744,7 +745,10 @@ impl Drop for DropVVal {
     fn drop(&mut self) {
         let mut e = Env::new();
         e.push(self.v.clone());
-        self.fun.call_internal(&mut e, 1);
+        match self.fun.call_internal(&mut e, 1) {
+            Err(e) => { eprintln!("Error in drop function: {}", e); },
+            Ok(_) => (),
+        }
     }
 }
 
@@ -1147,6 +1151,23 @@ impl VVal {
                     r.borrow().iter()
                 } else { std::iter::from_fn(Box::new(|| { None })) },
             _ => std::iter::from_fn(Box::new(|| { None })),
+        }
+    }
+
+    /// This method will disable all arity checks of the function in the VVal.
+    /// Does nothing if the VVal is not a function.
+    ///
+    /// It is used for disabling checks of drop functions, as they are
+    /// evaluated in their own environment and there is no proper way to report
+    /// errors upwards.
+    pub fn disable_function_arity(&self) -> VVal {
+        if let VVal::Fun(fu) = self {
+            let mut new_fu = fu.as_ref().clone();
+            new_fu.min_args = None;
+            new_fu.max_args = None;
+            VVal::Fun(Rc::new(new_fu))
+        } else {
+            self.clone()
         }
     }
 

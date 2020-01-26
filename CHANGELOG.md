@@ -1,3 +1,5 @@
+* Feature: Added `std:to_no_arity` for disabling arity checks for functions.
+* Change: `std:to_drop` disables arity checks for drop functions.
 * Feature: Added `std:strengthen` for weak refs and weakening refs.
 
 0.3.6 (2020-01-24)

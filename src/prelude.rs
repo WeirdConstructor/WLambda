@@ -99,10 +99,18 @@ methods:
         name = name,
     };
 
-    self.meow = { std:displayln self.name " meows!"; };
+    # Captures refer to the value in the `self` reference
+    # weakly now. That means, once the main reference in `self`
+    # in the parent scope vanishes, the closures are also freed.
+    self.meow     = { std:displayln self.name " meows!"; };
     self.get_name = { self.name };
 
-    self
+    # Lastly we convert the weakable reference to a strong `$&&`
+    # reference, so that the callers can hold the reference
+    # anywhere they like. If you don't do this, then the caller
+    # might accidentally drops the object reference when using it
+    # only from other closures.
+    std:strengthen self
 };
 
 !my_cat = new_Cat "Spot";
@@ -116,21 +124,20 @@ Alternatively you can just make the cat name private:
 
 ```wlambda
 !new_Cat = {!(name) = @;
-
-    # Notice the weakable reference `$&` to prevent
-    # reference cylces:
-
-    !self = ${}; # Just holds the methods
-
     # Make a strong reference, so the closures DO keep cat_name alive!
+    # This does not make cycles, because name does not store a closure.
     !cat_name = $&& name;
 
-    self.meow = { std:displayln cat_name " meows!"; };
+    !meow     = { std:displayln cat_name " meows!"; };
+    !get_name = { $*cat_name };
+    !set_name = { .*cat_name = _; };
 
-    self.get_name = { $*cat_name };
-    self.set_name = { .*cat_name = _; };
-
-    self
+    # Just holds the methods
+    ${
+        meow     = meow,
+        get_name = get_name,
+        set_name = set_name,
+    };
 };
 
 !my_cat = new_Cat "Spot";
@@ -2027,9 +2034,15 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::Nul)
         }, None, None, false);
 
+    func!(st, "to_no_arity",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            Ok(v.disable_function_arity())
+        }, Some(1), Some(1), false);
+
     func!(st, "to_drop",
         |env: &mut Env, _argc: usize| {
-            let fun = env.arg(1);
+            let fun = env.arg(1).disable_function_arity();
             let v   = env.arg(0);
 
             Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))

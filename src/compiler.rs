@@ -1950,6 +1950,57 @@ mod tests {
                    "std:to_drop[$[1,3]]");
         assert_eq!(s_eval("!x = std:to_drop ${a=2} {||}; x.a = 3; x"),
                    "std:to_drop[${a=3}]");
+        assert_eq!(s_eval("
+            { !k = $&0;
+              { .k = 20; }[];
+              std:to_drop $[] {
+                # XXX: only works, because to_drop disables arity checks!
+                .k = 10;
+                std:displayln :foo;
+              };
+              $*k }[]
+        "), "10");
+    }
+
+    #[test]
+    fn check_to_no_arity() {
+        assert_eq!(
+            s_eval("(std:to_no_arity {!(x) = @; $[x, x + 1] })[]"),
+            "$[$n,1]");
+    }
+
+    #[test]
+    fn check_strengthen() {
+        assert_eq!(
+            s_eval(r#"
+                !dropper = $&&0;
+                !k = $&${ del = std:to_drop 1 { .*dropper = 1; } };
+                !f = { .k = $n; };
+                .k = $n;
+                $*dropper
+            "#), "1");
+        assert_eq!(
+            s_eval(r#"
+                !dropper = $&&0;
+                !k = std:strengthen $&${ del = std:to_drop 1 { .*dropper = 1; } };
+                !f = { .k = $n; };
+                .k = $n;
+                !r = $*dropper;
+                .f = $n;
+                .r = r + $*dropper;
+                r
+            "#), "1");
+        assert_eq!(
+            s_eval(r#"
+                !dropper = $&&0;
+                !k = std:strengthen $&${ del = std:to_drop 1 { .*dropper = 1; } };
+                !f = { .k = $n; };
+                .k = $n;
+                !r = $*dropper;
+                f[];
+                .r = r + $*dropper;
+                r
+            "#), "1");
     }
 
     #[test]
@@ -2480,7 +2531,6 @@ mod tests {
         assert_eq!(s_eval(r#"
             !oo = $&0;
             !new = {
-                #!o = $&${};
                 !self = $&${};
                 self.x = { !@dump_stack; self.y[] };
                 self.y = { 10 };
@@ -2489,7 +2539,6 @@ mod tests {
             };
 
             !c = new[];
-            !@dump_stack;
             c.x[];
             !k = $*oo + 1;
             .*c = $n;
