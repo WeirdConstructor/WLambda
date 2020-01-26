@@ -715,6 +715,13 @@ std:assert_eq $*y $n;
 std:assert drop_check;
 ```
 
+#### Strengthening References
+
+You can convert a weak reference (weakened by `std:weaken`) or a captured weak
+reference `$&` to strong with `std:strengthen`.
+
+TODO: Example
+
 ## Operators
 
 ### Arithmetics
@@ -2378,6 +2385,11 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::Nul)
             }
         }, Some(1), Some(1), true);
+
+    func!(st, "strengthen",
+        |env: &mut Env, _argc: usize| {
+            Ok(env.arg(0).upgrade())
+        }, Some(1), Some(1), false);
 
     func!(st, "weaken",
         |env: &mut Env, _argc: usize| {

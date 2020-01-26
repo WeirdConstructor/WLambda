@@ -1498,6 +1498,20 @@ impl VVal {
         }
     }
 
+    pub fn upgrade(self) -> VVal {
+        match self {
+            VVal::CRef(f) => VVal::Ref(f),
+            VVal::WWRef(f) => {
+                if let Some(r) = f.upgrade() {
+                    VVal::Ref(r)
+                } else {
+                    VVal::Nul
+                }
+            },
+            _ => self,
+        }
+    }
+
     pub fn downgrade(self) -> VVal {
         match self {
             VVal::Ref(f)  => VVal::WWRef(Rc::downgrade(&f)),

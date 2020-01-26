@@ -1,3 +1,5 @@
+* Feature: Added `std:strengthen` for weak refs and weakening refs.
+
 0.3.6 (2020-01-24)
 ==================
 
