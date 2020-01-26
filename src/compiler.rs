@@ -2478,18 +2478,25 @@ mod tests {
     #[test]
     fn check_oop() {
         assert_eq!(s_eval(r#"
+            !oo = $&0;
             !new = {
                 #!o = $&${};
                 !self = $&${};
                 self.x = { !@dump_stack; self.y[] };
                 self.y = { 10 };
-                $*self
+                self.k = std:to_drop 20 {|| .oo = 20; }; 
+                self
             };
 
             !c = new[];
             !@dump_stack;
             c.x[];
-        "#), "\"X\"");
+            !k = $*oo + 1;
+            .*c = $n;
+            .k = k + $*oo + 1;
+
+            k
+        "#), "22");
         assert_eq!(s_eval(r#"
             !new = {
                 !obj = $&${};
