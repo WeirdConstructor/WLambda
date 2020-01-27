@@ -1237,8 +1237,6 @@ impl VVal {
                     format!("Called an error value: {}", e.borrow().0.s())))
             },
             VVal::Sym(sym) => {
-//                env.dump_stack();
-                let r = 
                 env.with_local_call_info(argc, |e: &mut Env| {
                     if argc > 0 {
                         let v = e.arg(0);
@@ -1248,9 +1246,7 @@ impl VVal {
                             _ => Ok(VVal::Nul)
                         }
                     } else { Ok(self.clone()) }
-                });
-//                env.dump_stack();
-                r
+                })
             },
             VVal::Map(m) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
