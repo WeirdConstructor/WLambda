@@ -465,7 +465,7 @@ $b"\xFF\xFD\x00";
 $Q/ABCDEF\xFD/;      # \xFD is not an excape sequence here!
 ```
 
-#### Call Properties oy Bytes
+#### Call Properties of Bytes
 
 You can index inside a byte array by calling it with an integer:
 
@@ -728,6 +728,27 @@ You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
+
+### Calling Semantics of Data Types
+
+You can call almost all basic data types of WLambda.
+Here is an overview of the data type calling semantics:
+
+| Type      | Args              | Semantics |
+|-----------|-------------------|-----------|
+| `$none`   | -                 | Any call to `$none` will result in a panic. |
+| `$error`  | -                 | Any call to `$error` will result in a panic. |
+| function  | *                 | Will call the function with the specified arguments. |
+| `$true`   | `f1, f2`          | Will call `f1`.          |
+| `$false`  | `f1, f2`          | Will call `f2`.          |
+| symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
+| map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
+|           |                   | |
+|           |                   | |
+|           |                   | |
+|           |                   | |
+|           |                   | |
+|           |                   | |
 
 ## Operators
 
