@@ -380,5 +380,16 @@ impl State {
         ps.skip_ws_and_comments();
         ps
     }
+
+    pub fn expect_some<T>(&self, o: Option<T>) -> Result<T, ParseError> {
+        match o {
+            None => {
+                Err(ParseError::EOF(
+                    (format!("Unexpected EOF"), self.rest(),
+                    self.line_no, self.col_no, self.file.clone())))
+            },
+            Some(r) => Ok(r)
+        }
+    }
 }
 

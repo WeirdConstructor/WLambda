@@ -384,7 +384,7 @@ fn adchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
 fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     if ps.at_eof { return ps.err_eof("string"); }
 
-    let quote_char = ps.peek().unwrap();
+    let quote_char = ps.expect_some(ps.peek())?;
     ps.consume();
 
     let quote_char = match quote_char {
@@ -401,7 +401,7 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     let mut v : Vec<u8> = Vec::new();
 
     while ps.peek().unwrap_or(quote_char) != quote_char {
-        let c = ps.peek().unwrap();
+        let c = ps.expect_some(ps.peek())?;
         ps.consume();
         adchr(&mut v, &mut s, bytes, c);
     }
@@ -434,7 +434,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     let mut v : Vec<u8> = Vec::new();
 
     while ps.peek().unwrap_or('"') != '"' {
-        let c = ps.peek().unwrap();
+        let c = ps.expect_some(ps.peek())?;
         match c {
             '\\' => {
                 ps.consume();
@@ -519,7 +519,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
     if ps.at_eof { return ps.err_eof("number"); }
 
-    let c = ps.peek().unwrap();
+    let c = ps.expect_some(ps.peek())?;
     let sign = match c {
         '-' => {
             ps.consume();
@@ -617,7 +617,7 @@ fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
 
     let list = ps.syn(Syntax::Lst);
 
-    while ps.peek().unwrap() != ']' {
+    while ps.expect_some(ps.peek())? != ']' {
         if ps.consume_if_eq_wsc('*') {
             let r = ps.syn(Syntax::VecSplice);
             r.push(parse_expr(ps)?);
@@ -643,8 +643,8 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
     let map = ps.syn(Syntax::Map);
 
-    while ps.peek().unwrap() != '}' {
-        let c = ps.peek().unwrap();
+    while ps.expect_some(ps.peek())? != '}' {
+        let c = ps.expect_some(ps.peek())?;
 
         map.push(
             if ps.consume_if_eq_wsc('*') {
@@ -681,7 +681,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
 fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
     if ps.at_eof { return ps.err_eof("literal value"); }
-    let c = ps.peek().unwrap();
+    let c = ps.expect_some(ps.peek())?;
 
     match c {
         'b' => { ps.consume(); parse_string(ps, true) },
@@ -1173,7 +1173,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     let mut destructuring = false;
     let ids = VVal::vec();
 
-    match ps.peek().unwrap() {
+    match ps.expect_some(ps.peek())? {
         '(' => {
             ps.consume_wsc();
             destructuring = true;
@@ -1281,7 +1281,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 
     if ps.at_eof { return ps.err_eof("parsing arity definition"); }
 
-    let arity = if ps.peek().unwrap() != '|' {
+    let arity = if ps.expect_some(ps.peek())? != '|' {
         let min = parse_num(ps)?;
         if !min.is_int() {
             return ps.err_bad_value("Expected integer value for min arity.");
