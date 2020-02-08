@@ -16,6 +16,8 @@ use std::cell::RefCell;
 use std::time::Instant;
 use std::fmt::{Display, Formatter};
 
+use fnv::FnvHashMap;
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 struct CompileLocal {
@@ -88,13 +90,13 @@ impl LocalFileModuleResolver {
 ///```
 #[derive(Default, Debug, Clone)]
 pub struct SymbolTable {
-    symbols: std::collections::HashMap<String, VVal>,
+    symbols: FnvHashMap<String, VVal>,
 }
 
 impl SymbolTable {
     pub fn new() -> Self {
         SymbolTable {
-            symbols: std::collections::HashMap::new(),
+            symbols: FnvHashMap::with_capacity_and_hasher(10, Default::default()),
         }
     }
 
@@ -1368,6 +1370,30 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::Str => {
                     let str = ast.at(1).unwrap();
                     Ok(Box::new(move |_: &mut Env| Ok(str.clone())))
+                },
+                Syntax::GetKey => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let idx = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        let s = check_error_value(idx(e)?, "field idx/key")?;
+                        match s {
+                            VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                            VVal::Sym(sy) => Ok(m.get_key(&sy).unwrap_or(VVal::Nul)),
+                            _ => {
+                                e.with_pushed_sp(1, |e: &mut Env| {
+                                    e.set_arg(0, m.clone());
+                                    let ret = s.call_internal(e, 1);
+                                    if let Err(sa) = ret {
+                                        Err(sa.wrap_panic(Some(spos.clone())))
+                                    } else {
+                                        ret
+                                    }
+                                })
+                            }
+                        }
+                    }))
                 },
                 Syntax::SetKey => {
                     let map = compile(&ast.at(1).unwrap(), ce)?;

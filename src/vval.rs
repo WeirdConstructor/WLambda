@@ -14,6 +14,8 @@ use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Display, Debug, Formatter};
 
+use fnv::FnvHashMap;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FileRef {
     s: Rc<String>,
@@ -82,6 +84,7 @@ pub enum Syntax {
     Var,
     Key,
     SetKey,
+    GetKey,
     Str,
     Lst,
     Map,
@@ -136,7 +139,7 @@ pub struct Env {
     /// See also the [with_user_do](struct.Env.html#method.with_user_do) function.
     pub user: Rc<RefCell<dyn std::any::Any>>,
     /// The exported names of this module.
-    pub exports: std::collections::HashMap<String, VVal>,
+    pub exports: FnvHashMap<String, VVal>,
 }
 
 impl Default for Env {
@@ -152,7 +155,7 @@ impl Env {
             sp:                 0,
             argc:               0,
             user:               Rc::new(RefCell::new(VVal::vec())),
-            exports:            std::collections::HashMap::new(),
+            exports:            FnvHashMap::with_capacity_and_hasher(2, Default::default()),
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -165,7 +168,7 @@ impl Env {
             bp:                 0,
             sp:                 0,
             argc:               0,
-            exports:            std::collections::HashMap::new(),
+            exports:            FnvHashMap::with_capacity_and_hasher(2, Default::default()),
             user,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
@@ -785,7 +788,7 @@ pub enum VVal {
     /// A list (or vector) of VVals.
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
     /// A mapping of strings to VVals.
-    Map(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
+    Map(Rc<RefCell<FnvHashMap<String, VVal>>>),
     /// A function, see also [VValFun](struct.VValFun.html)
     Fun(Rc<VValFun>),
     /// A guarded VVal, that executes a given function when it is
@@ -846,14 +849,14 @@ pub fn format_vval_byt(v: &[u8]) -> String {
 }
 
 struct CycleCheck {
-    refs: std::collections::HashMap<i64, i64>,
+    refs: FnvHashMap<i64, i64>,
     backref_counter: i64,
 }
 
 impl CycleCheck {
     fn new() -> Self {
         CycleCheck {
-            refs: std::collections::HashMap::new(),
+            refs: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
             backref_counter: 1,
         }
     }
@@ -1240,11 +1243,7 @@ impl VVal {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     if argc > 0 {
                         let v = e.arg(0);
-                        match v {
-                            VVal::Ref(_) | VVal::CRef(_) | VVal::WWRef(_) | VVal::Map(_) | VVal::Usr(_) =>
-                                Ok(v.get_key(&sym).unwrap_or(VVal::Nul)),
-                            _ => Ok(VVal::Nul)
-                        }
+                        Ok(v.get_key(&sym).unwrap_or(VVal::Nul))
                     } else { Ok(self.clone()) }
                 })
             },
@@ -1356,6 +1355,8 @@ impl VVal {
                                     first_arg.at(1).unwrap_or_else(
                                         || VVal::Int((vval_bytes.borrow().len() - from) as i64))
                                     .i() as usize;
+                                println!("FOFOFOFO {:?}", from);
+                                println!("FOFOFOF4 {:?} | {:?}", cnt, first_arg);
                                 let r : Vec<u8> =
                                     vval_bytes.borrow().iter().skip(from)
                                               .take(cnt).copied().collect();
@@ -1431,33 +1432,9 @@ impl VVal {
             },
             VVal::Int(i) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc > 0 {
-                        let v = e.arg(0);
-                        match v {
-                            VVal::Byt(vval_bytes) => {
-                                let bytes = vval_bytes.borrow();
-                                if *i as usize >= bytes.len() {
-                                    Ok(VVal::Nul)
-                                } else {
-                                    Ok(VVal::new_byt(vec![bytes[*i as usize]]))
-                                }
-                            },
-                            VVal::Str(vval_str) => {
-                                let opt_char = vval_str.borrow().chars().nth(*i as usize);
-                                match opt_char {
-                                    None    => Ok(VVal::Nul),
-                                    Some(char) => {
-                                        let mut buf = [0; 4];
-                                        Ok(VVal::new_str(char.encode_utf8(&mut buf)))
-                                    },
-                                }
-                            },
-                            VVal::Lst(_) =>
-                                Ok(v.at(*i as usize).unwrap_or(VVal::Nul)),
-                            _ => Ok(v.get_key(&format!("{}", *i))
-                                     .unwrap_or(VVal::Nul)),
-                        }
-                    } else { Ok(self.clone()) }
+                    let v = e.arg(0);
+                    if argc > 0 { Ok(v.at(*i as usize).unwrap_or(VVal::Nul)) }
+                    else { Ok(self.clone()) }
                 })
             },
             VVal::Usr(ud) => {
@@ -1538,7 +1515,7 @@ impl VVal {
     }
 
     pub fn map() -> VVal {
-        VVal::Map(Rc::new(RefCell::new(std::collections::HashMap::new())))
+        VVal::Map(Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(2, Default::default()))))
     }
 
     pub fn sym(s: &str) -> VVal {
@@ -1552,7 +1529,7 @@ impl VVal {
             VVal::Str(s)     => { &*s.borrow() as *const String as i64 },
             VVal::Byt(s)     => { &*s.borrow() as *const Vec<u8> as i64 },
             VVal::Lst(v)     => { &*v.borrow() as *const Vec<VVal> as i64 },
-            VVal::Map(v)     => { &*v.borrow() as *const std::collections::HashMap<String, VVal> as i64 },
+            VVal::Map(v)     => { &*v.borrow() as *const FnvHashMap<String, VVal> as i64 },
             VVal::Fun(f)     => { &**f as *const VValFun as i64 },
             VVal::DropFun(f) => { &**f as *const DropVVal as i64 },
             VVal::Ref(v)     => { &*v.borrow() as *const VVal as i64 },
@@ -1657,7 +1634,7 @@ impl VVal {
         out.concat()
     }
 
-    fn dump_map_as_str(m: &Rc<RefCell<std::collections::HashMap<String,VVal>>>, c: &mut CycleCheck) -> String {
+    fn dump_map_as_str(m: &Rc<RefCell<FnvHashMap<String,VVal>>>, c: &mut CycleCheck) -> String {
         let mut out : Vec<String> = Vec::new();
         let mut first = true;
         out.push(String::from("${"));
@@ -1734,12 +1711,38 @@ impl VVal {
     }
 
     pub fn at(&self, index: usize) -> Option<VVal> {
-        if let VVal::Lst(b) = &self {
-            if b.borrow().len() > index {
-                return Some(b.borrow()[index].clone());
-            }
+        match self {
+            VVal::Ref(_)   => self.deref().at(index),
+            VVal::CRef(_)  => self.deref().at(index),
+            VVal::WWRef(_) => self.deref().at(index),
+            VVal::DropFun(f) => f.v.at(index),
+            VVal::Byt(vval_bytes) => {
+                let bytes = vval_bytes.borrow();
+                if index as usize >= bytes.len() {
+                    None
+                } else {
+                    Some(VVal::new_byt(vec![bytes[index as usize]]))
+                }
+            },
+            VVal::Str(vval_str) => {
+                let opt_char = vval_str.borrow().chars().nth(index as usize);
+                match opt_char {
+                    None    => None,
+                    Some(char) => {
+                        let mut buf = [0; 4];
+                        Some(VVal::new_str(char.encode_utf8(&mut buf)))
+                    },
+                }
+            },
+            VVal::Lst(b) => {
+                if b.borrow().len() > index {
+                    Some(b.borrow()[index].clone())
+                } else {
+                    None
+                }
+            },
+            _ => self.get_key(&format!("{}", index)),
         }
-        None
     }
 
     pub fn get_key(&self, key: &str) -> Option<VVal> {
@@ -1747,9 +1750,7 @@ impl VVal {
             VVal::Ref(_)   => self.deref().get_key(key),
             VVal::CRef(_)  => self.deref().get_key(key),
             VVal::WWRef(_) => self.deref().get_key(key),
-            VVal::Map(m) => {
-                m.borrow().get(&String::from(key)).cloned()
-            },
+            VVal::Map(m) => m.borrow().get(key).cloned(),
             VVal::Lst(l) => {
                 let idx = usize::from_str_radix(key, 10).unwrap_or(0);
                 if idx < l.borrow().len() {

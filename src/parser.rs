@@ -942,8 +942,10 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     }
                 },
                 '[' => {
-                    let call = make_to_call(ps, value);
+                    let call = ps.syn(Syntax::GetKey);
                     call.push(obj);
+                    call.push(value);
+
                     let mut field_call = make_to_call(ps, call);
                     match parse_arg_list(&mut field_call, ps) {
                         Ok(_)    => return Ok(field_call),
@@ -954,9 +956,13 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
             }
         }
 
-        let call = make_to_call(ps, value);
+        let call = ps.syn(Syntax::GetKey);
         call.push(obj);
+        call.push(value);
         obj = call;
+//        let call = make_to_call(ps, value);
+//        call.push(obj);
+//        obj = call;
     }
 
     Ok(obj)
@@ -1497,19 +1503,19 @@ mod tests {
         assert_eq!(parse("10[20, 30]"),               "$[&Block,$[&Call,10,20,30]]");
         assert_eq!(parse("10 x[20, 30]"),             "$[&Block,$[&Call,10,$[&Call,$[&Var,:\"x\"],20,30]]]");
         assert_eq!(parse("10 x[20, 30] | 50"),        "$[&Block,$[&Call,50,$[&Call,10,$[&Call,$[&Var,:\"x\"],20,30]]]]");
-        assert_eq!(parse("(10).a"),                   "$[&Block,$[&Call,$[&Key,:\"a\"],10]]");
-        assert_eq!(parse("a.b"),                      "$[&Block,$[&Call,$[&Key,:\"b\"],$[&Var,:\"a\"]]]");
-        assert_eq!(parse("10 a.b"),                   "$[&Block,$[&Call,10,$[&Call,$[&Key,:\"b\"],$[&Var,:\"a\"]]]]");
-        assert_eq!(parse("(10).(20)"),                "$[&Block,$[&Call,20,10]]");
+        assert_eq!(parse("(10).a"),                   "$[&Block,$[&GetKey,10,$[&Key,:\"a\"]]]");
+        assert_eq!(parse("a.b"),                      "$[&Block,$[&GetKey,$[&Var,:\"a\"],$[&Key,:\"b\"]]]");
+        assert_eq!(parse("10 a.b"),                   "$[&Block,$[&Call,10,$[&GetKey,$[&Var,:\"a\"],$[&Key,:\"b\"]]]]");
+        assert_eq!(parse("(10).(20)"),                "$[&Block,$[&GetKey,10,20]]");
         assert_eq!(parse("10.20 30"),                 "$[&Block,$[&Call,10.2,30]]");
         assert_eq!(parse("10 20 ~ 30 ~ 40 ~ 50"),     "$[&Block,$[&Call,10,20,$[&Call,30,$[&Call,40,50]]]]");
         assert_eq!(parse("10 20 ~ 30 40 ~ 40 1 2 3 ~ 50 60"),  "$[&Block,$[&Call,10,20,$[&Call,30,40,$[&Call,40,1,2,3,$[&Call,50,60]]]]]");
         assert_eq!(parse("10[10[1,2,3 foo] ~ 4]"),    "$[&Block,$[&Call,10,$[&Call,$[&Call,10,1,2,$[&Call,3,$[&Var,:\"foo\"]]],4]]]");
-        assert_eq!(parse("foo.b.c.d"),                "$[&Block,$[&Call,$[&Key,:\"d\"],$[&Call,$[&Key,:\"c\"],$[&Call,$[&Key,:\"b\"],$[&Var,:\"foo\"]]]]]");
-        assert_eq!(parse("foo.b.c.d[]"),              "$[&Block,$[&Call,$[&Call,$[&Key,:\"d\"],$[&Call,$[&Key,:\"c\"],$[&Call,$[&Key,:\"b\"],$[&Var,:\"foo\"]]]]]]");
-        assert_eq!(parse("foo.b.c.d[1,2,3]"),         "$[&Block,$[&Call,$[&Call,$[&Key,:\"d\"],$[&Call,$[&Key,:\"c\"],$[&Call,$[&Key,:\"b\"],$[&Var,:\"foo\"]]]],1,2,3]]");
-        assert_eq!(parse("foo.b.c.d 1 2 3"),          "$[&Block,$[&Call,$[&Call,$[&Key,:\"d\"],$[&Call,$[&Key,:\"c\"],$[&Call,$[&Key,:\"b\"],$[&Var,:\"foo\"]]]],1,2,3]]");
-        assert_eq!(parse("(foo.b.c.d) 1 2 3"),        "$[&Block,$[&Call,$[&Call,$[&Key,:\"d\"],$[&Call,$[&Key,:\"c\"],$[&Call,$[&Key,:\"b\"],$[&Var,:\"foo\"]]]],1,2,3]]");
+        assert_eq!(parse("foo.b.c.d"),                "$[&Block,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]]]");
+        assert_eq!(parse("foo.b.c.d[]"),              "$[&Block,$[&Call,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]]]]");
+        assert_eq!(parse("foo.b.c.d[1,2,3]"),         "$[&Block,$[&Call,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]],1,2,3]]");
+        assert_eq!(parse("foo.b.c.d 1 2 3"),          "$[&Block,$[&Call,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]],1,2,3]]");
+        assert_eq!(parse("(foo.b.c.d) 1 2 3"),        "$[&Block,$[&Call,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]],1,2,3]]");
         assert_eq!(parse("foo.a = 10"),               "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],10]]");
         assert_eq!(parse("foo.a = 10 | 20"),          "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],$[&Call,20,10]]]");
         assert_eq!(parse("foo.a = 10 ~ 20"),          "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],$[&Call,10,20]]]");
@@ -1622,8 +1628,8 @@ mod tests {
 
     #[test]
     fn check_parse_field_access() {
-        assert_eq!(parse("foo.(bar) == 2019"), "$[&Block,$[&Call,$[&Var,:\"==\"],$[&Call,$[&Var,:\"bar\"],$[&Var,:\"foo\"]],2019]]");
-        assert_eq!(parse("o.x[]"), "$[&Block,$[&Call,$[&Call,$[&Key,:\"x\"],$[&Var,:\"o\"]]]]");
+        assert_eq!(parse("foo.(bar) == 2019"), "$[&Block,$[&Call,$[&Var,:\"==\"],$[&GetKey,$[&Var,:\"foo\"],$[&Var,:\"bar\"]],2019]]");
+        assert_eq!(parse("o.x[]"),             "$[&Block,$[&Call,$[&GetKey,$[&Var,:\"o\"],$[&Key,:\"x\"]]]]");
     }
 
     #[test]
@@ -1642,13 +1648,13 @@ mod tests {
         assert_eq!(parse("$&&${z=1}"),    "$[&Block,$[&Ref,$[&Map,$[:\"z\",1]]]]");
         assert_eq!(parse("$*${z=1}.f=1"), "$[&Block,$[&SetKey,$[&Deref,$[&Map,$[:\"z\",1]]],$[&Key,:\"f\"],1]]");
         assert_eq!(parse("$*xxx.f=1"),    "$[&Block,$[&SetKey,$[&Deref,$[&Var,:\"xxx\"]],$[&Key,:\"f\"],1]]");
-        assert_eq!(parse("$*xxx.f"),      "$[&Block,$[&Call,$[&Key,:\"f\"],$[&Deref,$[&Var,:\"xxx\"]]]]");
+        assert_eq!(parse("$*xxx.f"),      "$[&Block,$[&GetKey,$[&Deref,$[&Var,:\"xxx\"]],$[&Key,:\"f\"]]]");
     }
 
     #[test]
     fn check_apply() {
         assert_eq!(parse("fo[[@]]"),            "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Var,:\"@\"]]]");
         assert_eq!(parse("fo[[$[1,2,3]]]"),     "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Lst,1,2,3]]]");
-        assert_eq!(parse("obj.1.field[[_]]"),   "$[&Block,$[&Apply,$[&Call,$[&Key,:\"field\"],$[&Call,1,$[&Var,:\"obj\"]]],$[&Var,:\"_\"]]]");
+        assert_eq!(parse("obj.1.field[[_]]"),   "$[&Block,$[&Apply,$[&GetKey,$[&GetKey,$[&Var,:\"obj\"],1],$[&Key,:\"field\"]],$[&Var,:\"_\"]]]");
     }
 }

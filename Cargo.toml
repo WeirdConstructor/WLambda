@@ -16,6 +16,7 @@ default = ["regex", "chrono", "serde", "serde_json", "rmp-serde"]
 
 [dependencies]
 rustyline  = "4.1.0"
+fnv        = "1.0.6"
 regex      = { version = "1.1.9",  optional = true }
 chrono     = { version = "0.4.7",  optional = true }
 serde      = { version = "1.0.92", optional = true }
