@@ -1235,51 +1235,51 @@ macro_rules! add_func {
 macro_rules! add_multi_op {
     ($g: ident, $op: tt) => {
         add_func!($g, $op, env, argc, {
-                if argc <= 0 { return Ok(VVal::Nul); }
-                if let VVal::Flt(f) = env.arg(0) {
+            if argc <= 0 { return Ok(VVal::Nul); }
+            if let VVal::Flt(f) = env.arg(0) {
                 let mut accum = f;
                 for i in 1..argc { accum = accum $op env.arg(i).f() }
                 Ok(VVal::Flt(accum))
-                } else {
+            } else {
                 let mut accum = env.arg(0).i();
                 for i in 1..argc { accum = accum $op env.arg(i).i() }
                 Ok(VVal::Int(accum))
-                }
-                }, Some(2), None, false)
+            }
+        }, Some(2), None, false)
     }
 }
 
 macro_rules! add_bool_bin_op {
     ($g: ident, $op: tt) => {
         add_func!($g, $op, env, argc, {
-                if argc < 2 { return Ok(VVal::Nul); }
-                let a = env.arg(0);
-                if let VVal::Flt(af) = a { Ok(VVal::Bol(af $op env.arg(1).f())) }
-                else { Ok(VVal::Bol(a.i() $op env.arg(1).i())) }
-                }, Some(2), Some(2), false)
+            if argc < 2 { return Ok(VVal::Nul); }
+            let a = env.arg(0);
+            if let VVal::Flt(af) = a { Ok(VVal::Bol(af $op env.arg(1).f())) }
+            else { Ok(VVal::Bol(a.i() $op env.arg(1).i())) }
+        }, Some(2), Some(2), false)
     }
 }
 
 macro_rules! add_fi_bin_op {
     ($g: ident, $op: tt, $a: ident, $b: ident, $ef: expr, $ei: expr) => {
         add_func!($g, $op, env, argc, {
-                if argc < 2 { return Ok(VVal::Nul); }
-                let $a = env.arg(0);
-                let $b = env.arg(1);
-                if let VVal::Flt(_) = $a { $ef }
-                else { $ei }
-                }, Some(2), Some(2), false)
+            if argc < 2 { return Ok(VVal::Nul); }
+            let $a = env.arg(0);
+            let $b = env.arg(1);
+            if let VVal::Flt(_) = $a { $ef }
+            else { $ei }
+        }, Some(2), Some(2), false)
     }
 }
 
 macro_rules! add_bin_op_err_ok {
     ($g: ident, $op: tt, $a: ident, $b: ident, $e: expr) => {
         add_func!($g, $op, env, argc, {
-                if argc < 2 { return Ok(VVal::Nul); }
-                let $a = env.arg(0);
-                let $b = env.arg(1);
-                $e
-                }, Some(2), Some(2), true)
+            if argc < 2 { return Ok(VVal::Nul); }
+            let $a = env.arg(0);
+            let $b = env.arg(1);
+            $e
+        }, Some(2), Some(2), true)
     }
 }
 

@@ -3,6 +3,9 @@
 * Feature: Added `std:strengthen` for weak refs and weakening refs.
 * Bugfix: Parser used unwrap() in some places where an EOF was not expected.
           These errors are now handled properly.
+* Change: Optimized a few hot spots.
+* Change: While optimizing I made arithmetic operations compiler syntax and not
+functions anymore.
 
 0.3.6 (2020-01-24)
 ==================

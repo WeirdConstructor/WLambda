@@ -599,7 +599,7 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
                 }
             } else {
                 if sign == -1 {
-                    Ok(VVal::Int(-(num as i64)))
+                    Ok(VVal::Int((num as i64).wrapping_neg()))
                 } else {
                     Ok(VVal::Int(num as i64))
                 }
@@ -793,6 +793,60 @@ fn make_binop(ps: &State, op: &str, left: VVal, right: VVal) -> VVal {
 
     } else if op == "&or" {
         let or = ps.syn(Syntax::Or);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == "+" {
+        let or = ps.syn(Syntax::BinOpAdd);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == "-" {
+        let or = ps.syn(Syntax::BinOpSub);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == "*" {
+        let or = ps.syn(Syntax::BinOpMul);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == "/" {
+        let or = ps.syn(Syntax::BinOpDiv);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == "%" {
+        let or = ps.syn(Syntax::BinOpMod);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == ">" {
+        let or = ps.syn(Syntax::BinOpGt);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == "<" {
+        let or = ps.syn(Syntax::BinOpLt);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == "<=" {
+        let or = ps.syn(Syntax::BinOpLe);
+        or.push(left);
+        or.push(right);
+        or
+
+    } else if op == ">=" {
+        let or = ps.syn(Syntax::BinOpGe);
         or.push(left);
         or.push(right);
         or
@@ -1436,7 +1490,7 @@ mod tests {
         assert_eq!(parse("foo :bar -2.3 2.3"),
                    "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&Key,:\"bar\"],-2.3,2.3]]");
         assert_eq!(parse("foo :bar -x 2"),
-                   "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&Call,$[&Var,:\"-\"],$[&Key,:\"bar\"],$[&Var,:\"x\"]],2]]");
+                   "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&BinOpSub,$[&Key,:\"bar\"],$[&Var,:\"x\"]],2]]");
         assert_eq!(parse("foo :bar -2 2"),
                    "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&Key,:\"bar\"],-2,2]]");
     }
@@ -1535,9 +1589,9 @@ mod tests {
         assert_eq!(parse("+"),          "$[&Block,$[&Var,:\"+\"]]");
         assert_eq!(parse("-"),          "$[&Block,$[&Var,:\"-\"]]");
         assert_eq!(parse("+ 10 20"),    "$[&Block,$[&Call,$[&Var,:\"+\"],10,20]]");
-        assert_eq!(parse("13 + 10 20"), "$[&Block,$[&Call,$[&Call,$[&Var,:\"+\"],13,10],20]]");
+        assert_eq!(parse("13 + 10 20"), "$[&Block,$[&Call,$[&BinOpAdd,13,10],20]]");
         assert_eq!(parse("13 + 10 == 23"),
-                                        "$[&Block,$[&Call,$[&Var,:\"==\"],$[&Call,$[&Var,:\"+\"],13,10],23]]");
+                                        "$[&Block,$[&Call,$[&Var,:\"==\"],$[&BinOpAdd,13,10],23]]");
         assert_eq!(parse("(+ 12 ~ - 24 23) == 13"),
            "$[&Block,$[&Call,$[&Var,:\"==\"],$[&Call,$[&Var,:\"+\"],12,$[&Call,$[&Var,:\"-\"],24,23]],13]]");
         assert_eq!(parse("_"),          "$[&Block,$[&Var,:\"_\"]]");

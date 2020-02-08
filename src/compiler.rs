@@ -970,7 +970,7 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
                             let set_val = val.clone();
                             match vi {
                                 VarPos::Local(vip) => {
-                                    e.set_local(*vip, &set_val);
+                                    e.set_consume(*vip, set_val);
                                 },
                                 VarPos::Global(r) => {
                                     if let VVal::Ref(gr) = r {
@@ -1224,7 +1224,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                 VarPos::Local(i) => {
                     Ok(Box::new(move |e: &mut Env| {
                         let v = cv(e)?;
-                        e.set_local(i, &v);
+                        e.set_consume(i, v);
                         Ok(VVal::Nul)
                     }))
                 },
@@ -1232,7 +1232,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                     if let VVal::Ref(glob_r) = glob_v {
                         Ok(Box::new(move |e: &mut Env| {
                             let v = cv(e)?;
-                            glob_r.replace(v.clone());
+                            glob_r.replace(v);
                             Ok(VVal::Nul)
                         }))
                     } else {
@@ -1548,6 +1548,132 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                 ret
                             }
                         })
+                    }))
+                },
+                Syntax::BinOpAdd => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(f) = le {
+                            Ok(VVal::Flt(f + re.f()))
+                        } else {
+                            Ok(VVal::Int(le.i().wrapping_add(re.i())))
+                        }
+                    }))
+                },
+                Syntax::BinOpSub => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(f) = le {
+                            Ok(VVal::Flt(f - re.f()))
+                        } else {
+                            Ok(VVal::Int(le.i().wrapping_sub(re.i())))
+                        }
+                    }))
+                },
+                Syntax::BinOpMul => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(f) = le {
+                            Ok(VVal::Flt(f * re.f()))
+                        } else {
+                            Ok(VVal::Int(le.i().wrapping_mul(re.i())))
+                        }
+                    }))
+                },
+                Syntax::BinOpDiv => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(f) = le {
+                            Ok(VVal::Flt(f / re.f()))
+                        } else {
+                            Ok(VVal::Int(le.i().wrapping_div(re.i())))
+                        }
+                    }))
+                },
+                Syntax::BinOpMod => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(f) = le {
+                            Ok(VVal::Flt(f % re.f()))
+                        } else {
+                            Ok(VVal::Int(le.i().wrapping_rem(re.i())))
+                        }
+                    }))
+                },
+                Syntax::BinOpLe => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(af) = le {
+                            Ok(VVal::Bol(af <= re.f()))
+                        } else {
+                            Ok(VVal::Bol(le.i() <= re.i()))
+                        }
+                    }))
+                },
+                Syntax::BinOpGe => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(af) = le {
+                            Ok(VVal::Bol(af >= re.f()))
+                        } else {
+                            Ok(VVal::Bol(le.i() >= re.i()))
+                        }
+                    }))
+                },
+                Syntax::BinOpLt => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(af) = le {
+                            Ok(VVal::Bol(af < re.f()))
+                        } else {
+                            Ok(VVal::Bol(le.i() < re.i()))
+                        }
+                    }))
+                },
+                Syntax::BinOpGt => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        if let VVal::Flt(af) = le {
+                            Ok(VVal::Bol(af > re.f()))
+                        } else {
+                            Ok(VVal::Bol(le.i() > re.i()))
+                        }
                     }))
                 },
                 Syntax::Call => {
