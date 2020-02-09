@@ -6,6 +6,7 @@
 * Change: Optimized a few hot spots.
 * Change: While optimizing I made arithmetic operations compiler syntax and not
 functions anymore.
+* Bugfix: Basic arithmetics are now wrapping and don't panic on overflow anymore.
 
 0.3.6 (2020-01-24)
 ==================

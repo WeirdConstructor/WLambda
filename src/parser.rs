@@ -1611,18 +1611,26 @@ mod tests {
 
     #[test]
     fn check_binops() {
-        assert_eq!(parse("20 * 10"),                "$[&Block,$[&Call,$[&Var,:\"*\"],20,10]]");
-        assert_eq!(parse("40 20 * 10"),             "$[&Block,$[&Call,40,$[&Call,$[&Var,:\"*\"],20,10]]]");
-        assert_eq!(parse("40 20 * 10 30"),          "$[&Block,$[&Call,40,$[&Call,$[&Var,:\"*\"],20,10],30]]");
-        assert_eq!(parse("40 20 * 10[]"),           "$[&Block,$[&Call,40,$[&Call,$[&Var,:\"*\"],20,$[&Call,10]]]]");
-        assert_eq!(parse("40 20[] * 10[]"),         "$[&Block,$[&Call,40,$[&Call,$[&Var,:\"*\"],$[&Call,20],$[&Call,10]]]]");
-        assert_eq!(parse("20[] * 10[]"),            "$[&Block,$[&Call,$[&Var,:\"*\"],$[&Call,20],$[&Call,10]]]");
-        assert_eq!(parse("10 - 20 * 30"),           "$[&Block,$[&Call,$[&Var,:\"-\"],10,$[&Call,$[&Var,:\"*\"],20,30]]]");
-        assert_eq!(parse("10 * 20 - 30"),           "$[&Block,$[&Call,$[&Var,:\"-\"],$[&Call,$[&Var,:\"*\"],10,20],30]]");
-        assert_eq!(parse("10 * 20 - 30 * 2"),       "$[&Block,$[&Call,$[&Var,:\"-\"],$[&Call,$[&Var,:\"*\"],10,20],$[&Call,$[&Var,:\"*\"],30,2]]]");
-        assert_eq!(parse("10 * 20 * 30"),           "$[&Block,$[&Call,$[&Var,:\"*\"],$[&Call,$[&Var,:\"*\"],10,20],30]]");
-        assert_eq!(parse("10 - 20 - 30 - 40"),      "$[&Block,$[&Call,$[&Var,:\"-\"],$[&Call,$[&Var,:\"-\"],$[&Call,$[&Var,:\"-\"],10,20],30],40]]");
-        assert_eq!(parse("10 - 20 - (30 - 40)"),    "$[&Block,$[&Call,$[&Var,:\"-\"],$[&Call,$[&Var,:\"-\"],10,20],$[&Call,$[&Var,:\"-\"],30,40]]]");
+        assert_eq!(parse("20 * 10"),                "$[&Block,$[&BinOpMul,20,10]]");
+        assert_eq!(parse("20 + 10"),                "$[&Block,$[&BinOpAdd,20,10]]");
+        assert_eq!(parse("20 - 10"),                "$[&Block,$[&BinOpSub,20,10]]");
+        assert_eq!(parse("20 / 10"),                "$[&Block,$[&BinOpDiv,20,10]]");
+        assert_eq!(parse("20 % 10"),                "$[&Block,$[&BinOpMod,20,10]]");
+        assert_eq!(parse("20 > 10"),                "$[&Block,$[&BinOpGt,20,10]]");
+        assert_eq!(parse("20 < 10"),                "$[&Block,$[&BinOpLt,20,10]]");
+        assert_eq!(parse("20 <= 10"),               "$[&Block,$[&BinOpLe,20,10]]");
+        assert_eq!(parse("20 >= 10"),               "$[&Block,$[&BinOpGe,20,10]]");
+        assert_eq!(parse("40 20 * 10"),             "$[&Block,$[&Call,40,$[&BinOpMul,20,10]]]");
+        assert_eq!(parse("40 20 * 10 30"),          "$[&Block,$[&Call,40,$[&BinOpMul,20,10],30]]");
+        assert_eq!(parse("40 20 * 10[]"),           "$[&Block,$[&Call,40,$[&BinOpMul,20,$[&Call,10]]]]");
+        assert_eq!(parse("40 20[] * 10[]"),         "$[&Block,$[&Call,40,$[&BinOpMul,$[&Call,20],$[&Call,10]]]]");
+        assert_eq!(parse("20[] * 10[]"),            "$[&Block,$[&BinOpMul,$[&Call,20],$[&Call,10]]]");
+        assert_eq!(parse("10 - 20 * 30"),           "$[&Block,$[&BinOpSub,10,$[&BinOpMul,20,30]]]");
+        assert_eq!(parse("10 * 20 - 30"),           "$[&Block,$[&BinOpSub,$[&BinOpMul,10,20],30]]");
+        assert_eq!(parse("10 * 20 - 30 * 2"),       "$[&Block,$[&BinOpSub,$[&BinOpMul,10,20],$[&BinOpMul,30,2]]]");
+        assert_eq!(parse("10 * 20 * 30"),           "$[&Block,$[&BinOpMul,$[&BinOpMul,10,20],30]]");
+        assert_eq!(parse("10 - 20 - 30 - 40"),      "$[&Block,$[&BinOpSub,$[&BinOpSub,$[&BinOpSub,10,20],30],40]]");
+        assert_eq!(parse("10 - 20 - (30 - 40)"),    "$[&Block,$[&BinOpSub,$[&BinOpSub,10,20],$[&BinOpSub,30,40]]]");
 
         assert_eq!(parse("$t &and $f"),                "$[&Block,$[&And,$true,$false]]");
         assert_eq!(parse("1 &and 2 &and 3 &and 4"),    "$[&Block,$[&And,$[&And,$[&And,1,2],3],4]]");
