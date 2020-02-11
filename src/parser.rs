@@ -654,7 +654,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
             } else {
                 let key = if is_ident_start(c) {
-                    VVal::Sym(parse_identifier(ps))
+                    VVal::new_sym_mv(parse_identifier(ps))
                 } else {
                     parse_expr(ps)?
                 };
@@ -774,13 +774,13 @@ fn make_to_call(ps: &State, expr: VVal) -> VVal {
 
 fn make_var(ps: &State, identifier: &str) -> VVal {
     let id = ps.syn(Syntax::Var);
-    id.push(VVal::Sym(String::from(identifier)));
+    id.push(VVal::new_sym(identifier));
     id
 }
 
 fn make_sym(ps: &State, identifier: &str) -> VVal {
     let id = ps.syn(Syntax::Key);
-    id.push(VVal::Sym(String::from(identifier)));
+    id.push(VVal::new_sym(identifier));
     id
 }
 
@@ -909,7 +909,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                     let block = parse_block(ps, true)?;
 
                     block.set_at(0, syn);
-                    block.insert_at(1, VVal::Sym(block_name));
+                    block.insert_at(1, VVal::new_sym_mv(block_name));
                     Ok(block)
                 } else {
                     let block = ps.syn(Syntax::Func);
@@ -949,6 +949,28 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
     }
 }
 
+fn optimize_get_key(ps: &mut State, obj: VVal, value: VVal) -> VVal {
+    let mut first_syn = obj.v_(0);
+    if first_syn.get_syn() == Syntax::GetKey {
+        first_syn.set_syn(Syntax::GetKey2);
+        obj.set_at(0, first_syn);
+        obj.push(value);
+        obj
+
+    } else if first_syn.get_syn() == Syntax::GetKey2 {
+        first_syn.set_syn(Syntax::GetKey3);
+        obj.set_at(0, first_syn);
+        obj.push(value);
+        obj
+
+    } else {
+        let call = ps.syn(Syntax::GetKey);
+        call.push(obj);
+        call.push(value);
+        call
+    }
+}
+
 fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError> {
     let mut obj = obj_val;
 
@@ -977,7 +999,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
 
             } else if is_ident_start(c) {
                 let id = ps.syn(Syntax::Key);
-                id.push(VVal::Sym(parse_identifier(ps)));
+                id.push(VVal::new_sym_mv(parse_identifier(ps)));
                 id
             } else {
                 parse_value(ps)?
@@ -996,9 +1018,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     }
                 },
                 '[' => {
-                    let call = ps.syn(Syntax::GetKey);
-                    call.push(obj);
-                    call.push(value);
+                    let call = optimize_get_key(ps, obj, value);
 
                     let mut field_call = make_to_call(ps, call);
                     match parse_arg_list(&mut field_call, ps) {
@@ -1010,13 +1030,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
             }
         }
 
-        let call = ps.syn(Syntax::GetKey);
-        call.push(obj);
-        call.push(value);
-        obj = call;
-//        let call = make_to_call(ps, value);
-//        call.push(obj);
-//        obj = call;
+        obj = optimize_get_key(ps, obj, value);
     }
 
     Ok(obj)
@@ -1240,7 +1254,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
             while let Some(c) = ps.peek() {
                 if c == ')' { break; }
-                ids.push(VVal::Sym(parse_identifier(ps)));
+                ids.push(VVal::new_sym_mv(parse_identifier(ps)));
                 if !ps.consume_if_eq_wsc(',') { break; }
             }
 
@@ -1254,7 +1268,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     ')', "At the end of destructuring assignment.");
             }
         },
-        _ => { ids.push(VVal::Sym(parse_identifier(ps))); }
+        _ => { ids.push(VVal::new_sym_mv(parse_identifier(ps))); }
     }
 
     assign.push(ids);
@@ -1565,11 +1579,11 @@ mod tests {
         assert_eq!(parse("10 20 ~ 30 ~ 40 ~ 50"),     "$[&Block,$[&Call,10,20,$[&Call,30,$[&Call,40,50]]]]");
         assert_eq!(parse("10 20 ~ 30 40 ~ 40 1 2 3 ~ 50 60"),  "$[&Block,$[&Call,10,20,$[&Call,30,40,$[&Call,40,1,2,3,$[&Call,50,60]]]]]");
         assert_eq!(parse("10[10[1,2,3 foo] ~ 4]"),    "$[&Block,$[&Call,10,$[&Call,$[&Call,10,1,2,$[&Call,3,$[&Var,:\"foo\"]]],4]]]");
-        assert_eq!(parse("foo.b.c.d"),                "$[&Block,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]]]");
-        assert_eq!(parse("foo.b.c.d[]"),              "$[&Block,$[&Call,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]]]]");
-        assert_eq!(parse("foo.b.c.d[1,2,3]"),         "$[&Block,$[&Call,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]],1,2,3]]");
-        assert_eq!(parse("foo.b.c.d 1 2 3"),          "$[&Block,$[&Call,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]],1,2,3]]");
-        assert_eq!(parse("(foo.b.c.d) 1 2 3"),        "$[&Block,$[&Call,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"foo\"],$[&Key,:\"b\"]],$[&Key,:\"c\"]],$[&Key,:\"d\"]],1,2,3]]");
+        assert_eq!(parse("foo.b.c.d"),                "$[&Block,$[&GetKey3,$[&Var,:\"foo\"],$[&Key,:\"b\"],$[&Key,:\"c\"],$[&Key,:\"d\"]]]");
+        assert_eq!(parse("foo.b.c.d[]"),              "$[&Block,$[&Call,$[&GetKey3,$[&Var,:\"foo\"],$[&Key,:\"b\"],$[&Key,:\"c\"],$[&Key,:\"d\"]]]]");
+        assert_eq!(parse("foo.b.c.d[1,2,3]"),         "$[&Block,$[&Call,$[&GetKey3,$[&Var,:\"foo\"],$[&Key,:\"b\"],$[&Key,:\"c\"],$[&Key,:\"d\"]],1,2,3]]");
+        assert_eq!(parse("foo.b.c.d 1 2 3"),          "$[&Block,$[&Call,$[&GetKey3,$[&Var,:\"foo\"],$[&Key,:\"b\"],$[&Key,:\"c\"],$[&Key,:\"d\"]],1,2,3]]");
+        assert_eq!(parse("(foo.b.c.d) 1 2 3"),        "$[&Block,$[&Call,$[&GetKey3,$[&Var,:\"foo\"],$[&Key,:\"b\"],$[&Key,:\"c\"],$[&Key,:\"d\"]],1,2,3]]");
         assert_eq!(parse("foo.a = 10"),               "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],10]]");
         assert_eq!(parse("foo.a = 10 | 20"),          "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],$[&Call,20,10]]]");
         assert_eq!(parse("foo.a = 10 ~ 20"),          "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],$[&Call,10,20]]]");
@@ -1717,6 +1731,6 @@ mod tests {
     fn check_apply() {
         assert_eq!(parse("fo[[@]]"),            "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Var,:\"@\"]]]");
         assert_eq!(parse("fo[[$[1,2,3]]]"),     "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Lst,1,2,3]]]");
-        assert_eq!(parse("obj.1.field[[_]]"),   "$[&Block,$[&Apply,$[&GetKey,$[&GetKey,$[&Var,:\"obj\"],1],$[&Key,:\"field\"]],$[&Var,:\"_\"]]]");
+        assert_eq!(parse("obj.1.field[[_]]"),   "$[&Block,$[&Apply,$[&GetKey2,$[&Var,:\"obj\"],1,$[&Key,:\"field\"]],$[&Var,:\"_\"]]]");
     }
 }

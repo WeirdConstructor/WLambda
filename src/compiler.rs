@@ -1380,11 +1380,116 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let s = check_error_value(idx(e)?, "field idx/key")?;
                         match s {
                             VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
-                            VVal::Sym(sy) => Ok(m.get_key(&sy).unwrap_or(VVal::Nul)),
+                            VVal::Sym(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            VVal::Str(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
                             _ => {
                                 e.with_pushed_sp(1, |e: &mut Env| {
                                     e.set_arg(0, m.clone());
                                     let ret = s.call_internal(e, 1);
+                                    if let Err(sa) = ret {
+                                        Err(sa.wrap_panic(Some(spos.clone())))
+                                    } else {
+                                        ret
+                                    }
+                                })
+                            }
+                        }
+                    }))
+                },
+                Syntax::GetKey2 => {
+                    let map  = compile(&ast.at(1).unwrap(), ce)?;
+                    let idx  = compile(&ast.at(2).unwrap(), ce)?;
+                    let idx2 = compile(&ast.at(3).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        let s = check_error_value(idx(e)?, "field idx/key")?;
+                        let s2 = check_error_value(idx2(e)?, "field idx/key")?;
+                        let m = match s {
+                            VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                            VVal::Sym(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            VVal::Str(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            _ => {
+                                e.with_pushed_sp(1, |e: &mut Env| {
+                                    e.set_arg(0, m.clone());
+                                    let ret = s.call_internal(e, 1);
+                                    if let Err(sa) = ret {
+                                        Err(sa.wrap_panic(Some(spos.clone())))
+                                    } else {
+                                        ret
+                                    }
+                                })
+                            }
+                        }?;
+                        match s2 {
+                            VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                            VVal::Sym(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            VVal::Str(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            _ => {
+                                e.with_pushed_sp(1, |e: &mut Env| {
+                                    e.set_arg(0, m.clone());
+                                    let ret = s2.call_internal(e, 1);
+                                    if let Err(sa) = ret {
+                                        Err(sa.wrap_panic(Some(spos.clone())))
+                                    } else {
+                                        ret
+                                    }
+                                })
+                            }
+                        }
+                    }))
+                },
+                Syntax::GetKey3 => {
+                    let map  = compile(&ast.at(1).unwrap(), ce)?;
+                    let idx  = compile(&ast.at(2).unwrap(), ce)?;
+                    let idx2 = compile(&ast.at(3).unwrap(), ce)?;
+                    let idx3 = compile(&ast.at(4).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        let s = check_error_value(idx(e)?, "field idx/key")?;
+                        let s2 = check_error_value(idx2(e)?, "field idx/key")?;
+                        let s3 = check_error_value(idx3(e)?, "field idx/key")?;
+                        let m = match s {
+                            VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                            VVal::Sym(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            VVal::Str(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            _ => {
+                                e.with_pushed_sp(1, |e: &mut Env| {
+                                    e.set_arg(0, m.clone());
+                                    let ret = s.call_internal(e, 1);
+                                    if let Err(sa) = ret {
+                                        Err(sa.wrap_panic(Some(spos.clone())))
+                                    } else {
+                                        ret
+                                    }
+                                })
+                            }
+                        }?;
+                        let m = match s2 {
+                            VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                            VVal::Sym(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            VVal::Str(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            _ => {
+                                e.with_pushed_sp(1, |e: &mut Env| {
+                                    e.set_arg(0, m.clone());
+                                    let ret = s2.call_internal(e, 1);
+                                    if let Err(sa) = ret {
+                                        Err(sa.wrap_panic(Some(spos.clone())))
+                                    } else {
+                                        ret
+                                    }
+                                })
+                            }
+                        }?;
+                        match s3 {
+                            VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                            VVal::Sym(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            VVal::Str(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
+                            _ => {
+                                e.with_pushed_sp(1, |e: &mut Env| {
+                                    e.set_arg(0, m.clone());
+                                    let ret = s3.call_internal(e, 1);
                                     if let Err(sa) = ret {
                                         Err(sa.wrap_panic(Some(spos.clone())))
                                     } else {
@@ -1682,23 +1787,154 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     call_args.reverse();
                     let func = call_args.pop().expect("function in evaluation args list");
                     call_args.reverse();
+                    let argc = call_args.len();
 
-                    Ok(Box::new(move |e: &mut Env| {
-                        let f    = func(e)?;
-                        let argc = call_args.len();
-                        e.with_pushed_sp(argc, |e: &mut Env| {
-                            for (i, x) in call_args.iter().enumerate() {
-                                let v = x(e)?;
-                                e.set_arg(i, v);
-                            }
-                            let ret = f.call_internal(e, argc);
+                    match argc {
+                        0 => Ok(Box::new(move |e: &mut Env| {
+                            let f = func(e)?;
+                            let ret = f.call_no_args(e);
                             if let Err(sa) = ret {
                                 Err(sa.wrap_panic(Some(spos.clone())))
                             } else {
                                 ret
                             }
-                        })
-                    }))
+                        })),
+                        1 => Ok(Box::new(move |e: &mut Env| {
+                            let f = func(e)?;
+
+                            e.with_pushed_sp(1, |e: &mut Env| {
+                                let v = call_args[0](e)?;
+                                e.set_arg(0, v);
+                                let ret = f.call_internal(e, 1);
+                                if let Err(sa) = ret {
+                                    Err(sa.wrap_panic(Some(spos.clone())))
+                                } else {
+                                    ret
+                                }
+                            })
+                        })),
+                        2 => Ok(Box::new(move |e: &mut Env| {
+                            let f = func(e)?;
+
+                            e.with_pushed_sp(2, |e: &mut Env| {
+                                let v = call_args[0](e)?;
+                                let v1 = call_args[1](e)?;
+                                e.set_arg(0, v);
+                                e.set_arg(1, v1);
+
+                                let ret = f.call_internal(e, 2);
+                                if let Err(sa) = ret {
+                                    Err(sa.wrap_panic(Some(spos.clone())))
+                                } else {
+                                    ret
+                                }
+                            })
+                        })),
+                        3 => Ok(Box::new(move |e: &mut Env| {
+                            let f = func(e)?;
+
+                            e.with_pushed_sp(3, |e: &mut Env| {
+                                let v = call_args[0](e)?;
+                                let v1 = call_args[1](e)?;
+                                let v2 = call_args[2](e)?;
+                                e.set_arg(0, v);
+                                e.set_arg(1, v1);
+                                e.set_arg(2, v2);
+
+                                let ret = f.call_internal(e, 3);
+                                if let Err(sa) = ret {
+                                    Err(sa.wrap_panic(Some(spos.clone())))
+                                } else {
+                                    ret
+                                }
+                            })
+                        })),
+                        4 => Ok(Box::new(move |e: &mut Env| {
+                            let f = func(e)?;
+
+                            e.with_pushed_sp(4, |e: &mut Env| {
+                                let v = call_args[0](e)?;
+                                let v1 = call_args[1](e)?;
+                                let v2 = call_args[2](e)?;
+                                let v3 = call_args[3](e)?;
+                                e.set_arg(0, v);
+                                e.set_arg(1, v1);
+                                e.set_arg(2, v2);
+                                e.set_arg(3, v3);
+
+                                let ret = f.call_internal(e, 4);
+                                if let Err(sa) = ret {
+                                    Err(sa.wrap_panic(Some(spos.clone())))
+                                } else {
+                                    ret
+                                }
+                            })
+                        })),
+                        5 => Ok(Box::new(move |e: &mut Env| {
+                            let f = func(e)?;
+
+                            e.with_pushed_sp(5, |e: &mut Env| {
+                                let v = call_args[0](e)?;
+                                let v1 = call_args[1](e)?;
+                                let v2 = call_args[2](e)?;
+                                let v3 = call_args[3](e)?;
+                                let v4 = call_args[4](e)?;
+                                e.set_arg(0, v);
+                                e.set_arg(1, v1);
+                                e.set_arg(2, v2);
+                                e.set_arg(3, v3);
+                                e.set_arg(4, v4);
+
+                                let ret = f.call_internal(e, 5);
+                                if let Err(sa) = ret {
+                                    Err(sa.wrap_panic(Some(spos.clone())))
+                                } else {
+                                    ret
+                                }
+                            })
+                        })),
+                        6 => Ok(Box::new(move |e: &mut Env| {
+                            let f = func(e)?;
+
+                            e.with_pushed_sp(6, |e: &mut Env| {
+                                let v = call_args[0](e)?;
+                                let v1 = call_args[1](e)?;
+                                let v2 = call_args[2](e)?;
+                                let v3 = call_args[3](e)?;
+                                let v4 = call_args[4](e)?;
+                                let v5 = call_args[5](e)?;
+                                e.set_arg(0, v);
+                                e.set_arg(1, v1);
+                                e.set_arg(2, v2);
+                                e.set_arg(3, v3);
+                                e.set_arg(4, v4);
+                                e.set_arg(5, v5);
+
+                                let ret = f.call_internal(e, 6);
+                                if let Err(sa) = ret {
+                                    Err(sa.wrap_panic(Some(spos.clone())))
+                                } else {
+                                    ret
+                                }
+                            })
+                        })),
+                        _ => Ok(Box::new(move |e: &mut Env| {
+                            let f    = func(e)?;
+
+                            e.with_pushed_sp(argc, |e: &mut Env| {
+                                for (i, x) in call_args.iter().enumerate() {
+                                    let v = x(e)?;
+                                    e.set_arg(i, v);
+                                }
+                                let ret = f.call_internal(e, argc);
+                                if let Err(sa) = ret {
+                                    Err(sa.wrap_panic(Some(spos.clone())))
+                                } else {
+                                    ret
+                                }
+                            })
+                        }))
+                    }
                 },
                 Syntax::Func => {
                     let mut ce_sub = CompileEnv::create_env(Some(ce.clone()));

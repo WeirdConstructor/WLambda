@@ -7,6 +7,10 @@
 * Change: While optimizing I made arithmetic operations compiler syntax and not
 functions anymore.
 * Bugfix: Basic arithmetics are now wrapping and don't panic on overflow anymore.
+* Change: Symbols are handled equally to strings internally now, also improves
+performance a bit when accessing maps.
+* Optimization: Unrolled argument processing for function calls.
+* Optimization: Unrolled GetKey operations.
 
 0.3.6 (2020-01-24)
 ==================

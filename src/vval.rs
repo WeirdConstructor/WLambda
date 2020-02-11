@@ -85,6 +85,8 @@ pub enum Syntax {
     Key,
     SetKey,
     GetKey,
+    GetKey2,
+    GetKey3,
     BinOpAdd,
     BinOpSub,
     BinOpMul,
@@ -164,7 +166,7 @@ impl Env {
             sp:                 0,
             argc:               0,
             user:               Rc::new(RefCell::new(VVal::vec())),
-            exports:            FnvHashMap::with_capacity_and_hasher(2, Default::default()),
+            exports:            FnvHashMap::with_capacity_and_hasher(5, Default::default()),
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -783,7 +785,7 @@ pub enum VVal {
     ///
     /// This one might be interned at some point, so that it only contains
     /// an Rc<SymRef> in future.
-    Sym(String),
+    Sym(Rc<RefCell<String>>),
     /// Representation of a unicode/text string.
     Str(Rc<RefCell<String>>),
     /// Representation of a byte buffer.
@@ -956,7 +958,11 @@ impl VVal {
     }
 
     pub fn new_sym(s: &str) -> VVal {
-        VVal::Sym(String::from(s))
+        VVal::Sym(Rc::new(RefCell::new(String::from(s))))
+    }
+
+    pub fn new_sym_mv(s: String) -> VVal {
+        VVal::Sym(Rc::new(RefCell::new(s)))
     }
 
     pub fn new_byt(v: Vec<u8>) -> VVal {
@@ -1131,7 +1137,7 @@ impl VVal {
                     r
                 }))
             },
-            VVal::Str(s) => {
+            VVal::Str(s) | VVal::Sym(s) => {
                 let s = s.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
@@ -1143,18 +1149,18 @@ impl VVal {
                     r
                 }))
             },
-            VVal::Sym(s) => {
-                let s = s.clone();
-                let mut idx = 0;
-                std::iter::from_fn(Box::new(move || {
-                    let r = match s.chars().nth(idx) {
-                        Some(chr) => Some(VVal::new_str_mv(chr.to_string())),
-                        None      => None,
-                    };
-                    idx += 1;
-                    r
-                }))
-            },
+//            VVal::Sym(s) => {
+//                let s = s.clone();
+//                let mut idx = 0;
+//                std::iter::from_fn(Box::new(move || {
+//                    let r = match s.chars().nth(idx) {
+//                        Some(chr) => Some(VVal::new_str_mv(chr.to_string())),
+//                        None      => None,
+//                    };
+//                    idx += 1;
+//                    r
+//                }))
+//            },
             VVal::DropFun(v) => v.v.iter(),
             VVal::Ref(v)     => v.borrow().iter(),
             VVal::CRef(v)    => v.borrow().iter(),
@@ -1252,7 +1258,7 @@ impl VVal {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     if argc > 0 {
                         let v = e.arg(0);
-                        Ok(v.get_key(&sym).unwrap_or(VVal::Nul))
+                        Ok(v.get_key(&*sym.borrow()).unwrap_or(VVal::Nul))
                     } else { Ok(self.clone()) }
                 })
             },
@@ -1528,7 +1534,7 @@ impl VVal {
     }
 
     pub fn sym(s: &str) -> VVal {
-        VVal::Sym(String::from(s))
+        VVal::Sym(std::rc::Rc::new(std::cell::RefCell::new(String::from(s))))
     }
 
     #[allow(clippy::cast_ptr_alignment)]
@@ -1888,7 +1894,7 @@ impl VVal {
             VVal::Map(l) => l.borrow().len(),
             VVal::Byt(l) => l.borrow().len(),
             VVal::Str(l) => l.borrow().len(),
-            VVal::Sym(l) => l.len(),
+            VVal::Sym(l) => l.borrow().len(),
             _ => 0,
         }
     }
@@ -1896,7 +1902,7 @@ impl VVal {
     pub fn s_len(&self) -> usize {
         match self {
             VVal::Str(s)  => s.borrow().chars().count(),
-            VVal::Sym(s)  => s.chars().count(),
+            VVal::Sym(s)  => s.borrow().chars().count(),
             VVal::Usr(s)  => s.s_raw().chars().count(),
             VVal::Byt(b)  => b.borrow().len(),
             VVal::Nul     => 0,
@@ -1921,7 +1927,7 @@ impl VVal {
     pub fn s_raw(&self) -> String {
         match self {
             VVal::Str(s)  => s.borrow().clone(),
-            VVal::Sym(s)  => s.clone(),
+            VVal::Sym(s)  => s.borrow().clone(),
             VVal::Usr(s)  => s.s_raw(),
             VVal::Byt(s)  => s.borrow().iter().map(|b| *b as char).collect(),
             VVal::Nul     => String::from(""),
@@ -1953,6 +1959,12 @@ impl VVal {
                 syn: Syntax::Block,
                 line: 0, col: 0, file: FileRef::new("?")
             }
+        }
+    }
+
+    pub fn set_syn(&mut self, syn: Syntax) {
+        if let VVal::Syn(s) = self {
+            s.syn = syn;
         }
     }
 
@@ -2155,11 +2167,11 @@ impl VVal {
     pub fn f(&self) -> f64 {
         match self {
             VVal::Str(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
+            VVal::Sym(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
             VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as f64 } else { 0.0 },
             VVal::Nul        => 0.0,
             VVal::Err(_)     => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
-            VVal::Sym(s)     => s.parse::<f64>().unwrap_or(0.0),
             VVal::Syn(s)     => (s.syn.clone() as i64) as f64,
             VVal::Int(i)     => *i as f64,
             VVal::Flt(f)     => *f,
@@ -2183,11 +2195,11 @@ impl VVal {
     pub fn i(&self) -> i64 {
         match self {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
+            VVal::Sym(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
             VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 },
             VVal::Nul        => 0,
             VVal::Err(_)     => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
-            VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0),
             VVal::Syn(s)     => s.syn.clone() as i64,
             VVal::Int(i)     => *i,
             VVal::Flt(f)     => (*f as i64),
@@ -2211,11 +2223,11 @@ impl VVal {
     pub fn b(&self) -> bool {
         match self {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0) != 0,
+            VVal::Sym(s)     => (*s).borrow().parse::<i64>().unwrap_or(0) != 0,
             VVal::Byt(s)     => (if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 }) != 0,
             VVal::Nul        => false,
             VVal::Err(_)     => false,
             VVal::Bol(b)     => *b,
-            VVal::Sym(s)     => s.parse::<i64>().unwrap_or(0) != 0,
             VVal::Syn(s)     => (s.syn.clone() as i64) != 0,
             VVal::Int(i)     => (*i) != 0,
             VVal::Flt(f)     => (*f as i64) != 0,
@@ -2244,11 +2256,11 @@ impl VVal {
         };
         let s = match self {
             VVal::Str(s)     => format_vval_str(&s.borrow(), false),
+            VVal::Sym(s)     => format!(":\"{}\"", &s.borrow()),
             VVal::Byt(s)     => format!("$b{}", format_vval_byt(&s.borrow())),
             VVal::Nul        => "$n".to_string(),
             VVal::Err(e)     => format!("$e{} {}", (*e).borrow().1, (*e).borrow().0.s_cy(c)),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
-            VVal::Sym(s)     => format!(":\"{}\"", s),
             VVal::Syn(s)     => format!("&{:?}", s.syn),
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
