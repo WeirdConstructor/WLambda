@@ -1396,6 +1396,24 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         }
                     }))
                 },
+                Syntax::GetIdx => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let idx = ast.at(2).unwrap().i();
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        Ok(m.at(idx as usize).unwrap_or(VVal::Nul))
+                    }))
+                },
+                Syntax::GetSym => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let sym = ast.at(2).unwrap().s_raw();
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        Ok(m.get_key(&sym).unwrap_or(VVal::Nul))
+                    }))
+                },
                 Syntax::GetKey2 => {
                     let map  = compile(&ast.at(1).unwrap(), ce)?;
                     let idx  = compile(&ast.at(2).unwrap(), ce)?;

@@ -85,6 +85,8 @@ pub enum Syntax {
     Key,
     SetKey,
     GetKey,
+    GetSym,
+    GetIdx,
     GetKey2,
     GetKey3,
     BinOpAdd,

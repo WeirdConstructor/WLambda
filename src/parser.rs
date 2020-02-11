@@ -951,6 +951,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
 
 fn optimize_get_key(ps: &mut State, obj: VVal, value: VVal) -> VVal {
     let mut first_syn = obj.v_(0);
+
     if first_syn.get_syn() == Syntax::GetKey {
         first_syn.set_syn(Syntax::GetKey2);
         obj.set_at(0, first_syn);
@@ -964,10 +965,25 @@ fn optimize_get_key(ps: &mut State, obj: VVal, value: VVal) -> VVal {
         obj
 
     } else {
-        let call = ps.syn(Syntax::GetKey);
-        call.push(obj);
-        call.push(value);
-        call
+        if value.get_syn() == Syntax::Key {
+            println!("VALLL: {}", value.s());
+            let call = ps.syn(Syntax::GetIdx);
+            call.push(obj);
+            call.push(value.v_(1));
+            call
+
+        } else if value.is_int() {
+            let call = ps.syn(Syntax::GetIdx);
+            call.push(obj);
+            call.push(value);
+            call
+
+        } else {
+            let call = ps.syn(Syntax::GetKey);
+            call.push(obj);
+            call.push(value);
+            call
+        }
     }
 }
 
@@ -1574,7 +1590,7 @@ mod tests {
         assert_eq!(parse("(10).a"),                   "$[&Block,$[&GetKey,10,$[&Key,:\"a\"]]]");
         assert_eq!(parse("a.b"),                      "$[&Block,$[&GetKey,$[&Var,:\"a\"],$[&Key,:\"b\"]]]");
         assert_eq!(parse("10 a.b"),                   "$[&Block,$[&Call,10,$[&GetKey,$[&Var,:\"a\"],$[&Key,:\"b\"]]]]");
-        assert_eq!(parse("(10).(20)"),                "$[&Block,$[&GetKey,10,20]]");
+        assert_eq!(parse("(10).(20)"),                "$[&Block,$[&GetIdx,10,20]]");
         assert_eq!(parse("10.20 30"),                 "$[&Block,$[&Call,10.2,30]]");
         assert_eq!(parse("10 20 ~ 30 ~ 40 ~ 50"),     "$[&Block,$[&Call,10,20,$[&Call,30,$[&Call,40,50]]]]");
         assert_eq!(parse("10 20 ~ 30 40 ~ 40 1 2 3 ~ 50 60"),  "$[&Block,$[&Call,10,20,$[&Call,30,40,$[&Call,40,1,2,3,$[&Call,50,60]]]]]");
@@ -1731,6 +1747,6 @@ mod tests {
     fn check_apply() {
         assert_eq!(parse("fo[[@]]"),            "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Var,:\"@\"]]]");
         assert_eq!(parse("fo[[$[1,2,3]]]"),     "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Lst,1,2,3]]]");
-        assert_eq!(parse("obj.1.field[[_]]"),   "$[&Block,$[&Apply,$[&GetKey2,$[&Var,:\"obj\"],1,$[&Key,:\"field\"]],$[&Var,:\"_\"]]]");
+        assert_eq!(parse("obj.1.field[[_]]"),   "$[&Block,$[&Apply,$[&GetKey,$[&GetIdx,$[&Var,:\"obj\"],1],$[&Key,:\"field\"]],$[&Var,:\"_\"]]]");
     }
 }
