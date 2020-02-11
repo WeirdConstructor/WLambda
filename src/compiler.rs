@@ -1371,6 +1371,72 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let str = ast.at(1).unwrap();
                     Ok(Box::new(move |_: &mut Env| Ok(str.clone())))
                 },
+                Syntax::GetIdx => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let idx = ast.at(2).unwrap().i();
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        Ok(m.at(idx as usize).unwrap_or(VVal::Nul))
+                    }))
+                },
+                Syntax::GetIdx2 => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let idx = ast.at(2).unwrap().i();
+                    let idx2 = ast.at(3).unwrap().i();
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        Ok(m.at(idx as usize).unwrap_or(VVal::Nul)
+                            .at(idx2 as usize).unwrap_or(VVal::Nul))
+                    }))
+                },
+                Syntax::GetIdx3 => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let idx = ast.at(2).unwrap().i();
+                    let idx2 = ast.at(3).unwrap().i();
+                    let idx3 = ast.at(4).unwrap().i();
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        Ok(m.at(idx as usize).unwrap_or(VVal::Nul)
+                            .at(idx2 as usize).unwrap_or(VVal::Nul)
+                            .at(idx3 as usize).unwrap_or(VVal::Nul))
+                    }))
+                },
+                Syntax::GetSym => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let sym = ast.at(2).unwrap().s_raw();
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        Ok(m.get_key(&sym).unwrap_or(VVal::Nul))
+                    }))
+                },
+                Syntax::GetSym2 => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let sym = ast.at(2).unwrap().s_raw();
+                    let sym2 = ast.at(3).unwrap().s_raw();
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        Ok(m.get_key(&sym).unwrap_or(VVal::Nul)
+                            .get_key(&sym2).unwrap_or(VVal::Nul))
+                    }))
+                },
+                Syntax::GetSym3 => {
+                    let map = compile(&ast.at(1).unwrap(), ce)?;
+                    let sym = ast.at(2).unwrap().s_raw();
+                    let sym2 = ast.at(3).unwrap().s_raw();
+                    let sym3 = ast.at(4).unwrap().s_raw();
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let m = map(e)?;
+                        Ok(m.get_key(&sym).unwrap_or(VVal::Nul)
+                            .get_key(&sym2).unwrap_or(VVal::Nul)
+                            .get_key(&sym3).unwrap_or(VVal::Nul))
+                    }))
+                },
                 Syntax::GetKey => {
                     let map = compile(&ast.at(1).unwrap(), ce)?;
                     let idx = compile(&ast.at(2).unwrap(), ce)?;
@@ -1394,24 +1460,6 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                 })
                             }
                         }
-                    }))
-                },
-                Syntax::GetIdx => {
-                    let map = compile(&ast.at(1).unwrap(), ce)?;
-                    let idx = ast.at(2).unwrap().i();
-
-                    Ok(Box::new(move |e: &mut Env| {
-                        let m = map(e)?;
-                        Ok(m.at(idx as usize).unwrap_or(VVal::Nul))
-                    }))
-                },
-                Syntax::GetSym => {
-                    let map = compile(&ast.at(1).unwrap(), ce)?;
-                    let sym = ast.at(2).unwrap().s_raw();
-
-                    Ok(Box::new(move |e: &mut Env| {
-                        let m = map(e)?;
-                        Ok(m.get_key(&sym).unwrap_or(VVal::Nul))
                     }))
                 },
                 Syntax::GetKey2 => {
@@ -3651,4 +3699,23 @@ mod tests {
         "), "123");
     }
 
+    #[test]
+    fn check_field_access() {
+        assert_eq!(s_eval("$[1,$[1,2,$[1,2,3]]].1"),                                 "$[1,2,$[1,2,3]]");
+        assert_eq!(s_eval("$[1,$[1,2,$[1,2,3]]].1.2"),                               "$[1,2,3]");
+        assert_eq!(s_eval("$[1,$[1,2,$[1,2,3]]].1.2.3"),                             "$n");
+        assert_eq!(s_eval("$[1,$[1,2,$[1,2,3]]].1.2.2"),                             "3");
+        assert_eq!(s_eval("2 ~ 2 ~ 1 $[1,$[1,2,$[1,2,3]]]"),                         "3");
+        assert_eq!(s_eval("$[1,$[1,2,$[1,2,3]]].(0 + 1)"),                           "$[1,2,$[1,2,3]]");
+        assert_eq!(s_eval("$[1,$[1,2,$[1,2,3]]].(0 + 1).(1 + 1)"),                   "$[1,2,3]");
+        assert_eq!(s_eval("$[1,$[1,2,$[1,2,3]]].(0 + 1).(1 + 1).(1 + 1)"),           "3");
+        assert_eq!(s_eval("${a=${b=${c=9}}}.a"),                                      "${b=${c=9}}");
+        assert_eq!(s_eval("${a=${b=${c=9}}}.a.b"),                                    "${c=9}");
+        assert_eq!(s_eval("${a=${b=${c=9}}}.a.b.c"),                                  "9");
+        assert_eq!(s_eval("${a=${b=${c=9}}}.\"a\".\"b\".c"),                          "9");
+        assert_eq!(s_eval("${a=${b=${c=9}}}.a.\"b\".c"),                              "9");
+        assert_eq!(s_eval("${a=${b=${c=9}}}.\"a\".\"b\".\"c\""),                      "9");
+        assert_eq!(s_eval("${a=${b=${c=9}}}.(\"a\" \"\").\"b\".\"c\""),               "9");
+        assert_eq!(s_eval("${a=${b=${c=9}}}.(\"a\" \"\").(\"b\" \"\").(\"c\" \"\")"), "9");
+    }
 }
