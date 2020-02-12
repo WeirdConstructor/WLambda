@@ -2819,6 +2819,58 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(ret)
         }, Some(1), Some(2), false);
 
+    func!(st, "num:int_to_open01", |env: &mut Env, _argc: usize| {
+        Ok(VVal::Flt(util::u64_to_open01(env.arg(0).i() as u64)))
+    }, Some(1), Some(1), false);
+
+    func!(st, "num:int_to_open_closed01", |env: &mut Env, _argc: usize| {
+        Ok(VVal::Flt(util::u64_to_open_closed01(env.arg(0).i() as u64)))
+    }, Some(1), Some(1), false);
+
+    func!(st, "num:int_to_closed_open01", |env: &mut Env, _argc: usize| {
+        Ok(VVal::Flt(util::u64_to_closed_open01(env.arg(0).i() as u64)))
+    }, Some(1), Some(1), false);
+
+    func!(st, "rand:split_mix64_next_closed_open01",
+        |env: &mut Env, argc: usize| {
+            let mut sm =
+                util::SplitMix64::new_from_i64(
+                    env.arg(0).at(0).unwrap_or(VVal::Int(0)).i());
+            let ret =
+                if argc == 2 {
+                    let v = VVal::vec();
+                    for _i in 0..env.arg(1).i() {
+                        v.push(VVal::Flt(util::u64_to_closed_open01(sm.next_u64())));
+                    }
+                    v
+                } else {
+                    VVal::Flt(util::u64_to_closed_open01(sm.next_u64()))
+                };
+            env.arg(0).set_at(0,
+                VVal::Int(i64::from_be_bytes(sm.0.to_be_bytes())));
+            Ok(ret)
+        }, Some(1), Some(2), false);
+
+    func!(st, "rand:split_mix64_next_open_closed01",
+        |env: &mut Env, argc: usize| {
+            let mut sm =
+                util::SplitMix64::new_from_i64(
+                    env.arg(0).at(0).unwrap_or(VVal::Int(0)).i());
+            let ret =
+                if argc == 2 {
+                    let v = VVal::vec();
+                    for _i in 0..env.arg(1).i() {
+                        v.push(VVal::Flt(util::u64_to_open_closed01(sm.next_u64())));
+                    }
+                    v
+                } else {
+                    VVal::Flt(util::u64_to_open_closed01(sm.next_u64()))
+                };
+            env.arg(0).set_at(0,
+                VVal::Int(i64::from_be_bytes(sm.0.to_be_bytes())));
+            Ok(ret)
+        }, Some(1), Some(2), false);
+
     func!(st, "rand:split_mix64_next_open01",
         |env: &mut Env, argc: usize| {
             let mut sm =

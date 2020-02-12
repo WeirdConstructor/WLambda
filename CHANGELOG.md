@@ -11,6 +11,10 @@ functions anymore.
 performance a bit when accessing maps.
 * Optimization: Unrolled argument processing for function calls.
 * Optimization: Unrolled GetKey operations.
+* Feature: Added `std:num:int_to_open01`, `std:num:int_to_closed_open01`
+and `std:num:int_to_open_closed01`.
+* Feature: Added `std:rand:split_mix64_next_closed_open01` and
+`std:rand:split_mix64_next_open_closed01`.
 
 0.3.6 (2020-01-24)
 ==================

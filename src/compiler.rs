@@ -3546,6 +3546,16 @@ mod tests {
     }
 
     #[test]
+    fn check_int_float_conversion() {
+        assert_eq!(s_eval("std:num:int_to_open01 0"),         "0.00000000000000011102230246251565");
+        assert_eq!(s_eval("std:num:int_to_open01 -1"),        "0.9999999999999999");
+        assert_eq!(s_eval("std:num:int_to_open_closed01 0"),  "0.00000000000000011102230246251565");
+        assert_eq!(s_eval("std:num:int_to_open_closed01 -1"), "1");
+        assert_eq!(s_eval("std:num:int_to_closed_open01 0"),  "0");
+        assert_eq!(s_eval("std:num:int_to_closed_open01 -1"), "0.9999999999999999");
+    }
+
+    #[test]
     fn check_splitmix64() {
         assert_eq!(s_eval(r"
             !s = std:rand:split_mix64_new_from 120312302310;
@@ -3558,6 +3568,14 @@ mod tests {
         assert_eq!(s_eval(r"
             !s = std:rand:split_mix64_new_from 120312302310;
             std:rand:split_mix64_next_open01 s 4
+        "), "$[0.24250616342560194,0.5116026362903058,0.41955559979060253,0.9754275257990305]");
+        assert_eq!(s_eval(r"
+            !s = std:rand:split_mix64_new_from 120312302310;
+            std:rand:split_mix64_next_open_closed01 s 4
+        "), "$[0.24250616342560205,0.5116026362903059,0.41955559979060264,0.9754275257990306]");
+        assert_eq!(s_eval(r"
+            !s = std:rand:split_mix64_new_from 120312302310;
+            std:rand:split_mix64_next_closed_open01 s 4
         "), "$[0.24250616342560194,0.5116026362903058,0.41955559979060253,0.9754275257990305]");
         assert_eq!(s_eval(r"
             !s = std:rand:split_mix64_new_from 120312302310;

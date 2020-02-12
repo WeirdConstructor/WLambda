@@ -56,6 +56,36 @@ pub fn u64_to_open01(u: u64) -> f64 {
     f64::from_bits(fraction | exponent_bits) - (1.0 - EPSILON / 2.0)
 }
 
+// Taken from rand::distributions
+// Licensed under the Apache License, Version 2.0
+// Copyright 2018 Developers of the Rand project.
+pub fn u64_to_closed_open01(u: u64) -> f64 {
+    // Multiply-based method; 24/53 random bits; [0, 1) interval.
+    // We use the most significant bits because for simple RNGs
+    // those are usually more random.
+    let float_size = std::mem::size_of::<f64>() as u32 * 8;
+    let precision = 52 + 1;
+    let scale = 1.0 / (((1 as u64) << precision) as f64);
+
+    let value = u >> (float_size - precision);
+    scale * (value as f64)
+}
+
+// Taken from rand::distributions
+// Licensed under the Apache License, Version 2.0
+// Copyright 2018 Developers of the Rand project.
+pub fn u64_to_open_closed01(u: u64) -> f64 {
+    // Multiply-based method; 24/53 random bits; [0, 1) interval.
+    // We use the most significant bits because for simple RNGs
+    // those are usually more random.
+    let float_size = std::mem::size_of::<f64>() as u32 * 8;
+    let precision = 52 + 1;
+    let scale = 1.0 / (((1 as u64) << precision) as f64);
+
+    let value = u >> (float_size - precision);
+    scale * ((value + 1) as f64)
+}
+
 /// Original FNV Rust implementation taken from fnv crate on
 /// crates.io by Alex Crichton <alex@alexcrichton.com>
 /// under Apache-2.0 / MIT license Copyright 2018.
@@ -93,7 +123,7 @@ impl FnvHasher {
 
     #[inline]
     pub fn write_f64(&mut self, f: f64) {
-        self.write(&f.to_bits().to_be_bytes());
+            self.write(&f.to_bits().to_be_bytes());
     }
 
     #[inline]
