@@ -15,6 +15,7 @@ performance a bit when accessing maps.
 and `std:num:int_to_open_closed01`.
 * Feature: Added `std:rand:split_mix64_next_closed_open01` and
 `std:rand:split_mix64_next_open_closed01`.
+* Bugfix: Protect against division by 0 and make a wlambda panic from it.
 
 0.3.6 (2020-01-24)
 ==================

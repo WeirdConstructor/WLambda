@@ -1773,7 +1773,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         if let VVal::Flt(f) = le {
                             Ok(VVal::Flt(f / re.f()))
                         } else {
-                            Ok(VVal::Int(le.i().wrapping_div(re.i())))
+                            if re.i() == 0 {
+                                Err(StackAction::panic_str(
+                                    format!("Division by 0: {}/{}", le.i(), re.i()),
+                                    Some(spos.clone())))
+                            } else {
+                                Ok(VVal::Int(le.i().wrapping_div(re.i())))
+                            }
                         }
                     }))
                 },
