@@ -1259,6 +1259,50 @@ fn check_error_value(v: VVal, at: &str) -> Result<VVal, StackAction> {
     Ok(v)
 }
 
+fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
+    let syn = ast.at(1).unwrap().v_(0).get_syn();
+    match syn {
+        Syntax::GetKey => {
+//            Some((Syntax::GetKey, 
+            None
+        },
+        Syntax::GetKey2 => {
+            None
+        },
+        Syntax::GetKey3 => {
+            None
+        },
+        Syntax::GetSym => {
+            Some((Syntax::GetSym, ast.at(1).unwrap().v_(1), ast.at(1).unwrap().v_(2)))
+        },
+        Syntax::GetSym2 => {
+            println!("FOO: {}", ast.at(1).unwrap().s());
+//            (Syntax::GetSym, ast.at(1).unwrap().v_(1), ast.at(1).unwrap().v_(2))
+            let tmp_ast = ast.at(1).unwrap().shallow_clone();
+            let mut v = tmp_ast.v_(0);
+            v.set_syn(Syntax::GetSym);
+            tmp_ast.set(0, v);
+            let last_key = tmp_ast.pop();
+            println!("FOO NEW OBJ: {} key: {}", tmp_ast.s(), last_key.s());
+//            Some((Syntax::GetSym, ast.at(1).unwrap().v_(1), ast.at(1).unwrap().v_(2)))
+            None
+        },
+        Syntax::GetSym3 => {
+            None
+        },
+        Syntax::GetIdx => {
+            None
+        },
+        Syntax::GetIdx2 => {
+            None
+        },
+        Syntax::GetIdx3 => {
+            None
+        },
+        _ => None,
+    }
+}
+
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     match ast {
         VVal::Lst(_l) => {
@@ -1854,6 +1898,9 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     }))
                 },
                 Syntax::Call => {
+//                    println!("CALL: {:?}", ast.at(1).unwrap());
+                    let x = fetch_object_key_access(ast);
+
                     let mut call_args : Vec<EvalNode> =
                         ast.map_skip(|e| compile(e, ce), 1)?;
                     call_args.reverse();
