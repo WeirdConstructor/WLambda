@@ -2077,7 +2077,6 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     }))
                 },
                 Syntax::Call => {
-                    println!("CALL: {:?}", ast.at(1).unwrap());
                     if let Some((syntax, object, key)) =
                         fetch_object_key_access(&ast.at(1).unwrap()) {
 

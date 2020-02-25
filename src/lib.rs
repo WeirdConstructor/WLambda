@@ -171,13 +171,19 @@ some_obj.do_something = {
 some_obj.do_something[]; # Method call
 
 # Basic prototyped OOP:
-!some_class = ${ bang = { std:str:cat "bang!" _ ":" $self.a }, };
-!new_some = { ${
-    _proto = some_class,
-    a = 10,
-} };
+!some_class = ${
+    new = {
+        ${
+            _proto = $self,
+            a = 10,
+        }
+    },
+    bang = {
+        std:str:cat "bang!" _ ":" $self.a
+    },
+};
 
-!o = new_some[];
+!o = some_class.new[];
 !r = o.bang 22;
 std:assert_eq r "bang!22:10";
 ```

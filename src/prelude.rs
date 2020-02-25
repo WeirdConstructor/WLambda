@@ -250,7 +250,7 @@ was called upon can be accessed using the special value '$self'.
 ```wlambda
 !some_map = ${
     some_func = { $self.a_value },
-    a_value = 10,
+    a_value = 11,
 };
 
 std:assert_eq some_map.some_func[] 11;
