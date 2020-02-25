@@ -120,6 +120,7 @@ pub enum Syntax {
     Deref,
     AssignRef,
     DefGlobRef,
+    SelfObj,
     Import,
     Export,
     DumpStack,
@@ -142,6 +143,8 @@ pub struct Env {
     /// Used for accessing the up values and other details
     /// about the function.
     pub fun:  Rc<VValFun>,
+    /// Holds the object of the currently called method:
+    pub current_self: VVal,
     /// The basepointer to reference arguments and
     /// local variables.
     ///
@@ -168,6 +171,7 @@ impl Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             fun:                VValFun::new_dummy(),
+            current_self:       VVal::Nul,
             bp:                 0,
             sp:                 0,
             argc:               0,
@@ -182,6 +186,7 @@ impl Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             fun:                VValFun::new_dummy(),
+            current_self:       VVal::Nul,
             bp:                 0,
             sp:                 0,
             argc:               0,
@@ -252,6 +257,18 @@ impl Env {
 //        self.sp -= env_size;
         self.popn(env_size);
         self.bp = oldbp;
+    }
+
+    pub fn self_object(&self) -> VVal {
+        self.current_self.clone()
+    }
+
+    pub fn with_object<T>(&mut self, object: VVal, f: T) -> Result<VVal, StackAction>
+        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+        let old_self = std::mem::replace(&mut self.current_self, object);
+        let ret = f(self);
+        std::mem::replace(&mut self.current_self, old_self);
+        ret
     }
 
     pub fn with_local_call_info<T>(&mut self, argc: usize, f: T) -> Result<VVal, StackAction>
@@ -1230,7 +1247,6 @@ impl VVal {
                     if !(*fu).err_arg_ok {
                         for i in 0..argc {
                             if let Some(VVal::Err(ev)) = e.arg_err_internal(i) {
-
                                 return
                                     Err(StackAction::panic_str(
                                         format!("Error value in parameter list: {}",
@@ -1766,6 +1782,19 @@ impl VVal {
         }
     }
 
+    pub fn get_method(&self, key: &str) -> Option<VVal> {
+        match self.get_key(key) {
+            None => {
+                if let Some(proto) = self.get_key("_proto") {
+                    proto.get_method(key)
+                } else {
+                    None
+                }
+            },
+            v => v
+        }
+    }
+
     pub fn get_key(&self, key: &str) -> Option<VVal> {
         match self {
             VVal::Ref(_)   => self.deref().get_key(key),
@@ -1972,6 +2001,12 @@ impl VVal {
         if let VVal::Syn(s) = self {
             s.syn = syn;
         }
+    }
+
+    pub fn set_syn_at(&mut self, idx: usize, syn: Syntax) {
+        let mut v = self.v_(idx);
+        v.set_syn(syn);
+        self.set(idx, v);
     }
 
     pub fn get_syn(&self) -> Syntax {

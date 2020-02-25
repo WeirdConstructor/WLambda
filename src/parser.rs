@@ -95,6 +95,8 @@ In the following grammar, white space and comments are omitted:
                   ;
     map           = "{", [ map_expr, { ",", map_expr }, [ "," ] ], "}"
                   ;
+    self          = "s" | "self"
+                  ;
     true          = "t" | "true"
                   ;
     false         = "f" | "false"
@@ -116,6 +118,7 @@ In the following grammar, white space and comments are omitted:
                   | none
                   | true
                   | false
+                  | self
                   | err
                   | ref
                   | wref
@@ -696,6 +699,14 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
             }
             Ok(VVal::Nul)
+        },
+        's' => {
+            if ps.consume_lookahead("self") {
+                ps.skip_ws_and_comments();
+            } else {
+                ps.consume_wsc();
+            }
+            Ok(ps.syn(Syntax::SelfObj))
         },
         't' => {
             if ps.consume_lookahead("true") {
@@ -1798,6 +1809,12 @@ mod tests {
         assert_eq!(parse("$*${z=1}.f=1"), "$[&Block,$[&SetKey,$[&Deref,$[&Map,$[:\"z\",1]]],$[&Key,:\"f\"],1]]");
         assert_eq!(parse("$*xxx.f=1"),    "$[&Block,$[&SetKey,$[&Deref,$[&Var,:\"xxx\"]],$[&Key,:\"f\"],1]]");
         assert_eq!(parse("$*xxx.f"),      "$[&Block,$[&GetSym,$[&Deref,$[&Var,:\"xxx\"]],:\"f\"]]");
+    }
+
+    #[test]
+    fn check_self() {
+        assert_eq!(parse("$s"),    "$[&Block,$[&SelfObj]]");
+        assert_eq!(parse("$self"), "$[&Block,$[&SelfObj]]");
     }
 
     #[test]
