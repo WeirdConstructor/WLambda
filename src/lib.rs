@@ -23,6 +23,7 @@ Here are some of it's properties:
 - No exceptions, except panics. Error handling is accomplished
 by a specialized data type. It can be thought of as dynamic counterpart
 of Rust's Result type.
+- Prototyped object orientation.
 - Easy maintenance of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 
@@ -159,8 +160,8 @@ range 0 10 1 { # This is a regular function.
     # cleanup ...
 };
 
-# Basic OOP:
-# std:weaken to make any closure capture of some_obj a weak reference, so
+# Basic closure OOP:
+# $& to make any closure capture of some_obj a weak reference, so
 # we don't get any cyclic references:
 !some_obj = $&${};
 some_obj.do_something = {
@@ -168,6 +169,17 @@ some_obj.do_something = {
     # from the upper lexical scope.
 };
 some_obj.do_something[]; # Method call
+
+# Basic prototyped OOP:
+!some_class = ${ bang = { std:str:cat "bang!" _ ":" $self.a }, };
+!new_some = { ${
+    _proto = some_class,
+    a = 10,
+} };
+
+!o = new_some[];
+!r = o.bang 22;
+std:assert_eq r "bang!22:10";
 ```
 
 Currently there are many more examples in the test cases in `compiler.rs`.

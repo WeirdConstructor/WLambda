@@ -240,6 +240,46 @@ std:assert_eq dosomething[1, 2]         3;
 std:assert_eq dosomething[2, 2, 3, 4]  16;
 ```
 
+### Calling fields of maps / Method calling 
+
+If you use the '.' for accessing fields in a map,
+the object the most recent field is accessed of is passed
+to the called function. The object the function/method
+was called upon can be accessed using the special value '$self'.
+
+```wlambda
+!some_map = ${
+    some_func = { $self.a_value },
+    a_value = 10,
+};
+
+std:assert_eq some_map.some_func[] 11;
+```
+
+This in combination with the special key `'_proto'` can be used to
+implement a basic form of object orientation with prototype inheritance.
+
+It can also be combined with the closure OOP approach or used for
+other purposes.
+
+#### Object Oriented Programming with Prototypes
+
+Instead of using closures for OOP the preferred way is to use
+maps of functions as classes and form an inheritance hierarchy
+by using the `'_proto'` key of a map:
+
+```wlambda
+!class_a = ${
+    # $self is set by any key access using the '.' calling form:
+    new = { ${ _proto = $self } },
+    generate = { "I am A" },  # A method
+};
+
+!a_instance = class_a.new[];
+
+std:assert_eq a_instance.generate[] "I am A";
+```
+
 ## Data Types
 
 ### None sentinel value: `$n` or `$none`
@@ -624,6 +664,10 @@ Keys can also be computed at runtime in the literal form:
 
 std:assert_eq (str some_map) "${ab=10}";
 ```
+
+If you call a field that is being accessed directly using
+the field accessing syntax `some_map.a` is passed the map `some_map`
+via the special value `$self`.
 
 #### Splicing
 

@@ -1782,11 +1782,11 @@ impl VVal {
         }
     }
 
-    pub fn get_method(&self, key: &str) -> Option<VVal> {
+    pub fn proto_lookup(&self, key: &str) -> Option<VVal> {
         match self.get_key(key) {
             None => {
                 if let Some(proto) = self.get_key("_proto") {
-                    proto.get_method(key)
+                    proto.proto_lookup(key)
                 } else {
                     None
                 }
