@@ -26,4 +26,3 @@ rmp-serde  = { version = "0.14.0", optional = true }
 
 [profile.release]
 debug = true
-

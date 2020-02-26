@@ -1782,14 +1782,14 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
             v.unshift(env.arg(1));
-            Ok(v.clone())
+            Ok(v)
         }, Some(2), Some(2), false);
 
     func!(st, "push",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
             v.push(env.arg(1));
-            Ok(v.clone())
+            Ok(v)
         }, Some(2), Some(2), false);
 
     func!(st, "prepend",
@@ -2793,9 +2793,11 @@ pub fn std_symbol_table() -> SymbolTable {
                             Err(e) => { ret = Err(e); 1 },
                         };
                     env.popn(2);
-                    if i == 0     { std::cmp::Ordering::Equal }
-                    else if i > 0 { std::cmp::Ordering::Greater }
-                    else          { std::cmp::Ordering::Less }
+                    match i {
+                        _ if i == 0 => std::cmp::Ordering::Equal,
+                        _ if i >  0 => std::cmp::Ordering::Greater,
+                        _           => std::cmp::Ordering::Less,
+                    }
                 });
                 if ret.is_ok() { ret = Ok(list); }
                 ret

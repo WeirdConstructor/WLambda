@@ -512,7 +512,7 @@ impl EvalContext {
             global: global.clone(),
             local_compile: Rc::new(RefCell::new(CompileEnv {
                 parent:    None,
-                global:    global.clone(),
+                global,
                 local_map: std::collections::HashMap::new(),
                 locals:    Vec::new(),
                 upvals:    Vec::new(),
@@ -555,7 +555,7 @@ impl EvalContext {
                     match l_env.with_restore_sp(
                             |e: &mut Env| { prog_closures(e) })
                     {
-                        Ok(v)   => Ok(v.clone()),
+                        Ok(v)   => Ok(v),
                         Err(je) =>
                             Err(EvalError::ExecError(
                                 format!("Jumped out of execution: {:?}", je))),
@@ -829,7 +829,7 @@ impl CompileEnv {
                         VarPos::UpValue(self.def_up(s, par_var_pos))
                     },
                     VarPos::UpValue(_) => VarPos::UpValue(self.def_up(s, par_var_pos)),
-                    VarPos::Global(g)  => VarPos::Global(g.clone()),
+                    VarPos::Global(g)  => VarPos::Global(g),
                     VarPos::NoPos      => VarPos::NoPos
                 }
             }
@@ -1027,10 +1027,9 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
                 }))
             },
             VarPos::Global(r) => {
-                let gref = r.clone();
+                let gref = r;
                 Ok(Box::new(move |e: &mut Env| {
-                    let v = cv(e)?;
-                    gref.set_ref(v.clone());
+                    gref.set_ref(cv(e)?);
                     Ok(VVal::Nul)
                 }))
             },
@@ -1604,7 +1603,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::Err => {
                     let err_val = compile(&ast.at(1).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env|
-                        Ok(VVal::err(err_val(e)?.clone(), spos.clone()))))
+                        Ok(VVal::err(err_val(e)?, spos.clone()))))
                 },
                 Syntax::Key => {
                     let sym = ast.at(1).unwrap();
@@ -1995,14 +1994,14 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let re = right(e)?;
                         if let VVal::Flt(f) = le {
                             Ok(VVal::Flt(f / re.f()))
+
+                        } else if re.i() == 0 {
+                            Err(StackAction::panic_str(
+                                format!("Division by 0: {}/{}", le.i(), re.i()),
+                                Some(spos.clone())))
+
                         } else {
-                            if re.i() == 0 {
-                                Err(StackAction::panic_str(
-                                    format!("Division by 0: {}/{}", le.i(), re.i()),
-                                    Some(spos.clone())))
-                            } else {
-                                Ok(VVal::Int(le.i().wrapping_div(re.i())))
-                            }
+                            Ok(VVal::Int(le.i().wrapping_div(re.i())))
                         }
                     }))
                 },

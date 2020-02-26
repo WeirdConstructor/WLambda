@@ -782,9 +782,8 @@ impl Drop for DropVVal {
     fn drop(&mut self) {
         let mut e = Env::new();
         e.push(self.v.clone());
-        match self.fun.call_internal(&mut e, 1) {
-            Err(e) => { eprintln!("Error in drop function: {}", e); },
-            Ok(_) => (),
+        if let Err(e) = self.fun.call_internal(&mut e, 1) {
+            eprintln!("Error in drop function: {}", e);
         }
     }
 }
@@ -955,14 +954,14 @@ impl CycleCheck {
             if let Some(id) = v.ref_id() { id }
             else { return None; };
         if let Some(backref) = self.refs.get(&id) {
-            if *backref > 0 {
-                let i = *backref;
-                self.refs.insert(id, -i);
-                Some((true, format!("$<{}=>", i)))
-            } else if *backref < 0 {
-                Some((false, format!("$<{}>", -*backref)))
-            } else /* == 0 */ {
-                None
+            match *backref {
+                br if br > 0 => {
+                    self.refs.insert(id, -br);
+                    Some((true, format!("$<{}=>", br)))
+                },
+                br if br < 0 =>
+                    Some((false, format!("$<{}>", -br))),
+                _ => None,
             }
         } else {
             None
@@ -1263,7 +1262,7 @@ impl VVal {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let idx = if *b { 0 } else { 1 };
                     if argc > 0 {
-                        let v = e.arg(idx).clone();
+                        let v = e.arg(idx);
                         if !v.is_none() {
                             v.call_internal(e, 0)
                         } else {

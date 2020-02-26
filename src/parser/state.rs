@@ -385,7 +385,7 @@ impl State {
         match o {
             None => {
                 Err(ParseError::EOF(
-                    (format!("Unexpected EOF"), self.rest(),
+                    ("Unexpected EOF".to_string(), self.rest(),
                     self.line_no, self.col_no, self.file.clone())))
             },
             Some(r) => Ok(r)
