@@ -1,3 +1,6 @@
+// Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
+// This is a part of WLambda. See README.md and COPYING for details.
+
 /// This macro helps with exporting something with a more OO interface
 /// instead of using a VValUserData trait implementation.
 ///

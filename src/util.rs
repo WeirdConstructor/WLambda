@@ -1,3 +1,6 @@
+// Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
+// This is a part of WLambda. See README.md and COPYING for details.
+
 //- splitmix64 (http://xoroshiro.di.unimi.it/splitmix64.c) 
 //"""
 //  Written in 2015 by Sebastiano Vigna (vigna@acm.org)
@@ -151,4 +154,3 @@ pub fn now_timestamp() -> u64 {
     .unwrap()
     .as_secs() as u64
 }
-

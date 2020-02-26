@@ -1,5 +1,9 @@
 <img align="left" width="60" height="60" src="http://m8geil.de/data/git/wlambda/res/wlambda_logo_60.png">
 
+# wlambda - 0.4.0
+
+<img align="left" width="60" height="60" src="http://m8geil.de/data/git/wlambda/res/wlambda_logo_60.png">
+
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
@@ -10,31 +14,33 @@ without parenthesis. Or as a mixture of Perl, JavaScript and LISP/Scheme.
 
 Here are some of it's properties:
 
-- Simple syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
+- Simple but unique syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
 - It's about getting things done quickly, so performance is not a main priority.
   Current performance is roughly in the ball park of (C)Python. Which means,
-  it's too slow if you need speed. But fast enough if you are not primarily concerned
-  about speed.
-- No garbage collector. Garbage collection relies only on reference counting.
+  it's too slow if you need speed. But fast enough if you do the heavy
+  lifting (if required) in Rust.
+- No garbage collector. Memory and resource management relies only on reference counting.
+You can create your own drop functions.
 - Main data structures are Lists and Maps.
 - No exceptions, except panics. Error handling is accomplished
 by a specialized data type. It can be thought of as dynamic counterpart
 of Rust's Result type.
+- Prototyped object orientation.
 - Easy maintenance of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 
 The embedding API and all internal operations rely on a data structure
 made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
-Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
+Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
-# Example WLambda Code
+## Example WLambda Code
 
 Just a quick glance at the WLambda syntax and semantics.
 
 More details for the syntax and the provided global functions
-can be found in the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
+can be found in the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
 ```wlambda
 # This is a comment
@@ -133,9 +139,9 @@ range 0 10 1 { # This is a regular function.
     # _? transforms an error value, and returns it from the current
     #    function. optionally jumping outwards.
 
-    std:assert_eq (str {
+    std:assert_eq (str ~ std:to_ref ~ {
         _? ~ $e "ok"; # is with an error value the same as: `return $e "ok"`
-    }[]) "$e[98,17:<wlambda::eval>(Err)] \"ok\"";
+    }[]) "$&&$e[98,17:<wlambda::eval>(Err)] \"ok\"";
 
     _? 10; # passes the value through
 
@@ -157,8 +163,8 @@ range 0 10 1 { # This is a regular function.
     # cleanup ...
 };
 
-# Basic OOP:
-# std:weaken to make any closure capture of some_obj a weak reference, so
+# Basic closure OOP:
+# $& to make any closure capture of some_obj a weak reference, so
 # we don't get any cyclic references:
 !some_obj = $&${};
 some_obj.do_something = {
@@ -166,28 +172,45 @@ some_obj.do_something = {
     # from the upper lexical scope.
 };
 some_obj.do_something[]; # Method call
+
+# Basic prototyped OOP:
+!some_class = ${
+    new = {
+        ${
+            _proto = $self,
+            a = 10,
+        }
+    },
+    bang = {
+        std:str:cat "bang!" _ ":" $self.a
+    },
+};
+
+!o = some_class.new[];
+!r = o.bang 22;
+std:assert_eq r "bang!22:10";
 ```
 
 Currently there are many more examples in the test cases in `compiler.rs`.
 
-# API Usage Examples
+## API Usage Examples
 
-## Basic API Usage
+### Basic API Usage
 
 Here is how you can quickly evaluate a piece of WLambda code:
 
-```
+```rust
 let s = "$[1,2,3]";
 let r = wlambda::compiler::eval(&s).unwrap();
 println!("Res: {}", r.s());
 ```
 
-## More Advanced API Usage
+### More Advanced API Usage
 
 If you want to quickly add some of your own functions,
 you can use the GlobalEnv `add_func` method:
 
-```
+```rust
 use wlambda::vval::{VVal, VValFun, Env};
 
 let global_env = wlambda::GlobalEnv::new_default();
@@ -211,7 +234,7 @@ ctx.set_global_var(
        Ok(VVal::Int(
           (env.arg(0).i() + 11)
         * (env.arg(1).i() + 13)))
-    }, Some(2), Some(2)));
+    }, Some(2), Some(2), false));
 
 
 let res_add : VVal = ctx.eval("my_crazy_add 2 4").unwrap();
@@ -221,60 +244,27 @@ let res_mul : VVal = ctx.eval("my_crazy_mul 2 4").unwrap();
 assert_eq!(res_mul.i(), 221);
 ```
 
-# Possible Roadmap
+## Possible Roadmap
 
 There are several things that can be added more or less easily to
 WLambda. But I am currently working on making the language more
 complete for real world use. So my current goals are:
 
-- Add namespacing and importing for managing the global environment.
-- Make namespaces for utility functions in the areas:
-    - List handling
-    - Map handling
-    - Iteration
-    - Basic I/O for testing purposes
-      (WLambda is for embedding, there are currently no goals
-       to provide a binary beyond basic needs.)
 - Improve and further document the VVal API for interacting with WLambda.
-- Make VVal::Sym hold an interned string instead of a `String` instance.
-
-Future plans could be:
-
-- Prototyped inheritance, sketched out like this:
-
-    ```norun_wlambda
-        !proto = ${ print = { std:displayln _ }, };
-        !o = to_obj ${ _proto_ = proto };
-        o.print(123);
-
-        # MetaMap(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
-        # => invokes _proto_ lookup on field access (not write)
-    ```
-
-- Augment functions with tagged values:
-
-    ```norun_wlambda
-        !tag = 123;
-        !v = tag 10 tag;
-        !fun = { println("not tagged!") };
-        .fun = add_tag fun tag { println("tagged with 123"); }
-        fun[v]; # prints "tagged with 123"
-        fun[10]; # prints "not tagged!"
-
-        # TagFun(Rc<RefCell<std::collections::HashMap<String, Rc<VValFun>>>>),
-    ```
-
+- Improve reference documentation.
+- DONE: Add proper module support (via !@import and !@export).
+- DONE: Add prototyped inheritance for OOP paradigm.
 - There are currently no plans to change the internal evaluator
 from a closure tree to a VM and/or JIT speedup.
 However, help is appreachiated if someone is able to significantly speed up the
 evaluation without too much breakage.
 
-# License
+## License
 
 This project is licensed under the GNU General Public License Version 3 or
 later.
 
-## Why GPL?
+### Why GPL?
 
 Picking a license for my code bothered me for a long time. I read many
 discussions about this topic. Read the license explanations. And discussed
@@ -321,19 +311,20 @@ This makes two reasons for me to choose the GPL:
 2. I don't want to low ball my own wage and prices by giving away free software
    with no strings attached (for companies).
 
-## If you need a permissive or private license (MIT)
+### If you need a permissive or private license (MIT)
 
 Please contact me if you need a different license and really want to use
 my code. As long as I am the only author, I can change the license.
 We might find an agreement.
 
-# Contribution
+## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in WLambda by you, shall be licensed as GPLv3 or later,
 without any additional terms or conditions.
 
-# Authors
+## Authors
 
 * Weird Constructor <weirdconstructor@gmail.com>
   (You may find me as `WeirdConstructor` on the Rust Discord.)
+

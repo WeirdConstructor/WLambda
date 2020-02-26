@@ -1,7 +1,9 @@
-// Copyright (c) 2019 Weird Constructor <weirdconstructor@gmail.com>
+// Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
 /*!
+<img align="left" width="60" height="60" src="http://m8geil.de/data/git/wlambda/res/wlambda_logo_60.png">
+
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
@@ -12,13 +14,14 @@ without parenthesis. Or as a mixture of Perl, JavaScript and LISP/Scheme.
 
 Here are some of it's properties:
 
-- Simple syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
+- Simple but unique syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
 - It's about getting things done quickly, so performance is not a main priority.
   Current performance is roughly in the ball park of (C)Python. Which means,
-  it's too slow if you need speed. But fast enough if you are not primarily concerned
-  about speed.
-- No garbage collector. Garbage collection relies only on reference counting.
+  it's too slow if you need speed. But fast enough if you do the heavy
+  lifting (if required) in Rust.
+- No garbage collector. Memory and resource management relies only on reference counting.
+You can create your own drop functions.
 - Main data structures are Lists and Maps.
 - No exceptions, except panics. Error handling is accomplished
 by a specialized data type. It can be thought of as dynamic counterpart
@@ -247,43 +250,10 @@ There are several things that can be added more or less easily to
 WLambda. But I am currently working on making the language more
 complete for real world use. So my current goals are:
 
-- Add namespacing and importing for managing the global environment.
-- Make namespaces for utility functions in the areas:
-    - List handling
-    - Map handling
-    - Iteration
-    - Basic I/O for testing purposes
-      (WLambda is for embedding, there are currently no goals
-       to provide a binary beyond basic needs.)
 - Improve and further document the VVal API for interacting with WLambda.
-- Make VVal::Sym hold an interned string instead of a `String` instance.
-
-Future plans could be:
-
-- Prototyped inheritance, sketched out like this:
-
-    ```norun_wlambda
-        !proto = ${ print = { std:displayln _ }, };
-        !o = to_obj ${ _proto_ = proto };
-        o.print(123);
-
-        # MetaMap(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
-        # => invokes _proto_ lookup on field access (not write)
-    ```
-
-- Augment functions with tagged values:
-
-    ```norun_wlambda
-        !tag = 123;
-        !v = tag 10 tag;
-        !fun = { println("not tagged!") };
-        .fun = add_tag fun tag { println("tagged with 123"); }
-        fun[v]; # prints "tagged with 123"
-        fun[10]; # prints "not tagged!"
-
-        # TagFun(Rc<RefCell<std::collections::HashMap<String, Rc<VValFun>>>>),
-    ```
-
+- Improve reference documentation.
+- DONE: Add proper module support (via !@import and !@export).
+- DONE: Add prototyped inheritance for OOP paradigm.
 - There are currently no plans to change the internal evaluator
 from a closure tree to a VM and/or JIT speedup.
 However, help is appreachiated if someone is able to significantly speed up the

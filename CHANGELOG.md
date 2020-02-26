@@ -1,22 +1,25 @@
+0.4.0 (2020-02-27)
+==================
+
 * Feature: Added `std:to_no_arity` for disabling arity checks for functions.
-* Change: `std:to_drop` disables arity checks for drop functions.
 * Feature: Added `std:strengthen` for weak refs and weakening refs.
-* Bugfix: Parser used unwrap() in some places where an EOF was not expected.
-          These errors are now handled properly.
-* Change: Optimized a few hot spots.
-* Change: While optimizing I made arithmetic operations compiler syntax and not
-functions anymore.
-* Bugfix: Basic arithmetics are now wrapping and don't panic on overflow anymore.
-* Change: Symbols are handled equally to strings internally now, also improves
-performance a bit when accessing maps.
-* Optimization: Unrolled argument processing for function calls.
-* Optimization: Unrolled GetKey operations.
 * Feature: Added `std:num:int_to_open01`, `std:num:int_to_closed_open01`
 and `std:num:int_to_open_closed01`.
 * Feature: Added `std:rand:split_mix64_next_closed_open01` and
 `std:rand:split_mix64_next_open_closed01`.
-* Bugfix: Protect against division by 0 and make a wlambda panic from it.
 * Feature: Added basic prototyped object orientation.
+* Optimization: Unrolled argument processing for function calls.
+* Optimization: Unrolled GetKey operations.
+* Change: `std:to_drop` disables arity checks for drop functions.
+* Change: Optimized a few hot spots.
+* Change: While optimizing I made arithmetic operations compiler syntax and not
+functions anymore.
+* Change: Symbols are handled equally to strings internally now, also improves
+performance a bit when accessing maps.
+* Bugfix: Basic arithmetics are now wrapping and don't panic on overflow anymore.
+* Bugfix: Parser used unwrap() in some places where an EOF was not expected.
+          These errors are now handled properly.
+* Bugfix: Protect against division by 0 and make a wlambda panic from it.
 
 0.3.6 (2020-01-24)
 ==================
