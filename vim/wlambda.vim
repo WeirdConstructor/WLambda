@@ -103,6 +103,8 @@ syn match wlKeyword "std:yay"
 
 syn match wlValue     '\$s'
 syn match wlValue     '\$self'
+syn match wlValue     '\$d'
+syn match wlValue     '\$data'
 syn match wlValue     '\$t'
 syn match wlValue     '\$true'
 syn match wlValue     '\$f'
