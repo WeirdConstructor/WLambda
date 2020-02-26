@@ -240,7 +240,7 @@ std:assert_eq dosomething[1, 2]         3;
 std:assert_eq dosomething[2, 2, 3, 4]  16;
 ```
 
-### Calling fields of maps / Method calling 
+### Calling fields / Method calling
 
 If you use the '.' for accessing fields in a map,
 the object the most recent field is accessed of is passed
@@ -262,6 +262,10 @@ implement a basic form of object orientation with prototype inheritance.
 It can also be combined with the closure OOP approach or used for
 other purposes.
 
+You can also use a vector/list as object, in that case the `_proto`
+field that holds the class method map is the first element of the
+vector. The second element of the vector can be accessed using `$data`.
+
 #### Object Oriented Programming with Prototypes
 
 Instead of using closures for OOP the preferred way is to use
@@ -278,6 +282,57 @@ by using the `'_proto'` key of a map:
 !a_instance = class_a.new[];
 
 std:assert_eq a_instance.generate[] "I am A";
+```
+
+The special key `'_data'` can be used (and is encouraged to be used)
+as storage for data members of your objects. This is useful to separate
+method name space inside objects from the data member namespace.
+To quickly access the data members you can use the special value `$data`,
+which will evaluate to `$self._data` in case `$self` is a map, and
+to `$self.1` in case `$self` is a vector.
+
+Here is an example with a map and data:
+
+```wlambda
+!class_b = ${
+    new = {
+        ${
+            _proto = $self, # $self is class_b
+            _data = ${
+                a = 10
+            },
+        }
+    },
+    gen  = { _ * $data.a },     # $data is equivalent to `$self._data` here
+    gen2 = { _ * $self._data.a },
+};
+
+!inst = class_b.new[];
+
+std:assert_eq inst.gen[2] 20;
+std:assert_eq inst.gen2[2] 20;
+```
+
+You can also use vectors as objects, which can be beneficial as they are
+a bit slimmer and access to `_proto` and `_data` are reduced to a single
+vector index lookup instead of an array lookup.
+
+```wlambda
+!class_b = ${
+    new = {
+        $[  # return a vector
+            $self, # $self is class_b
+            ${ a = 10 },
+        ]
+    },
+    gen  = { _ * $data.a },     # $data is equivalent to `$self.1` here
+    gen2 = { _ * $self.1.a },
+};
+
+!inst = class_b.new[];
+
+std:assert_eq inst.gen[3] 30;
+std:assert_eq inst.gen2[4] 40;
 ```
 
 ## Data Types
@@ -666,8 +721,9 @@ std:assert_eq (str some_map) "${ab=10}";
 ```
 
 If you call a field that is being accessed directly using
-the field accessing syntax `some_map.a` is passed the map `some_map`
-via the special value `$self`.
+the field accessing syntax `some_map.a`, the function is passed the map `some_map`
+via the special value `$self`. There is another special variable `$data`
+that allows you to access the `$self._data` field.
 
 #### Splicing
 

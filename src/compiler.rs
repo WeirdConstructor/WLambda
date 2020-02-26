@@ -1515,6 +1515,9 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::SelfObj => {
                     Ok(Box::new(move |e: &mut Env| { Ok(e.self_object()) }))
                 },
+                Syntax::SelfData => {
+                    Ok(Box::new(move |e: &mut Env| { Ok(e.self_object().proto_data()) }))
+                },
                 Syntax::Import => {
                     let prefix = ast.at(1).unwrap();
                     let name   = ast.at(2).unwrap();
@@ -3872,6 +3875,34 @@ mod tests {
         assert_eq!(s_eval("!v = $[1,2,$[10,{ _ }]]; v.2.1 20"),           "20");
         assert_eq!(s_eval("!v = $[$[1,2,$[10,{ _ }]]]; v.0.2.1 20"),      "20");
         assert_eq!(s_eval("!v = $[$[$[1,2,$[10,{ _ }]]]]; v.0.0.2.1 20"), "20");
+
+        // Does it work on references?
+        assert_eq!(s_eval(r"
+            !class = ${ a = { 10 }};
+            !v = $&${_proto = class};
+            v.a[]
+        "), "10");
+
+        // Does it work with arrays?
+        assert_eq!(s_eval(r"
+            !class = ${ a = { 11 }};
+            !v = $[class];
+            v.a[]
+        "), "11");
+
+        // Does it work with arrays and $data
+        assert_eq!(s_eval(r"
+            !class = ${ a = { $s.b[] * $d.x }, b = { 10 } };
+            !v = $[class, ${ x = 10 }];
+            v.a[]
+        "), "100");
+
+        // Does it work with $data?
+        assert_eq!(s_eval(r"
+            !class = ${ a = { $s.b[] * $d.x }, b = { 10 } };
+            !v = ${ _proto = class, _data = ${ x = 11 } };
+            v.a[]
+        "), "110");
 
         // Idiomatic class making:
         assert_eq!(s_eval(r"

@@ -700,6 +700,14 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             }
             Ok(VVal::Nul)
         },
+        'd' => {
+            if ps.consume_lookahead("data") {
+                ps.skip_ws_and_comments();
+            } else {
+                ps.consume_wsc();
+            }
+            Ok(ps.syn(Syntax::SelfData))
+        },
         's' => {
             if ps.consume_lookahead("self") {
                 ps.skip_ws_and_comments();
@@ -1815,6 +1823,8 @@ mod tests {
     fn check_self() {
         assert_eq!(parse("$s"),    "$[&Block,$[&SelfObj]]");
         assert_eq!(parse("$self"), "$[&Block,$[&SelfObj]]");
+        assert_eq!(parse("$d"),    "$[&Block,$[&SelfData]]");
+        assert_eq!(parse("$data"), "$[&Block,$[&SelfData]]");
     }
 
     #[test]

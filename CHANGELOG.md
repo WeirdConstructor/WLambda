@@ -1,3 +1,8 @@
+* Feature: Support for method calls on vectors.
+* Feature: Added `$data` shorthand for `$self._data` or `$self.1` to access
+object member data and encourage saving member data separately from the
+class methods.
+
 0.4.0 (2020-02-27)
 ==================
 

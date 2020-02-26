@@ -121,6 +121,7 @@ pub enum Syntax {
     AssignRef,
     DefGlobRef,
     SelfObj,
+    SelfData,
     Import,
     Export,
     DumpStack,
@@ -1781,16 +1782,46 @@ impl VVal {
         }
     }
 
+    pub fn proto_data(&self) -> VVal {
+        match self {
+            VVal::Ref(_)   => self.deref().proto_data(),
+            VVal::CRef(_)  => self.deref().proto_data(),
+            VVal::WWRef(_) => self.deref().proto_data(),
+            VVal::Map(m) => m.borrow().get("_data").cloned().unwrap_or(VVal::Nul),
+            VVal::Lst(l) => {
+                if l.borrow().len() > 1 {
+                    l.borrow()[1].clone()
+                } else {
+                    VVal::Nul
+                }
+            },
+            _ => VVal::Nul,
+        }
+    }
+
     pub fn proto_lookup(&self, key: &str) -> Option<VVal> {
-        match self.get_key(key) {
-            None => {
-                if let Some(proto) = self.get_key("_proto") {
+        match self {
+            VVal::Ref(_)   => self.deref().proto_lookup(key),
+            VVal::CRef(_)  => self.deref().proto_lookup(key),
+            VVal::WWRef(_) => self.deref().proto_lookup(key),
+            VVal::Map(m) => {
+                if let Some(func) = m.borrow().get(key) {
+                    Some(func.clone())
+                } else if let Some(proto) = m.borrow().get("_proto") {
                     proto.proto_lookup(key)
                 } else {
                     None
                 }
             },
-            v => v
+            VVal::Lst(l) => {
+                let l = l.borrow();
+                if l.is_empty() {
+                    None
+                } else {
+                    l[0].proto_lookup(key)
+                }
+            },
+            _ => None
         }
     }
 
