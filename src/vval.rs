@@ -416,9 +416,26 @@ impl Env {
         }
     }
 
+    pub fn get_local_up_promotion(&mut self, i: usize) -> VVal {
+        let idx = self.bp + i;
+        match &self.args[idx] {
+            VVal::CRef(r) => VVal::WWRef(Rc::downgrade(&r)),
+            VVal::Ref(r)  => VVal::Ref(r.clone()),
+            v => {
+                let new_v = v.to_weakened_upvalue_ref();
+                self.args[idx] = new_v.clone();
+                new_v.downgrade()
+            }
+        }
+    }
+
     pub fn get_local(&mut self, i: usize) -> VVal {
         let idx = self.bp + i;
-        self.args[idx].clone()
+        match &self.args[idx] {
+            VVal::CRef(r)  => r.borrow().clone(),
+            VVal::Ref(r)   => r.borrow().clone(),
+            v              => v.clone(),
+        }
     }
 
     pub fn set_up(&mut self, index: usize, value: &VVal) {
@@ -437,14 +454,18 @@ impl Env {
         }
     }
 
-    pub fn set_local(&mut self, i: usize, value: &VVal) {
-        let idx = self.bp + i;
-        self.args[idx] = value.clone();
-    }
-
     pub fn set_consume(&mut self, i: usize, value: VVal) {
         let idx = self.bp + i;
-        self.args[idx] = value;
+        match &mut self.args[idx] {
+            VVal::Ref(r)   => { r.replace(value.clone()); }
+            VVal::CRef(r)  => { r.replace(value.clone()); }
+            VVal::WWRef(r) => {
+                if let Some(r) = Weak::upgrade(r) {
+                    r.replace(value.clone());
+                }
+            },
+            v => { *v = value }
+        }
     }
 }
 
@@ -1496,7 +1517,7 @@ impl VVal {
         VVal::Ref(Rc::new(RefCell::new(self.clone())))
     }
 
-    pub fn to_wref(&self) -> VVal {
+    pub fn to_weakened_upvalue_ref(&self) -> VVal {
         VVal::CRef(Rc::new(RefCell::new(self.clone())))
     }
 
