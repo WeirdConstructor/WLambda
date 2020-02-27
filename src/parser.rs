@@ -109,6 +109,8 @@ In the following grammar, white space and comments are omitted:
                   ;
     wref          = "&", value
                   ;
+    capture_ref   = ":", var
+                  ;
     deref         = "*", value
                   ;
     special_value = byte_string
@@ -123,6 +125,7 @@ In the following grammar, white space and comments are omitted:
                   | ref
                   | wref
                   | deref
+                  | capture_ref
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
@@ -748,6 +751,12 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             let r = ps.syn(Syntax::Deref);
             r.push(parse_value(ps)?);
             Ok(r)
+        },
+        ':' => {
+            ps.consume_wsc();
+            let capture = ps.syn(Syntax::CaptureRef);
+            capture.push(VVal::new_sym_mv(parse_identifier(ps)));
+            Ok(capture)
         },
         '&' => {
             if ps.consume_lookahead("&&") {

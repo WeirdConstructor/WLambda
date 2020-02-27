@@ -877,37 +877,71 @@ fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
     }
 }
 
-fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
+fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Result<EvalNode, CompileError> {
     let var = ast.at(1).unwrap();
-
     let s = var.s_raw();
-    match &s[..] {
-        "_"  => { set_impl_arity(1,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0)) })) },
-        "_1" => { set_impl_arity(2,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1)) })) },
-        "_2" => { set_impl_arity(3,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2)) })) },
-        "_3" => { set_impl_arity(4,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3)) })) },
-        "_4" => { set_impl_arity(5,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4)) })) },
-        "_5" => { set_impl_arity(6,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5)) })) },
-        "_6" => { set_impl_arity(7,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6)) })) },
-        "_7" => { set_impl_arity(8,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7)) })) },
-        "_8" => { set_impl_arity(9,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8)) })) },
-        "_9" => { set_impl_arity(10, ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9)) })) },
-        "@"  => {
-            ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-            Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) }))
-        },
-        _ => {
-            let pos = ce.borrow_mut().get(&s);
-            match pos {
-                VarPos::UpValue(i) =>
-                    Ok(Box::new(move |e: &mut Env| { Ok(e.get_up(i)) })),
-                VarPos::Local(i) =>
-                    Ok(Box::new(move |e: &mut Env| { Ok(e.get_local(i)) })),
-                VarPos::Global(v) =>
-                    Ok(Box::new(move |_e: &mut Env| { Ok(v.deref()) })),
-                VarPos::NoPos => {
-                    ast.to_compile_err(
-                        format!("Variable '{}' undefined", var.s_raw()))
+
+    if to_ref {
+        match &s[..] {
+            "_"  => { set_impl_arity(1,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0).to_ref()) })) },
+            "_1" => { set_impl_arity(2,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1).to_ref()) })) },
+            "_2" => { set_impl_arity(3,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2).to_ref()) })) },
+            "_3" => { set_impl_arity(4,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3).to_ref()) })) },
+            "_4" => { set_impl_arity(5,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4).to_ref()) })) },
+            "_5" => { set_impl_arity(6,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5).to_ref()) })) },
+            "_6" => { set_impl_arity(7,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6).to_ref()) })) },
+            "_7" => { set_impl_arity(8,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7).to_ref()) })) },
+            "_8" => { set_impl_arity(9,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8).to_ref()) })) },
+            "_9" => { set_impl_arity(10, ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9).to_ref()) })) },
+            "@"  => {
+                ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+                Ok(Box::new(move |e: &mut Env| { Ok(e.argv().to_ref()) }))
+            },
+            _ => {
+                let pos = ce.borrow_mut().get(&s);
+                match pos {
+                    VarPos::UpValue(i) =>
+                        Ok(Box::new(move |e: &mut Env| { Ok(e.get_up_captured_ref(i)) })),
+                    VarPos::Local(i) =>
+                        Ok(Box::new(move |e: &mut Env| { Ok(e.get_local_captured_ref(i)) })),
+                    VarPos::Global(v) =>
+                        Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
+                    VarPos::NoPos => {
+                        ast.to_compile_err(
+                            format!("Variable '{}' undefined", var.s_raw()))
+                    }
+                }
+            }
+        }
+    } else {
+        match &s[..] {
+            "_"  => { set_impl_arity(1,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0)) })) },
+            "_1" => { set_impl_arity(2,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1)) })) },
+            "_2" => { set_impl_arity(3,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2)) })) },
+            "_3" => { set_impl_arity(4,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3)) })) },
+            "_4" => { set_impl_arity(5,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4)) })) },
+            "_5" => { set_impl_arity(6,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5)) })) },
+            "_6" => { set_impl_arity(7,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6)) })) },
+            "_7" => { set_impl_arity(8,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7)) })) },
+            "_8" => { set_impl_arity(9,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8)) })) },
+            "_9" => { set_impl_arity(10, ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9)) })) },
+            "@"  => {
+                ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+                Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) }))
+            },
+            _ => {
+                let pos = ce.borrow_mut().get(&s);
+                match pos {
+                    VarPos::UpValue(i) =>
+                        Ok(Box::new(move |e: &mut Env| { Ok(e.get_up(i)) })),
+                    VarPos::Local(i) =>
+                        Ok(Box::new(move |e: &mut Env| { Ok(e.get_local(i)) })),
+                    VarPos::Global(v) =>
+                        Ok(Box::new(move |_e: &mut Env| { Ok(v.deref()) })),
+                    VarPos::NoPos => {
+                        ast.to_compile_err(
+                            format!("Variable '{}' undefined", var.s_raw()))
+                    }
                 }
             }
         }
@@ -1500,7 +1534,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 
             match syn {
                 Syntax::Block       => { compile_block(ast, ce)       },
-                Syntax::Var         => { compile_var(ast, ce)         },
+                Syntax::Var         => { compile_var(ast, ce, false)  },
                 Syntax::Def         => { compile_def(ast, ce, false)  },
                 Syntax::DefGlobRef  => { compile_def(ast, ce, true)   },
                 Syntax::Assign      => { compile_assign(ast, ce, false) },
@@ -1800,6 +1834,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         }
                     }))
                 },
+                Syntax::CaptureRef => { compile_var(ast, ce, true) },
                 Syntax::Ref => {
                     let val = compile(&ast.at(1).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env| {
@@ -2579,7 +2614,7 @@ mod tests {
             s_eval(r#"
                 !dropper = 0;
                 !k = $&&${};
-                k.d = ${ k = k, del = std:to_drop 1 { .dropper = 1; } };
+                k.d = ${ k = $*k, del = std:to_drop 1 { .dropper = 1; } };
                 .k = $n;
                 dropper
             "#), "0");
@@ -3130,17 +3165,19 @@ mod tests {
     #[test]
     fn check_oop() {
         assert_eq!(s_eval(r#"
-            !oo = $&0;
+            !oo = 0;
             !new = {
-                !self = $&${};
-                self.x = { !@dump_stack; self.y[] };
+                !self = ${};
+                self.x = { self.y[] };
                 self.y = { 10 };
                 self.k = std:to_drop 20 {|| .oo = 20; }; 
-                self
+                $:self
             };
 
             !c = new[];
+            std:displayln "XXXXXXXXXXXXXXXXXXXXXXX";
             c.x[];
+            std:displayln "XXXXXXXXXXXXXXXXXXXXXXX";
             !k = $*oo + 1;
             .*c = $n;
             .k = k + $*oo + 1;
@@ -3153,7 +3190,7 @@ mod tests {
                 obj.add = { obj.b + 10 };
                 obj.get = { type obj };
                 obj.set = { obj.b = _; };
-                obj
+                $:obj
             };
             !v = $[];
             !o = new[];
@@ -3173,7 +3210,7 @@ mod tests {
         assert_eq!(s_eval(r#"
             !obj = ${};
             !x = $&&0;
-            obj.a = { .*x = 10 };
+            obj.a = { .x = 10 };
             obj.a[];
             $*x
         "#),
@@ -4110,7 +4147,7 @@ mod tests {
         assert_eq!(s_eval(r"
             !x = $&& 10;
             { .x = 20 }[];
-            x
+            $*x
         "), "20");
 
         assert_eq!(s_eval(r"
@@ -4128,8 +4165,8 @@ mod tests {
         assert_eq!(s_eval(r"
             !x = $&& 10;
             { .x = 20 }[];
-            .x = x + 1;
-            x
+            .x = $*x + 1;
+            $*x
         "), "21");
 
         assert_eq!(s_eval(r"
@@ -4154,9 +4191,9 @@ mod tests {
             !x = $&& 10;
             !f = { .x = x + 1 };
             f[];
-            .x = x + 1;
+            .x = $*x + 1;
             f[];
-            x
+            $*x
         "), "13");
     }
 }

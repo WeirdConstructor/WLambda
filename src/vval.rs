@@ -118,6 +118,7 @@ pub enum Syntax {
     Ref,
     WRef,
     Deref,
+    CaptureRef,
     AssignRef,
     DefGlobRef,
     SelfObj,
@@ -374,6 +375,10 @@ impl Env {
         self.fun.upvalues[i].clone()
     }
 
+    pub fn get_up_captured_ref(&mut self, i: usize) -> VVal {
+        self.fun.upvalues[i].to_ref()
+    }
+
     pub fn get_up(&mut self, i: usize) -> VVal {
         self.fun.upvalues[i].deref()
 //        match self.fun.upvalues[i].deref() {
@@ -429,11 +434,15 @@ impl Env {
         }
     }
 
+    pub fn get_local_captured_ref(&mut self, i: usize) -> VVal {
+        let idx = self.bp + i;
+        self.args[idx].to_ref()
+    }
+
     pub fn get_local(&mut self, i: usize) -> VVal {
         let idx = self.bp + i;
         match &self.args[idx] {
             VVal::CRef(r)  => r.borrow().clone(),
-            VVal::Ref(r)   => r.borrow().clone(),
             v              => v.clone(),
         }
     }
@@ -1514,7 +1523,17 @@ impl VVal {
     }
 
     pub fn to_ref(&self) -> VVal {
-        VVal::Ref(Rc::new(RefCell::new(self.clone())))
+        match self {
+            VVal::CRef(r)    => VVal::Ref(r.clone()),
+            VVal::Ref(r)     => VVal::Ref(r.clone()),
+            VVal::WWRef(v)   =>
+                if let Some(r) = v.upgrade() {
+                    VVal::Ref(r.clone())
+                } else {
+                    VVal::Ref(Rc::new(RefCell::new(VVal::Nul)))
+                },
+            _ => VVal::Ref(Rc::new(RefCell::new(self.clone()))),
+        }
     }
 
     pub fn to_weakened_upvalue_ref(&self) -> VVal {
