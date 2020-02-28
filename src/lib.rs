@@ -132,6 +132,67 @@ range 1 10 1 {!(i) = @;     # or just `!i = _`
 };
 ```
 
+## Endless loop
+
+```wlambda
+!x = 10;
+
+while $true {
+    std:displayln x;
+    .x = x - 1;
+    (x == 0) break;
+};
+```
+
+## Functions
+
+```wlambda
+!add = { _ + _1 };  # argument names _, _1, _2, ...
+
+!result = add 2 3;
+
+std:assert_eq result 5;
+```
+
+Explicit return and different function call syntaxes:
+
+```wlambda
+!add = {!(x, y) = @;    # named variables, @ evals to list of all args
+    return x + y;
+};
+
+std:displayln[add[2, 3]];   # [] parenthesis calling syntax
+
+std:displayln add[2, 3];    # less parenthesis
+
+std:displayln (add 2 3);    # explicit expression delimiting with `( ... )`
+
+std:displayln ~ add 2 3;    # `~` means: evaluate rest as one expression
+```
+
+## Arrays
+
+```wlambda
+!v = $[1, 2, 3];
+v.1 = 5;
+
+std:assert_eq v.1 5;
+
+std:assert_eq (std:pop v) 3;
+std:assert_eq (std:pop v) 5;
+std:assert_eq (std:pop v) 1;
+```
+
+## Hash tables/maps
+
+```wlambda
+!m = ${ a = 10, c = 2 };
+
+m.b = m.a + m.c;
+
+std:assert_eq m.b 12;
+```
+
 # Example WLambda Code
 
 Just a quick glance at the WLambda syntax and semantics.
