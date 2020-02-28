@@ -154,11 +154,11 @@ while $true {
 std:assert_eq result 5;
 ```
 
-Explicit return and different function call syntaxes:
+Different function call syntaxes:
 
 ```wlambda
 !add = {!(x, y) = @;    # named variables, @ evals to list of all args
-    return x + y;
+    x + y
 };
 
 std:displayln[add[2, 3]];   # [] parenthesis calling syntax
@@ -168,6 +168,22 @@ std:displayln add[2, 3];    # less parenthesis
 std:displayln (add 2 3);    # explicit expression delimiting with `( ... )`
 
 std:displayln ~ add 2 3;    # `~` means: evaluate rest as one expression
+```
+
+### Returning from nested functions:
+
+```wlambda
+
+!test = \:ret_label_a {!(x) = @;
+
+    # an `if` is actually a call to another function, so we need to
+    # dynamically jump upwards the call stack to the given label:
+    (x > 10) {
+        return :ret_label_a x * 2;
+    };
+};
+
+std:assert_eq (test 11) 22;
 ```
 
 ## Arrays
@@ -191,6 +207,87 @@ std:assert_eq (std:pop v) 1;
 m.b = m.a + m.c;
 
 std:assert_eq m.b 12;
+```
+
+## Strings
+
+```wlambda
+!name = "Mr. X";
+
+std:assert_eq name.4 "X";           # index a character
+std:assert_eq (name 0 3) "Mr.";     # substring
+
+!stuff = "日本人";
+std:assert_eq stuff.0 "日";         # Unicode support
+```
+
+## Unicode identifiers:
+
+```wlambda
+!人 = "jin";
+
+std:assert_eq 人 "jin";
+```
+
+## Object Oriented Programming with prototypes
+
+```wlambda
+!MyClass = ${
+    new = {
+        ${
+            _proto = $self,
+            _data = ${ balance = 0, }
+        }
+    },
+    deposit = {
+        $data.balance = $data.balance + _;
+    },
+};
+
+!account1 = MyClass.new[];
+
+account1.deposit 100;
+account1.deposit 50;
+
+std:assert_eq account1._data.balance 150;
+```
+
+## Object Oriented Programming with closures
+
+```wlambda
+
+!MyClass = {
+    !self = ${ balance = 0, };
+
+    self.deposit = { self.balance = self.balance + _; };
+
+    $:self
+};
+
+!account1 = MyClass[];
+
+account1.deposit 100;
+account1.deposit 50;
+
+std:assert_eq account1.balance 150;
+```
+
+## Modules
+
+```txt
+# util.wl:
+!@import std std;
+!@wlambda;
+
+!@export print_ten = { std:displayln ~ str 10; };
+```
+
+For import you do:
+
+```txt
+!@import u util;
+
+u:print_ten[]
 ```
 
 # Example WLambda Code
