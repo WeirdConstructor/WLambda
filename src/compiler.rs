@@ -1066,10 +1066,10 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
     }
 }
 
-fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
+fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, v: VVal) -> Option<String> {
     match pos {
         VarPos::UpValue(d) => { e.get_up(*d).set_ref(v.clone()); None },
-        VarPos::Local(d)   => { e.get_local(*d).set_ref(v.clone()); None },
+        VarPos::Local(d)   => { e.assign_ref_local(*d, v.clone()); None },
         VarPos::Global(d)  => {
             if let VVal::Ref(r) = d {
                 r.borrow().set_ref(v.clone());
@@ -1134,7 +1134,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                     VVal::Lst(l) => {
                         for (i, pos) in poses.iter().enumerate() {
                             let val = &mut l.borrow_mut()[i];
-                            if let Some(err) = set_ref_at_varpos(e, pos, val) {
+                            if let Some(err) = set_ref_at_varpos(e, pos, val.clone()) {
                                 return Err(
                                     StackAction::panic_str(err, Some(spos.clone())));
                             }
@@ -1144,7 +1144,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                         for (i, pos) in poses.iter().enumerate() {
                             let vname = vars.at(i).unwrap().s_raw();
                             let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-                            if let Some(err) = set_ref_at_varpos(e, pos, &val) {
+                            if let Some(err) = set_ref_at_varpos(e, pos, val) {
                                 return Err(
                                     StackAction::panic_str(err, Some(spos.clone())));
                             }
@@ -1152,7 +1152,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                     },
                     _ => {
                         for pos in poses.iter() {
-                            if let Some(err) = set_ref_at_varpos(e, pos, &v) {
+                            if let Some(err) = set_ref_at_varpos(e, pos, v.clone()) {
                                 return Err(
                                     StackAction::panic_str(err, Some(spos.clone())));
                             }
@@ -1217,7 +1217,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                 VarPos::Local(i) => {
                     Ok(Box::new(move |e: &mut Env| {
                         let v = cv(e)?;
-                        e.get_local(i).set_ref(v);
+                        e.assign_ref_local(i, v);
                         Ok(VVal::Nul)
                     }))
                 },
@@ -3553,8 +3553,8 @@ mod tests {
     #[test]
     fn check_cyclic_str_write() {
         assert_eq!(s_eval(r#"!x = $&&0; .*x = x; x"#), "$<1=>$&&$<1>");
-        assert_eq!(s_eval(r#"!x = $&0; .*x = x; x"#), "$<1=>$&$<1>");
-        assert_eq!(s_eval(r#"!x = $&0; .*x = x; !y = std:weaken x; y"#), "$<1=>$(&)$<1>");
+        assert_eq!(s_eval(r#"!x = $&1;  .x = $:x; x"#), "$<1=>$&(&)$<1>");
+        assert_eq!(s_eval(r#"!x = $&0;  .*x = x; !y = std:weaken x; y"#), "$<1=>$(&)$<1>");
         assert_eq!(s_eval(r#"
             !x = $[1,2];
             !y = ${};
@@ -4107,7 +4107,50 @@ mod tests {
     }
 
     #[test]
-    fn new_ref_semantics() {
+    fn capture_ref_semantics() {
+        assert_eq!(s_eval(r" !x = $& 10;   x "),            "10");
+        assert_eq!(s_eval(r" !x = $& 10; $*x "),            "10");
+        assert_eq!(s_eval(r" !x = $& 10; $:x "),            "$&&10");
+        assert_eq!(s_eval(r" !x = 10;     !y = { x }[]; $[x,  y] "),         "$[10,10]");
+        assert_eq!(s_eval(r" !x = 10;     !y = { x }[]; $[$*x, y] "),        "$[10,10]");
+        assert_eq!(s_eval(r" !x = 10;     !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
+        assert_eq!(s_eval(r" !x = $& 10;  !y = { x }[]; $[x,  y] "),         "$[10,10]");
+        assert_eq!(s_eval(r" !x = $& 10;  !y = { x }[]; $[$*x, y] "),        "$[10,10]");
+        assert_eq!(s_eval(r" !x = $& 10;  !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
+        assert_eq!(s_eval(r" !x = $&& 10; !y = { x }[]; $[x, y] "),          "$[$&&10,10]");
+        assert_eq!(s_eval(r" !x = $&& 10; !y = { x }[]; $[$*x, y] "),        "$[10,10]");
+        assert_eq!(s_eval(r" !x = $&& 10; !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
+
+        assert_eq!(s_eval(r" !x = $& 10;  !y = std:weaken $:x;   y "),       "$n");
+        assert_eq!(s_eval(r" !x = $& 10;  !y = std:weaken $:x; $*y "),       "10");
+        assert_eq!(s_eval(r" !x = $& 10;  !y = std:weaken $:x; $:y "),       "$&&10");
+        assert_eq!(s_eval(r" !x = $&& 10; !y = std:weaken $:x;   y "),       "$n");
+        assert_eq!(s_eval(r" !x = $&& 10; !y = std:weaken $:x; $*y "),       "10");
+        assert_eq!(s_eval(r" !x = $&& 10; !y = std:weaken $:x; $:y "),       "$&&10");
+
+        assert_eq!(s_eval("!x = 10; !y = { $:x }[]; .x = 20; y"), "$&&20");
+        assert_eq!(s_eval("!x = 10; !y = { $:x }[]; .x = 20; .y = 11; $[x, y]"),        "$[20,11]");
+        assert_eq!(s_eval("!x = 10; !y = { $:x }[]; .x = 20; .*y = 11; $[x, $*y, y]"),  "$[11,11,$&&11]");
+
+        assert_eq!(s_eval("!x =     10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&10]");
+        assert_eq!(s_eval("!x = $&  10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&& 10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&10]");
+        assert_eq!(s_eval("!x =     10; !y = $:x; .*x = 11; $[x,y]"), "$[11,$&&10]");
+        assert_eq!(s_eval("!x = $&  10; !y = $:x; .*x = 11; $[x,y]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&& 10; !y = $:x; .*x = 11; $[x,y]"), "$[$<1=>$&&11,$<1>]");
+
+        assert_eq!(s_eval("!x =     10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&  10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&& 10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x =     10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&10]");
+        assert_eq!(s_eval("!x = $&  10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[$<1=>$&&11,$<1>]");
+
+        // TODO: Nest the captures one more time to recapture upvalues!
+    }
+
+    #[test]
+    fn ref_semantics() {
         assert_eq!(s_eval(r"
             !dropped = $false;
             !self = ${};

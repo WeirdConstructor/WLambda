@@ -447,6 +447,20 @@ impl Env {
         }
     }
 
+    pub fn assign_ref_local(&mut self, i: usize, value: VVal) {
+        let idx = self.bp + i;
+        match &mut self.args[idx] {
+            VVal::Ref(r)     => { r.replace(value); }
+            VVal::CRef(r)    => { r.replace(value); }
+            VVal::WWRef(l)   => {
+                if let Some(r) = l.upgrade() {
+                    r.replace(value);
+                }
+            },
+            v => { *v = value },
+        }
+    }
+
     pub fn set_up(&mut self, index: usize, value: &VVal) {
         let fun = self.fun.clone();
         let upv = &fun.upvalues[index];
@@ -466,14 +480,8 @@ impl Env {
     pub fn set_consume(&mut self, i: usize, value: VVal) {
         let idx = self.bp + i;
         match &mut self.args[idx] {
-            VVal::Ref(r)   => { r.replace(value.clone()); }
-            VVal::CRef(r)  => { r.replace(value.clone()); }
-            VVal::WWRef(r) => {
-                if let Some(r) = Weak::upgrade(r) {
-                    r.replace(value.clone());
-                }
-            },
-            v => { *v = value }
+            VVal::CRef(r)  => { r.replace(value); }
+            v              => { *v = value }
         }
     }
 }
@@ -1543,7 +1551,7 @@ impl VVal {
     pub fn set_ref(&self, v: VVal) -> VVal {
         match self {
             VVal::Ref(r)     => r.replace(v),
-            VVal::CRef(r)     => r.replace(v),
+            VVal::CRef(r)    => r.replace(v),
             VVal::WWRef(l)   => {
                 if let Some(r) = l.upgrade() {
                     r.replace(v)
