@@ -447,6 +447,22 @@ impl Env {
         }
     }
 
+    pub fn assign_ref_up(&mut self, i: usize, value: VVal) {
+        let fun = self.fun.clone();
+        let upv = &fun.upvalues[i];
+
+        match upv {
+            VVal::Ref(r)     => { r.replace(value); }
+            VVal::CRef(r)    => { r.replace(value); }
+            VVal::WWRef(l)   => {
+                if let Some(r) = l.upgrade() {
+                    r.replace(value);
+                }
+            },
+            _ => (),
+        }
+    }
+
     pub fn assign_ref_local(&mut self, i: usize, value: VVal) {
         let idx = self.bp + i;
         match &mut self.args[idx] {

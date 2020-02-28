@@ -1068,11 +1068,11 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
 
 fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, v: VVal) -> Option<String> {
     match pos {
-        VarPos::UpValue(d) => { e.get_up(*d).set_ref(v.clone()); None },
-        VarPos::Local(d)   => { e.assign_ref_local(*d, v.clone()); None },
+        VarPos::UpValue(d) => { e.assign_ref_up(*d, v); None },
+        VarPos::Local(d)   => { e.assign_ref_local(*d, v); None },
         VarPos::Global(d)  => {
             if let VVal::Ref(r) = d {
-                r.borrow().set_ref(v.clone());
+                r.borrow().set_ref(v);
                 None
             } else {
                 Some("Can't assign to global read only variable!".to_string())
@@ -1210,7 +1210,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                 VarPos::UpValue(i) => {
                     Ok(Box::new(move |e: &mut Env| {
                         let v = cv(e)?;
-                        e.get_up(i).set_ref(v);
+                        e.assign_ref_up(i, v);
                         Ok(VVal::Nul)
                     }))
                 },
@@ -4142,11 +4142,16 @@ mod tests {
         assert_eq!(s_eval("!x =     10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
         assert_eq!(s_eval("!x = $&  10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
         assert_eq!(s_eval("!x = $&& 10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
-        assert_eq!(s_eval("!x =     10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&10]");
+        assert_eq!(s_eval("!x =     10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
         assert_eq!(s_eval("!x = $&  10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
-        assert_eq!(s_eval("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[$<1=>$&&11,$<1>]");
+        assert_eq!(s_eval("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]"); // yes, upvalue refs are implicit
 
-        // TODO: Nest the captures one more time to recapture upvalues!
+        assert_eq!(s_eval("!x =     10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&  10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&& 10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x =     10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&  10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+        assert_eq!(s_eval("!x = $&& 10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]"); // yes, upvalue refs are implicit
     }
 
     #[test]
