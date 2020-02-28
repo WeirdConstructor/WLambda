@@ -38,11 +38,9 @@ Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-re
 ```
 use wlambda::*;
 
-fn main() {
-    match wlambda::compiler::eval("40 + 2") {
-        Ok(v)  => { println!("Output: {}", v.s()); },
-        Err(e) => { eprintln!("Error: {}", e); },
-    }
+match wlambda::compiler::eval("40 + 2") {
+    Ok(v)  => { println!("Output: {}", v.s()); },
+    Err(e) => { eprintln!("Error: {}", e); },
 }
 ```
 
@@ -504,17 +502,15 @@ assert_eq!(res_mul.i(), 221);
 ```
 use wlambda::*;
 
-fn main() {
-    let mut ctx = EvalContext::new_default();
+let mut ctx = EvalContext::new_default();
 
-    ctx.eval("!x = 10").unwrap();
+ctx.eval("!x = 10").unwrap();
 
-    ctx.set_global_var("y", &VVal::Int(32));
+ctx.set_global_var("y", &VVal::Int(32));
 
-    let r = ctx.eval("x + y").unwrap();
+let r = ctx.eval("x + y").unwrap();
 
-    assert_eq!(r.s(), "42");
-}
+assert_eq!(r.s(), "42");
 ```
 
 # Possible Roadmap

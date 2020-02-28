@@ -1553,7 +1553,7 @@ impl VVal {
             VVal::Ref(r)     => VVal::Ref(r.clone()),
             VVal::WWRef(v)   =>
                 if let Some(r) = v.upgrade() {
-                    VVal::Ref(r.clone())
+                    VVal::Ref(r)
                 } else {
                     VVal::Ref(Rc::new(RefCell::new(VVal::Nul)))
                 },
