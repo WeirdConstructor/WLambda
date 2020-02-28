@@ -1,3 +1,8 @@
+0.4.3 (2020-02-29)
+==================
+
+* Change: Actually update README.md with new guide.
+
 0.4.2 (2020-02-29)
 ==================
 

@@ -31,6 +31,261 @@ made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
 Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
+## API Hello World
+
+```rust
+use wlambda::*;
+
+match wlambda::compiler::eval("40 + 2") {
+    Ok(v)  => { println!("Output: {}", v.s()); },
+    Err(e) => { eprintln!("Error: {}", e); },
+}
+```
+
+See further down below for more API usage examples!
+
+## WLambda Language Guide
+
+### Variables
+
+```wlambda
+!x = 10;        # Variable definition
+
+.x = 20;        # Variable assignment
+```
+
+### Operators
+
+```wlambda
+!x = (1 + 2) * (8 - 4) / 2;
+
+std:assert_eq x 6;
+```
+
+### If
+
+```wlambda
+$true {
+    std:displayln "It's true!";
+} {
+    std:displayln "It's false!";
+};
+```
+
+```wlambda
+!x = 10 / 2;
+
+(x == 5) {
+    std:displayln "x == 5";
+};
+```
+
+### While
+
+```wlambda
+!x = 10;
+
+while { x > 0 } {
+    std:displayln x;
+
+    (x == 5) {
+        break[];
+    };
+    .x = x - 1;
+};
+```
+
+```wlambda
+!x = 10;
+
+!r = while { x > 0 } {
+    std:displayln x;
+
+    (x == 5) {
+        # break is a function, first arg
+        # is the return value for `while`:
+        break 5;
+    };
+    .x = x - 1;
+};
+
+std:assert_eq r 5;
+```
+
+### Counting Loop
+
+```wlambda
+range 1 10 1 {
+    std:displayln "> " _;
+};
+```
+
+With named counting variable:
+
+```wlambda
+range 1 10 1 {!(i) = @;     # or just `!i = _`
+    std:displayln "> " i;
+};
+```
+
+### Endless loop
+
+```wlambda
+!x = 10;
+
+while $true {
+    std:displayln x;
+    .x = x - 1;
+    (x == 0) break;
+};
+```
+
+### Functions
+
+```wlambda
+!add = { _ + _1 };  # argument names _, _1, _2, ...
+
+!result = add 2 3;
+
+std:assert_eq result 5;
+```
+
+Different function call syntaxes:
+
+```wlambda
+!add = {!(x, y) = @;    # named variables, @ evals to list of all args
+    x + y
+};
+
+std:displayln[add[2, 3]];   # [] parenthesis calling syntax
+
+std:displayln add[2, 3];    # less parenthesis
+
+std:displayln (add 2 3);    # explicit expression delimiting with `( ... )`
+
+std:displayln ~ add 2 3;    # `~` means: evaluate rest as one expression
+```
+
+#### Returning from nested functions:
+
+```wlambda
+
+!test = \:ret_label_a {!(x) = @;
+
+    # an `if` is actually a call to another function, so we need to
+    # dynamically jump upwards the call stack to the given label:
+    (x > 10) {
+        return :ret_label_a x * 2;
+    };
+};
+
+std:assert_eq (test 11) 22;
+```
+
+### Arrays
+
+```wlambda
+!v = $[1, 2, 3];
+v.1 = 5;
+
+std:assert_eq v.1 5;
+
+std:assert_eq (std:pop v) 3;
+std:assert_eq (std:pop v) 5;
+std:assert_eq (std:pop v) 1;
+```
+
+### Hash tables/maps
+
+```wlambda
+!m = ${ a = 10, c = 2 };
+
+m.b = m.a + m.c;
+
+std:assert_eq m.b 12;
+```
+
+### Strings
+
+```wlambda
+!name = "Mr. X";
+
+std:assert_eq name.4 "X";           # index a character
+std:assert_eq (name 0 3) "Mr.";     # substring
+
+!stuff = "日本人";
+std:assert_eq stuff.0 "日";         # Unicode support
+```
+
+### Unicode identifiers:
+
+```wlambda
+!人 = "jin";
+
+std:assert_eq 人 "jin";
+```
+
+### Object Oriented Programming with prototypes
+
+```wlambda
+!MyClass = ${
+    new = {
+        ${
+            _proto = $self,
+            _data = ${ balance = 0, }
+        }
+    },
+    deposit = {
+        $data.balance = $data.balance + _;
+    },
+};
+
+!account1 = MyClass.new[];
+
+account1.deposit 100;
+account1.deposit 50;
+
+std:assert_eq account1._data.balance 150;
+```
+
+### Object Oriented Programming with closures
+
+```wlambda
+
+!MyClass = {
+    !self = ${ balance = 0, };
+
+    self.deposit = { self.balance = self.balance + _; };
+
+    $:self
+};
+
+!account1 = MyClass[];
+
+account1.deposit 100;
+account1.deposit 50;
+
+std:assert_eq account1.balance 150;
+```
+
+### Modules
+
+```txt
+# util.wl:
+!@import std std;
+!@wlambda;
+
+!@export print_ten = { std:displayln ~ str 10; };
+```
+
+For import you do:
+
+```txt
+!@import u util;
+
+u:print_ten[]
+```
+
 ## Example WLambda Code
 
 Just a quick glance at the WLambda syntax and semantics.
@@ -238,6 +493,22 @@ assert_eq!(res_add.i(), 74);
 
 let res_mul : VVal = ctx.eval("my_crazy_mul 2 4").unwrap();
 assert_eq!(res_mul.i(), 221);
+```
+
+### Maintaining state
+
+```rust
+use wlambda::*;
+
+let mut ctx = EvalContext::new_default();
+
+ctx.eval("!x = 10").unwrap();
+
+ctx.set_global_var("y", &VVal::Int(32));
+
+let r = ctx.eval("x + y").unwrap();
+
+assert_eq!(r.s(), "42");
 ```
 
 ## Possible Roadmap
