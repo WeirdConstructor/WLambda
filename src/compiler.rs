@@ -2605,11 +2605,27 @@ mod tests {
         assert_eq!(
             s_eval(r#"
                 !dropper = 0;
-                !k = std:strengthen $&${};
+                !k = ${};
                 k.d = ${ k = { k }, del = std:to_drop 1 { .dropper = 1; } };
                 .k = $n;
                 dropper
             "#), "1");
+        assert_eq!(
+            s_eval(r#"
+                !dropper = 0;
+                !k = $&${};
+                k.d = ${ k = { k }, del = std:to_drop 1 { .dropper = 1; } };
+                .k = $n;
+                dropper
+            "#), "1");
+        assert_eq!(
+            s_eval(r#"
+                !dropper = 0;
+                !k = std:strengthen $&${};
+                k.d = ${ k = { k }, del = std:to_drop 1 { .dropper = 1; } };
+                .k = $n;
+                dropper
+            "#), "0");
         assert_eq!(
             s_eval(r#"
                 !dropper = 0;
@@ -3471,14 +3487,14 @@ mod tests {
         assert_eq!(s_eval(r#"
                 !(x, y) = $[$&&1, $&&2];
                 !z = std:weaken y;
-                !f = { .*x = $*x + 1; .*z = $*z + 2; $[x, z] };
+                !f = { .x = x + 1; .z = z + 2; $[$:x, $:z] };
                 !r = $[];
                 std:push r ~ str f[];
                 .x = $n;
                 .y = $n;
                 std:push r ~ str f[];
                 $[r, z]
-            "#), "$[$[\"$[$&&2,$(&)4]\",\"$[$&&3,$n]\"],$n]");
+            "#), "$[$[\"$[$&&2,$&&4]\",\"$[$&&3,$&&$n]\"],$n]");
         assert_eq!(s_eval(r#"
             !self = $&&${};
             !wself = std:weaken self;
@@ -3553,8 +3569,8 @@ mod tests {
     #[test]
     fn check_cyclic_str_write() {
         assert_eq!(s_eval(r#"!x = $&&0; .*x = x; x"#), "$<1=>$&&$<1>");
-        assert_eq!(s_eval(r#"!x = $&1;  .x = $:x; x"#), "$<1=>$&(&)$<1>");
-        assert_eq!(s_eval(r#"!x = $&0;  .*x = x; !y = std:weaken x; y"#), "$<1=>$(&)$<1>");
+        assert_eq!(s_eval(r#"!x = $&1;  .x = $:x; x"#), "$<1=>$&&$<1>");
+        assert_eq!(s_eval(r#"!x = $&0;  .*x = $:x; !y = std:weaken x; y"#), "$<1=>$(&)$<1>");
         assert_eq!(s_eval(r#"
             !x = $[1,2];
             !y = ${};
@@ -3581,9 +3597,9 @@ mod tests {
         assert_eq!(s_eval(r#"
             !x = ${};
             x.f = { x.b };
-            $[x.f, x]
+            $[x.f, $:x]
         "#),
-        "$[$<1=>&F{@[3,19:<compiler:s_eval>(Func)],amin=0,amax=0,locals=0,upvalues=$[$&&$<2=>${f=$<1>}]},$<2>]");
+        "$[$<1=>&F{@[3,19:<compiler:s_eval>(Func)],amin=0,amax=0,locals=0,upvalues=$[$<2=>$(&)${f=$<1>}]},$<2>]");
 
         assert_eq!(s_eval(r#"
             !x = $[];
@@ -4155,6 +4171,36 @@ mod tests {
     }
 
     #[test]
+    fn closure_generator() {
+        assert_eq!(s_eval(r"
+            !mk_gen = {
+                !x = $& 0; # weakly captured does not keep alive!
+                { .x = x + 1; x }
+            };
+
+            !g1 = mk_gen[];
+            !g2 = mk_gen[];
+            $[g1[], g2[]]
+        "), "$[$n,$n]");
+
+        assert_eq!(s_eval(r"
+            !mk_gen = {
+                !x = $&& 0; # strongly captured keeps alive!
+                { .x = x + 1; x }
+            };
+
+            !g1 = mk_gen[];
+            !g2 = mk_gen[];
+            g1[];
+            g1[];
+            g2[];
+            g1[];
+            g2[];
+            $[g1[], g2[]]
+        "), "$[4,3]");
+    }
+
+    #[test]
     fn ref_semantics() {
         assert_eq!(s_eval(r"
             !dropped = $false;
@@ -4239,9 +4285,19 @@ mod tests {
             !x = $&& 10;
             !f = { .x = x + 1 };
             f[];
-            .x = $*x + 1;
+            .*x = $*x + 1;
             f[];
             $*x
         "), "13");
+
+        assert_eq!(s_eval(r"
+            !x = $&& 19;
+            !y = std:weaken x;
+            !f = { y }; # weak refs are captured and stay weak
+            !a = str f[];
+            .x = $n;
+            !b = str f[];
+            std:str:join $q$,$ $[a, b];
+        "), "\"19,\"");
     }
 }

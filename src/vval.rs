@@ -426,6 +426,7 @@ impl Env {
         match &self.args[idx] {
             VVal::CRef(r) => VVal::WWRef(Rc::downgrade(&r)),
             VVal::Ref(r)  => VVal::Ref(r.clone()),
+            VVal::WWRef(r) => VVal::WWRef(r.clone()),
             v => {
                 let new_v = v.to_weakened_upvalue_ref();
                 self.args[idx] = new_v.clone();

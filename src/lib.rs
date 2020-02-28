@@ -40,6 +40,21 @@ Just a quick glance at the WLambda syntax and semantics.
 More details for the syntax and the provided global functions
 can be found in the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
+## API Hello World
+
+```
+use wlambda::*;
+
+fn main() {
+    match wlambda::compiler::eval("40 + 2") {
+        Ok(v)  => { println!("Output: {}", v.s()); },
+        Err(e) => { eprintln!("Error: {}", e); },
+    }
+}
+```
+
+See further down below for more API usage examples!
+
 ```wlambda
 # This is a comment
 
@@ -240,6 +255,24 @@ assert_eq!(res_add.i(), 74);
 
 let res_mul : VVal = ctx.eval("my_crazy_mul 2 4").unwrap();
 assert_eq!(res_mul.i(), 221);
+```
+
+## Maintaining state
+
+```
+use wlambda::*;
+
+fn main() {
+    let mut ctx = EvalContext::new_default();
+
+    ctx.eval("!x = 10").unwrap();
+
+    ctx.set_global_var("y", &VVal::Int(32));
+
+    let r = ctx.eval("x + y").unwrap();
+
+    assert_eq!(r.s(), "42");
+}
 ```
 
 # Possible Roadmap

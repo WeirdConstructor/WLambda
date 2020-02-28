@@ -91,26 +91,21 @@ methods:
 
 ```wlambda
 !new_Cat = {!(name) = @;
-
-    # Notice the weakable reference `$&` to prevent
-    # reference cylces:
-
-    !self = $& ${
+    !self = ${
         name = name,
     };
 
     # Captures refer to the value in the `self` reference
-    # weakly now. That means, once the main reference in `self`
-    # in the parent scope vanishes, the closures are also freed.
+    # weakly now. `self` has been converted implicit to a _weakable_
+    # `$&` reference.
     self.meow     = { std:displayln self.name " meows!"; };
     self.get_name = { self.name };
 
-    # Lastly we convert the weakable reference to a strong `$&&`
-    # reference, so that the callers can hold the reference
-    # anywhere they like. If you don't do this, then the caller
-    # might accidentally drops the object reference when using it
-    # only from other closures.
-    std:strengthen self
+    # Because access to _weakable_ references is always implicitly
+    # dereferenced we need the `$:` capture reference operator to
+    # safe the reference to the map in `self` from being freed
+    # once the `new_Cat` function returns:
+    $:self
 };
 
 !my_cat = new_Cat "Spot";
@@ -749,22 +744,30 @@ std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 Some data structures already have reference characteristics, such as strings,
 vectors and maps. There are 3 types of references in WLambda that handle
 different usecases. These referencial types are neccessary to mutate lexical
-variables from a parent scope. To give an example:
+variables from a parent scope. To give a rather natural example:
 
 ```wlambda
 !x = 10;
 { .x = 20; }[];
-std:assert_eq x 10; # Yes, this is still 10!
+std:assert_eq x 20;
 ```
 
-To explain what is going on: Closures take captured values by copy.
-See also the section about closures at the start of this document.
-To mutate the outer you need a reference. There are two types of references:
+The example works rather intuitively. There is however lots of implicit
+referencial stuff going on. Once `x` is captured by a closure it ise implicitly
+changed in to a _weakable_ `$&` reference and the closure stores only a weak
+reference to `x`. This is done to maintain lexical scope and prevent accidental
+cyclic references when closures from a scope are leaked.
+
+These types of references exist:
 
 - `$&` - A _weakable_ reference, that is captured weakly by closures.
+- `$(&)` - A _weak_ reference, can't be constructed literally, only indirectly
+as upvalue of a closure or by `std:weaken`.
 - `$&&` - A _strong_ reference, that is captured stongly by closures.
+Inside closures they are also implicitly dereferenced by assignment
+and access by variable name.
 
-The weakable reference is captured weakly by closures and not keep the
+The weakable reference is captured weakly by closures and does not keep the
 referenced value alive if the value reference count drops to zero.
 The strong references are staying strong and need explicit care to handle:
 
@@ -773,7 +776,7 @@ The strong references are staying strong and need explicit care to handle:
 
 { .x = 20; }[]; # Closures implicitly handle weak references
 
-std:assert_eq $*x 20;
+std:assert_eq x 20;
 ```
 
 And the same with strong references:
@@ -782,7 +785,7 @@ And the same with strong references:
 !x = $&& 10;
 
 # Explicit handling via reference assignment `.*<var> = <expr>`
-{ .*x = 20; }[];
+{ .x = 20; }[];
 
 std:assert_eq $*x 20;
 ```

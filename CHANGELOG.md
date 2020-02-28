@@ -1,3 +1,12 @@
+0.4.2 (unreleased)
+==================
+
+* Change: Completely changed how weak and weakable references work `$&`.
+Closures implicitly convert captured variables to weakable references which
+are then caught weakly. This makes common code work less surprising and
+more complicated code possible.
+* Documentation: Added more documentation to the README.
+
 0.4.1 (2020-02-28)
 ==================
 
