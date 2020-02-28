@@ -33,14 +33,7 @@ made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
 Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
-# Example WLambda Code
-
-Just a quick glance at the WLambda syntax and semantics.
-
-More details for the syntax and the provided global functions
-can be found in the [WLambda Language Reference](prelude/index.html#wlambda-reference).
-
-## API Hello World
+# API Hello World
 
 ```
 use wlambda::*;
@@ -54,6 +47,97 @@ fn main() {
 ```
 
 See further down below for more API usage examples!
+
+# WLambda Language Guide
+
+## Variables
+
+```wlambda
+!x = 10;        # Variable definition
+
+.x = 20;        # Variable assignment
+```
+
+## Operators
+
+```wlambda
+!x = (1 + 2) * (8 - 4) / 2;
+
+std:assert_eq x 6;
+```
+
+## If
+
+```wlambda
+$true {
+    std:displayln "It's true!";
+} {
+    std:displayln "It's false!";
+};
+```
+
+```wlambda
+!x = 10 / 2;
+
+(x == 5) {
+    std:displayln "x == 5";
+};
+```
+
+## While
+
+```wlambda
+!x = 10;
+
+while { x > 0 } {
+    std:displayln x;
+
+    (x == 5) {
+        break[];
+    };
+    .x = x - 1;
+};
+```
+
+```wlambda
+!x = 10;
+
+!r = while { x > 0 } {
+    std:displayln x;
+
+    (x == 5) {
+        # break is a function, first arg
+        # is the return value for `while`:
+        break 5;
+    };
+    .x = x - 1;
+};
+
+std:assert_eq r 5;
+```
+
+## Counting Loop
+
+```wlambda
+range 1 10 1 {
+    std:displayln "> " _;
+};
+```
+
+With named counting variable:
+
+```wlambda
+range 1 10 1 {!(i) = @;     # or just `!i = _`
+    std:displayln "> " i;
+};
+```
+
+# Example WLambda Code
+
+Just a quick glance at the WLambda syntax and semantics.
+
+More details for the syntax and the provided global functions
+can be found in the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
 ```wlambda
 # This is a comment
