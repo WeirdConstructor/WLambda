@@ -531,6 +531,16 @@ evaluation without too much breakage.
 This project is licensed under the GNU General Public License Version 3 or
 later.
 
+### Conversion to MIT / Apache-2.0
+
+I (WeirdConstructor) herby promise to release WLambda under MIT / Apache-2.0
+license if you use it in an open source / free software game (licensed under
+MIT and/or Apache-2.0) written in Rust (and WLambda) with a playable beta
+release, non trivial amount of content and enough gameplay to keep me occupied
+for at least 2 hours. You may use WLambda for your release as if it was
+released under MIT and/or Apache-2.0. Proper attribution as required by MIT
+and/or Apache-2.0.
+
 ### Why GPL?
 
 Picking a license for my code bothered me for a long time. I read many
