@@ -5,56 +5,58 @@
 Threading API:
 
 ```
-use wlambda::vval::*;
+#[cfg(feature="regex")]
+{
+    use wlambda::vval::*;
 
-// Get some random user thread:
-let mut ctx = wlambda::EvalContext::new_default();
+    // Get some random user thread:
+    let mut ctx = wlambda::EvalContext::new_default();
 
-let mut msg_handle = wlambda::threads::MsgHandle::new();
-// You may register on multiple threads, but only one thread can use it at a time.
-let sender = msg_handle.sender();
-sender.register_on_as(&mut ctx, "worker");
+    let mut msg_handle = wlambda::threads::MsgHandle::new();
+    // You may register on multiple threads, but only one thread can use it at a time.
+    let sender = msg_handle.sender();
+    sender.register_on_as(&mut ctx, "worker");
 
-let t = std::thread::spawn(move || {
-    let quit = std::rc::Rc::new(std::cell::RefCell::new(false));
+    let t = std::thread::spawn(move || {
+        let quit = std::rc::Rc::new(std::cell::RefCell::new(false));
 
-    let global_t = wlambda::GlobalEnv::new_default();
+        let global_t = wlambda::GlobalEnv::new_default();
 
-    let qr = quit.clone();
-    global_t.borrow_mut()
-        .add_func("thread:quit", move |env: &mut Env, _argc: usize| {
-            *qr.borrow_mut() = true;
-            Ok(VVal::Nul)
-        }, Some(0), Some(0));
+        let qr = quit.clone();
+        global_t.borrow_mut()
+            .add_func("thread:quit", move |env: &mut Env, _argc: usize| {
+                *qr.borrow_mut() = true;
+                Ok(VVal::Nul)
+            }, Some(0), Some(0));
 
-    let mut ctx = wlambda::EvalContext::new(global_t);
+        let mut ctx = wlambda::EvalContext::new(global_t);
 
-    ctx.eval("!:global X = 123");
+        ctx.eval("!:global X = 123");
 
-    // msg_handle.run(&mut ctx);
-    // or alternatively:
+        // msg_handle.run(&mut ctx);
+        // or alternatively:
 
-    loop {
-        // Tries to handle one RPC call within 10ms.
-        if let None = msg_handle.step(&mut ctx, &std::time::Duration::from_millis(10)) {
-            break;
+        loop {
+            // Tries to handle one RPC call within 10ms.
+            if let None = msg_handle.step(&mut ctx, &std::time::Duration::from_millis(10)) {
+                break;
+            }
+
+            if *quit.borrow() { break; }
+
+            // do some other work here, that is not blocking the thread indefinitely.
         }
+    });
 
-        if *quit.borrow() { break; }
+    // Calls the global `displayln` in the Worker thread with the supplied arguments.
+    ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
 
-        // do some other work here, that is not blocking the thread indefinitely.
-    }
-});
+    ctx.eval("std:assert_eq (worker_call :std:eval \"X\") 123;").unwrap();
 
-// Calls the global `displayln` in the Worker thread with the supplied arguments.
-ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
+    sender.call("thread:quit", VVal::Nul);
 
-ctx.eval("std:assert_eq (worker_call :std:eval \"X\") 123;").unwrap();
-
-sender.call("thread:quit", VVal::Nul);
-
-t.join();
-
+    t.join();
+}
 ```
 
 The alternative async messaging API, that does not provide any return values
@@ -62,35 +64,42 @@ from the Thread. However, you could theoretically generate two message handles
 for a two way communication.
 
 ```
-use wlambda::vval::*;
+#[cfg(feature="regex")]
+{
+    use wlambda::vval::*;
 
-// Get some random user thread:
-let mut ctx = wlambda::EvalContext::new_default();
+    // Get some random user thread:
+    let mut ctx = wlambda::EvalContext::new_default();
 
-let mut msg_handle = wlambda::threads::MsgHandle::new();
+    let mut msg_handle = wlambda::threads::MsgHandle::new();
 
-let sender = msg_handle.sender();
+    let sender = msg_handle.sender();
 
-// You may register on multiple threads, but only one thread can use it at a time.
-sender.register_on_as(&mut ctx, "worker");
+    // You may register on multiple threads, but only one thread can use it at a time.
+    sender.register_on_as(&mut ctx, "worker");
 
-let t = std::thread::spawn(move || {
-    let mut ctx  = wlambda::EvalContext::new_default();
+    let t = std::thread::spawn(move || {
+        let mut ctx  = wlambda::EvalContext::new_default();
 
-    // This also implicitly defines a thread:quit:
-    msg_handle.run(&mut ctx);
-});
+        // This also implicitly defines a thread:quit:
+        msg_handle.run(&mut ctx);
+    });
 
-sender.call("thread:quit", VVal::Nul);
+    sender.call("thread:quit", VVal::Nul);
 
-t.join();
+    t.join();
+}
 
 ```
 */
 
+#[allow(unused_imports)]
 use crate::compiler::EvalContext;
+#[allow(unused_imports)]
 use crate::vval::*;
+#[allow(unused_imports)]
 use std::collections::VecDeque;
+#[allow(unused_imports)]
 use std::sync::{Arc, Mutex, Condvar};
 
 /// The Sender sends RPC calls to the Receiver thread.
@@ -246,7 +255,9 @@ enum RecvState {
     Return,
 }
 
+#[cfg(feature="rmp-serde")]
 type RecvData = (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>);
+#[cfg(feature="rmp-serde")]
 type RecvMutex = Mutex<RecvData>;
 
 #[derive(Debug)]
@@ -430,6 +441,7 @@ impl MsgHandle {
     }
 }
 
+#[cfg(feature="rmp-serde")]
 impl Default for MsgHandle {
     fn default() -> Self {
         Self::new()
@@ -437,6 +449,7 @@ impl Default for MsgHandle {
 }
 
 #[cfg(test)]
+#[cfg(feature="rmp-serde")]
 mod tests {
     #[cfg(feature="rmp-serde")]
     #[test]

@@ -37,28 +37,45 @@ fn main() {
         return;
     }
 
-    let mut rl = rustyline::Editor::<()>::new();
-    if rl.load_history("wlambda.history").is_ok() {
-        println!("Loaded history from 'wlambda.history' file.");
+    #[cfg(feature="rustline")]
+    {
+        let mut rl = rustyline::Editor::<()>::new();
+        if rl.load_history("wlambda.history").is_ok() {
+            println!("Loaded history from 'wlambda.history' file.");
+        }
+
+        eprintln!("WLambda Version {}", VERSION);
+        loop {
+            let readline = rl.readline(">> ");
+            match readline {
+                Ok(line) => {
+                    rl.add_history_entry(line.as_str());
+
+                    match ctx.eval(&line) {
+                        Ok(v)  => { println!("> {}", v.s()); },
+                        Err(e) => { println!("*** {}", e); }
+                    }
+                },
+                Err(_) => { break; },
+            }
+        }
+        if rl.save_history("wlambda.history").is_ok() {
+            println!("Saved history to 'wlambda.history'");
+        }
     }
 
-    eprintln!("WLambda Version {}", VERSION);
-    loop {
-        let readline = rl.readline(">> ");
-        match readline {
-            Ok(line) => {
-                rl.add_history_entry(line.as_str());
-
-                match ctx.eval(&line) {
+    #[cfg(not (feature="rustline"))]
+    {
+        eprintln!("WLambda Version {}", VERSION);
+        loop {
+            use std::io::{self, BufRead};
+            for line in io::stdin().lock().lines() {
+                match ctx.eval(&line.unwrap()) {
                     Ok(v)  => { println!("> {}", v.s()); },
                     Err(e) => { println!("*** {}", e); }
                 }
-            },
-            Err(_) => { break; },
+            }
         }
-    }
-    if rl.save_history("wlambda.history").is_ok() {
-        println!("Saved history to 'wlambda.history'");
     }
 }
 
