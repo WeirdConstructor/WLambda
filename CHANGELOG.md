@@ -1,6 +1,8 @@
 0.4.4 (unreleased)
 ==================
 
+* Feature: Added backtick quoting syntax for identifiers to make it possible
+to get the prefix form of some operators like `/` or `*`.
 * Bugfix: Cargo.toml default features are now really optional.
 * Documentation: Wrote wlambda\_functions.rs test for checking
 that all std: and core functions are documented.

@@ -853,34 +853,6 @@ Here is an overview of the data type calling semantics:
 |           |                   | |
 |           |                   | |
 
-## Operators
-
-### Arithmetics
-
-- \+
-- \-
-- \*
-- /
-- %
-- ^
-
-### Comparison
-
-- ==
-- !=
-- \<
-- \>
-- \<=
-- \>=
-
-### Bitwise
-
-- &|
-- &
-- &^
-- \<<
-- \>>
-
 ## Functions (part 2/2)
 
 ### Function call composition
@@ -986,8 +958,87 @@ iteration function. If you don't need that list you should use `for`.
 
 ## Arithmetics
 
-- operator precedence syntax
-- prefix operator syntax
+The output type (float vs. integer) of numerical arithmetics operators is defined
+by the _first_ operand of the operation. Use the casting functions `float` or
+`int` if you are unsure.
+
+Please note that not all operators are available as plain identifiers and need
+to be quoted when used in their prefix form or as functions, some of them are
+`*`, `/`, `%` and some others.
+
+#### + _operand-1_ _operand-2_ ...
+
+This function implements arithmetic addition.  If the first operand is a
+float number, the substraction will return a float result. If it is an integer
+or anything else (like a string), an integer result is returned.
+
+```wlambda
+std:assert_eq (+ 5.5 0.5) 6.0;
+std:assert_eq (5.5 + 0.5) 6.0;
+std:assert_eq (+ 5 2) 7;
+std:assert_eq (+ "5" 2) 7;
+std:assert_eq (+ :5 2) 7;
+```
+
+#### - _operand-1_ _operand-2_ ...
+
+This function implements arithmetic substraction.  If the first operand is a
+float number, the substraction will return a float result. If it is an integer
+or anything else (like a string), an integer result is returned.
+
+```wlambda
+std:assert_eq (- 5.5 0.5) 5.0;
+std:assert_eq (5.5 - 0.5) 5.0;
+std:assert_eq (- 5 2) 3;
+std:assert_eq (- "5" 2) 3;
+std:assert_eq (- :5 2) 3;
+```
+
+#### * _op-a_ _op-b_
+
+Returns the multiplication of the two operands.
+
+```wlambda
+std:assert 10   * 4 == 40;
+std:assert 10.1 * 4 == 40.4;
+std:assert "10" * 4 == 40;
+
+std:assert (`*` 10 4) == 40;
+
+std:assert (float "10.1") * 4 == 40.4;
+```
+
+#### / _op-a_ _op-b_
+
+Returns the division of the two operands.
+
+```wlambda
+std:assert 10   / 4 == 2;
+std:assert 10.0 / 4 == 2.5;
+std:assert "10" / 2 == 5;
+
+std:assert (`/` 10 4) == 2;
+
+std:assert (float "10.1") * 4 == 40.4;
+```
+
+#### % _op-a_ _op-b_
+
+Returns the remainder of the division of _op-a_ by _op-b_.
+
+```wlambda
+std:assert     5 % 4 == 1;
+std:assert (`%` 5 4) == 1;
+```
+
+#### & _op-a_ _op-b_
+
+Binary `and` operation between two integers.
+
+```wlambda
+std:assert (0b0011 & 0b1011) == 0b011;
+std:assert (3      &     11) == 3;
+```
 
 ## Modules
 
@@ -1024,7 +1075,7 @@ std:assert_eq (str v) "$[10,20]";
 
 This library contains all the core functions which belong to the
 core of the WLambda Programming Language. These functions can be seen
-as keywords of WLambda.
+as keywords of WLambda. Some functions are also available as operators.
 
 #### == _op-a_ _op-b_
 
@@ -1039,6 +1090,8 @@ std:assert            1 == 2 - 1;
 std:assert         "aa" == ("a" "a");
 std:assert         :xxy == :xxy;
 std:assert not ~ $[1,2] == $[1,2];
+
+std:assert ~ `==` 1 (2 - 1); # prefix form
 ```
 
 #### != _op-a_ _op-b_
@@ -1056,80 +1109,11 @@ std:assert     not[2 != 2];
 std:assert     "foo" != "bar";
 std:assert not["foo" != "foo"];
 
+std:assert ~ `!=` 1 2;
+
 !r1 = $[1,2];
 !r2 = $[1,2];
 std:assert r1 != r2;
-```
-
-#### + _operand-1_ _operand-2_ ...
-
-This function implements arithmetic addition.  If the first operand is a
-float number, the substraction will return a float result. If it is an integer
-or anything else (like a string), an integer result is returned.
-
-```wlambda
-std:assert_eq (+ 5.5 0.5) 6.0;
-std:assert_eq (5.5 + 0.5) 6.0;
-std:assert_eq (+ 5 2) 7;
-std:assert_eq (+ "5" 2) 7;
-std:assert_eq (+ :5 2) 7;
-```
-
-#### - _operand-1_ _operand-2_ ...
-
-This function implements arithmetic substraction.  If the first operand is a
-float number, the substraction will return a float result. If it is an integer
-or anything else (like a string), an integer result is returned.
-
-```wlambda
-std:assert_eq (- 5.5 0.5) 5.0;
-std:assert_eq (5.5 - 0.5) 5.0;
-std:assert_eq (- 5 2) 3;
-std:assert_eq (- "5" 2) 3;
-std:assert_eq (- :5 2) 3;
-```
-
-#### * _op-a_ _op-b_
-
-Returns the multiplication of the two operands. This arithmetic operation
-is only available as binary operator.
-
-```wlambda
-std:assert 10   * 4 == 40;
-std:assert 10.1 * 4 == 40.4;
-std:assert "10" * 4 == 40;
-
-std:assert (float "10.1") * 4 == 40.4;
-```
-
-#### / _op-a_ _op-b_
-
-Returns the division of the two operands. This arithmetic operation
-is only available as binary operator.
-
-```wlambda
-std:assert 10   / 4 == 2;
-std:assert 10.0 / 4 == 2.5;
-std:assert "10" / 2 == 5;
-
-std:assert (float "10.1") * 4 == 40.4;
-```
-
-#### % _op-a_ _op-b_
-
-Returns the remainder of the division of _op-a_ by _op-b_.
-
-```wlambda
-std:assert 5 % 4 == 1;
-```
-
-#### & _op-a_ _op-b_
-
-Binary `and` operation between two integers.
-
-```wlambda
-std:assert (0b0011 & 0b1011) == 0b011;
-std:assert (3      &     11) == 3;
 ```
 
 #### &^ _op-a_ _op-b_
@@ -1148,6 +1132,17 @@ Binary `or` operation between two integers.
 ```wlambda
 std:assert (0b0011 &| 0b1000) == 0b1011;
 std:assert (3      &|      8) == 11;
+```
+
+#### < _op-a_ _op-b_
+
+Numerical comparison operator tht checks whether _op-a_ is less than _op-b_
+Only avaiable in operator form.
+
+```wlambda
+std:assert   10   < 11;
+std:assert   10.1 < 10.2;
+std:assert not[10 < 10.1];  # the type of the first argument decides return type!
 ```
 
 ## Standard Library

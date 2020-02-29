@@ -38,8 +38,10 @@ In the following grammar, white space and comments are omitted:
                   (* a quoted identifier can not appear anywhere,
                      it's usually delimited or follows something that
                      makes sure we are now expecting an identifier *)
+                  | "`", { ?any character except '`'? }, "`" (* quoted identifier *)
                   ;
     ident         = ident_start, [ ident_end ]
+                  | "`", { ?any character except '`'? }, "`" (* quoted identifier *)
                   ;
     ref_specifier = ":", qident
                   ;
@@ -660,7 +662,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
             } else {
                 let key = if is_ident_start(c) {
-                    VVal::new_sym_mv(parse_identifier(ps))
+                    VVal::new_sym_mv(parse_identifier(ps)?)
                 } else {
                     parse_expr(ps)?
                 };
@@ -755,7 +757,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         ':' => {
             ps.consume_wsc();
             let capture = ps.syn(Syntax::CaptureRef);
-            capture.push(VVal::new_sym_mv(parse_identifier(ps)));
+            capture.push(VVal::new_sym_mv(parse_identifier(ps)?));
             Ok(capture)
         },
         '&' => {
@@ -771,7 +773,12 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(r)
             }
         },
-        _   => Ok(VVal::Flt(0.2)),
+        c => {
+            ps.err_bad_value(
+                &format!(
+                    "Expected special value, unknown special value identifier '{}'",
+                    c))
+        }
     }
 }
 
@@ -887,21 +894,52 @@ fn make_binop(ps: &State, op: &str, left: VVal, right: VVal) -> VVal {
     }
 }
 
-fn parse_identifier(ps: &mut State) -> String {
-    let identifier : String =
-        ps.take_while_wsc(|c| {
+fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
+    if ps.peek().unwrap() == '`' {
+        let mut identifier = "".to_string();
+        ps.consume();
+        while ps.peek().unwrap_or('`') != '`' {
+            let c = ps.expect_some(ps.peek())?;
             match c {
-               '.' | ',' | ';' | '{' | '}'
-             | '[' | ']' | '(' | ')' | '~' | '|' | '='
-                    => false,
-                _   => !c.is_whitespace()
+                '\\' => {
+                    ps.consume();
+                    if let Some(c) = ps.peek() {
+                        ps.consume();
+                        identifier.push(c);
+                    } else {
+                        return Err(ps.err_eof("identifier escape").unwrap_err());
+                    }
+                },
+                _ => {
+                    ps.consume();
+                    identifier.push(c);
+                },
             }
-        }).iter().collect();
-    identifier
+        }
+
+        if !ps.consume_if_eq('`') {
+            return Err(ps.err_unexpected_token('`', "").unwrap_err());
+        }
+
+        ps.skip_ws_and_comments();
+
+        Ok(identifier)
+    } else {
+        let identifier : String =
+            ps.take_while_wsc(|c| {
+                match c {
+                   '.' | ',' | ';' | '{' | '}'
+                 | '[' | ']' | '(' | ')' | '~' | '|' | '='
+                        => false,
+                    _   => !c.is_whitespace()
+                }
+            }).iter().collect();
+        Ok(identifier)
+    }
 }
 
 fn is_ident_start(c: char) -> bool {
-    c.is_alphabetic() || c == '_' || c == '@'
+    c.is_alphabetic() || c == '_' || c == '@' || c == '`'
 }
 
 fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
@@ -932,7 +970,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 if ps.consume_if_eq_wsc(':') {
                     let syn = ps.syn_raw(Syntax::Func);
 
-                    let block_name = parse_identifier(ps);
+                    let block_name = parse_identifier(ps)?;
                     ps.skip_ws_and_comments();
                     let block = parse_block(ps, true)?;
 
@@ -959,12 +997,12 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                     let s = parse_string(ps, false)?;
                     Ok(make_sym(ps, &s.at(1).unwrap().s_raw()))
                 } else {
-                    let id = parse_identifier(ps);
+                    let id = parse_identifier(ps)?;
                     Ok(make_sym(ps, &id))
                 }
             },
             _ if is_ident_start(c) => {
-                let id = parse_identifier(ps);
+                let id = parse_identifier(ps)?;
                 Ok(make_var(ps, &id))
             },
             _ => {
@@ -1084,7 +1122,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
 
             } else if is_ident_start(c) {
                 let id = ps.syn(Syntax::Key);
-                id.push(VVal::new_sym_mv(parse_identifier(ps)));
+                id.push(VVal::new_sym_mv(parse_identifier(ps)?));
                 id
             } else {
                 parse_value(ps)?
@@ -1318,7 +1356,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
     if is_def {
         if ps.consume_if_eq_wsc(':') {
-            let key = parse_identifier(ps);
+            let key = parse_identifier(ps)?;
             if key == "global" {
                 assign = ps.syn(Syntax::DefGlobRef);
             }
@@ -1339,7 +1377,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
             while let Some(c) = ps.peek() {
                 if c == ')' { break; }
-                ids.push(VVal::new_sym_mv(parse_identifier(ps)));
+                ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
                 if !ps.consume_if_eq_wsc(',') { break; }
             }
 
@@ -1353,7 +1391,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     ')', "At the end of destructuring assignment.");
             }
         },
-        _ => { ids.push(VVal::new_sym_mv(parse_identifier(ps))); }
+        _ => { ids.push(VVal::new_sym_mv(parse_identifier(ps)?)); }
     }
 
     assign.push(ids);
@@ -1380,7 +1418,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                     ps.consume_wsc();
                     if ps.consume_if_eq_wsc('@') {
                         if ps.at_eof { return ps.err_eof("special assignment"); }
-                        let id = parse_identifier(ps);
+                        let id = parse_identifier(ps)?;
                         match &id[..] {
                             "wlambda" => {
                                 let imp = ps.syn(Syntax::Import);
@@ -1390,7 +1428,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                             },
                             "import" => {
                                 let mut prefix =
-                                    VVal::new_sym(&parse_identifier(ps));
+                                    VVal::new_sym(&parse_identifier(ps)?);
                                 ps.skip_ws_and_comments();
                                 let name =
                                     if ps.peek().unwrap_or(';') == ';' {
@@ -1399,7 +1437,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                         p
                                     } else {
                                         ps.consume_if_eq_wsc('=');
-                                        VVal::new_sym(&parse_identifier(ps))
+                                        VVal::new_sym(&parse_identifier(ps)?)
                                     };
 
                                 let imp = ps.syn(Syntax::Import);
@@ -1408,7 +1446,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                 Ok(imp)
                             },
                             "export" => {
-                                let name = parse_identifier(ps);
+                                let name = parse_identifier(ps)?;
                                 ps.skip_ws_and_comments();
                                 ps.consume_if_eq_wsc('=');
                                 let expr = parse_expr(ps)?;
@@ -1834,6 +1872,15 @@ mod tests {
         assert_eq!(parse("$self"), "$[&Block,$[&SelfObj]]");
         assert_eq!(parse("$d"),    "$[&Block,$[&SelfData]]");
         assert_eq!(parse("$data"), "$[&Block,$[&SelfData]]");
+    }
+
+    #[test]
+    fn check_backtick_ident() {
+        assert_eq!(parse("` `"),        "$[&Block,$[&Var,:\" \"]]");
+        assert_eq!(parse("`\\``"),      "$[&Block,$[&Var,:\"`\"]]");
+        assert_eq!(parse("`\\\"`"),     "$[&Block,$[&Var,:\"\"\"]]");
+        assert_eq!(parse("`\"`"),       "$[&Block,$[&Var,:\"\"\"]]");
+        assert_eq!(parse("!` ` = 10;"), "$[&Block,$[&Def,$[:\" \"],10]]");
     }
 
     #[test]
