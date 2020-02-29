@@ -1,3 +1,12 @@
+0.4.4 (unreleased)
+==================
+
+* Bugfix: Cargo.toml default features are now really optional.
+* Documentation: Wrote wlambda\_functions.rs test for checking
+that all std: and core functions are documented.
+* Documentation: Fixed grammar errors in README.md and lib.rs
+contributed by Cedric Hutchings (cedric-h).
+
 0.4.3 (2020-02-29)
 ==================
 

@@ -79,5 +79,13 @@ fn main() {
         for (name, snip) in get_scripts_from_file("src/threads.rs") {
             execute_script(&name, &snip);
         }
+
+        for (name, snip) in get_scripts_from_file("src/util.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/csv.rs") {
+            execute_script(&name, &snip);
+        }
     }
 }

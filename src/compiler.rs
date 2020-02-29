@@ -100,6 +100,17 @@ impl SymbolTable {
         }
     }
 
+    /// This function returns all symbols defined in this SymbolTable.
+    /// It's mainly used for tests.
+    #[allow(dead_code)]
+    pub fn list(&self) -> std::vec::Vec<String> {
+        let mut v = vec![];
+        for (s, _) in self.symbols.iter() {
+            v.push(s.to_string());
+        }
+        v
+    }
+
     /// Sets the entry `name` to the `value`. So that the
     /// value can be imported.
     #[allow(dead_code)]
