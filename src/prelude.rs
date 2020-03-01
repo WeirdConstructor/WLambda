@@ -1096,51 +1096,18 @@ std:assert     5 % 4 == 1;
 std:assert (`%` 5 4) == 1;
 ```
 
-#### & _op-a_ _op-b_
+#### ^ _op-a_ _op-b_
 
-Binary `and` operation between two integers.
-
-```wlambda
-std:assert (0b0011 & 0b1011) == 0b011;
-std:assert (3      &     11) == 3;
-```
-
-## Modules
-
-### export
+Returns _op-a_ raised by the power of _op-b_.
+Supports float and integers.
 
 ```wlambda
-
-!expr = { _ + 30 };
-
-!@export symbol = expr; # exports symbol with value of expr (a function)
-
+std:assert_eq 2 ^ 4     16;
+std:assert_eq std:num:round[(2.0 ^ 2.1) * 1000] 4287.0;
+std:assert_eq 2 ^ 2.1   4; # first arg type matters!
 ```
 
-### import
-
-```wlambda
-
-!@import x = tests:test_mod; # prefixes everything from modixes with x:
-
-std:assert ~ (x:symbol 10) == 40;
-
-```
-
-You can also skip the prefix:
-
-```wlambda
-!@import std;
-!v = $[];
-push v 10; push v 20;
-std:assert_eq (str v) "$[10,20]";
-```
-
-## Core Library
-
-This library contains all the core functions which belong to the
-core of the WLambda Programming Language. These functions can be seen
-as keywords of WLambda. Some functions are also available as operators.
+## Comparison
 
 #### == _op-a_ _op-b_
 
@@ -1181,6 +1148,57 @@ std:assert ~ `!=` 1 2;
 std:assert r1 != r2;
 ```
 
+#### < _op-a_ _op-b_
+
+Numerical comparison operator that checks whether _op-a_ is less than _op-b_
+
+```wlambda
+std:assert   10   < 11;
+std:assert   10.1 < 10.2;
+std:assert not[10 < 10.1];  # the type of the first argument decides return type!
+```
+
+#### <= _op-a_ _op-b_
+
+Numerical comparison operator that checks whether _op-a_ is less or equal to _op-b_
+
+```wlambda
+std:assert 10   <= 11;
+std:assert 10.1 <= 10.2;
+std:assert 10   <= 10.1;  # integer <=, the type of the first argument decides return type!
+```
+
+#### > _op-a_ _op-b_
+
+Numerical comparison operator that checks whether _op-a_ is greater than _op-b_
+
+```wlambda
+std:assert   11.1 > 11;
+std:assert   11.1 > 11.0;
+std:assert not[10 > 10.1];  # the type of the first argument decides return type!
+```
+
+#### >= _op-a_ _op-b_
+
+Numerical comparison operator that checks whether _op-a_ is greater or equal to _op-b_
+
+```wlambda
+std:assert 11   >= 11;
+std:assert 10.2 >= 10.1;
+std:assert 10 >= 10.1;  # integer >=, the type of the first argument decides return type!
+```
+
+## Bit Operations
+
+#### & _op-a_ _op-b_
+
+Binary `and` operation between two integers.
+
+```wlambda
+std:assert (0b0011 & 0b1011) == 0b011;
+std:assert (3      &     11) == 3;
+```
+
 #### &^ _op-a_ _op-b_
 
 Binary `xor` operation between two integers.
@@ -1199,16 +1217,93 @@ std:assert (0b0011 &| 0b1000) == 0b1011;
 std:assert (3      &|      8) == 11;
 ```
 
-#### < _op-a_ _op-b_
+#### << _op-a_ _op-b_
 
-Numerical comparison operator tht checks whether _op-a_ is less than _op-b_
-Only avaiable in operator form.
+Binary `left shift` operation of _op-a_ by _op-b_ bits.
 
 ```wlambda
-std:assert   10   < 11;
-std:assert   10.1 < 10.2;
-std:assert not[10 < 10.1];  # the type of the first argument decides return type!
+std:assert (0b0011 << 3)   == 0b11000;
+std:assert (`<<` 0b1011 2) == 0b101100
 ```
+
+#### >> _op-a_ _op-b_
+
+Binary `right shift` operation of _op-a_ by _op-b_ bits.
+
+```wlambda
+std:assert (0b0011 >> 2)      == 0b0;
+std:assert (0b1100 >> 2)      == 0b11;
+std:assert (`>>` 0b1011000 3) == 0b1011
+```
+
+## Modules
+
+### export
+
+```wlambda
+
+!expr = { _ + 30 };
+
+!@export symbol = expr; # exports symbol with value of expr (a function)
+
+```
+
+### import
+
+```wlambda
+
+!@import x = tests:test_mod; # prefixes everything from modixes with x:
+
+std:assert ~ (x:symbol 10) == 40;
+
+```
+
+You can also skip the prefix:
+
+```wlambda
+!@import std;
+!v = $[];
+push v 10; push v 20;
+std:assert_eq (str v) "$[10,20]";
+```
+
+## Core Library
+
+This library contains all the core functions which belong to the
+core of the WLambda Programming Language. These functions can be seen
+as keywords of WLambda. Some functions are also available as operators.
+
+#### _? [_label_] _value_
+
+Return from the current function up to a given _label_ if _value_ is an
+error value.  If no _label_ is given only the current function is returned from
+with the error value.  If there is no error, the given value is returned.
+
+The best usecase is, if you just want to hand any errors that might be returned
+further upwards the call stack for the parent functions to handle.
+
+```wlambda
+!do_fail = $false;
+
+!maybe_fails1 = { 10 };
+!maybe_fails2 = {
+    do_fail { $error "something is wrong" }
+            { .do_fail = $true; 2 };
+};
+
+!a = {
+    !x = _? maybe_fails1[];
+    .x = x + (_? maybe_fails2[]);
+    x
+};
+
+!first  = a[];
+!second = a[];
+
+std:assert_eq first 12;
+std:assert (is_err second);
+```
+
 
 ## Standard Library
 
