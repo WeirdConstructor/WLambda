@@ -1316,22 +1316,51 @@ fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
     while let Some(c) = ps.peek() {
         match c {
             '|' => {
-                let push_front =
-                    if ps.lookahead("||") { ps.consume(); true } else { false };
-                ps.consume_wsc();
+                if ps.lookahead("|>") {
+                    ps.consume();
+                    ps.consume_wsc();
 
-                let mut fn_expr = parse_call(ps, false)?;
-                if !is_call(&fn_expr) {
-                    fn_expr = make_to_call(ps, fn_expr);
-                }
+                    let call_right = parse_call(ps, false)?;
 
-                if push_front {
-                    fn_expr.insert_at(2, call);
+                    let new_call = make_to_call(ps, call);
+                    new_call.push(call_right);
+                    call = new_call;
+
+                } else if ps.lookahead("|<") {
+//                    ps.consume();
+//                    ps.consume_wsc();
+//
+////                    a |< b |< c |< d
+//
+////                    a |< b |< c |< d
+//                    (b a)
+//                    ((c b) a)
+//                    (((d c) b) a)
+//
+//                    ((b c) a)
+//                    ((b c) a)
+//
+//
+////                    (((d c) b) a)
+
                 } else {
-                    fn_expr.push(call);
-                }
+                    let push_front =
+                        if ps.lookahead("||") { ps.consume(); true } else { false };
+                    ps.consume_wsc();
 
-                call = fn_expr;
+                    let mut fn_expr = parse_call(ps, false)?;
+                    if !is_call(&fn_expr) {
+                        fn_expr = make_to_call(ps, fn_expr);
+                    }
+
+                    if push_front {
+                        fn_expr.insert_at(2, call);
+                    } else {
+                        fn_expr.push(call);
+                    }
+
+                    call = fn_expr;
+                }
             },
             _ => {
                 break;
@@ -1889,5 +1918,20 @@ mod tests {
         assert_eq!(parse("fo[[$[1,2,3]]]"),     "$[&Block,$[&Apply,$[&Var,:\"fo\"],$[&Lst,1,2,3]]]");
         assert_eq!(parse("obj.1.field[[_]]"),   "$[&Block,$[&Apply,$[&GetSym,$[&GetIdx,$[&Var,:\"obj\"],1],:\"field\"],$[&Var,:\"_\"]]]");
         assert_eq!(parse("obj.1.(\"field\")[[_]]"),   "$[&Block,$[&Apply,$[&GetSym,$[&GetIdx,$[&Var,:\"obj\"],1],\"field\"],$[&Var,:\"_\"]]]");
+    }
+
+    #[test]
+    fn check_right_call() {
+        assert_eq!(parse("10 |> 20"),                "$[&Block,$[&Call,10,20]]");
+        assert_eq!(parse("10 20"),                   "$[&Block,$[&Call,10,20]]");
+        assert_eq!(parse("10 |> 20 |> 30"),          "$[&Block,$[&Call,$[&Call,10,20],30]]");
+        assert_eq!(parse("10 20 |> 30"),             "$[&Block,$[&Call,$[&Call,10,20],30]]");
+
+        assert_eq!(parse("10 20 |> 20 30 40"),       "$[&Block,$[&Call,$[&Call,10,20],$[&Call,20,30,40]]]");
+
+        assert_eq!(parse("10 11 |> 20"),             "$[&Block,$[&Call,$[&Call,10,11],20]]");
+        assert_eq!(parse("10 11 |> 20 |> 30"),       "$[&Block,$[&Call,$[&Call,$[&Call,10,11],20],30]]");
+        assert_eq!(parse("10 11 |> 20 21 |> 30"),    "$[&Block,$[&Call,$[&Call,$[&Call,10,11],$[&Call,20,21]],30]]");
+        assert_eq!(parse("10 11 |> 20 21 |> 30 31"), "$[&Block,$[&Call,$[&Call,$[&Call,10,11],$[&Call,20,21]],$[&Call,30,31]]]");
     }
 }

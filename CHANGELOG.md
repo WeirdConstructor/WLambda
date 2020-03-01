@@ -1,6 +1,8 @@
 0.4.4 (unreleased)
 ==================
 
+* Feature: Added _Left Hand Function Chaining_ syntax `|>` and documentation
+for it.
 * Feature: Added backtick quoting syntax for identifiers to make it possible
 to get the prefix form of some operators like `/` or `*`.
 * Bugfix: Cargo.toml default features are now really optional.

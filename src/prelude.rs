@@ -860,7 +860,6 @@ Here is an overview of the data type calling semantics:
 - chaining
 - traditional () call syntax
 - ~ syntax
-- | syntax
 - || syntax
 
 >> $[] || push 10
@@ -875,6 +874,72 @@ Here is an overview of the data type calling semantics:
 
 - [...] syntax
 
+#### '|' Tail Argument Function Chaninig
+
+This syntax is useful if you have following function call composition:
+
+    (fn arg1 arg2 (fn2 arg_b1 arg_b2 (fn3 arg_c1 arg_c2 ...)))
+
+These can be written more comfortably like this:
+
+    fn3 arg1 arg2 | fn2 arg_b1 arg_b2 | fn arg1 arg2
+
+An example with actual values:
+
+```wlambda
+!x = 10 | { _ * 4 } | { _ + 2 };
+
+std:assert_eq x 42;
+```
+
+Think of it as if the value `10` was _piped_ through the
+functions on the right.
+
+The call reordering of the `|` operator looks like this:
+
+```text
+    fn1 a1 a2 | fn2 b1 b2 (   )   =>   fn2 b1 b2 (fn1 a1 a2)
+    """""""""               ^
+        v                   |
+        --------------------|
+```
+
+#### '|>' Left Hand Function Chaining
+
+This syntax is useful if you want to make deep call chains like these:
+
+    (((fn arg1 arg2 ...) arg_b1 arg_b2 ...) arg_c1 arg_c2 ...)
+
+These can be written more comfortably like this:
+
+    fn arg1 arg2 |> arg_b1 arg_b2 |> arg_c1 arg_c2
+
+or nicer formatted:
+
+    fn arg1 arg2
+        |> arg_b1 arg_b2
+        |> arg_c1 arg_c2
+
+Here an actual example:
+
+```wlambda
+!res =
+    $[1,2,3]
+    |> { _ * 2 }
+    |> { _ + 3 };
+
+std:assert_eq (str res) "$[5,7,9]";
+```
+
+The call reordering of the `|>` operator looks like this:
+
+```text
+    fn1 a1 a2 |> b1 b2    =>   ((   )   )
+    """""""""    """""            ^   ^
+        v          v              |   |
+        -----------|--------------|   |
+                   -------------------|
+```
 ### Control Flow - Returning
 
 - \:lbl { ... } syntax and returning
@@ -1314,7 +1379,7 @@ the file to the given filename.
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
-## Optional Standarf Library
+## Optional Standard Library
 
 ### serialization
 
