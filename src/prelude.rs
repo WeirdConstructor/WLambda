@@ -2598,108 +2598,75 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(3), Some(3), false);
 
-    if cfg!(feature="regex") {
-        use regex::Regex;
-        func!(st, "re:replace_all",
-            |env: &mut Env, _argc: usize| {
-                let re   = env.arg(0).s_raw();
-                let f    = env.arg(1);
-                let text = env.arg(2).s_raw();
+    #[cfg(feature="regex")]
+    func!(st, "re:replace_all",
+        |env: &mut Env, _argc: usize| {
+            use regex::Regex;
+            let re   = env.arg(0).s_raw();
+            let f    = env.arg(1);
+            let text = env.arg(2).s_raw();
 
-                let rx = Regex::new(&re);
-                if let Err(e) = rx {
-                    return Ok(VVal::err_msg(
-                        &format!("Regex '{}' did not compile: {}", re, e)));
+            let rx = Regex::new(&re);
+            if let Err(e) = rx {
+                return Ok(VVal::err_msg(
+                    &format!("Regex '{}' did not compile: {}", re, e)));
+            }
+            let rx = rx.unwrap();
+
+            let mut finished = false;
+            let mut ret = Ok(VVal::Nul);
+            let ret_str = VVal::new_str_mv(String::from(rx.replace_all(&text, |capts: &regex::Captures| {
+                let captures = VVal::vec();
+                for cap in capts.iter() {
+                    match cap {
+                        None    => { captures.push(VVal::Nul); },
+                        Some(c) => {
+                            captures.push(VVal::new_str(c.as_str()));
+                        }
+                    }
                 }
-                let rx = rx.unwrap();
 
-                let mut finished = false;
-                let mut ret = Ok(VVal::Nul);
-                let ret_str = VVal::new_str_mv(String::from(rx.replace_all(&text, |capts: &regex::Captures| {
+                let repl = captures.at(0).unwrap_or(VVal::Nul).s_raw();
+                if finished { return repl; }
+
+                if f.is_fun() {
+                    env.push(captures);
+                    let rv = f.call_internal(env, 1);
+                    env.popn(1);
+
+                    match rv {
+                        Ok(v)                      => v.s_raw(),
+                        Err(StackAction::Break(v)) => { finished = true; v.s_raw() },
+                        Err(StackAction::Next)     => { repl },
+                        Err(e)                     => { finished = true; ret = Err(e); repl },
+                    }
+                } else {
+                    f.s_raw()
+                }
+            })));
+            if ret.is_err() { return ret; }
+            Ok(ret_str)
+        }, Some(3), Some(3), false);
+
+    #[cfg(feature="regex")]
+    func!(st, "re:match",
+        |env: &mut Env, _argc: usize| {
+            use regex::Regex;
+            let re   = env.arg(0).s_raw();
+            let text = env.arg(1).s_raw();
+            let f    = env.arg(2);
+
+            let rx = Regex::new(&re);
+            if let Err(e) = rx {
+                return Ok(VVal::err_msg(
+                    &format!("Regex '{}' did not compile: {}", re, e)));
+            }
+            let rx = rx.unwrap();
+
+            match rx.captures(&text) {
+                Some(c) => {
                     let captures = VVal::vec();
-                    for cap in capts.iter() {
-                        match cap {
-                            None    => { captures.push(VVal::Nul); },
-                            Some(c) => {
-                                captures.push(VVal::new_str(c.as_str()));
-                            }
-                        }
-                    }
-
-                    let repl = captures.at(0).unwrap_or(VVal::Nul).s_raw();
-                    if finished { return repl; }
-
-                    if f.is_fun() {
-                        env.push(captures);
-                        let rv = f.call_internal(env, 1);
-                        env.popn(1);
-
-                        match rv {
-                            Ok(v)                      => v.s_raw(),
-                            Err(StackAction::Break(v)) => { finished = true; v.s_raw() },
-                            Err(StackAction::Next)     => { repl },
-                            Err(e)                     => { finished = true; ret = Err(e); repl },
-                        }
-                    } else {
-                        f.s_raw()
-                    }
-                })));
-                if ret.is_err() { return ret; }
-                Ok(ret_str)
-            }, Some(3), Some(3), false);
-
-        func!(st, "re:match",
-            |env: &mut Env, _argc: usize| {
-                let re   = env.arg(0).s_raw();
-                let text = env.arg(1).s_raw();
-                let f    = env.arg(2);
-
-                let rx = Regex::new(&re);
-                if let Err(e) = rx {
-                    return Ok(VVal::err_msg(
-                        &format!("Regex '{}' did not compile: {}", re, e)));
-                }
-                let rx = rx.unwrap();
-
-                match rx.captures(&text) {
-                    Some(c) => {
-                        let captures = VVal::vec();
-                        for cap in c.iter() {
-                            match cap {
-                                None    => { captures.push(VVal::Nul); },
-                                Some(c) => {
-                                    captures.push(VVal::new_str(c.as_str()));
-                                }
-                            }
-                        }
-                        env.push(captures);
-                        let rv = f.call_internal(env, 1);
-                        env.popn(1);
-                        rv
-                    },
-                    None => {
-                        Ok(VVal::Nul)
-                    }
-                }
-            }, Some(3), Some(3), false);
-
-        func!(st, "re:map",
-            |env: &mut Env, _argc: usize| {
-                let re   = env.arg(0).s_raw();
-                let f    = env.arg(1);
-                let text = env.arg(2).s_raw();
-
-                let rx = Regex::new(&re);
-                if let Err(e) = rx {
-                    return Ok(VVal::err_msg(
-                        &format!("Regex '{}' did not compile: {}", re, e)));
-                }
-                let rx = rx.unwrap();
-
-                let ret = VVal::vec();
-                for capts in rx.captures_iter(&text) {
-                    let captures = VVal::vec();
-                    for cap in capts.iter() {
+                    for cap in c.iter() {
                         match cap {
                             None    => { captures.push(VVal::Nul); },
                             Some(c) => {
@@ -2710,81 +2677,116 @@ pub fn std_symbol_table() -> SymbolTable {
                     env.push(captures);
                     let rv = f.call_internal(env, 1);
                     env.popn(1);
+                    rv
+                },
+                None => {
+                    Ok(VVal::Nul)
+                }
+            }
+        }, Some(3), Some(3), false);
 
-                    match rv {
-                        Ok(v)                      => { ret.push(v); },
-                        Err(StackAction::Break(v)) => { ret.push(v); break; },
-                        Err(StackAction::Next)     => { },
-                        Err(e)                     => { return Err(e); },
+    #[cfg(feature="regex")]
+    func!(st, "re:map",
+        |env: &mut Env, _argc: usize| {
+            use regex::Regex;
+            let re   = env.arg(0).s_raw();
+            let f    = env.arg(1);
+            let text = env.arg(2).s_raw();
+
+            let rx = Regex::new(&re);
+            if let Err(e) = rx {
+                return Ok(VVal::err_msg(
+                    &format!("Regex '{}' did not compile: {}", re, e)));
+            }
+            let rx = rx.unwrap();
+
+            let ret = VVal::vec();
+            for capts in rx.captures_iter(&text) {
+                let captures = VVal::vec();
+                for cap in capts.iter() {
+                    match cap {
+                        None    => { captures.push(VVal::Nul); },
+                        Some(c) => {
+                            captures.push(VVal::new_str(c.as_str()));
+                        }
                     }
                 }
-                Ok(ret)
-            }, Some(3), Some(3), false);
-    }
+                env.push(captures);
+                let rv = f.call_internal(env, 1);
+                env.popn(1);
 
-    if cfg!(feature="chrono") {
-        func!(st, "chrono:timestamp",
-            |env: &mut Env, _argc: usize| {
-                use chrono::prelude::*;
-                let dt = Local::now();
-
-                let fmt = env.arg(0);
-                let fmt = if fmt.is_str() {
-                    fmt.s_raw()
-                } else {
-                    String::from("%Y-%m-%d %H:%M:%S.%f")
-
-                };
-
-                Ok(VVal::new_str_mv(dt.format(&fmt).to_string()))
-            }, Some(0), Some(1), false);
-    }
-
-    if cfg!(feature="serde_json") {
-        func!(st, "ser:json",
-            |env: &mut Env, _argc: usize| {
-                let v = env.arg(0);
-                let pp = env.arg(1).b();
-
-                match v.to_json(pp) {
-                    Ok(s) => Ok(VVal::new_str_mv(s)),
-                    Err(e) => Ok(VVal::err_msg(&e)),
+                match rv {
+                    Ok(v)                      => { ret.push(v); },
+                    Err(StackAction::Break(v)) => { ret.push(v); break; },
+                    Err(StackAction::Next)     => { },
+                    Err(e)                     => { return Err(e); },
                 }
-            }, Some(1), Some(2), false);
+            }
+            Ok(ret)
+        }, Some(3), Some(3), false);
 
-        func!(st, "deser:json",
-            |env: &mut Env, _argc: usize| {
-                let s = env.arg(0).s_raw();
+    #[cfg(feature="chrono")]
+    func!(st, "chrono:timestamp",
+        |env: &mut Env, _argc: usize| {
+            use chrono::prelude::*;
+            let dt = Local::now();
 
-                match VVal::from_json(&s) {
+            let fmt = env.arg(0);
+            let fmt = if fmt.is_str() {
+                fmt.s_raw()
+            } else {
+                String::from("%Y-%m-%d %H:%M:%S.%f")
+
+            };
+
+            Ok(VVal::new_str_mv(dt.format(&fmt).to_string()))
+        }, Some(0), Some(1), false);
+
+    #[cfg(feature="serde_json")]
+    func!(st, "ser:json",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            let pp = env.arg(1).b();
+
+            match v.to_json(pp) {
+                Ok(s) => Ok(VVal::new_str_mv(s)),
+                Err(e) => Ok(VVal::err_msg(&e)),
+            }
+        }, Some(1), Some(2), false);
+
+    #[cfg(feature="serde_json")]
+    func!(st, "deser:json",
+        |env: &mut Env, _argc: usize| {
+            let s = env.arg(0).s_raw();
+
+            match VVal::from_json(&s) {
+                Ok(v) => Ok(v),
+                Err(e) => Ok(VVal::err_msg(&e)),
+            }
+        }, Some(1), Some(1), false);
+
+    #[cfg(feature="rmp-serde")]
+    func!(st, "ser:msgpack",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            match v.to_msgpack() {
+                Ok(s) => Ok(VVal::new_byt(s)),
+                Err(e) => Ok(VVal::err_msg(&e)),
+            }
+        }, Some(1), Some(1), false);
+
+    #[cfg(feature="rmp-serde")]
+    func!(st, "deser:msgpack",
+        |env: &mut Env, _argc: usize| {
+            if let VVal::Byt(u) = env.arg(0) {
+                match VVal::from_msgpack(&u.borrow()[..]) {
                     Ok(v) => Ok(v),
                     Err(e) => Ok(VVal::err_msg(&e)),
                 }
-            }, Some(1), Some(1), false);
-    }
-
-    if cfg!(feature="rmp-serde") {
-        func!(st, "ser:msgpack",
-            |env: &mut Env, _argc: usize| {
-                let v = env.arg(0);
-                match v.to_msgpack() {
-                    Ok(s) => Ok(VVal::new_byt(s)),
-                    Err(e) => Ok(VVal::err_msg(&e)),
-                }
-            }, Some(1), Some(1), false);
-
-        func!(st, "deser:msgpack",
-            |env: &mut Env, _argc: usize| {
-                if let VVal::Byt(u) = env.arg(0) {
-                    match VVal::from_msgpack(&u.borrow()[..]) {
-                        Ok(v) => Ok(v),
-                        Err(e) => Ok(VVal::err_msg(&e)),
-                    }
-                } else {
-                    Ok(VVal::err_msg("deser:msgpack expects bytes"))
-                }
-            }, Some(1), Some(1), false);
-    }
+            } else {
+                Ok(VVal::err_msg("deser:msgpack expects bytes"))
+            }
+        }, Some(1), Some(1), false);
 
     func!(st, "copy",
         |env: &mut Env, _argc: usize| {

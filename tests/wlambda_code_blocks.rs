@@ -1,8 +1,11 @@
+#[cfg(feature="regex")]
 use std::fs::File;
-use regex::Regex;
+#[cfg(feature="regex")]
 use std::io::{BufRead, BufReader};
 
+#[cfg(feature="regex")]
 fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
+    use regex::Regex;
     let f = File::open(filename).expect("Open file");
 
     let rx = Regex::new("```wlambda").unwrap();
@@ -35,6 +38,7 @@ fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
     code_snippets
 }
 
+#[cfg(feature="regex")]
 fn execute_script(name: &str, snippet: &str) {
     use wlambda::EvalContext;
 
@@ -50,27 +54,30 @@ fn execute_script(name: &str, snippet: &str) {
 #[test]
 fn main() {
 
-    for (name, snip) in get_scripts_from_file("src/prelude.rs") {
-        execute_script(&name, &snip);
-    }
+    #[cfg(feature="regex")]
+    {
+        for (name, snip) in get_scripts_from_file("src/prelude.rs") {
+            execute_script(&name, &snip);
+        }
 
-    for (name, snip) in get_scripts_from_file("src/parser.rs") {
-        execute_script(&name, &snip);
-    }
+        for (name, snip) in get_scripts_from_file("src/parser.rs") {
+            execute_script(&name, &snip);
+        }
 
-    for (name, snip) in get_scripts_from_file("src/compiler.rs") {
-        execute_script(&name, &snip);
-    }
+        for (name, snip) in get_scripts_from_file("src/compiler.rs") {
+            execute_script(&name, &snip);
+        }
 
-    for (name, snip) in get_scripts_from_file("src/lib.rs") {
-        execute_script(&name, &snip);
-    }
+        for (name, snip) in get_scripts_from_file("src/lib.rs") {
+            execute_script(&name, &snip);
+        }
 
-    for (name, snip) in get_scripts_from_file("src/vval.rs") {
-        execute_script(&name, &snip);
-    }
+        for (name, snip) in get_scripts_from_file("src/vval.rs") {
+            execute_script(&name, &snip);
+        }
 
-    for (name, snip) in get_scripts_from_file("src/threads.rs") {
-        execute_script(&name, &snip);
+        for (name, snip) in get_scripts_from_file("src/threads.rs") {
+            execute_script(&name, &snip);
+        }
     }
 }

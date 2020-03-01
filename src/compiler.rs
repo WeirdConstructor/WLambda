@@ -3346,24 +3346,22 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature="serde_json")]
     fn check_json() {
-        if cfg!(feature="serde_json") {
-            assert_eq!(s_eval("std:ser:json $[1,1.2,$f,$t,$n,${a=1}]"), "\"[\\n  1,\\n  1.2,\\n  false,\\n  true,\\n  null,\\n  {\\n    \\\"a\\\": 1\\n  }\\n]\"");
-            assert_eq!(s_eval("std:ser:json $[1,1.2,$f,$t,$n,${a=1}] $t"), "\"[1,1.2,false,true,null,{\\\"a\\\":1}]\"");
-            assert_eq!(s_eval("std:deser:json $q$[1,2.3,true,null,{\"a\":10}]$"), "$[1,2.3,$true,$n,${a=10}]");
-        }
+        assert_eq!(s_eval("std:ser:json $[1,1.2,$f,$t,$n,${a=1}]"), "\"[\\n  1,\\n  1.2,\\n  false,\\n  true,\\n  null,\\n  {\\n    \\\"a\\\": 1\\n  }\\n]\"");
+        assert_eq!(s_eval("std:ser:json $[1,1.2,$f,$t,$n,${a=1}] $t"), "\"[1,1.2,false,true,null,{\\\"a\\\":1}]\"");
+        assert_eq!(s_eval("std:deser:json $q$[1,2.3,true,null,{\"a\":10}]$"), "$[1,2.3,$true,$n,${a=10}]");
     }
 
     #[test]
+    #[cfg(feature="rmp-serde")]
     fn check_msgpack() {
-        if cfg!(feature="rmp-serde") {
-            assert_eq!(s_eval("std:deser:msgpack ~ std:ser:msgpack $[1,1.2,$f,$t,$n,${a=1},\"abcä\",$b\"abcä\"]"),
-                       "$[1,1.2,$false,$true,$n,${a=1},\"abcä\",$b\"abc\\xC3\\xA4\"]");
-            assert_eq!(s_eval("std:ser:msgpack $b\"abc\""), "$b\"\\xC4\\x03abc\"");
-            assert_eq!(s_eval("std:ser:msgpack $[1,$n,16.22]"), "$b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\"");
-            assert_eq!(s_eval("std:deser:msgpack $b\"\\xC4\\x03abc\""), "$b\"abc\"");
-            assert_eq!(s_eval("std:deser:msgpack $b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\""), "$[1,$n,16.22]");
-        }
+        assert_eq!(s_eval("std:deser:msgpack ~ std:ser:msgpack $[1,1.2,$f,$t,$n,${a=1},\"abcä\",$b\"abcä\"]"),
+                   "$[1,1.2,$false,$true,$n,${a=1},\"abcä\",$b\"abc\\xC3\\xA4\"]");
+        assert_eq!(s_eval("std:ser:msgpack $b\"abc\""), "$b\"\\xC4\\x03abc\"");
+        assert_eq!(s_eval("std:ser:msgpack $[1,$n,16.22]"), "$b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\"");
+        assert_eq!(s_eval("std:deser:msgpack $b\"\\xC4\\x03abc\""), "$b\"abc\"");
+        assert_eq!(s_eval("std:deser:msgpack $b\"\\x93\\x01\\xC0\\xCB@08Q\\xEB\\x85\\x1E\\xB8\""), "$[1,$n,16.22]");
     }
 
     #[test]
@@ -3438,7 +3436,9 @@ mod tests {
 
     #[test]
     fn check_bytes_impl() {
+        #[cfg(feature="serde_json")]
         assert_eq!(s_eval("std:ser:json $b\"abc\""),                         "\"[\\n  97,\\n  98,\\n  99\\n]\"", "JSON serializer for bytes ok");
+
         assert_eq!(s_eval("str $b\"abc\""),                              "\"abc\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
         assert_eq!(s_eval("str $b\"äbcß\""),                             "\"Ã¤bcÃ\\u{9f}\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
         assert_eq!(s_eval("std:str:from_utf8 $b\"äbcß\""),                   "\"äbcß\"", "Bytes to String from UTF8");
