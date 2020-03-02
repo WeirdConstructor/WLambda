@@ -557,7 +557,7 @@ Bytes are a special kind of strings. Their literal form is:
 ```wlambda
 $b"abc";
 $b"\xFF\xFD\x00";
-$Q/ABCDEF\xFD/;      # \xFD is not an excape sequence here!
+$Q/ABCDEF\xFD/;      # \xFD is not an escape sequence here!
 ```
 
 #### 3.7.1 - Call Properties of Bytes
@@ -629,7 +629,7 @@ std:push v 64;
 std:assert_eq b $b"ABC@";
 ```
 
-There is also an invese operation to `bytes:to_hex`:
+There is also an inverse operation to `bytes:to_hex`:
 
 ```wlambda
 std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
