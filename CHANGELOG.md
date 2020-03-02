@@ -5,6 +5,7 @@
 for it.
 * Feature: Added backtick quoting syntax for identifiers to make it possible
 to get the prefix form of some operators like `/` or `*`.
+* Feature: std:io:stdout:print, :newline and :write added.
 * Bugfix: Cargo.toml default features are now really optional.
 * Documentation: Wrote wlambda\_functions.rs test for checking
 that all std: and core functions are documented.

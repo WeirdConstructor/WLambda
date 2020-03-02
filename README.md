@@ -29,7 +29,7 @@ of Rust's Result type.
 The embedding API and all internal operations rely on a data structure
 made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
-Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-reference).
+Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference)
 
 ## API Hello World
 
