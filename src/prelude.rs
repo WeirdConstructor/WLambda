@@ -86,7 +86,7 @@ out of scope, the reference in the closure does
 not keep it alive. This is important to prevent cyclic refences
 where closures keep captured values unneccessarily alive.
 
-You will also need this to make refencial types such as maps `${ }`
+You will also need this to make referential types such as maps `${ }`
 and vectors `$[ ]` weakly referenced by closures for OOP.
 
 #### 2.1.1 - Object Oriented Programming with Closures
@@ -774,7 +774,9 @@ and access by variable name.
 
 The weakable reference is captured weakly by closures and does not keep the
 referenced value alive if the value reference count drops to zero.
-The strong references are staying strong and need explicit care to handle:
+The strong references will stay strong and need explicit care to handle in the
+function where they are stored directly in a local variable. But if strong
+references are caught, they are also implicitly handled.
 
 ```wlambda
 !x = $& 10;
@@ -789,8 +791,9 @@ And the same with strong references:
 ```wlambda
 !x = $&& 10;
 
-# Explicit handling via reference assignment `.*<var> = <expr>`
-{ .x = 20; }[];
+.*x = 11;
+
+{ .x = 20; }[]; # Closures implicitly handle strong references too
 
 std:assert_eq $*x 20;
 ```
@@ -848,7 +851,7 @@ Here is an overview of the data type calling semantics:
 | `$error`  | -                 | Any call to `$error` will result in a panic. |
 | function  | *                 | Will call the function with the specified arguments. |
 | `$true`   | `f1, f2`          | Will call `f1`.          |
-| `$false`  | `f1, f2`          | Will call `f2`.          |
+| `$false`  | `f1, f2`          | Will call `f2`. Will default to `$n` if not provided. |
 | symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
 |           |                   | |
@@ -1026,9 +1029,9 @@ iteration function. If you don't need that list you should use `for`.
 - !:wref x = y            weak upvalue references
 - !(x, y) = list / map    destructuring assignments
 
-## 6 - Arithmetics
+## 6 - Arithmetic
 
-The output type (float vs. integer) of numerical arithmetics operators is defined
+The output type (float vs. integer) of numerical arithmetic operators is defined
 by the _first_ operand of the operation. Use the casting functions `float` or
 `int` if you are unsure.
 
