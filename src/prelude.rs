@@ -1104,26 +1104,38 @@ Often, you may want to choose one variable or another based on some predicate.
 For these situations, the `pick` function is available.
 For example, perhaps you want to make a function which can take any number of parameters,
 or a single list parameter.
+
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } ~ pick (is_vec _) _ @;
 ```
+
 Booleans can also be used to index into lists.
 When this is done, `$t` represents `1` and `$f` represents `0`.
 This means that we can also express our `sum` function as:
+
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } $[@, _].(is_vec _);
 ```
+
 Furthermore, as `a.b` is equivalent to `b[a]`, one can also write this `sum` function
 by simply invoking `(is_vec _)` and passing in the list of options as a parameter.
+
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } ~ (is_vec _) $[@, _];
 ```
+
 When comparing the `pick` and indexing approaches it is important to note
 that the two possible return values are inverted:
+
 ```wlambda
-pick (x == 20) "x is 20" "x isn't 20";
-$["x isn't 20", "x is 20"].(x == 20);
+!x = 20;
+!res = pick (x == 20) "x is 20" "x isn't 20";
+std:assert_eq res "x is 20";
+
+.res = $["x isn't 20", "x is 20"].(x == 20);
+std:assert_eq res "x is 20";
 ```
+
 With `pick`, the value to return in the `$t` case comes first, followed by the `$f` case's value,
 whereas with indexing approach, the opposite is true.
 
