@@ -4333,4 +4333,12 @@ mod tests {
             std:str:join $q$,$ $[a, b];
         "), "\"19,\"");
     }
+
+    #[test]
+    fn check_trim() {
+        assert_eq!(s_eval("$qX foo X | std:str:trim_start"), "\"foo \"");
+        assert_eq!(s_eval("$qX foo X | std:str:trim_end"),   "\" foo\"");
+        assert_eq!(s_eval("$qX foo X | std:str:trim"),       "\"foo\"");
+        assert_eq!(s_eval("$qX foo \n X | std:str:trim"),    "\"foo\"");
+    }
 }

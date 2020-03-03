@@ -130,6 +130,37 @@ pub enum Syntax {
     VecSplice,
 }
 
+#[derive(Clone)]
+pub struct Stdio {
+    pub write: Rc<RefCell<dyn std::io::Write>>,
+    pub read:  Rc<RefCell<dyn std::io::BufRead>>,
+}
+
+impl Stdio {
+    pub fn new_rust_std() -> Self {
+        Self {
+            write: Rc::new(RefCell::new(std::io::stdout())),
+            read:  Rc::new(RefCell::new(std::io::BufReader::new(std::io::stdin()))),
+        }
+    }
+
+    pub fn new_from_mem(input: Rc<RefCell<std::io::Cursor<Vec<u8>>>>,
+                        output: Rc<RefCell<Vec<u8>>>)
+        -> Self
+    {
+        Self {
+            write: output,
+            read: input,
+        }
+    }
+}
+
+impl std::fmt::Debug for Stdio {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "wlambda::vval::Stdio")
+    }
+}
+
 /// The maximum stack size.
 ///
 /// Currently hardcoded, but later the API user will be able to specify it.
@@ -162,6 +193,10 @@ pub struct Env {
     pub user: Rc<RefCell<dyn std::any::Any>>,
     /// The exported names of this module.
     pub exports: FnvHashMap<String, VVal>,
+    /// This is the standard output used for any functions in
+    /// WLambda that print something. Such as `std:displayln`
+    /// or `std:writeln`.
+    pub stdio: Stdio,
 }
 
 impl Default for Env {
@@ -179,6 +214,7 @@ impl Env {
             argc:               0,
             user:               Rc::new(RefCell::new(VVal::vec())),
             exports:            FnvHashMap::with_capacity_and_hasher(5, Default::default()),
+            stdio:              Stdio::new_rust_std(),
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -193,10 +229,46 @@ impl Env {
             sp:                 0,
             argc:               0,
             exports:            FnvHashMap::with_capacity_and_hasher(2, Default::default()),
+            stdio:              Stdio::new_rust_std(),
             user,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
+    }
+
+    /// Sets a custom stdio procedure. This can be used to redirect the
+    /// standard input/output operations of WLambda to other sinks and sources.
+    /// For instance writing and reading from a Buffer when using WASM
+    /// or some other embedded application:
+    ///
+    /// ```
+    /// use wlambda::*;
+    /// use std::rc::Rc;
+    /// use std::cell::RefCell;
+    ///
+    /// let new_output : Rc<RefCell<Vec<u8>>> =
+    ///     Rc::new(RefCell::new(vec![]));
+    /// let new_input =
+    ///     Rc::new(RefCell::new(std::io::Cursor::new("abc\ndef\n1 2 3 4\n"
+    ///                          .to_string().as_bytes().to_vec())));
+    ///
+    /// let memory_stdio =
+    ///     vval::Stdio::new_from_mem(new_input, new_output.clone());
+    ///
+    /// let mut ctx = EvalContext::new_default();
+    /// ctx.local.borrow_mut().set_stdio(memory_stdio);
+    ///
+    /// ctx.eval("std:displayln :TEST 123").unwrap();
+    ///
+    /// let output = String::from_utf8(new_output.borrow().clone()).unwrap();
+    /// assert_eq!(output, "TEST 123\n");
+    ///
+    /// let out_lines =
+    ///     ctx.eval("!l = $[]; std:io:lines \\std:push l _; l").unwrap().s();
+    /// assert_eq!(out_lines, "$[\"abc\\n\",\"def\\n\",\"1 2 3 4\\n\"]");
+    /// ```
+    pub fn set_stdio(&mut self, stdio: Stdio) {
+        self.stdio = stdio;
     }
 
     /// Returns the passed in user context value.

@@ -6,6 +6,14 @@ for it.
 * Feature: Added backtick quoting syntax for identifiers to make it possible
 to get the prefix form of some operators like `/` or `*`.
 * Feature: std:io:stdout:print, :newline and :write added.
+* Feature: Calling `$true` or `$false` with a vector will return one
+of the first elements.
+* Feature: Added `pick` function for picking values based on a boolean
+value.
+* Feature: Made it possible to capture stdio output/input for
+operations like `std:displayln` and alike.
+* Feature: Added `std:io:lines` for reading lines of UTF-8 text.
+* Feature: Added `std:str:trim`, `:trim_start` and `:trim_end`.
 * Bugfix: Cargo.toml default features are now really optional.
 * Documentation: Wrote wlambda\_functions.rs test for checking
 that all std: and core functions are documented.

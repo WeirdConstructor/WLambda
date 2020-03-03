@@ -1005,11 +1005,15 @@ Here is an overview of the data type calling semantics:
 
 This syntax is useful if you have following function call composition:
 
-    (fn arg1 arg2 (fn2 arg_b1 arg_b2 (fn3 arg_c1 arg_c2 ...)))
+```text
+(fn arg1 arg2 (fn2 arg_b1 arg_b2 (fn3 arg_c1 arg_c2 ...)))
+```
 
 These can be written more comfortably like this:
 
-    fn3 arg1 arg2 | fn2 arg_b1 arg_b2 | fn arg1 arg2
+```text
+fn3 arg1 arg2 | fn2 arg_b1 arg_b2 | fn arg1 arg2
+```
 
 An example with actual values:
 
@@ -1035,17 +1039,23 @@ The call reordering of the `|` operator looks like this:
 
 This syntax is useful if you want to make deep call chains like these:
 
-    (((fn arg1 arg2 ...) arg_b1 arg_b2 ...) arg_c1 arg_c2 ...)
+```text
+(((fn arg1 arg2 ...) arg_b1 arg_b2 ...) arg_c1 arg_c2 ...)
+```
 
 These can be written more comfortably like this:
 
-    fn arg1 arg2 |> arg_b1 arg_b2 |> arg_c1 arg_c2
+```text
+fn arg1 arg2 |> arg_b1 arg_b2 |> arg_c1 arg_c2
+```
 
 or nicer formatted:
 
-    fn arg1 arg2
-        |> arg_b1 arg_b2
-        |> arg_c1 arg_c2
+```text
+fn arg1 arg2
+    |> arg_b1 arg_b2
+    |> arg_c1 arg_c2
+```
 
 Here an actual example:
 
@@ -2314,6 +2324,36 @@ pub fn core_symbol_table() -> SymbolTable {
     st
 }
 
+fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackAction> {
+    let mut write = env.stdio.write.borrow_mut();
+
+    for i in 0..argc {
+        let s =
+            if raw { env.arg(i).s_raw() }
+            else { env.arg(i).s() };
+
+        if i == (argc - 1) {
+            if i > 0 {
+                writeln!(write, " {}", s).ok();
+            } else {
+                writeln!(write, "{}", s).ok();
+            }
+        } else if i > 0 {
+            write!(write, " {}", s).ok();
+        } else {
+            write!(write, "{}", s).ok();
+        }
+    }
+    if argc == 0 {
+        writeln!(write, "").ok();
+    }
+    if argc > 0 {
+        Ok(env.arg(argc - 1))
+    } else {
+        Ok(VVal::Nul)
+    }
+}
+
 /// Returns a SymbolTable with all WLambda standard library language symbols.
 pub fn std_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
@@ -2445,6 +2485,15 @@ pub fn std_symbol_table() -> SymbolTable {
         Some(1), Some(1), false);
     func!(st, "str:to_uppercase",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_uppercase())) },
+        Some(1), Some(1), false);
+    func!(st, "str:trim",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim().to_string())) },
+        Some(1), Some(1), false);
+    func!(st, "str:trim_start",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim_start().to_string())) },
+        Some(1), Some(1), false);
+    func!(st, "str:trim_end",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim_end().to_string())) },
         Some(1), Some(1), false);
     func!(st, "str:padl",
         |env: &mut Env, _argc: usize| {
@@ -2750,24 +2799,76 @@ pub fn std_symbol_table() -> SymbolTable {
             })
         }, Some(1), Some(1), false);
 
+    func!(st, "io:lines",
+        |env: &mut Env, _argc: usize| {
+            let f = env.arg(0);
+            let mut ret = VVal::Nul;
+            loop {
+                let mut line = String::new();
+                {
+                    let mut read = env.stdio.read.borrow_mut();
+                    match read.read_line(&mut line) {
+                        Ok(n) => { if n == 0 { break; } },
+                        Err(e) => {
+                            return Ok(VVal::err_msg(
+                                &format!("IO-Error on std:io:lines: {}", e)))
+                        },
+                    }
+                }
+
+                env.push(VVal::new_str_mv(line));
+                match f.call_internal(env, 1) {
+                    Ok(v)                      => { ret = v; },
+                    Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
+                    Err(StackAction::Next)     => { },
+                    Err(e)                     => { env.popn(1); return Err(e); }
+                }
+                env.popn(1);
+            }
+
+            Ok(ret)
+        }, Some(1), Some(1), false);
+
+    func!(st, "io:stdout:flush",
+        |env: &mut Env, _argc: usize| {
+            if let Err(e) = env.stdio.write.borrow_mut().flush() {
+                Ok(VVal::err_msg(
+                    &format!("IO-Error on std:io:stdout:flush: {}", e)))
+            } else {
+                Ok(VVal::Bol(true))
+            }
+        }, Some(0), Some(0), false);
+
     func!(st, "io:stdout:newline",
-        |_env: &mut Env, _argc: usize| {
-            println!("");
-            Ok(VVal::Bol(true))
+        |env: &mut Env, _argc: usize| {
+            if let Err(e) = writeln!(*env.stdio.write.borrow_mut(), "") {
+                Ok(VVal::err_msg(
+                    &format!("IO-Error on std:io:stdout:newline: {}", e)))
+            } else {
+                Ok(VVal::Bol(true))
+            }
         }, Some(0), Some(0), false);
 
     func!(st, "io:stdout:write",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
-            print!("{}", v.s());
-            Ok(v)
+            if let Err(e) = write!(*env.stdio.write.borrow_mut(), "{}", v.s()) {
+                Ok(VVal::err_msg(
+                    &format!("IO-Error on std:io:stdout:write: {}", e)))
+            } else {
+                Ok(v)
+            }
         }, Some(1), Some(1), false);
 
     func!(st, "io:stdout:print",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
-            print!("{}", v.s_raw());
-            Ok(v)
+            if let Err(e) = write!(*env.stdio.write.borrow_mut(), "{}", v.s_raw()) {
+                Ok(VVal::err_msg(
+                   &format!("IO-Error on std:io:stdout:print: {}", e)))
+            } else {
+                Ok(v)
+            }
         }, Some(1), Some(1), false);
 
     func!(st, "io:file:read_text",
@@ -2928,48 +3029,12 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "writeln",
         |env: &mut Env, argc: usize| {
-            for i in 0..argc {
-                if i == (argc - 1) {
-                    if i > 0 {
-                        println!(" {}", env.arg(i).s());
-                    } else {
-                        println!("{}", env.arg(i).s());
-                    }
-                } else if i > 0 {
-                    print!(" {}", env.arg(i).s());
-                } else {
-                    print!("{}", env.arg(i).s());
-                }
-            }
-            if argc == 0 { println!(""); }
-            if argc > 0 {
-                Ok(env.arg(argc - 1))
-            } else {
-                Ok(VVal::Nul)
-            }
+            print_value(env, argc, false)
         }, None, None, false);
 
     func!(st, "displayln",
         |env: &mut Env, argc: usize| {
-            for i in 0..argc {
-                if i == (argc - 1) {
-                    if i > 0 {
-                        println!(" {}", env.arg(i).s_raw());
-                    } else {
-                        println!("{}", env.arg(i).s_raw());
-                    }
-                } else if i > 0 {
-                    print!(" {}", env.arg(i).s_raw());
-                } else {
-                    print!("{}", env.arg(i).s_raw());
-                }
-            }
-            if argc == 0 { println!(""); }
-            if argc > 0 {
-                Ok(env.arg(argc - 1))
-            } else {
-                Ok(VVal::Nul)
-            }
+            print_value(env, argc, true)
         }, None, None, false);
 
     func!(st, "dump_func",
