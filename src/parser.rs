@@ -19,9 +19,11 @@ to parse in this hand written parser.
 ## Full WLambda Lexical Syntax and Grammar
 
 White space is everything that satisfies `std::char::is_whitespace`,
-so unicode white space is respected. Comments have to following syntax:
+so unicode white space is respected. Comments have the following syntax:
 
-   comment = "#" ?anything except "\n"? "\n"
+```ebnf
+    comment = "#" ?anything except "\n"? "\n"
+```
 
 In the following grammar, white space and comments are omitted:
 
