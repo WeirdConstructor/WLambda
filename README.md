@@ -16,20 +16,21 @@ Here are some of its properties:
   Current performance is roughly in the ball park of (C)Python, which means
   the language is quite possibly too slow where speed is the focus, but fast enough if
   you do any heavy lifting in Rust.
-- No garbage collector. Memory and resource management relies only on reference counting.
+- No garbage collector. Memory and resource management relies only on reference counting and RAII.
 You can create your own drop functions.
 - Main data structures are Lists and Maps.
 - No exceptions, except panics. Error handling is accomplished
 by a specialized data type. It can be thought of as dynamic counterpart
 of Rust's Result type.
 - Prototyped object orientation.
-- Easy maintenance of the implementation.
+- Easy maintenance and hackability of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
+- Has a testable wasm32 version: [WASM WLambda Evaluator](http://wlambda.m8geil.de/#!/main).
 
 The embedding API and all internal operations rely on a data structure
 made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
-Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference)
+Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
 ## API Hello World
 
@@ -45,6 +46,8 @@ match wlambda::compiler::eval("40 + 2") {
 See further down below for more API usage examples!
 
 ## WLambda Language Guide
+
+**Try out WLambda right away in the [WASM WLambda Evaluator](http://wlambda.m8geil.de/#!/main).**
 
 ### Variables
 
@@ -521,10 +524,8 @@ complete for real world use. So my current goals are:
 - Improve reference documentation.
 - DONE: Add proper module support (via !@import and !@export).
 - DONE: Add prototyped inheritance for OOP paradigm.
-- There are currently no plans to change the internal evaluator
-from a closure tree to a VM and/or JIT speedup.
-However, help is appreachiated if someone is able to significantly speed up the
-evaluation without too much breakage.
+- There are no plans to change the internal evaluator to a VM and/or JIT speedup.
+It's one of WLambda's goals to have a simple and easily hackable implementation.
 
 ## License
 

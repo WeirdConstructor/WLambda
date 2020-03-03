@@ -27,6 +27,7 @@ of Rust's Result type.
 - Prototyped object orientation.
 - Easy maintenance and hackability of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
+- Has a testable wasm32 version: [WASM WLambda Evaluator](http://wlambda.m8geil.de/#!/main).
 
 The embedding API and all internal operations rely on a data structure
 made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
@@ -47,6 +48,8 @@ match wlambda::compiler::eval("40 + 2") {
 See further down below for more API usage examples!
 
 # WLambda Language Guide
+
+**Try out WLambda right away in the [WASM WLambda Evaluator](http://wlambda.m8geil.de/#!/main).**
 
 ## Variables
 
