@@ -643,6 +643,16 @@ std:assert ~ not[is_bool ""];
 std:assert ~ not[is_bool 0];
 ```
 
+#### Boolean List Indexing
+
+Booleans can also be used to pick a value from a list
+by calling the boolean with a list as first argument:
+
+```wlambda
+std:assert_eq ($true  $[:a, :b]) :b;
+std:assert_eq ($false $[:a, :b]) :a;
+```
+
 ### <a name="34-64-bit-integers"></a>3.4 - 64-Bit Integers
 
 ### <a name="35-64-bit-floats"></a>3.5 - 64-Bit Floats
@@ -951,6 +961,8 @@ Here is an overview of the data type calling semantics:
 | function  | *                 | Will call the function with the specified arguments. |
 | `$true`   | `f1, f2`          | Will call `f1`.          |
 | `$false`  | `f1, f2`          | Will call `f2` or return `$n` if `f2` is not provided.          |
+| `$true`   | `$[1,2]`          | Will return the second element `2` of the list. |
+| `$false`  | `$[1,2]`          | Will return the first element `1` of the list. |
 | symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
 |           |                   | |
@@ -1049,23 +1061,59 @@ The call reordering of the `|>` operator looks like this:
 ```
 ### <a name="42-control-flow---returning"></a>4.2 - Control Flow - Returning
 
-- \:lbl { ... } syntax and returning
-
 WLambda uses labelled blocks for control flow, as returning from the current function would not be
 very helpful for the control flow in wlambda in case of conditional execution.
 
 ```wlambda
 !some_func = \:outer {
     !x = 10;
-# does stuff
+
+    # does stuff...
 
     (x == 10) {
-return :outer 20
-    }
+        return :outer 20
+    };
 
-# more stuff that is not executed if x == 10.
+    # more stuff that is not executed if x == 10.
 }
 ```
+
+
+#### - block [label] _function_
+
+Calls the _function_ with the given _label_ for `return`to jump to.
+
+If you just want to setup a point inside a function to jump to
+with `return` the `block` function is more convenient to use:
+
+```wlambda
+!y = 1;
+
+!res = block :x {
+    .y = y + 1;
+    (y >= 2) \return :x 20;
+    .y = y + 1;
+    .y = y + 1;
+};
+
+std:assert_eq res 20;
+```
+
+The alternative is the less clear syntax would be in this case:
+
+```wlambda
+!y = 1;
+
+!res = \:x {
+    .y = y + 1;
+    (y >= 2) \return :x 20;
+    .y = y + 1;
+    .y = y + 1;
+}[];
+
+std:assert_eq res 20;
+```
+
 
 ### <a name="43-conditional-execution---if--then--else"></a>4.3 - Conditional Execution - if / then / else
 
