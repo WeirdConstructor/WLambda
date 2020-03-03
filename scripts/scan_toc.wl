@@ -34,7 +34,7 @@
             $data.current_count = $data.current_count + 1;
         };
 
-        !section_number = 
+        !section_number =
             std:str:join "." $[*$data.stack, $data.current_count];
 
         std:push $data.toc $[
@@ -56,12 +56,15 @@
 # from the WLambda code examples:
 .prel = prel | std:re:replace_all $q_(?s)```.*?```_ {|| "" };
 
-std:re:map $q_(#+)\s*(?:<a href=.*?</a>\s*)?(?:[1-9][0-9]*(?:\.[0-9]+)*\s+-)?\s+(.*)_ {
+std:re:map $q_(#+)\s*(?:<a name=.*?</a>\s*)?(?:[1-9][0-9]*(?:\.[0-9]+)*\s*)?\s*-\s+(.*)_ {
     c.feed _.1 _.2 _.0;
 } prel;
 
 c._data.toc {
-    .orig = orig | std:str:replace _.3 ~ std:str:cat _.0 " <a name=\"" _.4 "\"></a>" ~ make_new_section_str[_];
+    .orig = orig
+        | std:str:replace _.3
+              ~ std:str:cat _.0 " <a name=\"" _.4 "\"></a>"
+              ~ make_new_section_str[_];
 };
 
 !new_toc = std:str:join "\n" ~ c._data.toc {
@@ -73,6 +76,8 @@ c._data.toc {
 .orig = orig | std:re:replace_all $q_(?s)\*\*Table Of Contents:\*\*.*?-----_ {||
     std:str:cat "**Table Of Contents:**\n\n" new_toc "\n\n-----"
 };
-std:io:stdout:print orig;
+#std:io:stdout:print orig;
+
+std:io:file:write_safe "src/prelude.rs" orig;
 
 #std:io:stdout:print new_toc;

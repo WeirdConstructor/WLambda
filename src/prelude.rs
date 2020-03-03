@@ -44,6 +44,9 @@ Smalltalk, LISP and Perl.
     - [3.2.1](#321-return-on-error-with-) - Return on error with `_?`
     - [3.2.2](#322-handle-errors-with-onerror) - Handle errors with `on_error`
   - [3.3](#33-booleans) - Booleans
+    - [3.3.1](#331-isbool-any-value) - is_bool _any-value_
+    - [3.3.2](#332-bool-any-value) - bool _any-value_
+    - [3.3.3](#333-boolean-list-indexing) - Boolean List Indexing
   - [3.4](#34-64-bit-integers) - 64-Bit Integers
   - [3.5](#35-64-bit-floats) - 64-Bit Floats
   - [3.6](#36-strings) - Strings
@@ -64,6 +67,7 @@ Smalltalk, LISP and Perl.
     - [4.1.1](#411--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
     - [4.1.2](#412--left-hand-function-chaining) - '|>' Left Hand Function Chaining
   - [4.2](#42-control-flow---returning) - Control Flow - Returning
+    - [4.2.1](#421-block-label-function) - block [label] _function_
   - [4.3](#43-conditional-execution---if--then--else) - Conditional Execution - if / then / else
   - [4.4](#44-iteration) - Iteration
 - [5](#5-lexical-scope-and-variable-assignment) - Lexical Scope and Variable assignment
@@ -612,7 +616,21 @@ std:assert_eq some_num "it is ten";
 std:assert_eq some_num "it is not ten";
 ```
 
-You can cast other values into a boolean with the `bool` function:
+#### <a name="331-isbool-any-value"></a>3.3.1 - is_bool _any-value_
+
+You can check if something is a boolean with `is_bool`:
+
+```wlambda
+std:assert ~ is_bool $true;
+std:assert ~ is_bool $false;
+std:assert ~ not[is_bool $n];
+std:assert ~ not[is_bool ""];
+std:assert ~ not[is_bool 0];
+```
+
+#### <a name="332-bool-any-value"></a>3.3.2 - bool _any-value_
+
+You can cast _any-value_ into a boolean with the `bool` function:
 
 ```wlambda
 std:assert_eq (bool 1)          $true;
@@ -633,17 +651,7 @@ std:assert_eq (bool $b"\x00")   $false;
 std:assert_eq (bool $b"\x01")   $true;
 ```
 
-You can also check if something is a boolean with `is_bool`:
-
-```wlambda
-std:assert ~ is_bool $true;
-std:assert ~ is_bool $false;
-std:assert ~ not[is_bool $n];
-std:assert ~ not[is_bool ""];
-std:assert ~ not[is_bool 0];
-```
-
-#### Boolean List Indexing
+#### <a name="333-boolean-list-indexing"></a>3.3.3 - Boolean List Indexing
 
 Booleans can also be used to pick a value from a list
 by calling the boolean with a list as first argument:
@@ -1079,7 +1087,7 @@ very helpful for the control flow in wlambda in case of conditional execution.
 ```
 
 
-#### - block [label] _function_
+#### <a name="421-block-label-function"></a>4.2.1 - block [label] _function_
 
 Calls the _function_ with the given _label_ for `return`to jump to.
 
