@@ -103,7 +103,7 @@ methods:
 
     # Because access to _weakable_ references is always implicitly
     # dereferenced we need the `$:` capture reference operator to
-    # safe the reference to the map in `self` from being freed
+    # prevent the reference to the map in `self` from being freed
     # once the `new_Cat` function returns:
     $:self
 };
