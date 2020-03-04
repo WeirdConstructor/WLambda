@@ -1100,7 +1100,6 @@ syntax, but still works:
 (x == 20)[{ std:displayln "x is 20" }, { std:displayln "x isn't 20" }]; #=> print "x isn't 20"
 ```
 
-<<<<<<< HEAD
 Often, you may want to choose one variable or another based on some predicate.
 For these situations, the `pick` function is available.
 For example, perhaps you want to make a function which can take any number of parameters,
