@@ -1559,6 +1559,74 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::SelfData => {
                     Ok(Box::new(move |e: &mut Env| { Ok(e.self_object().proto_data()) }))
                 },
+                Syntax::Accum => {
+                    match ast.at(1) {
+                        Some(s) => {
+                            match &s.s_raw()[..] {
+                                "string" => {
+                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+                                    Ok(Box::new(move |e: &mut Env| {
+                                        e.with_accum(
+                                            VVal::new_str(""),
+                                            |e: &mut Env| Ok(ex(e)?))
+                                    }))
+                                },
+                                "bytes" => {
+                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+                                    Ok(Box::new(move |e: &mut Env| {
+                                        e.with_accum(
+                                            VVal::new_byt(vec![]),
+                                            |e: &mut Env| Ok(ex(e)?))
+                                    }))
+                                },
+                                "float" => {
+                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+                                    Ok(Box::new(move |e: &mut Env| {
+                                        e.with_accum(
+                                            VVal::Flt(0.0),
+                                            |e: &mut Env| Ok(ex(e)?))
+                                    }))
+                                },
+                                "int" => {
+                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+                                    Ok(Box::new(move |e: &mut Env| {
+                                        e.with_accum(
+                                            VVal::Int(0),
+                                            |e: &mut Env| Ok(ex(e)?))
+                                    }))
+                                },
+                                "map" => {
+                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+                                    Ok(Box::new(move |e: &mut Env| {
+                                        e.with_accum(
+                                            VVal::map(),
+                                            |e: &mut Env| Ok(ex(e)?))
+                                    }))
+                                },
+                                "vec" => {
+                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+                                    Ok(Box::new(move |e: &mut Env| {
+                                        e.with_accum(
+                                            VVal::vec(),
+                                            |e: &mut Env| Ok(ex(e)?))
+                                    }))
+                                },
+                                "@" => {
+                                    Ok(Box::new(move |e: &mut Env| {
+                                        Ok(e.get_accum_value())
+                                    }))
+                                },
+                                _ => {
+                                    panic!("COMPILER ERROR: BAD ACCUM SYM");
+                                }
+                            }
+                        },
+                        None => {
+                            Ok(Box::new(move |e: &mut Env|
+                                Ok(e.get_accum_function())))
+                        }
+                    }
+                },
                 Syntax::Import => {
                     let prefix = ast.at(1).unwrap();
                     let name   = ast.at(2).unwrap();
@@ -2385,8 +2453,10 @@ mod tests {
         assert_eq!(s_eval("$[94, 38].(is_vec $[])"),                                        "38");
         assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].$t"),          "15");
         assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].(is_none 1)"), "10");
-        assert_eq!(s_eval("$[$[1, 2], $[3, 4]] $t"),                                        "$[2,4]");
-        assert_eq!(s_eval("$[$[1, 2], $[3, 4]] $f"),                                        "$[1,3]");
+        assert_eq!(s_eval("$[$[1, 2], $[3, 4]] $t"),                                        "4");
+        assert_eq!(s_eval("$[$[1, 2], $[3, 4]] $f"),                                        "3");
+        assert_eq!(s_eval("$@v$[$[1, 2], $[3, 4]] \\_|$t|$+"),                              "$[2,4]");
+        assert_eq!(s_eval("$@v$[$[1, 2], $[3, 4]] \\_|$f|$+"),                              "$[1,3]");
         assert_eq!(s_eval("$f $[:a, :b]"),                                                  ":\"a\"");
         assert_eq!(s_eval("$t $[:a, :b]"),                                                  ":\"b\"");
     }
@@ -2443,8 +2513,8 @@ mod tests {
             !x = $&$[1,2,3];
             !y = $&&$[1,2,3];
             !z = std:weaken y;
-            $[x \_ * 2, y \_ * 2, z \_ * 2]
-        "), "$[$[2,4,6],$[2,4,6],$[2,4,6]]");
+            $[$@v x \$+ _ * 2, $@i y \$+ _ * 2, z \_ * 2]
+        "), "$[$[2,4,6],12,6]");
     }
 
     #[test]
@@ -2599,7 +2669,7 @@ mod tests {
         assert_eq!(s_eval(r"
             !l = $&0;
             !x = std:to_drop $[1,2,3] {|| .l = 18; };
-            .x = x { _ * 2 };
+            .x = $@v x { $+ _ * 2 };
             $[$*l, x]
         "), "$[18,$[2,4,6]]");
         assert_eq!(s_eval("!x = std:to_drop $[1,2] {||}; x.1 = 3; x"),
@@ -3302,10 +3372,11 @@ mod tests {
 
     #[test]
     fn check_lst_map() {
-        assert_eq!(s_eval("$[12,1,30] \\_ * 2"),            "$[24,2,60]");
-        assert_eq!(s_eval("$[12,1,304] std:str:len"),       "$[2,1,3]");
-        assert_eq!(s_eval("$[123,22,4304] std:str:len"),    "$[3,2,4]");
-        assert_eq!(s_eval("$[123,22,4304] std:str:len | std:fold 1 \\_ * _1"), "24");
+        assert_eq!(s_eval("$[12,1,30] \\_ * 2"),                         "60");
+        assert_eq!(s_eval("$@v $[12,1,30] \\$+ _ * 2"),                  "$[24,2,60]");
+        assert_eq!(s_eval("$@v $[12,1,304] \\std:str:len _ | $+"),       "$[2,1,3]");
+        assert_eq!(s_eval("$@v $[123,22,4304] \\std:str:len _ | $+"),    "$[3,2,4]");
+        assert_eq!(s_eval("($@v $[123,22,4304] \\std:str:len _ | $+) | std:fold 1 \\_ * _1"), "24");
     }
 
     #[test]
@@ -3331,11 +3402,11 @@ mod tests {
     #[test]
     fn check_prelude_regex() {
         if cfg!(feature="regex") {
-            assert_eq!(s_eval("$q$fofoaaaaofefoeaafefeoaaaa$ | std:re:map $q{(a+)} { _.1 } | std:str:join $q$,$"),
+            assert_eq!(s_eval("($@v $q$fofoaaaaofefoeaafefeoaaaa$ | std:re:map $q{(a+)} { $+ _.1 }) | std:str:join $q$,$"),
                        "\"aaaa,aa,aaaa\"");
             assert_eq!(s_eval("
-                $q$fofoaaaofefoeaaaaafefeoaaaaaaa$
-                | std:re:map $q{(a+)} { std:str:len _.1 }
+                ($@v $q$fofoaaaofefoeaaaaafefeoaaaaaaa$
+                     | std:re:map $q{(a+)} { $+ ~ std:str:len _.1 })
                 | std:fold 1 \\_ * _1"),
                 "105");
 
@@ -3767,8 +3838,8 @@ mod tests {
 
     #[test]
     fn string_map_with_function() {
-        assert_eq!(s_eval("$q$abcdef$   { _ }"), "$[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\"]");
-        assert_eq!(s_eval("$b\"abcdef\" { _ }"), "$[$b\"a\",$b\"b\",$b\"c\",$b\"d\",$b\"e\",$b\"f\"]");
+        assert_eq!(s_eval("$@v $q$abcdef$ $+"), "$[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\"]");
+        assert_eq!(s_eval("$@v $b\"abcdef\" $+"), "$[$b\"a\",$b\"b\",$b\"c\",$b\"d\",$b\"e\",$b\"f\"]");
     }
 
     #[test]
@@ -4340,5 +4411,40 @@ mod tests {
         assert_eq!(s_eval("$qX foo X | std:str:trim_end"),   "\" foo\"");
         assert_eq!(s_eval("$qX foo X | std:str:trim"),       "\"foo\"");
         assert_eq!(s_eval("$qX foo \n X | std:str:trim"),    "\"foo\"");
+    }
+
+    #[test]
+    fn check_accumulator() {
+        assert_eq!(s_eval(r"$@v   $[1,2,3]\$+2*_"),         "$[2,4,6]");
+        assert_eq!(s_eval(r"$@vec $[1,2,3]\$+2*_"),         "$[2,4,6]");
+
+        assert_eq!(s_eval(r"$@i   $[1,2,3]\$+_"),           "6");
+        assert_eq!(s_eval(r"$@int $[1,2,3]\$+_"),           "6");
+
+        assert_eq!(s_eval(r"$@s      $[1,2,3]\$+_"),        "\"123\"");
+        assert_eq!(s_eval(r"$@string $[1,2,3]\$+_"),        "\"123\"");
+
+        assert_eq!(s_eval(r"$@b      $[1,2,3]\$+_"),        "$b\"\\x01\\x02\\x03\"");
+        assert_eq!(s_eval(r"$@bytes  $[1,2,3]\$+_"),        "$b\"\\x01\\x02\\x03\"");
+
+        assert_eq!(s_eval(r"std:num:round ~ 10.0 * $@f     $[1.1,2.1,3.1]\$+_"), "63");
+        assert_eq!(s_eval(r"std:num:round ~ 10.0 * $@float $[1.1,2.1,3.1]\$+_"), "63");
+
+        assert_eq!(s_eval(r"($@m   $[1,2,3]\$+_ 2*_).2"),   "4");
+        assert_eq!(s_eval(r"($@map $[1,2,3]\$+_ 2*_).2"),   "4");
+
+        assert_eq!(s_eval("$@s $+10"),        "\"10\"");
+        assert_eq!(s_eval("$@s $+10.1"),      "\"10.1\"");
+        assert_eq!(s_eval("$@s $+$b\"ABC\""), "\"ABC\"");
+        assert_eq!(s_eval("$@s $+$t"),        "\"$true\"");
+        assert_eq!(s_eval("$@s $+$f"),        "\"$false\"");
+        assert_eq!(s_eval("$@s $+\"ABC\""),   "\"ABC\"");
+
+        assert_eq!(s_eval("$@b $+10"),        "$b\"\\n\"");
+        assert_eq!(s_eval("$@b $+10.1"),      "$b\"\\n\"");
+        assert_eq!(s_eval("$@b $+$b\"ABC\""), "$b\"ABC\"");
+        assert_eq!(s_eval("$@b $+$t"),        "$b\"\\x01\"");
+        assert_eq!(s_eval("$@b $+$f"),        "$b\"\\0\"");
+        assert_eq!(s_eval("$@b $+\"ABC\""),   "$b\"ABC\"");
     }
 }

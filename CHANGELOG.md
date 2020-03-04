@@ -1,6 +1,9 @@
 0.4.4 (unreleased)
 ==================
 
+* Incompatible Change: Removed implicit collection of values when
+iterating over a list. Implemented `$@vec`/`$+` collection/accumulation
+operations for building new data structures.
 * Feature: Added _Left Hand Function Chaining_ syntax `|>` and documentation
 for it.
 * Feature: Added backtick quoting syntax for identifiers to make it possible

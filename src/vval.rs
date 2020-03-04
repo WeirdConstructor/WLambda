@@ -128,6 +128,7 @@ pub enum Syntax {
     DumpStack,
     MapSplice,
     VecSplice,
+    Accum,
 }
 
 #[derive(Clone)]
@@ -197,6 +198,10 @@ pub struct Env {
     /// WLambda that print something. Such as `std:displayln`
     /// or `std:writeln`.
     pub stdio: Stdio,
+    /// Current accumulator value:
+    pub accum_val: VVal,
+    /// Current accumulator function:
+    pub accum_fun: VVal,
 }
 
 impl Default for Env {
@@ -215,6 +220,8 @@ impl Env {
             user:               Rc::new(RefCell::new(VVal::vec())),
             exports:            FnvHashMap::with_capacity_and_hasher(5, Default::default()),
             stdio:              Stdio::new_rust_std(),
+            accum_fun:          VVal::Nul,
+            accum_val:          VVal::Nul,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -230,6 +237,8 @@ impl Env {
             argc:               0,
             exports:            FnvHashMap::with_capacity_and_hasher(2, Default::default()),
             stdio:              Stdio::new_rust_std(),
+            accum_fun:          VVal::Nul,
+            accum_val:          VVal::Nul,
             user,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
@@ -572,6 +581,48 @@ impl Env {
             VVal::CRef(r)  => { r.replace(value); }
             v              => { *v = value }
         }
+    }
+
+    pub fn with_accum<T>(&mut self, v: VVal, acfun: T) -> Result<VVal, StackAction>
+        where T: Fn(&mut Env) -> Result<VVal, StackAction>
+    {
+        let f =
+            match v {
+                VVal::Map(_) => {
+                    VValFun::new_fun(
+                        move |env: &mut Env, _argc: usize| {
+                            let k = env.arg(0);
+                            let v = env.arg(1);
+                            env.accum_val.set_key(&k, v.clone())?;
+                            Ok(v)
+                        }, Some(2), Some(2), false)
+                },
+                _ => {
+                    VValFun::new_fun(
+                        move |env: &mut Env, _argc: usize| {
+                            let v = env.arg(0);
+                            env.accum_val.append(&v);
+                            Ok(v)
+                        }, Some(1), Some(1), false)
+                }
+            };
+
+        let old_val = std::mem::replace(&mut self.accum_val, v);
+        let old_fun = std::mem::replace(&mut self.accum_fun, f);
+
+        acfun(self)?;
+
+        std::mem::replace(&mut self.accum_fun, old_fun);
+
+        Ok(std::mem::replace(&mut self.accum_val, old_val))
+    }
+
+    pub fn get_accum_value(&self) -> VVal {
+        self.accum_val.clone()
+    }
+
+    pub fn get_accum_function(&self) -> VVal {
+        self.accum_fun.clone()
     }
 }
 
@@ -1426,7 +1477,7 @@ impl VVal {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let f = e.arg(0);
 
-                    let ret = VVal::vec();
+                    let mut ret = VVal::Nul;
                     for (k, v) in m.borrow().iter() {
                         e.push(VVal::new_str(k));
                         e.push(v.clone());
@@ -1434,8 +1485,8 @@ impl VVal {
                         e.popn(2);
 
                         match el {
-                            Ok(v)                      => { ret.push(v); },
-                            Err(StackAction::Break(v)) => { ret.push(v); break; },
+                            Ok(v)                      => { ret = v; },
+                            Err(StackAction::Break(v)) => { ret = v; break; },
                             Err(StackAction::Next)     => { },
                             Err(e)                     => { return Err(e); },
                         }
@@ -1450,15 +1501,15 @@ impl VVal {
                     // in the map is passed in as the parameter.
                     let f = e.arg(0);
 
-                    let ret = VVal::vec();
+                    let mut ret = VVal::Nul;
                     for i in l.borrow().iter() {
                         e.push(i.clone());
                         let el = f.call_internal(e, 1);
                         e.popn(1);
 
                         match el {
-                            Ok(v)                      => { ret.push(v); },
-                            Err(StackAction::Break(v)) => { ret.push(v); break; },
+                            Ok(v)                      => { ret = v; },
+                            Err(StackAction::Break(v)) => { ret = v; break; },
                             Err(StackAction::Next)     => { },
                             Err(e)                     => { return Err(e); },
                         }
@@ -1511,14 +1562,14 @@ impl VVal {
                                 }
                             },
                             VVal::Fun(_) => {
-                                let ret = VVal::vec();
+                                let mut ret = VVal::Nul;
                                 for c in vval_bytes.borrow().iter() {
                                     e.push(VVal::new_byt(vec![*c]));
                                     let el = first_arg.call_internal(e, 1);
                                     e.popn(1);
                                     match el {
-                                        Ok(v)                      => { ret.push(v); },
-                                        Err(StackAction::Break(v)) => { ret.push(v); break; },
+                                        Ok(v)                      => { ret = v; },
+                                        Err(StackAction::Break(v)) => { ret = v; break; },
                                         Err(StackAction::Next)     => { },
                                         Err(e)                     => { return Err(e); },
                                     }
@@ -1569,14 +1620,14 @@ impl VVal {
                                 }
                             },
                             VVal::Fun(_) => {
-                                let ret = VVal::vec();
+                                let mut ret = VVal::Nul;
                                 for c in vval_str.borrow().chars() {
                                     e.push(VVal::new_str_mv(c.to_string()));
                                     let el = first_arg.call_internal(e, 1);
                                     e.popn(1);
                                     match el {
-                                        Ok(v)                      => { ret.push(v); },
-                                        Err(StackAction::Break(v)) => { ret.push(v); break; },
+                                        Ok(v)                      => { ret = v; },
+                                        Err(StackAction::Break(v)) => { ret = v; break; },
                                         Err(StackAction::Next)     => { },
                                         Err(e)                     => { return Err(e); },
                                     }
@@ -2090,6 +2141,41 @@ impl VVal {
             b.borrow_mut().pop().unwrap_or(VVal::Nul)
         } else {
             VVal::Nul
+        }
+    }
+
+    pub fn append(&mut self, val: &VVal) {
+        match self {
+            VVal::Byt(b) => {
+                let mut acc = b.borrow_mut();
+                match val {
+                    VVal::Int(i) => { acc.push(*i as u8); },
+                    VVal::Flt(f) => { acc.push(*f as u8); },
+                    VVal::Str(s) => { acc.extend_from_slice(s.borrow().as_bytes()); },
+                    VVal::Sym(s) => { acc.extend_from_slice(s.borrow().as_bytes()); },
+                    VVal::Byt(s) => { acc.extend_from_slice(&s.borrow()); },
+                    VVal::Bol(b) => { acc.push(*b as u8); },
+                    _ => { acc.extend_from_slice(val.s_raw().as_bytes()); }
+                }
+            },
+            VVal::Str(a) => {
+                let mut acc = a.borrow_mut();
+                match val {
+                    VVal::Str(s) => { acc.push_str(&s.borrow()); },
+                    VVal::Sym(s) => { acc.push_str(&s.borrow()); },
+                    VVal::Byt(s) => {
+                        for b in s.borrow().iter() {
+                            let b = *b as char;
+                            acc.push(b);
+                        }
+                    },
+                    _ => { acc.push_str(&val.s_raw()); }
+                }
+            },
+            VVal::Int(i) => { *i += val.i(); },
+            VVal::Flt(f) => { *f += val.f(); },
+            VVal::Lst(v) => { v.borrow_mut().push(val.clone()); },
+            _ => (),
         }
     }
 

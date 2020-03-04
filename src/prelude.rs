@@ -1246,12 +1246,14 @@ fn arg1 arg2
 Here an actual example:
 
 ```wlambda
-!res =
-    $[1,2,3]
-    |> { _ * 2 }
-    |> { _ + 3 };
+!res = $@v
+    1 + 1
+    |> $["abc", "def", "ceg"]
+    |> { $+ ~ std:str:cat "|" _ "|" };
 
-std:assert_eq (str res) "$[5,7,9]";
+std:assert_eq res.0 "|c|";
+std:assert_eq res.1 "|e|";
+std:assert_eq res.2 "|g|";
 ```
 
 The call reordering of the `|>` operator looks like this:
@@ -1522,13 +1524,142 @@ that iteratively call you react to it, like `std:re:map` and `std:re:replace_all
 std:assert_eq ret :DONE;
 ```
 
-An example where the list iteration is stopped, but note
-that the argument value of break will be accumulated into the list:
+An example where the list iteration is stopped:
 
 ```wlambda
-!list = $[1,2,3,4] { (_ > 3) { break :XX }; _ };
+!val = $[1,2,3,4] { (_ > 3) { break :XX }; _ };
 
-std:assert_eq (str list) "$[1,2,3,:\"XX\"]";
+std:assert_eq val :XX;
+```
+
+### - Accumulation and Collection
+
+WLambda provides special syntax and semantics for accumulating or collecting
+values while iterating through lists. There are following special syntax
+constructs:
+
+| Syntax            | Semantics |
+|-------------------|-----------|
+| $@v _expr_        | Setup collection of values in a vector, evaluates _expr_ and returns the vector. |
+| $@vec _expr_      | Same as $@v |
+| $@m _expr_        | Setup collection of key/value pairs in a map, evaluates _expr_ and returns the vector. |
+| $@map _expr_      | Same as $@m |
+| $@s _expr_        | Setup appending of values to a string, evaluates _expr_ and returns the string. |
+| $@string _expr_   | Same as $@s |
+| $@b _expr_        | Setup collection of values in a byte vector, evaluates _expr_ and returns byte vector. |
+| $@bytes _expr_    | Same as $@b |
+| $@i _expr_        | Setup accumulation in an integer, evaluates _expr_ and returns the integer sum. |
+| $@int _expr_      | Same as $@i |
+| $@f _expr_        | Setup accumulation in a float, evaluates _expr_ and returns the float sum. |
+| $@flt _expr_      | Same as $@f |
+| $+                | Evaluated to a function that can be called to add/append a new value to the current collection/accumulation. |
+| $@@               | Access the current accumulation value. |
+
+#### - Transforming a vector
+
+If you just want to do something with items in a vector and
+construct a new one from the results:
+
+```wlambda
+!result = $@vec $[1,2,3,4] \$+ _ * 2;   # multiply each item by 2
+
+std:assert_eq (str result)  "$[2,4,6,8]";
+```
+
+#### - Example of `$@@`
+
+Here is an interesting example how $@@ might be used:
+
+```wlambda
+
+!list_of_lists = $[];
+!result = $@vec $[1,2,3,4] {
+    $+ 2 * _;               # put the value into the list
+    std:push list_of_lists
+        ~ std:copy $@@; # construct a list of intermediate results
+};
+
+std:assert_eq (str result) "$[2,4,6,8]";
+
+std:assert_eq (str list_of_lists)
+    "$[$[2],$[2,4],$[2,4,6],$[2,4,6,8]]";
+```
+
+#### - Transforming a vector to a map
+
+For constructing maps the `$@map` construct is available.
+In the following example we transform a vector of pairs into a map:
+
+```wlambda
+
+!result = $@map $[ $[:a, 10], $[:b, 33], $[:c, 99] ] {
+    !(key, value) = _;
+    $+ key value;
+};
+
+std:assert_eq result.a 10;
+std:assert_eq result.b 33;
+std:assert_eq result.c 99;
+```
+
+#### - Iteratively concatenating strings
+
+In case you need to construct a longer text the `$@string` construct allows
+you to efficiently create a long string. For demonstration purposes
+we compare the following inefficient code with the usage of `$@string`:
+
+```wlambda
+# Inefficient example:
+
+!accum = "";
+$["abc", "def", "ghi", "XXX"] {
+    .accum = accum _;   # allocates a new string each iteration
+};
+
+std:assert_eq accum "abcdefghiXXX";
+```
+
+In theory for this constructed example the quickest way would
+be to use `std:str:join`:
+
+```wlambda
+!accum = std:str:join "" $["abc", "def", "ghi", "XXX"];
+
+std:assert_eq accum "abcdefghiXXX";
+```
+
+But maybe you need to transform or construct the strings before joining:
+
+```wlambda
+!transform = { ">" _ };
+
+!accum = $@string $["abc", "def", "ghi", "XXX"] {
+    $+[transform _] # appends the string to the accumulation string
+};
+
+std:assert_eq accum ">abc>def>ghi>XXX";
+```
+
+#### - Accumulating sums
+
+The following examples show how accumulation of values with `$@int` and `$@float` work.
+
+```wlambda
+!sum = $@int $[1,2,3,4] {
+    $+ _
+};
+
+std:assert_eq sum 10;
+```
+
+And with floats:
+
+```wlambda
+!sum = $@float $[1.2,1.3,2.2,3.4] {
+    $+ _
+};
+
+std:assert_eq (std:num:round 10.0 * sum) 81.0;
 ```
 
 ## <a name="6-arithmetic"></a>6 - Arithmetic
@@ -2850,11 +2981,20 @@ pub fn std_symbol_table() -> SymbolTable {
         }, Some(3), Some(3), false);
     func!(st, "str:join",
         |env: &mut Env, _argc: usize| {
-            let sep = env.arg(0).s_raw();
+            let sep = env.arg(0);
             let lst = env.arg(1);
             if let VVal::Lst(l) = lst {
-                let svec : Vec<String> = l.borrow().iter().map(|v| v.s_raw()).collect();
-                Ok(VVal::new_str_mv((&svec).join(&sep)))
+                let mut s = VVal::new_str("");
+                let mut first = true;
+                for item in l.borrow().iter() {
+                    if !first {
+                        s.append(&sep);
+                    } else {
+                        first = false;
+                    }
+                    s.append(item);
+                }
+                Ok(s)
 
             } else {
                 Ok(VVal::err_msg(
@@ -3587,7 +3727,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
             let rx = rx.unwrap();
 
-            let ret = VVal::vec();
+            let mut ret = VVal::Nul;
             for capts in rx.captures_iter(&text) {
                 let captures = VVal::vec();
                 for cap in capts.iter() {
@@ -3603,8 +3743,8 @@ pub fn std_symbol_table() -> SymbolTable {
                 env.popn(1);
 
                 match rv {
-                    Ok(v)                      => { ret.push(v); },
-                    Err(StackAction::Break(v)) => { ret.push(v); break; },
+                    Ok(v)                      => { ret = v; },
+                    Err(StackAction::Break(v)) => { ret = v; break; },
                     Err(StackAction::Next)     => { },
                     Err(e)                     => { return Err(e); },
                 }
