@@ -1305,6 +1305,7 @@ fn generate_get_key(map: EvalNode, idx: EvalNode, spos: SynPos, method: bool)
             let s = check_error_value(idx(e)?, "field idx/key")?;
             match s {
                 VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                VVal::Bol(b)  => Ok(m.at(b as usize).unwrap_or(VVal::Nul)),
                 VVal::Sym(sy) => Ok(m.proto_lookup(&sy.borrow()).unwrap_or(VVal::Nul)),
                 VVal::Str(sy) => Ok(m.proto_lookup(&sy.borrow()).unwrap_or(VVal::Nul)),
                 _ => {
@@ -1326,6 +1327,7 @@ fn generate_get_key(map: EvalNode, idx: EvalNode, spos: SynPos, method: bool)
             let s = check_error_value(idx(e)?, "field idx/key")?;
             match s {
                 VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                VVal::Bol(b)  => Ok(m.at(b as usize).unwrap_or(VVal::Nul)),
                 VVal::Sym(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
                 VVal::Str(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
                 _ => {
