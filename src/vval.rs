@@ -1362,30 +1362,25 @@ impl VVal {
             },
             VVal::Lst(l) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    match e.arg(0) {
-                        // calling a list with a boolean as the parameter indexes into the list using
-                        // the boolean, such that $t yields the 1st value and $f yields the second.
-                        VVal::Bol(b) => Ok(self.at(b as usize).unwrap_or(VVal::Nul)),
-                        // calling a list with any other value is an implicit map, meaning that for
-                        // each value in the list the argument is called and the respective element
-                        // in the map is passed in as the parameter.
-                        f => {
-                            let ret = VVal::vec();
-                            for i in l.borrow().iter() {
-                                e.push(i.clone());
-                                let el = f.call_internal(e, 1);
-                                e.popn(1);
+                    // calling a list with any other value is an implicit map, meaning that for
+                    // each value in the list the argument is called and the respective element
+                    // in the map is passed in as the parameter.
+                    let f = e.arg(0);
 
-                                match el {
-                                    Ok(v)                      => { ret.push(v); },
-                                    Err(StackAction::Break(v)) => { ret.push(v); break; },
-                                    Err(StackAction::Next)     => { },
-                                    Err(e)                     => { return Err(e); },
-                                }
-                            }
-                            Ok(ret)
+                    let ret = VVal::vec();
+                    for i in l.borrow().iter() {
+                        e.push(i.clone());
+                        let el = f.call_internal(e, 1);
+                        e.popn(1);
+
+                        match el {
+                            Ok(v)                      => { ret.push(v); },
+                            Err(StackAction::Break(v)) => { ret.push(v); break; },
+                            Err(StackAction::Next)     => { },
+                            Err(e)                     => { return Err(e); },
                         }
                     }
+                    Ok(ret)
                 })
             },
             VVal::Byt(vval_bytes) => {

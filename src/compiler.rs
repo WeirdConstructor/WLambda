@@ -2373,10 +2373,10 @@ mod tests {
 
     #[test]
     fn check_list_boolean_indexing() {
-        assert_eq!(s_eval("$[\"hi\", \"there\"] $t"), s_eval("pick $f \"hi\" \"there\""));
+        assert_eq!(s_eval("$[\"hi\", \"there\"].$t"), s_eval("pick $f \"hi\" \"there\""));
         assert_eq!(s_eval("$[94, 38].(is_vec $[])"), "38");
-        assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[] $t"), "15");
         assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].$t"), "15");
+        assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].(is_none 1)"), "10");
     }
 
     #[test]
