@@ -26,4 +26,6 @@ rmp-serde  = { version = "0.14.0", optional = true }
 
 [profile.release]
 #debug = true
-opt-level="s"
+#opt-level="z"
+lto = true
+panic = 'abort'

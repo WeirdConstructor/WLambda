@@ -11,7 +11,7 @@ fn get_functions_from_file(filename: &str) -> Vec<String> {
     use regex::Regex;
     let f = File::open(filename).expect("Open file");
 
-    let rx = Regex::new("^####\\s+(\\S+)").unwrap();
+    let rx = Regex::new("^####\\s+(?:<a.*?</a>\\s*)?[0-9\\.]*\\s*-\\s*(\\S+)").unwrap();
 
     let mut functions = Vec::new();
 

@@ -84,6 +84,8 @@ In the following grammar, white space and comments are omitted:
     byte_string   = "b", string
                   ;
     quote_string  = "q", ?any character as quote?, { ?any character? }, ?any character as quote?
+                  | "Q", ?any character as quote?, { ?any character? }, ?any character as quote?
+                    (* but Q generates a byte string instead! *)
                   ;
     list_expr     = "*", expr   (* splices the vector result of 'expr'
                                    into the currently parsed list *)

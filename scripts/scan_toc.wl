@@ -1,5 +1,13 @@
 !prel = std:io:file:read_text "src/prelude.rs";
 
+!make_new_section_str = { std:str:cat _.1 " - " _.2 };
+
+!strip_for_anchor_name = {
+    std:str:to_lowercase
+        ~ std:re:replace_all $q$ $ {|| "-" }
+        ~ std:re:replace_all $q$[^ a-zA-Z0-9-]$ {|| "" } _
+};
+
 !collector = ${
     new = \${
         _proto = $self,
@@ -10,7 +18,7 @@
             stack         = $[],
         }
     },
-    feed = \:feed{!(depth_marker, title) = @;
+    feed = \:feed{!(depth_marker, title, line) = @;
         ((len depth_marker) == 1) {
             return :feed $n;
         };
@@ -26,10 +34,15 @@
             $data.current_count = $data.current_count + 1;
         };
 
+        !section_number = 
+            std:str:join "." $[*$data.stack, $data.current_count];
+
         std:push $data.toc $[
             depth_marker,
-            std:str:join "." $[*$data.stack, $data.current_count],
-            title
+            section_number,
+            title,
+            line,
+            strip_for_anchor_name ~ std:str:cat section_number " " title,
         ];
 
         $data.current_count = $data.current_count + 1;
@@ -39,17 +52,27 @@
 !c = collector.new[];
 
 !orig = prel;
-# remove code fragments:
+# remove code fragments, or else we get all the # comments
+# from the WLambda code examples:
 .prel = prel | std:re:replace_all $q_(?s)```.*?```_ {|| "" };
 
-#!toc
-
-#!root = section.new[];
-
-#!section_counter
-std:re:map $q_(#+)\s*(?:[1-9]+(?:\.[0-9])*)?\s+(.*)_ {
-    std:displayln _.1 _.2;
-    c.feed _.1 _.2;
+std:re:map $q_(#+)\s*(?:<a href=.*?</a>\s*)?(?:[1-9][0-9]*(?:\.[0-9]+)*\s+-)?\s+(.*)_ {
+    c.feed _.1 _.2 _.0;
 } prel;
 
-c._data.toc std:displayln;
+c._data.toc {
+    .orig = orig | std:str:replace _.3 ~ std:str:cat _.0 " <a name=\"" _.4 "\"></a>" ~ make_new_section_str[_];
+};
+
+!new_toc = std:str:join "\n" ~ c._data.toc {
+    !pad = "";
+    range 3 (len _.0) 1 {|| .pad = pad "  "; };
+    std:str:cat pad "- [" _.1 "](#" _.4 ") - " _.2
+};
+
+.orig = orig | std:re:replace_all $q_(?s)\*\*Table Of Contents:\*\*.*?-----_ {||
+    std:str:cat "**Table Of Contents:**\n\n" new_toc "\n\n-----"
+};
+std:io:stdout:print orig;
+
+#std:io:stdout:print new_toc;
