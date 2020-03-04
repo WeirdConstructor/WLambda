@@ -2377,6 +2377,7 @@ mod tests {
         assert_eq!(s_eval("$[94, 38].(is_vec $[])"), "38");
         assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].$t"), "15");
         assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].(is_none 1)"), "10");
+        assert_eq!(s_eval("$[$[1, 2], $[2, 1]] $f"), "$[1,2]");
     }
 
     #[test]

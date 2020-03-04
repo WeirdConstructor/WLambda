@@ -1316,15 +1316,26 @@ impl VVal {
             },
             VVal::Bol(b) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    let idx = if *b { 0 } else { 1 };
-                    if argc > 0 {
-                        let v = e.arg(idx);
-                        if !v.is_none() {
-                            v.call_internal(e, 0)
-                        } else {
-                            Ok(VVal::Nul)
+                    let first = e.arg(0);
+                    match first {
+                        // Calling a boolean on a list converts the boolean into an integer
+                        // and fetches the value at that index.
+                        VVal::Lst(_) => Ok(first.at(*b as usize).unwrap_or(VVal::Nul)),
+                        // Calling a boolean with anything else becomes an implicit `if`,
+                        // calling the first parameter if the boolean is true
+                        // and the second if the boolean is false.
+                        _ => {
+                            let idx = if *b { 0 } else { 1 };
+                            if argc > 0 {
+                                let v = e.arg(idx);
+                                if !v.is_none() {
+                                    v.call_internal(e, 0)
+                                } else {
+                                    Ok(VVal::Nul)
+                                }
+                            } else { Ok(self.clone()) }
                         }
-                    } else { Ok(self.clone()) }
+                    }
                 })
             },
             VVal::Err(e) => {

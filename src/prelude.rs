@@ -1114,12 +1114,6 @@ This means that we can also express our `sum` function as:
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } $[@, _].(is_vec _);
 ```
-Furthermore, calling a list with a boolean parameter has the same effect as
-indexing into that list with a boolean, so a third way to make our `sum` function
-would be like so:
-```wlambda
-!sum = \|| std:fold 0 { _ + _1 } ~ $[@, _] (is_vec _);
-```
 When comparing the `pick` and indexing approaches it is important to note
 that the two possible return values are inverted:
 ```
