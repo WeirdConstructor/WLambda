@@ -81,6 +81,12 @@ Smalltalk, LISP and Perl.
     - [5.4.1](#541-while-predicate-fun) - while _predicate_ _fun_
     - [5.4.2](#542-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
     - [5.4.3](#543-break-value) - break _value_
+  - [5.5](#55-accumulation-and-collection) - Accumulation and Collection
+    - [5.5.1](#551-transforming-a-vector) - Transforming a vector
+    - [5.5.2](#552-example-of-) - Example of `$@@`
+    - [5.5.3](#553-transforming-a-vector-to-a-map) - Transforming a vector to a map
+    - [5.5.4](#554-iteratively-concatenating-strings) - Iteratively concatenating strings
+    - [5.5.5](#555-accumulating-sums) - Accumulating sums
 - [6](#6-arithmetic) - Arithmetic
     - [6.1](#61--operand-1-operand-2-) - + _operand-1_ _operand-2_ ...
     - [6.1.1](#611---operand-1-operand-2-) - - _operand-1_ _operand-2_ ...
@@ -1532,7 +1538,7 @@ An example where the list iteration is stopped:
 std:assert_eq val :XX;
 ```
 
-### - Accumulation and Collection
+### <a name="55-accumulation-and-collection"></a>5.5 - Accumulation and Collection
 
 WLambda provides special syntax and semantics for accumulating or collecting
 values while iterating through lists. There are following special syntax
@@ -1555,7 +1561,7 @@ constructs:
 | $+                | Evaluated to a function that can be called to add/append a new value to the current collection/accumulation. |
 | $@@               | Access the current accumulation value. |
 
-#### - Transforming a vector
+#### <a name="551-transforming-a-vector"></a>5.5.1 - Transforming a vector
 
 If you just want to do something with items in a vector and
 construct a new one from the results:
@@ -1566,7 +1572,7 @@ construct a new one from the results:
 std:assert_eq (str result)  "$[2,4,6,8]";
 ```
 
-#### - Example of `$@@`
+#### <a name="552-example-of-"></a>5.5.2 - Example of `$@@`
 
 Here is an interesting example how $@@ might be used:
 
@@ -1585,7 +1591,7 @@ std:assert_eq (str list_of_lists)
     "$[$[2],$[2,4],$[2,4,6],$[2,4,6,8]]";
 ```
 
-#### - Transforming a vector to a map
+#### <a name="551-transforming-a-vector"></a>5.5.1 - Transforming a vector to a map
 
 For constructing maps the `$@map` construct is available.
 In the following example we transform a vector of pairs into a map:
@@ -1602,7 +1608,7 @@ std:assert_eq result.b 33;
 std:assert_eq result.c 99;
 ```
 
-#### - Iteratively concatenating strings
+#### <a name="554-iteratively-concatenating-strings"></a>5.5.4 - Iteratively concatenating strings
 
 In case you need to construct a longer text the `$@string` construct allows
 you to efficiently create a long string. For demonstration purposes
@@ -1640,7 +1646,7 @@ But maybe you need to transform or construct the strings before joining:
 std:assert_eq accum ">abc>def>ghi>XXX";
 ```
 
-#### - Accumulating sums
+#### <a name="555-accumulating-sums"></a>5.5.5 - Accumulating sums
 
 The following examples show how accumulation of values with `$@int` and `$@float` work.
 
