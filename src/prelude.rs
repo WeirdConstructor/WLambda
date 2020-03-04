@@ -62,6 +62,7 @@ Smalltalk, LISP and Perl.
   - [4.8](#48-symbols) - Symbols
   - [4.9](#49-vectors-or-lists) - Vectors (or Lists)
     - [4.9.1](#491-splicing) - Splicing
+    - [4.9.2](#492-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
   - [4.10](#410-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
     - [4.10.1](#4101-splicing) - Splicing
   - [4.11](#411-references) - References
@@ -108,12 +109,14 @@ Smalltalk, LISP and Perl.
     - [11.1](#111-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
     - [11.1.1](#1111-stdcopy-vecormap) - std:copy _vec_or_map_
     - [11.1.2](#1112-stdsort-comparefun-vec) - std:sort [_compare_fun_] _vec_
-    - [11.1.3](#1113-stddisplayln-arg1-) - std:displayln _arg1_ ...
-    - [11.1.4](#1114-stdwriteln-arg1-) - std:writeln _arg1_ ...
-    - [11.1.5](#1115-stdstrwrite-arg) - std:str:write _arg_
-    - [11.1.6](#1116-stdeval-code-string) - std:eval _code-string_
-    - [11.1.7](#1117-stdassert-bool-message) - std:assert _bool_ \[_message_]
-    - [11.1.8](#1118-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
+    - [11.1.3](#1113-stdcmpnumasc-a-b) - std:cmp:num:asc _a_ _b_
+    - [11.1.4](#1114-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
+    - [11.1.5](#1115-stddisplayln-arg1-) - std:displayln _arg1_ ...
+    - [11.1.6](#1116-stdwriteln-arg1-) - std:writeln _arg1_ ...
+    - [11.1.7](#1117-stdstrwrite-arg) - std:str:write _arg_
+    - [11.1.8](#1118-stdeval-code-string) - std:eval _code-string_
+    - [11.1.9](#1119-stdassert-bool-message) - std:assert _bool_ \[_message_]
+    - [11.1.10](#11110-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
   - [11.2](#112-io) - I/O
     - [11.2.1](#1121-stdiofilereadtext-filename) - std:io:file:read_text _filename_
     - [11.2.2](#1122-stdiofileread-filename) - std:io:file:read _filename_
@@ -962,6 +965,25 @@ std:assert_eq some_vec.(1 + 1) 3;
 
 # A more direct example:
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
+```
+
+#### <a name="492-stdappend-vec-a-value-or-vec-"></a>4.9.2 - std:append _vec-a_ _value-or-vec_ ...
+
+Appends _value-or-vec_ and all following items to _vec-a_.
+If _value-or-vec_ is a vector, all it's items will be appended to _vec-a_.
+
+```wlambda
+!v = std:append $[1,2,3] :a :b $[:c, :d];
+
+std:assert_eq (str v) "$[1,2,3,:\"a\",:\"b\",:\"c\",:\"d\"]";
+```
+
+If _vec-a_ is not a vector, a vector containing it will be created:
+
+```wlambda
+!v = std:append 1 :a :b $[:c, :d];
+
+std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
 ```
 
 ### <a name="410-associative-maps-or-string-to-value-mappings"></a>4.10 - Associative Maps (or String to Value mappings)
@@ -1814,7 +1836,39 @@ std:assert_eq v.1.0 1;
 std:assert_eq v.2.0 -1;
 ```
 
-#### <a name="1113-stddisplayln-arg1-"></a>11.1.3 - std:displayln _arg1_ ...
+#### <a name="1113-stdcmpnumasc-a-b"></a>11.1.3 - std:cmp:num:asc _a_ _b_
+
+Compares _a_ and _b_ numerically and returns:
+
+| Cases         | Return Value |
+|---------------|--------------|
+| _a_ > _b_     | -1           |
+| _a_ == _b_    | 0            |
+| _a_ < _b_     | 1            |
+
+```wlambda
+std:assert_eq (std:cmp:num:asc 20 2)        -1;
+std:assert_eq (std:cmp:num:asc "20" "20")    0;
+std:assert_eq (std:cmp:num:asc 20 21)        1;
+```
+
+#### <a name="1114-stdcmpnumdesc-a-b"></a>11.1.4 - std:cmp:num:desc _a_ _b_
+
+Compares _a_ and _b_ numerically descending and returns:
+
+| Cases         | Return Value |
+|---------------|--------------|
+| _a_ > _b_     | 1            |
+| _a_ == _b_    | 0            |
+| _a_ < _b_     | -1           |
+
+```wlambda
+std:assert_eq (std:cmp:num:desc "20" "2")     1;
+std:assert_eq (std:cmp:num:desc "20" "20")    0;
+std:assert_eq (std:cmp:num:desc 20 21)       -1;
+```
+
+#### <a name="1115-stddisplayln-arg1-"></a>11.1.5 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -1828,7 +1882,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles it's argument like written via `std:str:write` instead of `str`.
 
-#### <a name="1114-stdwriteln-arg1-"></a>11.1.4 - std:writeln _arg1_ ...
+#### <a name="1116-stdwriteln-arg1-"></a>11.1.6 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of it's arguments
 (with a space inbetween) to standard output. This means that:
@@ -1843,7 +1897,7 @@ See also the description of `std:str:write`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="1115-stdstrwrite-arg"></a>11.1.5 - std:str:write _arg_
+#### <a name="1117-stdstrwrite-arg"></a>11.1.7 - std:str:write _arg_
 
 Returns the WLambda representation of the value _arg_ as string.
 
@@ -1859,7 +1913,7 @@ std:assert_eq (std:str:write $none) $q|$n|;
 std:assert_eq (std:str:write $[1,:a]) $q|$[1,:"a"]|;
 ```
 
-#### <a name="1116-stdeval-code-string"></a>11.1.6 - std:eval _code-string_
+#### <a name="1118-stdeval-code-string"></a>11.1.8 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -1871,7 +1925,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="1117-stdassert-bool-message"></a>11.1.7 - std:assert _bool_ \[_message_]
+#### <a name="1119-stdassert-bool-message"></a>11.1.9 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -1882,7 +1936,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="1118-stdasserteq-actual-expected-message"></a>11.1.8 - std:assert_eq _actual_ _expected_ \[_message_]
+#### <a name="11110-stdasserteq-actual-expected-message"></a>11.1.10 - std:assert_eq _actual_ _expected_ \[_message_]
 
 This function check if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
