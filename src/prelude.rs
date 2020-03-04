@@ -28,49 +28,55 @@ syntax and semantics of WLambda are different from what you might know. Think
 of it more like a LISP without parenthesis. The syntax is loosely inspired from
 Smalltalk, LISP and Perl.
 
+-----
 **Table Of Contents:**
 
 - [1](#1-syntax) - Syntax
-- [2](#2-functions-part-12) - Functions (part 1/2)
-  - [2.1](#21-closures) - Closures
-    - [2.1.1](#211-object-oriented-programming-with-closures) - Object Oriented Programming with Closures
-  - [2.2](#22-function-calling) - Function calling
-  - [2.3](#23-function-arity-checks) - Function arity checks
-  - [2.4](#24-calling-fields--method-calling) - Calling fields / Method calling
-    - [2.4.1](#241-object-oriented-programming-with-prototypes) - Object Oriented Programming with Prototypes
-- [3](#3-data-types) - Data Types
-  - [3.1](#31-none-sentinel-value-n-or-none) - None sentinel value: `$n` or `$none`
-  - [3.2](#32-error-values-e-expr-or-error-expr) - Error values: `$e expr` or `$error expr`
-    - [3.2.1](#321-return-on-error-with-) - Return on error with `_?`
-    - [3.2.2](#322-handle-errors-with-onerror) - Handle errors with `on_error`
-  - [3.3](#33-booleans) - Booleans
-    - [3.3.1](#331-isbool-any-value) - is_bool _any-value_
-    - [3.3.2](#332-bool-any-value) - bool _any-value_
-    - [3.3.3](#333-boolean-list-indexing) - Boolean List Indexing
-  - [3.4](#34-64-bit-integers) - 64-Bit Integers
-  - [3.5](#35-64-bit-floats) - 64-Bit Floats
-  - [3.6](#36-strings) - Strings
-  - [3.7](#37-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
-    - [3.7.1](#371-call-properties-of-bytes) - Call Properties of Bytes
-    - [3.7.2](#372-byte-conversion-functions) - Byte Conversion Functions
-  - [3.8](#38-symbols) - Symbols
-  - [3.9](#39-vectors-or-lists) - Vectors (or Lists)
-    - [3.9.1](#391-splicing) - Splicing
-  - [3.10](#310-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
-    - [3.10.1](#3101-splicing) - Splicing
-  - [3.11](#311-references) - References
-    - [3.11.1](#3111-weaken-references) - Weaken References
-    - [3.11.2](#3112-strengthening-references) - Strengthening References
-  - [3.12](#312-calling-semantics-of-data-types) - Calling Semantics of Data Types
-- [4](#4-functions-part-22) - Functions (part 2/2)
-  - [4.1](#41-function-call-composition) - Function call composition
-    - [4.1.1](#411--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
-    - [4.1.2](#412--left-hand-function-chaining) - '|>' Left Hand Function Chaining
-  - [4.2](#42-control-flow---returning) - Control Flow - Returning
-    - [4.2.1](#421-block-label-function) - block [label] _function_
-  - [4.3](#43-conditional-execution---if--then--else) - Conditional Execution - if / then / else
-  - [4.4](#44-iteration) - Iteration
-- [5](#5-lexical-scope-and-variable-assignment) - Lexical Scope and Variable assignment
+- [2](#2-variable-definition-and-assignment) - Variable Definition and Assignment
+  - [2.1](#21-global-variables) - Global Variables
+- [3](#3-functions-part-12) - Functions (part 1/2)
+  - [3.1](#31-closures) - Closures
+    - [3.1.1](#311-object-oriented-programming-with-closures) - Object Oriented Programming with Closures
+  - [3.2](#32-function-calling) - Function calling
+  - [3.3](#33-function-arity-checks) - Function arity checks
+  - [3.4](#34-calling-fields--method-calling) - Calling fields / Method calling
+    - [3.4.1](#341-object-oriented-programming-with-prototypes) - Object Oriented Programming with Prototypes
+- [4](#4-data-types) - Data Types
+  - [4.1](#41-none-sentinel-value-n-or-none) - None sentinel value: `$n` or `$none`
+  - [4.2](#42-error-values-e-expr-or-error-expr) - Error values: `$e expr` or `$error expr`
+    - [4.2.1](#421--label-value) - _? [_label_] _value_
+    - [4.2.2](#422-onerror-handler-maybe-error-value) - on_error _handler_ _maybe-error-value_
+    - [4.2.3](#423-errortostr-value) - error_to_str _value_
+  - [4.3](#43-booleans) - Booleans
+    - [4.3.1](#431-isbool-any-value) - is_bool _any-value_
+    - [4.3.2](#432-bool-any-value) - bool _any-value_
+    - [4.3.3](#433-boolean-list-indexing) - Boolean List Indexing
+  - [4.4](#44-64-bit-integers) - 64-Bit Integers
+  - [4.5](#45-64-bit-floats) - 64-Bit Floats
+  - [4.6](#46-strings) - Strings
+  - [4.7](#47-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
+    - [4.7.1](#471-call-properties-of-bytes) - Call Properties of Bytes
+    - [4.7.2](#472-byte-conversion-functions) - Byte Conversion Functions
+  - [4.8](#48-symbols) - Symbols
+  - [4.9](#49-vectors-or-lists) - Vectors (or Lists)
+    - [4.9.1](#491-splicing) - Splicing
+  - [4.10](#410-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
+    - [4.10.1](#4101-splicing) - Splicing
+  - [4.11](#411-references) - References
+    - [4.11.1](#4111-weaken-references) - Weaken References
+    - [4.11.2](#4112-strengthening-references) - Strengthening References
+  - [4.12](#412-calling-semantics-of-data-types) - Calling Semantics of Data Types
+- [5](#5-functions-part-22) - Functions (part 2/2)
+  - [5.1](#51-function-call-composition) - Function call composition
+    - [5.1.1](#511--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
+    - [5.1.2](#512--left-hand-function-chaining) - '|>' Left Hand Function Chaining
+  - [5.2](#52-control-flow---returning) - Control Flow - Returning
+    - [5.2.1](#521-block-label-function) - block [label] _function_
+  - [5.3](#53-conditional-execution---if--then--else) - Conditional Execution - if / then / else
+  - [5.4](#54-iteration) - Iteration
+    - [5.4.1](#541-while-predicate-fun) - while _predicate_ _fun_
+    - [5.4.2](#542-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
+    - [5.4.3](#543-break-value) - break _value_
 - [6](#6-arithmetic) - Arithmetic
     - [6.1](#61--operand-1-operand-2-) - + _operand-1_ _operand-2_ ...
     - [6.1.1](#611---operand-1-operand-2-) - - _operand-1_ _operand-2_ ...
@@ -95,7 +101,6 @@ Smalltalk, LISP and Perl.
   - [9.1](#91-export) - export
   - [9.2](#92-import) - import
 - [10](#10-core-library) - Core Library
-    - [10.1](#101--label-value) - _? [_label_] _value_
 - [11](#11-standard-library) - Standard Library
     - [11.1](#111-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
     - [11.1.1](#1111-stdcopy-vecormap) - std:copy _vec_or_map_
@@ -136,13 +141,65 @@ Smalltalk, LISP and Perl.
 
 A more formal introduction to the syntax can be found in the [parser API documentation](../parser/index.html).
 
-## <a name="2-functions-part-12"></a>2 - Functions (part 1/2)
+## <a name="2-variable-definition-and-assignment"></a>2 - Variable Definition and Assignment
+
+As this manual assumes you have some programming knowledge,
+we will just take a short look at the variable definition and assignment
+syntax:
+
+```wlambda
+!a = 10;            # variable definition & initialization
+
+.a = 20;            # assignment of a new value to a variable
+```
+
+WLambda also supports destructuring assignment of vectors:
+
+```wlambda
+!v = $[1,2,3];
+!(a, b, c) = v;     # destructuring definition of variables
+.(a, b, c) = v;     # destructuring assignment
+
+std:assert_eq a 1;
+std:assert_eq b 2;
+std:assert_eq c 3;
+```
+
+This also works with maps, where the key names are matched to
+the variable names:
+
+```wlambda
+!m = ${ a = 10, b = 20, c = 30 };
+!(a, b, c) = m;     # destructuring definition by map
+.(a, b, c) = m;     # destructuring assignment by map
+
+std:assert_eq a 10;
+std:assert_eq b 20;
+std:assert_eq c 30;
+```
+
+### <a name="21-global-variables"></a>2.1 - Global Variables
+
+You can define global variables that are not bound to
+a lexical scope as follows:
+
+```wlambda
+{
+    !:global a = 13;
+}[];
+
+std:assert_eq a 13;
+```
+
+Global variables however do not live beyond file or module boundaries.
+
+## <a name="3-functions-part-12"></a>3 - Functions (part 1/2)
 
 A function can be defined using the `{ ... }` syntax and the `\ _statement_`
 syntax: To give functions a name, you need to assign them to a variable with
 the `!_name_ = _expr_` syntax.
 
-### <a name="21-closures"></a>2.1 - Closures
+### <a name="31-closures"></a>3.1 - Closures
 
 Functions take values from the outer scope by copying their value:
 
@@ -188,7 +245,7 @@ where closures keep captured values unneccessarily alive.
 You will also need this to make referential types such as maps `${ }`
 and vectors `$[ ]` weakly referenced by closures for OOP.
 
-#### <a name="211-object-oriented-programming-with-closures"></a>2.1.1 - Object Oriented Programming with Closures
+#### <a name="311-object-oriented-programming-with-closures"></a>3.1.1 - Object Oriented Programming with Closures
 
 This is how you can use a map data type as object which stores
 methods:
@@ -250,7 +307,7 @@ my_cat.set_name "Spotty";
 std:assert_eq my_cat.get_name[] "Spotty";
 ```
 
-### <a name="22-function-calling"></a>2.2 - Function calling
+### <a name="32-function-calling"></a>3.2 - Function calling
 
 To call functions, you have at least 3 alternatives. First is the bare
 `_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the fully delimited
@@ -304,7 +361,7 @@ syntax:
 std:assert_eq add[1, 2] 3;
 ```
 
-### <a name="23-function-arity-checks"></a>2.3 - Function arity checks
+### <a name="33-function-arity-checks"></a>3.3 - Function arity checks
 
 Functions check the number of arguments passed to them. The compiler tries to
 infer the number of arguments the function requires by looking at the parameter
@@ -336,7 +393,7 @@ std:assert_eq dosomething[1, 2]         3;
 std:assert_eq dosomething[2, 2, 3, 4]  16;
 ```
 
-### <a name="24-calling-fields--method-calling"></a>2.4 - Calling fields / Method calling
+### <a name="34-calling-fields--method-calling"></a>3.4 - Calling fields / Method calling
 
 If you use the '.' for accessing fields in a map,
 the object the most recent field is accessed of is passed
@@ -362,7 +419,7 @@ You can also use a vector/list as object, in that case the `_proto`
 field that holds the class method map is the first element of the
 vector. The second element of the vector can be accessed using `$data`.
 
-#### <a name="241-object-oriented-programming-with-prototypes"></a>2.4.1 - Object Oriented Programming with Prototypes
+#### <a name="341-object-oriented-programming-with-prototypes"></a>3.4.1 - Object Oriented Programming with Prototypes
 
 Instead of using closures for OOP the preferred way is to use
 maps of functions as classes and form an inheritance hierarchy
@@ -431,9 +488,9 @@ std:assert_eq inst.gen[3] 30;
 std:assert_eq inst.gen2[4] 40;
 ```
 
-## <a name="3-data-types"></a>3 - Data Types
+## <a name="4-data-types"></a>4 - Data Types
 
-### <a name="31-none-sentinel-value-n-or-none"></a>3.1 - None sentinel value: `$n` or `$none`
+### <a name="41-none-sentinel-value-n-or-none"></a>4.1 - None sentinel value: `$n` or `$none`
 
 This is a special sentinel value that is returned by functions and
 when a non existing field of a datastructure is accessed. It's semantic
@@ -455,7 +512,7 @@ std:assert ~ std:str:write[$n] == "$n";
 std:assert ~ is_none[$n];
 ```
 
-### <a name="32-error-values-e-expr-or-error-expr"></a>3.2 - Error values: `$e expr` or `$error expr`
+### <a name="42-error-values-e-expr-or-error-expr"></a>4.2 - Error values: `$e expr` or `$error expr`
 
 There are no exceptions in WLambda, except the panic, that
 halts all execution of the currently running WLambda
@@ -521,7 +578,7 @@ a few functions that accept error values in their arguments:
 
 All other functions don't accept errors as their argument.
 
-#### <a name="101--label-value"></a>10.1 - _? [_label_] _value_
+#### <a name="421--label-value"></a>4.2.1 - _? [_label_] _value_
 
 Unwind the call stack from the current function to a given _label_ if _value_ is an error value.
 If no _label_ is given only the current function is returned from with the error value.  If there
@@ -596,7 +653,7 @@ std:assert_eq first 12;
 std:assert (is_err second);
 ```
 
-#### <a name="322-handle-errors-with-onerror"></a>3.2.2 - on_error _handler_ _maybe-error-value_
+#### <a name="422-onerror-handler-maybe-error-value"></a>4.2.2 - on_error _handler_ _maybe-error-value_
 
 The first parameter to `on_error` should be a _handler_ function,
 which will be called with four parameters.
@@ -637,7 +694,7 @@ std:assert_eq $*x "this failed!";
 std:assert_eq ret "all ok!";
 ```
 
-#### - error_to_str _value_
+#### <a name="423-errortostr-value"></a>4.2.3 - error_to_str _value_
 
 This function accepts an error value in contrast to `str`, but does
 not panic but transform the error value into it's string representation.
@@ -652,7 +709,7 @@ WARNING: The string representation might change between wlambda versions.
 Please use `on_error` to access the individual parts
 (line, column, filename, error value) of the error.
 
-### <a name="33-booleans"></a>3.3 - Booleans
+### <a name="43-booleans"></a>4.3 - Booleans
 
 True and false are represented by `$t` and `$f` or `$true` and `$false`,
 whatever suits your coding style better.
@@ -675,7 +732,7 @@ std:assert_eq some_num "it is ten";
 std:assert_eq some_num "it is not ten";
 ```
 
-#### <a name="331-isbool-any-value"></a>3.3.1 - is_bool _any-value_
+#### <a name="431-isbool-any-value"></a>4.3.1 - is_bool _any-value_
 
 You can check if something is a boolean with `is_bool`:
 
@@ -687,7 +744,7 @@ std:assert ~ not[is_bool ""];
 std:assert ~ not[is_bool 0];
 ```
 
-#### <a name="332-bool-any-value"></a>3.3.2 - bool _any-value_
+#### <a name="432-bool-any-value"></a>4.3.2 - bool _any-value_
 
 You can cast _any-value_ into a boolean with the `bool` function:
 
@@ -710,7 +767,7 @@ std:assert_eq (bool $b"\x00")   $false;
 std:assert_eq (bool $b"\x01")   $true;
 ```
 
-#### <a name="333-boolean-list-indexing"></a>3.3.3 - Boolean List Indexing
+#### <a name="433-boolean-list-indexing"></a>4.3.3 - Boolean List Indexing
 
 Booleans can also be used to pick a value from a list
 by calling the boolean with a list as first argument:
@@ -720,13 +777,13 @@ std:assert_eq ($true  $[:a, :b]) :b;
 std:assert_eq ($false $[:a, :b]) :a;
 ```
 
-### <a name="34-64-bit-integers"></a>3.4 - 64-Bit Integers
+### <a name="44-64-bit-integers"></a>4.4 - 64-Bit Integers
 
-### <a name="35-64-bit-floats"></a>3.5 - 64-Bit Floats
+### <a name="45-64-bit-floats"></a>4.5 - 64-Bit Floats
 
-### <a name="36-strings"></a>3.6 - Strings
+### <a name="46-strings"></a>4.6 - Strings
 
-### <a name="37-bytes-or-byte-vectors"></a>3.7 - Bytes (or Byte Vectors)
+### <a name="47-bytes-or-byte-vectors"></a>4.7 - Bytes (or Byte Vectors)
 
 Bytes are a special kind of strings. Their literal form is:
 
@@ -736,7 +793,7 @@ $b"\xFF\xFD\x00";
 $Q/ABCDEF\xFD/;      # \xFD is not an escape sequence here!
 ```
 
-#### <a name="371-call-properties-of-bytes"></a>3.7.1 - Call Properties of Bytes
+#### <a name="471-call-properties-of-bytes"></a>4.7.1 - Call Properties of Bytes
 
 You can index inside a byte array by calling it with an integer:
 
@@ -763,7 +820,7 @@ std:assert_eq ($b"b" some_map) 30;
 std:assert_eq some_map.$b"a" 20;   # with method call syntax
 ```
 
-#### <a name="372-byte-conversion-functions"></a>3.7.2 - Byte Conversion Functions
+#### <a name="472-byte-conversion-functions"></a>4.7.2 - Byte Conversion Functions
 
 You can convert bytes to strings in a multitude of ways:
 
@@ -811,9 +868,9 @@ There is also an inverse operation to `bytes:to_hex`:
 std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 ```
 
-### <a name="38-symbols"></a>3.8 - Symbols
+### <a name="48-symbols"></a>4.8 - Symbols
 
-### <a name="39-vectors-or-lists"></a>3.9 - Vectors (or Lists)
+### <a name="49-vectors-or-lists"></a>4.9 - Vectors (or Lists)
 
 The literal syntax for vectors (or sometimes also called lists in WLambda)
 is `$[...]`. You may write any kind of expression in it and you will get
@@ -839,7 +896,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="391-splicing"></a>3.9.1 - Splicing
+#### <a name="491-splicing"></a>4.9.1 - Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -859,7 +916,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-### <a name="310-associative-maps-or-string-to-value-mappings"></a>3.10 - Associative Maps (or String to Value mappings)
+### <a name="410-associative-maps-or-string-to-value-mappings"></a>4.10 - Associative Maps (or String to Value mappings)
 
 Aside from vectors there are associative maps in WLambda. Their syntax is
 `${ key = expr, ... }`. The keys of these maps have to be strings,
@@ -901,7 +958,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="3101-splicing"></a>3.10.1 - Splicing
+#### <a name="4101-splicing"></a>4.10.1 - Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -920,7 +977,7 @@ std:assert_eq (str ${*${a=10}}) "${a=10}";
 std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 ```
 
-### <a name="311-references"></a>3.11 - References
+### <a name="411-references"></a>4.11 - References
 
 Some data structures already have reference characteristics, such as strings,
 vectors and maps. There are 3 types of references in WLambda that handle
@@ -981,7 +1038,7 @@ Strong references can also be created using the `std:to_ref` function:
 std:assert_eq (std:write_str x) "$&&10";
 ```
 
-#### <a name="3111-weaken-references"></a>3.11.1 - Weaken References
+#### <a name="4111-weaken-references"></a>4.11.1 - Weaken References
 
 You can weaken any of those two types of references manually using the
 `std:weaken` function.
@@ -1009,14 +1066,14 @@ std:assert_eq $*y $n;
 std:assert drop_check;
 ```
 
-#### <a name="3112-strengthening-references"></a>3.11.2 - Strengthening References
+#### <a name="4112-strengthening-references"></a>4.11.2 - Strengthening References
 
 You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
 
-### <a name="312-calling-semantics-of-data-types"></a>3.12 - Calling Semantics of Data Types
+### <a name="412-calling-semantics-of-data-types"></a>4.12 - Calling Semantics of Data Types
 
 You can call almost all basic data types of WLambda.
 Here is an overview of the data type calling semantics:
@@ -1039,9 +1096,9 @@ Here is an overview of the data type calling semantics:
 |           |                   | |
 |           |                   | |
 
-## <a name="4-functions-part-22"></a>4 - Functions (part 2/2)
+## <a name="5-functions-part-22"></a>5 - Functions (part 2/2)
 
-### <a name="41-function-call-composition"></a>4.1 - Function call composition
+### <a name="51-function-call-composition"></a>5.1 - Function call composition
 
 - chaining
 - traditional () call syntax
@@ -1060,7 +1117,7 @@ Here is an overview of the data type calling semantics:
 
 - [...] syntax
 
-#### <a name="411--tail-argument-function-chaninig"></a>4.1.1 - '|' Tail Argument Function Chaninig
+#### <a name="511--tail-argument-function-chaninig"></a>5.1.1 - '|' Tail Argument Function Chaninig
 
 This syntax is useful if you have following function call composition:
 
@@ -1094,7 +1151,7 @@ The call reordering of the `|` operator looks like this:
         --------------------|
 ```
 
-#### <a name="412--left-hand-function-chaining"></a>4.1.2 - '|>' Left Hand Function Chaining
+#### <a name="512--left-hand-function-chaining"></a>5.1.2 - '|>' Left Hand Function Chaining
 
 This syntax is useful if you want to make deep call chains like these:
 
@@ -1136,7 +1193,7 @@ The call reordering of the `|>` operator looks like this:
         -----------|--------------|   |
                    -------------------|
 ```
-### <a name="42-control-flow---returning"></a>4.2 - Control Flow - Returning
+### <a name="52-control-flow---returning"></a>5.2 - Control Flow - Returning
 
 WLambda uses labelled blocks for control flow, as returning from the current function would not be
 very helpful for the control flow in wlambda in case of conditional execution.
@@ -1156,7 +1213,7 @@ very helpful for the control flow in wlambda in case of conditional execution.
 ```
 
 
-#### <a name="421-block-label-function"></a>4.2.1 - block [label] _function_
+#### <a name="521-block-label-function"></a>5.2.1 - block [label] _function_
 
 Calls the _function_ with the given _label_ for `return`to jump to.
 
@@ -1192,7 +1249,7 @@ std:assert_eq res 20;
 ```
 
 
-### <a name="43-conditional-execution---if--then--else"></a>4.3 - Conditional Execution - if / then / else
+### <a name="53-conditional-execution---if--then--else"></a>5.3 - Conditional Execution - if / then / else
 
 WLambda has no `if`. Conditional execution is provided by the bool
 data type. As in WLambda everything can be called like a function, you
@@ -1264,7 +1321,7 @@ std:assert_eq res "x is 20";
 With `pick`, the value to return in the `$t` case comes first, followed by the `$f` case's value,
 whereas with indexing approach, the opposite is true.
 
-### <a name="44-iteration"></a>4.4 - Iteration
+### <a name="54-iteration"></a>5.4 - Iteration
 
 WLambda has many ways to iterate:
 
@@ -1284,7 +1341,7 @@ iteration function. But if you call the value with a function as first argument 
 is done. That means, the return value of the operation is a list with the return values of the
 iteration function. If you don't need that list you should use `for`.
 
-#### - while _predicate_ _fun_
+#### <a name="541-while-predicate-fun"></a>5.4.1 - while _predicate_ _fun_
 
 `while` will call _fun_ until the _predicate_ function returns `$false`.
 This is the most basic loop for iteration:
@@ -1315,7 +1372,7 @@ while $true {
 std:assert_eq i 4;
 ```
 
-#### - range _start_ _end_ _step_ _fun_
+#### <a name="542-range-start-end-step-fun"></a>5.4.2 - range _start_ _end_ _step_ _fun_
 
 `range` counts from _start_ to _end_ by increments of _step_ and calls _fun_ with the counter. The
 iteration is inclusive, this means if _start_ == _end_ the function _fun_ will be called once.
@@ -1343,7 +1400,7 @@ range 0.3 0.4 0.01 {
 std:assert_eq (str out) "$[30,31,32,33,34,35,36,37,38,39]";
 ```
 
-#### - break _value_
+#### <a name="543-break-value"></a>5.4.3 - break _value_
 
 `break` stops the inner most iterative construct, which then will return _value_.
 This should work for all repeatedly calling operations, such as
@@ -1366,14 +1423,6 @@ that the argument value of break will be accumulated into the list:
 
 std:assert_eq (str list) "$[1,2,3,:\"XX\"]";
 ```
-
-## <a name="5-lexical-scope-and-variable-assignment"></a>5 - Lexical Scope and Variable assignment
-
-- !x = y                  variable definition
-- .x = y                  assignments
-- !:ref x = y             upvalue references
-- !:wref x = y            weak upvalue references
-- !(x, y) = list / map    destructuring assignments
 
 ## <a name="6-arithmetic"></a>6 - Arithmetic
 
