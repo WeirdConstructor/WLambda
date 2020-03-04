@@ -1296,6 +1296,7 @@ fn check_error_value(v: VVal, at: &str) -> Result<VVal, StackAction> {
     Ok(v)
 }
 
+// Optimizes a.b -> b[a] conversions.
 fn generate_get_key(map: EvalNode, idx: EvalNode, spos: SynPos, method: bool)
     -> EvalNode
 {
