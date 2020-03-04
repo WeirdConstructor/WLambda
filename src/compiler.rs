@@ -4447,4 +4447,30 @@ mod tests {
         assert_eq!(s_eval("$@b $+$f"),        "$b\"\\0\"");
         assert_eq!(s_eval("$@b $+\"ABC\""),   "$b\"ABC\"");
     }
+
+    #[test]
+    fn check_accum() {
+        assert_eq!(s_eval("std:accum $b\"a\" 1"), "");
+        assert_eq!(s_eval("std:accum $b\"a\" 2.2"), "");
+        assert_eq!(s_eval("std:accum $b\"a\" \"abcde\""), "");
+        assert_eq!(s_eval("std:accum $b\"a\" $b\"abcde\""), "");
+        assert_eq!(s_eval("std:accum $b\"a\" $t"), "");
+
+        assert_eq!(s_eval("std:accum \"a\" 1"), "");
+        assert_eq!(s_eval("std:accum \"a\" 2.2"), "");
+        assert_eq!(s_eval("std:accum \"a\" \"abcde\""), "");
+        assert_eq!(s_eval("std:accum \"a\" $b\"abcde\""), "");
+        assert_eq!(s_eval("std:accum \"a\" $t"), "");
+
+        assert_eq!(s_eval("std:accum 10 1"), "");
+        assert_eq!(s_eval("std:accum 11 2.2"), "");
+        assert_eq!(s_eval("std:accum 12 \"3\""), "");
+
+        assert_eq!(s_eval("std:accum 10.2 1"), "");
+        assert_eq!(s_eval("std:accum 11.2 2.2"), "");
+        assert_eq!(s_eval("std:accum 12.2 \"3\""), "");
+
+        assert_eq!(s_eval("std:accum $[1] \"3\""), "");
+        assert_eq!(s_eval("std:accum $[1] $[2,3]"), "");
+    }
 }

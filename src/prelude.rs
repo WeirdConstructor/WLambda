@@ -2845,6 +2845,15 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(v)
         }, Some(2), Some(2), false);
 
+    func!(st, "accum",
+        |env: &mut Env, argc: usize| {
+            let mut v = env.arg(0);
+            for i in 1..argc {
+                v.accum(&env.arg(i));
+            }
+            Ok(v)
+        }, Some(2), None, false);
+
     func!(st, "prepend",
         |env: &mut Env, argc: usize| {
             let v = env.arg(0);
@@ -3022,11 +3031,11 @@ pub fn std_symbol_table() -> SymbolTable {
                 let mut first = true;
                 for item in l.borrow().iter() {
                     if !first {
-                        s.append(&sep);
+                        s.accum(&sep);
                     } else {
                         first = false;
                     }
-                    s.append(item);
+                    s.accum(item);
                 }
                 Ok(s)
 

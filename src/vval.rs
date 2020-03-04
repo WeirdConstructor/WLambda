@@ -601,7 +601,7 @@ impl Env {
                     VValFun::new_fun(
                         move |env: &mut Env, _argc: usize| {
                             let v = env.arg(0);
-                            env.accum_val.append(&v);
+                            env.accum_val.accum(&v);
                             Ok(v)
                         }, Some(1), Some(1), false)
                 }
@@ -2144,7 +2144,7 @@ impl VVal {
         }
     }
 
-    pub fn append(&mut self, val: &VVal) {
+    pub fn accum(&mut self, val: &VVal) {
         match self {
             VVal::Byt(b) => {
                 let mut acc = b.borrow_mut();
