@@ -1696,6 +1696,18 @@ And with floats:
 std:assert_eq (std:num:round 10.0 * sum) 81.0;
 ```
 
+#### - std:accum _collection_ _a_ _b_ ...
+
+This function accumulates all it's arguments in the _collection_.
+It does the same form of accumulation as `$+` does.
+
+```wlambda
+std:assert_eq (str ~ std:accum $[] 1 2 3)   "$[1,2,3]";
+std:assert_eq (std:accum "" 1 2 3)          "123";
+std:assert_eq (str ~ std:accum $b"" 1 2 3)  "\x01\x02\x03";
+std:assert_eq (str ~ std:accum 10 1 2 3)    "16";
+```
+
 ## <a name="9-arithmetic"></a>9 - Arithmetic
 
 The output type (float vs. integer) of the numerical arithmetic operators is defined

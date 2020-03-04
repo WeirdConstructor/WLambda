@@ -4450,27 +4450,28 @@ mod tests {
 
     #[test]
     fn check_accum() {
-        assert_eq!(s_eval("std:accum $b\"a\" 1"), "");
-        assert_eq!(s_eval("std:accum $b\"a\" 2.2"), "");
-        assert_eq!(s_eval("std:accum $b\"a\" \"abcde\""), "");
-        assert_eq!(s_eval("std:accum $b\"a\" $b\"abcde\""), "");
-        assert_eq!(s_eval("std:accum $b\"a\" $t"), "");
+        assert_eq!(s_eval("std:accum $b\"a\" 1"),           "$b\"a\\x01\"");
+        assert_eq!(s_eval("std:accum $b\"a\" 2.2"),         "$b\"a\\x02\"");
+        assert_eq!(s_eval("std:accum $b\"a\" \"abcde\""),   "$b\"aabcde\"");
+        assert_eq!(s_eval("std:accum $b\"a\" $b\"abcde\""), "$b\"aabcde\"");
+        assert_eq!(s_eval("std:accum $b\"a\" $t"),          "$b\"a\\x01\"");
 
-        assert_eq!(s_eval("std:accum \"a\" 1"), "");
-        assert_eq!(s_eval("std:accum \"a\" 2.2"), "");
-        assert_eq!(s_eval("std:accum \"a\" \"abcde\""), "");
-        assert_eq!(s_eval("std:accum \"a\" $b\"abcde\""), "");
-        assert_eq!(s_eval("std:accum \"a\" $t"), "");
+        assert_eq!(s_eval("std:accum \"a\" 1"),             "\"a1\"");
+        assert_eq!(s_eval("std:accum \"a\" 2.2"),           "\"a2.2\"");
+        assert_eq!(s_eval("std:accum \"a\" \"abcde\""),     "\"aabcde\"");
+        assert_eq!(s_eval("std:accum \"a\" $b\"abcde\""),   "\"aabcde\"");
+        assert_eq!(s_eval("std:accum \"a\" $t"),            "\"a$true\"");
 
-        assert_eq!(s_eval("std:accum 10 1"), "");
-        assert_eq!(s_eval("std:accum 11 2.2"), "");
-        assert_eq!(s_eval("std:accum 12 \"3\""), "");
+        assert_eq!(s_eval("std:accum 10 1"),                "11");
+        assert_eq!(s_eval("std:accum 11 2.2"),              "13");
+        assert_eq!(s_eval("std:accum 12 \"3\""),            "15");
 
-        assert_eq!(s_eval("std:accum 10.2 1"), "");
-        assert_eq!(s_eval("std:accum 11.2 2.2"), "");
-        assert_eq!(s_eval("std:accum 12.2 \"3\""), "");
+        assert_eq!(s_eval("std:accum 10.2 1"),              "11.2");
+        assert_eq!(s_eval("std:num:round 10.0 * (std:accum 11.2 2.1)"),
+                   "133");
+        assert_eq!(s_eval("std:accum 12.2 \"3\""),          "15.2");
 
-        assert_eq!(s_eval("std:accum $[1] \"3\""), "");
-        assert_eq!(s_eval("std:accum $[1] $[2,3]"), "");
+        assert_eq!(s_eval("std:accum $[1] \"3\""),          "$[1,\"3\"]");
+        assert_eq!(s_eval("std:accum $[1] $[2,3]"),         "$[1,$[2,3]]");
     }
 }
