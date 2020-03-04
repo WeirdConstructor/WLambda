@@ -23,7 +23,7 @@
             return :feed $n;
         };
 
-        ((len depth_marker) - 1 > $data.depth) {
+        while { (len depth_marker) - 1 > $data.depth } {
             std:push $data.stack $data.current_count - 1;
             $data.current_count = 1;
             $data.depth = $data.depth + 1;
