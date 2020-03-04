@@ -39,6 +39,7 @@ Smalltalk, LISP and Perl.
     - [3.1.1](#311-object-oriented-programming-with-closures) - Object Oriented Programming with Closures
   - [3.2](#32-function-calling) - Function calling
   - [3.3](#33-function-arity-checks) - Function arity checks
+    - [3.3.1](#331-stdtonoarity-function) - std:to_no_arity _function_
   - [3.4](#34-calling-fields--method-calling) - Calling fields / Method calling
     - [3.4.1](#341-object-oriented-programming-with-prototypes) - Object Oriented Programming with Prototypes
 - [4](#4-data-types) - Data Types
@@ -50,7 +51,8 @@ Smalltalk, LISP and Perl.
   - [4.3](#43-booleans) - Booleans
     - [4.3.1](#431-isbool-any-value) - is_bool _any-value_
     - [4.3.2](#432-bool-any-value) - bool _any-value_
-    - [4.3.3](#433-boolean-list-indexing) - Boolean List Indexing
+    - [4.3.3](#433-not-value) - not _value_
+    - [4.3.4](#434-boolean-list-indexing) - Boolean List Indexing
   - [4.4](#44-64-bit-integers) - 64-Bit Integers
   - [4.5](#45-64-bit-floats) - 64-Bit Floats
     - [4.5.1](#451-float-value) - float _value_
@@ -403,6 +405,21 @@ Here an example:
 
 std:assert_eq dosomething[1, 2]         3;
 std:assert_eq dosomething[2, 2, 3, 4]  16;
+```
+
+#### <a name="331-stdtonoarity-function"></a>3.3.1 - std:to_no_arity _function_
+
+This function disables all arity checks of a function. Use this with care
+and diligence.
+
+```wlambda
+!f = { _ }; # accepts exactly 1 param
+
+# f keeps it's arity checks, but f2 will
+# call the same function, but without arity checks.
+!f2 = std:to_no_arity f;
+
+std:assert_eq (f2 1 2 3) 1;
 ```
 
 ### <a name="34-calling-fields--method-calling"></a>3.4 - Calling fields / Method calling
@@ -779,7 +796,18 @@ std:assert_eq (bool $b"\x00")   $false;
 std:assert_eq (bool $b"\x01")   $true;
 ```
 
-#### <a name="433-boolean-list-indexing"></a>4.3.3 - Boolean List Indexing
+#### <a name="433-not-value"></a>4.3.3 - not _value_
+
+This function negates the boolean _value_. If it is not a boolean, it will
+be casted into one before negating.
+
+```wlambda
+std:assert ~ not $false;
+std:assert ~ not 0;
+std:assert ~ not $none;
+```
+
+#### <a name="434-boolean-list-indexing"></a>4.3.4 - Boolean List Indexing
 
 Booleans can also be used to pick a value from a list
 by calling the boolean with a list as first argument:
@@ -1591,7 +1619,7 @@ std:assert_eq (str list_of_lists)
     "$[$[2],$[2,4],$[2,4,6],$[2,4,6,8]]";
 ```
 
-#### <a name="551-transforming-a-vector"></a>5.5.1 - Transforming a vector to a map
+#### <a name="553-transforming-a-vector-to-a-map"></a>5.5.3 - Transforming a vector to a map
 
 For constructing maps the `$@map` construct is available.
 In the following example we transform a vector of pairs into a map:
@@ -3149,13 +3177,6 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             Ok(VVal::new_str_mv(env.arg(0).s()))
         }, Some(1), Some(1), true);
-
-    func!(st, "yay",
-        |env: &mut Env, _argc: usize| {
-            println!("YAAAAY {}", env.arg(0).s());
-            env.dump_stack();
-            Ok(VVal::Nul)
-        }, None, None, false);
 
     func!(st, "to_no_arity",
         |env: &mut Env, _argc: usize| {
