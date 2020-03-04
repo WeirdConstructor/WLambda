@@ -53,6 +53,8 @@ Smalltalk, LISP and Perl.
     - [4.3.3](#433-boolean-list-indexing) - Boolean List Indexing
   - [4.4](#44-64-bit-integers) - 64-Bit Integers
   - [4.5](#45-64-bit-floats) - 64-Bit Floats
+    - [4.5.1](#451-float-value) - float _value_
+    - [4.5.2](#452-isfloat-value) - is_float _value_
   - [4.6](#46-strings) - Strings
   - [4.7](#47-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
     - [4.7.1](#471-call-properties-of-bytes) - Call Properties of Bytes
@@ -71,7 +73,8 @@ Smalltalk, LISP and Perl.
     - [5.1.1](#511--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
     - [5.1.2](#512--left-hand-function-chaining) - '|>' Left Hand Function Chaining
   - [5.2](#52-control-flow---returning) - Control Flow - Returning
-    - [5.2.1](#521-block-label-function) - block [label] _function_
+    - [5.2.1](#521-return-label-value) - return [_label_] _value_
+    - [5.2.2](#522-block-label-function) - block [label] _function_
   - [5.3](#53-conditional-execution---if--then--else) - Conditional Execution - if / then / else
   - [5.4](#54-iteration) - Iteration
     - [5.4.1](#541-while-predicate-fun) - while _predicate_ _fun_
@@ -781,6 +784,51 @@ std:assert_eq ($false $[:a, :b]) :a;
 
 ### <a name="45-64-bit-floats"></a>4.5 - 64-Bit Floats
 
+WLambda supports 64-Bit floating point numbers, aka _f64_ in Rust.
+Like with other numbers multiple radix literal forms are supported:
+
+```wlambda
+# Decimal:
+std:assert_eq 10r9.92       9.92;
+
+# Hexadecimal:
+std:assert_eq 0xFF.1        255.0625;
+
+# Binary:
+std:assert_eq 0b1011.101    11.625;
+
+# Radix 4:
+std:assert_eq 4r3.3         3.75;
+```
+
+#### <a name="451-float-value"></a>4.5.1 - float _value_
+
+This function casts _value_ into a float:
+
+```wlambda
+
+std:assert_eq (float 10)       10.0;
+std:assert_eq (float $t)        1.0;
+std:assert_eq (float $f)        0.0;
+std:assert_eq (float :"32.2")  32.2;
+std:assert_eq (float "5.42")   5.42;
+std:assert_eq (float "5.42")   5.42;
+std:assert_eq (float $b"\xFF") 255.0;
+
+```
+
+#### <a name="452-isfloat-value"></a>4.5.2 - is_float _value_
+
+Returns `$true` if _value_ is a float, otherwise `$false` is returned.
+
+```wlambda
+std:assert ~ is_float 4.4;
+std:assert ~ is_float 1.0 + 1;
+std:assert ~ not ~ is_float 1 + 1.0;
+std:assert ~ not ~ is_float 4;
+std:assert ~ not ~ is_float $true;
+```
+
 ### <a name="46-strings"></a>4.6 - Strings
 
 ### <a name="47-bytes-or-byte-vectors"></a>4.7 - Bytes (or Byte Vectors)
@@ -1212,8 +1260,45 @@ very helpful for the control flow in wlambda in case of conditional execution.
 }
 ```
 
+#### <a name="521-return-label-value"></a>5.2.1 - return [_label_] _value_
 
-#### <a name="521-block-label-function"></a>5.2.1 - block [label] _function_
+Returns _value_ from the current function if no _label_ is given.
+If _label_ is given, the call stack will unwind until either a `block`
+or a function with the given _label_ is encountered.
+
+```wlambda
+!f = {
+    10;
+    return 20;
+    30
+};
+
+std:assert_eq f[] 20;
+```
+
+Here an example for unwinding two call frames:
+
+```wlambda
+!f = \:x {
+    10;
+    { return :x 20 }[];
+    30;
+};
+
+std:assert_eq f[] 20;
+```
+
+The labels do not adhere to lexical scoping and are dynamically scoped:
+
+```wlambda
+!g = { return :x 30 };
+
+!f = \:x { 20; g[]; 40 };
+
+std:assert_eq f[] 30;
+```
+
+#### <a name="522-block-label-function"></a>5.2.2 - block [label] _function_
 
 Calls the _function_ with the given _label_ for `return`to jump to.
 
