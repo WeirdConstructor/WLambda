@@ -495,7 +495,8 @@ True and false are represented by `$t` and `$f` or `$true` and `$false`,
 whatever suits your coding style better.
 
 You can either use a boolean value with one or two arguments, where `$true`
-will call the first argument, and `$false` the second argument. So to
+will call the first argument, and `$false` the second argument. If a second argument
+isn't provided and the value is `$false`, `$none` is returned. So to
 check for truthness you can just do:
 
 ```wlambda
