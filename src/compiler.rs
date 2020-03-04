@@ -1296,6 +1296,7 @@ fn check_error_value(v: VVal, at: &str) -> Result<VVal, StackAction> {
     Ok(v)
 }
 
+// Optimizes a.b -> b[a] conversions.
 fn generate_get_key(map: EvalNode, idx: EvalNode, spos: SynPos, method: bool)
     -> EvalNode
 {
@@ -1305,6 +1306,7 @@ fn generate_get_key(map: EvalNode, idx: EvalNode, spos: SynPos, method: bool)
             let s = check_error_value(idx(e)?, "field idx/key")?;
             match s {
                 VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                VVal::Bol(b)  => Ok(m.at(b as usize).unwrap_or(VVal::Nul)),
                 VVal::Sym(sy) => Ok(m.proto_lookup(&sy.borrow()).unwrap_or(VVal::Nul)),
                 VVal::Str(sy) => Ok(m.proto_lookup(&sy.borrow()).unwrap_or(VVal::Nul)),
                 _ => {
@@ -1326,6 +1328,7 @@ fn generate_get_key(map: EvalNode, idx: EvalNode, spos: SynPos, method: bool)
             let s = check_error_value(idx(e)?, "field idx/key")?;
             match s {
                 VVal::Int(i)  => Ok(m.at(i as usize).unwrap_or(VVal::Nul)),
+                VVal::Bol(b)  => Ok(m.at(b as usize).unwrap_or(VVal::Nul)),
                 VVal::Sym(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
                 VVal::Str(sy) => Ok(m.get_key(&sy.borrow()).unwrap_or(VVal::Nul)),
                 _ => {
@@ -2367,6 +2370,15 @@ mod tests {
                    "&F{@[1,17:<compiler:s_eval>(Func)],amin=1,amax=3,locals=2,upvalues=$[$n]}");
         assert_eq!(s_eval("!upv1 = $&& \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
                    "&F{@[1,19:<compiler:s_eval>(Func)],amin=1,amax=3,locals=2,upvalues=$[$&&\"lol!\"]}");
+    }
+
+    #[test]
+    fn check_list_boolean_indexing() {
+        assert_eq!(s_eval("$[\"hi\", \"there\"].$t"), s_eval("pick $f \"hi\" \"there\""));
+        assert_eq!(s_eval("$[94, 38].(is_vec $[])"), "38");
+        assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].$t"), "15");
+        assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].(is_none 1)"), "10");
+        assert_eq!(s_eval("$[$[1, 2], $[2, 1]] $f"), "$[1,2]");
     }
 
     #[test]
