@@ -1113,9 +1113,14 @@ This means that we can also express our `sum` function as:
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } $[@, _].(is_vec _);
 ```
+Furthermore, as `a.b` is equivalent to `b[a]`, one can also write this `sum` function
+by simply invoking `(is_vec _)` and passing in the list of options as a parameter.
+```wlambda
+!sum = \|| std:fold 0 { _ + _1 } ~ (is_vec _) $[@, _];
+```
 When comparing the `pick` and indexing approaches it is important to note
 that the two possible return values are inverted:
-```
+```wlambda
 pick (x == 20) "x is 20" "x isn't 20";
 $["x isn't 20", "x is 20"].(x == 20);
 ```
