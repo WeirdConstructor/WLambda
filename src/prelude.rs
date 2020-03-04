@@ -54,7 +54,7 @@ std:assert_eq result 30;
 ```
 
 This also means, that functions can not modify the values of
-the scope they were created in. To do that, you need a referencial
+the scope they were created in. To do that, you need a referential
 data type, that is described further down this document.
 
 Here is an example how we would write the above example by mutating
@@ -72,7 +72,7 @@ the value in the `result` variable:
 
 add_a_and_b[];
 
-std:assert_eq $*result 30; # $* dereferences referencial types
+std:assert_eq $*result 30; # $* dereferences referential types
 ```
 
 About the weakly capturing of `result`:
@@ -149,9 +149,10 @@ std:assert_eq my_cat.get_name[] "Spotty";
 ### Function calling
 
 To call functions, you have at least 3 alternatives. First is the bare
-`_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the delimiter
-full variant: `_expr_[arg1, arg2, arg3, ...]`. You can always delimit the first
-variant using the `( ... )` parenthesis around the whole call.
+`_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the fully delimited
+variant: `_expr_[arg1, arg2, arg3, ...]`. You can always delimit the first
+variant using the `( ... )` parenthesis around the whole call,
+i.e. `(_expr_ arg1 arg2 arg3 arg4)`.
 Third you can call a function with a vector as argument with `_expr_[[_expr_]]`,
 where the second expression should return a vector (if it doesn't it will use the
 value as first argument).
@@ -218,13 +219,9 @@ For the shortened function syntax there is:
 Here an example:
 
 ```wlambda
-!dosomething = {|2 < 4|
-    !a = _;
-    !b = _1;
-    !c = _2;
-    !d = _3;
-
-    # Please note: We have to assign _ to _3 here, because
+!dosomething = {|2 < 4| !(a, b, c, d) = @;
+    # Please note: We have to assign the
+    # parameters to named values here, because
     # the arms of the conditional below have
     # their own set of arguments.
 
@@ -466,6 +463,12 @@ std:assert_eq (unwrap_err ~ func 42) :FAIL;
 
 #### Handle errors with `on_error`
 
+The first parameter to `on_error` should be a function,
+which will be called with four parameters.
+The first of these parameters is the error text,
+followed by the line number, column number and file name
+from which the error originates.
+
 ```wlambda
 !func = {
     (_ == 13) {
@@ -491,7 +494,7 @@ std:assert_eq ret "all ok!";
 True and false are represented by `$t` and `$f` or `$true` and `$false`,
 whatever suits your coding style better.
 
-You can either use a boolean value with two arguments, where `$true`
+You can either use a boolean value with one or two arguments, where `$true`
 will call the first argument, and `$false` the second argument. So to
 check for truthness you can just do:
 
@@ -552,7 +555,7 @@ Bytes are a special kind of strings. Their literal form is:
 ```wlambda
 $b"abc";
 $b"\xFF\xFD\x00";
-$Q/ABCDEF\xFD/;      # \xFD is not an excape sequence here!
+$Q/ABCDEF\xFD/;      # \xFD is not an escape sequence here!
 ```
 
 #### Call Properties of Bytes
@@ -624,7 +627,7 @@ std:push v 64;
 std:assert_eq b $b"ABC@";
 ```
 
-There is also an invese operation to `bytes:to_hex`:
+There is also an inverse operation to `bytes:to_hex`:
 
 ```wlambda
 std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
@@ -743,7 +746,7 @@ std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 
 Some data structures already have reference characteristics, such as strings,
 vectors and maps. There are 3 types of references in WLambda that handle
-different usecases. These referencial types are neccessary to mutate lexical
+different usecases. These referential types are neccessary to mutate lexical
 variables from a parent scope. To give a rather natural example:
 
 ```wlambda
@@ -753,7 +756,7 @@ std:assert_eq x 20;
 ```
 
 The example works rather intuitively. There is however lots of implicit
-referencial stuff going on. Once `x` is captured by a closure it ise implicitly
+referential stuff going on. Once `x` is captured by a closure it ise implicitly
 changed in to a _weakable_ `$&` reference and the closure stores only a weak
 reference to `x`. This is done to maintain lexical scope and prevent accidental
 cyclic references when closures from a scope are leaked.
@@ -769,7 +772,8 @@ and access by variable name.
 
 The weakable reference is captured weakly by closures and does not keep the
 referenced value alive if the value reference count drops to zero.
-The strong references are staying strong and need explicit care to handle:
+The strong references will stay strong when captured and need
+explicit care to handle:
 
 ```wlambda
 !x = $& 10;
@@ -843,7 +847,7 @@ Here is an overview of the data type calling semantics:
 | `$error`  | -                 | Any call to `$error` will result in a panic. |
 | function  | *                 | Will call the function with the specified arguments. |
 | `$true`   | `f1, f2`          | Will call `f1`.          |
-| `$false`  | `f1, f2`          | Will call `f2`.          |
+| `$false`  | `f1, f2`          | Will call `f2` or return `$n` if `f2` is not provided.          |
 | symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
 |           |                   | |
@@ -1021,9 +1025,9 @@ iteration function. If you don't need that list you should use `for`.
 - !:wref x = y            weak upvalue references
 - !(x, y) = list / map    destructuring assignments
 
-## Arithmetics
+## Arithmetic
 
-The output type (float vs. integer) of numerical arithmetics operators is defined
+The output type (float vs. integer) of the numerical arithmetic operators is defined
 by the _first_ operand of the operation. Use the casting functions `float` or
 `int` if you are unsure.
 
@@ -1114,7 +1118,7 @@ std:assert_eq 2 ^ 2.1   4; # first arg type matters!
 Checks whether the two operands are equal to each other. Data types like
 booleans, integers, floats, symbols and strings are compared by their contents.
 Other types like vectors, maps, functions, errors or references are compared
-by referencial equality.
+by referential equality.
 
 ```wlambda
 std:assert        $none == $none;
@@ -1131,7 +1135,7 @@ std:assert ~ `==` 1 (2 - 1); # prefix form
 Checks whether the two operands are distinct from each other.  Data types like
 booleans, integers, floats, symbols and strings are compared by their contents.
 Other types like vectors, maps, functions, errors or references are compared
-by referencial equality.
+by referential equality.
 
 It's generally the opposite of `==`.
 
