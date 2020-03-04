@@ -521,7 +521,14 @@ a few functions that accept error values in their arguments:
 
 All other functions don't accept errors as their argument.
 
-#### <a name="321-return-on-error-with-"></a>3.2.1 - Return on error with `_?`
+#### <a name="101--label-value"></a>10.1 - _? [_label_] _value_
+
+Unwind the call stack from the current function to a given _label_ if _value_ is an error value.
+If no _label_ is given only the current function is returned from with the error value.  If there
+is no error, the given value is returned.
+
+The best usecase is, if you just want to hand any errors that might be returned
+further upwards the call stack for the parent functions to handle.
 
 ```wlambda
 !func = { $e "this failed!" };
@@ -565,13 +572,50 @@ as jump label. That is handy if you want to jump up multiple call frames:
 std:assert_eq (unwrap_err ~ func 42) :FAIL;
 ```
 
-#### <a name="322-handle-errors-with-onerror"></a>3.2.2 - Handle errors with `on_error`
+A more elaborate example:
 
-The first parameter to `on_error` should be a function,
+```wlambda
+!do_fail = $false;
+
+!maybe_fails1 = { 10 };
+!maybe_fails2 = {
+    do_fail { $error "something is wrong" }
+            { .do_fail = $true; 2 };
+};
+
+!a = {
+    !x = _? maybe_fails1[];
+    .x = x + (_? maybe_fails2[]);
+    x
+};
+
+!first  = a[];
+!second = a[];
+
+std:assert_eq first 12;
+std:assert (is_err second);
+```
+
+#### <a name="322-handle-errors-with-onerror"></a>3.2.2 - on_error _handler_ _maybe-error-value_
+
+The first parameter to `on_error` should be a _handler_ function,
 which will be called with four parameters.
 The first of these parameters is the error text,
 followed by the line number, column number and file name
 from which the error originates.
+
+The given _handler_ is called when an error value is encountered
+as second argument, the _maybe-error-value_.
+
+An example to demonstrate the handler arguments:
+
+```wlambda
+on_error {!(func, line, col, filename) = @;
+    # ...
+} ($e "test");
+```
+
+A usage example:
 
 ```wlambda
 !func = {
@@ -592,6 +636,21 @@ std:assert_eq $*x "this failed!";
 !ret = on_error {|4| .x = _; } ~ func 1;
 std:assert_eq ret "all ok!";
 ```
+
+#### - error_to_str _value_
+
+This function accepts an error value in contrast to `str`, but does
+not panic but transform the error value into it's string representation.
+
+```wlambda
+!r = error_to_str $e "TEST";
+
+std:assert_eq r "$e[1,22:<wlambda::eval>(Err)] \"TEST\"";
+```
+
+WARNING: The string representation might change between wlambda versions.
+Please use `on_error` to access the individual parts
+(line, column, filename, error value) of the error.
 
 ### <a name="33-booleans"></a>3.3 - Booleans
 
@@ -1225,6 +1284,89 @@ iteration function. But if you call the value with a function as first argument 
 is done. That means, the return value of the operation is a list with the return values of the
 iteration function. If you don't need that list you should use `for`.
 
+#### - while _predicate_ _fun_
+
+`while` will call _fun_ until the _predicate_ function returns `$false`.
+This is the most basic loop for iteration:
+
+```wlambda
+!i   = 0;
+!out = $[];
+
+while { i < 10 } {
+    std:push out i;
+    .i = i + 1;
+};
+
+std:assert_eq (str out) "$[0,1,2,3,4,5,6,7,8,9]";
+```
+
+If you need an endless loop you can pass `$true` as predicate:
+
+```wlambda
+
+!i = 0;
+
+while $true {
+    (i >= 4) break;
+    .i = i + 1;
+};
+
+std:assert_eq i 4;
+```
+
+#### - range _start_ _end_ _step_ _fun_
+
+`range` counts from _start_ to _end_ by increments of _step_ and calls _fun_ with the counter. The
+iteration is inclusive, this means if _start_ == _end_ the function _fun_ will be called once.
+
+```wlambda
+!out = $[];
+range 0 9 1 {!(i) = @;
+    std:push out i;
+};
+
+std:assert_eq (str out) "$[0,1,2,3,4,5,6,7,8,9]";
+```
+
+The construct also works for floating point numbers,
+but be aware of the inherent floating point errors:
+
+```wlambda
+!out = $[];
+range 0.3 0.4 0.01 {
+    std:push out ~ std:num:round 100.0 * _;
+};
+
+# 40 is not in the set because the accumulation of 0.01 results
+# in a value slightly above 0.4 and ends the range iteration:
+std:assert_eq (str out) "$[30,31,32,33,34,35,36,37,38,39]";
+```
+
+#### - break _value_
+
+`break` stops the inner most iterative construct, which then will return _value_.
+This should work for all repeatedly calling operations, such as
+`for`, `while` and when calling lists directly. Also most library functions
+that iteratively call you react to it, like `std:re:map` and `std:re:replace_all`.
+
+```wlambda
+!ret = range 0 9 1 {!(i) = @;
+    (i > 4) { break :DONE };
+};
+
+std:assert_eq ret :DONE;
+```
+
+An example where the list iteration is stopped, but note
+that the argument value of break will be accumulated into the list:
+
+```wlambda
+!list = $[1,2,3,4] { (_ > 3) { break :XX }; _ };
+
+std:assert_eq (str list) "$[1,2,3,:\"XX\"]";
+```
+
 ## <a name="5-lexical-scope-and-variable-assignment"></a>5 - Lexical Scope and Variable assignment
 
 - !x = y                  variable definition
@@ -1484,38 +1626,6 @@ std:assert_eq (str v) "$[10,20]";
 This library contains all the core functions which belong to the
 core of the WLambda Programming Language. These functions can be seen
 as keywords of WLambda. Some functions are also available as operators.
-
-#### <a name="101--label-value"></a>10.1 - _? [_label_] _value_
-
-Return from the current function up to a given _label_ if _value_ is an
-error value.  If no _label_ is given only the current function is returned from
-with the error value.  If there is no error, the given value is returned.
-
-The best usecase is, if you just want to hand any errors that might be returned
-further upwards the call stack for the parent functions to handle.
-
-```wlambda
-!do_fail = $false;
-
-!maybe_fails1 = { 10 };
-!maybe_fails2 = {
-    do_fail { $error "something is wrong" }
-            { .do_fail = $true; 2 };
-};
-
-!a = {
-    !x = _? maybe_fails1[];
-    .x = x + (_? maybe_fails2[]);
-    x
-};
-
-!first  = a[];
-!second = a[];
-
-std:assert_eq first 12;
-std:assert (is_err second);
-```
-
 
 ## <a name="11-standard-library"></a>11 - Standard Library
 

@@ -35,6 +35,8 @@ fn get_functions_from_file(filename: &str) -> Vec<String> {
 fn wlambda_functions() {
     let documented_funs = get_functions_from_file("src/prelude.rs");
 
+    let mut count_missing = 0;
+
     let core_syms = core_symbol_table();
     let mut core_syms = core_syms.list();
     core_syms.sort();
@@ -42,7 +44,8 @@ fn wlambda_functions() {
         if let Some(_) = documented_funs.iter().find(|f: &&String| **f == core_sym) {
             println!("OK - '{}'", core_sym);
         } else {
-            panic!("Undocumented core function: '{}'", core_sym);
+            println!("MISSING - '{}'", core_sym);
+            count_missing += 1;
         }
     }
 
@@ -54,7 +57,11 @@ fn wlambda_functions() {
         if let Some(_) = documented_funs.iter().find(|f: &&String| **f == std_sym) {
             println!("OK - {}", std_sym);
         } else {
-            panic!("Undocumented core function: '{}'", std_sym);
+            println!("MISSING - '{}'", std_sym);
         }
+    }
+
+    if count_missing > 0 {
+        panic!(format!("Found {} undocumented functions!", count_missing));
     }
 }

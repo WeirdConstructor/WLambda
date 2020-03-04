@@ -52,7 +52,7 @@ fn execute_script(name: &str, snippet: &str) {
 }
 
 #[test]
-fn main() {
+fn wlambda_code_blocks() {
 
     #[cfg(feature="regex")]
     {
