@@ -2081,6 +2081,25 @@ std:assert (`>>` 0b1011000 3) == 0b1011
 
 ```
 
+**Warning:** Do not expect the declared variables in the module to exist beyond
+execution time. Weak caught values will vanish like usual once the module scope
+is exited. This means, if you declare helper functions in local variables, do
+this with the `:global` modifier:
+
+```wlambda
+!:global helper = { _ * 2 };
+
+!@export doit = { helper 10 };
+```
+
+Alternatively make the helper a strong reference:
+
+```wlambda
+!helper = $&& { _ * 2 };
+
+!@export doit = { helper 10 };
+```
+
 ### <a name="92-import"></a>9.2 - import
 
 ```wlambda
