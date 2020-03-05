@@ -2373,12 +2373,22 @@ mod tests {
     }
 
     #[test]
+    fn check_pick() {
+        assert_eq!(s_eval("pick $t :v :h"), ":\"v\"");
+        assert_eq!(s_eval("pick $f :v :h"), ":\"h\"");
+    }
+
+    #[test]
     fn check_list_boolean_indexing() {
-        assert_eq!(s_eval("$[\"hi\", \"there\"].$t"), s_eval("pick $f \"hi\" \"there\""));
-        assert_eq!(s_eval("$[94, 38].(is_vec $[])"), "38");
-        assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].$t"), "15");
+        assert_eq!(s_eval("$[\"hi\", \"there\"].$t"),
+                   s_eval("pick $f \"hi\" \"there\""));
+        assert_eq!(s_eval("$[94, 38].(is_vec $[])"),                                        "38");
+        assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].$t"),          "15");
         assert_eq!(s_eval("{ !l = $[]; range 10 20 5 { std:push l _ }; l }[].(is_none 1)"), "10");
-        assert_eq!(s_eval("$[$[1, 2], $[2, 1]] $f"), "$[1,2]");
+        assert_eq!(s_eval("$[$[1, 2], $[3, 4]] $t"),                                        "$[2,4]");
+        assert_eq!(s_eval("$[$[1, 2], $[3, 4]] $f"),                                        "$[1,3]");
+        assert_eq!(s_eval("$f $[:a, :b]"),                                                  ":\"a\"");
+        assert_eq!(s_eval("$t $[:a, :b]"),                                                  ":\"b\"");
     }
 
     #[test]
@@ -4322,5 +4332,13 @@ mod tests {
             !b = str f[];
             std:str:join $q$,$ $[a, b];
         "), "\"19,\"");
+    }
+
+    #[test]
+    fn check_trim() {
+        assert_eq!(s_eval("$qX foo X | std:str:trim_start"), "\"foo \"");
+        assert_eq!(s_eval("$qX foo X | std:str:trim_end"),   "\" foo\"");
+        assert_eq!(s_eval("$qX foo X | std:str:trim"),       "\"foo\"");
+        assert_eq!(s_eval("$qX foo \n X | std:str:trim"),    "\"foo\"");
     }
 }

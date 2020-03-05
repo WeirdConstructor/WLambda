@@ -44,6 +44,9 @@ Smalltalk, LISP and Perl.
     - [3.2.1](#321-return-on-error-with-) - Return on error with `_?`
     - [3.2.2](#322-handle-errors-with-onerror) - Handle errors with `on_error`
   - [3.3](#33-booleans) - Booleans
+    - [3.3.1](#331-isbool-any-value) - is_bool _any-value_
+    - [3.3.2](#332-bool-any-value) - bool _any-value_
+    - [3.3.3](#333-boolean-list-indexing) - Boolean List Indexing
   - [3.4](#34-64-bit-integers) - 64-Bit Integers
   - [3.5](#35-64-bit-floats) - 64-Bit Floats
   - [3.6](#36-strings) - Strings
@@ -64,6 +67,7 @@ Smalltalk, LISP and Perl.
     - [4.1.1](#411--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
     - [4.1.2](#412--left-hand-function-chaining) - '|>' Left Hand Function Chaining
   - [4.2](#42-control-flow---returning) - Control Flow - Returning
+    - [4.2.1](#421-block-label-function) - block [label] _function_
   - [4.3](#43-conditional-execution---if--then--else) - Conditional Execution - if / then / else
   - [4.4](#44-iteration) - Iteration
 - [5](#5-lexical-scope-and-variable-assignment) - Lexical Scope and Variable assignment
@@ -612,7 +616,21 @@ std:assert_eq some_num "it is ten";
 std:assert_eq some_num "it is not ten";
 ```
 
-You can cast other values into a boolean with the `bool` function:
+#### <a name="331-isbool-any-value"></a>3.3.1 - is_bool _any-value_
+
+You can check if something is a boolean with `is_bool`:
+
+```wlambda
+std:assert ~ is_bool $true;
+std:assert ~ is_bool $false;
+std:assert ~ not[is_bool $n];
+std:assert ~ not[is_bool ""];
+std:assert ~ not[is_bool 0];
+```
+
+#### <a name="332-bool-any-value"></a>3.3.2 - bool _any-value_
+
+You can cast _any-value_ into a boolean with the `bool` function:
 
 ```wlambda
 std:assert_eq (bool 1)          $true;
@@ -633,14 +651,14 @@ std:assert_eq (bool $b"\x00")   $false;
 std:assert_eq (bool $b"\x01")   $true;
 ```
 
-You can also check if something is a boolean with `is_bool`:
+#### <a name="333-boolean-list-indexing"></a>3.3.3 - Boolean List Indexing
+
+Booleans can also be used to pick a value from a list
+by calling the boolean with a list as first argument:
 
 ```wlambda
-std:assert ~ is_bool $true;
-std:assert ~ is_bool $false;
-std:assert ~ not[is_bool $n];
-std:assert ~ not[is_bool ""];
-std:assert ~ not[is_bool 0];
+std:assert_eq ($true  $[:a, :b]) :b;
+std:assert_eq ($false $[:a, :b]) :a;
 ```
 
 ### <a name="34-64-bit-integers"></a>3.4 - 64-Bit Integers
@@ -951,6 +969,8 @@ Here is an overview of the data type calling semantics:
 | function  | *                 | Will call the function with the specified arguments. |
 | `$true`   | `f1, f2`          | Will call `f1`.          |
 | `$false`  | `f1, f2`          | Will call `f2` or return `$n` if `f2` is not provided.          |
+| `$true`   | `$[1,2]`          | Will return the second element `2` of the list. |
+| `$false`  | `$[1,2]`          | Will return the first element `1` of the list. |
 | symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
 |           |                   | |
@@ -985,11 +1005,15 @@ Here is an overview of the data type calling semantics:
 
 This syntax is useful if you have following function call composition:
 
-    (fn arg1 arg2 (fn2 arg_b1 arg_b2 (fn3 arg_c1 arg_c2 ...)))
+```text
+(fn arg1 arg2 (fn2 arg_b1 arg_b2 (fn3 arg_c1 arg_c2 ...)))
+```
 
 These can be written more comfortably like this:
 
-    fn3 arg1 arg2 | fn2 arg_b1 arg_b2 | fn arg1 arg2
+```text
+fn3 arg1 arg2 | fn2 arg_b1 arg_b2 | fn arg1 arg2
+```
 
 An example with actual values:
 
@@ -1015,17 +1039,23 @@ The call reordering of the `|` operator looks like this:
 
 This syntax is useful if you want to make deep call chains like these:
 
-    (((fn arg1 arg2 ...) arg_b1 arg_b2 ...) arg_c1 arg_c2 ...)
+```text
+(((fn arg1 arg2 ...) arg_b1 arg_b2 ...) arg_c1 arg_c2 ...)
+```
 
 These can be written more comfortably like this:
 
-    fn arg1 arg2 |> arg_b1 arg_b2 |> arg_c1 arg_c2
+```text
+fn arg1 arg2 |> arg_b1 arg_b2 |> arg_c1 arg_c2
+```
 
 or nicer formatted:
 
-    fn arg1 arg2
-        |> arg_b1 arg_b2
-        |> arg_c1 arg_c2
+```text
+fn arg1 arg2
+    |> arg_b1 arg_b2
+    |> arg_c1 arg_c2
+```
 
 Here an actual example:
 
@@ -1049,23 +1079,59 @@ The call reordering of the `|>` operator looks like this:
 ```
 ### <a name="42-control-flow---returning"></a>4.2 - Control Flow - Returning
 
-- \:lbl { ... } syntax and returning
-
 WLambda uses labelled blocks for control flow, as returning from the current function would not be
 very helpful for the control flow in wlambda in case of conditional execution.
 
 ```wlambda
 !some_func = \:outer {
     !x = 10;
-# does stuff
+
+    # does stuff...
 
     (x == 10) {
-return :outer 20
-    }
+        return :outer 20
+    };
 
-# more stuff that is not executed if x == 10.
+    # more stuff that is not executed if x == 10.
 }
 ```
+
+
+#### <a name="421-block-label-function"></a>4.2.1 - block [label] _function_
+
+Calls the _function_ with the given _label_ for `return`to jump to.
+
+If you just want to setup a point inside a function to jump to
+with `return` the `block` function is more convenient to use:
+
+```wlambda
+!y = 1;
+
+!res = block :x {
+    .y = y + 1;
+    (y >= 2) \return :x 20;
+    .y = y + 1;
+    .y = y + 1;
+};
+
+std:assert_eq res 20;
+```
+
+The alternative is the less clear syntax would be in this case:
+
+```wlambda
+!y = 1;
+
+!res = \:x {
+    .y = y + 1;
+    (y >= 2) \return :x 20;
+    .y = y + 1;
+    .y = y + 1;
+}[];
+
+std:assert_eq res 20;
+```
+
 
 ### <a name="43-conditional-execution---if--then--else"></a>4.3 - Conditional Execution - if / then / else
 
@@ -1104,26 +1170,38 @@ Often, you may want to choose one variable or another based on some predicate.
 For these situations, the `pick` function is available.
 For example, perhaps you want to make a function which can take any number of parameters,
 or a single list parameter.
+
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } ~ pick (is_vec _) _ @;
 ```
+
 Booleans can also be used to index into lists.
 When this is done, `$t` represents `1` and `$f` represents `0`.
 This means that we can also express our `sum` function as:
+
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } $[@, _].(is_vec _);
 ```
+
 Furthermore, as `a.b` is equivalent to `b[a]`, one can also write this `sum` function
 by simply invoking `(is_vec _)` and passing in the list of options as a parameter.
+
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } ~ (is_vec _) $[@, _];
 ```
+
 When comparing the `pick` and indexing approaches it is important to note
 that the two possible return values are inverted:
+
 ```wlambda
-pick (x == 20) "x is 20" "x isn't 20";
-$["x isn't 20", "x is 20"].(x == 20);
+!x = 20;
+!res = pick (x == 20) "x is 20" "x isn't 20";
+std:assert_eq res "x is 20";
+
+.res = $["x isn't 20", "x is 20"].(x == 20);
+std:assert_eq res "x is 20";
 ```
+
 With `pick`, the value to return in the `$t` case comes first, followed by the `$f` case's value,
 whereas with indexing approach, the opposite is true.
 
@@ -2265,6 +2343,36 @@ pub fn core_symbol_table() -> SymbolTable {
     st
 }
 
+fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackAction> {
+    let mut write = env.stdio.write.borrow_mut();
+
+    for i in 0..argc {
+        let s =
+            if raw { env.arg(i).s_raw() }
+            else { env.arg(i).s() };
+
+        if i == (argc - 1) {
+            if i > 0 {
+                writeln!(write, " {}", s).ok();
+            } else {
+                writeln!(write, "{}", s).ok();
+            }
+        } else if i > 0 {
+            write!(write, " {}", s).ok();
+        } else {
+            write!(write, "{}", s).ok();
+        }
+    }
+    if argc == 0 {
+        writeln!(write, "").ok();
+    }
+    if argc > 0 {
+        Ok(env.arg(argc - 1))
+    } else {
+        Ok(VVal::Nul)
+    }
+}
+
 /// Returns a SymbolTable with all WLambda standard library language symbols.
 pub fn std_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
@@ -2396,6 +2504,15 @@ pub fn std_symbol_table() -> SymbolTable {
         Some(1), Some(1), false);
     func!(st, "str:to_uppercase",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_uppercase())) },
+        Some(1), Some(1), false);
+    func!(st, "str:trim",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim().to_string())) },
+        Some(1), Some(1), false);
+    func!(st, "str:trim_start",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim_start().to_string())) },
+        Some(1), Some(1), false);
+    func!(st, "str:trim_end",
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim_end().to_string())) },
         Some(1), Some(1), false);
     func!(st, "str:padl",
         |env: &mut Env, _argc: usize| {
@@ -2730,24 +2847,76 @@ pub fn std_symbol_table() -> SymbolTable {
             })
         }, Some(1), Some(1), false);
 
+    func!(st, "io:lines",
+        |env: &mut Env, _argc: usize| {
+            let f = env.arg(0);
+            let mut ret = VVal::Nul;
+            loop {
+                let mut line = String::new();
+                {
+                    let mut read = env.stdio.read.borrow_mut();
+                    match read.read_line(&mut line) {
+                        Ok(n) => { if n == 0 { break; } },
+                        Err(e) => {
+                            return Ok(VVal::err_msg(
+                                &format!("IO-Error on std:io:lines: {}", e)))
+                        },
+                    }
+                }
+
+                env.push(VVal::new_str_mv(line));
+                match f.call_internal(env, 1) {
+                    Ok(v)                      => { ret = v; },
+                    Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
+                    Err(StackAction::Next)     => { },
+                    Err(e)                     => { env.popn(1); return Err(e); }
+                }
+                env.popn(1);
+            }
+
+            Ok(ret)
+        }, Some(1), Some(1), false);
+
+    func!(st, "io:stdout:flush",
+        |env: &mut Env, _argc: usize| {
+            if let Err(e) = env.stdio.write.borrow_mut().flush() {
+                Ok(VVal::err_msg(
+                    &format!("IO-Error on std:io:stdout:flush: {}", e)))
+            } else {
+                Ok(VVal::Bol(true))
+            }
+        }, Some(0), Some(0), false);
+
     func!(st, "io:stdout:newline",
-        |_env: &mut Env, _argc: usize| {
-            println!("");
-            Ok(VVal::Bol(true))
+        |env: &mut Env, _argc: usize| {
+            if let Err(e) = writeln!(*env.stdio.write.borrow_mut(), "") {
+                Ok(VVal::err_msg(
+                    &format!("IO-Error on std:io:stdout:newline: {}", e)))
+            } else {
+                Ok(VVal::Bol(true))
+            }
         }, Some(0), Some(0), false);
 
     func!(st, "io:stdout:write",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
-            print!("{}", v.s());
-            Ok(v)
+            if let Err(e) = write!(*env.stdio.write.borrow_mut(), "{}", v.s()) {
+                Ok(VVal::err_msg(
+                    &format!("IO-Error on std:io:stdout:write: {}", e)))
+            } else {
+                Ok(v)
+            }
         }, Some(1), Some(1), false);
 
     func!(st, "io:stdout:print",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
-            print!("{}", v.s_raw());
-            Ok(v)
+            if let Err(e) = write!(*env.stdio.write.borrow_mut(), "{}", v.s_raw()) {
+                Ok(VVal::err_msg(
+                   &format!("IO-Error on std:io:stdout:print: {}", e)))
+            } else {
+                Ok(v)
+            }
         }, Some(1), Some(1), false);
 
     func!(st, "io:file:read_text",
@@ -2908,48 +3077,12 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "writeln",
         |env: &mut Env, argc: usize| {
-            for i in 0..argc {
-                if i == (argc - 1) {
-                    if i > 0 {
-                        println!(" {}", env.arg(i).s());
-                    } else {
-                        println!("{}", env.arg(i).s());
-                    }
-                } else if i > 0 {
-                    print!(" {}", env.arg(i).s());
-                } else {
-                    print!("{}", env.arg(i).s());
-                }
-            }
-            if argc == 0 { println!(""); }
-            if argc > 0 {
-                Ok(env.arg(argc - 1))
-            } else {
-                Ok(VVal::Nul)
-            }
+            print_value(env, argc, false)
         }, None, None, false);
 
     func!(st, "displayln",
         |env: &mut Env, argc: usize| {
-            for i in 0..argc {
-                if i == (argc - 1) {
-                    if i > 0 {
-                        println!(" {}", env.arg(i).s_raw());
-                    } else {
-                        println!("{}", env.arg(i).s_raw());
-                    }
-                } else if i > 0 {
-                    print!(" {}", env.arg(i).s_raw());
-                } else {
-                    print!("{}", env.arg(i).s_raw());
-                }
-            }
-            if argc == 0 { println!(""); }
-            if argc > 0 {
-                Ok(env.arg(argc - 1))
-            } else {
-                Ok(VVal::Nul)
-            }
+            print_value(env, argc, true)
         }, None, None, false);
 
     func!(st, "dump_func",
