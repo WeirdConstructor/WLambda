@@ -79,81 +79,85 @@ Smalltalk, LISP and Perl.
     - [5.2.1](#521-return-label-value) - return [_label_] _value_
     - [5.2.2](#522-block-label-function) - block [label] _function_
 - [6](#6-conditional-execution---if--then--else) - Conditional Execution - if / then / else
-- [7](#7-iteration) - Iteration
-    - [7.0.1](#701-iteration-over-vectors) - Iteration over vectors
-    - [7.0.2](#702-iteration-over-maps) - Iteration over maps
-    - [7.0.3](#703-for-iteratable-value-function) - for _iteratable-value_ _function_
-    - [7.0.4](#704-while-predicate-fun) - while _predicate_ _fun_
-    - [7.0.5](#705-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
-    - [7.0.6](#706-break-value) - break _value_
-    - [7.0.7](#707-stdzip-vector-map-fn) - std:zip _vector_ _map-fn_
-    - [7.0.8](#708-stdenumerate-map-fn) - std:enumerate _map-fn_
-- [8](#8-accumulation-and-collection) - Accumulation and Collection
-    - [8.0.1](#801-transforming-a-vector) - Transforming a vector
-    - [8.0.2](#802-example-of-) - Example of `$@@`
-    - [8.0.3](#803-transforming-a-vector-to-a-map) - Transforming a vector to a map
-    - [8.0.4](#804-iteratively-concatenating-strings) - Iteratively concatenating strings
-    - [8.0.5](#805-accumulating-sums) - Accumulating sums
-    - [8.0.6](#806-stdaccum-collection-a-b-) - std:accum _collection_ _a_ _b_ ...
-- [9](#9-arithmetic) - Arithmetic
-    - [9.0.1](#901--operand-1-operand-2-) - + _operand-1_ _operand-2_ ...
-    - [9.0.2](#902---operand-1-operand-2-) - - _operand-1_ _operand-2_ ...
-    - [9.0.3](#903--op-a-op-b) - * _op-a_ _op-b_
-    - [9.0.4](#904--op-a-op-b) - / _op-a_ _op-b_
-    - [9.0.5](#905--op-a-op-b) - % _op-a_ _op-b_
-    - [9.0.6](#906--op-a-op-b) - ^ _op-a_ _op-b_
-- [10](#10-comparison) - Comparison
-    - [10.0.1](#1001--op-a-op-b) - == _op-a_ _op-b_
-    - [10.0.2](#1002--op-a-op-b) - != _op-a_ _op-b_
-    - [10.0.3](#1003--op-a-op-b) - < _op-a_ _op-b_
-    - [10.0.4](#1004--op-a-op-b) - <= _op-a_ _op-b_
-    - [10.0.5](#1005--op-a-op-b) - > _op-a_ _op-b_
-    - [10.0.6](#1006--op-a-op-b) - >= _op-a_ _op-b_
-- [11](#11-bit-operations) - Bit Operations
-    - [11.0.1](#1101--op-a-op-b) - & _op-a_ _op-b_
-    - [11.0.2](#1102--op-a-op-b) - &^ _op-a_ _op-b_
-    - [11.0.3](#1103--op-a-op-b) - &| _op-a_ _op-b_
-    - [11.0.4](#1104--op-a-op-b) - << _op-a_ _op-b_
-    - [11.0.5](#1105--op-a-op-b) - >> _op-a_ _op-b_
-- [12](#12-modules) - Modules
-  - [12.1](#121-export) - export
-  - [12.2](#122-import) - import
-- [13](#13-core-library) - Core Library
-- [14](#14-standard-library) - Standard Library
-    - [14.0.1](#1401-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
-    - [14.0.2](#1402-stdcopy-vecormap) - std:copy _vec_or_map_
-    - [14.0.3](#1403-stdsort-comparefun-vec) - std:sort [_compare_fun_] _vec_
-    - [14.0.4](#1404-stdcmpnumasc-a-b) - std:cmp:num:asc _a_ _b_
-    - [14.0.5](#1405-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
-    - [14.0.6](#1406-stddisplayln-arg1-) - std:displayln _arg1_ ...
-    - [14.0.7](#1407-stdwriteln-arg1-) - std:writeln _arg1_ ...
-    - [14.0.8](#1408-stdstrwrite-arg) - std:str:write _arg_
-    - [14.0.9](#1409-stdeval-code-string) - std:eval _code-string_
-    - [14.0.10](#14010-stdassert-bool-message) - std:assert _bool_ \[_message_]
-    - [14.0.11](#14011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
-  - [14.1](#141-io) - I/O
-    - [14.1.1](#1411-stdiofilereadtext-filename) - std:io:file:read_text _filename_
-    - [14.1.2](#1412-stdiofileread-filename) - std:io:file:read _filename_
-    - [14.1.3](#1413-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
-    - [14.1.4](#1414-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
-- [15](#15-optional-standard-library) - Optional Standard Library
-  - [15.1](#151-serialization) - serialization
-    - [15.1.1](#1511-stdserjson-data-nopretty) - std:ser:json _data_ \[_no_pretty_]
-    - [15.1.2](#1512-stddeserjson-string) - std:deser:json _string_
-    - [15.1.3](#1513-stdsercsv-fielddelim-rowseparator-escapeall-table) - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
-    - [15.1.4](#1514-stddesercsv-fielddelim-rowseparator-data) - std:deser:csv _field_delim_ _row_separator_ _data_
-    - [15.1.5](#1515-stdsermsgpack-data) - std:ser:msgpack _data_
-    - [15.1.6](#1516-stddesermsgpack-bytes) - std:deser:msgpack _bytes_
-  - [15.2](#152-regex) - regex
-  - [15.3](#153-chrono) - chrono
-    - [15.3.1](#1531-stdchronotimestamp-format) - std:chrono:timestamp \[_format_]
-  - [15.4](#154-hash) - hash
-    - [15.4.1](#1541-stdhashfnv1a-arg1-) - std:hash:fnv1a _arg1_ ...
-  - [15.5](#155-rand) - rand
-    - [15.5.1](#1551-stdrandsplitmix64new) - std:rand:split_mix64_new
-    - [15.5.2](#1552-stdrandsplitmix64newfrom-seed) - std:rand:split_mix64_new_from _seed_
-    - [15.5.3](#1553-stdrandsplitmix64next-smstate-count) - std:rand:split_mix64_next _sm_state_ \[_count_]
-    - [15.5.4](#1554-stdrandsplitmix64nextopen01-smstate-count) - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
+- [7](#7-loops-and-iteration) - Loops And Iteration
+  - [7.1](#71-control-flow) - Control Flow
+    - [7.1.1](#711-while-predicate-fun) - while _predicate_ _fun_
+    - [7.1.2](#712-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
+    - [7.1.3](#713-break-value) - break _value_
+  - [7.2](#72-collection-iteration) - Collection Iteration
+    - [7.2.1](#721-iteration-over-vectors) - Iteration over vectors
+    - [7.2.2](#722-iteration-over-maps) - Iteration over maps
+    - [7.2.3](#723-for-iteratable-value-function) - for _iteratable-value_ _function_
+  - [7.3](#73-accumulation-and-collection) - Accumulation and Collection
+    - [7.3.1](#731-transforming-a-vector) - Transforming a vector
+    - [7.3.2](#732-example-of-) - Example of `$@@`
+    - [7.3.3](#733-transforming-a-vector-to-a-map) - Transforming a vector to a map
+    - [7.3.4](#734-iteratively-concatenating-strings) - Iteratively concatenating strings
+    - [7.3.5](#735-accumulating-sums) - Accumulating sums
+  - [7.4](#74-utilities) - Utilities
+    - [7.4.1](#741-stdaccum-collection-a-b-) - std:accum _collection_ _a_ _b_ ...
+    - [7.4.2](#742-stdzip-vector-map-fn) - std:zip _vector_ _map-fn_
+    - [7.4.3](#743-stdenumerate-map-fn) - std:enumerate _map-fn_
+- [8](#8-operators) - Operators
+  - [8.1](#81-arithmetic) - Arithmetic
+    - [8.1.1](#811--operand-1-operand-2-) - + _operand-1_ _operand-2_ ...
+    - [8.1.2](#812---operand-1-operand-2-) - - _operand-1_ _operand-2_ ...
+    - [8.1.3](#813--op-a-op-b) - * _op-a_ _op-b_
+    - [8.1.4](#814--op-a-op-b) - / _op-a_ _op-b_
+    - [8.1.5](#815--op-a-op-b) - % _op-a_ _op-b_
+    - [8.1.6](#816--op-a-op-b) - ^ _op-a_ _op-b_
+  - [8.2](#82-comparison) - Comparison
+    - [8.2.1](#821--op-a-op-b) - == _op-a_ _op-b_
+    - [8.2.2](#822--op-a-op-b) - != _op-a_ _op-b_
+    - [8.2.3](#823--op-a-op-b) - < _op-a_ _op-b_
+    - [8.2.4](#824--op-a-op-b) - <= _op-a_ _op-b_
+    - [8.2.5](#825--op-a-op-b) - > _op-a_ _op-b_
+    - [8.2.6](#826--op-a-op-b) - >= _op-a_ _op-b_
+  - [8.3](#83-bit-operations) - Bit Operations
+    - [8.3.1](#831--op-a-op-b) - & _op-a_ _op-b_
+    - [8.3.2](#832--op-a-op-b) - &^ _op-a_ _op-b_
+    - [8.3.3](#833--op-a-op-b) - &| _op-a_ _op-b_
+    - [8.3.4](#834--op-a-op-b) - << _op-a_ _op-b_
+    - [8.3.5](#835--op-a-op-b) - >> _op-a_ _op-b_
+- [9](#9-modules) - Modules
+  - [9.1](#91-export) - export
+  - [9.2](#92-import) - import
+- [10](#10-core-library) - Core Library
+- [11](#11-standard-library) - Standard Library
+    - [11.0.1](#1101-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
+    - [11.0.2](#1102-stdcopy-vecormap) - std:copy _vec_or_map_
+    - [11.0.3](#1103-stdsort-comparefun-vec) - std:sort [_compare_fun_] _vec_
+    - [11.0.4](#1104-stdcmpnumasc-a-b) - std:cmp:num:asc _a_ _b_
+    - [11.0.5](#1105-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
+    - [11.0.6](#1106-stddisplayln-arg1-) - std:displayln _arg1_ ...
+    - [11.0.7](#1107-stdwriteln-arg1-) - std:writeln _arg1_ ...
+    - [11.0.8](#1108-stdstrwrite-arg) - std:str:write _arg_
+    - [11.0.9](#1109-stdeval-code-string) - std:eval _code-string_
+    - [11.0.10](#11010-stdassert-bool-message) - std:assert _bool_ \[_message_]
+    - [11.0.11](#11011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
+  - [11.1](#111-io) - I/O
+    - [11.1.1](#1111-stdiofilereadtext-filename) - std:io:file:read_text _filename_
+    - [11.1.2](#1112-stdiofileread-filename) - std:io:file:read _filename_
+    - [11.1.3](#1113-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
+    - [11.1.4](#1114-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
+- [12](#12-optional-standard-library) - Optional Standard Library
+  - [12.1](#121-serialization) - serialization
+    - [12.1.1](#1211-stdserjson-data-nopretty) - std:ser:json _data_ \[_no_pretty_]
+    - [12.1.2](#1212-stddeserjson-string) - std:deser:json _string_
+    - [12.1.3](#1213-stdsercsv-fielddelim-rowseparator-escapeall-table) - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
+    - [12.1.4](#1214-stddesercsv-fielddelim-rowseparator-data) - std:deser:csv _field_delim_ _row_separator_ _data_
+    - [12.1.5](#1215-stdsermsgpack-data) - std:ser:msgpack _data_
+    - [12.1.6](#1216-stddesermsgpack-bytes) - std:deser:msgpack _bytes_
+  - [12.2](#122-regex) - regex
+  - [12.3](#123-chrono) - chrono
+    - [12.3.1](#1231-stdchronotimestamp-format) - std:chrono:timestamp \[_format_]
+  - [12.4](#124-hash) - hash
+    - [12.4.1](#1241-stdhashfnv1a-arg1-) - std:hash:fnv1a _arg1_ ...
+  - [12.5](#125-rand) - rand
+    - [12.5.1](#1251-stdrandsplitmix64new) - std:rand:split_mix64_new
+    - [12.5.2](#1252-stdrandsplitmix64newfrom-seed) - std:rand:split_mix64_new_from _seed_
+    - [12.5.3](#1253-stdrandsplitmix64next-smstate-count) - std:rand:split_mix64_next _sm_state_ \[_count_]
+    - [12.5.4](#1254-stdrandsplitmix64nextopen01-smstate-count) - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
 
 -----
 
@@ -967,7 +971,7 @@ The literal syntax for vectors (or sometimes also called lists in WLambda)
 is `$[...]`. You may write any kind of expression in it and you will get
 a vector from it.
 
-For iteration over a vector please refer to [7. Iteration](#7-iteration).
+For iteration over a vector please refer to [7.2 Collection Iteration](#72-collection-iteration).
 
 To access the elements of a vector you have to call a number with a vector
 as first argument. The field syntax is a more convenient shorthand syntax.
@@ -1034,7 +1038,7 @@ Aside from vectors there are associative maps in WLambda. Their syntax is
 `${ key = expr, ... }`. The keys of these maps have to be strings,
 the values in the literals can be any expression.
 
-For iteration over a map please refer to [7. Iteration](#7-iteration).
+For iteration over a map please refer to [7.2 Collection Iteration](#72-collection-iteration).
 
 You can call a symbol or a string with an associative map to get the value in
 the map with the string value as key. There is also, like vectors, the field
@@ -1474,9 +1478,9 @@ std:assert_eq res "x is 20";
 With `pick`, the value to return in the `$t` case comes first, followed by the `$f` case's value,
 whereas with indexing approach, the opposite is true.
 
-## <a name="7-iteration"></a>7 - Iteration
+## <a name="7-loops-and-iteration"></a>7 - Loops And Iteration
 
-WLambda has many ways to iterate:
+WLambda has many ways to loop and iterate:
 
 - Counting loop with `range`
 - While some condition is `$true` with `while`
@@ -1494,7 +1498,93 @@ iteration function. But if you call the value with a function as first argument 
 is done. That means, the return value of the operation is a list with the return values of the
 iteration function. If you don't need that list you should use `for`.
 
-#### <a name="701-iteration-over-vectors"></a>7.0.1 - Iteration over vectors
+### <a name="71-control-flow"></a>7.1 - Control Flow
+
+#### <a name="711-while-predicate-fun"></a>7.1.1 - while _predicate_ _fun_
+
+`while` will call _fun_ until the _predicate_ function returns `$false`.
+This is the most basic loop for iteration:
+
+```wlambda
+!i   = 0;
+!out = $[];
+
+while { i < 10 } {
+    std:push out i;
+    .i = i + 1;
+};
+
+std:assert_eq (str out) "$[0,1,2,3,4,5,6,7,8,9]";
+```
+
+If you need an endless loop you can pass `$true` as predicate:
+
+```wlambda
+
+!i = 0;
+
+while $true {
+    (i >= 4) break;
+    .i = i + 1;
+};
+
+std:assert_eq i 4;
+```
+
+#### <a name="712-range-start-end-step-fun"></a>7.1.2 - range _start_ _end_ _step_ _fun_
+
+`range` counts from _start_ to _end_ by increments of _step_ and calls _fun_ with the counter. The
+iteration is inclusive, this means if _start_ == _end_ the function _fun_ will be called once.
+
+```wlambda
+!out = $[];
+range 0 9 1 {!(i) = @;
+    std:push out i;
+};
+
+std:assert_eq (str out) "$[0,1,2,3,4,5,6,7,8,9]";
+```
+
+The construct also works for floating point numbers,
+but be aware of the inherent floating point errors:
+
+```wlambda
+!out = $[];
+range 0.3 0.4 0.01 {
+    std:push out ~ std:num:round 100.0 * _;
+};
+
+# 40 is not in the set because the accumulation of 0.01 results
+# in a value slightly above 0.4 and ends the range iteration:
+std:assert_eq (str out) "$[30,31,32,33,34,35,36,37,38,39]";
+```
+
+#### <a name="713-break-value"></a>7.1.3 - break _value_
+
+`break` stops the inner most iterative construct, which then will return _value_.
+This should work for all repeatedly calling operations, such as
+`for`, `while` and when calling lists directly. Also most library functions
+that iteratively call you react to it, like `std:re:map` and `std:re:replace_all`.
+
+```wlambda
+!ret = range 0 9 1 {!(i) = @;
+    (i > 4) { break :DONE };
+};
+
+std:assert_eq ret :DONE;
+```
+
+An example where the list iteration is stopped:
+
+```wlambda
+!val = $[1,2,3,4] { (_ > 3) { break :XX }; _ };
+
+std:assert_eq val :XX;
+```
+
+### <a name="72-collection-iteration"></a>7.2 - Collection Iteration
+
+#### <a name="721-iteration-over-vectors"></a>7.2.1 - Iteration over vectors
 
 Iterating over a vector is the most basic iteration supported by WLambda.
 You just call the vector with a function as first argument:
@@ -1510,7 +1600,7 @@ std:assert_eq sum 6;
 
 You can also use `for` if you like.
 
-#### <a name="702-iteration-over-maps"></a>7.0.2 - Iteration over maps
+#### <a name="722-iteration-over-maps"></a>7.2.2 - Iteration over maps
 
 Iterating over a map is as simple as iterating over a vector.
 The map can be called with a function as first argument and it starts
@@ -1533,7 +1623,7 @@ std:assert_eq (std:str:join "," ~ std:sort keys) "a,b,c";
 
 You can also use `for` if you like.
 
-#### <a name="703-for-iteratable-value-function"></a>7.0.3 - for _iteratable-value_ _function_
+#### <a name="723-for-iteratable-value-function"></a>7.2.3 - for _iteratable-value_ _function_
 
 Calls _function_ for every element of _iteratable-value_.
 Iteratable values are:
@@ -1594,114 +1684,7 @@ for :abc {
 std:assert_eq (str str_chars) (str $["a", "b", "c"]);
 ```
 
-#### <a name="704-while-predicate-fun"></a>7.0.4 - while _predicate_ _fun_
-
-`while` will call _fun_ until the _predicate_ function returns `$false`.
-This is the most basic loop for iteration:
-
-```wlambda
-!i   = 0;
-!out = $[];
-
-while { i < 10 } {
-    std:push out i;
-    .i = i + 1;
-};
-
-std:assert_eq (str out) "$[0,1,2,3,4,5,6,7,8,9]";
-```
-
-If you need an endless loop you can pass `$true` as predicate:
-
-```wlambda
-
-!i = 0;
-
-while $true {
-    (i >= 4) break;
-    .i = i + 1;
-};
-
-std:assert_eq i 4;
-```
-
-#### <a name="705-range-start-end-step-fun"></a>7.0.5 - range _start_ _end_ _step_ _fun_
-
-`range` counts from _start_ to _end_ by increments of _step_ and calls _fun_ with the counter. The
-iteration is inclusive, this means if _start_ == _end_ the function _fun_ will be called once.
-
-```wlambda
-!out = $[];
-range 0 9 1 {!(i) = @;
-    std:push out i;
-};
-
-std:assert_eq (str out) "$[0,1,2,3,4,5,6,7,8,9]";
-```
-
-The construct also works for floating point numbers,
-but be aware of the inherent floating point errors:
-
-```wlambda
-!out = $[];
-range 0.3 0.4 0.01 {
-    std:push out ~ std:num:round 100.0 * _;
-};
-
-# 40 is not in the set because the accumulation of 0.01 results
-# in a value slightly above 0.4 and ends the range iteration:
-std:assert_eq (str out) "$[30,31,32,33,34,35,36,37,38,39]";
-```
-
-#### <a name="706-break-value"></a>7.0.6 - break _value_
-
-`break` stops the inner most iterative construct, which then will return _value_.
-This should work for all repeatedly calling operations, such as
-`for`, `while` and when calling lists directly. Also most library functions
-that iteratively call you react to it, like `std:re:map` and `std:re:replace_all`.
-
-```wlambda
-!ret = range 0 9 1 {!(i) = @;
-    (i > 4) { break :DONE };
-};
-
-std:assert_eq ret :DONE;
-```
-
-An example where the list iteration is stopped:
-
-```wlambda
-!val = $[1,2,3,4] { (_ > 3) { break :XX }; _ };
-
-std:assert_eq val :XX;
-```
-
-#### <a name="707-stdzip-vector-map-fn"></a>7.0.7 - std:zip _vector_ _map-fn_
-
-Creates a generator that calls _map_fn_ with the consecutive elements of _vector_
-as the first argument of _map-fn_. All arguments passed to std:zip
-are appended to the argument list.
-
-This is useful for combining the iteration over two vectors or collections.
-
-```wlambda
-!l = $@v $[13, 42, 97] ~ std:zip $["Foo", "Bar", "Baz"] { $+ @ };
-std:assert_eq (str l) (str $[$["Foo", 13], $["Bar", 42], $["Baz", 97]]);
-```
-
-#### <a name="708-stdenumerate-map-fn"></a>7.0.8 - std:enumerate _map-fn_
-
-Creates a generator that calls _map-fn_ with a counter that is incremented
-after each call, starting with 0. All received arguments are appended to
-the argument list after the counter.
-
-```wlambda
-!l = $@v $["lo", "mid", "hi"] ~ std:enumerate { $+ @ };
-std:assert_eq (str l) (str $[$[0, "lo"], $[1, "mid"], $[2, "hi"]]);
-```
-
-
-## <a name="8-accumulation-and-collection"></a>8 - Accumulation and Collection
+### <a name="73-accumulation-and-collection"></a>7.3 - Accumulation and Collection
 
 WLambda provides special syntax and semantics for accumulating or collecting
 values while iterating through lists. There are following special syntax
@@ -1724,7 +1707,7 @@ constructs:
 | $+                | Evaluated to a function that can be called to add/append a new value to the current collection/accumulation. |
 | $@@               | Access the current accumulation value. |
 
-#### <a name="801-transforming-a-vector"></a>8.0.1 - Transforming a vector
+#### <a name="731-transforming-a-vector"></a>7.3.1 - Transforming a vector
 
 If you just want to do something with items in a vector and
 construct a new one from the results:
@@ -1735,7 +1718,7 @@ construct a new one from the results:
 std:assert_eq (str result)  "$[2,4,6,8]";
 ```
 
-#### <a name="802-example-of-"></a>8.0.2 - Example of `$@@`
+#### <a name="732-example-of-"></a>7.3.2 - Example of `$@@`
 
 Here is an interesting example how $@@ might be used:
 
@@ -1754,7 +1737,7 @@ std:assert_eq (str list_of_lists)
     "$[$[2],$[2,4],$[2,4,6],$[2,4,6,8]]";
 ```
 
-#### <a name="803-transforming-a-vector-to-a-map"></a>8.0.3 - Transforming a vector to a map
+#### <a name="733-transforming-a-vector-to-a-map"></a>7.3.3 - Transforming a vector to a map
 
 For constructing maps the `$@map` construct is available.
 In the following example we transform a vector of pairs into a map:
@@ -1771,7 +1754,7 @@ std:assert_eq result.b 33;
 std:assert_eq result.c 99;
 ```
 
-#### <a name="804-iteratively-concatenating-strings"></a>8.0.4 - Iteratively concatenating strings
+#### <a name="734-iteratively-concatenating-strings"></a>7.3.4 - Iteratively concatenating strings
 
 In case you need to construct a longer text the `$@string` construct allows
 you to efficiently create a long string. For demonstration purposes
@@ -1809,7 +1792,7 @@ But maybe you need to transform or construct the strings before joining:
 std:assert_eq accum ">abc>def>ghi>XXX";
 ```
 
-#### <a name="805-accumulating-sums"></a>8.0.5 - Accumulating sums
+#### <a name="735-accumulating-sums"></a>7.3.5 - Accumulating sums
 
 The following examples show how accumulation of values with `$@int` and `$@float` work.
 
@@ -1831,7 +1814,10 @@ And with floats:
 std:assert_eq (std:num:round 10.0 * sum) 81.0;
 ```
 
-#### <a name="806-stdaccum-collection-a-b-"></a>8.0.6 - std:accum _collection_ _a_ _b_ ...
+
+### <a name="74-utilities"></a>7.4 - Utilities
+
+#### <a name="741-stdaccum-collection-a-b-"></a>7.4.1 - std:accum _collection_ _a_ _b_ ...
 
 This function accumulates all it's arguments in the _collection_.
 It does the same form of accumulation as `$+` does.
@@ -1843,7 +1829,32 @@ std:assert_eq (str ~ std:accum $b"" 1 2 3)  "\x01\x02\x03";
 std:assert_eq (str ~ std:accum 10 1 2 3)    "16";
 ```
 
-## <a name="9-arithmetic"></a>9 - Arithmetic
+#### <a name="742-stdzip-vector-map-fn"></a>7.4.2 - std:zip _vector_ _map-fn_
+
+Creates a generator that calls _map_fn_ with the consecutive elements of _vector_
+as the first argument of _map-fn_. All arguments passed to std:zip
+are appended to the argument list.
+
+This is useful for combining the iteration over two vectors or collections.
+
+```wlambda
+!l = $@v $[13, 42, 97] ~ std:zip $["Foo", "Bar", "Baz"] { $+ @ };
+std:assert_eq (str l) (str $[$["Foo", 13], $["Bar", 42], $["Baz", 97]]);
+```
+
+#### <a name="743-stdenumerate-map-fn"></a>7.4.3 - std:enumerate _map-fn_
+
+Creates a generator that calls _map-fn_ with a counter that is incremented
+after each call, starting with 0. All received arguments are appended to
+the argument list after the counter.
+
+```wlambda
+!l = $@v $["lo", "mid", "hi"] ~ std:enumerate { $+ @ };
+std:assert_eq (str l) (str $[$[0, "lo"], $[1, "mid"], $[2, "hi"]]);
+```
+
+## <a name="8-operators"></a>8 - Operators
+### <a name="81-arithmetic"></a>8.1 - Arithmetic
 
 The output type (float vs. integer) of the numerical arithmetic operators is defined
 by the _first_ operand of the operation. Use the casting functions `float` or
@@ -1853,7 +1864,7 @@ Please note that not all operators are available as plain identifiers and need
 to be quoted when used in their prefix form or as functions, some of them are
 `*`, `/`, `%` and some others.
 
-#### <a name="901--operand-1-operand-2-"></a>9.0.1 - + _operand-1_ _operand-2_ ...
+#### <a name="811--operand-1-operand-2-"></a>8.1.1 - + _operand-1_ _operand-2_ ...
 
 This function implements arithmetic addition.  If the first operand is a
 float number, the substraction will return a float result. If it is an integer
@@ -1867,7 +1878,7 @@ std:assert_eq (+ "5" 2) 7;
 std:assert_eq (+ :5 2) 7;
 ```
 
-#### <a name="902---operand-1-operand-2-"></a>9.0.2 - - _operand-1_ _operand-2_ ...
+#### <a name="812---operand-1-operand-2-"></a>8.1.2 - - _operand-1_ _operand-2_ ...
 
 This function implements arithmetic substraction.  If the first operand is a
 float number, the substraction will return a float result. If it is an integer
@@ -1881,7 +1892,7 @@ std:assert_eq (- "5" 2) 3;
 std:assert_eq (- :5 2) 3;
 ```
 
-#### <a name="903--op-a-op-b"></a>9.0.3 - * _op-a_ _op-b_
+#### <a name="813--op-a-op-b"></a>8.1.3 - * _op-a_ _op-b_
 
 Returns the multiplication of the two operands.
 
@@ -1895,7 +1906,7 @@ std:assert (`*` 10 4) == 40;
 std:assert (float "10.1") * 4 == 40.4;
 ```
 
-#### <a name="904--op-a-op-b"></a>9.0.4 - / _op-a_ _op-b_
+#### <a name="814--op-a-op-b"></a>8.1.4 - / _op-a_ _op-b_
 
 Returns the division of the two operands.
 
@@ -1909,7 +1920,7 @@ std:assert (`/` 10 4) == 2;
 std:assert (float "10.1") * 4 == 40.4;
 ```
 
-#### <a name="905--op-a-op-b"></a>9.0.5 - % _op-a_ _op-b_
+#### <a name="815--op-a-op-b"></a>8.1.5 - % _op-a_ _op-b_
 
 Returns the remainder of the division of _op-a_ by _op-b_.
 
@@ -1918,7 +1929,7 @@ std:assert     5 % 4 == 1;
 std:assert (`%` 5 4) == 1;
 ```
 
-#### <a name="906--op-a-op-b"></a>9.0.6 - ^ _op-a_ _op-b_
+#### <a name="816--op-a-op-b"></a>8.1.6 - ^ _op-a_ _op-b_
 
 Returns _op-a_ raised by the power of _op-b_.
 Supports float and integers.
@@ -1929,9 +1940,9 @@ std:assert_eq std:num:round[(2.0 ^ 2.1) * 1000] 4287.0;
 std:assert_eq 2 ^ 2.1   4; # first arg type matters!
 ```
 
-## <a name="10-comparison"></a>10 - Comparison
+### <a name="82-comparison"></a>8.2 - Comparison
 
-#### <a name="1001--op-a-op-b"></a>10.0.1 - == _op-a_ _op-b_
+#### <a name="821--op-a-op-b"></a>8.2.1 - == _op-a_ _op-b_
 
 Checks whether the two operands are equal to each other. Data types like
 booleans, integers, floats, symbols and strings are compared by their contents.
@@ -1948,7 +1959,7 @@ std:assert not ~ $[1,2] == $[1,2];
 std:assert ~ `==` 1 (2 - 1); # prefix form
 ```
 
-#### <a name="1002--op-a-op-b"></a>10.0.2 - != _op-a_ _op-b_
+#### <a name="822--op-a-op-b"></a>8.2.2 - != _op-a_ _op-b_
 
 Checks whether the two operands are distinct from each other.  Data types like
 booleans, integers, floats, symbols and strings are compared by their contents.
@@ -1970,7 +1981,7 @@ std:assert ~ `!=` 1 2;
 std:assert r1 != r2;
 ```
 
-#### <a name="1003--op-a-op-b"></a>10.0.3 - < _op-a_ _op-b_
+#### <a name="823--op-a-op-b"></a>8.2.3 - < _op-a_ _op-b_
 
 Numerical comparison operator that checks whether _op-a_ is less than _op-b_
 
@@ -1980,7 +1991,7 @@ std:assert   10.1 < 10.2;
 std:assert not[10 < 10.1];  # the type of the first argument decides return type!
 ```
 
-#### <a name="1004--op-a-op-b"></a>10.0.4 - <= _op-a_ _op-b_
+#### <a name="824--op-a-op-b"></a>8.2.4 - <= _op-a_ _op-b_
 
 Numerical comparison operator that checks whether _op-a_ is less or equal to _op-b_
 
@@ -1990,7 +2001,7 @@ std:assert 10.1 <= 10.2;
 std:assert 10   <= 10.1;  # integer <=, the type of the first argument decides return type!
 ```
 
-#### <a name="1005--op-a-op-b"></a>10.0.5 - > _op-a_ _op-b_
+#### <a name="825--op-a-op-b"></a>8.2.5 - > _op-a_ _op-b_
 
 Numerical comparison operator that checks whether _op-a_ is greater than _op-b_
 
@@ -2000,7 +2011,7 @@ std:assert   11.1 > 11.0;
 std:assert not[10 > 10.1];  # the type of the first argument decides return type!
 ```
 
-#### <a name="1006--op-a-op-b"></a>10.0.6 - >= _op-a_ _op-b_
+#### <a name="826--op-a-op-b"></a>8.2.6 - >= _op-a_ _op-b_
 
 Numerical comparison operator that checks whether _op-a_ is greater or equal to _op-b_
 
@@ -2010,9 +2021,9 @@ std:assert 10.2 >= 10.1;
 std:assert 10 >= 10.1;  # integer >=, the type of the first argument decides return type!
 ```
 
-## <a name="11-bit-operations"></a>11 - Bit Operations
+### <a name="83-bit-operations"></a>8.3 - Bit Operations
 
-#### <a name="1101--op-a-op-b"></a>11.0.1 - & _op-a_ _op-b_
+#### <a name="831--op-a-op-b"></a>8.3.1 - & _op-a_ _op-b_
 
 Binary `and` operation between two integers.
 
@@ -2021,7 +2032,7 @@ std:assert (0b0011 & 0b1011) == 0b011;
 std:assert (3      &     11) == 3;
 ```
 
-#### <a name="1102--op-a-op-b"></a>11.0.2 - &^ _op-a_ _op-b_
+#### <a name="832--op-a-op-b"></a>8.3.2 - &^ _op-a_ _op-b_
 
 Binary `xor` operation between two integers.
 
@@ -2030,7 +2041,7 @@ std:assert (0b0011 &^ 0b1011) == 0b1000;
 std:assert (3      &^     11) == 8;
 ```
 
-#### <a name="1103--op-a-op-b"></a>11.0.3 - &| _op-a_ _op-b_
+#### <a name="833--op-a-op-b"></a>8.3.3 - &| _op-a_ _op-b_
 
 Binary `or` operation between two integers.
 
@@ -2039,7 +2050,7 @@ std:assert (0b0011 &| 0b1000) == 0b1011;
 std:assert (3      &|      8) == 11;
 ```
 
-#### <a name="1104--op-a-op-b"></a>11.0.4 - << _op-a_ _op-b_
+#### <a name="834--op-a-op-b"></a>8.3.4 - << _op-a_ _op-b_
 
 Binary `left shift` operation of _op-a_ by _op-b_ bits.
 
@@ -2048,7 +2059,7 @@ std:assert (0b0011 << 3)   == 0b11000;
 std:assert (`<<` 0b1011 2) == 0b101100
 ```
 
-#### <a name="1105--op-a-op-b"></a>11.0.5 - >> _op-a_ _op-b_
+#### <a name="835--op-a-op-b"></a>8.3.5 - >> _op-a_ _op-b_
 
 Binary `right shift` operation of _op-a_ by _op-b_ bits.
 
@@ -2058,9 +2069,9 @@ std:assert (0b1100 >> 2)      == 0b11;
 std:assert (`>>` 0b1011000 3) == 0b1011
 ```
 
-## <a name="12-modules"></a>12 - Modules
+## <a name="9-modules"></a>9 - Modules
 
-### <a name="121-export"></a>12.1 - export
+### <a name="91-export"></a>9.1 - export
 
 ```wlambda
 
@@ -2070,7 +2081,7 @@ std:assert (`>>` 0b1011000 3) == 0b1011
 
 ```
 
-### <a name="122-import"></a>12.2 - import
+### <a name="92-import"></a>9.2 - import
 
 ```wlambda
 
@@ -2089,15 +2100,15 @@ push v 10; push v 20;
 std:assert_eq (str v) "$[10,20]";
 ```
 
-## <a name="13-core-library"></a>13 - Core Library
+## <a name="10-core-library"></a>10 - Core Library
 
 This library contains all the core functions which belong to the
 core of the WLambda Programming Language. These functions can be seen
 as keywords of WLambda. Some functions are also available as operators.
 
-## <a name="14-standard-library"></a>14 - Standard Library
+## <a name="11-standard-library"></a>11 - Standard Library
 
-#### <a name="1401-stdshuffle-randfunc-vec"></a>14.0.1 - std:shuffle _rand_func_ _vec_
+#### <a name="1101-stdshuffle-randfunc-vec"></a>11.0.1 - std:shuffle _rand_func_ _vec_
 
 Shuffles the _vec_ in place. The function _rand_func_ needs to return
 a random 64 bit integer on each call. Here is an example:
@@ -2110,7 +2121,7 @@ std:shuffle { std:rand:split_mix64_next sm } vec;
 std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
 ```
 
-#### <a name="1402-stdcopy-vecormap"></a>14.0.2 - std:copy _vec_or_map_
+#### <a name="1102-stdcopy-vecormap"></a>11.0.2 - std:copy _vec_or_map_
 
 Makes a shallow copy of the given vector or map.
 
@@ -2123,7 +2134,7 @@ std:assert_eq a.0 1;
 std:assert_eq b.0 10;
 ```
 
-#### <a name="1403-stdsort-comparefun-vec"></a>14.0.3 - std:sort [_compare_fun_] _vec_
+#### <a name="1103-stdsort-comparefun-vec"></a>11.0.3 - std:sort [_compare_fun_] _vec_
 
 Sorts the given _vec_ in place. The comparison function _compare_fun_ gets the
 two values a and b and needs to return -1 if a < b, 0 if a = b and 1 if a > b.
@@ -2148,7 +2159,7 @@ std:assert_eq v.1.0 1;
 std:assert_eq v.2.0 -1;
 ```
 
-#### <a name="1404-stdcmpnumasc-a-b"></a>14.0.4 - std:cmp:num:asc _a_ _b_
+#### <a name="1104-stdcmpnumasc-a-b"></a>11.0.4 - std:cmp:num:asc _a_ _b_
 
 Compares _a_ and _b_ numerically and returns:
 
@@ -2164,7 +2175,7 @@ std:assert_eq (std:cmp:num:asc "20" "20")    0;
 std:assert_eq (std:cmp:num:asc 20 21)        1;
 ```
 
-#### <a name="1405-stdcmpnumdesc-a-b"></a>14.0.5 - std:cmp:num:desc _a_ _b_
+#### <a name="1105-stdcmpnumdesc-a-b"></a>11.0.5 - std:cmp:num:desc _a_ _b_
 
 Compares _a_ and _b_ numerically descending and returns:
 
@@ -2180,7 +2191,7 @@ std:assert_eq (std:cmp:num:desc "20" "20")    0;
 std:assert_eq (std:cmp:num:desc 20 21)       -1;
 ```
 
-#### <a name="1406-stddisplayln-arg1-"></a>14.0.6 - std:displayln _arg1_ ...
+#### <a name="1106-stddisplayln-arg1-"></a>11.0.6 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -2194,7 +2205,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles it's argument like written via `std:str:write` instead of `str`.
 
-#### <a name="1407-stdwriteln-arg1-"></a>14.0.7 - std:writeln _arg1_ ...
+#### <a name="1107-stdwriteln-arg1-"></a>11.0.7 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of it's arguments
 (with a space inbetween) to standard output. This means that:
@@ -2209,7 +2220,7 @@ See also the description of `std:str:write`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="1408-stdstrwrite-arg"></a>14.0.8 - std:str:write _arg_
+#### <a name="1108-stdstrwrite-arg"></a>11.0.8 - std:str:write _arg_
 
 Returns the WLambda representation of the value _arg_ as string.
 
@@ -2225,7 +2236,7 @@ std:assert_eq (std:str:write $none) $q|$n|;
 std:assert_eq (std:str:write $[1,:a]) $q|$[1,:"a"]|;
 ```
 
-#### <a name="1409-stdeval-code-string"></a>14.0.9 - std:eval _code-string_
+#### <a name="1109-stdeval-code-string"></a>11.0.9 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -2237,7 +2248,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="14010-stdassert-bool-message"></a>14.0.10 - std:assert _bool_ \[_message_]
+#### <a name="11010-stdassert-bool-message"></a>11.0.10 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -2248,7 +2259,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="14011-stdasserteq-actual-expected-message"></a>14.0.11 - std:assert_eq _actual_ _expected_ \[_message_]
+#### <a name="11011-stdasserteq-actual-expected-message"></a>11.0.11 - std:assert_eq _actual_ _expected_ \[_message_]
 
 This function check if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -2259,9 +2270,9 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-### <a name="141-io"></a>14.1 - I/O
+### <a name="111-io"></a>11.1 - I/O
 
-#### <a name="1411-stdiofilereadtext-filename"></a>14.1.1 - std:io:file:read_text _filename_
+#### <a name="1111-stdiofilereadtext-filename"></a>11.1.1 - std:io:file:read_text _filename_
 
 Opens the file _filename_ and returns it's contents interpreted as UTF8
 text as string.
@@ -2273,7 +2284,7 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading text from file works";
 ```
 
-#### <a name="1412-stdiofileread-filename"></a>14.1.2 - std:io:file:read _filename_
+#### <a name="1112-stdiofileread-filename"></a>11.1.2 - std:io:file:read _filename_
 
 Opens the file _filename_ and returns it's contents as byte buffer.
 
@@ -2285,22 +2296,22 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading binary from file works";
 ```
 
-#### <a name="1413-stdiofilewritesafe-filename-bytes-or-string"></a>14.1.3 - std:io:file:write_safe _filename_ _bytes-or-string_
+#### <a name="1113-stdiofilewritesafe-filename-bytes-or-string"></a>11.1.3 - std:io:file:write_safe _filename_ _bytes-or-string_
 
 Creates a new file with the given filename but with a "~" appended
 and writes the contents into it. After successful write, it renames
 the file to the given filename.
 
-#### <a name="1414-stdiofileappend-filename-bytes-or-string"></a>14.1.4 - std:io:file:append _filename_ _bytes-or-string_
+#### <a name="1114-stdiofileappend-filename-bytes-or-string"></a>11.1.4 - std:io:file:append _filename_ _bytes-or-string_
 
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
-## <a name="15-optional-standard-library"></a>15 - Optional Standard Library
+## <a name="12-optional-standard-library"></a>12 - Optional Standard Library
 
-### <a name="151-serialization"></a>15.1 - serialization
+### <a name="121-serialization"></a>12.1 - serialization
 
-#### <a name="1511-stdserjson-data-nopretty"></a>15.1.1 - std:ser:json _data_ \[_no_pretty_]
+#### <a name="1211-stdserjson-data-nopretty"></a>12.1.1 - std:ser:json _data_ \[_no_pretty_]
 
 Serializes the _data_ and returns a JSON formatted (and pretty printed) string.
 Optionally not pretty printed if _no_pretty_ is a true value.
@@ -2310,7 +2321,7 @@ Optionally not pretty printed if _no_pretty_ is a true value.
 std:assert_eq str "[1,2.3,{\"a\":4}]";
 ```
 
-#### <a name="1512-stddeserjson-string"></a>15.1.2 - std:deser:json _string_
+#### <a name="1212-stddeserjson-string"></a>12.1.2 - std:deser:json _string_
 
 Deserializes the JSON formatted _string_ into a data structure.
 
@@ -2321,7 +2332,7 @@ std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
 ```
 
-#### <a name="1513-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>15.1.3 - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
+#### <a name="1213-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.3 - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
 
 This serializes the _table_ as CSV with the given _field_delim_
 and _row_separator_. If _escape_all_ is `$true` all fields will be
@@ -2343,7 +2354,7 @@ std:assert_eq
     "a;\";\";\"|\";\" \"|";
 ```
 
-#### <a name="1514-stddesercsv-fielddelim-rowseparator-data"></a>15.1.4 - std:deser:csv _field_delim_ _row_separator_ _data_
+#### <a name="1214-stddesercsv-fielddelim-rowseparator-data"></a>12.1.4 - std:deser:csv _field_delim_ _row_separator_ _data_
 
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
@@ -2355,7 +2366,7 @@ std:assert_eq table.0.1 "bar";
 std:assert_eq table.1.1 "y";
 ```
 
-#### <a name="1515-stdsermsgpack-data"></a>15.1.5 - std:ser:msgpack _data_
+#### <a name="1215-stdsermsgpack-data"></a>12.1.5 - std:ser:msgpack _data_
 
 Serializes the _data_ and returns a msgpack bytes value.
 
@@ -2363,7 +2374,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
-#### <a name="1516-stddesermsgpack-bytes"></a>15.1.6 - std:deser:msgpack _bytes_
+#### <a name="1216-stddesermsgpack-bytes"></a>12.1.6 - std:deser:msgpack _bytes_
 
 Deserializes the msgpack bytes value into a data structure.
 
@@ -2371,12 +2382,12 @@ Deserializes the msgpack bytes value into a data structure.
 std:assert_eq (std:deser:msgpack $b"\xC4\x03abc") $b"abc";
 ```
 
-### <a name="152-regex"></a>15.2 - regex
+### <a name="122-regex"></a>12.2 - regex
 
 
-### <a name="153-chrono"></a>15.3 - chrono
+### <a name="123-chrono"></a>12.3 - chrono
 
-#### <a name="1531-stdchronotimestamp-format"></a>15.3.1 - std:chrono:timestamp \[_format_]
+#### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]
 
 For the documentation of _format_ please consule the
 chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
@@ -2389,15 +2400,15 @@ std:assert ~ (year_str | int) == 2020;
 !now_str = std:chrono:timestamp[];
 ```
 
-### <a name="154-hash"></a>15.4 - hash
+### <a name="124-hash"></a>12.4 - hash
 
-#### <a name="1541-stdhashfnv1a-arg1-"></a>15.4.1 - std:hash:fnv1a _arg1_ ...
+#### <a name="1241-stdhashfnv1a-arg1-"></a>12.4.1 - std:hash:fnv1a _arg1_ ...
 
 Hashes all the arguments as FNV1a and returns an integer.
 
-### <a name="155-rand"></a>15.5 - rand
+### <a name="125-rand"></a>12.5 - rand
 
-#### <a name="1551-stdrandsplitmix64new"></a>15.5.1 - std:rand:split_mix64_new
+#### <a name="1251-stdrandsplitmix64new"></a>12.5.1 - std:rand:split_mix64_new
 
 Initializes the _sm_state_ from the current time (seconds) and returns it.
 The time is retrieved in seconds, so don't expect different seed states
@@ -2405,18 +2416,18 @@ if you call this multiple times in the same wall clock second.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1552-stdrandsplitmix64newfrom-seed"></a>15.5.2 - std:rand:split_mix64_new_from _seed_
+#### <a name="1252-stdrandsplitmix64newfrom-seed"></a>12.5.2 - std:rand:split_mix64_new_from _seed_
 
 Initializes the _sm_state_ from the given _seed_ and returns it.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1553-stdrandsplitmix64next-smstate-count"></a>15.5.3 - std:rand:split_mix64_next _sm_state_ \[_count_]
+#### <a name="1253-stdrandsplitmix64next-smstate-count"></a>12.5.3 - std:rand:split_mix64_next _sm_state_ \[_count_]
 
 Returns the _count_ next integer values generated from the given
 _sm_state_.
 
-#### <a name="1554-stdrandsplitmix64nextopen01-smstate-count"></a>15.5.4 - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
+#### <a name="1254-stdrandsplitmix64nextopen01-smstate-count"></a>12.5.4 - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
 
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
