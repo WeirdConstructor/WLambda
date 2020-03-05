@@ -1,4 +1,4 @@
-0.4.4 (unreleased)
+0.4.4 (2020-03-06)
 ==================
 
 * Incompatible Change: Removed implicit collection of values when
@@ -26,6 +26,8 @@ operations like `std:displayln` and alike.
 that all std: and core functions are documented.
 * Documentation: Fixed grammar errors in README.md and lib.rs
 contributed by Cedric Hutchings (cedric-h).
+* Documentation: Reference has a TOC now.
+* Documentation: Many more functions in reference.
 
 0.4.3 (2020-02-29)
 ==================

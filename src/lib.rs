@@ -603,10 +603,13 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in WLambda by you, shall be licensed as GPLv3 or later,
 without any additional terms or conditions.
 
-# Authors & Contributors
+# Author
 
 * Weird Constructor <weirdconstructor@gmail.com> (WeirdConstructor on GitHub)
   (You may find me as `WeirdConstructor` on the Rust Discord.)
+
+# Contributors
+
 * Cedric Hutchings <cedhut02@gmail.com> (cedric-h on GitHub)
 
 */
