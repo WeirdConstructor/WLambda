@@ -80,9 +80,14 @@ Smalltalk, LISP and Perl.
     - [5.2.2](#522-block-label-function) - block [label] _function_
 - [6](#6-conditional-execution---if--then--else) - Conditional Execution - if / then / else
 - [7](#7-iteration) - Iteration
-    - [7.0.1](#701-while-predicate-fun) - while _predicate_ _fun_
-    - [7.0.2](#702-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
-    - [7.0.3](#703-break-value) - break _value_
+    - [7.0.1](#701-iteration-over-vectors) - Iteration over vectors
+    - [7.0.2](#702-iteration-over-maps) - Iteration over maps
+    - [7.0.3](#703-for-iteratable-value-function) - for _iteratable-value_ _function_
+    - [7.0.4](#704-while-predicate-fun) - while _predicate_ _fun_
+    - [7.0.5](#705-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
+    - [7.0.6](#706-break-value) - break _value_
+    - [7.0.7](#707-stdzip-vector-map-fn) - std:zip _vector_ _map-fn_
+    - [7.0.8](#708-stdenumerate-map-fn) - std:enumerate _map-fn_
 - [8](#8-accumulation-and-collection) - Accumulation and Collection
     - [8.0.1](#801-transforming-a-vector) - Transforming a vector
     - [8.0.2](#802-example-of-) - Example of `$@@`
@@ -126,8 +131,6 @@ Smalltalk, LISP and Perl.
     - [14.0.9](#1409-stdeval-code-string) - std:eval _code-string_
     - [14.0.10](#14010-stdassert-bool-message) - std:assert _bool_ \[_message_]
     - [14.0.11](#14011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
-    - [14.0.12](#14012-stdzip-mapfn) - std:zip _map_fn_
-    - [14.0.13](#14013-stdenumerate-mapfn) - std:enumerate _map_fn_
   - [14.1](#141-io) - I/O
     - [14.1.1](#1411-stdiofilereadtext-filename) - std:io:file:read_text _filename_
     - [14.1.2](#1412-stdiofileread-filename) - std:io:file:read _filename_
@@ -1491,7 +1494,7 @@ iteration function. But if you call the value with a function as first argument 
 is done. That means, the return value of the operation is a list with the return values of the
 iteration function. If you don't need that list you should use `for`.
 
-#### - Iteration over vectors
+#### <a name="701-iteration-over-vectors"></a>7.0.1 - Iteration over vectors
 
 Iterating over a vector is the most basic iteration supported by WLambda.
 You just call the vector with a function as first argument:
@@ -1507,7 +1510,30 @@ std:assert_eq sum 6;
 
 You can also use `for` if you like.
 
-#### - for _iteratable-value_ _function_
+#### <a name="702-iteration-over-maps"></a>7.0.2 - Iteration over maps
+
+Iterating over a map is as simple as iterating over a vector.
+The map can be called with a function as first argument and it starts
+iterating over it's key/value pairs. The first argument of the
+function is the value, the second argument is the key.
+
+```wlambda
+!sum  = 0;
+!keys = $[];
+
+${a = 10, b = 20, c = 30} {
+    !(k, v) = @;
+    .sum = sum + v;
+    std:push keys k;
+};
+
+std:assert_eq sum 60;
+std:assert_eq (std:str:join "," ~ std:sort keys) "a,b,c";
+```
+
+You can also use `for` if you like.
+
+#### <a name="703-for-iteratable-value-function"></a>7.0.3 - for _iteratable-value_ _function_
 
 Calls _function_ for every element of _iteratable-value_.
 Iteratable values are:
@@ -1515,6 +1541,7 @@ Iteratable values are:
 - Vectors
 ```wlambda
 !product = 1;
+
 for $[3,4,5] {
     .product = product * _;
 };
@@ -1525,6 +1552,7 @@ std:assert_eq product 60;
 ```wlambda
 !product = 1;
 !keys    = $[];
+
 for ${a = 10, b = 20, c = 30} {
     !(k, v) = @;
     .product = product * v;
@@ -1566,7 +1594,7 @@ for :abc {
 std:assert_eq (str str_chars) (str $["a", "b", "c"]);
 ```
 
-#### <a name="701-while-predicate-fun"></a>7.0.1 - while _predicate_ _fun_
+#### <a name="704-while-predicate-fun"></a>7.0.4 - while _predicate_ _fun_
 
 `while` will call _fun_ until the _predicate_ function returns `$false`.
 This is the most basic loop for iteration:
@@ -1597,7 +1625,7 @@ while $true {
 std:assert_eq i 4;
 ```
 
-#### <a name="702-range-start-end-step-fun"></a>7.0.2 - range _start_ _end_ _step_ _fun_
+#### <a name="705-range-start-end-step-fun"></a>7.0.5 - range _start_ _end_ _step_ _fun_
 
 `range` counts from _start_ to _end_ by increments of _step_ and calls _fun_ with the counter. The
 iteration is inclusive, this means if _start_ == _end_ the function _fun_ will be called once.
@@ -1625,7 +1653,7 @@ range 0.3 0.4 0.01 {
 std:assert_eq (str out) "$[30,31,32,33,34,35,36,37,38,39]";
 ```
 
-#### <a name="703-break-value"></a>7.0.3 - break _value_
+#### <a name="706-break-value"></a>7.0.6 - break _value_
 
 `break` stops the inner most iterative construct, which then will return _value_.
 This should work for all repeatedly calling operations, such as
@@ -1648,7 +1676,7 @@ An example where the list iteration is stopped:
 std:assert_eq val :XX;
 ```
 
-#### <a name="14012-stdzip-mapfn"></a>14.0.12 - std:zip _vector_ _map-fn_
+#### <a name="707-stdzip-vector-map-fn"></a>7.0.7 - std:zip _vector_ _map-fn_
 
 Creates a generator that calls _map_fn_ with the consecutive elements of _vector_
 as the first argument of _map-fn_. All arguments passed to std:zip
@@ -1661,7 +1689,7 @@ This is useful for combining the iteration over two vectors or collections.
 std:assert_eq (str l) (str $[$["Foo", 13], $["Bar", 42], $["Baz", 97]]);
 ```
 
-#### <a name="14013-stdenumerate-mapfn"></a>14.0.13 - std:enumerate _map-fn_
+#### <a name="708-stdenumerate-map-fn"></a>7.0.8 - std:enumerate _map-fn_
 
 Creates a generator that calls _map-fn_ with a counter that is incremented
 after each call, starting with 0. All received arguments are appended to
