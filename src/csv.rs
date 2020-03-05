@@ -192,10 +192,10 @@ pub fn to_csv(delim: char, row_sep: &str, escape_all: bool, table: VVal) -> Stri
     let mut ret = String::new();
     let need_escape_chars = format!("\t\r\n \"{}{}", delim, row_sep);
 
-    for row in table.iter() {
+    for (row, _) in table.iter() {
         let mut first_field = true;
 
-        for cell in row.iter() {
+        for (cell, _) in row.iter() {
             if !first_field { ret.push(delim); }
             else { first_field = false; }
 

@@ -4,6 +4,8 @@
 * Incompatible Change: Removed implicit collection of values when
 iterating over a list. Implemented `$@vec`/`$+` collection/accumulation
 operations for building new data structures.
+* Incompatible Change: `VVal::iter` returns now a tuple for key/value pairs
+instead of a newly allocated vector.
 * Feature: Added _Left Hand Function Chaining_ syntax `|>` and documentation
 for it.
 * Feature: Added backtick quoting syntax for identifiers to make it possible
@@ -13,6 +15,8 @@ to get the prefix form of some operators like `/` or `*`.
 of the first elements. Contributed by Cedric Hutchings (cedric-h).
 * Feature: Added `pick` function for picking values based on a boolean
 value. Contributed by Cedric Hutchings (cedric-h).
+* Feature: Added `std:zip` and `std:enumerate`.
+Contributed by Cedric Hutchings (cedric-h).
 * Feature: Made it possible to capture stdio output/input for
 operations like `std:displayln` and alike.
 * Feature: Added `std:io:lines` for reading lines of UTF-8 text.

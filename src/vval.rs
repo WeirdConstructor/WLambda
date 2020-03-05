@@ -1299,14 +1299,14 @@ impl VVal {
     ///
     /// assert_eq!(sum, 68);
     /// ```
-    pub fn iter(&self) -> std::iter::FromFn<Box<dyn FnMut() -> Option<VVal>>> {
+    pub fn iter(&self) -> std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>> {
         match self {
             VVal::Lst(l) => {
                 let l = l.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     if idx >= l.borrow().len() { return None; }
-                    let r = Some(l.borrow()[idx].clone());
+                    let r = Some((l.borrow()[idx].clone(), None));
                     idx += 1;
                     r
                 }))
@@ -1317,10 +1317,7 @@ impl VVal {
                 std::iter::from_fn(Box::new(move || {
                     let r = match m.borrow().iter().nth(idx) {
                         Some((k, v)) => {
-                            let l = VVal::vec();
-                            l.push(VVal::new_str(&k));
-                            l.push(v.clone());
-                            Some(l)
+                            Some((v.clone(), Some(VVal::new_str(&k))))
                         },
                         None => None,
                     };
@@ -1333,7 +1330,7 @@ impl VVal {
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     if idx >= b.borrow().len() { return None; }
-                    let r = Some(VVal::new_byt(vec![b.borrow()[idx]]));
+                    let r = Some((VVal::new_byt(vec![b.borrow()[idx]]), None));
                     idx += 1;
                     r
                 }))
@@ -1343,25 +1340,13 @@ impl VVal {
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     let r = match s.borrow().chars().nth(idx) {
-                        Some(chr) => Some(VVal::new_str_mv(chr.to_string())),
+                        Some(chr) => Some((VVal::new_str_mv(chr.to_string()), None)),
                         None      => None,
                     };
                     idx += 1;
                     r
                 }))
             },
-//            VVal::Sym(s) => {
-//                let s = s.clone();
-//                let mut idx = 0;
-//                std::iter::from_fn(Box::new(move || {
-//                    let r = match s.chars().nth(idx) {
-//                        Some(chr) => Some(VVal::new_str_mv(chr.to_string())),
-//                        None      => None,
-//                    };
-//                    idx += 1;
-//                    r
-//                }))
-//            },
             VVal::DropFun(v) => v.v.iter(),
             VVal::Ref(v)     => v.borrow().iter(),
             VVal::CRef(v)    => v.borrow().iter(),

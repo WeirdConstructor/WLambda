@@ -964,6 +964,8 @@ The literal syntax for vectors (or sometimes also called lists in WLambda)
 is `$[...]`. You may write any kind of expression in it and you will get
 a vector from it.
 
+For iteration over a vector please refer to [7. Iteration](#7-iteration).
+
 To access the elements of a vector you have to call a number with a vector
 as first argument. The field syntax is a more convenient shorthand syntax.
 The following example demonstrates it:
@@ -1028,6 +1030,8 @@ std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
 Aside from vectors there are associative maps in WLambda. Their syntax is
 `${ key = expr, ... }`. The keys of these maps have to be strings,
 the values in the literals can be any expression.
+
+For iteration over a map please refer to [7. Iteration](#7-iteration).
 
 You can call a symbol or a string with an associative map to get the value in
 the map with the string value as key. There is also, like vectors, the field
@@ -1487,6 +1491,81 @@ iteration function. But if you call the value with a function as first argument 
 is done. That means, the return value of the operation is a list with the return values of the
 iteration function. If you don't need that list you should use `for`.
 
+#### - Iteration over vectors
+
+Iterating over a vector is the most basic iteration supported by WLambda.
+You just call the vector with a function as first argument:
+
+```wlambda
+!sum = 0;
+$[1, 2, 3] {
+    .sum = sum + _;
+};
+
+std:assert_eq sum 6;
+```
+
+You can also use `for` if you like.
+
+#### - for _iteratable-value_ _function_
+
+Calls _function_ for every element of _iteratable-value_.
+Iteratable values are:
+
+- Vectors
+```wlambda
+!product = 1;
+for $[3,4,5] {
+    .product = product * _;
+};
+
+std:assert_eq product 60;
+```
+- Maps
+```wlambda
+!product = 1;
+!keys    = $[];
+for ${a = 10, b = 20, c = 30} {
+    !(k, v) = @;
+    .product = product * v;
+    std:push keys k;
+};
+
+std:assert_eq (std:str:join "," ~ std:sort keys) "a,b,c";
+
+std:assert_eq product 6000;
+```
+- Byte Vectors
+```wlambda
+!byte_sum = 0;
+
+for $b"abc" {
+    .byte_sum = byte_sum + (int _);
+};
+
+std:assert_eq byte_sum 294;
+```
+- Strings
+```wlambda
+!str_chars = $[];
+
+for "abc" {
+    std:push str_chars _;
+};
+
+std:assert_eq (str str_chars) (str $["a", "b", "c"]);
+```
+- Symbols
+```wlambda
+!str_chars = $[];
+
+for :abc {
+    std:push str_chars _;
+};
+
+std:assert_eq (str str_chars) (str $["a", "b", "c"]);
+```
+
 #### <a name="701-while-predicate-fun"></a>7.0.1 - while _predicate_ _fun_
 
 `while` will call _fun_ until the _predicate_ function returns `$false`.
@@ -1568,6 +1647,31 @@ An example where the list iteration is stopped:
 
 std:assert_eq val :XX;
 ```
+
+#### <a name="14012-stdzip-mapfn"></a>14.0.12 - std:zip _vector_ _map-fn_
+
+Creates a generator that calls _map_fn_ with the consecutive elements of _vector_
+as the first argument of _map-fn_. All arguments passed to std:zip
+are appended to the argument list.
+
+This is useful for combining the iteration over two vectors or collections.
+
+```wlambda
+!l = $@v $[13, 42, 97] ~ std:zip $["Foo", "Bar", "Baz"] { $+ @ };
+std:assert_eq (str l) (str $[$["Foo", 13], $["Bar", 42], $["Baz", 97]]);
+```
+
+#### <a name="14013-stdenumerate-mapfn"></a>14.0.13 - std:enumerate _map-fn_
+
+Creates a generator that calls _map-fn_ with a counter that is incremented
+after each call, starting with 0. All received arguments are appended to
+the argument list after the counter.
+
+```wlambda
+!l = $@v $["lo", "mid", "hi"] ~ std:enumerate { $+ @ };
+std:assert_eq (str l) (str $[$[0, "lo"], $[1, "mid"], $[2, "hi"]]);
+```
+
 
 ## <a name="8-accumulation-and-collection"></a>8 - Accumulation and Collection
 
@@ -2121,25 +2225,6 @@ std:assert 120;    #=> 120
 This function check if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
 passed in the panic for reference.
-
-#### <a name="14012-stdzip-mapfn"></a>14.0.12 - std:zip _map_fn_
-
-Combines iterators `a` and `b` into an iterator of lists containing elements from both,
-i.e.`$[b1, a1], $[b2, a2] ..`
-```wlambda
-!l = $[13, 42, 97] ~ std:zip $["Foo", "Bar", "Baz"] { @ };
-std:assert_eq l $[$["Foo", 13], $["Bar", 42], $["Baz", 97]];
-```
-
-#### <a name="14013-stdenumerate-mapfn"></a>14.0.13 - std:enumerate _map_fn_
-
-Takes an iterator and turns it into an iterator of lists where the first element
-in the list is the index of that list in the iterator,
-and the second element is the original that was in the iterator.
-```wlambda
-!l = $["lo", "mid", "hi"] ~ std:enumerate { @ };
-std:assert_eq l $[$[0, "lo"], $[1, "mid"], $[2, "hi"]];
-```
 
 ```wlambda
 !x = 30 * 2;
@@ -2753,15 +2838,18 @@ pub fn core_symbol_table() -> SymbolTable {
             let f   = env.arg(1);
 
             let mut ret = VVal::Nul;
-            for v in val.iter() {
+            for (v, k) in val.iter() {
                 env.push(v);
-                match f.call_internal(env, 1) {
+                let n =
+                    if let Some(k) = k { env.push(k); 2 }
+                    else               { 1 };
+                match f.call_internal(env, n) {
                     Ok(v)                      => { ret = v; },
-                    Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
+                    Err(StackAction::Break(v)) => { env.popn(n); return Ok(v); },
                     Err(StackAction::Next)     => { },
-                    Err(e)                     => { env.popn(1); return Err(e); }
+                    Err(e)                     => { env.popn(n); return Err(e); }
                 }
-                env.popn(1);
+                env.popn(n);
             }
 
             Ok(ret)
@@ -3118,7 +3206,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "str:from_char_vec",
         |env: &mut Env, _argc: usize| {
             let mut s = String::new();
-            for vc in env.arg(0).iter() {
+            for (vc, _) in env.arg(0).iter() {
                 s.push(std::char::from_u32(vc.i() as u32).unwrap_or('?'));
             }
             Ok(VVal::new_str_mv(s))
@@ -3269,7 +3357,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let f = env.arg(0);
             let i = Rc::new(std::cell::RefCell::new(0));
-            
+
             Ok(VValFun::new_fun(
                 move |env: &mut Env, argc: usize| {
                     env.push(VVal::Int(*i.borrow() as i64));
@@ -3285,7 +3373,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let o = env.arg(0);
             let f = env.arg(1);
             let i = Rc::new(std::cell::RefCell::new(0));
-            
+
             Ok(VValFun::new_fun(
                 move |env: &mut Env, argc: usize| {
                     env.push(o.at(*i.borrow()).unwrap_or(VVal::Nul));

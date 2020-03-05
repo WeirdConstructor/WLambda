@@ -3934,10 +3934,10 @@ mod tests {
                 !x = $&0;
                 !o = $&0;
                 for ${a=3, b=2, c=4} {
-                    .x = x + (_ | 0 | std:bytes:to_vec | 0);
-                    .o = _.1 + o;
+                    .x = x + (@ | 0 | std:bytes:to_vec | 0);
+                    .o = _1 + o;
                 };
-                $[$*x, $*o]
+                $[x, o]
             "), "$[294,9]");
     }
 
