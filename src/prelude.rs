@@ -1454,6 +1454,25 @@ std:shuffle { std:rand:split_mix64_next sm } vec;
 std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
 ```
 
+#### std:zip _list_ _map_fn_
+
+Combines iterators `a` and `b` into an iterator of lists containing elements from both,
+i.e.`$[b1, a1], $[b2, a2] ..`
+```wlambda
+!l = $[13, 42, 97] ~ std:zip $["Foo", "Bar", "Baz"] { @ };
+std:assert_eq l $[$["Foo", 13], $["Bar", 42], $["Baz", 97]];
+```
+
+#### std:enumerate _map_fn_
+
+Takes an iterator and turns it into an iterator of lists where the first element
+in the list is the index of that list in the iterator,
+and the second element is the original that was in the iterator.
+```wlambda
+!l = $["lo", "mid", "hi"] ~ std:enumerate { @ };
+std:assert_eq l $[$[0, "lo"], $[1, "mid"], $[2, "hi"]];
+```
+
 #### <a name="1111-stdcopy-vecormap"></a>11.1.1 - std:copy _vec_or_map_
 
 Makes a shallow copy of the given vector or map.
@@ -2639,6 +2658,35 @@ pub fn std_symbol_table() -> SymbolTable {
 
             Ok(acc)
         }, Some(3), Some(3), false);
+
+    func!(st, "enumerate",
+        |env: &mut Env, _argc: usize| {
+            let f = env.arg(0);
+            let i = Rc::new(std::cell::RefCell::new(0));
+            
+            Ok(VValFun::new_fun(
+                move |env: &mut Env, argc: usize| {
+                    env.push(VVal::Int(*i.borrow() as i64));
+                    let r = f.call_internal(env, 1 + argc);
+                    *i.borrow_mut() += 1;
+                    r
+                }, None, None, false))
+        }, Some(1), Some(1), false);
+
+    func!(st, "zip",
+        |env: &mut Env, _argc: usize| {
+            let o = env.arg(0);
+            let f = env.arg(1);
+            let i = Rc::new(std::cell::RefCell::new(0));
+            
+            Ok(VValFun::new_fun(
+                move |env: &mut Env, argc: usize| {
+                    env.push(o.at(*i.borrow()).unwrap_or(VVal::Nul));
+                    let r = f.call_internal(env, 1 + argc);
+                    *i.borrow_mut() += 1;
+                    r
+                }, None, None, false))
+        }, Some(2), Some(2), false);
 
     add_num_fun_flt!(st, "num:ceil",       ceil);
     add_num_fun_flt!(st, "num:sqrt",       sqrt);
