@@ -504,7 +504,7 @@ impl EvalContext {
             let mut ctx = ctx.register_self_eval();
             match ctx.eval(&code) {
                 Ok(v)  => Ok(v),
-                Err(e) => Ok(VVal::err_msg(&format!("{}", e))),
+                Err(e) => Ok(env.new_err(format!("{}", e))),
             }
         }, Some(1), Some(2));
 
@@ -521,284 +521,292 @@ impl EvalContext {
 
         EvalContext {
             global: global.clone(),
-            local_compile: Rc::new(RefCell::new(CompileEnv {
-                parent:    None,
-                global,
-                local_map: std::collections::HashMap::new(),
-                locals:    Vec::new(),
-                upvals:    Vec::new(),
-                implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-                explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-            })),
-            local: Rc::new(RefCell::new(Env::new_with_user(user))),
+                local_compile: Rc::new(RefCell::new(CompileEnv {
+                    parent:    None,
+                    global,
+                    local_map: std::collections::HashMap::new(),
+                    locals:    Vec::new(),
+                    upvals:    Vec::new(),
+                    recent_var: String::new(),
+                    recent_sym: String::new(),
+                    implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+                    explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+                })),
+                local: Rc::new(RefCell::new(Env::new_with_user(user))),
+            }
         }
-    }
 
-    #[allow(dead_code)]
-    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> EvalContext {
-        (Self::new_with_user_impl(global, user)).register_self_eval()
-    }
-
-    /// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
-    ///
-    /// ```
-    /// use wlambda::parser;
-    /// let mut ctx = wlambda::EvalContext::new_default();
-    ///
-    /// let s = "$[1,2,3]";
-    /// let ast = parser::parse(s, "somefilename").unwrap();
-    /// let r = &mut ctx.eval_ast(&ast).unwrap();
-    ///
-    /// println!("Res: {}", r.s());
-    /// ```
-    pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
-        let prog = compile(ast, &mut self.local_compile);
-        let local_env_size = CompileEnv::local_env_size(&self.local_compile);
-
-        let env = self.local.borrow_mut();
-        let mut res = Ok(VVal::Nul);
-
-        std::cell::RefMut::map(env, |l_env| {
-            res = match prog {
-                Ok(prog_closures) => {
-                    l_env.sp = 0;
-                    l_env.set_bp(local_env_size);
-                    match l_env.with_restore_sp(
-                            |e: &mut Env| { prog_closures(e) })
-                    {
-                        Ok(v)   => Ok(v),
-                        Err(je) =>
-                            Err(EvalError::ExecError(
-                                format!("Jumped out of execution: {:?}", je))),
-                    }
-                },
-                Err(e) => { Err(EvalError::CompileError(e)) },
-            };
-            l_env
-        });
-
-        res
-    }
-
-    /// Evaluates a piece of WLambda code with the given `EvalContext`.
-    ///
-    /// ```
-    /// let mut ctx = wlambda::EvalContext::new_default();
-    ///
-    /// let r = &mut ctx.eval("$[1,2,3]").unwrap();
-    /// println!("Res: {}", r.s());
-    /// ```
-    #[allow(dead_code)]
-    pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
-        match parser::parse(s, "<wlambda::eval>") {
-            Ok(ast) => { self.eval_ast(&ast) },
-            Err(e) => { Err(EvalError::ParseError(e)) },
+        #[allow(dead_code)]
+        pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> EvalContext {
+            (Self::new_with_user_impl(global, user)).register_self_eval()
         }
-    }
 
-    /// Evaluates a WLambda code in a file with the given `EvalContext`.
-    ///
-    /// ```
-    /// let mut ctx = wlambda::EvalContext::new_default();
-    ///
-    /// let r = &mut ctx.eval_file("examples/read_test.wl").unwrap();
-    /// assert_eq!(r.i(), 403, "matches contents!");
-    /// ```
-    #[allow(dead_code)]
-    pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
-        let contents = std::fs::read_to_string(filename);
-        if let Err(err) = contents {
-            Err(EvalError::IOError(format!("file '{}': {}", filename, err)))
-        } else {
-            let contents = contents.unwrap();
-            match parser::parse(&contents, filename) {
+        /// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
+        ///
+        /// ```
+        /// use wlambda::parser;
+        /// let mut ctx = wlambda::EvalContext::new_default();
+        ///
+        /// let s = "$[1,2,3]";
+        /// let ast = parser::parse(s, "somefilename").unwrap();
+        /// let r = &mut ctx.eval_ast(&ast).unwrap();
+        ///
+        /// println!("Res: {}", r.s());
+        /// ```
+        pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
+            let prog = compile(ast, &mut self.local_compile);
+            let local_env_size = CompileEnv::local_env_size(&self.local_compile);
+
+            let env = self.local.borrow_mut();
+            let mut res = Ok(VVal::Nul);
+
+            std::cell::RefMut::map(env, |l_env| {
+                res = match prog {
+                    Ok(prog_closures) => {
+                        l_env.sp = 0;
+                        l_env.set_bp(local_env_size);
+                        match l_env.with_restore_sp(
+                                |e: &mut Env| { prog_closures(e) })
+                        {
+                            Ok(v)   => Ok(v),
+                            Err(je) =>
+                                Err(EvalError::ExecError(
+                                    format!("Jumped out of execution: {:?}", je))),
+                        }
+                    },
+                    Err(e) => { Err(EvalError::CompileError(e)) },
+                };
+                l_env
+            });
+
+            res
+        }
+
+        /// Evaluates a piece of WLambda code with the given `EvalContext`.
+        ///
+        /// ```
+        /// let mut ctx = wlambda::EvalContext::new_default();
+        ///
+        /// let r = &mut ctx.eval("$[1,2,3]").unwrap();
+        /// println!("Res: {}", r.s());
+        /// ```
+        #[allow(dead_code)]
+        pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
+            match parser::parse(s, "<wlambda::eval>") {
+                Ok(ast) => { self.eval_ast(&ast) },
+                Err(e) => { Err(EvalError::ParseError(e)) },
+            }
+        }
+
+        /// Evaluates a WLambda code in a file with the given `EvalContext`.
+        ///
+        /// ```
+        /// let mut ctx = wlambda::EvalContext::new_default();
+        ///
+        /// let r = &mut ctx.eval_file("examples/read_test.wl").unwrap();
+        /// assert_eq!(r.i(), 403, "matches contents!");
+        /// ```
+        #[allow(dead_code)]
+        pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
+            let contents = std::fs::read_to_string(filename);
+            if let Err(err) = contents {
+                Err(EvalError::IOError(format!("file '{}': {}", filename, err)))
+            } else {
+                let contents = contents.unwrap();
+                match parser::parse(&contents, filename) {
+                    Ok(ast) => { self.eval_ast(&ast) },
+                    Err(e)  => { Err(EvalError::ParseError(e)) },
+                }
+            }
+        }
+
+        /// Evaluates a WLambda code with the corresponding filename
+        /// in the given `EvalContext`.
+        ///
+        /// ```
+        /// let mut ctx = wlambda::EvalContext::new_default();
+        ///
+        /// let r = &mut ctx.eval_string("403", "examples/read_test.wl").unwrap();
+        /// assert_eq!(r.i(), 403, "matches contents!");
+        /// ```
+        #[allow(dead_code)]
+        pub fn eval_string(&mut self, code: &str, filename: &str)
+            -> Result<VVal, EvalError>
+        {
+            match parser::parse(code, filename) {
                 Ok(ast) => { self.eval_ast(&ast) },
                 Err(e)  => { Err(EvalError::ParseError(e)) },
             }
         }
-    }
 
-    /// Evaluates a WLambda code with the corresponding filename
-    /// in the given `EvalContext`.
-    ///
-    /// ```
-    /// let mut ctx = wlambda::EvalContext::new_default();
-    ///
-    /// let r = &mut ctx.eval_string("403", "examples/read_test.wl").unwrap();
-    /// assert_eq!(r.i(), 403, "matches contents!");
-    /// ```
-    #[allow(dead_code)]
-    pub fn eval_string(&mut self, code: &str, filename: &str)
-        -> Result<VVal, EvalError>
-    {
-        match parser::parse(code, filename) {
-            Ok(ast) => { self.eval_ast(&ast) },
-            Err(e)  => { Err(EvalError::ParseError(e)) },
+        /// Calls a wlambda function with the given `EvalContext`.
+        ///
+        /// ```
+        /// use wlambda::{VVal, EvalContext};
+        /// let mut ctx = EvalContext::new_default();
+        ///
+        /// let returned_func = &mut ctx.eval("{ _ + _1 }").unwrap();
+        /// assert_eq!(
+        ///     ctx.call(returned_func,
+        ///              &vec![VVal::Int(10), VVal::Int(11)]).unwrap().i(),
+        ///     21);
+        /// ```
+        #[allow(dead_code)]
+        pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
+            let mut env = self.local.borrow_mut();
+            f.call(&mut env, args)
+        }
+
+        /// Sets a global variable for the scripts to access.
+        ///
+        /// ```
+        /// use wlambda::{VVal, EvalContext};
+        /// let mut ctx = EvalContext::new_default();
+        ///
+        /// ctx.set_global_var("XXX", &VVal::Int(200));
+        ///
+        /// assert_eq!(ctx.eval("XXX * 2").unwrap().i(), 400);
+        /// ```
+        #[allow(dead_code)]
+        pub fn set_global_var(&mut self, var: &str, val: &VVal) {
+            self.global.borrow_mut().set_var(var, val);
+        }
+
+        /// Gets the value of a global variable from the script:
+        ///
+        /// ```
+        /// use wlambda::{VVal, EvalContext};
+        /// let mut ctx = EvalContext::new_default();
+        ///
+        /// assert_eq!(ctx.eval("!:global XXX = 22 * 2; XXX").unwrap().i(), 44);
+        /// ```
+        #[allow(dead_code)]
+        pub fn get_global_var(&mut self, var: &str) -> Option<VVal> {
+            self.global.borrow_mut().get_var(var)
         }
     }
 
-    /// Calls a wlambda function with the given `EvalContext`.
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum ArityParam {
+        Undefined,
+        Limit(usize),
+        Infinite,
+    }
+
+    /// Compile time environment for allocating and
+    /// storing variables inside a function scope.
     ///
-    /// ```
-    /// use wlambda::{VVal, EvalContext};
-    /// let mut ctx = EvalContext::new_default();
-    ///
-    /// let returned_func = &mut ctx.eval("{ _ + _1 }").unwrap();
-    /// assert_eq!(
-    ///     ctx.call(returned_func,
-    ///              &vec![VVal::Int(10), VVal::Int(11)]).unwrap().i(),
-    ///     21);
-    /// ```
+    /// Also handles upvalues. Upvalues in WLambda are copied to every
+    /// scope that they are passed through until they are needed.
     #[allow(dead_code)]
-    pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
-        let mut env = self.local.borrow_mut();
-        f.call(&mut env, args)
+    #[derive(Debug, Clone)]
+    struct CompileEnv {
+        /// Reference to the global environment
+        global:    GlobalEnvRef,
+        /// Reference to the environment of the _parent_ function.
+        parent:    Option<Rc<RefCell<CompileEnv>>>,
+        /// Mapping of strings to where they can be found.
+        local_map: std::collections::HashMap<String, VarPos>,
+        /// List of local variables of this function.
+        locals:    std::vec::Vec<CompileLocal>,
+        /// Stores position of the upvalues for copying the upvalues at runtime.
+        upvals:    std::vec::Vec<VarPos>,
+        /// Stores the implicitly calculated arity of this function.
+        implicit_arity: (ArityParam, ArityParam),
+        /// Stores the explicitly defined arity of this function.
+        explicit_arity: (ArityParam, ArityParam),
+        /// Recently accessed variable name:
+        recent_var: String,
+        /// Recently compiled symbol:
+        recent_sym: String,
     }
 
-    /// Sets a global variable for the scripts to access.
-    ///
-    /// ```
-    /// use wlambda::{VVal, EvalContext};
-    /// let mut ctx = EvalContext::new_default();
-    ///
-    /// ctx.set_global_var("XXX", &VVal::Int(200));
-    ///
-    /// assert_eq!(ctx.eval("XXX * 2").unwrap().i(), 400);
-    /// ```
-    #[allow(dead_code)]
-    pub fn set_global_var(&mut self, var: &str, val: &VVal) {
-        self.global.borrow_mut().set_var(var, val);
-    }
+    /// Reference type to a `CompileEnv`.
+    type CompileEnvRef = Rc<RefCell<CompileEnv>>;
 
-    /// Gets the value of a global variable from the script:
-    ///
-    /// ```
-    /// use wlambda::{VVal, EvalContext};
-    /// let mut ctx = EvalContext::new_default();
-    ///
-    /// assert_eq!(ctx.eval("!:global XXX = 22 * 2; XXX").unwrap().i(), 44);
-    /// ```
-    #[allow(dead_code)]
-    pub fn get_global_var(&mut self, var: &str) -> Option<VVal> {
-        self.global.borrow_mut().get_var(var)
-    }
-}
+    impl CompileEnv {
+        fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
+            let global = if let Some(p) = &parent {
+                p.borrow_mut().global.clone()
+            } else {
+                GlobalEnv::new()
+            };
+            Rc::new(RefCell::new(CompileEnv {
+                parent,
+                global,
+                local_map: std::collections::HashMap::new(),
+                locals:    Vec::new(),
+                upvals:    Vec::new(),
+                recent_var: String::new(),
+                recent_sym: String::new(),
+                implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+                explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+            }))
+        }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ArityParam {
-    Undefined,
-    Limit(usize),
-    Infinite,
-}
+        fn def_up(&mut self, s: &str, pos: VarPos) -> usize {
+            let next_index = self.upvals.len();
+            self.upvals.push(pos);
+            self.local_map.insert(String::from(s), VarPos::UpValue(next_index));
+            next_index
+        }
 
-/// Compile time environment for allocating and
-/// storing variables inside a function scope.
-///
-/// Also handles upvalues. Upvalues in WLambda are copied to every
-/// scope that they are passed through until they are needed.
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-struct CompileEnv {
-    /// Reference to the global environment
-    global:    GlobalEnvRef,
-    /// Reference to the environment of the _parent_ function.
-    parent:    Option<Rc<RefCell<CompileEnv>>>,
-    /// Mapping of strings to where they can be found.
-    local_map: std::collections::HashMap<String, VarPos>,
-    /// List of local variables of this function.
-    locals:    std::vec::Vec<CompileLocal>,
-    /// Stores position of the upvalues for copying the upvalues at runtime.
-    upvals:    std::vec::Vec<VarPos>,
-    /// Stores the implicitly calculated arity of this function.
-    implicit_arity: (ArityParam, ArityParam),
-    /// Stores the explicitly defined arity of this function.
-    explicit_arity: (ArityParam, ArityParam),
-}
+        fn def(&mut self, s: &str, is_global: bool) -> VarPos {
+            //d// println!("DEF: {} global={}", s, is_global);
+            let pos = self.local_map.get(s);
+            match pos {
+                None => {
+                    if is_global {
+                        let v = VVal::Nul;
+                        let r = v.to_ref();
+                        //d// println!("GLOBAL: {} => {}", s, r.s());
+                        self.global.borrow_mut().env.insert(String::from(s), r.clone());
+                        return VarPos::Global(r);
+                    }
+                },
+                Some(p) => {
+                    match p {
+                        VarPos::NoPos => {
+                            if is_global {
+                                let v = VVal::Nul;
+                                let r = v.to_ref();
+                                //d// println!("GLOBAL: {} => {}", s, r.s());
+                                self.global.borrow_mut().env.insert(String::from(s), r.clone());
+                                return VarPos::Global(r);
+                            }
+                        },
+                        VarPos::UpValue(_)  => {},
+                        VarPos::Global(_)   => {},
+                        VarPos::Local(_i)   => return p.clone(),
+                    }
+                },
+            }
 
-/// Reference type to a `CompileEnv`.
-type CompileEnvRef = Rc<RefCell<CompileEnv>>;
+            let next_index = self.locals.len();
+            self.locals.push(CompileLocal {
+                is_upvalue: false,
+            });
+            self.local_map.insert(String::from(s), VarPos::Local(next_index));
+            VarPos::Local(next_index)
+        }
 
-impl CompileEnv {
-    fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
-        let global = if let Some(p) = &parent {
-            p.borrow_mut().global.clone()
-        } else {
-            GlobalEnv::new()
-        };
-        Rc::new(RefCell::new(CompileEnv {
-            parent,
-            global,
-            local_map: std::collections::HashMap::new(),
-            locals:    Vec::new(),
-            upvals:    Vec::new(),
-            implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-            explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-        }))
-    }
-
-    fn def_up(&mut self, s: &str, pos: VarPos) -> usize {
-        let next_index = self.upvals.len();
-        self.upvals.push(pos);
-        self.local_map.insert(String::from(s), VarPos::UpValue(next_index));
-        next_index
-    }
-
-    fn def(&mut self, s: &str, is_global: bool) -> VarPos {
-        //d// println!("DEF: {} global={}", s, is_global);
-        let pos = self.local_map.get(s);
-        match pos {
-            None => {
-                if is_global {
-                    let v = VVal::Nul;
-                    let r = v.to_ref();
-                    //d// println!("GLOBAL: {} => {}", s, r.s());
-                    self.global.borrow_mut().env.insert(String::from(s), r.clone());
-                    return VarPos::Global(r);
-                }
-            },
-            Some(p) => {
+        fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
+            //d// println!("COPY UPVALS: {:?}", self.upvals);
+            for p in self.upvals.iter() {
                 match p {
-                    VarPos::NoPos => {
-                        if is_global {
-                            let v = VVal::Nul;
-                            let r = v.to_ref();
-                            //d// println!("GLOBAL: {} => {}", s, r.s());
-                            self.global.borrow_mut().env.insert(String::from(s), r.clone());
-                            return VarPos::Global(r);
-                        }
+                    VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
+                    VarPos::Local(i) => {
+                        upvalues.push(e.get_local_up_promotion(*i));
                     },
-                    VarPos::UpValue(_)  => {},
-                    VarPos::Global(_)   => {},
-                    VarPos::Local(_i)   => return p.clone(),
+                    VarPos::Global(_) => {
+                        panic!("Globals can't be captured as upvalues!");
+                    },
+                    VarPos::NoPos => upvalues.push(VVal::Nul.to_ref()),
                 }
-            },
-        }
-
-        let next_index = self.locals.len();
-        self.locals.push(CompileLocal {
-            is_upvalue: false,
-        });
-        self.local_map.insert(String::from(s), VarPos::Local(next_index));
-        VarPos::Local(next_index)
-    }
-
-    fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
-        //d// println!("COPY UPVALS: {:?}", self.upvals);
-        for p in self.upvals.iter() {
-            match p {
-                VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
-                VarPos::Local(i) => {
-                    upvalues.push(e.get_local_up_promotion(*i));
-                },
-                VarPos::Global(_) => {
-                    panic!("Globals can't be captured as upvalues!");
-                },
-                VarPos::NoPos => upvalues.push(VVal::Nul.to_ref()),
             }
         }
-    }
 
-    fn local_env_size(ce: &CompileEnvRef) -> usize {
+        fn local_env_size(ce: &CompileEnvRef) -> usize {
         ce.borrow().locals.len()
     }
 
@@ -984,8 +992,9 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
 
     //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
-    let cv = compile(&value, ce)?;
     if destr.b() {
+        let cv = compile(&value, ce)?;
+
         check_for_at_arity(prev_max_arity, ast, ce, &vars);
 
         let poses =
@@ -1054,7 +1063,11 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
             Ok(VVal::Nul)
         }))
     } else {
-        let pos = ce.borrow_mut().def(&vars.at(0).unwrap().s_raw(), is_global);
+        let varname = vars.at(0).unwrap().s_raw();
+        ce.borrow_mut().recent_var = varname.clone();
+        let cv = compile(&value, ce)?;
+
+        let pos = ce.borrow_mut().def(&varname, is_global);
 
         match pos {
             VarPos::Local(vip) => {
@@ -1719,11 +1732,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 },
                 Syntax::Key => {
                     let sym = ast.at(1).unwrap();
+                    ce.borrow_mut().recent_sym = sym.s_raw();
                     Ok(Box::new(move |_: &mut Env| Ok(sym.clone())))
                 },
                 Syntax::Str => {
-                    let str = ast.at(1).unwrap();
-                    Ok(Box::new(move |_: &mut Env| Ok(str.clone())))
+                    let s = ast.at(1).unwrap();
+                    ce.borrow_mut().recent_sym = s.s_raw();
+                    Ok(Box::new(move |_: &mut Env| Ok(s.clone())))
                 },
                 Syntax::GetIdx => {
                     let map = compile(&ast.at(1).unwrap(), ce)?;
@@ -1903,6 +1918,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::SetKey => {
                     let map = compile(&ast.at(1).unwrap(), ce)?;
                     let sym = compile(&ast.at(2).unwrap(), ce)?;
+                    let recent_sym = ce.borrow().recent_sym.clone();
+                    ce.borrow_mut().recent_var = recent_sym;
                     let val = compile(&ast.at(3).unwrap(), ce)?;
                     Ok(Box::new(move |e: &mut Env| {
                         let m = map(e)?;
@@ -1971,6 +1988,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                     Ok((sc, None))
                                 } else {
                                     let kc = compile(&k, ce)?;
+                                    if let VVal::Sym(y) = k {
+                                        ce.borrow_mut().recent_var = y.borrow().clone();
+                                    } else {
+                                        let recent_sym = ce.borrow().recent_sym.clone();
+                                        ce.borrow_mut().recent_var = recent_sym;
+                                    }
                                     let vc = compile(&v, ce)?;
                                     Ok((kc, Some(vc)))
                                 }
@@ -2245,13 +2268,17 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     }
                 },
                 Syntax::Func => {
+                    let last_def_varname = ce.borrow().recent_var.clone();
+                    let mut fun_spos = spos.clone();
+                    fun_spos.name = Some(Rc::new(last_def_varname));
+
                     let mut ce_sub = CompileEnv::create_env(Some(ce.clone()));
                     let label          = ast.at(1).unwrap();
                     let explicit_arity = ast.at(2).unwrap();
                     let stmts : Vec<EvalNode> =
                         ast.map_skip(|e| compile(e, &mut ce_sub), 3)?;
 
-                    let spos_inner = spos.clone();
+                    let spos_inner = fun_spos.clone();
                     #[allow(unused_assignments)]
                     let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
                         let mut res = VVal::Nul;
@@ -2324,7 +2351,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         Ok(VValFun::new_val(
                             fun_ref.clone(),
                             v, env_size, min_args, max_args, false,
-                            Some(spos.clone())))
+                            Some(fun_spos.clone())))
                     }))
                 },
                 _ => { ast.to_compile_err(format!("bad input: {}", ast.s())) }
@@ -2347,6 +2374,8 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
         local_map: std::collections::HashMap::new(),
         locals:    Vec::new(),
         upvals:    Vec::new(),
+        recent_var: String::new(),
+        recent_sym: String::new(),
         implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
         explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
     }));
@@ -2431,13 +2460,13 @@ mod tests {
     #[test]
     fn check_function_string_rep() {
         assert_eq!(s_eval("!upv1 = \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
-                   "\"&F{@[1,21:<compiler:s_eval>(Func)],amin=1,amax=3,locals=2,upvalues=$[$(&)\\\"lol!\\\"]}\"");
+                   "\"&F{@[1,21:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$(&)\\\"lol!\\\"]}\"");
         assert_eq!(s_eval("!upv1 = $&& \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
-                   "\"&F{@[1,23:<compiler:s_eval>(Func)],amin=1,amax=3,locals=2,upvalues=$[$&&\\\"lol!\\\"]}\"");
+                   "\"&F{@[1,23:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&&\\\"lol!\\\"]}\"");
         assert_eq!(s_eval("!upv1 = \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
-                   "&F{@[1,17:<compiler:s_eval>(Func)],amin=1,amax=3,locals=2,upvalues=$[$n]}");
+                   "&F{@[1,17:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$n]}");
         assert_eq!(s_eval("!upv1 = $&& \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
-                   "&F{@[1,19:<compiler:s_eval>(Func)],amin=1,amax=3,locals=2,upvalues=$[$&&\"lol!\"]}");
+                   "&F{@[1,19:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&&\"lol!\"]}");
     }
 
     #[test]
@@ -3181,7 +3210,7 @@ mod tests {
             !l = { x 10 };
             l[];
         "#),
-        "$e \"EXEC ERR: Caught [3,18:<compiler:s_eval_no_panic>(Func)]=>[7,22:<compiler:s_eval_no_panic>(Call)]=>[7,18:<compiler:s_eval_no_panic>(Func)]=>[8,14:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
+        "$e \"EXEC ERR: Caught [3,18:<compiler:s_eval_no_panic>(Func)@x]=>[7,22:<compiler:s_eval_no_panic>(Call)]=>[7,18:<compiler:s_eval_no_panic>(Func)@l]=>[8,14:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
     }
 
     #[test]
@@ -3703,7 +3732,7 @@ mod tests {
             x.f = { x.b };
             $[x.f, $:x]
         "#),
-        "$[$<1=>&F{@[3,19:<compiler:s_eval>(Func)],amin=0,amax=0,locals=0,upvalues=$[$<2=>$(&)${f=$<1>}]},$<2>]");
+        "$[$<1=>&F{@[3,19:<compiler:s_eval>(Func)@f],amin=0,amax=0,locals=0,upvalues=$[$<2=>$(&)${f=$<1>}]},$<2>]");
 
         assert_eq!(s_eval(r#"
             !x = $[];
@@ -3982,31 +4011,31 @@ mod tests {
             !x = $[1,2,3];
             x { x.1 = _; }
         "),
-        "$e \"EXEC ERR: Caught [3,23:<compiler:s_eval_no_panic>(SetKey)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
+        "$e \"EXEC ERR: Caught [3,23:<compiler:s_eval_no_panic>(SetKey)]=>[3,15:<compiler:s_eval_no_panic>(Func)@x]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
 
         assert_eq!(s_eval_no_panic(r"
             !x = ${a=1};
             x { x.a = $[_, _1]; }
         "),
-        "$e \"EXEC ERR: Caught [3,23:<compiler:s_eval_no_panic>(SetKey)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: ${a=1}\\\")\"");
+        "$e \"EXEC ERR: Caught [3,23:<compiler:s_eval_no_panic>(SetKey)]=>[3,15:<compiler:s_eval_no_panic>(Func)@a]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: ${a=1}\\\")\"");
 
         assert_eq!(s_eval_no_panic(r"
             !x = $[1,2,3];
             x { std:prepend x $[_] }
         "),
-        "$e \"EXEC ERR: Caught [3,29:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
+        "$e \"EXEC ERR: Caught [3,29:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)@x]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
 
         assert_eq!(s_eval_no_panic(r"
             !x = $[1,2,3];
             x { std:append x $[_] }
         "),
-        "$e \"EXEC ERR: Caught [3,28:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
+        "$e \"EXEC ERR: Caught [3,28:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)@x]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
 
         assert_eq!(s_eval_no_panic(r"
             !x = $[1,2,3];
             x { std:take 2 x; _ }
         "),
-        "$e \"EXEC ERR: Caught [3,26:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
+        "$e \"EXEC ERR: Caught [3,26:<compiler:s_eval_no_panic>(Call)]=>[3,15:<compiler:s_eval_no_panic>(Func)@x]=>[3,15:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"Can\\\\\\\'t mutate borrowed value: $[1,2,3]\\\")\"");
     }
 
     #[test]
@@ -4473,5 +4502,17 @@ mod tests {
 
         assert_eq!(s_eval("std:accum $[1] \"3\""),          "$[1,\"3\"]");
         assert_eq!(s_eval("std:accum $[1] $[2,3]"),         "$[1,$[2,3]]");
+    }
+
+    #[test]
+    fn check_error_reporting_func() {
+        assert_eq!(s_eval_no_panic("!f = {}; f 10;"),
+            "$e \"EXEC ERR: Caught [1,6:<compiler:s_eval_no_panic>(Func)@f]=>[1,12:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
+        assert_eq!(s_eval_no_panic("!x = ${}; x.foo = {}; x.foo 10;"),
+            "$e \"EXEC ERR: Caught [1,19:<compiler:s_eval_no_panic>(Func)@foo]=>[1,29:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
+        assert_eq!(s_eval_no_panic("!x = ${(\"foo\") = {}}; x.foo 10;"),
+            "$e \"EXEC ERR: Caught [1,18:<compiler:s_eval_no_panic>(Func)@foo]=>[1,29:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
+        assert_eq!(s_eval_no_panic("!x = ${foo = {}}; x.foo 10;"),
+            "$e \"EXEC ERR: Caught [1,14:<compiler:s_eval_no_panic>(Func)@foo]=>[1,25:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
     }
 }

@@ -3220,8 +3220,8 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(s)
 
             } else {
-                Ok(VVal::err_msg(
-                    &format!(
+                Ok(env.new_err(
+                    format!(
                         "str:join only works with lists as second argument, got '{}'",
                         lst.s())))
             }
@@ -3243,8 +3243,8 @@ pub fn std_symbol_table() -> SymbolTable {
                 match String::from_utf8(u.borrow().to_vec()) {
                     Ok(s) => Ok(VVal::new_str_mv(s)),
                     Err(e) => {
-                        Ok(VVal::err_msg(
-                            &format!("str:from_utf8 decoding error: {}", e)))
+                        Ok(env.new_err(
+                            format!("str:from_utf8 decoding error: {}", e)))
                     }
                 }
             } else {
@@ -3402,8 +3402,8 @@ pub fn std_symbol_table() -> SymbolTable {
                     }
                 }
             } else {
-                return Ok(VVal::err_msg(
-                    &format!(
+                return Ok(env.new_err(
+                    format!(
                         "fold only works with lists as argument, got '{}'",
                         lst.s())));
             }
@@ -3495,8 +3495,8 @@ pub fn std_symbol_table() -> SymbolTable {
                     match read.read_line(&mut line) {
                         Ok(n) => { if n == 0 { break; } },
                         Err(e) => {
-                            return Ok(VVal::err_msg(
-                                &format!("IO-Error on std:io:lines: {}", e)))
+                            return Ok(env.new_err(
+                                format!("IO-Error on std:io:lines: {}", e)))
                         },
                     }
                 }
@@ -3517,8 +3517,8 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "io:stdout:flush",
         |env: &mut Env, _argc: usize| {
             if let Err(e) = env.stdio.write.borrow_mut().flush() {
-                Ok(VVal::err_msg(
-                    &format!("IO-Error on std:io:stdout:flush: {}", e)))
+                Ok(env.new_err(
+                    format!("IO-Error on std:io:stdout:flush: {}", e)))
             } else {
                 Ok(VVal::Bol(true))
             }
@@ -3527,8 +3527,8 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "io:stdout:newline",
         |env: &mut Env, _argc: usize| {
             if let Err(e) = writeln!(*env.stdio.write.borrow_mut(), "") {
-                Ok(VVal::err_msg(
-                    &format!("IO-Error on std:io:stdout:newline: {}", e)))
+                Ok(env.new_err(
+                    format!("IO-Error on std:io:stdout:newline: {}", e)))
             } else {
                 Ok(VVal::Bol(true))
             }
@@ -3538,8 +3538,8 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
             if let Err(e) = write!(*env.stdio.write.borrow_mut(), "{}", v.s()) {
-                Ok(VVal::err_msg(
-                    &format!("IO-Error on std:io:stdout:write: {}", e)))
+                Ok(env.new_err(
+                    format!("IO-Error on std:io:stdout:write: {}", e)))
             } else {
                 Ok(v)
             }
@@ -3549,8 +3549,8 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
             if let Err(e) = write!(*env.stdio.write.borrow_mut(), "{}", v.s_raw()) {
-                Ok(VVal::err_msg(
-                   &format!("IO-Error on std:io:stdout:print: {}", e)))
+                Ok(env.new_err(
+                   format!("IO-Error on std:io:stdout:print: {}", e)))
             } else {
                 Ok(v)
             }
@@ -3572,16 +3572,14 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match file {
                 Err(e) => {
-                    Ok(VVal::err_msg(
-                        &format!(
-                            "Couldn't open file '{}': {}",
-                            filename, e)))
+                    Ok(env.new_err(
+                        format!("Couldn't open file '{}': {}", filename, e)))
                 },
                 Ok(mut f) => {
                     let mut contents = String::new();
                     if let Err(e) = f.read_to_string(&mut contents) {
-                        Ok(VVal::err_msg(
-                            &format!(
+                        Ok(env.new_err(
+                            format!(
                                 "Couldn't read text from file '{}': {}",
                                 filename, e)))
                     } else {
@@ -3607,16 +3605,14 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match file {
                 Err(e) => {
-                    Ok(VVal::err_msg(
-                        &format!(
-                            "Couldn't open file '{}': {}",
-                            filename, e)))
+                    Ok(env.new_err(
+                        format!("Couldn't open file '{}': {}", filename, e)))
                 },
                 Ok(mut f) => {
                     let mut contents : Vec<u8> = Vec::new();
                     if let Err(e) = f.read_to_end(&mut contents) {
-                        Ok(VVal::err_msg(
-                            &format!(
+                        Ok(env.new_err(
+                            format!(
                                 "Couldn't read text from file '{}': {}",
                                 filename, e)))
                     } else {
@@ -3648,22 +3644,22 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match file {
                 Err(e) => {
-                    Ok(VVal::err_msg(
-                        &format!(
+                    Ok(env.new_err(
+                        format!(
                             "Couldn't open file '{}': {}",
                             filename, e)))
                 },
                 Ok(mut f) => {
                     if let Err(e) = f.write_all(&buf) {
-                        return Ok(VVal::err_msg(
-                            &format!(
+                        return Ok(env.new_err(
+                            format!(
                                 "Couldn't write to file '{}': {}",
                                 tmp_filename, e)));
                     }
 
                     if let Err(e) = std::fs::rename(&tmp_filename, &filename) {
-                        return Ok(VVal::err_msg(
-                            &format!(
+                        return Ok(env.new_err(
+                            format!(
                                 "Couldn't rename file '{}' to file '{}': {}",
                                 tmp_filename, filename, e)));
                     }
@@ -3694,15 +3690,15 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match file {
                 Err(e) => {
-                    Ok(VVal::err_msg(
-                        &format!(
+                    Ok(env.new_err(
+                        format!(
                             "Couldn't open file '{}': {}",
                             filename, e)))
                 },
                 Ok(mut f) => {
                     if let Err(e) = f.write_all(&buf) {
-                        Ok(VVal::err_msg(
-                            &format!(
+                        Ok(env.new_err(
+                            format!(
                                 "Couldn't write to file '{}': {}",
                                 filename, e)))
                     } else {
@@ -3868,7 +3864,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     &data)
             {
                 Ok(v) => Ok(v),
-                Err(e) => Ok(VVal::err_msg(&e)),
+                Err(e) => Ok(env.new_err(e)),
             }
         }, Some(3), Some(3), false);
 
@@ -3882,8 +3878,8 @@ pub fn std_symbol_table() -> SymbolTable {
 
             let rx = Regex::new(&re);
             if let Err(e) = rx {
-                return Ok(VVal::err_msg(
-                    &format!("Regex '{}' did not compile: {}", re, e)));
+                return Ok(env.new_err(
+                    format!("Regex '{}' did not compile: {}", re, e)));
             }
             let rx = rx.unwrap();
 
@@ -3932,8 +3928,8 @@ pub fn std_symbol_table() -> SymbolTable {
 
             let rx = Regex::new(&re);
             if let Err(e) = rx {
-                return Ok(VVal::err_msg(
-                    &format!("Regex '{}' did not compile: {}", re, e)));
+                return Ok(env.new_err(
+                    format!("Regex '{}' did not compile: {}", re, e)));
             }
             let rx = rx.unwrap();
 
@@ -3969,8 +3965,8 @@ pub fn std_symbol_table() -> SymbolTable {
 
             let rx = Regex::new(&re);
             if let Err(e) = rx {
-                return Ok(VVal::err_msg(
-                    &format!("Regex '{}' did not compile: {}", re, e)));
+                return Ok(env.new_err(
+                    format!("Regex '{}' did not compile: {}", re, e)));
             }
             let rx = rx.unwrap();
 
@@ -4024,7 +4020,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match v.to_json(pp) {
                 Ok(s) => Ok(VVal::new_str_mv(s)),
-                Err(e) => Ok(VVal::err_msg(&e)),
+                Err(e) => Ok(env.new_err(e)),
             }
         }, Some(1), Some(2), false);
 
@@ -4035,7 +4031,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
             match VVal::from_json(&s) {
                 Ok(v) => Ok(v),
-                Err(e) => Ok(VVal::err_msg(&e)),
+                Err(e) => Ok(env.new_err(e)),
             }
         }, Some(1), Some(1), false);
 
@@ -4045,7 +4041,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let v = env.arg(0);
             match v.to_msgpack() {
                 Ok(s) => Ok(VVal::new_byt(s)),
-                Err(e) => Ok(VVal::err_msg(&e)),
+                Err(e) => Ok(env.new_err(e)),
             }
         }, Some(1), Some(1), false);
 
@@ -4055,10 +4051,10 @@ pub fn std_symbol_table() -> SymbolTable {
             if let VVal::Byt(u) = env.arg(0) {
                 match VVal::from_msgpack(&u.borrow()[..]) {
                     Ok(v) => Ok(v),
-                    Err(e) => Ok(VVal::err_msg(&e)),
+                    Err(e) => Ok(env.new_err(e)),
                 }
             } else {
-                Ok(VVal::err_msg("deser:msgpack expects bytes"))
+                Ok(env.new_err("deser:msgpack expects bytes".to_string()))
             }
         }, Some(1), Some(1), false);
 

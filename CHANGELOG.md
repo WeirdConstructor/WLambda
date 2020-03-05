@@ -1,3 +1,12 @@
+0.4.5 (unreleased)
+==================
+
+* Change: Added proper error location to errors generated from
+prelude or other pure Rust functions.
+* Change: Added recently defined variable name or key to syntax positions
+for functions. This might help finding the actual function where
+the error occured easier.
+
 0.4.4 (2020-03-06)
 ==================
 
