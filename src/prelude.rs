@@ -1522,7 +1522,7 @@ function is the value, the second argument is the key.
 !keys = $[];
 
 ${a = 10, b = 20, c = 30} {
-    !(k, v) = @;
+    !(v, k) = @;
     .sum = sum + v;
     std:push keys k;
 };
@@ -1554,7 +1554,7 @@ std:assert_eq product 60;
 !keys    = $[];
 
 for ${a = 10, b = 20, c = 30} {
-    !(k, v) = @;
+    !(v, k) = @;
     .product = product * v;
     std:push keys k;
 };
@@ -2867,10 +2867,10 @@ pub fn core_symbol_table() -> SymbolTable {
 
             let mut ret = VVal::Nul;
             for (v, k) in val.iter() {
-                env.push(v);
                 let n =
                     if let Some(k) = k { env.push(k); 2 }
                     else               { 1 };
+                env.push(v);
                 match f.call_internal(env, n) {
                     Ok(v)                      => { ret = v; },
                     Err(StackAction::Break(v)) => { env.popn(n); return Ok(v); },
