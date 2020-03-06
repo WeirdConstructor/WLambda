@@ -115,6 +115,17 @@ In the following grammar, white space and comments are omitted:
                   ;
     wref          = "&", value
                   ;
+    accumulator   = "@", ("i" | "int"
+                         |"s" | "string"
+                         |"f" | "float"
+                         |"b" | "bytes"
+                         |"v" | "vec"
+                         |"m" | "map" ), expr
+                    (* defines a new accumulator context *)
+                  | "@", ("a" | "accum")
+                    (* returns the current accumulator value *)
+                  | "+" (* resolves to the current accumulator function *)
+                  ;
     capture_ref   = ":", var
                   ;
     deref         = "*", value
@@ -132,6 +143,7 @@ In the following grammar, white space and comments are omitted:
                   | wref
                   | deref
                   | capture_ref
+                  | accumulator
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
@@ -776,6 +788,57 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 r.push(parse_value(ps)?);
                 Ok(r)
             }
+        },
+        '@' => {
+            let a = ps.syn(Syntax::Accum);
+            if ps.consume_lookahead("@int") || ps.consume_lookahead("@i") {
+                ps.skip_ws_and_comments();
+                a.push(VVal::new_sym("int"));
+                a.push(parse_expr(ps)?);
+                Ok(a)
+
+            } else if ps.consume_lookahead("@float") || ps.consume_lookahead("@f") {
+                ps.skip_ws_and_comments();
+                a.push(VVal::new_sym("float"));
+                a.push(parse_expr(ps)?);
+                Ok(a)
+
+            } else if ps.consume_lookahead("@string") || ps.consume_lookahead("@s") {
+                ps.skip_ws_and_comments();
+                a.push(VVal::new_sym("string"));
+                a.push(parse_expr(ps)?);
+                Ok(a)
+
+            } else if ps.consume_lookahead("@bytes") || ps.consume_lookahead("@b") {
+                ps.skip_ws_and_comments();
+                a.push(VVal::new_sym("bytes"));
+                a.push(parse_expr(ps)?);
+                Ok(a)
+
+            } else if ps.consume_lookahead("@vec") || ps.consume_lookahead("@v") {
+                ps.skip_ws_and_comments();
+                a.push(VVal::new_sym("vec"));
+                a.push(parse_expr(ps)?);
+                Ok(a)
+
+            } else if ps.consume_lookahead("@map") || ps.consume_lookahead("@m") {
+                ps.skip_ws_and_comments();
+                a.push(VVal::new_sym("map"));
+                a.push(parse_expr(ps)?);
+                Ok(a)
+
+            } else if ps.consume_lookahead("@@") {
+                ps.skip_ws_and_comments();
+                a.push(VVal::new_sym("@"));
+                Ok(a)
+
+            } else {
+                ps.err_bad_value(&format!("Expected accumulator value"))
+            }
+        },
+        '+' => {
+            ps.consume_wsc();
+            Ok(ps.syn(Syntax::Accum))
         },
         c => {
             ps.err_bad_value(

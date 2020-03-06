@@ -23,7 +23,7 @@
             return :feed $n;
         };
 
-        ((len depth_marker) - 1 > $data.depth) {
+        while { (len depth_marker) - 1 > $data.depth } {
             std:push $data.stack $data.current_count - 1;
             $data.current_count = 1;
             $data.depth = $data.depth + 1;
@@ -67,10 +67,10 @@ c._data.toc {
               ~ make_new_section_str[_];
 };
 
-!new_toc = std:str:join "\n" ~ c._data.toc {
+!new_toc = std:str:join "\n" ~ $@v c._data.toc {
     !pad = "";
     range 3 (len _.0) 1 {|| .pad = pad "  "; };
-    std:str:cat pad "- [" _.1 "](#" _.4 ") - " _.2
+    $+ ~ std:str:cat pad "- [" _.1 "](#" _.4 ") - " _.2
 };
 
 .orig = orig | std:re:replace_all $q_(?s)\*\*Table Of Contents:\*\*.*?-----_ {||
