@@ -89,6 +89,7 @@ Smalltalk, LISP and Perl.
     - [8.0.3](#803-transforming-a-vector-to-a-map) - Transforming a vector to a map
     - [8.0.4](#804-iteratively-concatenating-strings) - Iteratively concatenating strings
     - [8.0.5](#805-accumulating-sums) - Accumulating sums
+    - [8.0.6](#806-stdaccum-collection-a-b-) - std:accum _collection_ _a_ _b_ ...
 - [9](#9-arithmetic) - Arithmetic
     - [9.0.1](#901--operand-1-operand-2-) - + _operand-1_ _operand-2_ ...
     - [9.0.2](#902---operand-1-operand-2-) - - _operand-1_ _operand-2_ ...
@@ -125,6 +126,8 @@ Smalltalk, LISP and Perl.
     - [14.0.9](#1409-stdeval-code-string) - std:eval _code-string_
     - [14.0.10](#14010-stdassert-bool-message) - std:assert _bool_ \[_message_]
     - [14.0.11](#14011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
+    - [14.0.12](#14012-stdzip-mapfn) - std:zip _map_fn_
+    - [14.0.13](#14013-stdenumerate-mapfn) - std:enumerate _map_fn_
   - [14.1](#141-io) - I/O
     - [14.1.1](#1411-stdiofilereadtext-filename) - std:io:file:read_text _filename_
     - [14.1.2](#1412-stdiofileread-filename) - std:io:file:read _filename_
@@ -1696,7 +1699,7 @@ And with floats:
 std:assert_eq (std:num:round 10.0 * sum) 81.0;
 ```
 
-#### - std:accum _collection_ _a_ _b_ ...
+#### <a name="806-stdaccum-collection-a-b-"></a>8.0.6 - std:accum _collection_ _a_ _b_ ...
 
 This function accumulates all it's arguments in the _collection_.
 It does the same form of accumulation as `$+` does.
@@ -2118,6 +2121,25 @@ std:assert 120;    #=> 120
 This function check if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
 passed in the panic for reference.
+
+#### <a name="14012-stdzip-mapfn"></a>14.0.12 - std:zip _map_fn_
+
+Combines iterators `a` and `b` into an iterator of lists containing elements from both,
+i.e.`$[b1, a1], $[b2, a2] ..`
+```wlambda
+!l = $[13, 42, 97] ~ std:zip $["Foo", "Bar", "Baz"] { @ };
+std:assert_eq l $[$["Foo", 13], $["Bar", 42], $["Baz", 97]];
+```
+
+#### <a name="14013-stdenumerate-mapfn"></a>14.0.13 - std:enumerate _map_fn_
+
+Takes an iterator and turns it into an iterator of lists where the first element
+in the list is the index of that list in the iterator,
+and the second element is the original that was in the iterator.
+```wlambda
+!l = $["lo", "mid", "hi"] ~ std:enumerate { @ };
+std:assert_eq l $[$[0, "lo"], $[1, "mid"], $[2, "hi"]];
+```
 
 ```wlambda
 !x = 30 * 2;
@@ -3242,6 +3264,37 @@ pub fn std_symbol_table() -> SymbolTable {
 
             Ok(acc)
         }, Some(3), Some(3), false);
+
+    func!(st, "enumerate",
+        |env: &mut Env, _argc: usize| {
+            let f = env.arg(0);
+            let i = Rc::new(std::cell::RefCell::new(0));
+            
+            Ok(VValFun::new_fun(
+                move |env: &mut Env, argc: usize| {
+                    env.push(VVal::Int(*i.borrow() as i64));
+                    let r = f.call_internal(env, 1 + argc);
+                    *i.borrow_mut() += 1;
+                    env.popn(1);
+                    r
+                }, None, None, false))
+        }, Some(1), Some(1), false);
+
+    func!(st, "zip",
+        |env: &mut Env, _argc: usize| {
+            let o = env.arg(0);
+            let f = env.arg(1);
+            let i = Rc::new(std::cell::RefCell::new(0));
+            
+            Ok(VValFun::new_fun(
+                move |env: &mut Env, argc: usize| {
+                    env.push(o.at(*i.borrow()).unwrap_or(VVal::Nul));
+                    let r = f.call_internal(env, 1 + argc);
+                    *i.borrow_mut() += 1;
+                    env.popn(1);
+                    r
+                }, None, None, false))
+        }, Some(2), Some(2), false);
 
     add_num_fun_flt!(st, "num:ceil",       ceil);
     add_num_fun_flt!(st, "num:sqrt",       sqrt);
