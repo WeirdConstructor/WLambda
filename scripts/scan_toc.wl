@@ -1,3 +1,4 @@
+std:io:file:copy "src/prelude.rs" "src/prelude.bak";
 !prel = std:io:file:read_text "src/prelude.rs";
 
 !make_new_section_str = { std:str:cat _.1 " - " _.2 };

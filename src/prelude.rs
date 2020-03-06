@@ -59,29 +59,33 @@ Smalltalk, LISP and Perl.
   - [4.5](#45-64-bit-floats) - 64-Bit Floats
     - [4.5.1](#451-float-value) - float _value_
     - [4.5.2](#452-isfloat-value) - is_float _value_
-  - [4.6](#46-strings) - Strings
-    - [4.6.1](#461-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
-    - [4.6.2](#462-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
-    - [4.6.3](#463-stdstrlen-value) - std:str:len _value_
-    - [4.6.4](#464-stdstrtrim-value) - std:str:trim _value_
-    - [4.6.5](#465-stdstrtrimstart-value) - std:str:trim_start _value_
-    - [4.6.6](#466-stdstrtrimend-value) - std:str:trim_end _value_
-    - [4.6.7](#467-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
-    - [4.6.8](#468-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
-  - [4.7](#47-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
-    - [4.7.1](#471-call-properties-of-bytes) - Call Properties of Bytes
-    - [4.7.2](#472-byte-conversion-functions) - Byte Conversion Functions
-  - [4.8](#48-symbols) - Symbols
-  - [4.9](#49-vectors-or-lists) - Vectors (or Lists)
-    - [4.9.1](#491-splicing) - Splicing
-    - [4.9.2](#492-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
-  - [4.10](#410-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
+  - [4.6](#46-numeric-functions) - Numeric Functions
+    - [4.6.1](#461-stdnumabs-number) - std:num:abs _number_
+  - [4.7](#47-strings) - Strings
+    - [4.7.1](#471-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
+    - [4.7.2](#472-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
+    - [4.7.3](#473-stdstrlen-value) - std:str:len _value_
+    - [4.7.4](#474-stdstrtrim-value) - std:str:trim _value_
+    - [4.7.5](#475-stdstrtrimstart-value) - std:str:trim_start _value_
+    - [4.7.6](#476-stdstrtrimend-value) - std:str:trim_end _value_
+    - [4.7.7](#477-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
+    - [4.7.8](#478-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
+  - [4.8](#48-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
+    - [4.8.1](#481-call-properties-of-bytes) - Call Properties of Bytes
+    - [4.8.2](#482-byte-conversion-functions) - Byte Conversion Functions
+  - [4.9](#49-symbols) - Symbols
+  - [4.10](#410-vectors-or-lists) - Vectors (or Lists)
     - [4.10.1](#4101-splicing) - Splicing
-  - [4.11](#411-references) - References
-    - [4.11.1](#4111-weaken-references) - Weaken References
-    - [4.11.2](#4112-strengthening-references) - Strengthening References
-    - [4.11.3](#4113-stdsetref-ref-value) - std:set_ref _ref_ _value_
-  - [4.12](#412-calling-semantics-of-data-types) - Calling Semantics of Data Types
+    - [4.10.2](#4102-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
+    - [4.10.3](#4103-stdtake-count-vector) - std:take _count_ _vector_
+    - [4.10.4](#4104-stddrop-count-vector) - std:drop _count_ _vector_
+  - [4.11](#411-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
+    - [4.11.1](#4111-splicing) - Splicing
+  - [4.12](#412-references) - References
+    - [4.12.1](#4121-weaken-references) - Weaken References
+    - [4.12.2](#4122-strengthening-references) - Strengthening References
+    - [4.12.3](#4123-stdsetref-ref-value) - std:set_ref _ref_ _value_
+  - [4.13](#413-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
   - [5.1](#51-function-call-composition) - Function call composition
     - [5.1.1](#511--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
@@ -907,7 +911,21 @@ std:assert ~ not ~ is_float 4;
 std:assert ~ not ~ is_float $true;
 ```
 
-### <a name="46-strings"></a>4.6 - Strings
+### <a name="46-numeric-functions"></a>4.6 - Numeric Functions
+
+These functions work for all types of numbers.
+
+#### <a name="461-stdnumabs-number"></a>4.6.1 - std:num:abs _number_
+
+Takes the absolute value of _number_. If _number_ is not a number
+it will be converted into an integer.
+
+```wlambda
+std:assert_eq (std:num:abs -10)     10;
+std:assert_eq (std:num:abs -13.3)   13.3;
+```
+
+### <a name="47-strings"></a>4.7 - Strings
 
 Strings in WLambda are like Rust UTF-8 encoded Unicode strings.
 There is no character data type however. There are two types of literal
@@ -921,7 +939,7 @@ std:assert_eq $q/any delimiter may be used instead of/
 std:assert_eq "\u{2211}" "∑";
 ```
 
-#### <a name="461-stdstrcat-a-b-"></a>4.6.1 - std:str:cat _a_ _b_ ...
+#### <a name="471-stdstrcat-a-b-"></a>4.7.1 - std:str:cat _a_ _b_ ...
 
 Stringifies (like with `str`) and concatenates all it's arguments.
 
@@ -931,7 +949,7 @@ std:assert_eq
     "a1023.2abcd$[1,2,3]";
 ```
 
-#### <a name="462-stdstrjoin-sep-vector"></a>4.6.2 - std:str:join _sep_ _vector_
+#### <a name="472-stdstrjoin-sep-vector"></a>4.7.2 - std:str:join _sep_ _vector_
 
 Join's the stringified elements of _vector_ with the _sep_ string.
 Will return an error if _vector_ is not a vector.
@@ -942,7 +960,7 @@ std:assert_eq
     "1::2::3";
 ```
 
-#### <a name="463-stdstrlen-value"></a>4.6.3 - std:str:len _value_
+#### <a name="473-stdstrlen-value"></a>4.7.3 - std:str:len _value_
 
 Returns the length of the stringified _value_ in unicode characters.
 The core function `len` does return the number of bytes in the string
@@ -957,7 +975,7 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### <a name="464-stdstrtrim-value"></a>4.6.4 - std:str:trim _value_
+#### <a name="474-stdstrtrim-value"></a>4.7.4 - std:str:trim _value_
 
 Trims off any (unicode) white space from the start and end of the
 stringified _value_.
@@ -968,7 +986,7 @@ std:assert_eq
     "fooo bar";
 ```
 
-#### <a name="465-stdstrtrimstart-value"></a>4.6.5 - std:str:trim_start _value_
+#### <a name="475-stdstrtrimstart-value"></a>4.7.5 - std:str:trim_start _value_
 
 Trims off any (unicode) white space from the start of the stringified _value_.
 
@@ -978,7 +996,7 @@ std:assert_eq
     "fooo bar \n";
 ```
 
-#### <a name="466-stdstrtrimend-value"></a>4.6.6 - std:str:trim_end _value_
+#### <a name="476-stdstrtrimend-value"></a>4.7.6 - std:str:trim_end _value_
 
 Trims off any (unicode) white space from the end of the stringified _value_.
 
@@ -988,7 +1006,7 @@ std:assert_eq
     "  \nfooo bar";
 ```
 
-#### <a name="467-stdstrpadstart-len-pad-str-value"></a>4.6.7 - std:str:pad_start _len_ _pad-str_ _value_
+#### <a name="477-stdstrpadstart-len-pad-str-value"></a>4.7.7 - std:str:pad_start _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
 at the start of the string.
@@ -1012,7 +1030,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="468-stdstrpadend-len-pad-str-value"></a>4.6.8 - std:str:pad_end _len_ _pad-str_ _value_
+#### <a name="478-stdstrpadend-len-pad-str-value"></a>4.7.8 - std:str:pad_end _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters,
 appending at the end.
@@ -1036,7 +1054,7 @@ std:assert_eq
     "∑∑";
 ```
 
-### <a name="47-bytes-or-byte-vectors"></a>4.7 - Bytes (or Byte Vectors)
+### <a name="48-bytes-or-byte-vectors"></a>4.8 - Bytes (or Byte Vectors)
 
 Bytes are a special kind of strings. Their literal form is:
 
@@ -1046,7 +1064,7 @@ $b"\xFF\xFD\x00";
 $Q/ABCDEF\xFD/;      # \xFD is not an escape sequence here!
 ```
 
-#### <a name="471-call-properties-of-bytes"></a>4.7.1 - Call Properties of Bytes
+#### <a name="481-call-properties-of-bytes"></a>4.8.1 - Call Properties of Bytes
 
 You can index inside a byte array by calling it with an integer:
 
@@ -1073,7 +1091,7 @@ std:assert_eq ($b"b" some_map) 30;
 std:assert_eq some_map.$b"a" 20;   # with method call syntax
 ```
 
-#### <a name="472-byte-conversion-functions"></a>4.7.2 - Byte Conversion Functions
+#### <a name="482-byte-conversion-functions"></a>4.8.2 - Byte Conversion Functions
 
 You can convert bytes to strings in a multitude of ways:
 
@@ -1121,9 +1139,9 @@ There is also an inverse operation to `bytes:to_hex`:
 std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 ```
 
-### <a name="48-symbols"></a>4.8 - Symbols
+### <a name="49-symbols"></a>4.9 - Symbols
 
-### <a name="49-vectors-or-lists"></a>4.9 - Vectors (or Lists)
+### <a name="410-vectors-or-lists"></a>4.10 - Vectors (or Lists)
 
 The literal syntax for vectors (or sometimes also called lists in WLambda)
 is `$[...]`. You may write any kind of expression in it and you will get
@@ -1151,7 +1169,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="491-splicing"></a>4.9.1 - Splicing
+#### <a name="4111-splicing"></a>4.11.1 - Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -1171,7 +1189,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-#### <a name="492-stdappend-vec-a-value-or-vec-"></a>4.9.2 - std:append _vec-a_ _value-or-vec_ ...
+#### <a name="4102-stdappend-vec-a-value-or-vec-"></a>4.10.2 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
 If _value-or-vec_ is a vector, all it's items will be appended to _vec-a_.
@@ -1190,7 +1208,35 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
 ```
 
-### <a name="410-associative-maps-or-string-to-value-mappings"></a>4.10 - Associative Maps (or String to Value mappings)
+#### <a name="4103-stdtake-count-vector"></a>4.10.3 - std:take _count_ _vector_
+
+Takes and returns the first _count_ elements of _vector_. Does not
+mutate _vector_.
+
+```wlambda
+!v = $[1,2,3,4,5,6];
+
+!t = std:take 4 v;
+
+std:assert_eq (str v) "$[1,2,3,4,5,6]";
+std:assert_eq (str t) "$[1,2,3,4]";
+```
+
+#### <a name="4104-stddrop-count-vector"></a>4.10.4 - std:drop _count_ _vector_
+
+Drops _count_ elements from _vector_ and returns them as new vector.
+Does not mutate _vector_.
+
+```wlambda
+!v = $[1,2,3,4,5,6];
+
+!t = std:drop 4 v;
+
+std:assert_eq (str v) "$[1,2,3,4,5,6]";
+std:assert_eq (str t) "$[5,6]";
+```
+
+### <a name="411-associative-maps-or-string-to-value-mappings"></a>4.11 - Associative Maps (or String to Value mappings)
 
 Aside from vectors there are associative maps in WLambda. Their syntax is
 `${ key = expr, ... }`. The keys of these maps have to be strings,
@@ -1234,7 +1280,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4101-splicing"></a>4.10.1 - Splicing
+#### <a name="4111-splicing"></a>4.11.1 - Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -1253,7 +1299,7 @@ std:assert_eq (str ${*${a=10}}) "${a=10}";
 std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 ```
 
-### <a name="411-references"></a>4.11 - References
+### <a name="412-references"></a>4.12 - References
 
 Some data structures already have reference characteristics, such as strings,
 vectors and maps. There are 3 types of references in WLambda that handle
@@ -1314,7 +1360,7 @@ Strong references can also be created using the `std:to_ref` function:
 std:assert_eq (std:write_str x) "$&&10";
 ```
 
-#### <a name="4111-weaken-references"></a>4.11.1 - Weaken References
+#### <a name="4121-weaken-references"></a>4.12.1 - Weaken References
 
 You can weaken any of those two types of references manually using the
 `std:weaken` function.
@@ -1342,14 +1388,14 @@ std:assert_eq $*y $n;
 std:assert drop_check;
 ```
 
-#### <a name="4112-strengthening-references"></a>4.11.2 - Strengthening References
+#### <a name="4122-strengthening-references"></a>4.12.2 - Strengthening References
 
 You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
 
-#### <a name="4113-stdsetref-ref-value"></a>4.11.3 - std:set_ref _ref_ _value_
+#### <a name="4123-stdsetref-ref-value"></a>4.12.3 - std:set_ref _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -1374,7 +1420,7 @@ std:set_ref w3 14;      # Set reference via the weak reference in w3 to r3.
 std:assert_eq $*r3 14;
 ```
 
-### <a name="412-calling-semantics-of-data-types"></a>4.12 - Calling Semantics of Data Types
+### <a name="413-calling-semantics-of-data-types"></a>4.13 - Calling Semantics of Data Types
 
 You can call almost all basic data types of WLambda.
 Here is an overview of the data type calling semantics:
@@ -3844,6 +3890,24 @@ pub fn std_symbol_table() -> SymbolTable {
                 },
             }
         }, Some(1), Some(1), false);
+
+    func!(st, "io:file:copy",
+        |env: &mut Env, _argc: usize| {
+            let from = env.arg(0).s_raw();
+            let to   = env.arg(1).s_raw();
+
+            use std::path::Path;
+
+            match std::fs::copy(Path::new(&from), Path::new(&to)) {
+                Ok(_) => Ok(VVal::Bol(true)),
+                Err(e) => {
+                    Ok(env.new_err(
+                        format!(
+                            "Couldn't copy file '{}' to file '{}': {}",
+                            from, to, e)))
+                },
+            }
+        }, Some(2), Some(2), false);
 
     func!(st, "io:file:write_safe",
         |env: &mut Env, _argc: usize| {
