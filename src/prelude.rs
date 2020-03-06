@@ -551,6 +551,25 @@ std:assert ~ std:str:write[$n] == "$n";
 std:assert ~ is_none[$n];
 ```
 
+#### - is_none _value_
+
+Returns `$true` if _value_ is `$none`.
+
+```wlambda
+std:assert ~ is_none $none;
+std:assert ~ not ~ is_none $false;
+```
+
+#### - is_some _value_
+
+Returns `$true` if _value_ is anything except `$none`.
+
+```wlambda
+std:assert ~ not ~ is_some $none;
+std:assert ~ is_some $false;
+std:assert ~ is_some 30;
+```
+
 ### <a name="42-error-values-e-expr-or-error-expr"></a>4.2 - Error values: `$e expr` or `$error expr`
 
 There are no exceptions in WLambda, except the panic, that
@@ -878,6 +897,133 @@ std:assert ~ not ~ is_float $true;
 
 ### <a name="46-strings"></a>4.6 - Strings
 
+Strings in WLambda are like Rust UTF-8 encoded Unicode strings.
+There is no character data type however. There are two types of literal
+forms for strings:
+
+```wlambda
+"abc def \"foo\"";
+std:assert_eq $q/any delimiter may be used instead of/
+    "any delimiter may be used instead of";
+# Unicode escapes are also working:
+std:assert_eq "\u{2211}" "∑";
+```
+
+#### - std:str:cat _a_ _b_ ...
+
+Stringifies (like with `str`) and concatenates all it's arguments.
+
+```wlambda
+std:assert_eq
+    (std:str:cat :a 10 23.2 "ab" "cd" $[1, 2, 3])
+    "a1023.2abcd$[1,2,3]";
+```
+
+#### - std:str:join _sep_ _vector_
+
+Join's the stringified elements of _vector_ with the _sep_ string.
+Will return an error if _vector_ is not a vector.
+
+```wlambda
+std:assert_eq
+    (std:str:join "::" $[1,2,3])
+    "1::2::3";
+```
+
+#### - std:str:len _value_
+
+Returns the length of the stringified _value_ in unicode characters.
+The core function `len` does return the number of bytes in the string
+instead.
+
+```wlambda
+std:assert_eq (len         "∑") 3;
+std:assert_eq (std:str:len "∑") 1;
+std:assert_eq (len         "∑ÄÄ") 7;
+std:assert_eq (std:str:len "∑ÄÄ") 3;
+std:assert_eq (len         "abcd") 4;
+std:assert_eq (std:str:len "abcd") 4;
+```
+
+#### - std:str:trim _value_
+
+Trims off any (unicode) white space from the start and end of the
+stringified _value_.
+
+```wlambda
+std:assert_eq
+    (std:str:trim "\nfooo bar ")
+    "fooo bar";
+```
+
+#### - std:str:trim_start _value_
+
+Trims off any (unicode) white space from the start of the stringified _value_.
+
+```wlambda
+std:assert_eq
+    (std:str:trim_start "  \nfooo bar \n")
+    "fooo bar \n";
+```
+
+#### - std:str:trim_end _value_
+
+Trims off any (unicode) white space from the end of the stringified _value_.
+
+```wlambda
+std:assert_eq
+    (std:str:trim_end "  \nfooo bar \n")
+    "  \nfooo bar";
+```
+
+#### - std:str:pad_start _len_ _pad-str_ _value_
+
+Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
+at the start of the string.
+The output string is guaranteed to be exactly _len_ unicode characters
+long and not longer. If _pad-str_ is empty, nothing is done.
+
+```wlambda
+std:assert_eq
+    (std:str:pad_start 2 "Ä" "0")
+    "Ä0";
+std:assert_eq
+    (std:str:pad_start 5 "∑∑∑" "∑∑")
+    "∑∑∑∑∑";
+std:assert_eq
+    (std:str:pad_start 8 "Ä∑ßs" "∑∑")
+    "ßsÄ∑ßs∑∑";
+
+# Empty _pad-str_ is not an error but a nop:
+std:assert_eq
+    (std:str:pad_start 8 "" "∑∑")
+    "∑∑";
+```
+
+#### - std:str:pad_end _len_ _pad-str_ _value_
+
+Pads the stringified _value_ by _pad-str_ up to _len_ characters,
+appending at the end.
+The output string is guaranteed to be exactly _len_ unicode characters
+long and not longer. If _pad-str_ is empty, nothing is done.
+
+```wlambda
+std:assert_eq
+    (std:str:pad_end 2 "Ä" "0")
+    "0Ä";
+std:assert_eq
+    (std:str:pad_end 5 "∑∑∑" "∑∑")
+    "∑∑∑∑∑";
+std:assert_eq
+    (std:str:pad_end 8 "Ä∑ßs" "∑∑")
+    "∑∑Ä∑ßsÄ∑";
+
+# Empty _pad-str_ is not an error but a nop:
+std:assert_eq
+    (std:str:pad_end 8 "" "∑∑")
+    "∑∑";
+```
+
 ### <a name="47-bytes-or-byte-vectors"></a>4.7 - Bytes (or Byte Vectors)
 
 Bytes are a special kind of strings. Their literal form is:
@@ -1190,6 +1336,31 @@ You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
+
+#### - std:set_ref _ref_ _value_
+
+Sets the value of the reference _ref_ to _value_.
+If _ref_ is not a strong, weakable or weak reference nothing happens.
+
+Returns _value_ or `$none`.
+
+```wlambda
+!r1 = $&&1;
+std:set_ref r1 10;
+std:assert_eq $*r1 10;
+
+# Note that $& references in local variables are
+# automatically derefernced. Because of that we need to wrap it into
+# an extra reference.
+!r2 = $& $& 1;
+std:set_ref r2 11;
+std:assert_eq $*r2 11;
+
+!r3 = $& $& 1;
+!w3 = std:weaken r3;
+std:set_ref w3 14;      # Set reference via the weak reference in w3 to r3.
+std:assert_eq $*r3 14;
+```
 
 ### <a name="412-calling-semantics-of-data-types"></a>4.12 - Calling Semantics of Data Types
 
@@ -2289,6 +2460,10 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
+#### - std:wlambda:version
+
+Returns the version number of the WLambda crate when called.
+
 ### <a name="111-io"></a>11.1 - I/O
 
 #### <a name="1111-stdiofilereadtext-filename"></a>11.1.1 - std:io:file:read_text _filename_
@@ -3147,27 +3322,63 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "str:trim_end",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim_end().to_string())) },
         Some(1), Some(1), false);
-    func!(st, "str:padl",
+    func!(st, "str:pad_start",
         |env: &mut Env, _argc: usize| {
-            let len = env.arg(0).i() as usize;
-            let pads = env.arg(1).s_raw();
+            let len   = env.arg(0).i() as usize;
+            let pads  = env.arg(1).s_raw();
             let mut s = env.arg(2).s_raw();
 
-            while s.len() < len {
-                s = pads.to_string() + &s;
+            let mut src_len = s.chars().count();
+            let pad_len     = pads.chars().count();
+
+            if pad_len == 0 {
+                return Ok(VVal::new_str_mv(s));
+            }
+
+            while src_len < len {
+                if len - src_len < pad_len {
+                    for c in pads.chars().rev() {
+                        s.insert(0, c);
+                        src_len += 1;
+                        if src_len >= len {
+                            break;
+                        }
+                    }
+                } else {
+                    s.insert_str(0, &pads);
+                }
+                src_len += pad_len;
             }
 
             Ok(VVal::new_str_mv(s))
         }, Some(3), Some(3), false);
 
-    func!(st, "str:padr",
+    func!(st, "str:pad_end",
         |env: &mut Env, _argc: usize| {
-            let len = env.arg(0).i() as usize;
-            let pads = env.arg(1).s_raw();
+            let len   = env.arg(0).i() as usize;
+            let pads  = env.arg(1).s_raw();
             let mut s = env.arg(2).s_raw();
 
-            while s.len() < len {
-                s += &pads;
+            let mut src_len = s.chars().count();
+            let pad_len     = pads.chars().count();
+
+            if pad_len == 0 {
+                return Ok(VVal::new_str_mv(s));
+            }
+
+            while src_len < len {
+                if len - src_len < pad_len {
+                    for c in pads.chars() {
+                        s.push(c);
+                        src_len += 1;
+                        if src_len >= len {
+                            break;
+                        }
+                    }
+                } else {
+                    s.push_str(&pads);
+                }
+                src_len += pad_len;
             }
 
             Ok(VVal::new_str_mv(s))
