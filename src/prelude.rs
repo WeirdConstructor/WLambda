@@ -114,12 +114,12 @@ Smalltalk, LISP and Perl.
     - [4.9.2](#492-byte-conversion-functions) - Byte Conversion Functions
   - [4.10](#410-symbols) - Symbols
   - [4.11](#411-vectors-or-lists) - Vectors (or Lists)
-    - [4.11.1](#4111-splicing) - Splicing
+    - [4.11.1](#4111-vector-splicing) - Vector Splicing
     - [4.11.2](#4112-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
     - [4.11.3](#4113-stdtake-count-vector) - std:take _count_ _vector_
     - [4.11.4](#4114-stddrop-count-vector) - std:drop _count_ _vector_
   - [4.12](#412-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
-    - [4.12.1](#4121-splicing) - Splicing
+    - [4.12.1](#4121-map-splicing) - Map Splicing
   - [4.13](#413-references) - References
     - [4.13.1](#4131-stdtoref-value) - std:to_ref _value_
     - [4.13.2](#4132-stdweaken-ref) - std:weaken _ref_
@@ -1467,7 +1467,31 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="4121-splicing"></a>4.12.1 - Splicing
+#### - std:push _vector_ _item_
+
+Pushes _item_ to the end of _vector_. Returns _item_.
+
+```wlambda
+!v = $[1,2];
+
+std:push v 3;
+
+std:assert_eq (str v) (str $[1,2,3]);
+```
+
+#### - std:pop _vector_
+
+Pops off the last element of _vector_. Returns `$none` if the vector is empty
+or if _vector_ is not a vector.
+
+```wlambda
+!v = $[1,2,3];
+
+std:assert_eq (std:pop v) 3;
+std:assert_eq (str v) (str $[1,2]);
+```
+
+#### <a name="4111-vector-splicing"></a>4.11.1 - Vector Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -1578,7 +1602,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4121-splicing"></a>4.12.1 - Splicing
+#### <a name="4121-map-splicing"></a>4.12.1 - Map Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -1955,6 +1979,23 @@ The alternative is the less clear syntax would be in this case:
 std:assert_eq res 20;
 ```
 
+#### - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
+
+You can create a function that is called when the associated value is
+dropped or it's reference count goes to 0.
+
+```wlambda
+!dropped = $false;
+
+!x = std:to_drop 20 { .dropped = $true; };
+
+std:assert not[dropped];
+std:assert_eq $*x 20;
+
+.x = $none;
+
+std:assert dropped;
+```
 
 ## <a name="6-conditional-execution---if--then--else"></a>6 - Conditional Execution - if / then / else
 
@@ -2763,7 +2804,6 @@ Returns the length of _value_. Depending on the data type you will get
 different semantics.
 
 ```wlambda
-
 # Always zero for scalar non sequential/collection values:
 std:assert_eq (len 10)              0;
 std:assert_eq (len 10.1)            0;
@@ -2777,6 +2817,11 @@ std:assert_eq (len $[1,2,3,4,5])    5;
 std:assert_eq (len ${a=1, b=2})     2;
 std:assert_eq (len ${a=1, b=2})     2;
 ```
+
+#### - panic _message_
+
+If your program runs into something that deserves a slap on the fingers
+of the developer you can use `panic` to do that.
 
 ## <a name="11-standard-library"></a>11 - Standard Library
 
