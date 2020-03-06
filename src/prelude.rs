@@ -1467,7 +1467,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="4111-splicing"></a>4.11.1 - Splicing
+#### <a name="4121-splicing"></a>4.12.1 - Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -1578,7 +1578,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4111-splicing"></a>4.11.1 - Splicing
+#### <a name="4121-splicing"></a>4.12.1 - Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -2742,7 +2742,6 @@ std:assert_eq (type 10)         "integer";
 std:assert_eq (type 10.0)       "float";
 std:assert_eq (type {})         "function";
 !y = $&&std:to_drop 10 { };
-!@dump_stack;
 std:assert_eq (type y)          "drop_function";
 std:assert_eq (type :s)         "symbol";
 std:assert_eq (type "s")        "string";
