@@ -2881,10 +2881,14 @@ mod tests {
         assert_eq!(s_eval("4.4 % 5.5"),   "4.4");
         assert_eq!(s_eval("5.5 % 5.5"),   "0");
 
-        assert_eq!(s_eval("std:neg 0xFF"),    "-256");
-        assert_eq!(s_eval("std:uneg 0xFF"),   "4294967040");
-        assert_eq!(s_eval("std:uneg 0x1"),    "4294967294");
-        assert_eq!(s_eval("std:uneg 0x0"),    "4294967295");
+        assert_eq!(s_eval("std:neg_i64 0xFF"),    "-255");
+        assert_eq!(s_eval("std:not_i64 0xFF"),    "-256");
+        assert_eq!(s_eval("std:neg_u32 0xFF"),   "4294967041");
+        assert_eq!(s_eval("std:neg_u32 0x1"),    "4294967295");
+        assert_eq!(s_eval("std:neg_u32 0x0"),    "0");
+        assert_eq!(s_eval("std:not_u32 0xFF"),   "4294967040");
+        assert_eq!(s_eval("std:not_u32 0x1"),    "4294967294");
+        assert_eq!(s_eval("std:not_u32 0x0"),    "4294967295");
 
         assert_eq!(s_eval("(0x10 &| 0x01) == 0x11"), "$true");
         assert_eq!(s_eval("(0x0f &  0x33) == 0x3"),  "$true");

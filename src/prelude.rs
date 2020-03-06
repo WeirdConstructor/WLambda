@@ -56,6 +56,10 @@ Smalltalk, LISP and Perl.
     - [4.3.3](#433-not-value) - not _value_
     - [4.3.4](#434-boolean-list-indexing) - Boolean List Indexing
   - [4.4](#44-64-bit-integers) - 64-Bit Integers
+    - [4.4.1](#441-stdnegi64-integer) - std:neg_i64 _integer_
+    - [4.4.2](#442-stdnoti64-integer) - std:not_i64 _integer_
+    - [4.4.3](#443-stdnegu32-integer) - std:neg_u32 _integer_
+    - [4.4.4](#444-stdnotu32-integer) - std:not_u32 _integer_
   - [4.5](#45-64-bit-floats) - 64-Bit Floats
     - [4.5.1](#451-float-value) - float _value_
     - [4.5.2](#452-isfloat-value) - is_float _value_
@@ -82,9 +86,10 @@ Smalltalk, LISP and Perl.
   - [4.11](#411-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
     - [4.11.1](#4111-splicing) - Splicing
   - [4.12](#412-references) - References
-    - [4.12.1](#4121-weaken-references) - Weaken References
-    - [4.12.2](#4122-strengthening-references) - Strengthening References
-    - [4.12.3](#4123-stdsetref-ref-value) - std:set_ref _ref_ _value_
+    - [4.12.1](#4121-stdtoref-value) - std:to_ref _value_
+    - [4.12.2](#4122-weaken-references) - Weaken References
+    - [4.12.3](#4123-strengthening-references) - Strengthening References
+    - [4.12.4](#4124-stdsetref-ref-value) - std:set_ref _ref_ _value_
   - [4.13](#413-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
   - [5.1](#51-function-call-composition) - Function call composition
@@ -864,6 +869,67 @@ std:assert_eq ($false $[:a, :b]) :a;
 
 ### <a name="44-64-bit-integers"></a>4.4 - 64-Bit Integers
 
+WLambda's most basic numeric data type is the 64-Bit integer, aka _i64_ in Rust.
+Like with other numbers multiple radix literal forms are supported:
+
+```wlambda
+# Decimal:
+std:assert_eq 10r99         99;
+
+# Hexadecimal:
+std:assert_eq 0xFF01        65281;
+
+# Binary:
+std:assert_eq  0b1011       11;
+std:assert_eq -0b1011      -11;
+
+# Radix 4:
+std:assert_eq 4r31          13;
+```
+
+#### <a name="441-stdnegi64-integer"></a>4.4.1 - std:neg_i64 _integer_
+
+Negates the _integer_, which makes a negative from a positive and positive
+from a negative number.
+
+```wlambda
+std:assert_eq (std:neg_i64 -1)      1;
+std:assert_eq (std:neg_i64 1)      -1;
+
+std:assert_eq (std:neg_i64 0xFF)  -255;
+```
+
+#### <a name="442-stdnoti64-integer"></a>4.4.2 - std:not_i64 _integer_
+
+Flips the bits of the signed 64-Bit _integer_.
+
+```wlambda
+std:assert_eq (std:not_i64 -1)      0;
+std:assert_eq (std:not_i64 1)      -2;
+
+std:assert_eq (std:not_i64 0xFF)  -256;
+```
+
+#### <a name="443-stdnegu32-integer"></a>4.4.3 - std:neg_u32 _integer_
+
+Negates the _integer_ as if it was an unsigned 32-Bit integer.
+
+```wlambda
+std:assert_eq (std:neg_u32 0xFF)   4294967041;
+std:assert_eq (std:neg_u32 0x1)    4294967295;
+std:assert_eq (std:neg_u32 0x0)    0;
+```
+
+#### <a name="444-stdnotu32-integer"></a>4.4.4 - std:not_u32 _integer_
+
+Flips the bits of the _integer_ as if it was an unsigned 32-Bit integer.
+
+```wlambda
+std:assert_eq (std:not_u32 0xFF)   4294967040;
+std:assert_eq (std:not_u32 0x1)    4294967294;
+std:assert_eq (std:not_u32 0x0)    4294967295;
+```
+
 ### <a name="45-64-bit-floats"></a>4.5 - 64-Bit Floats
 
 WLambda supports 64-Bit floating point numbers, aka _f64_ in Rust.
@@ -1169,7 +1235,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="4111-splicing"></a>4.11.1 - Splicing
+#### <a name="4101-splicing"></a>4.10.1 - Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -1280,7 +1346,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4111-splicing"></a>4.11.1 - Splicing
+#### <a name="4101-splicing"></a>4.10.1 - Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -1353,14 +1419,21 @@ And the same with strong references:
 std:assert_eq $*x 20;
 ```
 
-Strong references can also be created using the `std:to_ref` function:
+Strong references can also be created using the `std:to_ref` function.
+
+#### <a name="4121-stdtoref-value"></a>4.12.1 - std:to_ref _value_
+
+Creates a new strong reference that refers to a cell that stores _value_.
 
 ```wlambda
 !x = std:to_ref 10;
+
 std:assert_eq (std:write_str x) "$&&10";
+
+std:assert_eq $*x 10;
 ```
 
-#### <a name="4121-weaken-references"></a>4.12.1 - Weaken References
+#### <a name="4122-weaken-references"></a>4.12.2 - Weaken References
 
 You can weaken any of those two types of references manually using the
 `std:weaken` function.
@@ -1388,14 +1461,14 @@ std:assert_eq $*y $n;
 std:assert drop_check;
 ```
 
-#### <a name="4122-strengthening-references"></a>4.12.2 - Strengthening References
+#### <a name="4123-strengthening-references"></a>4.12.3 - Strengthening References
 
 You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
 
-#### <a name="4123-stdsetref-ref-value"></a>4.12.3 - std:set_ref _ref_ _value_
+#### <a name="4124-stdsetref-ref-value"></a>4.12.4 - std:set_ref _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -3234,14 +3307,21 @@ fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackActio
 pub fn std_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
 
-    func!(st, "neg",
+    func!(st, "not_i64",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Int(!env.arg(0).i()))
         }, Some(1), Some(1), false);
-
-    func!(st, "uneg",
+    func!(st, "neg_i64",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Int(env.arg(0).i().wrapping_neg()))
+        }, Some(1), Some(1), false);
+    func!(st, "not_u32",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Int(i64::from(!(env.arg(0).i() as u32))))
+        }, Some(1), Some(1), false);
+    func!(st, "neg_u32",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Int(i64::from((env.arg(0).i() as u32).wrapping_neg())))
         }, Some(1), Some(1), false);
 
     func!(st, "unshift",

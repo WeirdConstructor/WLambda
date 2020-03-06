@@ -8,6 +8,9 @@ prelude or other pure Rust functions.
 * Change: Added recently defined variable name or key to syntax positions
 for functions. This might help finding the actual function where
 the error occured easier.
+* Incompatible Change: Renamed `neg` to `neg_i64`, `uneg` to `neg_u32`.
+* Feature: Added `not_i64` and `not_u32`.
+* Documentation: More!
 
 0.4.4 (2020-03-06)
 ==================
