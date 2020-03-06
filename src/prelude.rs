@@ -2786,6 +2786,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     env.push(VVal::Int(*i.borrow() as i64));
                     let r = f.call_internal(env, 1 + argc);
                     *i.borrow_mut() += 1;
+                    env.popn(1);
                     r
                 }, None, None, false))
         }, Some(1), Some(1), false);
@@ -2801,6 +2802,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     env.push(o.at(*i.borrow()).unwrap_or(VVal::Nul));
                     let r = f.call_internal(env, 1 + argc);
                     *i.borrow_mut() += 1;
+                    env.popn(1);
                     r
                 }, None, None, false))
         }, Some(2), Some(2), false);
