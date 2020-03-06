@@ -44,6 +44,8 @@ Smalltalk, LISP and Perl.
     - [3.4.1](#341-object-oriented-programming-with-prototypes) - Object Oriented Programming with Prototypes
 - [4](#4-data-types) - Data Types
   - [4.1](#41-none-sentinel-value-n-or-none) - None sentinel value: `$n` or `$none`
+    - [4.1.1](#411-isnone-value) - is_none _value_
+    - [4.1.2](#412-issome-value) - is_some _value_
   - [4.2](#42-error-values-e-expr-or-error-expr) - Error values: `$e expr` or `$error expr`
     - [4.2.1](#421--label-value) - _? [_label_] _value_
     - [4.2.2](#422-onerror-handler-maybe-error-value) - on_error _handler_ _maybe-error-value_
@@ -58,6 +60,14 @@ Smalltalk, LISP and Perl.
     - [4.5.1](#451-float-value) - float _value_
     - [4.5.2](#452-isfloat-value) - is_float _value_
   - [4.6](#46-strings) - Strings
+    - [4.6.1](#461-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
+    - [4.6.2](#462-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
+    - [4.6.3](#463-stdstrlen-value) - std:str:len _value_
+    - [4.6.4](#464-stdstrtrim-value) - std:str:trim _value_
+    - [4.6.5](#465-stdstrtrimstart-value) - std:str:trim_start _value_
+    - [4.6.6](#466-stdstrtrimend-value) - std:str:trim_end _value_
+    - [4.6.7](#467-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
+    - [4.6.8](#468-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
   - [4.7](#47-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
     - [4.7.1](#471-call-properties-of-bytes) - Call Properties of Bytes
     - [4.7.2](#472-byte-conversion-functions) - Byte Conversion Functions
@@ -70,6 +80,7 @@ Smalltalk, LISP and Perl.
   - [4.11](#411-references) - References
     - [4.11.1](#4111-weaken-references) - Weaken References
     - [4.11.2](#4112-strengthening-references) - Strengthening References
+    - [4.11.3](#4113-stdsetref-ref-value) - std:set_ref _ref_ _value_
   - [4.12](#412-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
   - [5.1](#51-function-call-composition) - Function call composition
@@ -135,6 +146,7 @@ Smalltalk, LISP and Perl.
     - [11.0.9](#1109-stdeval-code-string) - std:eval _code-string_
     - [11.0.10](#11010-stdassert-bool-message) - std:assert _bool_ \[_message_]
     - [11.0.11](#11011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
+    - [11.0.12](#11012-stdwlambdaversion) - std:wlambda:version
   - [11.1](#111-io) - I/O
     - [11.1.1](#1111-stdiofilereadtext-filename) - std:io:file:read_text _filename_
     - [11.1.2](#1112-stdiofileread-filename) - std:io:file:read _filename_
@@ -551,7 +563,7 @@ std:assert ~ std:str:write[$n] == "$n";
 std:assert ~ is_none[$n];
 ```
 
-#### - is_none _value_
+#### <a name="411-isnone-value"></a>4.1.1 - is_none _value_
 
 Returns `$true` if _value_ is `$none`.
 
@@ -560,7 +572,7 @@ std:assert ~ is_none $none;
 std:assert ~ not ~ is_none $false;
 ```
 
-#### - is_some _value_
+#### <a name="412-issome-value"></a>4.1.2 - is_some _value_
 
 Returns `$true` if _value_ is anything except `$none`.
 
@@ -909,7 +921,7 @@ std:assert_eq $q/any delimiter may be used instead of/
 std:assert_eq "\u{2211}" "∑";
 ```
 
-#### - std:str:cat _a_ _b_ ...
+#### <a name="461-stdstrcat-a-b-"></a>4.6.1 - std:str:cat _a_ _b_ ...
 
 Stringifies (like with `str`) and concatenates all it's arguments.
 
@@ -919,7 +931,7 @@ std:assert_eq
     "a1023.2abcd$[1,2,3]";
 ```
 
-#### - std:str:join _sep_ _vector_
+#### <a name="462-stdstrjoin-sep-vector"></a>4.6.2 - std:str:join _sep_ _vector_
 
 Join's the stringified elements of _vector_ with the _sep_ string.
 Will return an error if _vector_ is not a vector.
@@ -930,7 +942,7 @@ std:assert_eq
     "1::2::3";
 ```
 
-#### - std:str:len _value_
+#### <a name="463-stdstrlen-value"></a>4.6.3 - std:str:len _value_
 
 Returns the length of the stringified _value_ in unicode characters.
 The core function `len` does return the number of bytes in the string
@@ -945,7 +957,7 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### - std:str:trim _value_
+#### <a name="464-stdstrtrim-value"></a>4.6.4 - std:str:trim _value_
 
 Trims off any (unicode) white space from the start and end of the
 stringified _value_.
@@ -956,7 +968,7 @@ std:assert_eq
     "fooo bar";
 ```
 
-#### - std:str:trim_start _value_
+#### <a name="465-stdstrtrimstart-value"></a>4.6.5 - std:str:trim_start _value_
 
 Trims off any (unicode) white space from the start of the stringified _value_.
 
@@ -966,7 +978,7 @@ std:assert_eq
     "fooo bar \n";
 ```
 
-#### - std:str:trim_end _value_
+#### <a name="466-stdstrtrimend-value"></a>4.6.6 - std:str:trim_end _value_
 
 Trims off any (unicode) white space from the end of the stringified _value_.
 
@@ -976,7 +988,7 @@ std:assert_eq
     "  \nfooo bar";
 ```
 
-#### - std:str:pad_start _len_ _pad-str_ _value_
+#### <a name="467-stdstrpadstart-len-pad-str-value"></a>4.6.7 - std:str:pad_start _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
 at the start of the string.
@@ -1000,7 +1012,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### - std:str:pad_end _len_ _pad-str_ _value_
+#### <a name="468-stdstrpadend-len-pad-str-value"></a>4.6.8 - std:str:pad_end _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters,
 appending at the end.
@@ -1337,7 +1349,7 @@ reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
 
-#### - std:set_ref _ref_ _value_
+#### <a name="4113-stdsetref-ref-value"></a>4.11.3 - std:set_ref _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -2460,7 +2472,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### - std:wlambda:version
+#### <a name="11012-stdwlambdaversion"></a>11.0.12 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
