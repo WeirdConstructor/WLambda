@@ -181,7 +181,8 @@ Smalltalk, LISP and Perl.
   - [9.1](#91-export) - export
   - [9.2](#92-import) - import
 - [10](#10-core-library) - Core Library
-    - [10.0.1](#1001-len-value) - len _value_
+    - [10.0.1](#1001-type-value) - type _value_
+    - [10.0.2](#1002-len-value) - len _value_
 - [11](#11-standard-library) - Standard Library
     - [11.0.1](#1101-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
     - [11.0.2](#1102-stdcopy-vecormap) - std:copy _vec_or_map_
@@ -190,11 +191,10 @@ Smalltalk, LISP and Perl.
     - [11.0.5](#1105-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
     - [11.0.6](#1106-stddisplayln-arg1-) - std:displayln _arg1_ ...
     - [11.0.7](#1107-stdwriteln-arg1-) - std:writeln _arg1_ ...
-    - [11.0.8](#1108-stdstrwrite-arg) - std:str:write _arg_
-    - [11.0.9](#1109-stdeval-code-string) - std:eval _code-string_
-    - [11.0.10](#11010-stdassert-bool-message) - std:assert _bool_ \[_message_]
-    - [11.0.11](#11011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
-    - [11.0.12](#11012-stdwlambdaversion) - std:wlambda:version
+    - [11.0.8](#1108-stdeval-code-string) - std:eval _code-string_
+    - [11.0.9](#1109-stdassert-bool-message) - std:assert _bool_ \[_message_]
+    - [11.0.10](#11010-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
+    - [11.0.11](#11011-stdwlambdaversion) - std:wlambda:version
   - [11.1](#111-io) - I/O
     - [11.1.1](#1111-stdiofilereadtext-filename) - std:io:file:read_text _filename_
     - [11.1.2](#1112-stdiofileread-filename) - std:io:file:read _filename_
@@ -202,12 +202,13 @@ Smalltalk, LISP and Perl.
     - [11.1.4](#1114-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
 - [12](#12-optional-standard-library) - Optional Standard Library
   - [12.1](#121-serialization) - serialization
-    - [12.1.1](#1211-stdserjson-data-nopretty) - std:ser:json _data_ \[_no_pretty_]
-    - [12.1.2](#1212-stddeserjson-string) - std:deser:json _string_
-    - [12.1.3](#1213-stdsercsv-fielddelim-rowseparator-escapeall-table) - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
-    - [12.1.4](#1214-stddesercsv-fielddelim-rowseparator-data) - std:deser:csv _field_delim_ _row_separator_ _data_
-    - [12.1.5](#1215-stdsermsgpack-data) - std:ser:msgpack _data_
-    - [12.1.6](#1216-stddesermsgpack-bytes) - std:deser:msgpack _bytes_
+    - [12.1.1](#1211-stdserwlamda-arg) - std:ser:wlamda _arg_
+    - [12.1.2](#1212-stdserjson-data-nopretty) - std:ser:json _data_ \[_no_pretty_]
+    - [12.1.3](#1213-stddeserjson-string) - std:deser:json _string_
+    - [12.1.4](#1214-stdsercsv-fielddelim-rowseparator-escapeall-table) - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
+    - [12.1.5](#1215-stddesercsv-fielddelim-rowseparator-data) - std:deser:csv _field_delim_ _row_separator_ _data_
+    - [12.1.6](#1216-stdsermsgpack-data) - std:ser:msgpack _data_
+    - [12.1.7](#1217-stddesermsgpack-bytes) - std:deser:msgpack _bytes_
   - [12.2](#122-regex) - regex
   - [12.3](#123-chrono) - chrono
     - [12.3.1](#1231-stdchronotimestamp-format) - std:chrono:timestamp \[_format_]
@@ -596,18 +597,18 @@ when a non existing field of a datastructure is accessed. It's semantic
 meaning is that there is no value.
 
 Most functions that expect a string value will turn a `$none` into an
-empty string. If you need an unambigous representation use `std:str:write`
+empty string. If you need an unambigous representation use `std:ser:wlambda`
 for dumping WLambda data structures.
 
 Please note for API design: In case of errornous states you should not
 return a `$none` but an `$error` value.
 
 ```wlambda
-std:assert ~ $n                == $none;
-std:assert ~ int[$n]           == 0;
-std:assert ~ float[$n]         == 0.0;
-std:assert ~ str[$n]           == "";
-std:assert ~ std:str:write[$n] == "$n";
+std:assert ~ $n                  == $none;
+std:assert ~ int[$n]             == 0;
+std:assert ~ float[$n]           == 0.0;
+std:assert ~ str[$n]             == "";
+std:assert ~ std:ser:wlambda[$n] == "$n";
 std:assert ~ is_none[$n];
 ```
 
@@ -692,7 +693,7 @@ a few functions that accept error values in their arguments:
 - !=
 - std:to_ref
 - std:ref_id
-- std:write_str
+- std:ser:wlambda
 
 All other functions don't accept errors as their argument.
 
@@ -1466,7 +1467,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="4121-splicing"></a>4.12.1 - Splicing
+#### <a name="4111-splicing"></a>4.11.1 - Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -1577,7 +1578,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4121-splicing"></a>4.12.1 - Splicing
+#### <a name="4111-splicing"></a>4.11.1 - Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -1659,7 +1660,7 @@ Creates a new strong reference that refers to a cell that stores _value_.
 ```wlambda
 !x = std:to_ref 10;
 
-std:assert_eq (std:write_str x) "$&&10";
+std:assert_eq (std:ser:wlambda x) "$&&10";
 
 std:assert_eq $*x 10;
 ```
@@ -1680,7 +1681,7 @@ You can weaken any of those two types of references manually using the
 !y = std:weaken x;
 
 # Deref y gives you 10:
-std:assert_eq $*y 10;
+std:assert_eq $*$*y 10; # twice deref to get the value in the drop fun
 
 # The reference to 10 is removed and this means that the weak reference
 # in y is invalidated and returns $n in future.
@@ -2732,7 +2733,32 @@ This library contains all the core functions which belong to the
 core of the WLambda Programming Language. These functions can be seen
 as keywords of WLambda. Some functions are also available as operators.
 
-#### <a name="1001-len-value"></a>10.0.1 - len _value_
+#### <a name="1001-type-value"></a>10.0.1 - type _value_
+
+Returns the name of the data type of _value_ as string.
+
+```wlambda
+std:assert_eq (type 10)         "integer";
+std:assert_eq (type 10.0)       "float";
+std:assert_eq (type {})         "function";
+!y = $&&std:to_drop 10 { };
+!@dump_stack;
+std:assert_eq (type y)          "drop_function";
+std:assert_eq (type :s)         "symbol";
+std:assert_eq (type "s")        "string";
+std:assert_eq (type $[])        "vector";
+std:assert_eq (type ${})        "map";
+std:assert_eq (type $b"")       "bytes";
+std:assert_eq (type $n)         "none";
+std:assert_eq (type $t)         "bool";
+std:assert_eq (type $e $n)      "error";
+std:assert_eq (type $&&10)      "strong";
+std:assert_eq (type $&10)       "weakable";
+!x = $&&10;
+std:assert_eq (type ~ std:weaken x) "weak";
+```
+
+#### <a name="1002-len-value"></a>10.0.2 - len _value_
 
 Returns the length of _value_. Depending on the data type you will get
 different semantics.
@@ -2850,7 +2876,7 @@ std:displayln "foo"
 Will just print `foo` and a newline.
 
 If you need a less ambigous form, use `std:writeln`, which
-handles it's argument like written via `std:str:write` instead of `str`.
+handles it's argument like written via `std:ser:wlambda` instead of `str`.
 
 #### <a name="1107-stdwriteln-arg1-"></a>11.0.7 - std:writeln _arg1_ ...
 
@@ -2863,27 +2889,11 @@ std:displayln "foo"
 
 Will print `"foo"` and a newline.
 
-See also the description of `std:str:write`.
+See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="1108-stdstrwrite-arg"></a>11.0.8 - std:str:write _arg_
-
-Returns the WLambda representation of the value _arg_ as string.
-
-Most values have the same represenation like a WLambda literal,
-but there are other values that don't have a literal representation.
-
-Warning: Consider all values that don't have a fixed literal representation
-in the WLambda syntax as debug output that might change in future versions.
-
-```wlambda
-std:assert_eq (std:str:write "foo") $q|"foo"|;
-std:assert_eq (std:str:write $none) $q|$n|;
-std:assert_eq (std:str:write $[1,:a]) $q|$[1,:"a"]|;
-```
-
-#### <a name="1109-stdeval-code-string"></a>11.0.9 - std:eval _code-string_
+#### <a name="1108-stdeval-code-string"></a>11.0.8 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -2895,7 +2905,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="11010-stdassert-bool-message"></a>11.0.10 - std:assert _bool_ \[_message_]
+#### <a name="1109-stdassert-bool-message"></a>11.0.9 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -2906,7 +2916,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="11011-stdasserteq-actual-expected-message"></a>11.0.11 - std:assert_eq _actual_ _expected_ \[_message_]
+#### <a name="11010-stdasserteq-actual-expected-message"></a>11.0.10 - std:assert_eq _actual_ _expected_ \[_message_]
 
 This function check if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -2917,7 +2927,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### <a name="11012-stdwlambdaversion"></a>11.0.12 - std:wlambda:version
+#### <a name="11011-stdwlambdaversion"></a>11.0.11 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
@@ -2962,7 +2972,23 @@ end of the file.
 
 ### <a name="121-serialization"></a>12.1 - serialization
 
-#### <a name="1211-stdserjson-data-nopretty"></a>12.1.1 - std:ser:json _data_ \[_no_pretty_]
+#### <a name="1211-stdserwlamda-arg"></a>12.1.1 - std:ser:wlamda _arg_
+
+Returns the serialized WLambda representation of the value _arg_ as string.
+
+Most values have the same represenation like a WLambda literal,
+but there are other values that don't have a literal representation.
+
+Warning: Consider all values that don't have a fixed literal representation
+in the WLambda syntax as debug output that might change in future versions.
+
+```wlambda
+std:assert_eq (std:ser:wlambda "foo") $q|"foo"|;
+std:assert_eq (std:ser:wlambda $none) $q|$n|;
+std:assert_eq (std:ser:wlambda $[1,:a]) $q|$[1,:"a"]|;
+```
+
+#### <a name="1212-stdserjson-data-nopretty"></a>12.1.2 - std:ser:json _data_ \[_no_pretty_]
 
 Serializes the _data_ and returns a JSON formatted (and pretty printed) string.
 Optionally not pretty printed if _no_pretty_ is a true value.
@@ -2972,7 +2998,7 @@ Optionally not pretty printed if _no_pretty_ is a true value.
 std:assert_eq str "[1,2.3,{\"a\":4}]";
 ```
 
-#### <a name="1212-stddeserjson-string"></a>12.1.2 - std:deser:json _string_
+#### <a name="1213-stddeserjson-string"></a>12.1.3 - std:deser:json _string_
 
 Deserializes the JSON formatted _string_ into a data structure.
 
@@ -2983,7 +3009,7 @@ std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
 ```
 
-#### <a name="1213-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.3 - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
+#### <a name="1214-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.4 - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
 
 This serializes the _table_ as CSV with the given _field_delim_
 and _row_separator_. If _escape_all_ is `$true` all fields will be
@@ -3005,7 +3031,7 @@ std:assert_eq
     "a;\";\";\"|\";\" \"|";
 ```
 
-#### <a name="1214-stddesercsv-fielddelim-rowseparator-data"></a>12.1.4 - std:deser:csv _field_delim_ _row_separator_ _data_
+#### <a name="1215-stddesercsv-fielddelim-rowseparator-data"></a>12.1.5 - std:deser:csv _field_delim_ _row_separator_ _data_
 
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
@@ -3017,7 +3043,7 @@ std:assert_eq table.0.1 "bar";
 std:assert_eq table.1.1 "y";
 ```
 
-#### <a name="1215-stdsermsgpack-data"></a>12.1.5 - std:ser:msgpack _data_
+#### <a name="1216-stdsermsgpack-data"></a>12.1.6 - std:ser:msgpack _data_
 
 Serializes the _data_ and returns a msgpack bytes value.
 
@@ -3025,7 +3051,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
-#### <a name="1216-stddesermsgpack-bytes"></a>12.1.6 - std:deser:msgpack _bytes_
+#### <a name="1217-stddesermsgpack-bytes"></a>12.1.7 - std:deser:msgpack _bytes_
 
 Deserializes the msgpack bytes value into a data structure.
 
@@ -3765,9 +3791,9 @@ pub fn std_symbol_table() -> SymbolTable {
             })
         }, Some(2), Some(2), false);
 
-    func!(st, "str:write",
+    func!(st, "ser:wlambda",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s())) },
-        Some(1), Some(1), false);
+        Some(1), Some(1), true);
     func!(st, "str:len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_len() as i64)) },
         Some(1), Some(1), false);
@@ -4036,11 +4062,6 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::Nul)
             }
         }, Some(1), Some(3), false);
-
-    func!(st, "write_str",
-        |env: &mut Env, _argc: usize| {
-            Ok(VVal::new_str_mv(env.arg(0).s()))
-        }, Some(1), Some(1), true);
 
     func!(st, "to_no_arity",
         |env: &mut Env, _argc: usize| {

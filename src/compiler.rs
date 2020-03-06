@@ -2995,7 +2995,7 @@ mod tests {
     #[test]
     fn check_type() {
         assert_eq!(s_eval("type type"), "\"function\"");
-        assert_eq!(s_eval("type 12"),   "\"int\"");
+        assert_eq!(s_eval("type 12"),   "\"integer\"");
         assert_eq!(s_eval("type 12.2"), "\"float\"");
         assert_eq!(s_eval("type $n"),   "\"none\"");
         assert_eq!(s_eval("type $[]"),  "\"vector\"");
@@ -3077,9 +3077,9 @@ mod tests {
 
     #[test]
     fn check_match() {
-        assert_eq!(s_eval("match 10 :?t :int {|| 13 } {|| 14 }"), "13");
-        assert_eq!(s_eval("match 10 :?t :str {|| 13 } {|| 14 }"), "14");
-        assert_eq!(s_eval("match 10 :?t :str {|| 13 }"),        "$n");
+        assert_eq!(s_eval("match 10 :?t :integer {|| 13 } {|| 14 }"), "13");
+        assert_eq!(s_eval("match 10 :?t :string {|| 13 } {|| 14 }"), "14");
+        assert_eq!(s_eval("match 10 :?t :string {|| 13 }"),        "$n");
         assert_eq!(s_eval("match $q xx :?s :xx      {|| 15 }"),    "15");
         assert_eq!(s_eval("match $q xx :?s :yx :xx  {|| 16 }"),    "16");
         assert_eq!(s_eval("match $q zx :?s :yx :xx  {|| 16 } {|| 17 }"), "17");
@@ -3416,7 +3416,7 @@ mod tests {
 
     #[test]
     fn check_prelude_assert() {
-        assert_eq!(s_eval("std:assert ~ (type \"2019\".(int)) == $q int "), "$true");
+        assert_eq!(s_eval("std:assert ~ (type \"2019\".(int)) == $q integer "), "$true");
     }
 
     #[test]

@@ -451,8 +451,10 @@ impl Env {
             println!("    {:9} [{:3}] = {}", mark, i, v.s());
             if i >= (10 + self.sp) { break; }
         }
-        for (i, u) in self.call_stack.last().unwrap().upvalues.iter().enumerate() {
-            println!("  UP[{:3}] = {}", i, u.s());
+        if !self.call_stack.is_empty() {
+            for (i, u) in self.call_stack.last().unwrap().upvalues.iter().enumerate() {
+                println!("  UP[{:3}] = {}", i, u.s());
+            }
         }
     }
 
@@ -506,8 +508,7 @@ impl Env {
         let v = &self.args[self.bp - (i + 1)];
         //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
         match v {
-            VVal::DropFun(r) => r.v.clone(),
-            v                => v.clone(),
+            v => v.clone(),
         }
     }
 
@@ -1740,6 +1741,7 @@ impl VVal {
 
     pub fn deref(&self) -> VVal {
         match self {
+            VVal::DropFun(r) => r.v.clone(),
             VVal::Ref(l)     => (*l).borrow().clone(),
             VVal::CRef(l)    => (*l).borrow().clone(),
             VVal::WWRef(l)   => {
@@ -2359,20 +2361,20 @@ impl VVal {
             VVal::Str(_)     => String::from("string"),
             VVal::Byt(_)     => String::from("bytes"),
             VVal::Nul        => String::from("none"),
-            VVal::Err(_)     => String::from("err"),
+            VVal::Err(_)     => String::from("error"),
             VVal::Bol(_)     => String::from("bool"),
-            VVal::Sym(_)     => String::from("sym"),
-            VVal::Syn(_)     => String::from("syn"),
-            VVal::Int(_)     => String::from("int"),
+            VVal::Sym(_)     => String::from("symbol"),
+            VVal::Syn(_)     => String::from("syntax"),
+            VVal::Int(_)     => String::from("integer"),
             VVal::Flt(_)     => String::from("float"),
             VVal::Lst(_)     => String::from("vector"),
             VVal::Map(_)     => String::from("map"),
             VVal::Usr(_)     => String::from("userdata"),
             VVal::Fun(_)     => String::from("function"),
             VVal::DropFun(_) => String::from("drop_function"),
-            VVal::Ref(_)     => String::from("ref"),
-            VVal::CRef(_)    => String::from("cref"),
-            VVal::WWRef(_)   => String::from("wref"),
+            VVal::Ref(_)     => String::from("strong"),
+            VVal::CRef(_)    => String::from("weakable"),
+            VVal::WWRef(_)   => String::from("weak"),
         }
     }
 
