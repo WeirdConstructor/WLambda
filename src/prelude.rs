@@ -63,6 +63,37 @@ Smalltalk, LISP and Perl.
   - [4.5](#45-64-bit-floats) - 64-Bit Floats
     - [4.5.1](#451-float-value) - float _value_
     - [4.5.2](#452-isfloat-value) - is_float _value_
+    - [4.5.3](#453-stdnumacos-float) - std:num:acos _float_
+    - [4.5.4](#454-stdnumacosh-float) - std:num:acosh _float_
+    - [4.5.5](#455-stdnumasin-float) - std:num:asin _float_
+    - [4.5.6](#456-stdnumasinh-float) - std:num:asinh _float_
+    - [4.5.7](#457-stdnumatan-float) - std:num:atan _float_
+    - [4.5.8](#458-stdnumatan2-y-x) - std:num:atan2 _y_ _x_
+    - [4.5.9](#459-stdnumatanh-float) - std:num:atanh _float_
+    - [4.5.10](#4510-stdnumcbrt-float) - std:num:cbrt _float_
+    - [4.5.11](#4511-stdnumceil-float) - std:num:ceil _float_
+    - [4.5.12](#4512-stdnumcos-float) - std:num:cos _float_
+    - [4.5.13](#4513-stdnumcosh-float) - std:num:cosh _float_
+    - [4.5.14](#4514-stdnumexp-float) - std:num:exp _float_
+    - [4.5.15](#4515-stdnumexp2-float) - std:num:exp2 _float_
+    - [4.5.16](#4516-stdnumexpm1-float) - std:num:exp_m1 _float_
+    - [4.5.17](#4517-stdnumfloor-float) - std:num:floor _float_
+    - [4.5.18](#4518-stdnumhypot-y-x) - std:num:hypot _y_ _x_
+    - [4.5.19](#4519-stdnumln-float) - std:num:ln _float_
+    - [4.5.20](#4520-stdnumlog-float) - std:num:log _float_
+    - [4.5.21](#4521-stdnumlog10-float) - std:num:log10 _float_
+    - [4.5.22](#4522-stdnumlog2-float) - std:num:log2 _float_
+    - [4.5.23](#4523-stdnumpow-float) - std:num:pow _float_
+    - [4.5.24](#4524-stdnumrecip-float) - std:num:recip _float_
+    - [4.5.25](#4525-stdnumround-float) - std:num:round _float_
+    - [4.5.26](#4526-stdnumsin-float) - std:num:sin _float_
+    - [4.5.27](#4527-stdnumsinh-float) - std:num:sinh _float_
+    - [4.5.28](#4528-stdnumsqrt-float) - std:num:sqrt _float_
+    - [4.5.29](#4529-stdnumtan-float) - std:num:tan _float_
+    - [4.5.30](#4530-stdnumtanh-float) - std:num:tanh _float_
+    - [4.5.31](#4531-stdnumtodegrees-float) - std:num:to_degrees _float_
+    - [4.5.32](#4532-stdnumtoradians-float) - std:num:to_radians _float_
+    - [4.5.33](#4533-stdnumtrunc-float) - std:num:trunc _float_
   - [4.6](#46-numeric-functions) - Numeric Functions
     - [4.6.1](#461-stdnumabs-number) - std:num:abs _number_
   - [4.7](#47-strings) - Strings
@@ -977,6 +1008,146 @@ std:assert ~ not ~ is_float 4;
 std:assert ~ not ~ is_float $true;
 ```
 
+#### <a name="453-stdnumacos-float"></a>4.5.3 - std:num:acos _float_
+
+Computes the arccosine of a number. Return value is in radians in the range [0,
+pi] or NaN if the number is outside the range [-1, 1].
+
+#### <a name="454-stdnumacosh-float"></a>4.5.4 - std:num:acosh _float_
+
+Inverse hyperbolic cosine function.
+
+#### <a name="455-stdnumasin-float"></a>4.5.5 - std:num:asin _float_
+
+Computes the arcsine of a number. Return value is in radians in the range
+[-pi/2, pi/2] or NaN if the number is outside the range [-1, 1].
+
+#### <a name="456-stdnumasinh-float"></a>4.5.6 - std:num:asinh _float_
+
+Inverse hyperbolic sine function.
+
+#### <a name="457-stdnumatan-float"></a>4.5.7 - std:num:atan _float_
+
+Computes the arctangent of a number. Return value is in radians in the range
+[-pi/2, pi/2].
+
+#### <a name="458-stdnumatan2-y-x"></a>4.5.8 - std:num:atan2 _y_ _x_
+
+Computes the four quadrant arctangent of _y_ and other _x_ in radians.
+
+- x = 0, y = 0: 0
+- x >= 0: arctan(y/x) -> [-pi/2, pi/2]
+- y >= 0: arctan(y/x) + pi -> (pi/2, pi]
+- y < 0: arctan(y/x) - pi -> (-pi, -pi/2)
+
+#### <a name="459-stdnumatanh-float"></a>4.5.9 - std:num:atanh _float_
+
+Inverse hyperbolic tangent function.
+
+#### <a name="4510-stdnumcbrt-float"></a>4.5.10 - std:num:cbrt _float_
+
+Takes the cubic root of a number.
+
+#### <a name="4511-stdnumceil-float"></a>4.5.11 - std:num:ceil _float_
+
+Returns the smallest integer (still a float) greater than or equal to a number.
+
+#### <a name="4512-stdnumcos-float"></a>4.5.12 - std:num:cos _float_
+
+Computes the cosine of a number (in radians).
+
+#### <a name="4513-stdnumcosh-float"></a>4.5.13 - std:num:cosh _float_
+
+Hyperbolic cosine function.
+
+#### <a name="4514-stdnumexp-float"></a>4.5.14 - std:num:exp _float_
+
+Returns e ^ _float_, (the exponential function).
+
+#### <a name="4515-stdnumexp2-float"></a>4.5.15 - std:num:exp2 _float_
+
+Returns 2 ^ _float_.
+
+#### <a name="4516-stdnumexpm1-float"></a>4.5.16 - std:num:exp_m1 _float_
+
+Returns (e ^ _float_ - 1) in a way that is accurate even if the number is close
+to zero.
+
+#### <a name="4517-stdnumfloor-float"></a>4.5.17 - std:num:floor _float_
+
+Returns the largest integer (still as float) less than or equal to a number.
+
+#### <a name="4518-stdnumhypot-y-x"></a>4.5.18 - std:num:hypot _y_ _x_
+
+Calculates the length of the hypotenuse of a right-angle triangle given legs of
+length _x_ and _y_.
+
+#### <a name="4519-stdnumln-float"></a>4.5.19 - std:num:ln _float_
+
+Returns the natural logarithm of the number.
+
+#### <a name="4520-stdnumlog-float"></a>4.5.20 - std:num:log _float_
+
+Returns the logarithm of the number with respect to an arbitrary base.
+
+The result may not be correctly rounded owing to implementation details;
+`std:log2` can produce more accurate results for base 2, and `std:log10` can
+produce more accurate results for base 10.
+
+#### <a name="4521-stdnumlog10-float"></a>4.5.21 - std:num:log10 _float_
+
+Returns the base 10 logarithm of the number.
+
+#### <a name="4522-stdnumlog2-float"></a>4.5.22 - std:num:log2 _float_
+
+Returns the base 2 logarithm of the number.
+
+#### <a name="4523-stdnumpow-float"></a>4.5.23 - std:num:pow _float_
+
+Raises a number to a floating point power.
+You may also use the `^` operator, which also works for integers.
+
+#### <a name="4524-stdnumrecip-float"></a>4.5.24 - std:num:recip _float_
+
+Takes the reciprocal (inverse) of a number, 1/x.
+
+#### <a name="4525-stdnumround-float"></a>4.5.25 - std:num:round _float_
+
+Returns the nearest integer (still a float) to a number. Round half-way cases
+away from 0.0.
+
+#### <a name="4526-stdnumsin-float"></a>4.5.26 - std:num:sin _float_
+
+Computes the sine of a number (in radians).
+
+#### <a name="4527-stdnumsinh-float"></a>4.5.27 - std:num:sinh _float_
+
+Hyperbolic sine function.
+
+#### <a name="4528-stdnumsqrt-float"></a>4.5.28 - std:num:sqrt _float_
+
+Takes the square root of a number.
+
+#### <a name="4529-stdnumtan-float"></a>4.5.29 - std:num:tan _float_
+
+Computes the tangent of a number (in radians).
+
+#### <a name="4530-stdnumtanh-float"></a>4.5.30 - std:num:tanh _float_
+
+Hyperbolic tangent function.
+
+#### <a name="4531-stdnumtodegrees-float"></a>4.5.31 - std:num:to_degrees _float_
+
+Converts radians to degrees.
+
+#### <a name="4532-stdnumtoradians-float"></a>4.5.32 - std:num:to_radians _float_
+
+Converts degrees to radians.
+
+#### <a name="4533-stdnumtrunc-float"></a>4.5.33 - std:num:trunc _float_
+
+Returns the integer part of a number.
+
 ### <a name="46-numeric-functions"></a>4.6 - Numeric Functions
 
 These functions work for all types of numbers.
@@ -1235,7 +1406,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="4101-splicing"></a>4.10.1 - Splicing
+#### <a name="4111-splicing"></a>4.11.1 - Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -1346,7 +1517,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4101-splicing"></a>4.10.1 - Splicing
+#### <a name="4111-splicing"></a>4.11.1 - Splicing
 
 Like vectors you can splice map values directly into map literals:
 
