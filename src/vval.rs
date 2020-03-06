@@ -1382,7 +1382,15 @@ impl VVal {
                 if let Some(r) = v.upgrade() {
                     r.borrow().iter()
                 } else { std::iter::from_fn(Box::new(|| { None })) },
-            _ => std::iter::from_fn(Box::new(|| { None })),
+            _ => {
+                let x = self.clone();
+                let mut used = false;
+                std::iter::from_fn(Box::new(move || {
+                    if used { return None; }
+                    used = true;
+                    Some((x.clone(), None))
+                }))
+            }
         }
     }
 
