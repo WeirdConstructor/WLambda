@@ -676,7 +676,9 @@ impl EvalContext {
     /// use wlambda::{VVal, EvalContext};
     /// let mut ctx = EvalContext::new_default();
     ///
-    /// assert_eq!(ctx.eval("!:global XXX = 22 * 2; XXX").unwrap().i(), 44);
+    /// ctx.eval("!:global XXX = 22 * 2;");
+    ///
+    /// assert_eq!(ctx.get_global_var("XXX").unwrap().i(), 44);
     /// ```
     #[allow(dead_code)]
     pub fn get_global_var(&mut self, var: &str) -> Option<VVal> {
