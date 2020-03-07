@@ -42,6 +42,8 @@ Smalltalk, LISP and Perl.
     - [3.3.1](#331-stdtonoarity-function) - std:to_no_arity _function_
   - [3.4](#34-calling-fields--method-calling) - Calling fields / Method calling
     - [3.4.1](#341-object-oriented-programming-with-prototypes) - Object Oriented Programming with Prototypes
+  - [3.5](#35-function-utilities) - Function utilities
+    - [3.5.1](#351-isfun-value) - is_fun _value_
 - [4](#4-data-types) - Data Types
   - [4.1](#41-none-sentinel-value-n-or-none) - None sentinel value: `$n` or `$none`
     - [4.1.1](#411-isnone-value) - is_none _value_
@@ -112,20 +114,26 @@ Smalltalk, LISP and Perl.
   - [4.9](#49-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
     - [4.9.1](#491-call-properties-of-bytes) - Call Properties of Bytes
     - [4.9.2](#492-byte-conversion-functions) - Byte Conversion Functions
+    - [4.9.3](#493-isbytes-value) - is_bytes _value_
   - [4.10](#410-symbols) - Symbols
   - [4.11](#411-vectors-or-lists) - Vectors (or Lists)
-    - [4.11.1](#4111-vector-splicing) - Vector Splicing
-    - [4.11.2](#4112-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
-    - [4.11.3](#4113-stdtake-count-vector) - std:take _count_ _vector_
-    - [4.11.4](#4114-stddrop-count-vector) - std:drop _count_ _vector_
+    - [4.11.1](#4111-stdpush-vector-item) - std:push _vector_ _item_
+    - [4.11.2](#4112-stdpop-vector) - std:pop _vector_
+    - [4.11.3](#4113-stdunshift-vector-item) - std:unshift _vector_ _item_
+    - [4.11.4](#4114-vector-splicing) - Vector Splicing
+    - [4.11.5](#4115-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
+    - [4.11.6](#4116-stdprepend-vec-a-value-or-vec-) - std:prepend _vec-a_ _value-or-vec_ ...
+    - [4.11.7](#4117-stdtake-count-vector) - std:take _count_ _vector_
+    - [4.11.8](#4118-stddrop-count-vector) - std:drop _count_ _vector_
   - [4.12](#412-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
     - [4.12.1](#4121-map-splicing) - Map Splicing
   - [4.13](#413-references) - References
     - [4.13.1](#4131-stdtoref-value) - std:to_ref _value_
     - [4.13.2](#4132-stdweaken-ref) - std:weaken _ref_
     - [4.13.3](#4133-isref-value) - is_ref _value_
-    - [4.13.4](#4134-stdstrengthen-ref) - std:strengthen _ref_
-    - [4.13.5](#4135-stdsetref-ref-value) - std:set_ref _ref_ _value_
+    - [4.13.4](#4134-iswref-value) - is_wref _value_
+    - [4.13.5](#4135-stdstrengthen-ref) - std:strengthen _ref_
+    - [4.13.6](#4136-stdsetref-ref-value) - std:set_ref _ref_ _value_
   - [4.14](#414-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
   - [5.1](#51-function-call-composition) - Function call composition
@@ -134,7 +142,10 @@ Smalltalk, LISP and Perl.
   - [5.2](#52-control-flow---returning) - Control Flow - Returning
     - [5.2.1](#521-return-label-value) - return [_label_] _value_
     - [5.2.2](#522-block-label-function) - block [label] _function_
+    - [5.2.3](#523-stdtodrop-value-function-or-raii-destructors-or-drop-functions) - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
 - [6](#6-conditional-execution---if--then--else) - Conditional Execution - if / then / else
+    - [6.0.1](#601-pick-bool-a--b-) - pick _bool_ _a_ -b-
+    - [6.0.2](#602-indexing-by-booleans) - Indexing by Booleans
 - [7](#7-loops-and-iteration) - Loops And Iteration
   - [7.1](#71-control-flow) - Control Flow
     - [7.1.1](#711-while-predicate-fun) - while _predicate_ _fun_
@@ -183,6 +194,7 @@ Smalltalk, LISP and Perl.
 - [10](#10-core-library) - Core Library
     - [10.0.1](#1001-type-value) - type _value_
     - [10.0.2](#1002-len-value) - len _value_
+    - [10.0.3](#1003-panic-message) - panic _message_
 - [11](#11-standard-library) - Standard Library
     - [11.0.1](#1101-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
     - [11.0.2](#1102-stdcopy-vecormap) - std:copy _vec_or_map_
@@ -202,7 +214,7 @@ Smalltalk, LISP and Perl.
     - [11.1.4](#1114-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
 - [12](#12-optional-standard-library) - Optional Standard Library
   - [12.1](#121-serialization) - serialization
-    - [12.1.1](#1211-stdserwlamda-arg) - std:ser:wlamda _arg_
+    - [12.1.1](#1211-stdserwlambda-arg) - std:ser:wlambda _arg_
     - [12.1.2](#1212-stdserjson-data-nopretty) - std:ser:json _data_ \[_no_pretty_]
     - [12.1.3](#1213-stddeserjson-string) - std:deser:json _string_
     - [12.1.4](#1214-stdsercsv-fielddelim-rowseparator-escapeall-table) - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
@@ -586,6 +598,18 @@ vector index lookup instead of an array lookup.
 
 std:assert_eq inst.gen[3] 30;
 std:assert_eq inst.gen2[4] 40;
+```
+
+### <a name="35-function-utilities"></a>3.5 - Function utilities
+
+#### <a name="351-isfun-value"></a>3.5.1 - is_fun _value_
+
+Returns `$true` if _value_ is a function.
+
+```wlambda
+std:assert ~ is_fun {};
+std:assert ~ is_fun is_fun;
+std:assert ~ not ~ is_fun ${a=10};
 ```
 
 ## <a name="4-data-types"></a>4 - Data Types
@@ -1437,6 +1461,15 @@ There is also an inverse operation to `bytes:to_hex`:
 std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 ```
 
+#### <a name="493-isbytes-value"></a>4.9.3 - is_bytes _value_
+
+Returns `$true` if _value_ is a byte vector.
+
+```wlambda
+std:assert ~ is_bytes $b"ABC";
+std:assert ~ not ~ is_bytes "ABC";
+```
+
 ### <a name="410-symbols"></a>4.10 - Symbols
 
 ### <a name="411-vectors-or-lists"></a>4.11 - Vectors (or Lists)
@@ -1467,7 +1500,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### - std:push _vector_ _item_
+#### <a name="4111-stdpush-vector-item"></a>4.11.1 - std:push _vector_ _item_
 
 Pushes _item_ to the end of _vector_. Returns _item_.
 
@@ -1479,7 +1512,7 @@ std:push v 3;
 std:assert_eq (str v) (str $[1,2,3]);
 ```
 
-#### - std:pop _vector_
+#### <a name="4112-stdpop-vector"></a>4.11.2 - std:pop _vector_
 
 Pops off the last element of _vector_. Returns `$none` if the vector is empty
 or if _vector_ is not a vector.
@@ -1491,7 +1524,20 @@ std:assert_eq (std:pop v) 3;
 std:assert_eq (str v) (str $[1,2]);
 ```
 
-#### <a name="4111-vector-splicing"></a>4.11.1 - Vector Splicing
+#### <a name="4113-stdunshift-vector-item"></a>4.11.3 - std:unshift _vector_ _item_
+
+Inserts _item_ at the front of _vector_. Returns _item_ and mutates _vector_
+inplace. Be aware that this operation is of O(n) complexity.
+
+```wlambda
+!v = $[1,2];
+
+std:unshift v 3;
+
+std:assert_eq (str v) (str $[3,1,2]);
+```
+
+#### <a name="4114-vector-splicing"></a>4.11.4 - Vector Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -1511,7 +1557,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-#### <a name="4112-stdappend-vec-a-value-or-vec-"></a>4.11.2 - std:append _vec-a_ _value-or-vec_ ...
+#### <a name="4115-stdappend-vec-a-value-or-vec-"></a>4.11.5 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
 If _value-or-vec_ is a vector, all it's items will be appended to _vec-a_.
@@ -1530,7 +1576,26 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
 ```
 
-#### <a name="4113-stdtake-count-vector"></a>4.11.3 - std:take _count_ _vector_
+#### <a name="4116-stdprepend-vec-a-value-or-vec-"></a>4.11.6 - std:prepend _vec-a_ _value-or-vec_ ...
+
+Prepends _value-or-vec_ and all following items to the front of _vec-a_.
+If _value-or-vec_ is a vector, all it's items will be prepended to _vec-a_.
+
+```wlambda
+!v = std:prepend $[1,2,3] :a :b $[:c, :d];
+
+std:assert_eq (str v) (str $[:d, :c, :b, :a, 1, 2, 3]);
+```
+
+If _vec-a_ is not a vector, a vector containing it will be created:
+
+```wlambda
+!v = std:prepend 1 :a :b $[:c, :d];
+
+std:assert_eq (str v) (str $[:d, :c, :b, :a, 1]);
+```
+
+#### <a name="4117-stdtake-count-vector"></a>4.11.7 - std:take _count_ _vector_
 
 Takes and returns the first _count_ elements of _vector_. Does not
 mutate _vector_.
@@ -1544,7 +1609,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[1,2,3,4]";
 ```
 
-#### <a name="4114-stddrop-count-vector"></a>4.11.4 - std:drop _count_ _vector_
+#### <a name="4118-stddrop-count-vector"></a>4.11.8 - std:drop _count_ _vector_
 
 Drops _count_ elements from _vector_ and returns them as new vector.
 Does not mutate _vector_.
@@ -1733,14 +1798,25 @@ std:assert ~ not ~ is_ref $true;
 std:assert ~ not ~ is_ref $none;
 ```
 
-#### <a name="4134-stdstrengthen-ref"></a>4.13.4 - std:strengthen _ref_
+#### <a name="4134-iswref-value"></a>4.13.4 - is_wref _value_
+
+Returns `$true` if _value_ is a weak reference.
+
+```wlambda
+!x = $&& 10;
+!y = std:weaken x;
+std:assert ~ is_wref y;
+std:assert ~ not ~ is_wref x;
+```
+
+#### <a name="4135-stdstrengthen-ref"></a>4.13.5 - std:strengthen _ref_
 
 You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
 
-#### <a name="4135-stdsetref-ref-value"></a>4.13.5 - std:set_ref _ref_ _value_
+#### <a name="4136-stdsetref-ref-value"></a>4.13.6 - std:set_ref _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -1979,7 +2055,7 @@ The alternative is the less clear syntax would be in this case:
 std:assert_eq res 20;
 ```
 
-#### - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
+#### <a name="523-stdtodrop-value-function-or-raii-destructors-or-drop-functions"></a>5.2.3 - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
 
 You can create a function that is called when the associated value is
 dropped or it's reference count goes to 0.
@@ -2030,7 +2106,9 @@ syntax, but still works:
 (x == 20)[{ std:displayln "x is 20" }, { std:displayln "x isn't 20" }]; #=> print "x isn't 20"
 ```
 
-Often, you may want to choose one variable or another based on some predicate.
+#### <a name="601-pick-bool-a--b-"></a>6.0.1 - pick _bool_ _a_ -b-
+
+Often, you may want to choose one variable (_a_) or another (_b_) based on some predicate (_bool_).
 For these situations, the `pick` function is available.
 For example, perhaps you want to make a function which can take any number of parameters,
 or a single list parameter.
@@ -2038,6 +2116,8 @@ or a single list parameter.
 ```wlambda
 !sum = \|| std:fold 0 { _ + _1 } ~ pick (is_vec _) _ @;
 ```
+
+#### <a name="602-indexing-by-booleans"></a>6.0.2 - Indexing by Booleans
 
 Booleans can also be used to index into lists.
 When this is done, `$t` represents `1` and `$f` represents `0`.
@@ -2818,7 +2898,7 @@ std:assert_eq (len ${a=1, b=2})     2;
 std:assert_eq (len ${a=1, b=2})     2;
 ```
 
-#### - panic _message_
+#### <a name="1003-panic-message"></a>10.0.3 - panic _message_
 
 If your program runs into something that deserves a slap on the fingers
 of the developer you can use `panic` to do that.
@@ -3016,7 +3096,7 @@ end of the file.
 
 ### <a name="121-serialization"></a>12.1 - serialization
 
-#### <a name="1211-stdserwlamda-arg"></a>12.1.1 - std:ser:wlamda _arg_
+#### <a name="1211-stdserwlambda-arg"></a>12.1.1 - std:ser:wlambda _arg_
 
 Returns the serialized WLambda representation of the value _arg_ as string.
 
