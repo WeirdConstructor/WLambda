@@ -526,6 +526,9 @@ complete for real world use. So my current goals are:
 - DONE: Add prototyped inheritance for OOP paradigm.
 - There are no plans to change the internal evaluator to a VM and/or JIT speedup.
 It's one of WLambda's goals to have a simple and easily hackable implementation.
+The compiler transforms the AST directly into Rust closures. This
+allows a seamless integration of new functions via WLambda's embedding
+API.
 
 ## License
 
