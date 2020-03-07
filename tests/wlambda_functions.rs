@@ -35,12 +35,14 @@ fn get_functions_from_file(filename: &str) -> Vec<String> {
 fn wlambda_functions() {
     let documented_funs = get_functions_from_file("src/prelude.rs");
 
+    let mut total         = 0;
     let mut count_missing = 0;
 
     let core_syms = core_symbol_table();
     let mut core_syms = core_syms.list();
     core_syms.sort();
     for core_sym in core_syms {
+        total += 1;
         if let Some(_) = documented_funs.iter().find(|f: &&String| **f == core_sym) {
             println!("OK - '{}'", core_sym);
         } else {
@@ -53,15 +55,20 @@ fn wlambda_functions() {
     let mut std_syms = std_syms.list();
     std_syms.sort();
     for std_sym in std_syms {
+        total += 1;
         let std_sym = "std:".to_string() + &std_sym;
         if let Some(_) = documented_funs.iter().find(|f: &&String| **f == std_sym) {
             println!("OK - {}", std_sym);
         } else {
             println!("MISSING - '{}'", std_sym);
+            count_missing += 1;
         }
     }
 
     if count_missing > 0 {
-        panic!(format!("Found {} undocumented functions!", count_missing));
+        panic!(format!(
+            "Found {}/{} undocumented functions!",
+            count_missing,
+            total));
     }
 }

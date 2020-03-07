@@ -112,6 +112,7 @@ impl State {
             line: self.line_no,
             col:  self.col_no,
             file: self.file.clone(),
+            name: None,
         })
     }
 

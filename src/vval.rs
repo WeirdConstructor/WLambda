@@ -42,13 +42,20 @@ pub struct SynPos {
     pub line:       u32,
     pub col:        u32,
     pub file:       FileRef,
+    pub name:       Option<std::rc::Rc<String>>,
 }
 
 impl Display for SynPos {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         if self.line > 0 {
-            write!(f, "[{},{}:{}({:?})]",
-                   self.line, self.col, self.file.s(), self.syn)
+            if self.name.is_some() && !self.name.as_ref().unwrap().is_empty() {
+                write!(f, "[{},{}:{}({:?})@{}]",
+                       self.line, self.col, self.file.s(), self.syn,
+                       self.name.as_ref().unwrap())
+            } else {
+                write!(f, "[{},{}:{}({:?})]",
+                       self.line, self.col, self.file.s(), self.syn)
+            }
         } else {
             write!(f, "")
         }
@@ -172,11 +179,11 @@ const STACK_SIZE : usize = 10240;
 pub struct Env {
     /// The argument stack, limited to `STACK_SIZE`.
     pub args: std::vec::Vec<VVal>,
-    /// A reference to the currently executed function.
+    /// A stack of the currently called functions.
     ///
-    /// Used for accessing the up values and other details
-    /// about the function.
-    pub fun:  Rc<VValFun>,
+    /// Used for accessing the up values, backtrace
+    /// and other details about the function.
+    pub call_stack: std::vec::Vec<Rc<VValFun>>,
     /// Holds the object of the currently called method:
     pub current_self: VVal,
     /// The basepointer to reference arguments and
@@ -212,7 +219,6 @@ impl Env {
     pub fn new() -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
-            fun:                VValFun::new_dummy(),
             current_self:       VVal::Nul,
             bp:                 0,
             sp:                 0,
@@ -222,6 +228,7 @@ impl Env {
             stdio:              Stdio::new_rust_std(),
             accum_fun:          VVal::Nul,
             accum_val:          VVal::Nul,
+            call_stack:         vec![],
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -230,7 +237,6 @@ impl Env {
     pub fn new_with_user(user: Rc<RefCell<dyn std::any::Any>>) -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
-            fun:                VValFun::new_dummy(),
             current_self:       VVal::Nul,
             bp:                 0,
             sp:                 0,
@@ -239,6 +245,7 @@ impl Env {
             stdio:              Stdio::new_rust_std(),
             accum_fun:          VVal::Nul,
             accum_val:          VVal::Nul,
+            call_stack:         vec![],
             user,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
@@ -372,14 +379,16 @@ impl Env {
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let local_size = fu.local_size;
         let old_argc = std::mem::replace(&mut self.argc, argc);
-        let old_fun  = std::mem::replace(&mut self.fun, fu);
+//        let old_fun  = std::mem::replace(&mut self.fun, fu.clone());
+        self.call_stack.push(fu);
         let old_bp   = self.set_bp(local_size);
         //d// println!("OLD FUN: {:?}", old_fun.upvalues);
 
         let ret = f(self);
 
         self.reset_bp(local_size, old_bp);
-        self.fun  = old_fun;
+//        self.fun  = old_fun;
+        self.call_stack.pop();
         self.argc = old_argc;
 
         ret
@@ -442,7 +451,7 @@ impl Env {
             println!("    {:9} [{:3}] = {}", mark, i, v.s());
             if i >= (10 + self.sp) { break; }
         }
-        for (i, u) in self.fun.upvalues.iter().enumerate() {
+        for (i, u) in self.call_stack.last().unwrap().upvalues.iter().enumerate() {
             println!("  UP[{:3}] = {}", i, u.s());
         }
     }
@@ -453,15 +462,15 @@ impl Env {
 
     pub fn get_up_raw(&mut self, i: usize) -> VVal {
         //d// println!("GET UP {}: {:?}", i, self.fun.upvalues);
-        self.fun.upvalues[i].clone()
+        self.call_stack.last().unwrap().upvalues[i].clone()
     }
 
     pub fn get_up_captured_ref(&mut self, i: usize) -> VVal {
-        self.fun.upvalues[i].to_ref()
+        self.call_stack.last().unwrap().upvalues[i].to_ref()
     }
 
     pub fn get_up(&mut self, i: usize) -> VVal {
-        self.fun.upvalues[i].deref()
+        self.call_stack.last().unwrap().upvalues[i].deref()
 //        match self.fun.upvalues[i].deref() {
 //            VVal::WWRef(l) => { 
 //                match l.upgrade() {
@@ -530,7 +539,7 @@ impl Env {
     }
 
     pub fn assign_ref_up(&mut self, i: usize, value: VVal) {
-        let fun = self.fun.clone();
+        let fun = self.call_stack.last().unwrap().clone();
         let upv = &fun.upvalues[i];
 
         match upv {
@@ -560,7 +569,7 @@ impl Env {
     }
 
     pub fn set_up(&mut self, index: usize, value: &VVal) {
-        let fun = self.fun.clone();
+        let fun = self.call_stack.last().unwrap().clone();
         let upv = &fun.upvalues[index];
 
         match upv {
@@ -623,6 +632,24 @@ impl Env {
 
     pub fn get_accum_function(&self) -> VVal {
         self.accum_fun.clone()
+    }
+
+    pub fn new_err(&self, s: String) -> VVal {
+        for i in self.call_stack.iter().rev() {
+            if i.syn_pos.is_some() {
+                return
+                    VVal::err(
+                        VVal::new_str_mv(s),
+                        i.syn_pos.clone().unwrap());
+            }
+        };
+
+        VVal::err(
+            VVal::new_str_mv(s),
+            self.call_stack.last().unwrap().syn_pos.clone().or_else(
+                || Some(SynPos { syn: Syntax::Block, line: 0,
+                                 col: 0, file: FileRef::new("?"),
+                                 name: None })).unwrap())
     }
 }
 
@@ -776,10 +803,10 @@ impl VValFun {
             fun:        Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) })),
             upvalues:   Vec::new(),
             local_size: 0,
-            min_args: None,
-            max_args: None,
+            min_args:   None,
+            max_args:   None,
             err_arg_ok: false,
-            syn_pos: None,
+            syn_pos:    None,
         })
     }
 
@@ -1177,7 +1204,8 @@ impl VVal {
     pub fn err_msg(s: &str) -> VVal {
         VVal::Err(Rc::new(RefCell::new(
             (VVal::new_str(s),
-             SynPos { syn: Syntax::Block, line: 0, col: 0, file: FileRef::new("?") }))))
+             SynPos { syn: Syntax::Block, line: 0,
+                      col: 0, file: FileRef::new("?"), name: None }))))
     }
 
     pub fn vec() -> VVal {
@@ -1299,14 +1327,14 @@ impl VVal {
     ///
     /// assert_eq!(sum, 68);
     /// ```
-    pub fn iter(&self) -> std::iter::FromFn<Box<dyn FnMut() -> Option<VVal>>> {
+    pub fn iter(&self) -> std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>> {
         match self {
             VVal::Lst(l) => {
                 let l = l.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     if idx >= l.borrow().len() { return None; }
-                    let r = Some(l.borrow()[idx].clone());
+                    let r = Some((l.borrow()[idx].clone(), None));
                     idx += 1;
                     r
                 }))
@@ -1317,10 +1345,7 @@ impl VVal {
                 std::iter::from_fn(Box::new(move || {
                     let r = match m.borrow().iter().nth(idx) {
                         Some((k, v)) => {
-                            let l = VVal::vec();
-                            l.push(VVal::new_str(&k));
-                            l.push(v.clone());
-                            Some(l)
+                            Some((v.clone(), Some(VVal::new_str(&k))))
                         },
                         None => None,
                     };
@@ -1333,7 +1358,7 @@ impl VVal {
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     if idx >= b.borrow().len() { return None; }
-                    let r = Some(VVal::new_byt(vec![b.borrow()[idx]]));
+                    let r = Some((VVal::new_byt(vec![b.borrow()[idx]]), None));
                     idx += 1;
                     r
                 }))
@@ -1343,25 +1368,13 @@ impl VVal {
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     let r = match s.borrow().chars().nth(idx) {
-                        Some(chr) => Some(VVal::new_str_mv(chr.to_string())),
+                        Some(chr) => Some((VVal::new_str_mv(chr.to_string()), None)),
                         None      => None,
                     };
                     idx += 1;
                     r
                 }))
             },
-//            VVal::Sym(s) => {
-//                let s = s.clone();
-//                let mut idx = 0;
-//                std::iter::from_fn(Box::new(move || {
-//                    let r = match s.chars().nth(idx) {
-//                        Some(chr) => Some(VVal::new_str_mv(chr.to_string())),
-//                        None      => None,
-//                    };
-//                    idx += 1;
-//                    r
-//                }))
-//            },
             VVal::DropFun(v) => v.v.iter(),
             VVal::Ref(v)     => v.borrow().iter(),
             VVal::CRef(v)    => v.borrow().iter(),
@@ -2259,7 +2272,9 @@ impl VVal {
         } else {
             SynPos {
                 syn: Syntax::Block,
-                line: 0, col: 0, file: FileRef::new("?")
+                line: 0, col: 0,
+                file: FileRef::new("?"),
+                name: None,
             }
         }
     }
