@@ -940,7 +940,7 @@ pub trait VValUserData {
     /// should be compared for equivalentness.
     fn eqv(&self, _other: &Box<dyn VValUserData>) -> bool { false }
     /// Should clone your user data instance. Whether you are doing
-    /// a deep clone or a shallow cloen or something else is up to you.
+    /// a deep clone or a shallow clone or something else is up to you.
     fn clone_ud(&self) -> Box<dyn VValUserData>;
     /// Makes your user data act like a map. This can be useful
     /// for implementing your own registries or data structures.
