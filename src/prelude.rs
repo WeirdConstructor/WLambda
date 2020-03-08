@@ -498,7 +498,7 @@ and diligence.
 ```wlambda
 !f = { _ }; # accepts exactly 1 param
 
-# f keeps it's arity checks, but f2 will
+# f keeps its arity checks, but f2 will
 # call the same function, but without arity checks.
 !f2 = std:to_no_arity f;
 
@@ -850,7 +850,7 @@ std:assert ~ not ~ is_err 10;
 #### <a name="424-errortostr-value"></a>4.2.4 - error_to_str _value_
 
 This function accepts an error value in contrast to `str`, but does
-not panic but transform the error value into it's string representation.
+not panic but transform the error value into its string representation.
 
 ```wlambda
 !r = error_to_str $e "TEST";
@@ -1263,7 +1263,7 @@ std:assert_eq (str ~ std:weaken x)   "$(&)10";
 
 #### <a name="482-stdstrcat-a-b-"></a>4.8.2 - std:str:cat _a_ _b_ ...
 
-Stringifies (like with `str`) and concatenates all it's arguments.
+Stringifies (like with `str`) and concatenates all its arguments.
 
 ```wlambda
 std:assert_eq
@@ -1560,7 +1560,7 @@ std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 #### <a name="4115-stdappend-vec-a-value-or-vec-"></a>4.11.5 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
-If _value-or-vec_ is a vector, all it's items will be appended to _vec-a_.
+If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
 
 ```wlambda
 !v = std:append $[1,2,3] :a :b $[:c, :d];
@@ -1579,7 +1579,7 @@ std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
 #### <a name="4116-stdprepend-vec-a-value-or-vec-"></a>4.11.6 - std:prepend _vec-a_ _value-or-vec_ ...
 
 Prepends _value-or-vec_ and all following items to the front of _vec-a_.
-If _value-or-vec_ is a vector, all it's items will be prepended to _vec-a_.
+If _value-or-vec_ is a vector, all its items will be prepended to _vec-a_.
 
 ```wlambda
 !v = std:prepend $[1,2,3] :a :b $[:c, :d];
@@ -2058,7 +2058,7 @@ std:assert_eq res 20;
 #### <a name="523-stdtodrop-value-function-or-raii-destructors-or-drop-functions"></a>5.2.3 - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
 
 You can create a function that is called when the associated value is
-dropped or it's reference count goes to 0.
+dropped or its reference count goes to 0.
 
 ```wlambda
 !dropped = $false;
@@ -2296,7 +2296,7 @@ You can also use `for` if you like.
 
 Iterating over a map is as simple as iterating over a vector.
 The map can be called with a function as first argument and it starts
-iterating over it's key/value pairs. The first argument of the
+iterating over its key/value pairs. The first argument of the
 function is the value, the second argument is the key.
 
 ```wlambda
@@ -2511,7 +2511,7 @@ std:assert_eq (std:num:round 10.0 * sum) 81.0;
 
 #### <a name="741-stdaccum-collection-a-b-"></a>7.4.1 - std:accum _collection_ _a_ _b_ ...
 
-This function accumulates all it's arguments in the _collection_.
+This function accumulates all its arguments in the _collection_.
 It does the same form of accumulation as `$+` does.
 
 ```wlambda
@@ -3000,11 +3000,11 @@ std:displayln "foo"
 Will just print `foo` and a newline.
 
 If you need a less ambigous form, use `std:writeln`, which
-handles it's argument like written via `std:ser:wlambda` instead of `str`.
+handles its argument like written via `std:ser:wlambda` instead of `str`.
 
 #### <a name="1107-stdwriteln-arg1-"></a>11.0.7 - std:writeln _arg1_ ...
 
-This function writes the WLambda representation of it's arguments
+This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
 
 ```text
@@ -3059,7 +3059,7 @@ Returns the version number of the WLambda crate when called.
 
 #### <a name="1111-stdiofilereadtext-filename"></a>11.1.1 - std:io:file:read_text _filename_
 
-Opens the file _filename_ and returns it's contents interpreted as UTF8
+Opens the file _filename_ and returns its contents interpreted as UTF8
 text as string.
 
 ```wlambda
@@ -3071,7 +3071,7 @@ std:assert_eq t "abcäöü" "reading text from file works";
 
 #### <a name="1112-stdiofileread-filename"></a>11.1.2 - std:io:file:read _filename_
 
-Opens the file _filename_ and returns it's contents as byte buffer.
+Opens the file _filename_ and returns its contents as byte buffer.
 
 ```wlambda
 std:io:file:write_safe "prelude_test.txt" "abcäöü";
