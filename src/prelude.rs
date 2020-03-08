@@ -34,6 +34,7 @@ Smalltalk, LISP and Perl.
 - [1](#1-syntax) - Syntax
 - [2](#2-variable-definition-and-assignment) - Variable Definition and Assignment
   - [2.1](#21-global-variables) - Global Variables
+  - [2.2](#22-constants) - Constants
 - [3](#3-functions-part-12) - Functions (part 1/2)
   - [3.1](#31-closures) - Closures
     - [3.1.1](#311-object-oriented-programming-with-closures) - Object Oriented Programming with Closures
@@ -300,7 +301,7 @@ std:assert_eq a 13;
 
 Global variables however do not live beyond file or module boundaries.
 
-### - Constants
+### <a name="22-constants"></a>2.2 - Constants
 
 WLambda supports constant _variables_. These are global variables
 you can't assign to. They are resolved at compile time and offer a slight
