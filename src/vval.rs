@@ -635,6 +635,28 @@ impl Env {
         self.accum_fun.clone()
     }
 
+    /// Creates a new error VVal with the given string as error message.
+    /// Takes care to annotate the error value with the current function
+    /// information.
+    ///
+    ///```
+    /// use wlambda::compiler::EvalContext;
+    /// use wlambda::vval::{VVal, VValFun, Env};
+    ///
+    /// let mut ctx = EvalContext::new_default();
+    ///
+    /// ctx.set_global_var("xyz",
+    ///     &VValFun::new_fun(
+    ///         move |env: &mut Env, argc: usize| {
+    ///             let ok = false;
+    ///             if !ok {
+    ///                 Ok(env.new_err(
+    ///                     format!("Something was not ok!")))
+    ///             } else {
+    ///                 Ok(VVal::Bol(true))
+    ///             }
+    ///         }, None, None, false));
+    ///```
     pub fn new_err(&self, s: String) -> VVal {
         for i in self.call_stack.iter().rev() {
             if i.syn_pos.is_some() {
@@ -1322,7 +1344,7 @@ impl VVal {
     /// some_vec.push(VVal::Int(36));
     ///
     /// let mut sum = 0;
-    /// for v in some_vec.iter() {
+    /// for (v, _) in some_vec.iter() {
     ///     sum += v.i();
     /// }
     ///
