@@ -300,6 +300,46 @@ std:assert_eq a 13;
 
 Global variables however do not live beyond file or module boundaries.
 
+### - Constants
+
+WLambda supports constant _variables_. These are global variables
+you can't assign to. They are resolved at compile time and offer a slight
+performance advantage over (global or local) variables.
+
+```wlambda
+!:const X = 11;
+
+std:assert_eq X 11;
+
+# Destructuring works too, but only with compile time literal values
+# in the vectors / maps:
+!:const (ON, OFF) = $[$true, $false];
+!:const (RED, BLUE) = ${
+    BLUE = 0x0000FF,
+    RED  = 0xFF0000,
+};
+
+std:assert_eq ON  $true;
+std:assert_eq OFF $false;
+
+std:assert_eq RED 0xFF0000;
+std:assert_eq BLUE 0x0000FF;
+```
+
+However, be aware that these _constants_ are not really constant.
+Due to performance reasons referencial values like Strings, Lists
+or Maps are not copied (neither shallow, nor deep) if you access them
+through a constant.
+
+```wlambda
+!:const V = $[1,2,3];
+
+std:assert_eq (str V) (str $[1,2,3]);
+
+std:push V 43;  # Mutation of a 'constant'
+std:assert_eq V.3 43;
+```
+
 ## <a name="3-functions-part-12"></a>3 - Functions (part 1/2)
 
 A function can be defined using the `{ ... }` syntax and the `\ _statement_`
@@ -1255,7 +1295,6 @@ std:assert_eq "\u{2211}" "∑";
 Casts _value_ to a string and returns it.
 
 ```wlambda
-
 std:assert_eq (str "\xFF")     "ÿ";
 std:assert_eq (str "\x0A")     "\n";
 std:assert_eq (str 1)          "1";
@@ -1609,6 +1648,49 @@ std:assert ~ not ~ is_bytes "ABC";
 ```
 
 ### <a name="410-symbols"></a>4.10 - Symbols
+
+Symbols are a special kind of strings. Use them however you see fit. They will
+do a key lookup (on maps, vectors (as indices) and user values) if they are
+called with an argument.
+
+```wlambda
+std:assert_eq (:1 $[1,2,3]) 2;
+std:assert_eq (:a ${a=30}) 30;
+```
+
+They are basically the same as string, but strings have
+slightly different calling semantics and a different literal syntax.
+Often you can use them as shortform literal in places where a string
+is expected:
+
+```wlambda
+std:assert_eq (std:str:replace :A :a "All AbabA") "all ababa";
+```
+
+They can be very useful as sentinel values or custom enums:
+
+```wlambda
+!x = :ON;
+!y = :OFF;
+
+std:assert_eq ((x == :ON) { 10 }) 10;
+
+# They don't match with strings:
+std:assert_eq ((x == "ON") { 10 } { 20 }) 20;
+
+# Work together nicely with `match`:
+
+!state = "";
+match x
+    :ON  {|| .state = "is on" }
+    :OFF {|| .state = "is off" };
+std:assert_eq state "is on";
+
+match y
+    :ON  {|| .state = "is on" }
+    :OFF {|| .state = "is off" };
+std:assert_eq state "is off";
+```
 
 ### <a name="411-vectors-or-lists"></a>4.11 - Vectors (or Lists)
 

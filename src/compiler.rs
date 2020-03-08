@@ -391,6 +391,9 @@ enum VarPos {
     Local(usize),
     /// Variable is stored in the global variables with the given value.
     Global(VVal),
+    /// A constant value, major difference to Global is, that it is not a reference
+    /// and a slight bit faster.
+    Const(VVal),
 }
 
 /// Errors that can occur when evaluating a piece of WLambda code.
@@ -780,6 +783,10 @@ impl EvalContext {
             next_index
         }
 
+        fn def_const(&mut self, s: &str, val: VVal) {
+            self.global.borrow_mut().env.insert(String::from(s), val);
+        }
+
         fn def(&mut self, s: &str, is_global: bool) -> VarPos {
             //d// println!("DEF: {} global={}", s, is_global);
             let pos = self.local_map.get(s);
@@ -806,6 +813,7 @@ impl EvalContext {
                         },
                         VarPos::UpValue(_)  => {},
                         VarPos::Global(_)   => {},
+                        VarPos::Const(_)    => {},
                         VarPos::Local(_i)   => return p.clone(),
                     }
                 },
@@ -830,6 +838,9 @@ impl EvalContext {
                     VarPos::Global(_) => {
                         panic!("Globals can't be captured as upvalues!");
                     },
+                    VarPos::Const(_) => {
+                        panic!("Consts can't be captured as upvalues!");
+                    },
                     VarPos::NoPos => upvalues.push(VVal::Nul.to_ref()),
                 }
             }
@@ -850,7 +861,11 @@ impl EvalContext {
                 let opt_p = self.parent.as_mut();
                 if opt_p.is_none() {
                     if let Some(v) = self.global.borrow().env.get(s){
-                        return VarPos::Global(v.clone());
+                        if v.is_ref() {
+                            return VarPos::Global(v.clone());
+                        } else {
+                            return VarPos::Const(v.clone());
+                        }
                     } else {
                         return VarPos::NoPos;
                     }
@@ -871,6 +886,7 @@ impl EvalContext {
                     },
                     VarPos::UpValue(_) => VarPos::UpValue(self.def_up(s, par_var_pos)),
                     VarPos::Global(g)  => VarPos::Global(g),
+                    VarPos::Const(c)   => VarPos::Const(c),
                     VarPos::NoPos      => VarPos::NoPos
                 }
             }
@@ -954,6 +970,8 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Re
                         Ok(Box::new(move |e: &mut Env| { Ok(e.get_local_captured_ref(i)) })),
                     VarPos::Global(v) =>
                         Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
+                    VarPos::Const(v) =>
+                        Ok(Box::new(move |_e: &mut Env| { Ok(v.clone().to_ref()) })),
                     VarPos::NoPos => {
                         ast.to_compile_err(
                             format!("Variable '{}' undefined", var.s_raw()))
@@ -986,6 +1004,8 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Re
                         Ok(Box::new(move |e: &mut Env| { Ok(e.get_local(i)) })),
                     VarPos::Global(v) =>
                         Ok(Box::new(move |_e: &mut Env| { Ok(v.deref()) })),
+                    VarPos::Const(v) =>
+                        Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
                     VarPos::NoPos => {
                         ast.to_compile_err(
                             format!("Variable '{}' undefined", var.s_raw()))
@@ -1010,6 +1030,69 @@ fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut
             }
         }
     }
+}
+
+fn compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
+println!("COMCOSNT:{}",val.s());
+    match val {
+        VVal::Lst(l) => {
+            let l = l.borrow();
+            match l[0].get_syn() {
+                Syntax::Key => Ok(l[1].clone()),
+                Syntax::Str => Ok(l[1].clone()),
+                Syntax::Lst => {
+                    let v = VVal::vec();
+                    for i in l.iter().skip(1) {
+                        v.push(compile_const_value(i)?);
+                    }
+                    Ok(v)
+                },
+                Syntax::Map => {
+                    let m = VVal::map();
+                    for i in l.iter().skip(1) {
+                        println!("IIII {}!", i.at(0).unwrap().s());
+                        println!("IIII {}!", i.at(1).unwrap().s());
+                        let key = compile_const_value(&i.at(0).unwrap_or(VVal::Nul))?;
+                        let val = compile_const_value(&i.at(1).unwrap_or(VVal::Nul))?;
+                        m.set_key_mv(key.s_raw(), val);
+                    }
+                    Ok(m)
+                },
+                _ => Err(val.to_compile_err(
+                    format!(
+                        "Invalid literal in constant definition: {}",
+                        val.s())).err().unwrap()),
+            }
+        },
+        _ => Ok(val.clone()),
+    }
+}
+
+fn compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
+    let vars    = ast.at(1).unwrap();
+    let value   = ast.at(2).unwrap();
+    let destr   = ast.at(3).unwrap_or(VVal::Nul);
+
+    if destr.b() {
+        for (i, (v, _)) in vars.iter().enumerate() {
+            let varname = v.s_raw();
+            let val = compile_const_value(&value)?;
+            let val =
+                match val {
+                    VVal::Lst(_) => val.at(i).unwrap_or(VVal::Nul),
+                    VVal::Map(_) => val.get_key(&varname).unwrap_or(VVal::Nul),
+                    _ => val,
+                };
+
+            ce.borrow_mut().def_const(&varname, val);
+        }
+    } else {
+        let varname = vars.at(0).unwrap().s_raw();
+        let const_val = compile_const_value(&value)?;
+        ce.borrow_mut().def_const(&varname, const_val);
+    }
+
+    Ok(Box::new(move |_e: &mut Env| { Ok(VVal::Nul) }))
 }
 
 fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) -> Result<EvalNode, CompileError> {
@@ -1123,6 +1206,7 @@ fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, v: VVal) -> Option<String> {
     match pos {
         VarPos::UpValue(d) => { e.assign_ref_up(*d, v); None },
         VarPos::Local(d)   => { e.assign_ref_local(*d, v); None },
+        VarPos::Const(_)   => { Some("Can't assign to constant!".to_string()) },
         VarPos::Global(d)  => {
             if let VVal::Ref(r) = d {
                 r.borrow().set_ref(v);
@@ -1141,6 +1225,7 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
     match pos {
         VarPos::UpValue(d) => { e.set_up(*d, v); None },
         VarPos::Local(d)   => { e.set_consume(*d, v.clone()); None },
+        VarPos::Const(_)   => { Some("Can't assign to constant!".to_string()) },
         VarPos::Global(d)  => {
             if let VVal::Ref(r) = d {
                 r.replace(v.clone());
@@ -1287,6 +1372,9 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                                     s))
                     }
                 },
+                VarPos::Const(_) =>
+                    ast.to_compile_err(
+                        format!("Can't assign to constant '{}'", s)),
                 VarPos::NoPos =>
                     ast.to_compile_err(
                         format!("Can't assign to undefined local variable '{}'", s)),
@@ -1320,6 +1408,9 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                                     s))
                     }
                 },
+                VarPos::Const(_) =>
+                    ast.to_compile_err(
+                        format!("Can't assign to constant '{}'", s)),
                 VarPos::NoPos =>
                     ast.to_compile_err(
                         format!("Can't assign to undefined local variable '{}'", s)),
@@ -1589,12 +1680,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
             let syn  = syn.get_syn();
 
             match syn {
-                Syntax::Block       => { compile_block(ast, ce)       },
-                Syntax::Var         => { compile_var(ast, ce, false)  },
-                Syntax::Def         => { compile_def(ast, ce, false)  },
-                Syntax::DefGlobRef  => { compile_def(ast, ce, true)   },
+                Syntax::Block       => { compile_block(ast, ce)         },
+                Syntax::Var         => { compile_var(ast, ce, false)    },
+                Syntax::Def         => { compile_def(ast, ce, false)    },
+                Syntax::DefGlobRef  => { compile_def(ast, ce, true)     },
+                Syntax::DefConst    => { compile_const(ast, ce)         },
                 Syntax::Assign      => { compile_assign(ast, ce, false) },
-                Syntax::AssignRef   => { compile_assign(ast, ce, true) },
+                Syntax::AssignRef   => { compile_assign(ast, ce, true)  },
                 Syntax::SelfObj => {
                     Ok(Box::new(move |e: &mut Env| { Ok(e.self_object()) }))
                 },
@@ -4547,5 +4639,27 @@ mod tests {
             "$e \"EXEC ERR: Caught [1,18:<compiler:s_eval_no_panic>(Func)@foo]=>[1,29:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
         assert_eq!(s_eval_no_panic("!x = ${foo = {}}; x.foo 10;"),
             "$e \"EXEC ERR: Caught [1,14:<compiler:s_eval_no_panic>(Func)@foo]=>[1,25:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
+    }
+
+    #[test]
+    fn check_const() {
+        assert_eq!(s_eval("!:const X = 32; X"),                     "32");
+        assert_eq!(s_eval("!:const X = 32.4; X"),                   "32.4");
+        assert_eq!(s_eval("!:const X = :XX; X"),                    ":\"XX\"");
+        assert_eq!(s_eval("!:const X = $[1,2]; X.1"),               "2");
+        assert_eq!(s_eval("!:const X = ${A=32}; X.A"),              "32");
+        assert_eq!(s_eval("!:const X = \"fo\"; X"),                 "\"fo\"");
+        assert_eq!(s_eval("!:const (A,B,X) = $[1,3,4]; $[X,B,A]"),  "$[4,3,1]");
+        assert_eq!(s_eval("!:const (A,B,X) = ${A=1,B=3,X=4}; $[X,B,A]"),  "$[4,3,1]");
+
+        assert_eq!(s_eval(r"
+            !@import c tests:test_mod_const;
+            c:XX
+        "), "32");
+
+        assert_eq!(s_eval(r"
+            !@import c tests:test_mod_const;
+            c:X2
+        "), "$[1,2]");
     }
 }

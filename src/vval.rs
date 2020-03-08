@@ -128,6 +128,7 @@ pub enum Syntax {
     CaptureRef,
     AssignRef,
     DefGlobRef,
+    DefConst,
     SelfObj,
     SelfData,
     Import,
