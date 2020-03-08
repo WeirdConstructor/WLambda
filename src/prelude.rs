@@ -103,14 +103,24 @@ Smalltalk, LISP and Perl.
     - [4.7.1](#471-stdnumabs-number) - std:num:abs _number_
   - [4.8](#48-strings) - Strings
     - [4.8.1](#481-str-value) - str _value_
-    - [4.8.2](#482-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
-    - [4.8.3](#483-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
-    - [4.8.4](#484-stdstrlen-value) - std:str:len _value_
-    - [4.8.5](#485-stdstrtrim-value) - std:str:trim _value_
-    - [4.8.6](#486-stdstrtrimstart-value) - std:str:trim_start _value_
-    - [4.8.7](#487-stdstrtrimend-value) - std:str:trim_end _value_
-    - [4.8.8](#488-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
-    - [4.8.9](#489-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
+    - [4.8.2](#482-isstr-value) - is_str _value_
+    - [4.8.3](#483-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
+    - [4.8.4](#484-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
+    - [4.8.5](#485-stdstrlen-value) - std:str:len _value_
+    - [4.8.6](#486-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
+    - [4.8.7](#487-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+    - [4.8.8](#488-stdstrtrim-value) - std:str:trim _value_
+    - [4.8.9](#489-stdstrtrimstart-value) - std:str:trim_start _value_
+    - [4.8.10](#4810-stdstrtrimend-value) - std:str:trim_end _value_
+    - [4.8.11](#4811-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
+    - [4.8.12](#4812-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
+    - [4.8.13](#4813-stdstrtobytes-string) - std:str:to_bytes _string_
+    - [4.8.14](#4814-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
+    - [4.8.15](#4815-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
+    - [4.8.16](#4816-stdstrtocharvec-string) - std:str:to_char_vec _string_
+    - [4.8.17](#4817-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
+    - [4.8.18](#4818-stdstrtolowercase-string) - std:str:to_lowercase _string_
+    - [4.8.19](#4819-stdstrtouppercase-string) - std:str:to_uppercase _string_
   - [4.9](#49-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
     - [4.9.1](#491-call-properties-of-bytes) - Call Properties of Bytes
     - [4.9.2](#492-byte-conversion-functions) - Byte Conversion Functions
@@ -1261,7 +1271,22 @@ std:assert_eq (str $[1,2,3])   "$[1,2,3]";
 std:assert_eq (str ~ std:weaken x)   "$(&)10";
 ```
 
-#### <a name="482-stdstrcat-a-b-"></a>4.8.2 - std:str:cat _a_ _b_ ...
+#### <a name="482-isstr-value"></a>4.8.2 - is_str _value_
+
+Returns `$true` if _value_ is a string.
+
+```wlambda
+std:assert ~ is_str "foo";
+
+std:assert ~ not ~ is_str $b"foo";
+std:assert ~ not ~ is_str :foo;
+std:assert ~ not ~ is_str 324;
+
+std:assert ~ not ~ is_str $&&"foo";
+std:assert ~ is_str $*$&&"foo";
+```
+
+#### <a name="483-stdstrcat-a-b-"></a>4.8.3 - std:str:cat _a_ _b_ ...
 
 Stringifies (like with `str`) and concatenates all its arguments.
 
@@ -1271,7 +1296,7 @@ std:assert_eq
     "a1023.2abcd$[1,2,3]";
 ```
 
-#### <a name="483-stdstrjoin-sep-vector"></a>4.8.3 - std:str:join _sep_ _vector_
+#### <a name="484-stdstrjoin-sep-vector"></a>4.8.4 - std:str:join _sep_ _vector_
 
 Join's the stringified elements of _vector_ with the _sep_ string.
 Will return an error if _vector_ is not a vector.
@@ -1282,7 +1307,7 @@ std:assert_eq
     "1::2::3";
 ```
 
-#### <a name="484-stdstrlen-value"></a>4.8.4 - std:str:len _value_
+#### <a name="485-stdstrlen-value"></a>4.8.5 - std:str:len _value_
 
 Returns the length of the stringified _value_ in unicode characters.
 The core function `len` does return the number of bytes in the string
@@ -1297,7 +1322,39 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### <a name="485-stdstrtrim-value"></a>4.8.5 - std:str:trim _value_
+#### <a name="486-stdstrreplace-pattern-replacement-string"></a>4.8.6 - std:str:replace _pattern_ _replacement_ _string_
+
+Replaces every occurence of _pattern_ in _string_ with _replacement_
+and returns a new string. All values will be casted to a string if
+they aren't.
+
+```wlambda
+!s = std:str:replace "dog" "cat"
+    "I really like my dog, because when you dog, you can put dog in the dog!";
+std:assert_eq s
+    "I really like my cat, because when you cat, you can put cat in the cat!";
+
+!s = std:str:replace "9" "1" "9999";
+std:assert_eq s "1111";
+```
+
+#### <a name="487-stdstrreplacen-pattern-replacement-count-string"></a>4.8.7 - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+
+Replaces _count_ occurences of _pattern_ in _string_ with _replacement_
+and returns a new string. All values will be casted to a string if
+they aren't.
+
+```wlambda
+!s = std:str:replace_n "dog" "cat" 2
+    "I really like my dog, because when you dog, you can put dog in the dog!";
+std:assert_eq s
+    "I really like my cat, because when you cat, you can put dog in the dog!";
+
+!s = std:str:replace_n "9" "1" 3 "9999";
+std:assert_eq s "1119";
+```
+
+#### <a name="488-stdstrtrim-value"></a>4.8.8 - std:str:trim _value_
 
 Trims off any (unicode) white space from the start and end of the
 stringified _value_.
@@ -1308,7 +1365,7 @@ std:assert_eq
     "fooo bar";
 ```
 
-#### <a name="486-stdstrtrimstart-value"></a>4.8.6 - std:str:trim_start _value_
+#### <a name="489-stdstrtrimstart-value"></a>4.8.9 - std:str:trim_start _value_
 
 Trims off any (unicode) white space from the start of the stringified _value_.
 
@@ -1318,7 +1375,7 @@ std:assert_eq
     "fooo bar \n";
 ```
 
-#### <a name="487-stdstrtrimend-value"></a>4.8.7 - std:str:trim_end _value_
+#### <a name="4810-stdstrtrimend-value"></a>4.8.10 - std:str:trim_end _value_
 
 Trims off any (unicode) white space from the end of the stringified _value_.
 
@@ -1328,7 +1385,7 @@ std:assert_eq
     "  \nfooo bar";
 ```
 
-#### <a name="488-stdstrpadstart-len-pad-str-value"></a>4.8.8 - std:str:pad_start _len_ _pad-str_ _value_
+#### <a name="4811-stdstrpadstart-len-pad-str-value"></a>4.8.11 - std:str:pad_start _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
 at the start of the string.
@@ -1352,7 +1409,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="489-stdstrpadend-len-pad-str-value"></a>4.8.9 - std:str:pad_end _len_ _pad-str_ _value_
+#### <a name="4812-stdstrpadend-len-pad-str-value"></a>4.8.12 - std:str:pad_end _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters,
 appending at the end.
@@ -1374,6 +1431,87 @@ std:assert_eq
 std:assert_eq
     (std:str:pad_end 8 "" "∑∑")
     "∑∑";
+```
+
+#### <a name="4813-stdstrtobytes-string"></a>4.8.13 - std:str:to_bytes _string_
+
+Encodes _string_ in UTF-8 and returns a byte vector containing all it's bytes.
+
+```wlambda
+!b = std:str:to_bytes "1234";
+std:assert_eq b $b"1234";
+
+!b = std:str:to_bytes "Äß日本人";
+std:assert_eq b $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
+```
+
+#### <a name="4814-stdstrfromutf8-byte-vector"></a>4.8.14 - std:str:from_utf8 _byte-vector_
+
+Converts the _byte-vector_ to a Unicode string and returns it.
+If the _byte-vector_ contains invalid UTF-8 sequences an
+error value is returned.
+
+```wlambda
+!s = _? ~ std:str:from_utf8 $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
+std:assert_eq s "Äß日本人";
+
+!r = on_error {|| _ } ~ std:str:from_utf8 $b"\xFF\xFF";
+std:assert_eq r "str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0";
+```
+
+#### <a name="4815-stdstrfromutf8lossy-byte-vector"></a>4.8.15 - std:str:from_utf8_lossy _byte-vector_
+
+Converts the _byte-vector_ to a Unicode string and returns it.
+If the _byte-vector_ contains invalid UTF-8 sequences a `"�"` will be
+inserted.
+
+```wlambda
+!s = _? ~ std:str:from_utf8_lossy
+    $b"\xC3\x84\xFF\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA\xFF\xFF\x00";
+std:assert_eq s "Ä�ß日本人��\0";
+```
+
+#### <a name="4816-stdstrtocharvec-string"></a>4.8.16 - std:str:to_char_vec _string_
+
+Converts the _string_ into a vector of integers which represent the Unicode
+character number.
+
+```wlambda
+!v = std:str:to_char_vec "1234";
+std:assert_eq (str v) ~ str $[49,50,51,52];
+
+!v = std:str:to_char_vec "Äß日本人";
+std:assert_eq (str v) ~ str $[196,223,0x65E5,0x672C,0x4EBA];
+```
+
+#### <a name="4817-stdstrfromcharvec-vector"></a>4.8.17 - std:str:from_char_vec _vector_
+
+The reverse operation of `std:str:to_char_vec`. It converts
+a vector of integers to a unicode string. Any integer that has
+no associated Unicode character will be converted to `"?"`.
+
+```wlambda
+std:assert_eq (std:str:from_char_vec $[9999999999]) "?";
+std:assert_eq
+    (std:str:from_char_vec
+        $[49,50,196,223,0x65E5,0x672C,0x4EBA])
+    "12Äß日本人";
+```
+
+#### <a name="4818-stdstrtolowercase-string"></a>4.8.18 - std:str:to_lowercase _string_
+
+Swaps all (Unicode) characters in _string_ to their lowercase version.
+
+```wlambda
+std:assert_eq (std:str:to_lowercase "ZABzabÄßÜÖ") "zabzabäßüö";
+```
+
+#### <a name="4819-stdstrtouppercase-string"></a>4.8.19 - std:str:to_uppercase _string_
+
+Swaps all (Unicode) characters in _string_ to their lowercase version.
+
+```wlambda
+std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 ```
 
 ### <a name="49-bytes-or-byte-vectors"></a>4.9 - Bytes (or Byte Vectors)
@@ -4019,7 +4157,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let cnt  = env.arg(2).i() as usize;
             let data = env.arg(3).s_raw();
             Ok(VVal::new_str_mv(data.replacen(&pat, &to, cnt)))
-        }, Some(3), Some(3), false);
+        }, Some(4), Some(4), false);
     func!(st, "str:replace",
         |env: &mut Env, _argc: usize| {
             let pat  = env.arg(0).s_raw();
