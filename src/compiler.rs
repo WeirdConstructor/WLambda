@@ -393,11 +393,17 @@ enum VarPos {
     Global(VVal),
 }
 
+/// Errors that can occur when evaluating a piece of WLambda code.
+/// Usually created by methods of `EvalContext`.
 #[derive(Debug, Clone)]
 pub enum EvalError {
+    /// Errors regarding file I/O when parsing files
     IOError(String),
+    /// Syntax errors
     ParseError(parser::ParseError),
+    /// Grammar/Compilation time errors
     CompileError(CompileError),
+    /// Special kinds of runtime errors
     ExecError(String),
 }
 
@@ -472,6 +478,27 @@ impl EvalContext {
         .register_self_eval()
     }
 
+    /// Creates a new EvalContext with an empty GlobalEnv.
+    /// This means the EvalContext has none of the core or std library
+    /// functions in it's global environment and you have to provide
+    /// them yourself. Either by loading them from WLambda by `!@import std`
+    /// or `!@wlambda`. Or by manually binding in the corresponding
+    /// SymbolTable(s).
+    ///
+    ///```rust
+    /// use wlambda::compiler::EvalContext;
+    /// use wlambda::vval::{VVal, VValFun, Env};
+    ///
+    /// let mut ctx = EvalContext::new_empty_global_env();
+    ///
+    /// {
+    ///     let mut genv = ctx.global.borrow_mut();
+    ///     genv.set_module("wlambda", wlambda::prelude::core_symbol_table());
+    ///     genv.import_module_as("wlambda", "");
+    /// }
+    ///
+    /// assert_eq!(ctx.eval("type $true").unwrap().s_raw(), "bool")
+    ///```
     #[allow(dead_code)]
     pub fn new_empty_global_env() -> EvalContext {
         Self::new_with_user_impl(
