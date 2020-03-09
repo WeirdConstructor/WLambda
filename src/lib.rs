@@ -618,6 +618,7 @@ without any additional terms or conditions.
 */
 
 pub mod vval;
+pub mod aval;
 pub mod parser;
 pub mod compiler;
 pub mod prelude;
