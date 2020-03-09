@@ -2,13 +2,13 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 
 mod vval;
-mod aval;
 mod parser;
 mod compiler;
 mod prelude;
 mod util;
 mod vval_user_obj;
 mod csv;
+mod threads;
 
 use vval::Env;
 use vval::VVal;

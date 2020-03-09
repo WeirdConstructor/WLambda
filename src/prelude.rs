@@ -3471,7 +3471,7 @@ use crate::compiler::*;
 use crate::vval::*;
 use crate::util;
 use std::rc::Rc;
-use crate::aval::*;
+use crate::threads::*;
 
 macro_rules! func {
     ($g: ident, $name: expr, $cb: expr, $min: expr, $max: expr, $err_arg_ok: expr) => {
@@ -5353,6 +5353,24 @@ pub fn std_symbol_table() -> SymbolTable {
                     format!("Value is not a user data AtomicAVal: {}", av.s())))
             }
         }, Some(1), Some(1), false);
+
+    func!(st, "sync:atom:write",
+        |env: &mut Env, _argc: usize| {
+            let mut av = env.arg(0);
+            if let VVal::Usr(mut avu) = av {
+                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
+                    let v = env.arg(1);
+                    ud.store(&v);
+                    Ok(v)
+                } else {
+                    Ok(env.new_err(
+                        format!("Value is not an AtomicAVal: {}", avu.s())))
+                }
+            } else {
+                Ok(env.new_err(
+                    format!("Value is not a user data AtomicAVal: {}", av.s())))
+            }
+        }, Some(2), Some(2), false);
 
     st
 }

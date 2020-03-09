@@ -11,7 +11,11 @@ use crate::vval::VValFun;
 use crate::vval::EvalNode;
 use crate::vval::StackAction;
 use crate::vval::CompileError;
+use crate::vval::VValUserData;
+use crate::threads::*;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::cell::RefCell;
 use std::time::Instant;
 use std::fmt::{Display, Formatter};
@@ -146,6 +150,8 @@ impl ModuleResolver for LocalFileModuleResolver {
         -> Result<SymbolTable, ModuleLoadError>
     {
         let genv = GlobalEnv::new_empty_default();
+        genv.borrow_mut().set_thread_creator(
+            global.borrow().get_thread_creator());
         genv.borrow_mut().import_modules_from(&*global.borrow());
 
         let mut ctx = EvalContext::new(genv);
@@ -207,6 +213,7 @@ pub struct GlobalEnv {
     mem_modules:
         std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, SymbolTable>>>,
     resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
+    thread_creator: Option<Arc<Mutex<dyn ThreadCreator>>>,
 }
 
 impl std::fmt::Debug for GlobalEnv {
@@ -330,6 +337,7 @@ impl GlobalEnv {
                 std::rc::Rc::new(std::cell::RefCell::new(
                     std::collections::HashMap::new())),
             resolver: None,
+            thread_creator: None,
         }))
     }
 
@@ -343,6 +351,7 @@ impl GlobalEnv {
     /// - `set_module("wlambda", wlambda::prelude::core_symbol_table())`
     /// - `set_module("std",     wlambda::prelude::std_symbol_table())`
     /// - `set_resolver(Rc::new(RefCell::new(wlambda::compiler::LocalFileModuleResolver::new()))`
+    /// - `set_thread_creator(Some(Arc::new(Mutex::new(DefaultThreadCreator::new()))))`
     /// - `import_module_as("wlambda", "")`
     /// - `import_module_as("std", "std")`
     ///
@@ -374,9 +383,99 @@ impl GlobalEnv {
         let g = GlobalEnv::new();
         g.borrow_mut().set_module("wlambda", core_symbol_table());
         g.borrow_mut().set_module("std",     std_symbol_table());
+        g.borrow_mut().set_thread_creator(
+            Some(Arc::new(Mutex::new(DefaultThreadCreator::new()))));
         g.borrow_mut().set_resolver(
             Rc::new(RefCell::new(LocalFileModuleResolver::new())));
         g
+    }
+
+    /// Assigns a new thread creator to this GlobalEnv.
+    /// It will be used to spawn new threads if `std:thread:spawn` from
+    /// WLambda's standard library is called.
+    pub fn set_thread_creator(&mut self,
+        tc: Option<Arc<Mutex<dyn ThreadCreator>>>)
+    {
+        self.thread_creator = tc.clone();
+        self.add_func("std:thread:spawn",
+            move |env: &mut Env, argc: usize| {
+                let code = env.arg(0).s_raw();
+                let avs =
+                    if argc > 1 {
+                        let mut avs = vec![];
+                        for (i, (v, k)) in env.arg(1).iter().enumerate() {
+                            let av =
+                                if let VVal::Usr(mut vu) = v {
+                                    if let Some(avu) = vu.as_any().downcast_mut::<AtomicAVal>() {
+                                        avu.clone()
+                                    } else {
+                                        AtomicAVal::new()
+                                    }
+                                } else {
+                                    let av = AtomicAVal::new();
+                                    av.store(&v);
+                                    av
+                                };
+
+                            if let Some(k) = k {
+                                avs.push((k.s_raw(), av));
+                            } else {
+                                avs.push((format!("THREAD_ARG{}", i), av));
+                            }
+                        }
+                        Some(avs)
+                    } else {
+                        None
+                    };
+
+                if let Some(tc) = &tc {
+                    let ntc = tc.clone();
+                    match tc.lock() {
+                        Ok(mut tcg) => {
+                            Ok(tcg.spawn(ntc, code, &VVal::Nul, avs))
+                        },
+                        Err(e) => {
+                            Err(StackAction::panic_str(
+                                format!("Couldn't create thread: {}", e),
+                                None))
+                        },
+                    }
+
+                } else {
+                    Err(StackAction::panic_str(
+                        format!("This global environment does not provide threads."),
+                        None))
+                }
+            }, Some(1), Some(2));
+
+        self.add_func("std:thread:join",
+            move |env: &mut Env, _argc: usize| {
+                let mut hdl = env.arg(0);
+                if let VVal::Usr(mut hdl) = hdl {
+                    if let Some(ud) = hdl.as_any().downcast_mut::<DefaultThreadHandle>() {
+                        let hdl = std::mem::replace(&mut (*ud.0.borrow_mut()), None);
+                        if let Some(h) = hdl {
+                            Ok(h.join().unwrap().to_vval())
+                        } else {
+                            Ok(env.new_err(
+                                format!("DefaultThreadHandle already joined!")))
+                        }
+                    } else {
+                        Ok(env.new_err(
+                            format!("Value is not a DefaultThreadHandle: {}", hdl.s())))
+                    }
+                } else {
+                    Ok(env.new_err(
+                        format!("Value is not a user data DefaultThreadHandle: {}", hdl.s())))
+                }
+            }, Some(1), Some(1));
+    }
+
+    /// Returns the thread creator for this GlobalEnv if one is set.
+    pub fn get_thread_creator(&self)
+        -> Option<Arc<Mutex<dyn ThreadCreator>>>
+    {
+        self.thread_creator.clone()
     }
 }
 
@@ -421,9 +520,79 @@ impl Display for EvalError {
     }
 }
 
+pub trait ThreadCreator: Send {
+    fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+             code: String,
+             args: &VVal,
+             globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal;
+}
+
+impl std::fmt::Debug for dyn ThreadCreator {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "<<ThreadCreator>>")
+    }
+}
+
+struct DefaultThreadCreator();
+
+impl DefaultThreadCreator {
+    pub fn new() -> Self { Self {} }
+}
+
+#[derive(Clone)]
+struct DefaultThreadHandle(Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>>);
+
+impl VValUserData for DefaultThreadHandle {
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
+        Box::new(self.clone())
+    }
+}
+
+impl ThreadCreator for DefaultThreadCreator {
+    fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+             code: String,
+             args: &VVal,
+             globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
+
+        let tcc = tc.clone();
+        let args = AVal::from_vval(args);
+        let hdl =
+            std::thread::spawn(move || {
+                let genv = GlobalEnv::new_empty_default();
+                genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
+
+                if let Some(globals) = globals {
+                    for (k, av) in globals {
+                        println!("ASSIGN {}", k);
+                        genv.borrow_mut().set_var(&k, &VVal::Usr(Box::new(av)));
+                    }
+                }
+
+                let mut ctx = EvalContext::new(genv);
+
+                match ctx.eval(&code) {
+                    Ok(v) => AVal::from_vval(&v),
+                    Err(e) => {
+                        AVal::Err(
+                            Box::new(
+                                AVal::Str(format!("Error in Thread: {}", e))),
+                            String::from("?"))
+                    }
+                }
+            });
+        VVal::Usr(Box::new(DefaultThreadHandle(Rc::new(RefCell::new(Some(hdl))))))
+    }
+}
+
 /// This context holds all the data to compile and execute a piece of WLambda code.
-/// The context is not shareable between threads. For inter thread communication
-/// I suggest to look at [wlambda::threads::MsgHandle](../threads/struct.MsgHandle.html).
+/// You can either use the default environment, or customize the EvalContext
+/// to your application's needs. You can provide custom:
+///
+/// - Global environemnt
+/// - Module resolver
+/// - Custom preset modules
+/// - Thread creator
 ///
 /// It can be this easy to create a context:
 ///
@@ -468,11 +637,11 @@ impl Display for EvalError {
 pub struct EvalContext {
     /// Holds the reference to the supplied or internally created
     /// GlobalEnv.
-    pub global:        GlobalEnvRef,
-    local_compile:     Rc<RefCell<CompileEnv>>,
+    pub global:         GlobalEnvRef,
+    local_compile:      Rc<RefCell<CompileEnv>>,
     /// Holds the top level environment data accross multiple eval()
     /// invocations.
-    pub local:         Rc<RefCell<Env>>,
+    pub local:          Rc<RefCell<Env>>,
 }
 
 impl EvalContext {
@@ -551,220 +720,8 @@ impl EvalContext {
 
         EvalContext {
             global: global.clone(),
-                local_compile: Rc::new(RefCell::new(CompileEnv {
-                    parent:    None,
-                    global,
-                    local_map: std::collections::HashMap::new(),
-                    locals:    Vec::new(),
-                    upvals:    Vec::new(),
-                    recent_var: String::new(),
-                    recent_sym: String::new(),
-                    implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-                    explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-                })),
-                local: Rc::new(RefCell::new(Env::new_with_user(user))),
-            }
-        }
-
-        #[allow(dead_code)]
-        pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> EvalContext {
-            (Self::new_with_user_impl(global, user)).register_self_eval()
-        }
-
-        /// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
-        ///
-        /// ```
-        /// use wlambda::parser;
-        /// let mut ctx = wlambda::EvalContext::new_default();
-        ///
-        /// let s = "$[1,2,3]";
-        /// let ast = parser::parse(s, "somefilename").unwrap();
-        /// let r = &mut ctx.eval_ast(&ast).unwrap();
-        ///
-        /// println!("Res: {}", r.s());
-        /// ```
-        pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
-            let prog = compile(ast, &mut self.local_compile);
-            let local_env_size = CompileEnv::local_env_size(&self.local_compile);
-
-            let env = self.local.borrow_mut();
-            let mut res = Ok(VVal::Nul);
-
-            std::cell::RefMut::map(env, |l_env| {
-                res = match prog {
-                    Ok(prog_closures) => {
-                        l_env.sp = 0;
-                        l_env.set_bp(local_env_size);
-                        match l_env.with_restore_sp(
-                                |e: &mut Env| { prog_closures(e) })
-                        {
-                            Ok(v)   => Ok(v),
-                            Err(je) =>
-                                Err(EvalError::ExecError(
-                                    format!("Jumped out of execution: {:?}", je))),
-                        }
-                    },
-                    Err(e) => { Err(EvalError::CompileError(e)) },
-                };
-                l_env
-            });
-
-            res
-        }
-
-        /// Evaluates a piece of WLambda code with the given `EvalContext`.
-        ///
-        /// ```
-        /// let mut ctx = wlambda::EvalContext::new_default();
-        ///
-        /// let r = &mut ctx.eval("$[1,2,3]").unwrap();
-        /// println!("Res: {}", r.s());
-        /// ```
-        #[allow(dead_code)]
-        pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
-            match parser::parse(s, "<wlambda::eval>") {
-                Ok(ast) => { self.eval_ast(&ast) },
-                Err(e) => { Err(EvalError::ParseError(e)) },
-            }
-        }
-
-        /// Evaluates a WLambda code in a file with the given `EvalContext`.
-        ///
-        /// ```
-        /// let mut ctx = wlambda::EvalContext::new_default();
-        ///
-        /// let r = &mut ctx.eval_file("examples/read_test.wl").unwrap();
-        /// assert_eq!(r.i(), 403, "matches contents!");
-        /// ```
-        #[allow(dead_code)]
-        pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
-            let contents = std::fs::read_to_string(filename);
-            if let Err(err) = contents {
-                Err(EvalError::IOError(format!("file '{}': {}", filename, err)))
-            } else {
-                let contents = contents.unwrap();
-                match parser::parse(&contents, filename) {
-                    Ok(ast) => { self.eval_ast(&ast) },
-                    Err(e)  => { Err(EvalError::ParseError(e)) },
-                }
-            }
-        }
-
-        /// Evaluates a WLambda code with the corresponding filename
-        /// in the given `EvalContext`.
-        ///
-        /// ```
-        /// let mut ctx = wlambda::EvalContext::new_default();
-        ///
-        /// let r = &mut ctx.eval_string("403", "examples/read_test.wl").unwrap();
-        /// assert_eq!(r.i(), 403, "matches contents!");
-        /// ```
-        #[allow(dead_code)]
-        pub fn eval_string(&mut self, code: &str, filename: &str)
-            -> Result<VVal, EvalError>
-        {
-            match parser::parse(code, filename) {
-                Ok(ast) => { self.eval_ast(&ast) },
-                Err(e)  => { Err(EvalError::ParseError(e)) },
-            }
-        }
-
-        /// Calls a wlambda function with the given `EvalContext`.
-        ///
-        /// ```
-        /// use wlambda::{VVal, EvalContext};
-        /// let mut ctx = EvalContext::new_default();
-        ///
-        /// let returned_func = &mut ctx.eval("{ _ + _1 }").unwrap();
-        /// assert_eq!(
-        ///     ctx.call(returned_func,
-        ///              &vec![VVal::Int(10), VVal::Int(11)]).unwrap().i(),
-        ///     21);
-        /// ```
-        #[allow(dead_code)]
-        pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
-            let mut env = self.local.borrow_mut();
-            f.call(&mut env, args)
-        }
-
-        /// Sets a global variable for the scripts to access.
-        ///
-        /// ```
-        /// use wlambda::{VVal, EvalContext};
-        /// let mut ctx = EvalContext::new_default();
-        ///
-        /// ctx.set_global_var("XXX", &VVal::Int(200));
-        ///
-        /// assert_eq!(ctx.eval("XXX * 2").unwrap().i(), 400);
-        /// ```
-        #[allow(dead_code)]
-        pub fn set_global_var(&mut self, var: &str, val: &VVal) {
-            self.global.borrow_mut().set_var(var, val);
-        }
-
-        /// Gets the value of a global variable from the script:
-        ///
-        /// ```
-        /// use wlambda::{VVal, EvalContext};
-        /// let mut ctx = EvalContext::new_default();
-        ///
-        /// ctx.eval("!:global XXX = 22 * 2;");
-        ///
-        /// assert_eq!(ctx.get_global_var("XXX").unwrap().i(), 44);
-        /// ```
-        #[allow(dead_code)]
-        pub fn get_global_var(&mut self, var: &str) -> Option<VVal> {
-            self.global.borrow_mut().get_var(var)
-        }
-    }
-
-    #[derive(Debug, Clone, PartialEq)]
-    pub enum ArityParam {
-        Undefined,
-        Limit(usize),
-        Infinite,
-    }
-
-    /// Compile time environment for allocating and
-    /// storing variables inside a function scope.
-    ///
-    /// Also handles upvalues. Upvalues in WLambda are copied to every
-    /// scope that they are passed through until they are needed.
-    #[allow(dead_code)]
-    #[derive(Debug, Clone)]
-    struct CompileEnv {
-        /// Reference to the global environment
-        global:    GlobalEnvRef,
-        /// Reference to the environment of the _parent_ function.
-        parent:    Option<Rc<RefCell<CompileEnv>>>,
-        /// Mapping of strings to where they can be found.
-        local_map: std::collections::HashMap<String, VarPos>,
-        /// List of local variables of this function.
-        locals:    std::vec::Vec<CompileLocal>,
-        /// Stores position of the upvalues for copying the upvalues at runtime.
-        upvals:    std::vec::Vec<VarPos>,
-        /// Stores the implicitly calculated arity of this function.
-        implicit_arity: (ArityParam, ArityParam),
-        /// Stores the explicitly defined arity of this function.
-        explicit_arity: (ArityParam, ArityParam),
-        /// Recently accessed variable name:
-        recent_var: String,
-        /// Recently compiled symbol:
-        recent_sym: String,
-    }
-
-    /// Reference type to a `CompileEnv`.
-    type CompileEnvRef = Rc<RefCell<CompileEnv>>;
-
-    impl CompileEnv {
-        fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
-            let global = if let Some(p) = &parent {
-                p.borrow_mut().global.clone()
-            } else {
-                GlobalEnv::new()
-            };
-            Rc::new(RefCell::new(CompileEnv {
-                parent,
+            local_compile: Rc::new(RefCell::new(CompileEnv {
+                parent:    None,
                 global,
                 local_map: std::collections::HashMap::new(),
                 locals:    Vec::new(),
@@ -773,80 +730,292 @@ impl EvalContext {
                 recent_sym: String::new(),
                 implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
                 explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-            }))
+            })),
+            local: Rc::new(RefCell::new(Env::new_with_user(user))),
         }
+    }
 
-        fn def_up(&mut self, s: &str, pos: VarPos) -> usize {
-            let next_index = self.upvals.len();
-            self.upvals.push(pos);
-            self.local_map.insert(String::from(s), VarPos::UpValue(next_index));
-            next_index
-        }
+    #[allow(dead_code)]
+    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> EvalContext {
+        (Self::new_with_user_impl(global, user)).register_self_eval()
+    }
 
-        fn def_const(&mut self, s: &str, val: VVal) {
-            self.global.borrow_mut().env.insert(String::from(s), val);
-        }
+    /// Evaluates an AST of WLambda code and executes it with the given `EvalContext`.
+    ///
+    /// ```
+    /// use wlambda::parser;
+    /// let mut ctx = wlambda::EvalContext::new_default();
+    ///
+    /// let s = "$[1,2,3]";
+    /// let ast = parser::parse(s, "somefilename").unwrap();
+    /// let r = &mut ctx.eval_ast(&ast).unwrap();
+    ///
+    /// println!("Res: {}", r.s());
+    /// ```
+    pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
+        let prog = compile(ast, &mut self.local_compile);
+        let local_env_size = CompileEnv::local_env_size(&self.local_compile);
 
-        fn def(&mut self, s: &str, is_global: bool) -> VarPos {
-            //d// println!("DEF: {} global={}", s, is_global);
-            let pos = self.local_map.get(s);
-            match pos {
-                None => {
-                    if is_global {
-                        let v = VVal::Nul;
-                        let r = v.to_ref();
-                        //d// println!("GLOBAL: {} => {}", s, r.s());
-                        self.global.borrow_mut().env.insert(String::from(s), r.clone());
-                        return VarPos::Global(r);
+        let env = self.local.borrow_mut();
+        let mut res = Ok(VVal::Nul);
+
+        std::cell::RefMut::map(env, |l_env| {
+            res = match prog {
+                Ok(prog_closures) => {
+                    l_env.sp = 0;
+                    l_env.set_bp(local_env_size);
+                    match l_env.with_restore_sp(
+                            |e: &mut Env| { prog_closures(e) })
+                    {
+                        Ok(v)   => Ok(v),
+                        Err(je) =>
+                            Err(EvalError::ExecError(
+                                format!("Jumped out of execution: {:?}", je))),
                     }
                 },
-                Some(p) => {
-                    match p {
-                        VarPos::NoPos => {
-                            if is_global {
-                                let v = VVal::Nul;
-                                let r = v.to_ref();
-                                //d// println!("GLOBAL: {} => {}", s, r.s());
-                                self.global.borrow_mut().env.insert(String::from(s), r.clone());
-                                return VarPos::Global(r);
-                            }
-                        },
-                        VarPos::UpValue(_)  => {},
-                        VarPos::Global(_)   => {},
-                        VarPos::Const(_)    => {},
-                        VarPos::Local(_i)   => return p.clone(),
-                    }
-                },
+                Err(e) => { Err(EvalError::CompileError(e)) },
+            };
+            l_env
+        });
+
+        res
+    }
+
+    /// Evaluates a piece of WLambda code with the given `EvalContext`.
+    ///
+    /// ```
+    /// let mut ctx = wlambda::EvalContext::new_default();
+    ///
+    /// let r = &mut ctx.eval("$[1,2,3]").unwrap();
+    /// println!("Res: {}", r.s());
+    /// ```
+    #[allow(dead_code)]
+    pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
+        match parser::parse(s, "<wlambda::eval>") {
+            Ok(ast) => { self.eval_ast(&ast) },
+            Err(e) => { Err(EvalError::ParseError(e)) },
+        }
+    }
+
+    /// Evaluates a WLambda code in a file with the given `EvalContext`.
+    ///
+    /// ```
+    /// let mut ctx = wlambda::EvalContext::new_default();
+    ///
+    /// let r = &mut ctx.eval_file("examples/read_test.wl").unwrap();
+    /// assert_eq!(r.i(), 403, "matches contents!");
+    /// ```
+    #[allow(dead_code)]
+    pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
+        let contents = std::fs::read_to_string(filename);
+        if let Err(err) = contents {
+            Err(EvalError::IOError(format!("file '{}': {}", filename, err)))
+        } else {
+            let contents = contents.unwrap();
+            match parser::parse(&contents, filename) {
+                Ok(ast) => { self.eval_ast(&ast) },
+                Err(e)  => { Err(EvalError::ParseError(e)) },
             }
-
-            let next_index = self.locals.len();
-            self.locals.push(CompileLocal {
-                is_upvalue: false,
-            });
-            self.local_map.insert(String::from(s), VarPos::Local(next_index));
-            VarPos::Local(next_index)
         }
+    }
 
-        fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
-            //d// println!("COPY UPVALS: {:?}", self.upvals);
-            for p in self.upvals.iter() {
-                match p {
-                    VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
-                    VarPos::Local(i) => {
-                        upvalues.push(e.get_local_up_promotion(*i));
-                    },
-                    VarPos::Global(_) => {
-                        panic!("Globals can't be captured as upvalues!");
-                    },
-                    VarPos::Const(_) => {
-                        panic!("Consts can't be captured as upvalues!");
-                    },
-                    VarPos::NoPos => upvalues.push(VVal::Nul.to_ref()),
+    /// Evaluates a WLambda code with the corresponding filename
+    /// in the given `EvalContext`.
+    ///
+    /// ```
+    /// let mut ctx = wlambda::EvalContext::new_default();
+    ///
+    /// let r = &mut ctx.eval_string("403", "examples/read_test.wl").unwrap();
+    /// assert_eq!(r.i(), 403, "matches contents!");
+    /// ```
+    #[allow(dead_code)]
+    pub fn eval_string(&mut self, code: &str, filename: &str)
+        -> Result<VVal, EvalError>
+    {
+        match parser::parse(code, filename) {
+            Ok(ast) => { self.eval_ast(&ast) },
+            Err(e)  => { Err(EvalError::ParseError(e)) },
+        }
+    }
+
+    /// Calls a wlambda function with the given `EvalContext`.
+    ///
+    /// ```
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
+    ///
+    /// let returned_func = &mut ctx.eval("{ _ + _1 }").unwrap();
+    /// assert_eq!(
+    ///     ctx.call(returned_func,
+    ///              &vec![VVal::Int(10), VVal::Int(11)]).unwrap().i(),
+    ///     21);
+    /// ```
+    #[allow(dead_code)]
+    pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
+        let mut env = self.local.borrow_mut();
+        f.call(&mut env, args)
+    }
+
+    /// Sets a global variable for the scripts to access.
+    ///
+    /// ```
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
+    ///
+    /// ctx.set_global_var("XXX", &VVal::Int(200));
+    ///
+    /// assert_eq!(ctx.eval("XXX * 2").unwrap().i(), 400);
+    /// ```
+    #[allow(dead_code)]
+    pub fn set_global_var(&mut self, var: &str, val: &VVal) {
+        self.global.borrow_mut().set_var(var, val);
+    }
+
+    /// Gets the value of a global variable from the script:
+    ///
+    /// ```
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
+    ///
+    /// ctx.eval("!:global XXX = 22 * 2;");
+    ///
+    /// assert_eq!(ctx.get_global_var("XXX").unwrap().i(), 44);
+    /// ```
+    #[allow(dead_code)]
+    pub fn get_global_var(&mut self, var: &str) -> Option<VVal> {
+        self.global.borrow_mut().get_var(var)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArityParam {
+    Undefined,
+    Limit(usize),
+    Infinite,
+}
+
+/// Compile time environment for allocating and
+/// storing variables inside a function scope.
+///
+/// Also handles upvalues. Upvalues in WLambda are copied to every
+/// scope that they are passed through until they are needed.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+struct CompileEnv {
+    /// Reference to the global environment
+    global:    GlobalEnvRef,
+    /// Reference to the environment of the _parent_ function.
+    parent:    Option<Rc<RefCell<CompileEnv>>>,
+    /// Mapping of strings to where they can be found.
+    local_map: std::collections::HashMap<String, VarPos>,
+    /// List of local variables of this function.
+    locals:    std::vec::Vec<CompileLocal>,
+    /// Stores position of the upvalues for copying the upvalues at runtime.
+    upvals:    std::vec::Vec<VarPos>,
+    /// Stores the implicitly calculated arity of this function.
+    implicit_arity: (ArityParam, ArityParam),
+    /// Stores the explicitly defined arity of this function.
+    explicit_arity: (ArityParam, ArityParam),
+    /// Recently accessed variable name:
+    recent_var: String,
+    /// Recently compiled symbol:
+    recent_sym: String,
+}
+
+/// Reference type to a `CompileEnv`.
+type CompileEnvRef = Rc<RefCell<CompileEnv>>;
+
+impl CompileEnv {
+    fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
+        let global = if let Some(p) = &parent {
+            p.borrow_mut().global.clone()
+        } else {
+            GlobalEnv::new()
+        };
+        Rc::new(RefCell::new(CompileEnv {
+            parent,
+            global,
+            local_map: std::collections::HashMap::new(),
+            locals:    Vec::new(),
+            upvals:    Vec::new(),
+            recent_var: String::new(),
+            recent_sym: String::new(),
+            implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+            explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+        }))
+    }
+
+    fn def_up(&mut self, s: &str, pos: VarPos) -> usize {
+        let next_index = self.upvals.len();
+        self.upvals.push(pos);
+        self.local_map.insert(String::from(s), VarPos::UpValue(next_index));
+        next_index
+    }
+
+    fn def_const(&mut self, s: &str, val: VVal) {
+        self.global.borrow_mut().env.insert(String::from(s), val);
+    }
+
+    fn def(&mut self, s: &str, is_global: bool) -> VarPos {
+        //d// println!("DEF: {} global={}", s, is_global);
+        let pos = self.local_map.get(s);
+        match pos {
+            None => {
+                if is_global {
+                    let v = VVal::Nul;
+                    let r = v.to_ref();
+                    //d// println!("GLOBAL: {} => {}", s, r.s());
+                    self.global.borrow_mut().env.insert(String::from(s), r.clone());
+                    return VarPos::Global(r);
                 }
-            }
+            },
+            Some(p) => {
+                match p {
+                    VarPos::NoPos => {
+                        if is_global {
+                            let v = VVal::Nul;
+                            let r = v.to_ref();
+                            //d// println!("GLOBAL: {} => {}", s, r.s());
+                            self.global.borrow_mut().env.insert(String::from(s), r.clone());
+                            return VarPos::Global(r);
+                        }
+                    },
+                    VarPos::UpValue(_)  => {},
+                    VarPos::Global(_)   => {},
+                    VarPos::Const(_)    => {},
+                    VarPos::Local(_i)   => return p.clone(),
+                }
+            },
         }
 
-        fn local_env_size(ce: &CompileEnvRef) -> usize {
+        let next_index = self.locals.len();
+        self.locals.push(CompileLocal {
+            is_upvalue: false,
+        });
+        self.local_map.insert(String::from(s), VarPos::Local(next_index));
+        VarPos::Local(next_index)
+    }
+
+    fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
+        //d// println!("COPY UPVALS: {:?}", self.upvals);
+        for p in self.upvals.iter() {
+            match p {
+                VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
+                VarPos::Local(i) => {
+                    upvalues.push(e.get_local_up_promotion(*i));
+                },
+                VarPos::Global(_) => {
+                    panic!("Globals can't be captured as upvalues!");
+                },
+                VarPos::Const(_) => {
+                    panic!("Consts can't be captured as upvalues!");
+                },
+                VarPos::NoPos => upvalues.push(VVal::Nul.to_ref()),
+            }
+        }
+    }
+
+    fn local_env_size(ce: &CompileEnvRef) -> usize {
         ce.borrow().locals.len()
     }
 
@@ -1033,7 +1202,6 @@ fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut
 }
 
 fn compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
-println!("COMCOSNT:{}",val.s());
     match val {
         VVal::Lst(l) => {
             let l = l.borrow();
@@ -1774,14 +1942,9 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let e  = &mut gr.env;
                         let hm = &mm.borrow();
                         let mod_name = name.s_raw();
-//                        println!("FFFFFFFFFFFFFFF ***** '{}'", mod_name);
-//                        for (k, v) in hm.iter() {
-//                            println!("MODULE MEM: '{}': {:?} => {:?}/{:?}", k, v, hm.get(&mod_name).is_some(), hm.get(k).is_some());
-//                        }
-//                        println!("GET NAME: {:?}", hm.get(&mod_name));
+
                         if let Some(stbl) = hm.get(&mod_name) {
                             for (k, v) in &stbl.symbols {
-//                                println!("IMPORT: {}", k);
                                 e.insert(s_prefix.clone() + &k, v.clone());
                             }
                             return Ok(Box::new(move |_e: &mut Env| { Ok(VVal::Nul) }));
@@ -4661,5 +4824,13 @@ mod tests {
             !@import c tests:test_mod_const;
             c:X2
         "), "$[1,2]");
+    }
+
+    #[test]
+    fn check_threads() {
+        assert_eq!(s_eval("
+            !h = std:thread:spawn $q( $[1,2,${a=20},:x] );
+            std:thread:join h;
+        "), "$[1,2,${a=20},:\"x\"]");
     }
 }
