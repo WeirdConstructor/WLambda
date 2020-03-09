@@ -2,6 +2,7 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 
 mod vval;
+mod aval;
 mod parser;
 mod compiler;
 mod prelude;
