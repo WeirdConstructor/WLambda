@@ -11,15 +11,15 @@ use fnv::FnvHashMap;
 enum AVal {
     Free,
     Nul,
-    Err(usize, String),
+    Err(Box<AVal>, String),
     Bol(bool),
     Sym(String),
     Str(String),
     Byt(Vec<u8>),
     Int(i64),
     Flt(f64),
-    Lst(Vec<usize>),
-    Map(FnvHashMap<String, usize>),
+    Lst(Vec<AVal>),
+    Map(FnvHashMap<String, AVal>),
 }
 
 #[derive(Clone, Debug)]
@@ -134,7 +134,15 @@ impl AtomicAVal {
     fn store(&mut self, vv: VVal) {
     }
 
-    fn read(&mut self, vv: VVal) {
+    fn read(&mut self) -> VVal {
+        VVal::Nul
+    }
+
+    fn store_at(&mut self, keypath: &VVal, vv: VVal) {
+    }
+
+    fn read_at(&mut self, keypath: &VVal) -> VVal {
+        VVal::Nul
     }
 }
 
