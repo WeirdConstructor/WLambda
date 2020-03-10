@@ -4001,7 +4001,7 @@ fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackActio
         }
     }
     if argc == 0 {
-        writeln!(write, "").ok();
+        writeln!(write).ok();
     }
     if argc > 0 {
         Ok(env.arg(argc - 1))
@@ -5340,10 +5340,10 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "sync:atom:read",
         |env: &mut Env, _argc: usize| {
-            let mut av = env.arg(0);
+            let av = env.arg(0);
             if let VVal::Usr(mut avu) = av {
                 if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
-                    return Ok(ud.read());
+                    Ok(ud.read())
                 } else {
                     Ok(env.new_err(
                         format!("Value is not an AtomicAVal: {}", avu.s())))
@@ -5356,7 +5356,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "sync:atom:write",
         |env: &mut Env, _argc: usize| {
-            let mut av = env.arg(0);
+            let av = env.arg(0);
             if let VVal::Usr(mut avu) = av {
                 if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
                     let v = env.arg(1);
@@ -5371,6 +5371,74 @@ pub fn std_symbol_table() -> SymbolTable {
                     format!("Value is not a user data AtomicAVal: {}", av.s())))
             }
         }, Some(2), Some(2), false);
+
+    func!(st, "thread:spawn",
+        move |env: &mut Env, argc: usize| {
+            let code = env.arg(0).s_raw();
+            let avs =
+                if argc > 1 {
+                    let mut avs = vec![];
+                    for (i, (v, k)) in env.arg(1).iter().enumerate() {
+                        let av =
+                            if let VVal::Usr(mut vu) = v {
+                                if let Some(avu) = vu.as_any().downcast_mut::<AtomicAVal>() {
+                                    avu.clone()
+                                } else {
+                                    AtomicAVal::new()
+                                }
+                            } else {
+                                let av = AtomicAVal::new();
+                                av.store(&v);
+                                av
+                            };
+
+                        if let Some(k) = k {
+                            avs.push((k.s_raw(), av));
+                        } else {
+                            avs.push((format!("THREAD_ARG{}", i), av));
+                        }
+                    }
+                    Some(avs)
+                } else {
+                    None
+                };
+
+            let tc = env.global.borrow().get_thread_creator();
+            if let Some(tc) = &tc {
+                let ntc = tc.clone();
+                match tc.lock() {
+                    Ok(mut tcg) => {
+                        Ok(tcg.spawn(ntc, code, avs))
+                    },
+                    Err(e) => {
+                        Err(StackAction::panic_str(
+                            format!("Couldn't create thread: {}", e),
+                            None))
+                    },
+                }
+
+            } else {
+                Err(StackAction::panic_str(
+                    "This global environment does not provide threads.".to_string(),
+                    None))
+            }
+        }, Some(1), Some(2), false);
+
+    func!(st, "thread:join",
+        move |env: &mut Env, _argc: usize| {
+            let hdl = env.arg(0);
+            if let VVal::Usr(mut hdl) = hdl {
+                if let Some(ud) = hdl.as_any().downcast_mut::<DefaultThreadHandle>() {
+                    Ok(ud.join(env))
+                } else {
+                    Ok(env.new_err(
+                        format!("Value is not a DefaultThreadHandle: {}", hdl.s())))
+                }
+            } else {
+                Ok(env.new_err(
+                    format!("Value is not a user data DefaultThreadHandle: {}", hdl.s())))
+            }
+        }, Some(1), Some(1), false);
 
     st
 }

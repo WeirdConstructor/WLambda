@@ -1,16 +1,50 @@
 // Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
+/*!
+
+This module provides threading functionality for WLambda.
+It does not depend on anything else than the Rust standard library.
+
+If you want to implement or specialize thread creation please
+refer to the documentation of the `ThreadCreator` trait.
+
+*/
+
 use crate::vval::*;
+use crate::compiler::*;
 
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
+use std::fmt::Formatter;
 
 use fnv::FnvHashMap;
 
+/// AVal is a copy-by-value structure for storing the most
+/// important data of VVals inside an atomic container (AtomicAVal).
+///
+/// You can create an AVal from a VVal like this:
+/// ```
+/// use wlambda::*;
+///
+/// let av = {
+///     let v = VVal::vec();
+///     v.push(VVal::Int(1));
+///     v.push(VVal::Int(2));
+///     v.push(VVal::Int(3));
+///
+///     AVal::from_vval(&v)
+/// };
+///
+/// /// You get back the VVal like this:
+///
+/// assert_eq!(av.to_vval().s(), "$[1,2,3]");
+/// ```
+///
+/// And get back the VVal like this:
 #[derive(Clone, Debug)]
 pub enum AVal {
     Nul,
@@ -27,6 +61,10 @@ pub enum AVal {
 }
 
 impl AVal {
+    /// Takes a path of indices and the start index of that path,
+    /// and sets the addressed slot to the given AVal.
+    /// This is used by `std:sync:atom:write_at`.
+    #[allow(dead_code)]
     pub fn set_at_path(&mut self, path_idx: usize, pth: &VVal, av: AVal) {
         match pth.at(path_idx).unwrap_or(VVal::Nul) {
             VVal::Int(i) => {
@@ -47,6 +85,12 @@ impl AVal {
         }
     }
 
+    /// Converts the AVal back to a VVal.
+    ///
+    /// ```
+    /// use wlambda::*;
+    /// assert_eq!(AVal::Sym(String::from("x")).to_vval().s(), ":\"x\"");
+    /// ```
     pub fn to_vval(&self) -> VVal {
         match self {
             AVal::Nul    => VVal::Nul,
@@ -82,6 +126,18 @@ impl AVal {
         }
     }
 
+    /// Converts a VVal to an AVal.
+    ///
+    /// ```
+    /// use wlambda::*;
+    ///
+    /// let av = AVal::from_vval(&VVal::new_sym("x"));
+    /// if let AVal::Sym(s) = av {
+    ///     assert_eq!(s, "x");
+    /// } else {
+    ///     assert!(false);
+    /// }
+    /// ```
     pub fn from_vval(v: &VVal) -> Self {
         match v {
             VVal::Nul => AVal::Nul,
@@ -128,7 +184,7 @@ impl AVal {
 
 /// WLambda:
 ///
-/// ```
+/// ```text
 /// !atom = std:sync:atom:new 10;
 /// !queue = std:sync:mpsc:new[];
 /// !thrd = std:spawn_thread $q{
@@ -147,14 +203,27 @@ impl AVal {
 ///
 /// ```
 
+/// Wraps an AVal like this: Arc<RwLock<AVal>>.
+/// An AtomicAVal is a thread safe container for VVal
+/// data structures. It's used by WLambda functions like
+/// `std:sync:atom:new`, `std:sync:atom:read` or `std:sync:atom:write`.
+///
+/// These containers are shared between the threads by passing them
+/// to the threads at `std:thread:spawn`.
 #[derive(Clone, Debug)]
 pub struct AtomicAVal(Arc<RwLock<AVal>>);
 
+impl Default for AtomicAVal {
+    fn default() -> Self { AtomicAVal::new() }
+}
+
 impl AtomicAVal {
+    /// Creates a new empty instance, containing AVal::Nul.
     pub fn new() -> Self {
         Self(Arc::new(RwLock::new(AVal::Nul)))
     }
 
+    /// Locks and stores the VVal.
     pub fn store(&self, vv: &VVal) {
         let new_av = AVal::from_vval(vv);
         if let Ok(mut guard) = self.0.write() {
@@ -162,22 +231,25 @@ impl AtomicAVal {
         }
     }
 
+    /// Locks and reads the AVal and converts it to a VVal.
     pub fn read(&self) -> VVal {
         if let Ok(guard) = self.0.read() {
             guard.to_vval()
         } else {
-            return VVal::err_msg("Lock Poisoned");
+            VVal::err_msg("Lock Poisoned")
         }
     }
 
-    pub fn store_at(&self, keypath: &VVal, vv: &VVal) {
+    /// Locks and stores the VVal at the given key path.
+    pub fn store_at(&self, _keypath: &VVal, vv: &VVal) {
         let new_av = AVal::from_vval(vv);
         if let Ok(mut guard) = self.0.write() {
             *guard = new_av;
         }
     }
 
-    pub fn read_at(&self, keypath: &VVal) -> VVal {
+    /// Locks and reads the AVal at the given key path.
+    pub fn read_at(&self, _keypath: &VVal) -> VVal {
         VVal::Nul
     }
 }
@@ -186,5 +258,144 @@ impl VValUserData for AtomicAVal {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
         Box::new(self.clone())
+    }
+}
+
+/// This trait allows WLambda to create new threads.
+/// You can either use the `DefaultThreadCreator`
+/// default implementation or provide your own. Providing
+/// your own might be necessary if you want to customize
+/// how a thread is created.
+///
+/// Please refer to the source of `DefaultThreadCreator`
+/// for a comprehensive example.
+///
+/// ```
+/// use wlambda::*;
+/// use wlambda::threads::*;
+/// use std::sync::Arc;
+/// use std::sync::Mutex;
+///
+/// // For simplicity we make detached threads here and don't pass any globals.
+/// pub struct CustomThreadCreator();
+///
+/// impl ThreadCreator for CustomThreadCreator {
+///     fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+///              code: String,
+///              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
+///
+///         let tcc = tc.clone();
+///         let hdl =
+///             std::thread::spawn(move || {
+///                 let genv = GlobalEnv::new_empty_default();
+///                 genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
+///
+///                 let mut ctx = EvalContext::new(genv);
+///
+///                 match ctx.eval(&code) {
+///                     Ok(v) => AVal::from_vval(&v),
+///                     Err(e) => {
+///                         AVal::Err(
+///                             Box::new(
+///                                 AVal::Str(format!("Error in Thread: {}", e))),
+///                             String::from("?"))
+///                     }
+///                 }
+///             });
+///         VVal::Nul
+///     }
+/// }
+/// ```
+pub trait ThreadCreator: Send {
+    /// Spawns a new thread with the given ThreadCreator.
+    /// You need to pass the `tc` reference, so that the
+    /// GlobalEnv of the thread also knows how to
+    /// create new threads. You could even pass a different
+    /// ThreadCreator for those.
+    ///
+    /// `code` is a String containing WLambda code which
+    /// is executed after the new thread has been spawned.
+    /// `globals` is a mapping of global variable names and
+    /// AtomicAVal instances that are loaded into the threads
+    /// global environment. This is the only way to share
+    /// data between threads.
+    fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+             code: String,
+             globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal;
+}
+
+impl std::fmt::Debug for dyn ThreadCreator {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "<<ThreadCreator>>")
+    }
+}
+
+/// Default implementation of a ThreadCreator.
+///
+/// See also `GlobalEnv::new_default` for further information
+/// how this may be used.
+pub struct DefaultThreadCreator();
+
+#[allow(clippy::new_without_default)]
+impl DefaultThreadCreator {
+    pub fn new() -> Self { Self {} }
+}
+
+/// To join a thread that was created by a DefaultThreadCreator
+/// this JoinHandle wrapper is used. It provides a way to wrap it
+/// into a `VValUserData` and use it by the WLambda function `std:thread:join`.
+#[derive(Clone)]
+pub struct DefaultThreadHandle(Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>>);
+
+impl DefaultThreadHandle {
+    /// Joins the handle, and returns the result VVal of the thread.
+    pub fn join(&self, env: &mut Env) -> VVal {
+        let hdl = std::mem::replace(&mut (*self.0.borrow_mut()), None);
+        if let Some(h) = hdl {
+            h.join().unwrap().to_vval()
+        } else {
+            env.new_err(
+                "DefaultThreadHandle already joined!".to_string())
+        }
+    }
+}
+
+impl VValUserData for DefaultThreadHandle {
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
+        Box::new(self.clone())
+    }
+}
+
+impl ThreadCreator for DefaultThreadCreator {
+    fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+             code: String,
+             globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
+
+        let tcc = tc.clone();
+        let hdl =
+            std::thread::spawn(move || {
+                let genv = GlobalEnv::new_empty_default();
+                genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
+
+                if let Some(globals) = globals {
+                    for (k, av) in globals {
+                        genv.borrow_mut().set_var(&k, &VVal::Usr(Box::new(av)));
+                    }
+                }
+
+                let mut ctx = EvalContext::new(genv);
+
+                match ctx.eval(&code) {
+                    Ok(v) => AVal::from_vval(&v),
+                    Err(e) => {
+                        AVal::Err(
+                            Box::new(
+                                AVal::Str(format!("Error in Thread: {}", e))),
+                            String::from("?"))
+                    }
+                }
+            });
+        VVal::Usr(Box::new(DefaultThreadHandle(Rc::new(RefCell::new(Some(hdl))))))
     }
 }

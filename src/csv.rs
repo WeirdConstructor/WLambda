@@ -1,6 +1,13 @@
 // Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
+/*!
+
+Implements a CSV parser to be used by serialization and deserialization
+utility WLambda functions `std:ser:csv` and `std:deser:csv`.
+
+*/
+
 use crate::vval::VVal;
 
 struct CSVParser {

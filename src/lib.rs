@@ -630,6 +630,7 @@ pub use vval::VVal;
 pub use vval::Env;
 pub use vval::StackAction;
 pub use vval::VValUserData;
+pub use threads::AVal;
 pub use compiler::GlobalEnv;
 pub use compiler::EvalContext;
 pub use compiler::eval;

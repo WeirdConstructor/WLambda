@@ -14,6 +14,8 @@ use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Display, Debug, Formatter};
 
+use crate::compiler::{GlobalEnv, GlobalEnvRef};
+
 use fnv::FnvHashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -210,14 +212,17 @@ pub struct Env {
     pub accum_val: VVal,
     /// Current accumulator function:
     pub accum_fun: VVal,
+    /// A pointer to the global environment, holding stuff like
+    /// the module loader and thread creator.
+    pub global: GlobalEnvRef,
 }
 
-impl Default for Env {
-    fn default() -> Self { Self::new() }
-}
-
+//impl Default for Env {
+//    fn default() -> Self { Self::new() }
+//}
+//
 impl Env {
-    pub fn new() -> Env {
+    pub fn new(global: GlobalEnvRef) -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             current_self:       VVal::Nul,
@@ -230,12 +235,13 @@ impl Env {
             accum_fun:          VVal::Nul,
             accum_val:          VVal::Nul,
             call_stack:         vec![],
+            global
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
     }
 
-    pub fn new_with_user(user: Rc<RefCell<dyn std::any::Any>>) -> Env {
+    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             current_self:       VVal::Nul,
@@ -248,6 +254,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             user,
+            global,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -1010,7 +1017,8 @@ pub struct DropVVal {
 impl Drop for DropVVal {
     #[allow(unused_must_use)]
     fn drop(&mut self) {
-        let mut e = Env::new();
+        let global = GlobalEnv::new_default();
+        let mut e = Env::new(global);
         e.push(self.v.clone());
         if let Err(e) = self.fun.call_internal(&mut e, 1) {
             eprintln!("Error in drop function: {}", e);
@@ -1199,6 +1207,9 @@ impl CycleCheck {
     }
 }
 
+pub type VValIter =
+    std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>>;
+
 #[allow(dead_code)]
 impl VVal {
     pub fn new_str(s: &str) -> VVal {
@@ -1351,7 +1362,7 @@ impl VVal {
     ///
     /// assert_eq!(sum, 68);
     /// ```
-    pub fn iter(&self) -> std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>> {
+    pub fn iter(&self) -> VValIter {
         match self {
             VVal::Lst(l) => {
                 let l = l.clone();

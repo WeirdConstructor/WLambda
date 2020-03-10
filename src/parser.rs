@@ -833,7 +833,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(a)
 
             } else {
-                ps.err_bad_value(&format!("Expected accumulator value"))
+                ps.err_bad_value("Expected accumulator value")
             }
         },
         '+' => {
