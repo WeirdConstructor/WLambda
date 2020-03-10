@@ -206,22 +206,22 @@ pub fn to_csv(delim: char, row_sep: &str, escape_all: bool, table: VVal) -> Stri
             if !first_field { ret.push(delim); }
             else { first_field = false; }
 
-            let field = cell.s_raw();
-
-            if escape_all
-               || field.find(|c| need_escape_chars.find(c).is_some()).is_some()
-            {
-                ret.push('"');
-                for c in field.chars() {
-                    match c {
-                        '"' => { ret += "\"\""; }
-                        _   => { ret.push(c); }
+            cell.with_s_ref(|field: &str| {
+                if escape_all
+                   || field.find(|c| need_escape_chars.find(c).is_some()).is_some()
+                {
+                    ret.push('"');
+                    for c in field.chars() {
+                        match c {
+                            '"' => { ret += "\"\""; }
+                            _   => { ret.push(c); }
+                        }
                     }
+                    ret.push('"');
+                } else {
+                    ret += &field;
                 }
-                ret.push('"');
-            } else {
-                ret += &field;
-            }
+            })
         }
 
         ret += row_sep;

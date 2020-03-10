@@ -1017,77 +1017,77 @@ fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
 
 fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Result<EvalNode, CompileError> {
     let var = ast.at(1).unwrap();
-    let s = var.s_raw();
-
-    if to_ref {
-        match &s[..] {
-            "_"  => { set_impl_arity(1,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0).to_ref()) })) },
-            "_1" => { set_impl_arity(2,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1).to_ref()) })) },
-            "_2" => { set_impl_arity(3,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2).to_ref()) })) },
-            "_3" => { set_impl_arity(4,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3).to_ref()) })) },
-            "_4" => { set_impl_arity(5,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4).to_ref()) })) },
-            "_5" => { set_impl_arity(6,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5).to_ref()) })) },
-            "_6" => { set_impl_arity(7,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6).to_ref()) })) },
-            "_7" => { set_impl_arity(8,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7).to_ref()) })) },
-            "_8" => { set_impl_arity(9,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8).to_ref()) })) },
-            "_9" => { set_impl_arity(10, ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9).to_ref()) })) },
-            "@"  => {
-                ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                Ok(Box::new(move |e: &mut Env| { Ok(e.argv().to_ref()) }))
-            },
-            _ => {
-                let pos = ce.borrow_mut().get(&s);
-                match pos {
-                    VarPos::UpValue(i) =>
-                        Ok(Box::new(move |e: &mut Env| { Ok(e.get_up_captured_ref(i)) })),
-                    VarPos::Local(i) =>
-                        Ok(Box::new(move |e: &mut Env| { Ok(e.get_local_captured_ref(i)) })),
-                    VarPos::Global(v) =>
-                        Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
-                    VarPos::Const(v) =>
-                        Ok(Box::new(move |_e: &mut Env| { Ok(v.clone().to_ref()) })),
-                    VarPos::NoPos => {
-                        ast.to_compile_err(
-                            format!("Variable '{}' undefined", var.s_raw()))
+    var.with_s_ref(|var_s: &str| -> Result<EvalNode, CompileError> {
+        if to_ref {
+            match var_s {
+                "_"  => { set_impl_arity(1,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0).to_ref()) })) },
+                "_1" => { set_impl_arity(2,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1).to_ref()) })) },
+                "_2" => { set_impl_arity(3,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2).to_ref()) })) },
+                "_3" => { set_impl_arity(4,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3).to_ref()) })) },
+                "_4" => { set_impl_arity(5,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4).to_ref()) })) },
+                "_5" => { set_impl_arity(6,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5).to_ref()) })) },
+                "_6" => { set_impl_arity(7,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6).to_ref()) })) },
+                "_7" => { set_impl_arity(8,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7).to_ref()) })) },
+                "_8" => { set_impl_arity(9,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8).to_ref()) })) },
+                "_9" => { set_impl_arity(10, ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9).to_ref()) })) },
+                "@"  => {
+                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+                    Ok(Box::new(move |e: &mut Env| { Ok(e.argv().to_ref()) }))
+                },
+                _ => {
+                    let pos = ce.borrow_mut().get(var_s);
+                    match pos {
+                        VarPos::UpValue(i) =>
+                            Ok(Box::new(move |e: &mut Env| { Ok(e.get_up_captured_ref(i)) })),
+                        VarPos::Local(i) =>
+                            Ok(Box::new(move |e: &mut Env| { Ok(e.get_local_captured_ref(i)) })),
+                        VarPos::Global(v) =>
+                            Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
+                        VarPos::Const(v) =>
+                            Ok(Box::new(move |_e: &mut Env| { Ok(v.clone().to_ref()) })),
+                        VarPos::NoPos => {
+                            ast.to_compile_err(
+                                format!("Variable '{}' undefined", var_s))
+                        }
+                    }
+                }
+            }
+        } else {
+            match var_s {
+                "_"  => { set_impl_arity(1,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0)) })) },
+                "_1" => { set_impl_arity(2,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1)) })) },
+                "_2" => { set_impl_arity(3,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2)) })) },
+                "_3" => { set_impl_arity(4,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3)) })) },
+                "_4" => { set_impl_arity(5,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4)) })) },
+                "_5" => { set_impl_arity(6,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5)) })) },
+                "_6" => { set_impl_arity(7,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6)) })) },
+                "_7" => { set_impl_arity(8,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7)) })) },
+                "_8" => { set_impl_arity(9,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8)) })) },
+                "_9" => { set_impl_arity(10, ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9)) })) },
+                "@"  => {
+                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+                    Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) }))
+                },
+                _ => {
+                    let pos = ce.borrow_mut().get(var_s);
+                    match pos {
+                        VarPos::UpValue(i) =>
+                            Ok(Box::new(move |e: &mut Env| { Ok(e.get_up(i)) })),
+                        VarPos::Local(i) =>
+                            Ok(Box::new(move |e: &mut Env| { Ok(e.get_local(i)) })),
+                        VarPos::Global(v) =>
+                            Ok(Box::new(move |_e: &mut Env| { Ok(v.deref()) })),
+                        VarPos::Const(v) =>
+                            Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
+                        VarPos::NoPos => {
+                            ast.to_compile_err(
+                                format!("Variable '{}' undefined", var_s))
+                        }
                     }
                 }
             }
         }
-    } else {
-        match &s[..] {
-            "_"  => { set_impl_arity(1,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(0)) })) },
-            "_1" => { set_impl_arity(2,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(1)) })) },
-            "_2" => { set_impl_arity(3,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(2)) })) },
-            "_3" => { set_impl_arity(4,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(3)) })) },
-            "_4" => { set_impl_arity(5,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(4)) })) },
-            "_5" => { set_impl_arity(6,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(5)) })) },
-            "_6" => { set_impl_arity(7,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(6)) })) },
-            "_7" => { set_impl_arity(8,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(7)) })) },
-            "_8" => { set_impl_arity(9,  ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(8)) })) },
-            "_9" => { set_impl_arity(10, ce); Ok(Box::new(move |e: &mut Env| { Ok(e.arg(9)) })) },
-            "@"  => {
-                ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                Ok(Box::new(move |e: &mut Env| { Ok(e.argv()) }))
-            },
-            _ => {
-                let pos = ce.borrow_mut().get(&s);
-                match pos {
-                    VarPos::UpValue(i) =>
-                        Ok(Box::new(move |e: &mut Env| { Ok(e.get_up(i)) })),
-                    VarPos::Local(i) =>
-                        Ok(Box::new(move |e: &mut Env| { Ok(e.get_local(i)) })),
-                    VarPos::Global(v) =>
-                        Ok(Box::new(move |_e: &mut Env| { Ok(v.deref()) })),
-                    VarPos::Const(v) =>
-                        Ok(Box::new(move |_e: &mut Env| { Ok(v.clone()) })),
-                    VarPos::NoPos => {
-                        ast.to_compile_err(
-                            format!("Variable '{}' undefined", var.s_raw()))
-                    }
-                }
-            }
-        }
-    }
+    })
 }
 
 fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, vars: &VVal) {
@@ -1098,7 +1098,7 @@ fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut
             let llen = l.borrow().len();
 
             let var = ast.at(2).unwrap().at(1).unwrap();
-            if var.s_raw() == "@" {
+            if var.with_s_ref(|var: &str| var == "@") {
                 ce.borrow_mut().implicit_arity = prev_arity;
                 set_impl_arity(llen, ce);
             }
@@ -3260,6 +3260,8 @@ mod tests {
         assert_eq!(s_eval("\"\" 2 -1"),                        "\"\"");
         assert_eq!(s_eval("\"foobar\" 6 -1"),                  "\"\"");
         assert_eq!(s_eval("\"foobar\" 6"),                     "\"\"");
+
+        assert_eq!(s_eval("\"foo\" \"a\" :b $b\"c\""),         "\"fooabc\"");
     }
 
     #[test]

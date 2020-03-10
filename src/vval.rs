@@ -1278,7 +1278,7 @@ impl VVal {
     }
 
     pub fn compare_str(&self, b: &VVal) -> std::cmp::Ordering {
-        self.s_raw().cmp(&b.s_raw())
+        self.with_s_ref(|a: &str| b.with_s_ref(|b: &str| a.cmp(b)))
     }
 
     pub fn shallow_clone(&self) -> VVal {
@@ -1640,14 +1640,12 @@ impl VVal {
                                     first_arg.at(1).unwrap_or_else(
                                         || VVal::Int((vval_bytes.borrow().len() - from) as i64))
                                     .i() as usize;
-                                println!("FOFOFOFO {:?}", from);
-                                println!("FOFOFOF4 {:?} | {:?}", cnt, first_arg);
                                 let r : Vec<u8> =
                                     vval_bytes.borrow().iter().skip(from)
                                               .take(cnt).copied().collect();
                                 Ok(VVal::new_byt(r))
                             },
-                            VVal::Map(_) => Ok(first_arg.get_key(&self.s_raw()).unwrap_or(VVal::Nul)),
+                            VVal::Map(_) => Ok(self.with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::Nul))),
                             _ => Ok(VVal::Nul)
                         }
                     } else { Ok(self.clone()) }
@@ -1698,15 +1696,13 @@ impl VVal {
                             },
                             VVal::Str(s2) => {
                                 if argc > 1 {
-                                    // TODO: Fix the extra clone here:
-                                    let mut accum = vval_str.borrow().clone() + &s2.borrow().clone();
-                                    for i in 2..argc {
-                                        accum += &e.arg(i).s_raw();
+                                    let mut accum = vval_str.borrow().clone() + &s2.borrow();
+                                    for i in 1..argc {
+                                        e.arg_ref(i).unwrap().with_s_ref(|s: &str| accum += s);
                                     }
                                     Ok(VVal::new_str_mv(accum))
                                 } else {
-                                    // TODO: Fix the extra clone here:
-                                    Ok(VVal::new_str_mv(vval_str.borrow().clone() + &s2.borrow().clone()))
+                                    Ok(VVal::new_str_mv(vval_str.borrow().clone() + &s2.borrow()))
                                 }
                             },
                             VVal::Map(_) => Ok(first_arg.get_key(&vval_str.borrow()).unwrap_or(VVal::Nul)),
@@ -2212,7 +2208,7 @@ impl VVal {
                     VVal::Sym(s) => { acc.extend_from_slice(s.borrow().as_bytes()); },
                     VVal::Byt(s) => { acc.extend_from_slice(&s.borrow()); },
                     VVal::Bol(b) => { acc.push(*b as u8); },
-                    _ => { acc.extend_from_slice(val.s_raw().as_bytes()); }
+                    _ => { val.with_s_ref(|s: &str| acc.extend_from_slice(s.as_bytes())); }
                 }
             },
             VVal::Str(a) => {
@@ -2226,7 +2222,7 @@ impl VVal {
                             acc.push(b);
                         }
                     },
-                    _ => { acc.push_str(&val.s_raw()); }
+                    _ => { val.with_s_ref(|s: &str| acc.push_str(s)); }
                 }
             },
             VVal::Int(i) => { *i += val.i(); },
@@ -2269,13 +2265,18 @@ impl VVal {
         }
     }
 
-    /// Returns string data unescaped and also turns VVal::Nul into an empty string.
+    /// Returns the string data or converts the value to a string for displaying.
+    /// The conversion format is not for reading the value in again via
+    /// the WLambda parser, it's for accessing the data as pure as possible.
     ///
     /// Use this if you need the raw unescaped contents of VVal::Str, VVal::Sym,
     /// VVal::Byt and other VVals.
     ///
     /// As this is used usually for generating output a VVal::Nul is
     /// turned into an empty string
+    ///
+    /// **There is also `with_s_ref()` which allows you to work with a
+    /// reference to the string, in case you don't need to own the copy!**
     ///
     /// ```
     /// use wlambda::VVal;
@@ -2291,6 +2292,37 @@ impl VVal {
             VVal::Byt(s)  => s.borrow().iter().map(|b| *b as char).collect(),
             VVal::Nul     => String::from(""),
             _             => self.s(),
+        }
+    }
+
+    /// Like s_raw() but returns a reference to the string.
+    ///
+    /// Use this if you need the raw unescaped contents of VVal::Str, VVal::Sym,
+    /// VVal::Byt and other VVals.
+    ///
+    /// As this is used usually for generating output a VVal::Nul is
+    /// turned into an empty string
+    ///
+    /// ```
+    /// use wlambda::VVal;
+    ///
+    /// VVal::Nul.with_s_ref(
+    ///     |s: &str| assert_eq!(s, ""));
+    ///
+    /// VVal::new_str("Test").with_s_ref(
+    ///     |s: &str| assert_eq!(s, "Test"));
+    /// ```
+    #[inline]
+    pub fn with_s_ref<T, R>(&self, f: T) -> R
+        where T: FnOnce(&str) -> R
+    {
+        match self {
+            VVal::Str(s)  => f(&s.borrow()),
+            VVal::Sym(s)  => f(&s.borrow()),
+            VVal::Usr(s)  => f(&s.s_raw()),
+            VVal::Byt(_)  => f(&self.s_raw()),
+            VVal::Nul     => f(""),
+            _             => f(&self.s_raw()),
         }
     }
 
@@ -2470,6 +2502,19 @@ impl VVal {
     /// assert_eq!(v.v_s_raw(0), "12");
     ///```
     pub fn v_s_raw(&self, idx: usize) -> String { self.v_(idx).s_raw() }
+    /// Quick access of a raw string as reference at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::new_str("12"));
+    /// assert_eq!(v.v_with_s_ref(0, |s: &str| s.chars().nth(0).unwrap()), '1');
+    ///```
+    pub fn v_with_s_ref<T, R>(&self, idx: usize, f: T) -> R
+        where T: FnOnce(&str) -> R
+    {
+        self.v_(idx).with_s_ref(f)
+    }
     /// Quick access of the string at the given `key`.
     /// See also `v_k`.
     ///
@@ -2479,6 +2524,19 @@ impl VVal {
     /// assert_eq!(v.v_s_rawk("aaa"), "XYX");
     ///```
     pub fn v_s_rawk(&self, key: &str) -> String { self.v_k(key).s_raw() }
+    /// Quick access of the string as reference at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_map_key(String::from("aaa"), wlambda::VVal::new_str("XYX"));
+    /// assert!(v.v_with_s_refk("aaa", |s: &str| s == "XYX"));
+    ///```
+    pub fn v_with_s_refk<T, R>(&self, key: &str, f: T) -> R
+        where T: FnOnce(&str) -> R
+    {
+        self.v_k(key).with_s_ref(f)
+    }
     /// Quick access of the string representation at the given `idx`.
     /// See also `v_`.
     ///
@@ -2678,7 +2736,7 @@ impl VVal {
                     None    => std::vec::Vec::new(),
                 }
             },
-            _ => self.s_raw().as_bytes().to_vec(),
+            _ => self.with_s_ref(|s: &str| s.as_bytes().to_vec()),
         }
     }
 
@@ -2755,8 +2813,8 @@ impl serde::ser::Serialize for VVal {
         use serde::ser::{SerializeSeq, SerializeMap};
 
         match self {
-            VVal::Str(_)     => serializer.serialize_str(&self.s_raw()),
-            VVal::Sym(_)     => serializer.serialize_str(&self.s_raw()),
+            VVal::Str(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
+            VVal::Sym(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Byt(b)     => serializer.serialize_bytes(&b.borrow()[..]),
             VVal::Nul        => serializer.serialize_none(),
             VVal::Err(_)     => serializer.serialize_str(&self.s()),
@@ -2860,7 +2918,7 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
 
         while let Some((ke, ve)) = map.next_entry()? {
             let k : VVal = ke;
-            v.set_key(&VVal::new_sym(&k.s_raw()), ve).unwrap();
+            v.set_map_key(k.s_raw(), ve);
         }
 
         Ok(v)

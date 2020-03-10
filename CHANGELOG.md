@@ -9,6 +9,9 @@ prelude or other pure Rust functions.
 for functions. This might help finding the actual function where
 the error occured easier.
 * Incompatible Change: Renamed `neg` to `neg_i64`, `uneg` to `neg_u32`.
+* Incompatible Change: Rewrote the complete threading implementation
+of WLambda.
+* Optimization: Removed many unnecessary String allocations.
 * Feature: Added `not_i64` and `not_u32`.
 * Feature: Added compile time constant values: `!:const X = ...`.
 * Documentation: More!

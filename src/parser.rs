@@ -1062,7 +1062,8 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
                 if ps.lookahead("\"") {
                     let s = parse_string(ps, false)?;
-                    Ok(make_sym(ps, &s.at(1).unwrap().s_raw()))
+                    s.at(1).unwrap().with_s_ref(|s: &str|
+                        Ok(make_sym(ps, s)))
                 } else {
                     let id = parse_identifier(ps)?;
                     Ok(make_sym(ps, &id))
