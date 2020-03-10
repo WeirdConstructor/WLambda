@@ -5391,7 +5391,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
             let av = AtomicAVal::new();
-            av.store(&v);
+            av.write(&v);
             Ok(VVal::Usr(Box::new(av)))
         }, Some(1), Some(1), false);
 
@@ -5411,13 +5411,31 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(1), Some(1), false);
 
+    func!(st, "sync:atom:swap",
+        |env: &mut Env, _argc: usize| {
+            let av = env.arg(0);
+            if let VVal::Usr(mut avu) = av {
+                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
+                    let v = env.arg(1);
+                    Ok(ud.swap(&v))
+                } else {
+                    Ok(env.new_err(
+                        format!("Value is not an AtomicAVal: {}", avu.s())))
+                }
+            } else {
+                Ok(env.new_err(
+                    format!("Value is not a user data AtomicAVal: {}", av.s())))
+            }
+        }, Some(2), Some(2), false);
+
+
     func!(st, "sync:atom:write",
         |env: &mut Env, _argc: usize| {
             let av = env.arg(0);
             if let VVal::Usr(mut avu) = av {
                 if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
                     let v = env.arg(1);
-                    ud.store(&v);
+                    ud.write(&v);
                     Ok(v)
                 } else {
                     Ok(env.new_err(
@@ -5444,7 +5462,7 @@ pub fn std_symbol_table() -> SymbolTable {
                                 }
                             } else {
                                 let av = AtomicAVal::new();
-                                av.store(&v);
+                                av.write(&v);
                                 av
                             };
 

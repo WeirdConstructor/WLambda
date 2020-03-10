@@ -19,6 +19,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
+use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::fmt::Formatter;
 
 use fnv::FnvHashMap;
@@ -217,6 +218,53 @@ impl Default for AtomicAVal {
     fn default() -> Self { AtomicAVal::new() }
 }
 
+pub struct AValSender(Rc<Sender<AVal>>);
+
+impl AValSender {
+    pub fn send(&self, v: &VVal) -> VVal {
+        if let Err(e) = self.0.send(AVal::from_vval(v)) {
+            VVal::err_msg(&format!("send error: {}", e))
+        } else {
+            VVal::Bol(true)
+        }
+    }
+}
+
+pub struct AValReceiver(Arc<Mutex<Receiver<AVal>>>);
+
+impl AValReceiver {
+    pub fn try_recv(&self, timeout: i64) -> VVal {
+        match self.0.lock() {
+            Ok(guard) => {
+                match guard.try_recv() {
+                    Ok(av) => av.to_vval(),
+                    Err(TryRecvError::Empty) => VVal::Nul,
+                    Err(e) => {
+                        VVal::err_msg(&format!("try_recv error: {}", e))
+                    }
+                }
+            },
+            Err(e) => {
+                VVal::err_msg(&format!("try_recv error: {}", e))
+            }
+        }
+    }
+}
+
+//impl VValUserData for Sender {
+//    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+//    fn clone_ud(&self) -> Box<dyn VValUserData> {
+//        Box::new(self.clone())
+//    }
+//}
+//
+//impl VValUserData for ReadLock {
+//    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+//    fn clone_ud(&self) -> Box<dyn VValUserData> {
+//        Box::new(self.clone())
+//    }
+//}
+
 impl AtomicAVal {
     /// Creates a new empty instance, containing AVal::Nul.
     pub fn new() -> Self {
@@ -224,10 +272,25 @@ impl AtomicAVal {
     }
 
     /// Locks and stores the VVal.
-    pub fn store(&self, vv: &VVal) {
+    pub fn write(&self, vv: &VVal) -> VVal {
         let new_av = AVal::from_vval(vv);
         if let Ok(mut guard) = self.0.write() {
             *guard = new_av;
+            VVal::Bol(true)
+        } else {
+            VVal::err_msg("Lock Poisoned")
+        }
+    }
+
+    /// Locks and stores the VVal.
+    pub fn swap(&self, vv: &VVal) -> VVal {
+        let new_av = AVal::from_vval(vv);
+        if let Ok(mut guard) = self.0.write() {
+            let ret = guard.to_vval();
+            *guard = new_av;
+            ret
+        } else {
+            VVal::err_msg("Lock Poisoned")
         }
     }
 
