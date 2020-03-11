@@ -1026,17 +1026,20 @@ fn compile_value_access(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bo
     var.with_s_ref(|var_s: &str| -> Result<EnvValue, CompileError> {
         if to_ref {
             match var_s {
-                "_"  => Ok(EnvValue::ArgRef(0)),
-                "_1" => Ok(EnvValue::ArgRef(1)),
-                "_2" => Ok(EnvValue::ArgRef(2)),
-                "_3" => Ok(EnvValue::ArgRef(3)),
-                "_4" => Ok(EnvValue::ArgRef(4)),
-                "_5" => Ok(EnvValue::ArgRef(5)),
-                "_6" => Ok(EnvValue::ArgRef(6)),
-                "_7" => Ok(EnvValue::ArgRef(7)),
-                "_8" => Ok(EnvValue::ArgRef(8)),
-                "_9" => Ok(EnvValue::ArgRef(9)),
-                "@"  => Ok(EnvValue::ArgvRef),
+                "_"  => { set_impl_arity(1,  ce); Ok(EnvValue::ArgRef(0)) },
+                "_1" => { set_impl_arity(2,  ce); Ok(EnvValue::ArgRef(1)) },
+                "_2" => { set_impl_arity(3,  ce); Ok(EnvValue::ArgRef(2)) },
+                "_3" => { set_impl_arity(4,  ce); Ok(EnvValue::ArgRef(3)) },
+                "_4" => { set_impl_arity(5,  ce); Ok(EnvValue::ArgRef(4)) },
+                "_5" => { set_impl_arity(6,  ce); Ok(EnvValue::ArgRef(5)) },
+                "_6" => { set_impl_arity(7,  ce); Ok(EnvValue::ArgRef(6)) },
+                "_7" => { set_impl_arity(8,  ce); Ok(EnvValue::ArgRef(7)) },
+                "_8" => { set_impl_arity(9,  ce); Ok(EnvValue::ArgRef(8)) },
+                "_9" => { set_impl_arity(10, ce); Ok(EnvValue::ArgRef(9)) },
+                "@"  => {
+                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+                    Ok(EnvValue::ArgvRef)
+                },
                 _ => {
                     let pos = ce.borrow_mut().get(var_s);
                     match pos {
@@ -1054,17 +1057,20 @@ fn compile_value_access(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bo
             }
         } else {
             match var_s {
-                "_"  => Ok(EnvValue::Arg(0)),
-                "_1" => Ok(EnvValue::Arg(1)),
-                "_2" => Ok(EnvValue::Arg(2)),
-                "_3" => Ok(EnvValue::Arg(3)),
-                "_4" => Ok(EnvValue::Arg(4)),
-                "_5" => Ok(EnvValue::Arg(5)),
-                "_6" => Ok(EnvValue::Arg(6)),
-                "_7" => Ok(EnvValue::Arg(7)),
-                "_8" => Ok(EnvValue::Arg(8)),
-                "_9" => Ok(EnvValue::Arg(9)),
-                "@"  => Ok(EnvValue::Argv),
+                "_"  => { set_impl_arity(1,  ce); Ok(EnvValue::Arg(0)) },
+                "_1" => { set_impl_arity(2,  ce); Ok(EnvValue::Arg(1)) },
+                "_2" => { set_impl_arity(3,  ce); Ok(EnvValue::Arg(2)) },
+                "_3" => { set_impl_arity(4,  ce); Ok(EnvValue::Arg(3)) },
+                "_4" => { set_impl_arity(5,  ce); Ok(EnvValue::Arg(4)) },
+                "_5" => { set_impl_arity(6,  ce); Ok(EnvValue::Arg(5)) },
+                "_6" => { set_impl_arity(7,  ce); Ok(EnvValue::Arg(6)) },
+                "_7" => { set_impl_arity(8,  ce); Ok(EnvValue::Arg(7)) },
+                "_8" => { set_impl_arity(9,  ce); Ok(EnvValue::Arg(8)) },
+                "_9" => { set_impl_arity(10, ce); Ok(EnvValue::Arg(9)) },
+                "@"  => {
+                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+                    Ok(EnvValue::Argv)
+                },
                 _ => {
                     let pos = ce.borrow_mut().get(var_s);
                     match pos {
@@ -1090,10 +1096,8 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool)
     let var = ast.at(1).unwrap();
     let envval = compile_value_access(ast, ce, to_ref)?;
     Ok(match envval {
-        EnvValue::Arg(i)         => { set_impl_arity(i + 1,  ce);
-                                      Box::new(move |e: &mut Env| { Ok(e.arg(i)) }) },
-        EnvValue::ArgRef(i)      => { set_impl_arity(i + 1,  ce);
-                                      Box::new(move |e: &mut Env| { Ok(e.arg(i).to_ref()) }) },
+        EnvValue::Arg(i)         => { Box::new(move |e: &mut Env| { Ok(e.arg(i)) }) },
+        EnvValue::ArgRef(i)      => { Box::new(move |e: &mut Env| { Ok(e.arg(i).to_ref()) }) },
         EnvValue::Up(i)          => { Box::new(move |e: &mut Env| { Ok(e.get_up(i)) }) },
         EnvValue::UpCapRef(i)    => { Box::new(move |e: &mut Env| { Ok(e.get_up_captured_ref(i)) }) },
         EnvValue::Local(i)       => { Box::new(move |e: &mut Env| { Ok(e.get_local(i)) }) },
@@ -1103,15 +1107,32 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool)
         EnvValue::Const(v)       => { Box::new(move |e: &mut Env| { Ok(v.clone()) }) },
         EnvValue::ConstRef(v)    => { Box::new(move |e: &mut Env| { Ok(v.clone().to_ref()) }) },
         EnvValue::ArgvRef        => {
-            ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
             Box::new(move |e: &mut Env| { Ok(e.argv().to_ref()) })
         },
         // Argv, Ignoring Eval, which won't occur here:
         _ => {
-            ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
             Box::new(move |e: &mut Env| { Ok(e.argv()) })
         }
     })
+}
+
+#[inline]
+fn get_env_value(ev: &EnvValue, e: &mut Env) -> Result<VVal, StackAction> {
+    match ev {
+        EnvValue::Eval(val_call) => val_call(e),
+        EnvValue::Arg(i)         => Ok(e.arg(*i)),
+        EnvValue::ArgRef(i)      => Ok(e.arg(*i).to_ref()),
+        EnvValue::Argv           => Ok(e.argv()),
+        EnvValue::ArgvRef        => Ok(e.argv().to_ref()),
+        EnvValue::Up(i)          => Ok(e.get_up(*i)),
+        EnvValue::UpCapRef(i)    => Ok(e.get_up_captured_ref(*i)),
+        EnvValue::Local(i)       => Ok(e.get_local(*i)),
+        EnvValue::LocalCapRef(i) => Ok(e.get_local_captured_ref(*i)),
+        EnvValue::Global(v)      => Ok(v.deref()),
+        EnvValue::GlobalRef(v)   => Ok(v.clone()),
+        EnvValue::Const(v)       => Ok(v.clone()),
+        EnvValue::ConstRef(v)    => Ok(v.clone().to_ref()),
+    }
 }
 
 fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, vars: &VVal) {
@@ -1577,8 +1598,318 @@ fn generate_get_key(map: EvalNode, idx: EvalNode, spos: SynPos, method: bool)
     }
 }
 
+//fn generate_call(func: EvalNode,
+//                 call_args: Vec<EnvValue>,
+//                 spos: SynPos)
+//    -> EvalNode
+//{
+//    let argc = call_args.len();
+//
+//    match argc {
+//        0 => (Box::new(move |e: &mut Env| {
+//            let f = func(e)?;
+//            let ret = f.call_no_args(e);
+//            if let Err(sa) = ret {
+//                Err(sa.wrap_panic(Some(spos.clone())))
+//            } else {
+//                ret
+//            }
+//        })),
+//        1 => (Box::new(move |e: &mut Env| {
+//            let f = func(e)?;
+//
+//            e.with_pushed_sp(1, |e: &mut Env| {
+//                let v = get_env_value(call_args[0], e)?;
+//                e.set_arg(0, v);
+//                let ret = f.call_internal(e, 1);
+//                if let Err(sa) = ret {
+//                    Err(sa.wrap_panic(Some(spos.clone())))
+//                } else {
+//                    ret
+//                }
+//            })
+//        })),
+//        2 => (Box::new(move |e: &mut Env| {
+//            let f = func(e)?;
+//
+//            e.with_pushed_sp(2, |e: &mut Env| {
+//                let v  = get_env_value(call_args[0], e)?;
+//                let v1 = get_env_value(call_args[1], e)?;
+//                e.set_arg(0, v);
+//                e.set_arg(1, v1);
+//
+//                let ret = f.call_internal(e, 2);
+//                if let Err(sa) = ret {
+//                    Err(sa.wrap_panic(Some(spos.clone())))
+//                } else {
+//                    ret
+//                }
+//            })
+//        })),
+//        3 => (Box::new(move |e: &mut Env| {
+//            let f = func(e)?;
+//
+//            e.with_pushed_sp(3, |e: &mut Env| {
+//                let v = get_env_value(call_args[0], e)?;
+//                let v1 = get_env_value(call_args[1], e)?;
+//                let v2 = get_env_value(call_args[2], e)?;
+//                e.set_arg(0, v);
+//                e.set_arg(1, v1);
+//                e.set_arg(2, v2);
+//
+//                let ret = f.call_internal(e, 3);
+//                if let Err(sa) = ret {
+//                    Err(sa.wrap_panic(Some(spos.clone())))
+//                } else {
+//                    ret
+//                }
+//            })
+//        })),
+//        4 => (Box::new(move |e: &mut Env| {
+//            let f = func(e)?;
+//
+//            e.with_pushed_sp(4, |e: &mut Env| {
+//                let v = get_env_value(call_args[0], e)?;
+//                let v1 = get_env_value(call_args[1], e)?;
+//                let v2 = get_env_value(call_args[2], e)?;
+//                let v3 = get_env_value(call_args[3], e)?;
+//                e.set_arg(0, v);
+//                e.set_arg(1, v1);
+//                e.set_arg(2, v2);
+//                e.set_arg(3, v3);
+//
+//                let ret = f.call_internal(e, 4);
+//                if let Err(sa) = ret {
+//                    Err(sa.wrap_panic(Some(spos.clone())))
+//                } else {
+//                    ret
+//                }
+//            })
+//        })),
+//        5 => (Box::new(move |e: &mut Env| {
+//            let f = func(e)?;
+//
+//            e.with_pushed_sp(5, |e: &mut Env| {
+//                let v = get_env_value(call_args[0], e)?;
+//                let v1 = get_env_value(call_args[1], e)?;
+//                let v2 = get_env_value(call_args[2], e)?;
+//                let v3 = get_env_value(call_args[3], e)?;
+//                let v4 = get_env_value(call_args[4], e)?;
+//                e.set_arg(0, v);
+//                e.set_arg(1, v1);
+//                e.set_arg(2, v2);
+//                e.set_arg(3, v3);
+//                e.set_arg(4, v4);
+//
+//                let ret = f.call_internal(e, 5);
+//                if let Err(sa) = ret {
+//                    Err(sa.wrap_panic(Some(spos.clone())))
+//                } else {
+//                    ret
+//                }
+//            })
+//        })),
+//        6 => (Box::new(move |e: &mut Env| {
+//            let f = func(e)?;
+//
+//            e.with_pushed_sp(6, |e: &mut Env| {
+//                let v = get_env_value(call_args[0], e)?;
+//                let v1 = get_env_value(call_args[1], e)?;
+//                let v2 = get_env_value(call_args[2], e)?;
+//                let v3 = get_env_value(call_args[3], e)?;
+//                let v4 = get_env_value(call_args[4], e)?;
+//                let v5 = get_env_value(call_args[5], e)?;
+//                e.set_arg(0, v);
+//                e.set_arg(1, v1);
+//                e.set_arg(2, v2);
+//                e.set_arg(3, v3);
+//                e.set_arg(4, v4);
+//                e.set_arg(5, v5);
+//
+//                let ret = f.call_internal(e, 6);
+//                if let Err(sa) = ret {
+//                    Err(sa.wrap_panic(Some(spos.clone())))
+//                } else {
+//                    ret
+//                }
+//            })
+//        })),
+//        _ => (Box::new(move |e: &mut Env| {
+//            let f = func(e)?;
+//
+//            e.with_pushed_sp(argc, |e: &mut Env| {
+//                for (i, x) in call_args.iter().enumerate() {
+//                    let v = get_env_value(x, e)?;
+//                    e.set_arg(i, v);
+//                }
+//                let ret = f.call_internal(e, argc);
+//                if let Err(sa) = ret {
+//                    Err(sa.wrap_panic(Some(spos.clone())))
+//                } else {
+//                    ret
+//                }
+//            })
+//        }))
+//    }
+//}
+//
+fn generate_call_val(func: EnvValue,
+                 call_args: Vec<EnvValue>,
+                 spos: SynPos)
+    -> EvalNode
+{
+    let argc = call_args.len();
+
+    match argc {
+        0 => (Box::new(move |e: &mut Env| {
+            let f = get_env_value(&func, e)?;
+            let ret = f.call_no_args(e);
+            if let Err(sa) = ret {
+                Err(sa.wrap_panic(Some(spos.clone())))
+            } else {
+                ret
+            }
+        })),
+        1 => (Box::new(move |e: &mut Env| {
+            let f = get_env_value(&func, e)?;
+
+            e.with_pushed_sp(1, |e: &mut Env| {
+                let v = get_env_value(&call_args[0], e)?;
+                e.set_arg(0, v);
+                let ret = f.call_internal(e, 1);
+                if let Err(sa) = ret {
+                    Err(sa.wrap_panic(Some(spos.clone())))
+                } else {
+                    ret
+                }
+            })
+        })),
+        2 => (Box::new(move |e: &mut Env| {
+            let f = get_env_value(&func, e)?;
+
+            e.with_pushed_sp(2, |e: &mut Env| {
+                let v  = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                e.set_arg(0, v);
+                e.set_arg(1, v1);
+
+                let ret = f.call_internal(e, 2);
+                if let Err(sa) = ret {
+                    Err(sa.wrap_panic(Some(spos.clone())))
+                } else {
+                    ret
+                }
+            })
+        })),
+        3 => (Box::new(move |e: &mut Env| {
+            let f = get_env_value(&func, e)?;
+
+            e.with_pushed_sp(3, |e: &mut Env| {
+                let v = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                let v2 = get_env_value(&call_args[2], e)?;
+                e.set_arg(0, v);
+                e.set_arg(1, v1);
+                e.set_arg(2, v2);
+
+                let ret = f.call_internal(e, 3);
+                if let Err(sa) = ret {
+                    Err(sa.wrap_panic(Some(spos.clone())))
+                } else {
+                    ret
+                }
+            })
+        })),
+        4 => (Box::new(move |e: &mut Env| {
+            let f = get_env_value(&func, e)?;
+
+            e.with_pushed_sp(4, |e: &mut Env| {
+                let v = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                let v2 = get_env_value(&call_args[2], e)?;
+                let v3 = get_env_value(&call_args[3], e)?;
+                e.set_arg(0, v);
+                e.set_arg(1, v1);
+                e.set_arg(2, v2);
+                e.set_arg(3, v3);
+
+                let ret = f.call_internal(e, 4);
+                if let Err(sa) = ret {
+                    Err(sa.wrap_panic(Some(spos.clone())))
+                } else {
+                    ret
+                }
+            })
+        })),
+        5 => (Box::new(move |e: &mut Env| {
+            let f = get_env_value(&func, e)?;
+
+            e.with_pushed_sp(5, |e: &mut Env| {
+                let v = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                let v2 = get_env_value(&call_args[2], e)?;
+                let v3 = get_env_value(&call_args[3], e)?;
+                let v4 = get_env_value(&call_args[4], e)?;
+                e.set_arg(0, v);
+                e.set_arg(1, v1);
+                e.set_arg(2, v2);
+                e.set_arg(3, v3);
+                e.set_arg(4, v4);
+
+                let ret = f.call_internal(e, 5);
+                if let Err(sa) = ret {
+                    Err(sa.wrap_panic(Some(spos.clone())))
+                } else {
+                    ret
+                }
+            })
+        })),
+        6 => (Box::new(move |e: &mut Env| {
+            let f = get_env_value(&func, e)?;
+
+            e.with_pushed_sp(6, |e: &mut Env| {
+                let v = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                let v2 = get_env_value(&call_args[2], e)?;
+                let v3 = get_env_value(&call_args[3], e)?;
+                let v4 = get_env_value(&call_args[4], e)?;
+                let v5 = get_env_value(&call_args[5], e)?;
+                e.set_arg(0, v);
+                e.set_arg(1, v1);
+                e.set_arg(2, v2);
+                e.set_arg(3, v3);
+                e.set_arg(4, v4);
+                e.set_arg(5, v5);
+
+                let ret = f.call_internal(e, 6);
+                if let Err(sa) = ret {
+                    Err(sa.wrap_panic(Some(spos.clone())))
+                } else {
+                    ret
+                }
+            })
+        })),
+        _ => (Box::new(move |e: &mut Env| {
+            let f = get_env_value(&func, e)?;
+
+            e.with_pushed_sp(argc, |e: &mut Env| {
+                for (i, x) in call_args.iter().enumerate() {
+                    let v = get_env_value(x, e)?;
+                    e.set_arg(i, v);
+                }
+                let ret = f.call_internal(e, argc);
+                if let Err(sa) = ret {
+                    Err(sa.wrap_panic(Some(spos.clone())))
+                } else {
+                    ret
+                }
+            })
+        }))
+    }
+}
+
 fn generate_call(func: EvalNode,
-                 call_args: Vec<EvalNode>,
+                 call_args: Vec<EnvValue>,
                  spos: SynPos)
     -> EvalNode
 {
@@ -1598,7 +1929,7 @@ fn generate_call(func: EvalNode,
             let f = func(e)?;
 
             e.with_pushed_sp(1, |e: &mut Env| {
-                let v = call_args[0](e)?;
+                let v = get_env_value(&call_args[0], e)?;
                 e.set_arg(0, v);
                 let ret = f.call_internal(e, 1);
                 if let Err(sa) = ret {
@@ -1612,8 +1943,8 @@ fn generate_call(func: EvalNode,
             let f = func(e)?;
 
             e.with_pushed_sp(2, |e: &mut Env| {
-                let v = call_args[0](e)?;
-                let v1 = call_args[1](e)?;
+                let v  = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
                 e.set_arg(0, v);
                 e.set_arg(1, v1);
 
@@ -1629,9 +1960,9 @@ fn generate_call(func: EvalNode,
             let f = func(e)?;
 
             e.with_pushed_sp(3, |e: &mut Env| {
-                let v = call_args[0](e)?;
-                let v1 = call_args[1](e)?;
-                let v2 = call_args[2](e)?;
+                let v = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                let v2 = get_env_value(&call_args[2], e)?;
                 e.set_arg(0, v);
                 e.set_arg(1, v1);
                 e.set_arg(2, v2);
@@ -1648,10 +1979,10 @@ fn generate_call(func: EvalNode,
             let f = func(e)?;
 
             e.with_pushed_sp(4, |e: &mut Env| {
-                let v = call_args[0](e)?;
-                let v1 = call_args[1](e)?;
-                let v2 = call_args[2](e)?;
-                let v3 = call_args[3](e)?;
+                let v = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                let v2 = get_env_value(&call_args[2], e)?;
+                let v3 = get_env_value(&call_args[3], e)?;
                 e.set_arg(0, v);
                 e.set_arg(1, v1);
                 e.set_arg(2, v2);
@@ -1669,11 +2000,11 @@ fn generate_call(func: EvalNode,
             let f = func(e)?;
 
             e.with_pushed_sp(5, |e: &mut Env| {
-                let v = call_args[0](e)?;
-                let v1 = call_args[1](e)?;
-                let v2 = call_args[2](e)?;
-                let v3 = call_args[3](e)?;
-                let v4 = call_args[4](e)?;
+                let v = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                let v2 = get_env_value(&call_args[2], e)?;
+                let v3 = get_env_value(&call_args[3], e)?;
+                let v4 = get_env_value(&call_args[4], e)?;
                 e.set_arg(0, v);
                 e.set_arg(1, v1);
                 e.set_arg(2, v2);
@@ -1692,12 +2023,12 @@ fn generate_call(func: EvalNode,
             let f = func(e)?;
 
             e.with_pushed_sp(6, |e: &mut Env| {
-                let v = call_args[0](e)?;
-                let v1 = call_args[1](e)?;
-                let v2 = call_args[2](e)?;
-                let v3 = call_args[3](e)?;
-                let v4 = call_args[4](e)?;
-                let v5 = call_args[5](e)?;
+                let v = get_env_value(&call_args[0], e)?;
+                let v1 = get_env_value(&call_args[1], e)?;
+                let v2 = get_env_value(&call_args[2], e)?;
+                let v3 = get_env_value(&call_args[3], e)?;
+                let v4 = get_env_value(&call_args[4], e)?;
+                let v5 = get_env_value(&call_args[5], e)?;
                 e.set_arg(0, v);
                 e.set_arg(1, v1);
                 e.set_arg(2, v2);
@@ -1714,11 +2045,11 @@ fn generate_call(func: EvalNode,
             })
         })),
         _ => (Box::new(move |e: &mut Env| {
-            let f    = func(e)?;
+            let f = func(e)?;
 
             e.with_pushed_sp(argc, |e: &mut Env| {
                 for (i, x) in call_args.iter().enumerate() {
-                    let v = x(e)?;
+                    let v = get_env_value(x, e)?;
                     e.set_arg(i, v);
                 }
                 let ret = f.call_internal(e, argc);
@@ -1778,6 +2109,23 @@ fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
             VarPos::Global(_)  => (),
             VarPos::Const(_)   => (),
         }
+    }
+}
+
+fn compile_to_env_value(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EnvValue, CompileError> {
+    match ast {
+        VVal::Lst(_l) => {
+            let syn  = ast.at(0).unwrap_or(VVal::Nul);
+            let spos = syn.get_syn_pos();
+            let syn  = syn.get_syn();
+
+            match syn {
+                Syntax::Var        => compile_value_access(ast, ce, false),
+                Syntax::CaptureRef => compile_value_access(ast, ce, true),
+                _                  => Ok(EnvValue::Eval(compile(ast, ce)?)),
+            }
+        },
+        _ => Ok(EnvValue::Const(ast.clone())),
     }
 }
 
@@ -2441,8 +2789,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     if let Some((syntax, object, key)) =
                         fetch_object_key_access(&ast.at(1).unwrap()) {
 
-                        let call_args : Vec<EvalNode> =
-                            ast.map_skip(|e| compile(e, ce), 2)?;
+                        let call_args : Vec<EnvValue> =
+                            ast.map_skip(|e| compile_to_env_value(e, ce), 2)?;
 
                         let obj = compile(&object, ce)?;
 
@@ -2484,13 +2832,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         }
 
                     } else {
-                        let mut call_args : Vec<EvalNode> =
-                            ast.map_skip(|e| compile(e, ce), 1)?;
+                        let mut call_args : Vec<EnvValue> =
+                            ast.map_skip(|e| compile_to_env_value(e, ce), 1)?;
                         call_args.reverse();
                         let func = call_args.pop().expect("function in evaluation args list");
                         call_args.reverse();
 
-                        Ok(generate_call(func, call_args, spos))
+                        Ok(generate_call_val(func, call_args, spos))
                     }
                 },
                 Syntax::Func => {
