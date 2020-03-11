@@ -342,12 +342,14 @@ impl Env {
         self.exports.insert(String::from(name), value.clone());
     }
 
+    #[inline]
     pub fn set_bp(&mut self, env_size: usize) -> usize {
         let new_bp = self.sp;
         self.sp += env_size;
         std::mem::replace(&mut self.bp, new_bp)
     }
 
+    #[inline]
     pub fn reset_bp(&mut self, env_size: usize, oldbp: usize) {
         for i in self.bp..self.sp {
             self.args[i] = VVal::Nul;
@@ -361,6 +363,7 @@ impl Env {
         self.current_self.clone()
     }
 
+    #[inline]
     pub fn with_object<T>(&mut self, object: VVal, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let old_self = std::mem::replace(&mut self.current_self, object);
@@ -369,6 +372,7 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn with_local_call_info<T>(&mut self, argc: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let local_size = 0;
@@ -383,6 +387,7 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let local_size = fu.local_size;
@@ -402,6 +407,7 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn with_restore_sp<T>(&mut self, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
 
@@ -411,6 +417,7 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn with_pushed_sp<T>(&mut self, n: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
 
@@ -421,17 +428,20 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn push_sp(&mut self, n: usize) {
         self.sp += n;
         //d// println!("PUSH_SP {} => {}", n, self.sp);
     }
 
+    #[inline]
     pub fn push(&mut self, v: VVal) -> usize {
         self.args[self.sp] = v;
         self.sp += 1;
         self.sp - 1
     }
 
+    #[inline]
     pub fn popn(&mut self, n: usize) {
         if self.sp < n {
             panic!(format!("Stack pointer underflow {} {}", self.sp, n));
@@ -466,19 +476,23 @@ impl Env {
         }
     }
 
+    #[inline]
     pub fn argv(&mut self) -> VVal {
         VVal::vec_from(&self.args[(self.bp - self.argc)..self.bp])
     }
 
+    #[inline]
     pub fn get_up_raw(&mut self, i: usize) -> VVal {
         //d// println!("GET UP {}: {:?}", i, self.fun.upvalues);
         self.call_stack.last().unwrap().upvalues[i].clone()
     }
 
+    #[inline]
     pub fn get_up_captured_ref(&mut self, i: usize) -> VVal {
         self.call_stack.last().unwrap().upvalues[i].to_ref()
     }
 
+    #[inline]
     pub fn get_up(&mut self, i: usize) -> VVal {
         self.call_stack.last().unwrap().upvalues[i].deref()
 //        match self.fun.upvalues[i].deref() {
@@ -492,16 +506,19 @@ impl Env {
 //        }
     }
 
+    #[inline]
     pub fn set_arg(&mut self, i: usize, v: VVal) {
         //d// println!("SET ARG [{}/{}]= {}", i, self.sp - (i + 1), v.s());
         self.args[self.sp - (i + 1)] = v;
     }
 
+    #[inline]
     pub fn arg_ref(&self, i: usize) -> Option<&VVal> {
         if i >= self.argc { return None; }
         Some(&self.args[self.bp - (i + 1)])
     }
 
+    #[inline]
     pub fn arg_err_internal(&self, i: usize) -> Option<VVal> {
         let v = &self.args[self.bp - (i + 1)];
         match v {
@@ -510,6 +527,7 @@ impl Env {
         }
     }
 
+    #[inline]
     pub fn arg(&self, i: usize) -> VVal {
         //d// println!("GET ARGC [{}] = {}", i, self.argc);
         if i >= self.argc { return VVal::Nul; }
@@ -539,6 +557,7 @@ impl Env {
         self.args[idx].to_ref()
     }
 
+    #[inline]
     pub fn get_local(&mut self, i: usize) -> VVal {
         let idx = self.bp + i;
         match &self.args[idx] {

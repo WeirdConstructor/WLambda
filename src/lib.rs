@@ -15,7 +15,7 @@ Here are some of its properties:
 - Simple but unique syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
 - The language is about getting things done quickly, so performance is not a main priority.
-  Current performance is roughly in the ball park of (C)Python, which means
+  Current performance is roughly in the ball park of (C)Python or Perl, which means
   the language is quite possibly too slow where speed is the focus, but fast enough if
   you do any heavy lifting in Rust.
 - No garbage collector. Memory and resource management relies only on reference counting and RAII.

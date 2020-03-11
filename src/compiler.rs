@@ -896,23 +896,22 @@ impl CompileEnv {
         VarPos::Local(next_index)
     }
 
-    fn copy_upvals(&self, e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
-        //d// println!("COPY UPVALS: {:?}", self.upvals);
+    fn get_upval_pos(&self) -> std::vec::Vec<VarPos> {
+        let mut poses = vec![];
         for p in self.upvals.iter() {
             match p {
-                VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
-                VarPos::Local(i) => {
-                    upvalues.push(e.get_local_up_promotion(*i));
-                },
+                VarPos::UpValue(_) => poses.push(p.clone()),
+                VarPos::Local(_) => poses.push(p.clone()),
                 VarPos::Global(_) => {
                     panic!("Globals can't be captured as upvalues!");
                 },
                 VarPos::Const(_) => {
                     panic!("Consts can't be captured as upvalues!");
                 },
-                VarPos::NoPos => upvalues.push(VVal::Nul.to_ref()),
+                VarPos::NoPos => poses.push(p.clone()),
             }
         }
+        poses
     }
 
     fn local_env_size(ce: &CompileEnvRef) -> usize {
@@ -1008,6 +1007,22 @@ fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
         },
         _ => (),
     }
+}
+
+enum EnvVarAccess {
+    Arg(usize),
+    ArgRef(usize),
+    Argv,
+    ArgvRef,
+    UpCap,
+    UpCapRef,
+    LocalCap,
+    LocalCapRef,
+    Global(VVal),
+    GlobalRef(VVal),
+    Const(VVal),
+    ConstRef(VVal),
+    Eval(EvalNode),
 }
 
 fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Result<EvalNode, CompileError> {
@@ -1737,6 +1752,18 @@ fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
             Some((Syntax::GetSym, get_obj, key))
         },
         _ => None,
+    }
+}
+
+fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
+    for u in upvs.iter() {
+        match u {
+            VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
+            VarPos::Local(i)   => upvalues.push(e.get_local_up_promotion(*i)),
+            VarPos::NoPos      => upvalues.push(VVal::Nul.to_ref()),
+            VarPos::Global(_)  => (),
+            VarPos::Const(_)   => (),
+        }
     }
 }
 
@@ -2475,7 +2502,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                                         Some(ev.borrow().1.clone())));
                             }
 
-                            res = VVal::Nul;
+                            res = VVal::Nul; // drop any previous value now.
                             match s(env) {
                                 Ok(v)  => { res = v; },
                                 Err(StackAction::Return((v_lbl, v))) => {
@@ -2529,12 +2556,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     };
 
                     let env_size = CompileEnv::local_env_size(&ce_sub);
+                    let upvs = ce_sub.borrow_mut().get_upval_pos();
                     Ok(Box::new(move |e: &mut Env| {
-                        let mut v = Vec::new();
-                        ce_sub.borrow_mut().copy_upvals(e, &mut v);
+                        let mut upvalues = Vec::new();
+                        copy_upvs(&upvs, e, &mut upvalues);
                         Ok(VValFun::new_val(
                             fun_ref.clone(),
-                            v, env_size, min_args, max_args, false,
+                            upvalues, env_size, min_args, max_args, false,
                             Some(fun_spos.clone())))
                     }))
                 },
