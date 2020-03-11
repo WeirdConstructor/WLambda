@@ -1747,6 +1747,39 @@ fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
     }
 }
 
+/*
+
+    Enum VM, extra value stack:
+
+    SET_UP        <idx>
+    SET_LOCAL     <idx>
+    SET_GLOBAL    <ref>
+    GET_UP        <idx>
+    GET_LOCAL     <idx>
+    GET_GLOBAL    <ref>
+    GET_CONST     <ref>
+    GET_UP_R      <idx>
+    GET_LOCAL_R   <idx>
+    GET_GLOBAL_R  <ref>
+    GET_CONST_R   <ref>
+    IF            <value> <branch1> <branch2>
+    WHILE         <value> <branch>
+    FOR           <value> <branch>
+    CALL          <argc>
+    RET           <label>
+    POPN          <num>
+    ADD
+    SUB
+    DIV
+    MUL
+    LE
+    LT
+    GE
+    GT
+    EQ
+
+*/
+
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     match ast {
         VVal::Lst(_l) => {
