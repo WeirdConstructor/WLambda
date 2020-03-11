@@ -1762,9 +1762,17 @@ fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
     GET_LOCAL_R   <idx>
     GET_GLOBAL_R  <ref>
     GET_CONST_R   <ref>
-    IF            <value> <branch1> <branch2>
-    WHILE         <value> <branch>
-    FOR           <value> <branch>
+    SELF
+    SELF_DATA
+    ACCUM_PUSH    <type>
+    ACCUM_POP
+    PUSH          <value>
+    PUSH_CLOSURE  <programref> 
+    JUMP          <offset>
+    IF            <value> <branch1 len> <branch2 start/len>
+    WHILE         <value> <branch1 len>
+    FOR           <value> <branch1 len>
+    MATCH         <value> <match> <branch start/len>
     CALL          <argc>
     RET           <label>
     POPN          <num>
@@ -1778,6 +1786,7 @@ fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
     GT
     EQ
 
+    Capture spos in a list of $[index, spos]
 */
 
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
