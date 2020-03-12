@@ -5,7 +5,7 @@ use crate::vval::VVal;
 use crate::vval::Syntax;
 use crate::vval::SynPos;
 use crate::vval::FileRef;
-use std::fmt::{Display, Formatter};
+use std::fmt;
 
 /// This is the parser state data structure. It holds the to be read source
 /// code and keeps track of the parser head position.
@@ -31,79 +31,130 @@ pub struct State {
 }
 
 /// The possible errors the parser can detect while reading code.
-///
-/// The errors all take a tuple of 5 elements, with the following
-/// semantics:
-///
-/// ```txt
-///     (<error message>,
-///      <snipped of the following code>,
-///      <line number>,
-///      <column number>,
-///      <file number>)
-/// ```
-#[derive(Debug, Clone, PartialEq)]
-pub enum ParseError {
-    UnexpectedToken((String, String, u32, u32, FileRef)),
-    BadEscape(      (String, String, u32, u32, FileRef)),
-    BadValue(       (String, String, u32, u32, FileRef)),
-    BadKeyword(     (String, String, u32, u32, FileRef)),
-    BadNumber(      (String, String, u32, u32, FileRef)),
-    BadCall(        (String, String, u32, u32, FileRef)),
-    EOF(            (String, String, u32, u32, FileRef)),
+#[derive(Debug, PartialEq)]
+pub enum ParseErrorKind {
+    UnexpectedToken(char, &'static str),
+    BadEscape(&'static str),
+    BadValue(ParseValueError),
+    BadKeyword(String, &'static str),
+    BadNumber(ParseNumberError),
+    //BadCall(&'static str),
+    EOF(&'static str),
 }
-
-fn tuple2str(tp: &(String, String, u32, u32, FileRef)) -> String {
-    format!("error[{},{}:{}] {} at code '{}'", tp.2, tp.3, tp.4.s(), tp.0, tp.1)
-}
-
-pub fn parse_error_to_string(pe: &ParseError) -> String {
-    match pe {
-        ParseError::UnexpectedToken(t) => tuple2str(t),
-        ParseError::BadEscape(t)       => tuple2str(t),
-        ParseError::BadValue(t)        => tuple2str(t),
-        ParseError::BadKeyword(t)      => tuple2str(t),
-        ParseError::BadNumber(t)       => tuple2str(t),
-        ParseError::BadCall(t)         => tuple2str(t),
-        ParseError::EOF(t)             => tuple2str(t),
+impl fmt::Display for ParseErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use ParseErrorKind::*;
+        match self {
+            UnexpectedToken(c, s) => write!(f, "Unexpected token '{}'. {}", c, s),
+            BadEscape(s)          => write!(f, "{}", s),
+            BadValue(s)           => write!(f, "{}", s),
+            BadKeyword(kw, s)     => write!(f, "Got '{}', expected {}", kw, s),
+            BadNumber(s)          => write!(f, "{}", s),
+            BadCall(s)            => write!(f, "{}", s),
+            EOF(s)                => write!(f, "EOF while parsing {}", s),
+        }
     }
 }
 
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", parse_error_to_string(self))
+#[derive(Debug, PartialEq)]
+pub enum ParseValueError {
+    UnknownSpecialIdentifier(char),
+    ExpectedAccumulator,
+    ExpectedMaxArity,
+    ExpectedMinArity,
+}
+impl fmt::Display for ParseValueError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use ParseValueError::*;
+        match self {
+            UnknownSpecialIdentifier(c) => write!(
+                f,
+                "Expected special value, unknown special value identifier '{}'",
+                c
+            ),
+            ExpectedAccumulator => write!(f, "Expected accumulator value"),
+            ExpectedMaxArity    => write!(f, "Expected integer value for min arity"),
+            ExpectedMinArity    => write!(f, "Expected integer value for max arity"),
+        }
+    }
+}
+impl Into<ParseErrorKind> for ParseValueError {
+    fn into(self) -> ParseErrorKind {
+        ParseErrorKind::BadValue(self)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ParseNumberError {
+    InvalidIndexDigits(String),
+    InvalidFractionalDigits(String),
+    UnsupportedRadix(u8),
+    UnsupportedRadixPrefix(char, String),
+    InvalidRadix(String, u8, std::num::ParseIntError),
+}
+impl fmt::Display for ParseNumberError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use ParseNumberError::*;
+        match self {
+            InvalidIndexDigits(r)      => write!(f, "Invalid radix: {}", r),
+            InvalidFractionalDigits(s) => write!(f, "Invalid fractional digits: {}", s),
+            UnsupportedRadix(r)        => write!(f, "Unsupported radix: {}", r),
+            UnsupportedRadixPrefix(body, found) => write!(
+                f,
+                "Unsupported radix prefix. Must be '0{0}'. Found '{1}{0}'",
+                body,
+                found
+            ),
+            InvalidRadix(num, r, e) => write!(
+                f,
+                "'{}' can't be parsed with radix '{}': {}",
+                num, r, e
+            ),
+        }
+    }
+}
+impl Into<ParseErrorKind> for ParseNumberError {
+    fn into(self) -> ParseErrorKind {
+        ParseErrorKind::BadNumber(self)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ParseError {
+    kind: ParseErrorKind,
+    /// A snip of the code that caused this error.
+    snip: String,
+    line: u32,
+    col: u32,
+    file: FileRef
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "error[{},{}:{}] {} at code '{}'",
+            self.line,
+            self.col,
+            self.file.s(),
+            self.kind,
+            self.snip
+        )
     }
 }
 
 #[allow(dead_code)]
 impl State {
-    pub fn err_unexpected_token(&self, c: char, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::UnexpectedToken((format!("Unexpected token '{}'. {}", c, s), self.rest(), self.line_no, self.col_no, self.file.clone())))
+    pub fn err<E: Into<ParseErrorKind>>(&self, kind: E) -> ParseError {
+        ParseError {
+            kind: kind.into(),
+            snip: self.rest(),
+            line: self.line_no,
+            col: self.col_no,
+            file: self.file.clone(),
+        }
     }
 
-    pub fn err_bad_value(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadValue((String::from(s), self.rest(), self.line_no, self.col_no, self.file.clone())))
-    }
-
-    pub fn err_bad_keyword(&self, kw: &str, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadKeyword((format!("Got '{}', expected {}", kw, s), self.rest(), self.line_no, self.col_no, self.file.clone())))
-    }
-
-    pub fn err_bad_number(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadNumber((String::from(s), self.rest(), self.line_no, self.col_no, self.file.clone())))
-    }
-
-    pub fn err_bad_call(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadCall((String::from(s), self.rest(), self.line_no, self.col_no, self.file.clone())))
-    }
-
-    pub fn err_eof(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::EOF((format!("EOF while parsing {}", s), self.rest(), self.line_no, self.col_no, self.file.clone())))
-    }
-
-    pub fn err_bad_escape(&self, s: &str) -> Result<VVal,ParseError> {
-        Err(ParseError::BadEscape((String::from(s), self.rest(), self.line_no, self.col_no, self.file.clone())))
-    }
 
     /// Creates a `VVal::Syn` annotated with the current parse head position.
     pub fn syn_raw(&self, s: Syntax) -> VVal {
@@ -384,11 +435,7 @@ impl State {
 
     pub fn expect_some<T>(&self, o: Option<T>) -> Result<T, ParseError> {
         match o {
-            None => {
-                Err(ParseError::EOF(
-                    ("Unexpected EOF".to_string(), self.rest(),
-                    self.line_no, self.col_no, self.file.clone())))
-            },
+            None => Err(self.err(ParseErrorKind::EOF("Unexpected EOF"))),
             Some(r) => Ok(r)
         }
     }

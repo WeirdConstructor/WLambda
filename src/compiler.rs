@@ -24,12 +24,12 @@ struct CompileLocal {
     is_upvalue: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[allow(dead_code)]
-pub enum ModuleLoadError {
+pub enum ModuleLoadError<'a> {
     NoSuchModule(String),
     ModuleEvalError(EvalError),
-    Other(String),
+    Other(&'a str),
 }
 
 /// This trait is responsible for loading modules
@@ -393,21 +393,21 @@ enum VarPos {
     Global(VVal),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum EvalError {
-    IOError(String),
-    ParseError(parser::ParseError),
+    IOError(String, std::io::Error),
+    ParseError(String),
     CompileError(CompileError),
-    ExecError(String),
+    ExecError(StackAction),
 }
 
 impl Display for EvalError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            EvalError::IOError(e)      => { write!(f, "IO error: {}", e) },
-            EvalError::ParseError(e)   => { write!(f, "Parse error: {}", e) },
-            EvalError::CompileError(e) => { write!(f, "Compile error: {}", e) },
-            EvalError::ExecError(s)    => { write!(f, "Execution error: {}", s) },
+            EvalError::IOError(file, e) => write!(f, "IO error: file '{}': {} ", file, e),
+            EvalError::ParseError(e)    => write!(f, "Parse error: {}", e),
+            EvalError::CompileError(e)  => write!(f, "Compile error: {}", e),
+            EvalError::ExecError(s)     => write!(f, "Execution error: Jumped out of execution: {:?}", s),
         }
     }
 }
@@ -570,8 +570,7 @@ impl EvalContext {
                         {
                             Ok(v)   => Ok(v),
                             Err(je) =>
-                                Err(EvalError::ExecError(
-                                    format!("Jumped out of execution: {:?}", je))),
+                                Err(EvalError::ExecError(je)),
                         }
                     },
                     Err(e) => { Err(EvalError::CompileError(e)) },
@@ -610,12 +609,12 @@ impl EvalContext {
         pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
             let contents = std::fs::read_to_string(filename);
             if let Err(err) = contents {
-                Err(EvalError::IOError(format!("file '{}': {}", filename, err)))
+                Err(EvalError::IOError(filename.to_string(), err))
             } else {
                 let contents = contents.unwrap();
                 match parser::parse(&contents, filename) {
-                    Ok(ast) => { self.eval_ast(&ast) },
-                    Err(e)  => { Err(EvalError::ParseError(e)) },
+                    Ok(ast) => self.eval_ast(&ast),
+                    Err(e)  => Err(EvalError::ParseError(e)),
                 }
             }
         }
@@ -634,8 +633,8 @@ impl EvalContext {
             -> Result<VVal, EvalError>
         {
             match parser::parse(code, filename) {
-                Ok(ast) => { self.eval_ast(&ast) },
-                Err(e)  => { Err(EvalError::ParseError(e)) },
+                Ok(ast) => self.eval_ast(&ast),
+                Err(e)  => Err(EvalError::ParseError(e)),
             }
         }
 
@@ -1682,7 +1681,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 
                     if let Some(resolver) = resolver {
 
-                        let exports = resolver.borrow().resolve(glob_ref.clone(), &path, import_file_path);
+                        let r = resolver.borrow();
+                        let exports = r.resolve(glob_ref.clone(), &path, import_file_path);
                         match exports {
                             Err(ModuleLoadError::NoSuchModule(p)) => {
                                 ast.to_compile_err(
