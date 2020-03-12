@@ -60,6 +60,7 @@ impl fmt::Display for ParseErrorKind {
 pub enum ParseValueError {
     Expected(&'static str),
     UnknownSpecialIdentifier(char),
+    VectorLength,
     ExpectedAccumulator,
     ExpectedMaxArity,
     ExpectedMinArity,
@@ -78,6 +79,7 @@ impl fmt::Display for ParseValueError {
                 "Expected {}",
                 s
             ),
+            VectorLength        => write!(f, "Numerical Vectors must have 2 to 4 values, inclusive!"),
             ExpectedAccumulator => write!(f, "Expected accumulator value"),
             ExpectedMaxArity    => write!(f, "Expected integer value for min arity"),
             ExpectedMinArity    => write!(f, "Expected integer value for max arity"),
