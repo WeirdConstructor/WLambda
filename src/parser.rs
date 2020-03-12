@@ -490,7 +490,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
                         'u' => {
                             ps.consume();
                             if !ps.consume_if_eq('{') {
-                                return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "After unicode escape.")));
+                                return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "After unicode escape")));
                             }
 
                             let uh : String = ps.take_while(|c| c.is_digit(16)).iter().collect();
@@ -510,7 +510,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
                             }
 
                             if !ps.consume_if_eq('}') {
-                                return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "After unicode escape.")));
+                                return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "After unicode escape")));
                             }
                         },
                         c => { ps.consume(); adchr(&mut v, &mut s, bytes, c); },
@@ -634,7 +634,7 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
 
 fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_wsc('[') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('[', "At list.")));
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('[', "At list")));
     }
 
     let list = ps.syn(Syntax::Lst);
@@ -1015,7 +1015,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
                 let expr = parse_expr(ps)?;
                 if !ps.consume_if_eq_wsc(')') {
-                    return Err(ps.err(ParseErrorKind::UnexpectedToken(')', "In sub expression.")));
+                    return Err(ps.err(ParseErrorKind::UnexpectedToken(')', "In sub expression")));
                 }
                 Ok(expr)
             },
@@ -1069,12 +1069,12 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(make_var(ps, &id))
             },
             _ => {
-                Err(ps.err(ParseErrorKind::EOF("Expected literal value, sub \
-                                 expression, block, key or identifier.")))
+                Err(ps.err(ParseValueError::Expected("literal value, sub \
+                                 expression, block, key or identifier")))
             }
         }
     } else {
-        Err(ps.err(ParseErrorKind::EOF("value.")))
+        Err(ps.err(ParseErrorKind::EOF("value")))
     }
 }
 
@@ -1223,7 +1223,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
 
 fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a mut VVal, ParseError> {
     if !ps.consume_if_eq_wsc('[') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('[', "At start of call arguments.")));
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('[', "At start of call arguments")));
     }
 
     let is_apply = ps.consume_if_eq_wsc('[');
@@ -1479,7 +1479,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
             if !ps.consume_if_eq_wsc(')') {
                 return Err(ps.err(ParseErrorKind::UnexpectedToken(
-                    ')', "At the end of destructuring assignment.")));
+                    ')', "At the end of destructuring assignment")));
             }
         },
         _ => { ids.push(VVal::new_sym_mv(parse_identifier(ps)?)); }
@@ -1567,7 +1567,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
 /// Parses an arity definition for a function.
 fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_wsc('|') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition.")));
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition")));
     }
 
     if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("parsing arity definition"))); }
@@ -1600,7 +1600,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
     };
 
     if !ps.consume_if_eq_wsc('|') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition.")));
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition")));
     }
 
     Ok(arity)
@@ -1629,7 +1629,7 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
     //println!("parse_block [{}]", ps.rest());
     if is_func {
         if !ps.consume_if_eq_wsc('{') {
-            return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "When parsing a block.")));
+            return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "When parsing a block")));
         }
     }
 
@@ -1658,7 +1658,7 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
     if is_func {
         if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("parsing block"))); }
         if !ps.consume_if_eq_wsc('}') {
-            return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "When parsing a block.")));
+            return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "When parsing a block")));
         }
     }
 
@@ -1814,7 +1814,7 @@ mod tests {
     #[test]
     fn check_expr_err() {
         assert_eq!(parse_error("foo.a[] = 10"),
-            "Parse error: error[1,9:<parser_test>] Expected literal value, sub expression, block, key or identifier. at code \'= 10\'");
+            "Parse error: error[1,9:<parser_test>] Expected literal value, sub expression, block, key or identifier at code \'= 10\'");
     }
 
     #[test]

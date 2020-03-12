@@ -51,13 +51,14 @@ impl fmt::Display for ParseErrorKind {
             BadKeyword(kw, s)     => write!(f, "Got '{}', expected {}", kw, s),
             BadNumber(s)          => write!(f, "{}", s),
             //BadCall(s)            => write!(f, "{}", s),
-            EOF(s)                => write!(f, "EOF while parsing {}", s),
+            EOF(s)                => write!(f, "EOF while parsing: {}", s),
         }
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub enum ParseValueError {
+    Expected(&'static str),
     UnknownSpecialIdentifier(char),
     ExpectedAccumulator,
     ExpectedMaxArity,
@@ -71,6 +72,11 @@ impl fmt::Display for ParseValueError {
                 f,
                 "Expected special value, unknown special value identifier '{}'",
                 c
+            ),
+            Expected(s) => write!(
+                f,
+                "Expected {}",
+                s
             ),
             ExpectedAccumulator => write!(f, "Expected accumulator value"),
             ExpectedMaxArity    => write!(f, "Expected integer value for min arity"),
