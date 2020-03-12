@@ -248,7 +248,7 @@ use crate::vval::Syntax;
 pub mod state;
 
 pub use state::State;
-pub use state::ParseError;
+pub use state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
 
 /*
 
@@ -406,7 +406,7 @@ fn adchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
 
 /// Parsers a WLambda special quote string or byte buffer.
 fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
-    if ps.at_eof { return ps.err_eof("string"); }
+    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("string"))); }
 
     let quote_char = ps.expect_some(ps.peek())?;
     ps.consume();
@@ -437,7 +437,7 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     }
 
     if !ps.consume_if_eq(quote_char) {
-        return ps.err_unexpected_token(quote_char, "");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken(quote_char, "")));
     }
 
     ps.skip_ws_and_comments();
@@ -448,7 +448,7 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 
 /// Parsers a WLambda string or byte buffer.
 fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
-    if ps.at_eof { return ps.err_eof("string"); }
+    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("string"))); }
 
     ps.consume_if_eq('"');
 
@@ -474,10 +474,10 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
                                     if bytes { v.push(cn) }
                                     else { s.push(cn as char); }
                                 } else {
-                                    return ps.err_bad_escape("Bad hex escape in string");
+                                    return Err(ps.err(ParseErrorKind::BadEscape("Bad hex escape in string")));
                                 }
                             } else {
-                                return ps.err_eof("string hex escape");
+                                return Err(ps.err(ParseErrorKind::EOF("string hex escape")));
                             }
                         },
                         'n'  => { ps.consume(); adchr(&mut v, &mut s, bytes, '\n'); },
@@ -490,7 +490,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
                         'u' => {
                             ps.consume();
                             if !ps.consume_if_eq('{') {
-                                return ps.err_unexpected_token('{', "After unicode escape.");
+                                return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "After unicode escape")));
                             }
 
                             let uh : String = ps.take_while(|c| c.is_digit(16)).iter().collect();
@@ -499,22 +499,24 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
                                 if let Some(c) = std::char::from_u32(cn) {
                                     adchr(&mut v, &mut s, bytes, c);
                                 } else {
-                                    return ps.err_bad_escape(
-                                        "Bad char in unicode escape in string");
+                                    return Err(ps.err(ParseErrorKind::BadEscape(
+                                        "Bad char in unicode escape in string"
+                                    )));
                                 }
                             } else {
-                                return ps.err_bad_escape(
-                                    "Bad unicode hex escape in string");
+                                return Err(ps.err(ParseErrorKind::BadEscape(
+                                    "Bad unicode hex escape in string"
+                                )));
                             }
 
                             if !ps.consume_if_eq('}') {
-                                return ps.err_unexpected_token('}', "After unicode escape.");
+                                return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "After unicode escape")));
                             }
                         },
                         c => { ps.consume(); adchr(&mut v, &mut s, bytes, c); },
                     }
                 } else {
-                    return ps.err_eof("string escape");
+                    return Err(ps.err(ParseErrorKind::EOF("string escape")));
                 }
             },
             _ => {
@@ -531,7 +533,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     }
 
     if !ps.consume_if_eq('"') {
-        return ps.err_unexpected_token('\"', "");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('\"', "")));
     }
 
     ps.skip_ws_and_comments();
@@ -541,7 +543,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 
 #[allow(clippy::cast_lossless)]
 fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
-    if ps.at_eof { return ps.err_eof("number"); }
+    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("number"))); }
 
     let c = ps.expect_some(ps.peek())?;
     let sign = match c {
@@ -574,26 +576,23 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
         };
 
         if radix < 2 || radix > 36 {
-            return ps.err_bad_number(&format!("Unsupported radix: {}", radix));
+            return Err(ps.err(ParseNumberError::UnsupportedRadix(radix)));
         }
 
         (radix, ps.take_while(|c| c.is_digit(radix as u32)).iter().collect())
     } else if ps.consume_if_eq('x') {
         if radix_or_num != "0" {
-            return ps.err_bad_number(&format!("Unsupported radix prefix. \
-                                Must be '0x'. Found '{}x'", radix_or_num));
+            return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('x', radix_or_num)));
         }
         (16, ps.take_while(|c| c.is_digit(16)).iter().collect())
     } else if ps.consume_if_eq('b') {
         if radix_or_num != "0" {
-            return ps.err_bad_number(&format!("Unsupported radix prefix. \
-                                Must be '0b'. Found '{}b'", radix_or_num));
+            return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('b', radix_or_num)));
         }
         (2, ps.take_while(|c| c.is_digit(2)).iter().collect())
     } else if ps.consume_if_eq('o') {
         if radix_or_num != "0" {
-            return ps.err_bad_number(&format!("Unsupported radix prefix. \
-                                Must be '0o'. Found '{}o'", radix_or_num));
+            return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('o', radix_or_num)));
         }
         (8, ps.take_while(|c| c.is_digit(8)).iter().collect())
     } else {
@@ -605,7 +604,7 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
         if let Ok(fract_num) = u64::from_str_radix(&fract_digits, radix as u32) {
             (true, (fract_num as f64) / (radix as f64).powf(fract_digits.len() as f64))
         } else {
-            return ps.err_bad_number(&format!("Invalid fractional digits {}", fract_digits));
+            return Err(ps.err(ParseNumberError::InvalidFractionalDigits(fract_digits)));
         }
     } else {
         (false, 0.0)
@@ -629,14 +628,13 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
                 }
             }
         },
-        _ => ps.err_bad_number(&format!(
-                "Couldn't parse number '{}' with radix={}", num, radix)),
+        Err(e) => Err(ps.err(ParseNumberError::InvalidRadix(num, radix, e)))
     }
 }
 
 fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_wsc('[') {
-        return ps.err_unexpected_token('[', "At list.");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('[', "At list")));
     }
 
     let list = ps.syn(Syntax::Lst);
@@ -653,7 +651,7 @@ fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
     }
 
     if !ps.consume_if_eq_wsc(']') {
-        return ps.err_unexpected_token(']', "At the end of list");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken(']', "At the end of list")));
     }
 
     Ok(list)
@@ -662,7 +660,7 @@ fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
 fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
     //println!("parse_map [{}]", ps.rest());
     if !ps.consume_if_eq_wsc('{') {
-        return ps.err_unexpected_token('{', "At map");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "At map")));
     }
 
     let map = ps.syn(Syntax::Map);
@@ -683,7 +681,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
                     parse_expr(ps)?
                 };
                 if !ps.consume_if_eq_wsc('=') {
-                    return ps.err_unexpected_token('=', "After reading map key");
+                    return Err(ps.err(ParseErrorKind::UnexpectedToken('=', "After reading map key")));
                 }
 
                 let elem = VVal::vec();
@@ -696,7 +694,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
     }
 
     if !ps.consume_if_eq_wsc('}') {
-        return ps.err_unexpected_token('}', "At the end of a map");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "At the end of a map")));
     }
 
     Ok(map)
@@ -704,7 +702,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
 
 fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
-    if ps.at_eof { return ps.err_eof("literal value"); }
+    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("literal value"))); }
     let c = ps.expect_some(ps.peek())?;
 
     match c {
@@ -833,7 +831,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(a)
 
             } else {
-                ps.err_bad_value("Expected accumulator value")
+                Err(ps.err(ParseValueError::ExpectedAccumulator))
             }
         },
         '+' => {
@@ -841,10 +839,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             Ok(ps.syn(Syntax::Accum))
         },
         c => {
-            ps.err_bad_value(
-                &format!(
-                    "Expected special value, unknown special value identifier '{}'",
-                    c))
+            Err(ps.err(ParseValueError::UnknownSpecialIdentifier(c)))
         }
     }
 }
@@ -974,7 +969,7 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
                         ps.consume();
                         identifier.push(c);
                     } else {
-                        return Err(ps.err_eof("identifier escape").unwrap_err());
+                        return Err(ps.err(ParseErrorKind::EOF("identifier escape")));
                     }
                 },
                 _ => {
@@ -985,7 +980,7 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
         }
 
         if !ps.consume_if_eq('`') {
-            return Err(ps.err_unexpected_token('`', "").unwrap_err());
+            return Err(ps.err(ParseErrorKind::UnexpectedToken('`', "")));
         }
 
         ps.skip_ws_and_comments();
@@ -1020,7 +1015,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
                 let expr = parse_expr(ps)?;
                 if !ps.consume_if_eq_wsc(')') {
-                    return ps.err_unexpected_token(')', "In sub expression.");
+                    return Err(ps.err(ParseErrorKind::UnexpectedToken(')', "In sub expression")));
                 }
                 Ok(expr)
             },
@@ -1074,12 +1069,12 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(make_var(ps, &id))
             },
             _ => {
-                ps.err_bad_value("Expected literal value, sub \
-                                 expression, block, key or identifier.")
+                Err(ps.err(ParseValueError::Expected("literal value, sub \
+                                 expression, block, key or identifier")))
             }
         }
     } else {
-        ps.err_eof("value.")
+        Err(ps.err(ParseErrorKind::EOF("value")))
     }
 }
 
@@ -1173,7 +1168,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
         let c = if let Some(c) = ps.peek() {
             c
         } else {
-            return ps.err_eof("field access");
+            return Err(ps.err(ParseErrorKind::EOF("field access")));
         };
 
         let value =
@@ -1184,8 +1179,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     ps.skip_ws_and_comments();
                     VVal::Int(idx_num)
                 } else {
-                    return ps.err_bad_number(
-                        &format!("Invalid index digits {}", idx));
+                    return Err(ps.err(ParseNumberError::InvalidIndexDigits(idx)));
                 }
 
             } else if is_ident_start(c) {
@@ -1227,9 +1221,9 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
     Ok(obj)
 }
 
-fn parse_arg_list<'a>(call: &'a mut VVal, ps: &mut State) -> Result<&'a mut VVal, ParseError> {
+fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a mut VVal, ParseError> {
     if !ps.consume_if_eq_wsc('[') {
-        return Err(ps.err_unexpected_token('[', "At start of call arguments.").unwrap_err());
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('[', "At start of call arguments")));
     }
 
     let is_apply = ps.consume_if_eq_wsc('[');
@@ -1256,17 +1250,15 @@ fn parse_arg_list<'a>(call: &'a mut VVal, ps: &mut State) -> Result<&'a mut VVal
     }
 
     if ps.at_eof {
-        return Err(ps.err_eof("call args").unwrap_err());
+        return Err(ps.err(ParseErrorKind::EOF("call args")));
     }
 
     if is_apply && !ps.consume_if_eq_wsc(']') {
-        return Err(ps.err_unexpected_token(']',
-            "While reading apply arguments").unwrap_err());
+        return Err(ps.err(ParseErrorKind::UnexpectedToken(']', "While reading apply arguments")));
     }
 
     if !ps.consume_if_eq_wsc(']') {
-        return Err(ps.err_unexpected_token(']',
-            "While reading call arguments").unwrap_err());
+        return Err(ps.err(ParseErrorKind::UnexpectedToken(']', "While reading call arguments")));
     }
 
     Ok(call)
@@ -1441,7 +1433,7 @@ fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
 
 fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     if ps.at_eof {
-        return ps.err_eof("assignment");
+        return Err(ps.err(ParseErrorKind::EOF("assignment")));
     }
 
     let mut assign = VVal::vec();
@@ -1481,13 +1473,13 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
             }
 
             if ps.at_eof {
-                return ps.err_eof(
-                    "destructuring assignment");
+                return Err(ps.err(ParseErrorKind::EOF(
+                    "destructuring assignment")));
             }
 
             if !ps.consume_if_eq_wsc(')') {
-                return ps.err_unexpected_token(
-                    ')', "At the end of destructuring assignment.");
+                return Err(ps.err(ParseErrorKind::UnexpectedToken(
+                    ')', "At the end of destructuring assignment")));
             }
         },
         _ => { ids.push(VVal::new_sym_mv(parse_identifier(ps)?)); }
@@ -1496,7 +1488,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     assign.push(ids);
 
     if !ps.consume_if_eq_wsc('=') {
-        return ps.err_unexpected_token('=', "In assignment");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('=', "In assignment")));
     }
 
     assign.push(parse_expr(ps)?);
@@ -1516,7 +1508,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                 '!' => {
                     ps.consume_wsc();
                     if ps.consume_if_eq_wsc('@') {
-                        if ps.at_eof { return ps.err_eof("special assignment"); }
+                        if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("special assignment"))); }
                         let id = parse_identifier(ps)?;
                         match &id[..] {
                             "wlambda" => {
@@ -1554,39 +1546,42 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                 exp.push(expr);
                                 Ok(exp)
                             },
-                            "dump_stack" => { Ok(ps.syn(Syntax::DumpStack)) },
-                            _ => { ps.err_bad_keyword(&id, "import or export") }
+                            "dump_stack" => Ok(ps.syn(Syntax::DumpStack)),
+                            _ => Err(ps.err(ParseErrorKind::BadKeyword(id.to_string(), "import or export"))),
                         }
                     } else {
                         parse_assignment(ps, true)
                     }
                 },
-                '.' => { ps.consume_wsc(); parse_assignment(ps, false) },
-                _   => { parse_expr(ps) },
+                '.' => {
+                    ps.consume_wsc();
+                    parse_assignment(ps, false)
+                }
+                _   => parse_expr(ps),
             }
         },
-        None => { ps.err_eof("statement") }
+        None => Err(ps.err(ParseErrorKind::EOF("statement")))
     }
 }
 
 /// Parses an arity definition for a function.
 fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_wsc('|') {
-        return ps.err_unexpected_token('|', "When parsing an arity definition.");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition")));
     }
 
-    if ps.at_eof { return ps.err_eof("parsing arity definition"); }
+    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("parsing arity definition"))); }
 
     let arity = if ps.expect_some(ps.peek())? != '|' {
         let min = parse_num(ps)?;
         if !min.is_int() {
-            return ps.err_bad_value("Expected integer value for min arity.");
+            return Err(ps.err(ParseValueError::ExpectedMinArity));
         }
 
         let max = if ps.consume_if_eq_wsc('<') {
             let max = parse_num(ps)?;
             if !max.is_int() {
-                return ps.err_bad_value("Expected integer value for max arity.");
+                return Err(ps.err(ParseValueError::ExpectedMaxArity));
             }
             max
         } else {
@@ -1605,7 +1600,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
     };
 
     if !ps.consume_if_eq_wsc('|') {
-        return ps.err_unexpected_token('|', "When parsing an arity definition.");
+        return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition")));
     }
 
     Ok(arity)
@@ -1634,7 +1629,7 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
     //println!("parse_block [{}]", ps.rest());
     if is_func {
         if !ps.consume_if_eq_wsc('{') {
-            return ps.err_unexpected_token('{', "When parsing a block.");
+            return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "When parsing a block")));
         }
     }
 
@@ -1661,9 +1656,9 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
     }
 
     if is_func {
-        if ps.at_eof { return ps.err_eof("parsing block"); }
+        if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("parsing block"))); }
         if !ps.consume_if_eq_wsc('}') {
-            return ps.err_unexpected_token('}', "When parsing a block.");
+            return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "When parsing a block")));
         }
     }
 
@@ -1680,9 +1675,9 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
 ///     Err(e) => { panic!(format!("ERROR: {}", e)); },
 /// }
 /// ```
-pub fn parse(s: &str, filename: &str) -> Result<VVal, ParseError> {
+pub fn parse<'a>(s: &str, filename: &str) -> Result<VVal, String> {
     let mut ps = State::new(s, filename);
-   parse_block(&mut ps, false)
+    parse_block(&mut ps, false).map_err(|e| format!("{}", e))
 }
 
 #[cfg(test)]
@@ -1819,7 +1814,7 @@ mod tests {
     #[test]
     fn check_expr_err() {
         assert_eq!(parse_error("foo.a[] = 10"),
-            "Parse error: error[1,9:<parser_test>] Expected literal value, sub expression, block, key or identifier. at code \'= 10\'");
+            "Parse error: error[1,9:<parser_test>] Expected literal value, sub expression, block, key or identifier at code \'= 10\'");
     }
 
     #[test]

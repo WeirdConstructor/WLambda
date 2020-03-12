@@ -68,14 +68,14 @@ struct CompileLocal {
     is_upvalue: bool,
 }
 
+#[derive(Debug)]
 /// Error for the `ModuleResolver` trait, to implement
 /// custom module loading behaviour.
-#[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub enum ModuleLoadError {
+pub enum ModuleLoadError<'a> {
     NoSuchModule(String),
     ModuleEvalError(EvalError),
-    Other(String),
+    Other(&'a str),
 }
 
 /// This trait is responsible for loading modules
@@ -460,27 +460,27 @@ enum VarPos {
     Const(VVal),
 }
 
+#[derive(Debug)]
 /// Errors that can occur when evaluating a piece of WLambda code.
 /// Usually created by methods of `EvalContext`.
-#[derive(Debug, Clone)]
 pub enum EvalError {
     /// Errors regarding file I/O when parsing files
-    IOError(String),
+    IOError(String, std::io::Error),
     /// Syntax errors
-    ParseError(parser::ParseError),
+    ParseError(String),
     /// Grammar/Compilation time errors
     CompileError(CompileError),
     /// Special kinds of runtime errors
-    ExecError(String),
+    ExecError(StackAction),
 }
 
 impl Display for EvalError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            EvalError::IOError(e)      => { write!(f, "IO error: {}", e) },
-            EvalError::ParseError(e)   => { write!(f, "Parse error: {}", e) },
-            EvalError::CompileError(e) => { write!(f, "Compile error: {}", e) },
-            EvalError::ExecError(s)    => { write!(f, "Execution error: {}", s) },
+            EvalError::IOError(file, e) => write!(f, "IO error: file '{}': {} ", file, e),
+            EvalError::ParseError(e)    => write!(f, "Parse error: {}", e),
+            EvalError::CompileError(e)  => write!(f, "Compile error: {}", e),
+            EvalError::ExecError(s)     => write!(f, "Execution error: Jumped out of execution: {:?}", s),
         }
     }
 }
@@ -664,37 +664,17 @@ impl EvalContext {
                 Ok(prog_closures) => {
                     l_env.sp = 0;
                     l_env.set_bp(local_env_size);
-                    match l_env.with_restore_sp(
-                            |e: &mut Env| { prog_closures(e) })
-                    {
+                    match l_env.with_restore_sp(|e: &mut Env| { prog_closures(e) }) {
                         Ok(v)   => Ok(v),
-                        Err(je) =>
-                            Err(EvalError::ExecError(
-                                format!("Jumped out of execution: {:?}", je))),
+                        Err(je) => Err(EvalError::ExecError(je)),
                     }
                 },
-                Err(e) => { Err(EvalError::CompileError(e)) },
+                Err(e) => Err(EvalError::CompileError(e)),
             };
             l_env
         });
 
         res
-    }
-
-    /// Evaluates a piece of WLambda code with the given `EvalContext`.
-    ///
-    /// ```
-    /// let mut ctx = wlambda::EvalContext::new_default();
-    ///
-    /// let r = &mut ctx.eval("$[1,2,3]").unwrap();
-    /// println!("Res: {}", r.s());
-    /// ```
-    #[allow(dead_code)]
-    pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
-        match parser::parse(s, "<wlambda::eval>") {
-            Ok(ast) => { self.eval_ast(&ast) },
-            Err(e) => { Err(EvalError::ParseError(e)) },
-        }
     }
 
     /// Evaluates a WLambda code in a file with the given `EvalContext`.
@@ -709,13 +689,29 @@ impl EvalContext {
     pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
         let contents = std::fs::read_to_string(filename);
         if let Err(err) = contents {
-            Err(EvalError::IOError(format!("file '{}': {}", filename, err)))
+            Err(EvalError::IOError(filename.to_string(), err))
         } else {
             let contents = contents.unwrap();
             match parser::parse(&contents, filename) {
-                Ok(ast) => { self.eval_ast(&ast) },
-                Err(e)  => { Err(EvalError::ParseError(e)) },
+                Ok(ast) => self.eval_ast(&ast),
+                Err(e)  => Err(EvalError::ParseError(e)),
             }
+        }
+    }
+
+    /// Evaluates a piece of WLambda code with the given `EvalContext`.
+    ///
+    /// ```
+    /// let mut ctx = wlambda::EvalContext::new_default();
+    ///
+    /// let r = &mut ctx.eval("$[1,2,3]").unwrap();
+    /// println!("Res: {}", r.s());
+    /// ```
+    #[allow(dead_code)]
+    pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
+        match parser::parse(s, "<wlambda::eval>") {
+            Ok(ast) => self.eval_ast(&ast),
+            Err(e)  => Err(EvalError::ParseError(e)),
         }
     }
 
@@ -733,8 +729,8 @@ impl EvalContext {
         -> Result<VVal, EvalError>
     {
         match parser::parse(code, filename) {
-            Ok(ast) => { self.eval_ast(&ast) },
-            Err(e)  => { Err(EvalError::ParseError(e)) },
+            Ok(ast) => self.eval_ast(&ast),
+            Err(e)  => Err(EvalError::ParseError(e)),
         }
     }
 
@@ -1891,7 +1887,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 
                     if let Some(resolver) = resolver {
 
-                        let exports = resolver.borrow().resolve(glob_ref.clone(), &path, import_file_path);
+                        let r = resolver.borrow();
+                        let exports = r.resolve(glob_ref.clone(), &path, import_file_path);
                         match exports {
                             Err(ModuleLoadError::NoSuchModule(p)) => {
                                 ast.to_compile_err(
