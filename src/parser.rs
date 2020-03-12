@@ -1057,7 +1057,8 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
                 if ps.lookahead("\"") {
                     let s = parse_string(ps, false)?;
-                    Ok(make_sym(ps, &s.at(1).unwrap().s_raw()))
+                    s.at(1).unwrap().with_s_ref(|s: &str|
+                        Ok(make_sym(ps, s)))
                 } else {
                     let id = parse_identifier(ps)?;
                     Ok(make_sym(ps, &id))
@@ -1447,6 +1448,8 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
             let key = parse_identifier(ps)?;
             if key == "global" {
                 assign = ps.syn(Syntax::DefGlobRef);
+            } else if key == "const" {
+                assign = ps.syn(Syntax::DefConst);
             }
         }
     } else {
@@ -1995,5 +1998,16 @@ mod tests {
         assert_eq!(parse("10 11 |> 20 |> 30"),       "$[&Block,$[&Call,$[&Call,$[&Call,10,11],20],30]]");
         assert_eq!(parse("10 11 |> 20 21 |> 30"),    "$[&Block,$[&Call,$[&Call,$[&Call,10,11],$[&Call,20,21]],30]]");
         assert_eq!(parse("10 11 |> 20 21 |> 30 31"), "$[&Block,$[&Call,$[&Call,$[&Call,10,11],$[&Call,20,21]],$[&Call,30,31]]]");
+    }
+
+    #[test]
+    fn check_const() {
+        assert_eq!(parse("!:const X = 32;"),                "$[&Block,$[&DefConst,$[:\"X\"],32]]");
+        assert_eq!(parse("!:const X = 32.4;"),              "$[&Block,$[&DefConst,$[:\"X\"],32.4]]");
+        assert_eq!(parse("!:const X = :XX;"),               "$[&Block,$[&DefConst,$[:\"X\"],$[&Key,:\"XX\"]]]");
+        assert_eq!(parse("!:const X = \"fo\";"),            "$[&Block,$[&DefConst,$[:\"X\"],$[&Str,\"fo\"]]]");
+        assert_eq!(parse("!:const X = $[120];"),            "$[&Block,$[&DefConst,$[:\"X\"],$[&Lst,120]]]");
+        assert_eq!(parse("!:const X = ${a=10};"),           "$[&Block,$[&DefConst,$[:\"X\"],$[&Map,$[:\"a\",10]]]]");
+        assert_eq!(parse("!:const (A,B,X) = $[1,3,4];"),    "$[&Block,$[&DefConst,$[:\"A\",:\"B\",:\"X\"],$[&Lst,1,3,4],$true]]");
     }
 }

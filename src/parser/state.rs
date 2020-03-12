@@ -50,7 +50,7 @@ impl fmt::Display for ParseErrorKind {
             BadValue(s)           => write!(f, "{}", s),
             BadKeyword(kw, s)     => write!(f, "Got '{}', expected {}", kw, s),
             BadNumber(s)          => write!(f, "{}", s),
-            BadCall(s)            => write!(f, "{}", s),
+            //BadCall(s)            => write!(f, "{}", s),
             EOF(s)                => write!(f, "EOF while parsing {}", s),
         }
     }

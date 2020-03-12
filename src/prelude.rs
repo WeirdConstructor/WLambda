@@ -34,6 +34,7 @@ Smalltalk, LISP and Perl.
 - [1](#1-syntax) - Syntax
 - [2](#2-variable-definition-and-assignment) - Variable Definition and Assignment
   - [2.1](#21-global-variables) - Global Variables
+  - [2.2](#22-constants) - Constants
 - [3](#3-functions-part-12) - Functions (part 1/2)
   - [3.1](#31-closures) - Closures
     - [3.1.1](#311-object-oriented-programming-with-closures) - Object Oriented Programming with Closures
@@ -103,14 +104,24 @@ Smalltalk, LISP and Perl.
     - [4.7.1](#471-stdnumabs-number) - std:num:abs _number_
   - [4.8](#48-strings) - Strings
     - [4.8.1](#481-str-value) - str _value_
-    - [4.8.2](#482-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
-    - [4.8.3](#483-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
-    - [4.8.4](#484-stdstrlen-value) - std:str:len _value_
-    - [4.8.5](#485-stdstrtrim-value) - std:str:trim _value_
-    - [4.8.6](#486-stdstrtrimstart-value) - std:str:trim_start _value_
-    - [4.8.7](#487-stdstrtrimend-value) - std:str:trim_end _value_
-    - [4.8.8](#488-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
-    - [4.8.9](#489-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
+    - [4.8.2](#482-isstr-value) - is_str _value_
+    - [4.8.3](#483-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
+    - [4.8.4](#484-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
+    - [4.8.5](#485-stdstrlen-value) - std:str:len _value_
+    - [4.8.6](#486-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
+    - [4.8.7](#487-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+    - [4.8.8](#488-stdstrtrim-value) - std:str:trim _value_
+    - [4.8.9](#489-stdstrtrimstart-value) - std:str:trim_start _value_
+    - [4.8.10](#4810-stdstrtrimend-value) - std:str:trim_end _value_
+    - [4.8.11](#4811-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
+    - [4.8.12](#4812-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
+    - [4.8.13](#4813-stdstrtobytes-string) - std:str:to_bytes _string_
+    - [4.8.14](#4814-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
+    - [4.8.15](#4815-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
+    - [4.8.16](#4816-stdstrtocharvec-string) - std:str:to_char_vec _string_
+    - [4.8.17](#4817-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
+    - [4.8.18](#4818-stdstrtolowercase-string) - std:str:to_lowercase _string_
+    - [4.8.19](#4819-stdstrtouppercase-string) - std:str:to_uppercase _string_
   - [4.9](#49-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
     - [4.9.1](#491-call-properties-of-bytes) - Call Properties of Bytes
     - [4.9.2](#492-byte-conversion-functions) - Byte Conversion Functions
@@ -289,6 +300,55 @@ std:assert_eq a 13;
 ```
 
 Global variables however do not live beyond file or module boundaries.
+
+### <a name="22-constants"></a>2.2 - Constants
+
+WLambda supports constant _variables_. These are global variables you can't
+assign to. They are resolved at compile time and offer a slight performance
+advantage (roughly 3-4%) over (global or local) variables.
+
+```wlambda
+!:const X = 11;
+
+std:assert_eq X 11;
+
+# Destructuring works too, but only with compile time literal values
+# in the vectors / maps:
+!:const (ON, OFF) = $[$true, $false];
+!:const (RED, BLUE) = ${
+    BLUE = 0x0000FF,
+    RED  = 0xFF0000,
+};
+
+std:assert_eq ON  $true;
+std:assert_eq OFF $false;
+
+std:assert_eq RED 0xFF0000;
+std:assert_eq BLUE 0x0000FF;
+```
+
+However, be aware that these _constants_ are not really constant.
+Due to performance reasons referencial values like Strings, Lists
+or Maps are not copied (neither shallow, nor deep) if you access them
+through a constant.
+
+```wlambda
+!:const V = $[1,2,3];
+
+std:assert_eq (str V) (str $[1,2,3]);
+
+std:push V 43;  # Mutation of a 'constant'
+std:assert_eq V.3 43;
+```
+
+Constants also work across module borders:
+
+```wlambda
+!:const X = 10;
+
+# When imported the X will remain constant:
+!@export X = X;
+```
 
 ## <a name="3-functions-part-12"></a>3 - Functions (part 1/2)
 
@@ -1245,7 +1305,6 @@ std:assert_eq "\u{2211}" "∑";
 Casts _value_ to a string and returns it.
 
 ```wlambda
-
 std:assert_eq (str "\xFF")     "ÿ";
 std:assert_eq (str "\x0A")     "\n";
 std:assert_eq (str 1)          "1";
@@ -1261,17 +1320,46 @@ std:assert_eq (str $[1,2,3])   "$[1,2,3]";
 std:assert_eq (str ~ std:weaken x)   "$(&)10";
 ```
 
-#### <a name="482-stdstrcat-a-b-"></a>4.8.2 - std:str:cat _a_ _b_ ...
+#### <a name="482-isstr-value"></a>4.8.2 - is_str _value_
+
+Returns `$true` if _value_ is a string.
+
+```wlambda
+std:assert ~ is_str "foo";
+
+std:assert ~ not ~ is_str $b"foo";
+std:assert ~ not ~ is_str :foo;
+std:assert ~ not ~ is_str 324;
+
+std:assert ~ not ~ is_str $&&"foo";
+std:assert ~ is_str $*$&&"foo";
+```
+
+#### <a name="483-stdstrcat-a-b-"></a>4.8.3 - std:str:cat _a_ _b_ ...
 
 Stringifies (like with `str`) and concatenates all its arguments.
+If an argument is a vector, it's elements will be stringified and concatenated.
 
 ```wlambda
 std:assert_eq
     (std:str:cat :a 10 23.2 "ab" "cd" $[1, 2, 3])
-    "a1023.2abcd$[1,2,3]";
+    "a1023.2abcd123";
 ```
 
-#### <a name="483-stdstrjoin-sep-vector"></a>4.8.3 - std:str:join _sep_ _vector_
+If a vector argument is given, it's elements are stringified, thats
+useful if you prepare substrings to be concatenated in one single action:
+
+```wlambda
+!out = $[];
+std:push out "abc";
+std:push out "123";
+std:push out "XXX";
+
+!s = std:str:cat out;
+std:assert_eq s "abc123XXX";
+```
+
+#### <a name="484-stdstrjoin-sep-vector"></a>4.8.4 - std:str:join _sep_ _vector_
 
 Join's the stringified elements of _vector_ with the _sep_ string.
 Will return an error if _vector_ is not a vector.
@@ -1282,7 +1370,7 @@ std:assert_eq
     "1::2::3";
 ```
 
-#### <a name="484-stdstrlen-value"></a>4.8.4 - std:str:len _value_
+#### <a name="485-stdstrlen-value"></a>4.8.5 - std:str:len _value_
 
 Returns the length of the stringified _value_ in unicode characters.
 The core function `len` does return the number of bytes in the string
@@ -1297,7 +1385,39 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### <a name="485-stdstrtrim-value"></a>4.8.5 - std:str:trim _value_
+#### <a name="486-stdstrreplace-pattern-replacement-string"></a>4.8.6 - std:str:replace _pattern_ _replacement_ _string_
+
+Replaces every occurence of _pattern_ in _string_ with _replacement_
+and returns a new string. All values will be casted to a string if
+they aren't.
+
+```wlambda
+!s = std:str:replace "dog" "cat"
+    "I really like my dog, because when you dog, you can put dog in the dog!";
+std:assert_eq s
+    "I really like my cat, because when you cat, you can put cat in the cat!";
+
+!s = std:str:replace "9" "1" "9999";
+std:assert_eq s "1111";
+```
+
+#### <a name="487-stdstrreplacen-pattern-replacement-count-string"></a>4.8.7 - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+
+Replaces _count_ occurences of _pattern_ in _string_ with _replacement_
+and returns a new string. All values will be casted to a string if
+they aren't.
+
+```wlambda
+!s = std:str:replace_n "dog" "cat" 2
+    "I really like my dog, because when you dog, you can put dog in the dog!";
+std:assert_eq s
+    "I really like my cat, because when you cat, you can put dog in the dog!";
+
+!s = std:str:replace_n "9" "1" 3 "9999";
+std:assert_eq s "1119";
+```
+
+#### <a name="488-stdstrtrim-value"></a>4.8.8 - std:str:trim _value_
 
 Trims off any (unicode) white space from the start and end of the
 stringified _value_.
@@ -1308,7 +1428,7 @@ std:assert_eq
     "fooo bar";
 ```
 
-#### <a name="486-stdstrtrimstart-value"></a>4.8.6 - std:str:trim_start _value_
+#### <a name="489-stdstrtrimstart-value"></a>4.8.9 - std:str:trim_start _value_
 
 Trims off any (unicode) white space from the start of the stringified _value_.
 
@@ -1318,7 +1438,7 @@ std:assert_eq
     "fooo bar \n";
 ```
 
-#### <a name="487-stdstrtrimend-value"></a>4.8.7 - std:str:trim_end _value_
+#### <a name="4810-stdstrtrimend-value"></a>4.8.10 - std:str:trim_end _value_
 
 Trims off any (unicode) white space from the end of the stringified _value_.
 
@@ -1328,7 +1448,7 @@ std:assert_eq
     "  \nfooo bar";
 ```
 
-#### <a name="488-stdstrpadstart-len-pad-str-value"></a>4.8.8 - std:str:pad_start _len_ _pad-str_ _value_
+#### <a name="4811-stdstrpadstart-len-pad-str-value"></a>4.8.11 - std:str:pad_start _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
 at the start of the string.
@@ -1352,7 +1472,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="489-stdstrpadend-len-pad-str-value"></a>4.8.9 - std:str:pad_end _len_ _pad-str_ _value_
+#### <a name="4812-stdstrpadend-len-pad-str-value"></a>4.8.12 - std:str:pad_end _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters,
 appending at the end.
@@ -1374,6 +1494,87 @@ std:assert_eq
 std:assert_eq
     (std:str:pad_end 8 "" "∑∑")
     "∑∑";
+```
+
+#### <a name="4813-stdstrtobytes-string"></a>4.8.13 - std:str:to_bytes _string_
+
+Encodes _string_ in UTF-8 and returns a byte vector containing all it's bytes.
+
+```wlambda
+!b = std:str:to_bytes "1234";
+std:assert_eq b $b"1234";
+
+!b = std:str:to_bytes "Äß日本人";
+std:assert_eq b $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
+```
+
+#### <a name="4814-stdstrfromutf8-byte-vector"></a>4.8.14 - std:str:from_utf8 _byte-vector_
+
+Converts the _byte-vector_ to a Unicode string and returns it.
+If the _byte-vector_ contains invalid UTF-8 sequences an
+error value is returned.
+
+```wlambda
+!s = _? ~ std:str:from_utf8 $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
+std:assert_eq s "Äß日本人";
+
+!r = on_error {|| _ } ~ std:str:from_utf8 $b"\xFF\xFF";
+std:assert_eq r "str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0";
+```
+
+#### <a name="4815-stdstrfromutf8lossy-byte-vector"></a>4.8.15 - std:str:from_utf8_lossy _byte-vector_
+
+Converts the _byte-vector_ to a Unicode string and returns it.
+If the _byte-vector_ contains invalid UTF-8 sequences a `"�"` will be
+inserted.
+
+```wlambda
+!s = _? ~ std:str:from_utf8_lossy
+    $b"\xC3\x84\xFF\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA\xFF\xFF\x00";
+std:assert_eq s "Ä�ß日本人��\0";
+```
+
+#### <a name="4816-stdstrtocharvec-string"></a>4.8.16 - std:str:to_char_vec _string_
+
+Converts the _string_ into a vector of integers which represent the Unicode
+character number.
+
+```wlambda
+!v = std:str:to_char_vec "1234";
+std:assert_eq (str v) ~ str $[49,50,51,52];
+
+!v = std:str:to_char_vec "Äß日本人";
+std:assert_eq (str v) ~ str $[196,223,0x65E5,0x672C,0x4EBA];
+```
+
+#### <a name="4817-stdstrfromcharvec-vector"></a>4.8.17 - std:str:from_char_vec _vector_
+
+The reverse operation of `std:str:to_char_vec`. It converts
+a vector of integers to a unicode string. Any integer that has
+no associated Unicode character will be converted to `"?"`.
+
+```wlambda
+std:assert_eq (std:str:from_char_vec $[9999999999]) "?";
+std:assert_eq
+    (std:str:from_char_vec
+        $[49,50,196,223,0x65E5,0x672C,0x4EBA])
+    "12Äß日本人";
+```
+
+#### <a name="4818-stdstrtolowercase-string"></a>4.8.18 - std:str:to_lowercase _string_
+
+Swaps all (Unicode) characters in _string_ to their lowercase version.
+
+```wlambda
+std:assert_eq (std:str:to_lowercase "ZABzabÄßÜÖ") "zabzabäßüö";
+```
+
+#### <a name="4819-stdstrtouppercase-string"></a>4.8.19 - std:str:to_uppercase _string_
+
+Swaps all (Unicode) characters in _string_ to their lowercase version.
+
+```wlambda
+std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 ```
 
 ### <a name="49-bytes-or-byte-vectors"></a>4.9 - Bytes (or Byte Vectors)
@@ -1471,6 +1672,49 @@ std:assert ~ not ~ is_bytes "ABC";
 ```
 
 ### <a name="410-symbols"></a>4.10 - Symbols
+
+Symbols are a special kind of strings. Use them however you see fit. They will
+do a key lookup (on maps, vectors (as indices) and user values) if they are
+called with an argument.
+
+```wlambda
+std:assert_eq (:1 $[1,2,3]) 2;
+std:assert_eq (:a ${a=30}) 30;
+```
+
+They are basically the same as string, but strings have
+slightly different calling semantics and a different literal syntax.
+Often you can use them as shortform literal in places where a string
+is expected:
+
+```wlambda
+std:assert_eq (std:str:replace :A :a "All AbabA") "all ababa";
+```
+
+They can be very useful as sentinel values or custom enums:
+
+```wlambda
+!x = :ON;
+!y = :OFF;
+
+std:assert_eq ((x == :ON) { 10 }) 10;
+
+# They don't match with strings:
+std:assert_eq ((x == "ON") { 10 } { 20 }) 20;
+
+# Work together nicely with `match`:
+
+!state = "";
+match x
+    :ON  {|| .state = "is on" }
+    :OFF {|| .state = "is off" };
+std:assert_eq state "is on";
+
+match y
+    :ON  {|| .state = "is on" }
+    :OFF {|| .state = "is off" };
+std:assert_eq state "is off";
+```
 
 ### <a name="411-vectors-or-lists"></a>4.11 - Vectors (or Lists)
 
@@ -3241,6 +3485,7 @@ use crate::compiler::*;
 use crate::vval::*;
 use crate::util;
 use std::rc::Rc;
+use crate::threads::*;
 
 macro_rules! func {
     ($g: ident, $name: expr, $cb: expr, $min: expr, $max: expr, $err_arg_ok: expr) => {
@@ -3357,60 +3602,76 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
         let fun_idx = arg_idx;
 
         if    env.arg(match_vals[0]).is_sym()
-            && env.arg(match_vals[0]).s_raw().chars().nth(0).unwrap_or('_') == '?' {
+            && env.arg(match_vals[0]).with_s_ref(|s: &str| s.chars().nth(0).unwrap_or('_') == '?') {
 
-            match &env.arg(match_vals[0]).s_raw()[..] {
-                "?t" => {
-                    let val_type_name = val.type_name();
-                    for i in match_vals.iter().skip(1) {
-                        if env.arg(*i).s_raw() == val_type_name {
-                            return env.arg(fun_idx).call(env, &[val.clone()]);
-                        }
-                    }
-                },
-                "?s" => {
-                    let val_s = val.s_raw();
-                    for i in match_vals.iter().skip(1) {
-                        if env.arg(*i).s_raw() == val_s {
-                            return env.arg(fun_idx).call(env, &[val.clone()]);
-                        }
-                    }
-                },
-                "?e" => {
-                    if let VVal::Err(e) = val {
-                        let err_val = e.borrow().0.at(0).unwrap_or_else(|| e.borrow().0.clone());
-
-                        for i in match_vals.iter().skip(1) {
-                            if env.arg(*i).eqv(&err_val) {
-                                let args = vec![
-                                    e.borrow().0.clone(),
-                                    VVal::Int(i64::from(e.borrow().1.line)),
-                                    VVal::Int(i64::from(e.borrow().1.col)),
-                                    VVal::new_str(e.borrow().1.file.s()),
-                                ];
-                                return env.arg(fun_idx).call(env, &args);
+            let res =
+                env.arg(match_vals[0]).with_s_ref(|pat: &str| {
+                    match pat {
+                        "?t" => {
+                            let val_type_name = val.type_name();
+                            for i in match_vals.iter().skip(1) {
+                                if env.arg_ref(*i).unwrap().with_s_ref(
+                                    |sp: &str| sp == val_type_name)
+                                {
+                                    return Some(env.arg(fun_idx).call(env, &[val.clone()]));
+                                }
                             }
-                        }
-                    }
-                },
-                "?p" => {
-                    if fun_idx + 1 >= argc { return Ok(VVal::Nul); }
-                    let fun_idx = fun_idx + 1;
-
-                    let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
-                    match pred_res {
-                        Ok(v) => {
-                            arg_idx += 1;
-                            if v.b() {
-                                return env.arg(fun_idx).call(env, &[val.clone()]);
-                            }
+                            None
                         },
-                        Err(sa) => { return Err(sa); }
+                        "?s" => {
+                            val.with_s_ref(|val_s: &str| -> Option<Result<VVal, StackAction>> {
+                                for i in match_vals.iter().skip(1) {
+                                    if env.arg_ref(*i).unwrap().with_s_ref(
+                                        |sp: &str| sp == val_s)
+                                    {
+                                        return Some(env.arg(fun_idx).call(env, &[val.clone()]));
+                                    }
+                                }
+
+                                None
+                            })
+                        },
+                        "?e" => {
+                            if let VVal::Err(e) = val {
+                                let err_val = e.borrow().0.at(0).unwrap_or_else(|| e.borrow().0.clone());
+
+                                for i in match_vals.iter().skip(1) {
+                                    if env.arg(*i).eqv(&err_val) {
+                                        let args = vec![
+                                            e.borrow().0.clone(),
+                                            VVal::Int(i64::from(e.borrow().1.line)),
+                                            VVal::Int(i64::from(e.borrow().1.col)),
+                                            VVal::new_str(e.borrow().1.file.s()),
+                                        ];
+                                        return Some(env.arg(fun_idx).call(env, &args));
+                                    }
+                                }
+                            }
+                            None
+                        },
+                        "?p" => {
+                            if fun_idx + 1 >= argc { return Some(Ok(VVal::Nul)); }
+                            let fun_idx = fun_idx + 1;
+
+                            let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
+                            match pred_res {
+                                Ok(v) => {
+                                    arg_idx += 1;
+                                    if v.b() {
+                                        return Some(env.arg(fun_idx).call(env, &[val.clone()]));
+                                    }
+                                },
+                                Err(sa) => { return Some(Err(sa)); }
+                            }
+                            None
+                        },
+                        // TODO: Usually we should bail out with an error here.
+                        _ => None,
                     }
-                },
-                _ => {
-                    // TODO: Usually we should bail out with an error here.
-                }
+                });
+
+            if let Some(res) = res {
+                return res;
             }
         } else {
             for i in match_vals.iter() {
@@ -3588,7 +3849,7 @@ pub fn core_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw())) },
         Some(1), Some(1), false);
     func!(st, "sym",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_sym(&env.arg(0).s_raw())) },
+        |env: &mut Env, _argc: usize| { Ok(VVal::new_sym_mv(env.arg(0).s_raw())) },
         Some(1), Some(1), false);
     func!(st, "is_some",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(!env.arg(0).is_none())) },
@@ -3753,24 +4014,30 @@ fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackActio
     let mut write = env.stdio.write.borrow_mut();
 
     for i in 0..argc {
-        let s =
-            if raw { env.arg(i).s_raw() }
-            else { env.arg(i).s() };
-
-        if i == (argc - 1) {
-            if i > 0 {
-                writeln!(write, " {}", s).ok();
-            } else {
-                writeln!(write, "{}", s).ok();
-            }
-        } else if i > 0 {
-            write!(write, " {}", s).ok();
+        if raw {
+            env.arg_ref(i).unwrap().with_s_ref(|s: &str| {
+                if i == (argc - 1) {
+                    if i > 0 { write!(write, " ").ok(); }
+                    writeln!(write, "{}", s).ok();
+                } else {
+                    if i > 0 { write!(write, " ").ok(); }
+                    write!(write, "{}", s).ok();
+                }
+            });
         } else {
-            write!(write, "{}", s).ok();
+            let s = env.arg_ref(i).unwrap().s();
+
+            if i == (argc - 1) {
+                if i > 0 { write!(write, " ").ok(); }
+                writeln!(write, "{}", s).ok();
+            } else {
+                if i > 0 { write!(write, " ").ok(); }
+                write!(write, "{}", s).ok();
+            }
         }
     }
     if argc == 0 {
-        writeln!(write, "").ok();
+        writeln!(write).ok();
     }
     if argc > 0 {
         Ok(env.arg(argc - 1))
@@ -3922,19 +4189,29 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).s_len() as i64)) },
         Some(1), Some(1), false);
     func!(st, "str:to_lowercase",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_lowercase())) },
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str_mv(
+                env.arg_ref(0).unwrap().with_s_ref(|s: &str| s.to_lowercase()))) },
         Some(1), Some(1), false);
     func!(st, "str:to_uppercase",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().to_uppercase())) },
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str_mv(
+                env.arg_ref(0).unwrap().with_s_ref(|s: &str| s.to_uppercase()))) },
         Some(1), Some(1), false);
     func!(st, "str:trim",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim().to_string())) },
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str_mv(
+                env.arg_ref(0).unwrap().with_s_ref(|s: &str| s.trim().to_string()))) },
         Some(1), Some(1), false);
     func!(st, "str:trim_start",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim_start().to_string())) },
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str_mv(
+                env.arg_ref(0).unwrap().with_s_ref(|s: &str| s.trim_start().to_string()))) },
         Some(1), Some(1), false);
     func!(st, "str:trim_end",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw().trim_end().to_string())) },
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str_mv(
+                env.arg_ref(0).unwrap().with_s_ref(|s: &str| s.trim_end().to_string()))) },
         Some(1), Some(1), false);
     func!(st, "str:pad_start",
         |env: &mut Env, _argc: usize| {
@@ -3999,33 +4276,34 @@ pub fn std_symbol_table() -> SymbolTable {
         }, Some(3), Some(3), false);
     func!(st, "str:cat",
         |env: &mut Env, argc: usize| {
-            let lst = env.arg(0);
-            if let VVal::Lst(l) = lst {
-                let svec : Vec<String> = l.borrow().iter().map(|v| v.s_raw()).collect();
-                Ok(VVal::new_str_mv((&svec).concat()))
-
-            } else {
-                let mut s = String::from("");
-                for i in 0..argc {
-                    s += &env.arg(i).s_raw();
+            let mut s = String::from("");
+            for i in 0..argc {
+                let aref = env.arg_ref(i).unwrap();
+                if let VVal::Lst(l) = aref {
+                    for v in l.borrow().iter() {
+                        v.with_s_ref(|vs: &str| s.push_str(vs));
+                    }
+                } else {
+                    env.arg_ref(i).unwrap()
+                       .with_s_ref(|vs: &str| s.push_str(vs))
                 }
-                Ok(VVal::new_str_mv(s))
             }
+            Ok(VVal::new_str_mv(s))
         }, None, None, false);
     func!(st, "str:replace_n",
         |env: &mut Env, _argc: usize| {
-            let pat  = env.arg(0).s_raw();
-            let to   = env.arg(1).s_raw();
             let cnt  = env.arg(2).i() as usize;
-            let data = env.arg(3).s_raw();
-            Ok(VVal::new_str_mv(data.replacen(&pat, &to, cnt)))
-        }, Some(3), Some(3), false);
+            env.arg_ref(0).unwrap().with_s_ref(|pat: &str|
+                env.arg_ref(1).unwrap().with_s_ref(|to: &str|
+                    env.arg_ref(3).unwrap().with_s_ref(|data: &str|
+                        Ok(VVal::new_str_mv(data.replacen(pat, to, cnt))))))
+        }, Some(4), Some(4), false);
     func!(st, "str:replace",
         |env: &mut Env, _argc: usize| {
-            let pat  = env.arg(0).s_raw();
-            let to   = env.arg(1).s_raw();
-            let data = env.arg(2).s_raw();
-            Ok(VVal::new_str_mv(data.replace(&pat, &to)))
+            env.arg_ref(0).unwrap().with_s_ref(|pat: &str|
+                env.arg_ref(1).unwrap().with_s_ref(|to: &str|
+                    env.arg_ref(2).unwrap().with_s_ref(|data: &str|
+                        Ok(VVal::new_str_mv(data.replace(pat, to))))))
         }, Some(3), Some(3), false);
     func!(st, "str:join",
         |env: &mut Env, _argc: usize| {
@@ -4080,10 +4358,10 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "str:to_char_vec",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::vec_mv(
-                env.arg(0).s_raw()
-                    .chars()
+                env.arg_ref(0).unwrap().with_s_ref(|arg: &str|
+                    arg.chars()
                     .map(|c| VVal::Int(i64::from(c as u32)))
-                    .collect()))
+                    .collect())))
         }, Some(1), Some(1), false);
 
     func!(st, "str:from_char_vec",
@@ -4127,22 +4405,23 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "bytes:from_hex",
         |env: &mut Env, _argc: usize| {
-            let s = env.arg(0).s_raw();
-            let out : Vec<u8> = Vec::with_capacity((s.len() + 1) / 2);
-            Ok(VVal::new_byt(
-                s.chars()
-                 .map(|c|
-                     match c { '0'..='9' => i16::from( 9 - (b'9' - (c as u8))),
-                               'a'..='f' => i16::from(15 - (b'f' - (c as u8))),
-                               'A'..='F' => i16::from(15 - (b'F' - (c as u8))),
-                               _ => -1 })
-                 .fold((256, out), |(last, mut out), c: i16|
-                     if c == -1 { (last, out) }
-                     else if last == 256 { (c, out) }
-                     else {
-                         out.push((((last << 4) | (c & 0x0F)) & 0xFF) as u8);
-                         (256, out)
-                     }).1))
+            env.arg_ref(0).unwrap().with_s_ref(|s: &str| {
+                let out : Vec<u8> = Vec::with_capacity((s.len() + 1) / 2);
+                Ok(VVal::new_byt(
+                    s.chars()
+                     .map(|c|
+                         match c { '0'..='9' => i16::from( 9 - (b'9' - (c as u8))),
+                                   'a'..='f' => i16::from(15 - (b'f' - (c as u8))),
+                                   'A'..='F' => i16::from(15 - (b'F' - (c as u8))),
+                                   _ => -1 })
+                     .fold((256, out), |(last, mut out), c: i16|
+                         if c == -1 { (last, out) }
+                         else if last == 256 { (c, out) }
+                         else {
+                             out.push((((last << 4) | (c & 0x0F)) & 0xFF) as u8);
+                             (256, out)
+                         }).1))
+            })
         }, Some(1), Some(1), false);
 
     func!(st, "bytes:to_hex",
@@ -4361,12 +4640,14 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "io:stdout:print",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
-            if let Err(e) = write!(*env.stdio.write.borrow_mut(), "{}", v.s_raw()) {
-                Ok(env.new_err(
-                   format!("IO-Error on std:io:stdout:print: {}", e)))
-            } else {
-                Ok(v)
-            }
+            env.arg_ref(0).unwrap().with_s_ref(|vs: &str| {
+                if let Err(e) = write!(*env.stdio.write.borrow_mut(), "{}", vs) {
+                    Ok(env.new_err(
+                       format!("IO-Error on std:io:stdout:print: {}", e)))
+                } else {
+                    Ok(v)
+                }
+            })
         }, Some(1), Some(1), false);
 
     func!(st, "io:file:read_text",
@@ -4460,7 +4741,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let contents     = env.arg(1);
             let buf = match contents {
                 VVal::Byt(b) => b.borrow().clone(),
-                v => v.s_raw().as_bytes().to_vec(),
+                v            => v.with_s_ref(|v: &str| v.as_bytes().to_vec()),
             };
 
             use std::io::prelude::*;
@@ -4506,7 +4787,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let contents     = env.arg(1);
             let buf = match contents {
                 VVal::Byt(b) => b.borrow().clone(),
-                v => v.s_raw().as_bytes().to_vec(),
+                v            => v.with_s_ref(|v: &str| v.as_bytes().to_vec()),
             };
 
             use std::io::prelude::*;
@@ -4687,64 +4968,68 @@ pub fn std_symbol_table() -> SymbolTable {
                 } else {
                     env.arg(1).s_raw()
                 };
-            let data = env.arg(2).s_raw();
 
-            match csv::parse_csv(
-                    delim.chars().nth(0).unwrap_or(','),
-                    &row_sep,
-                    &data)
-            {
-                Ok(v) => Ok(v),
-                Err(e) => Ok(env.new_err(e)),
-            }
+            env.arg_ref(2).unwrap().with_s_ref(|data: &str| {
+                match csv::parse_csv(
+                        delim.chars().nth(0).unwrap_or(','),
+                        &row_sep,
+                        data)
+                {
+                    Ok(v) => Ok(v),
+                    Err(e) => Ok(env.new_err(e)),
+                }
+            })
         }, Some(3), Some(3), false);
 
     #[cfg(feature="regex")]
     func!(st, "re:replace_all",
         |env: &mut Env, _argc: usize| {
             use regex::Regex;
-            let re   = env.arg(0).s_raw();
+            let re   = env.arg(0);
             let f    = env.arg(1);
-            let text = env.arg(2).s_raw();
+            let text = env.arg(2);
 
-            let rx = Regex::new(&re);
+            let rx = re.with_s_ref(|re: &str| Regex::new(&re));
             if let Err(e) = rx {
                 return Ok(env.new_err(
-                    format!("Regex '{}' did not compile: {}", re, e)));
+                    format!("Regex '{}' did not compile: {}", re.s_raw(), e)));
             }
             let rx = rx.unwrap();
 
             let mut finished = false;
             let mut ret = Ok(VVal::Nul);
-            let ret_str = VVal::new_str_mv(String::from(rx.replace_all(&text, |capts: &regex::Captures| {
-                let captures = VVal::vec();
-                for cap in capts.iter() {
-                    match cap {
-                        None    => { captures.push(VVal::Nul); },
-                        Some(c) => {
-                            captures.push(VVal::new_str(c.as_str()));
+            let ret_str = text.with_s_ref(|text: &str| {
+                VVal::new_str_mv(String::from(
+                    rx.replace_all(&text, |capts: &regex::Captures| {
+                        let captures = VVal::vec();
+                        for cap in capts.iter() {
+                            match cap {
+                                None    => { captures.push(VVal::Nul); },
+                                Some(c) => {
+                                    captures.push(VVal::new_str(c.as_str()));
+                                }
+                            }
                         }
-                    }
-                }
 
-                let repl = captures.at(0).unwrap_or(VVal::Nul).s_raw();
-                if finished { return repl; }
+                        let repl = captures.at(0).unwrap_or(VVal::Nul).s_raw();
+                        if finished { return repl; }
 
-                if f.is_fun() {
-                    env.push(captures);
-                    let rv = f.call_internal(env, 1);
-                    env.popn(1);
+                        if f.is_fun() {
+                            env.push(captures);
+                            let rv = f.call_internal(env, 1);
+                            env.popn(1);
 
-                    match rv {
-                        Ok(v)                      => v.s_raw(),
-                        Err(StackAction::Break(v)) => { finished = true; v.s_raw() },
-                        Err(StackAction::Next)     => { repl },
-                        Err(e)                     => { finished = true; ret = Err(e); repl },
-                    }
-                } else {
-                    f.s_raw()
-                }
-            })));
+                            match rv {
+                                Ok(v)                      => v.s_raw(),
+                                Err(StackAction::Break(v)) => { finished = true; v.s_raw() },
+                                Err(StackAction::Next)     => { repl },
+                                Err(e)                     => { finished = true; ret = Err(e); repl },
+                            }
+                        } else {
+                            f.s_raw()
+                        }
+                    })))
+            });
             if ret.is_err() { return ret; }
             Ok(ret_str)
         }, Some(3), Some(3), false);
@@ -4753,21 +5038,61 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "re:match",
         |env: &mut Env, _argc: usize| {
             use regex::Regex;
-            let re   = env.arg(0).s_raw();
-            let text = env.arg(1).s_raw();
+            let re   = env.arg(0);
+            let text = env.arg(1);
             let f    = env.arg(2);
 
-            let rx = Regex::new(&re);
+            let rx = re.with_s_ref(|re: &str| Regex::new(&re));
             if let Err(e) = rx {
                 return Ok(env.new_err(
-                    format!("Regex '{}' did not compile: {}", re, e)));
+                    format!("Regex '{}' did not compile: {}", re.s_raw(), e)));
             }
             let rx = rx.unwrap();
 
-            match rx.captures(&text) {
-                Some(c) => {
+            text.with_s_ref(|text: &str| {
+                match rx.captures(text) {
+                    Some(c) => {
+                        let captures = VVal::vec();
+                        for cap in c.iter() {
+                            match cap {
+                                None    => { captures.push(VVal::Nul); },
+                                Some(c) => {
+                                    captures.push(VVal::new_str(c.as_str()));
+                                }
+                            }
+                        }
+                        env.push(captures);
+                        let rv = f.call_internal(env, 1);
+                        env.popn(1);
+                        rv
+                    },
+                    None => {
+                        Ok(VVal::Nul)
+                    }
+                }
+            })
+        }, Some(3), Some(3), false);
+
+    #[cfg(feature="regex")]
+    func!(st, "re:map",
+        |env: &mut Env, _argc: usize| {
+            use regex::Regex;
+            let re   = env.arg(0);
+            let f    = env.arg(1);
+            let text = env.arg(2);
+
+            let rx = re.with_s_ref(|re: &str| Regex::new(&re));
+            if let Err(e) = rx {
+                return Ok(env.new_err(
+                    format!("Regex '{}' did not compile: {}", re.s_raw(), e)));
+            }
+            let rx = rx.unwrap();
+
+            let mut ret = VVal::Nul;
+            text.with_s_ref(|text: &str| {
+                for capts in rx.captures_iter(text) {
                     let captures = VVal::vec();
-                    for cap in c.iter() {
+                    for cap in capts.iter() {
                         match cap {
                             None    => { captures.push(VVal::Nul); },
                             Some(c) => {
@@ -4778,52 +5103,16 @@ pub fn std_symbol_table() -> SymbolTable {
                     env.push(captures);
                     let rv = f.call_internal(env, 1);
                     env.popn(1);
-                    rv
-                },
-                None => {
-                    Ok(VVal::Nul)
-                }
-            }
-        }, Some(3), Some(3), false);
 
-    #[cfg(feature="regex")]
-    func!(st, "re:map",
-        |env: &mut Env, _argc: usize| {
-            use regex::Regex;
-            let re   = env.arg(0).s_raw();
-            let f    = env.arg(1);
-            let text = env.arg(2).s_raw();
-
-            let rx = Regex::new(&re);
-            if let Err(e) = rx {
-                return Ok(env.new_err(
-                    format!("Regex '{}' did not compile: {}", re, e)));
-            }
-            let rx = rx.unwrap();
-
-            let mut ret = VVal::Nul;
-            for capts in rx.captures_iter(&text) {
-                let captures = VVal::vec();
-                for cap in capts.iter() {
-                    match cap {
-                        None    => { captures.push(VVal::Nul); },
-                        Some(c) => {
-                            captures.push(VVal::new_str(c.as_str()));
-                        }
+                    match rv {
+                        Ok(v)                      => { ret = v; },
+                        Err(StackAction::Break(v)) => { ret = v; break; },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { return Err(e); },
                     }
                 }
-                env.push(captures);
-                let rv = f.call_internal(env, 1);
-                env.popn(1);
-
-                match rv {
-                    Ok(v)                      => { ret = v; },
-                    Err(StackAction::Break(v)) => { ret = v; break; },
-                    Err(StackAction::Next)     => { },
-                    Err(e)                     => { return Err(e); },
-                }
-            }
-            Ok(ret)
+                Ok(ret)
+            })
         }, Some(3), Some(3), false);
 
     #[cfg(feature="chrono")]
@@ -4833,14 +5122,13 @@ pub fn std_symbol_table() -> SymbolTable {
             let dt = Local::now();
 
             let fmt = env.arg(0);
-            let fmt = if fmt.is_str() {
-                fmt.s_raw()
+            if fmt.is_str() {
+                fmt.with_s_ref(|fmt: &str|
+                    Ok(VVal::new_str_mv(dt.format(fmt).to_string())))
             } else {
-                String::from("%Y-%m-%d %H:%M:%S.%f")
+                Ok(VVal::new_str_mv(dt.format("%Y-%m-%d %H:%M:%S.%f").to_string()))
+            }
 
-            };
-
-            Ok(VVal::new_str_mv(dt.format(&fmt).to_string()))
         }, Some(0), Some(1), false);
 
     #[cfg(feature="serde_json")]
@@ -4858,12 +5146,12 @@ pub fn std_symbol_table() -> SymbolTable {
     #[cfg(feature="serde_json")]
     func!(st, "deser:json",
         |env: &mut Env, _argc: usize| {
-            let s = env.arg(0).s_raw();
-
-            match VVal::from_json(&s) {
-                Ok(v) => Ok(v),
-                Err(e) => Ok(env.new_err(e)),
-            }
+            env.arg_ref(0).unwrap().with_s_ref(
+                |json_txt: &str|
+                    match VVal::from_json(json_txt) {
+                        Ok(v) => Ok(v),
+                        Err(e) => Ok(env.new_err(e)),
+                    })
         }, Some(1), Some(1), false);
 
     #[cfg(feature="rmp-serde")]
@@ -4984,8 +5272,8 @@ pub fn std_symbol_table() -> SymbolTable {
                     VVal::Int(i) => hash.write_i64(i),
                     VVal::Flt(f) => hash.write_f64(f),
                     _ => {
-                        let s = env.arg(i).s_raw();
-                        hash.write(&s.into_bytes()[..]);
+                        env.arg(i).with_s_ref(|s: &str|
+                            hash.write(&s.as_bytes()[..]));
                     }
                 }
             }
@@ -5099,6 +5387,133 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(ret)
         }, Some(1), Some(2), false);
 
+    func!(st, "sync:atom:new",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            let av = AtomicAVal::new();
+            av.write(&v);
+            Ok(VVal::Usr(Box::new(av)))
+        }, Some(1), Some(1), false);
+
+    func!(st, "sync:atom:read",
+        |env: &mut Env, _argc: usize| {
+            let av = env.arg(0);
+            if let VVal::Usr(mut avu) = av {
+                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
+                    Ok(ud.read())
+                } else {
+                    Ok(env.new_err(
+                        format!("Value is not an AtomicAVal: {}", avu.s())))
+                }
+            } else {
+                Ok(env.new_err(
+                    format!("Value is not a user data AtomicAVal: {}", av.s())))
+            }
+        }, Some(1), Some(1), false);
+
+    func!(st, "sync:atom:swap",
+        |env: &mut Env, _argc: usize| {
+            let av = env.arg(0);
+            if let VVal::Usr(mut avu) = av {
+                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
+                    let v = env.arg(1);
+                    Ok(ud.swap(&v))
+                } else {
+                    Ok(env.new_err(
+                        format!("Value is not an AtomicAVal: {}", avu.s())))
+                }
+            } else {
+                Ok(env.new_err(
+                    format!("Value is not a user data AtomicAVal: {}", av.s())))
+            }
+        }, Some(2), Some(2), false);
+
+
+    func!(st, "sync:atom:write",
+        |env: &mut Env, _argc: usize| {
+            let av = env.arg(0);
+            if let VVal::Usr(mut avu) = av {
+                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
+                    let v = env.arg(1);
+                    ud.write(&v);
+                    Ok(v)
+                } else {
+                    Ok(env.new_err(
+                        format!("Value is not an AtomicAVal: {}", avu.s())))
+                }
+            } else {
+                Ok(env.new_err(
+                    format!("Value is not a user data AtomicAVal: {}", av.s())))
+            }
+        }, Some(2), Some(2), false);
+
+    func!(st, "thread:spawn",
+        move |env: &mut Env, argc: usize| {
+            let avs =
+                if argc > 1 {
+                    let mut avs = vec![];
+                    for (i, (v, k)) in env.arg(1).iter().enumerate() {
+                        let av =
+                            if let VVal::Usr(mut vu) = v {
+                                if let Some(avu) = vu.as_any().downcast_mut::<AtomicAVal>() {
+                                    avu.clone()
+                                } else {
+                                    AtomicAVal::new()
+                                }
+                            } else {
+                                let av = AtomicAVal::new();
+                                av.write(&v);
+                                av
+                            };
+
+                        if let Some(k) = k {
+                            avs.push((k.s_raw(), av));
+                        } else {
+                            avs.push((format!("THREAD_ARG{}", i), av));
+                        }
+                    }
+                    Some(avs)
+                } else {
+                    None
+                };
+
+            let tc = env.global.borrow().get_thread_creator();
+            if let Some(tc) = &tc {
+                let ntc = tc.clone();
+                match tc.lock() {
+                    Ok(mut tcg) => {
+                        env.arg(0).with_s_ref(|code: &str|
+                            Ok(tcg.spawn(ntc, code.to_string(), avs)))
+                    },
+                    Err(e) => {
+                        Err(StackAction::panic_str(
+                            format!("Couldn't create thread: {}", e),
+                            None))
+                    },
+                }
+
+            } else {
+                Err(StackAction::panic_str(
+                    "This global environment does not provide threads.".to_string(),
+                    None))
+            }
+        }, Some(1), Some(2), false);
+
+    func!(st, "thread:join",
+        move |env: &mut Env, _argc: usize| {
+            let hdl = env.arg(0);
+            if let VVal::Usr(mut hdl) = hdl {
+                if let Some(ud) = hdl.as_any().downcast_mut::<DefaultThreadHandle>() {
+                    Ok(ud.join(env))
+                } else {
+                    Ok(env.new_err(
+                        format!("Value is not a DefaultThreadHandle: {}", hdl.s())))
+                }
+            } else {
+                Ok(env.new_err(
+                    format!("Value is not a user data DefaultThreadHandle: {}", hdl.s())))
+            }
+        }, Some(1), Some(1), false);
 
     st
 }

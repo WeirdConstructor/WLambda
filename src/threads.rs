@@ -2,657 +2,463 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 
 /*!
-Threading API:
 
-```
-#[cfg(feature="regex")]
-{
-    use wlambda::vval::*;
+This module provides threading functionality for WLambda.
+It does not depend on anything else than the Rust standard library.
 
-    // Get some random user thread:
-    let mut ctx = wlambda::EvalContext::new_default();
+If you want to implement or specialize thread creation please
+refer to the documentation of the `ThreadCreator` trait.
 
-    let mut msg_handle = wlambda::threads::MsgHandle::new();
-    // You may register on multiple threads, but only one thread can use it at a time.
-    let sender = msg_handle.sender();
-    sender.register_on_as(&mut ctx, "worker");
-
-    let t = std::thread::spawn(move || {
-        let quit = std::rc::Rc::new(std::cell::RefCell::new(false));
-
-        let global_t = wlambda::GlobalEnv::new_default();
-
-        let qr = quit.clone();
-        global_t.borrow_mut()
-            .add_func("thread:quit", move |env: &mut Env, _argc: usize| {
-                *qr.borrow_mut() = true;
-                Ok(VVal::Nul)
-            }, Some(0), Some(0));
-
-        let mut ctx = wlambda::EvalContext::new(global_t);
-
-        ctx.eval("!:global X = 123");
-
-        // msg_handle.run(&mut ctx);
-        // or alternatively:
-
-        loop {
-            // Tries to handle one RPC call within 10ms.
-            if let None = msg_handle.step(&mut ctx, &std::time::Duration::from_millis(10)) {
-                break;
-            }
-
-            if *quit.borrow() { break; }
-
-            // do some other work here, that is not blocking the thread indefinitely.
-        }
-    });
-
-    // Calls the global `displayln` in the Worker thread with the supplied arguments.
-    ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
-
-    ctx.eval("std:assert_eq (worker_call :std:eval \"X\") 123;").unwrap();
-
-    sender.call("thread:quit", VVal::Nul);
-
-    t.join();
-}
-```
-
-The alternative async messaging API, that does not provide any return values
-from the Thread. However, you could theoretically generate two message handles
-for a two way communication.
-
-```
-#[cfg(feature="regex")]
-{
-    use wlambda::vval::*;
-
-    // Get some random user thread:
-    let mut ctx = wlambda::EvalContext::new_default();
-
-    let mut msg_handle = wlambda::threads::MsgHandle::new();
-
-    let sender = msg_handle.sender();
-
-    // You may register on multiple threads, but only one thread can use it at a time.
-    sender.register_on_as(&mut ctx, "worker");
-
-    let t = std::thread::spawn(move || {
-        let mut ctx  = wlambda::EvalContext::new_default();
-
-        // This also implicitly defines a thread:quit:
-        msg_handle.run(&mut ctx);
-    });
-
-    sender.call("thread:quit", VVal::Nul);
-
-    t.join();
-}
-
-```
 */
 
-#[allow(unused_imports)]
-use crate::compiler::EvalContext;
-#[allow(unused_imports)]
 use crate::vval::*;
-#[allow(unused_imports)]
-use std::collections::VecDeque;
-#[allow(unused_imports)]
-use std::sync::{Arc, Mutex, Condvar};
+use crate::compiler::*;
 
-/// The Sender sends RPC calls to the Receiver thread.
-/// Any values passed by WLambda code are serialized into msgpack
-/// internally and transmitted to the thread
-/// in String form.
-/// This means, your values must not be cyclic or contain non serializable
-/// data like external handles.
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::RwLock;
+use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::fmt::Formatter;
+
+use fnv::FnvHashMap;
+
+/// AVal is a copy-by-value structure for storing the most
+/// important data of VVals inside an atomic container (AtomicAVal).
 ///
-/// The Sender also provides a method for storing a sending function
-/// in the global variables for the EvalContext.
+/// You can create an AVal from a VVal like this:
+/// ```
+/// use wlambda::*;
 ///
-///```
-/// let mut ctx = wlambda::compiler::EvalContext::new_default();
+/// let av = {
+///     let v = VVal::vec();
+///     v.push(VVal::Int(1));
+///     v.push(VVal::Int(2));
+///     v.push(VVal::Int(3));
 ///
-/// let mut msg_handle = wlambda::threads::MsgHandle::new();
-/// let sender = msg_handle.sender();
+///     AVal::from_vval(&v)
+/// };
 ///
-/// // You may register on multiple threads, but only one thread can use it at a time.
-/// sender.register_on_as(&mut ctx, "worker");
+/// /// You get back the VVal like this:
 ///
-/// // start thread here...
-///```
-#[derive(Debug, Clone)]
-#[cfg(feature="rmp-serde")]
-pub struct Sender {
-    receiver: Arc<Receiver>,
+/// assert_eq!(av.to_vval().s(), "$[1,2,3]");
+/// ```
+///
+/// And get back the VVal like this:
+#[derive(Clone, Debug)]
+pub enum AVal {
+    Nul,
+    Err(Box<AVal>, String),
+    Bol(bool),
+    Sym(String),
+    Str(String),
+    Byt(Vec<u8>),
+    Int(i64),
+    Flt(f64),
+    Lst(Vec<AVal>),
+    Map(FnvHashMap<String, AVal>),
+    Atom(AtomicAVal),
 }
 
-#[cfg(feature="rmp-serde")]
-impl Sender {
-    fn new(receiver: Arc<Receiver>) -> Self {
-        Sender { receiver }
-    }
-
-    /// Registers a call and message sending function on the supplied EvalContext.
-    /// You can call this function with the global variable name
-    /// of the thread function you want to call and additional
-    /// arguments to that function.
-    ///
-    /// ```no_run
-    /// let mut ctx = wlambda::compiler::EvalContext::new_default();
-    ///
-    /// let mut msg_handle = wlambda::threads::MsgHandle::new();
-    /// let sender = msg_handle.sender();
-    ///
-    /// sender.register_on_as(&mut ctx, "worker");
-    ///
-    /// ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
-    ///
-    /// // _send will not wait for the call to be finished or even started.
-    /// ctx.eval("worker_send :displayln \"hello world from worker thread!\";").unwrap();
-    /// ```
-    pub fn register_on_as(&self, ctx: &mut EvalContext, variable_name: &str) {
-        let sender = self.clone();
-        ctx.set_global_var(&format!("{}_call", variable_name),
-            &VValFun::new_fun(
-                move |env: &mut Env, argc: usize| {
-                    let args =
-                        if argc == 1 { VVal::Nul }
-                        else {
-                            let a = VVal::vec();
-                            for i in 1..argc {
-                                a.push(env.arg(i).clone());
-                            }
-                            a
-                        };
-                    Ok(sender.call(&env.arg(0).s_raw(), args))
-                }, Some(1), None, false));
-
-        let sender = self.clone();
-        ctx.set_global_var(&format!("{}_send", variable_name),
-            &VValFun::new_fun(
-                move |env: &mut Env, argc: usize| {
-                    let args =
-                        if argc == 1 { VVal::Nul }
-                        else {
-                            let a = VVal::vec();
-                            for i in 1..argc {
-                                a.push(env.arg(i).clone());
-                            }
-                            a
-                        };
-                    sender.send(&env.arg(0).s_raw(), args);
-                    Ok(VVal::Nul)
-                }, Some(1), None, false));
-    }
-
-    /// Calls the global variable in the receiver thread
-    /// with the given argument vector. You can pass `none` value
-    /// as args too.
-    pub fn call(&self, var_name: &str, args: VVal) -> VVal {
-        let r = &*self.receiver;
-
-        let mut mx = r.mx.lock().unwrap();
-        {
-            while mx.0 != RecvState::Open {
-                mx = r.cv.wait(mx).unwrap();
-            }
-
-            mx.0 = RecvState::Call;
-            mx.1 = var_name.to_string();
-            mx.2 = args.to_msgpack().unwrap();
-            mx.3 = false;
-
-            r.cv.notify_all();
-        }
-
-        while mx.0 != RecvState::Return {
-            mx = r.cv.wait(mx).unwrap();
-        }
-
-        let ret =
-            if mx.3 {
-                VVal::err_msg(&String::from_utf8(mx.2.clone()).unwrap())
-            } else {
-                VVal::from_msgpack(&mx.2).unwrap()
-            };
-
-        mx.0 = RecvState::Open;
-        mx.1 = String::from("");
-        mx.2 = String::from("").into_bytes();
-        mx.3 = false;
-
-        r.cv.notify_all();
-
-        ret
-    }
-
-    /// With send you can asynchronously send messages in form of
-    /// method calls to the receiver. The Receiver will process all
-    /// received messages per `step()`. Multiple senders can send
-    /// messages, while multiple Receivers can process them.
-    pub fn send(&self, var_name: &str, args: VVal) {
-        let r = &*self.receiver;
-        let mut mx = r.mx.lock().unwrap();
-        while !(mx.0 == RecvState::Open || mx.0 == RecvState::Msg) {
-            mx = r.cv.wait(mx).unwrap();
-        }
-        mx.0 = RecvState::Msg;
-        mx.4.push_back((
-            var_name.to_string(),
-            args.to_msgpack().unwrap()));
-    }
-}
-
-#[cfg(feature="rmp-serde")]
-#[derive(Debug, Copy, Clone, PartialEq)]
-enum RecvState {
-    Open,
-    Msg,
-    Call,
-    Return,
-}
-
-#[cfg(feature="rmp-serde")]
-type RecvData = (RecvState, String, Vec<u8>, bool, VecDeque<(String, Vec<u8>)>);
-#[cfg(feature="rmp-serde")]
-type RecvMutex = Mutex<RecvData>;
-
-#[derive(Debug)]
-#[cfg(feature="rmp-serde")]
-pub struct Receiver {
-    mx: RecvMutex,
-    cv: Condvar,
-}
-
-#[cfg(feature="rmp-serde")]
-impl Receiver {
-    fn new() -> Arc<Self> {
-        Arc::new(Receiver {
-            mx: Mutex::new((
-                    RecvState::Open,
-                    String::from(""),
-                    vec![],
-                    false,
-                    VecDeque::new())),
-            cv: Condvar::new(),
-        })
-    }
-}
-
-#[cfg(feature="rmp-serde")]
-fn mx_recv_error(mx: &mut RecvData, s: &str) {
-    mx.0 = RecvState::Return;
-    mx.2 =
-        VVal::err_msg(&format!("return value serialization error ({}): {}", mx.1, s))
-        .s().as_bytes().to_vec();
-    mx.3 = true;
-}
-
-#[cfg(feature="rmp-serde")]
-fn mx_return(mx: &mut RecvData, v: &VVal) {
-    mx.0 = RecvState::Return;
-    match v.to_msgpack() {
-        Ok(s) => {
-            mx.2 = s;
-            mx.3 = false;
-        },
-        Err(s) => mx_recv_error(mx, &s),
-    }
-}
-
-/// This a messaging handle for providing receiver and sender handles
-/// for the inter thread communication of WLambda instances.
-///
-/// The communication is internally done either by RPC or by async
-/// message passing. The VVal or WLambda values are serialized as msgpack
-/// internally for transmission to the
-/// other thread. This is not a high speed interface, as serialization
-/// and allocations are done.
-///
-/// The communication between WLambda thread instances can be done by
-/// multiple senders and multiple receivers, but bear in mind, that in
-/// case of RPC one RPC call will lock out all other sender and
-/// receiver thread, as RPC calls are synchronous.
-///
-/// Pass this MsgHandle to the receiver thread or multiple threads.
-/// You can clone this handle if you want to use it in multiple threads.
-///
-/// **See also** [threads module](index.html)
-#[cfg(feature="rmp-serde")]
-#[derive(Clone)]
-pub struct MsgHandle {
-    receiver: Arc<Receiver>,
-}
-
-#[cfg(feature="rmp-serde")]
-impl MsgHandle {
-    pub fn new() -> Self {
-        MsgHandle {
-            receiver: Receiver::new(),
-        }
-    }
-
-    /// Returns a Sender handle.
-    pub fn sender(&self) -> Sender {
-        Sender::new(self.receiver.clone())
-    }
-
-    /// Starts executing Sender requests infinitely long.
-    /// A global `thread:quit` function is defined, which can be used
-    /// to stop this infinitely long loop.
-    pub fn run(&mut self, ctx: &mut EvalContext) {
-        let quit = std::rc::Rc::new(std::cell::RefCell::new(false));
-
-        let qr = quit.clone();
-        ctx.set_global_var(
-            "thread:quit",
-            &VValFun::new_fun(move |_env: &mut Env, _argc: usize| {
-                *qr.borrow_mut() = true;
-                Ok(VVal::Nul)
-            }, Some(0), Some(0), false));
-
-        loop {
-            self.step(ctx, &std::time::Duration::from_secs(1));
-            if *quit.borrow() { break; }
-        }
-    }
-
-    /// Tries to execute a RPC call or received message if the request is
-    /// received within _timeout_ duration. Returns `None` if something
-    /// went wrong. Otherwise `Some(())` is returned.
-    pub fn step(&mut self, ctx: &mut EvalContext, timeout: &std::time::Duration) -> Option<()> {
-        let r = &*self.receiver;
-
-        let mut mx = r.mx.lock().unwrap();
-        loop {
-            let state = mx.0;
-            match state {
-                RecvState::Call => {
-                    if let Some(v) = ctx.get_global_var(&mx.1) {
-                        match VVal::from_msgpack(&mx.2) {
-                            Ok(args) => {
-                                let arg =
-                                    if args.is_none() { vec![] }
-                                    else { args.to_vec() };
-                                match ctx.call(&v, &arg) {
-                                    Ok(vret) => {
-                                        mx_return(&mut *mx, &vret);
-                                    },
-                                    Err(sa) => {
-                                        mx_recv_error(&mut *mx,
-                                            &format!("uncaught stack action calling: {}", sa));
-                                    }
-                                }
-                            },
-                            Err(s) => {
-                                mx_recv_error(&mut *mx,
-                                    &format!("deserialization error: {}", s));
-                            }
-                        }
-
+impl AVal {
+    /// Takes a path of indices and the start index of that path,
+    /// and sets the addressed slot to the given AVal.
+    /// This is used by `std:sync:atom:write_at`.
+    #[allow(dead_code)]
+    pub fn set_at_path(&mut self, path_idx: usize, pth: &VVal, av: AVal) {
+        match pth.at(path_idx).unwrap_or(VVal::Nul) {
+            VVal::Int(i) => {
+                if let AVal::Lst(ref mut v) = self {
+                    if (i as usize) < v.len() {
+                        v[i as usize] = av;
                     } else {
-                        let gvar = mx.1.clone();
-                        mx_recv_error(&mut *mx,
-                            &format!("no such global variable: {}", gvar));
-                    }
-
-                    r.cv.notify_all();
-                    break;
-                },
-                RecvState::Msg => {
-                    std::mem::drop(mx);
-                    loop {
-                        let mut mx = r.mx.lock().unwrap();
-                        if mx.4.is_empty() {
-                            mx.0 = RecvState::Open;
-                            break;
-                        }
-                        let (name, ser_val) = mx.4.pop_front().unwrap();
-                        std::mem::drop(mx);
-
-                        if let Some(v) = ctx.get_global_var(&name) {
-                            if let Ok(args) = VVal::from_msgpack(&ser_val) {
-                                let arg =
-                                    if args.is_none() { vec![] }
-                                    else { args.to_vec() };
-                                ctx.call(&v, &arg).unwrap_or(VVal::Nul);
-                            }
-                        }
-                    }
-                    r.cv.notify_all();
-                    break;
-                },
-                _ => {
-                    // FIXME: As soon as Rust is not nightly anymore,
-                    //        use wait_timeout_until for more precise timeout.
-                    let res = r.cv.wait_timeout(mx, *timeout).unwrap();
-                    mx = res.0;
-                    if res.1.timed_out() {
-                        break;
+                        v.insert(i as usize, av);
                     }
                 }
+            },
+            v => {
+                let key = v.s_raw();
+                if let AVal::Map(ref mut m) = self {
+                    m.insert(key, av);
+                }
+            },
+        }
+    }
+
+    /// Converts the AVal back to a VVal.
+    ///
+    /// ```
+    /// use wlambda::*;
+    /// assert_eq!(AVal::Sym(String::from("x")).to_vval().s(), ":\"x\"");
+    /// ```
+    pub fn to_vval(&self) -> VVal {
+        match self {
+            AVal::Nul    => VVal::Nul,
+            AVal::Err(av, pos) => {
+                let v = VVal::vec();
+                v.push(av.to_vval());
+                v.push(VVal::new_str(pos));
+                VVal::Err(Rc::new(RefCell::new((v,
+                     SynPos { syn: Syntax::Block, line: 0,
+                              col: 0, file: FileRef::new("?"), name: None }))))
+            },
+            AVal::Bol(b) => VVal::Bol(*b),
+            AVal::Int(i) => VVal::Int(*i),
+            AVal::Flt(f) => VVal::Flt(*f),
+            AVal::Sym(s) => VVal::new_sym(s),
+            AVal::Str(s) => VVal::new_str(s),
+            AVal::Byt(b) => VVal::new_byt(b.clone()),
+            AVal::Atom(a) => VVal::Usr(Box::new(a.clone())),
+            AVal::Lst(l) => {
+                let v = VVal::vec();
+                for av in l.iter() {
+                    v.push(av.to_vval());
+                }
+                v
+            },
+            AVal::Map(m) => {
+                let mv = VVal::map();
+                for (k, v) in m.iter() {
+                    mv.set_map_key(k.clone(), v.to_vval());
+                }
+                mv
+            },
+        }
+    }
+
+    /// Converts a VVal to an AVal.
+    ///
+    /// ```
+    /// use wlambda::*;
+    ///
+    /// let av = AVal::from_vval(&VVal::new_sym("x"));
+    /// if let AVal::Sym(s) = av {
+    ///     assert_eq!(s, "x");
+    /// } else {
+    ///     assert!(false);
+    /// }
+    /// ```
+    pub fn from_vval(v: &VVal) -> Self {
+        match v {
+            VVal::Nul => AVal::Nul,
+            VVal::Err(e) => {
+                let eb = e.borrow();
+                AVal::Err(
+                    Box::new(AVal::from_vval(&eb.0)),
+                    format!("{}", eb.1))
+            },
+            VVal::Bol(b) => AVal::Bol(*b),
+            VVal::Sym(s) => AVal::Sym(s.borrow().clone()),
+            VVal::Str(s) => AVal::Str(s.borrow().clone()),
+            VVal::Byt(b) => AVal::Byt(b.borrow().clone()),
+            VVal::Int(i) => AVal::Int(*i),
+            VVal::Flt(f) => AVal::Flt(*f),
+            VVal::Lst(l) => {
+                let mut avec = vec![];
+                for vv in l.borrow().iter() {
+                    avec.push(AVal::from_vval(vv));
+                }
+                AVal::Lst(avec)
+            },
+            VVal::Map(m) => {
+                let mut amap =
+                    FnvHashMap::with_capacity_and_hasher(2, Default::default());
+                for (k, v) in m.borrow().iter() {
+                    amap.insert(k.clone(), AVal::from_vval(v));
+                }
+                AVal::Map(amap)
+            },
+            VVal::Usr(u) => {
+                let mut cl_ud = u.clone_ud();
+                if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicAVal>() {
+                    AVal::Atom(ud.clone())
+
+                } else {
+                    AVal::Nul
+                }
+            },
+            _ => AVal::Nul,
+        }
+    }
+}
+
+/// WLambda:
+///
+/// ```text
+/// !atom = std:sync:atom:new 10;
+/// !queue = std:sync:mpsc:new[];
+/// !thrd = std:spawn_thread $q{
+///     !val = main.read;
+///     main.write $[1,$[0,1],3];
+///
+///     main.read_at 0;
+///     main.write_at $[1, 0] 320;
+///     q.push $["done", 10];
+///
+/// } ${ main = atom, q = queue };
+///
+/// !item = queue.pop[];
+/// .item = queue.pop_timeout 1000;
+///
+///
+/// ```
+
+/// Wraps an AVal like this: Arc<RwLock<AVal>>.
+/// An AtomicAVal is a thread safe container for VVal
+/// data structures. It's used by WLambda functions like
+/// `std:sync:atom:new`, `std:sync:atom:read` or `std:sync:atom:write`.
+///
+/// These containers are shared between the threads by passing them
+/// to the threads at `std:thread:spawn`.
+#[derive(Clone, Debug)]
+pub struct AtomicAVal(Arc<RwLock<AVal>>);
+
+impl Default for AtomicAVal {
+    fn default() -> Self { AtomicAVal::new() }
+}
+
+pub struct AValSender(Rc<Sender<AVal>>);
+
+impl AValSender {
+    pub fn send(&self, v: &VVal) -> VVal {
+        if let Err(e) = self.0.send(AVal::from_vval(v)) {
+            VVal::err_msg(&format!("send error: {}", e))
+        } else {
+            VVal::Bol(true)
+        }
+    }
+}
+
+pub struct AValReceiver(Arc<Mutex<Receiver<AVal>>>);
+
+impl AValReceiver {
+    pub fn try_recv(&self, timeout: i64) -> VVal {
+        match self.0.lock() {
+            Ok(guard) => {
+                match guard.try_recv() {
+                    Ok(av) => av.to_vval(),
+                    Err(TryRecvError::Empty) => VVal::Nul,
+                    Err(e) => {
+                        VVal::err_msg(&format!("try_recv error: {}", e))
+                    }
+                }
+            },
+            Err(e) => {
+                VVal::err_msg(&format!("try_recv error: {}", e))
             }
         }
-
-        Some(())
     }
 }
 
-#[cfg(feature="rmp-serde")]
-impl Default for MsgHandle {
-    fn default() -> Self {
-        Self::new()
+//impl VValUserData for Sender {
+//    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+//    fn clone_ud(&self) -> Box<dyn VValUserData> {
+//        Box::new(self.clone())
+//    }
+//}
+//
+//impl VValUserData for ReadLock {
+//    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+//    fn clone_ud(&self) -> Box<dyn VValUserData> {
+//        Box::new(self.clone())
+//    }
+//}
+
+impl AtomicAVal {
+    /// Creates a new empty instance, containing AVal::Nul.
+    pub fn new() -> Self {
+        Self(Arc::new(RwLock::new(AVal::Nul)))
+    }
+
+    /// Locks and stores the VVal.
+    pub fn write(&self, vv: &VVal) -> VVal {
+        let new_av = AVal::from_vval(vv);
+        if let Ok(mut guard) = self.0.write() {
+            *guard = new_av;
+            VVal::Bol(true)
+        } else {
+            VVal::err_msg("Lock Poisoned")
+        }
+    }
+
+    /// Locks and stores the VVal.
+    pub fn swap(&self, vv: &VVal) -> VVal {
+        let new_av = AVal::from_vval(vv);
+        if let Ok(mut guard) = self.0.write() {
+            let ret = guard.to_vval();
+            *guard = new_av;
+            ret
+        } else {
+            VVal::err_msg("Lock Poisoned")
+        }
+    }
+
+    /// Locks and reads the AVal and converts it to a VVal.
+    pub fn read(&self) -> VVal {
+        if let Ok(guard) = self.0.read() {
+            guard.to_vval()
+        } else {
+            VVal::err_msg("Lock Poisoned")
+        }
+    }
+
+    /// Locks and stores the VVal at the given key path.
+    pub fn store_at(&self, _keypath: &VVal, vv: &VVal) {
+        let new_av = AVal::from_vval(vv);
+        if let Ok(mut guard) = self.0.write() {
+            *guard = new_av;
+        }
+    }
+
+    /// Locks and reads the AVal at the given key path.
+    pub fn read_at(&self, _keypath: &VVal) -> VVal {
+        VVal::Nul
     }
 }
 
-#[cfg(test)]
-#[cfg(feature="rmp-serde")]
-mod tests {
-    #[cfg(feature="rmp-serde")]
-    #[test]
-    fn check_rpc() {
-        use crate::vval::*;
-
-        // Get some random user thread:
-        let mut ctx = crate::compiler::EvalContext::new_default();
-
-        let mut msg_handle = crate::threads::MsgHandle::new();
-        let sender = msg_handle.sender();
-        sender.register_on_as(&mut ctx, "worker");
-
-        let t = std::thread::spawn(move || {
-            let quit = std::rc::Rc::new(std::cell::RefCell::new(false));
-
-            let global_t = crate::compiler::GlobalEnv::new_default();
-
-            let qr = quit.clone();
-            global_t.borrow_mut().add_func("thread:quit", move |_env: &mut Env, _argc: usize| {
-                *qr.borrow_mut() = true;
-                Ok(VVal::Nul)
-            }, Some(0), Some(0));
-
-            let mut ctx = crate::compiler::EvalContext::new(global_t);
-
-            ctx.eval("!:global X = 123").unwrap();
-
-            loop {
-                msg_handle.step(&mut ctx, &std::time::Duration::from_secs(1));
-                if *quit.borrow() { break; }
-            }
-        });
-
-        ctx.eval("worker_call :displayln \"hello world from worker thread!\";").unwrap();
-        ctx.eval("std:assert_eq (worker_call :std:eval \"X\") 123;").unwrap();
-
-        sender.call("thread:quit", VVal::Nul);
-
-        t.join().unwrap();
+impl VValUserData for AtomicAVal {
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
     }
+}
 
-    #[cfg(feature="rmp-serde")]
-    #[test]
-    fn check_rpc_quit() {
-        use crate::vval::*;
+/// This trait allows WLambda to create new threads.
+/// You can either use the `DefaultThreadCreator`
+/// default implementation or provide your own. Providing
+/// your own might be necessary if you want to customize
+/// how a thread is created.
+///
+/// Please refer to the source of `DefaultThreadCreator`
+/// for a comprehensive example.
+///
+/// ```
+/// use wlambda::*;
+/// use wlambda::threads::*;
+/// use std::sync::Arc;
+/// use std::sync::Mutex;
+///
+/// // For simplicity we make detached threads here and don't pass any globals.
+/// pub struct CustomThreadCreator();
+///
+/// impl ThreadCreator for CustomThreadCreator {
+///     fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+///              code: String,
+///              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
+///
+///         let tcc = tc.clone();
+///         let hdl =
+///             std::thread::spawn(move || {
+///                 let genv = GlobalEnv::new_empty_default();
+///                 genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
+///
+///                 let mut ctx = EvalContext::new(genv);
+///
+///                 match ctx.eval(&code) {
+///                     Ok(v) => AVal::from_vval(&v),
+///                     Err(e) => {
+///                         AVal::Err(
+///                             Box::new(
+///                                 AVal::Str(format!("Error in Thread: {}", e))),
+///                             String::from("?"))
+///                     }
+///                 }
+///             });
+///         VVal::Nul
+///     }
+/// }
+/// ```
+pub trait ThreadCreator: Send {
+    /// Spawns a new thread with the given ThreadCreator.
+    /// You need to pass the `tc` reference, so that the
+    /// GlobalEnv of the thread also knows how to
+    /// create new threads. You could even pass a different
+    /// ThreadCreator for those.
+    ///
+    /// `code` is a String containing WLambda code which
+    /// is executed after the new thread has been spawned.
+    /// `globals` is a mapping of global variable names and
+    /// AtomicAVal instances that are loaded into the threads
+    /// global environment. This is the only way to share
+    /// data between threads.
+    fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+             code: String,
+             globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal;
+}
 
-        // Get some random user thread:
-        let mut ctx = crate::compiler::EvalContext::new_default();
-
-        let mut msg_handle = crate::threads::MsgHandle::new();
-        let sender = msg_handle.sender();
-        sender.register_on_as(&mut ctx, "worker");
-
-        let t = std::thread::spawn(move || {
-            let mut ctx = crate::compiler::EvalContext::new_default();
-
-            ctx.eval("!:global X = 123").unwrap();
-            msg_handle.run(&mut ctx);
-        });
-
-        ctx.eval("std:assert_eq (worker_call :std:eval \"X\") 123;").unwrap();
-
-        sender.call("thread:quit", VVal::Nul);
-
-        t.join().unwrap();
+impl std::fmt::Debug for dyn ThreadCreator {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "<<ThreadCreator>>")
     }
+}
 
-    #[cfg(feature="rmp-serde")]
-    #[test]
-    fn check_rpc_msgs() {
-        use crate::vval::*;
+/// Default implementation of a ThreadCreator.
+///
+/// See also `GlobalEnv::new_default` for further information
+/// how this may be used.
+pub struct DefaultThreadCreator();
 
-        let r = std::sync::Arc::new(std::sync::Mutex::new(String::from("")));
-        let ri = r.clone();
+#[allow(clippy::new_without_default)]
+impl DefaultThreadCreator {
+    pub fn new() -> Self { Self {} }
+}
 
-        // Get some random user thread:
-        let mut ctx = crate::compiler::EvalContext::new_default();
+/// To join a thread that was created by a DefaultThreadCreator
+/// this JoinHandle wrapper is used. It provides a way to wrap it
+/// into a `VValUserData` and use it by the WLambda function `std:thread:join`.
+#[derive(Clone)]
+pub struct DefaultThreadHandle(Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>>);
 
-        let mut msg_handle = crate::threads::MsgHandle::new();
-        let sender = msg_handle.sender();
-        sender.register_on_as(&mut ctx, "worker");
-
-        let t = std::thread::spawn(move || {
-            let mut ctx = crate::compiler::EvalContext::new_default();
-
-            ctx.eval(r#"
-                !:global X = $[1,2,3,4];
-                !:global Y = { std:pop X };
-                !:global G = { std:push X (str $[_, _1]); };
-                !:global H = { std:push X (_ + _1); };
-            "#).unwrap();
-            msg_handle.run(&mut ctx);
-
-            {
-                let mut i = ri.lock().unwrap();
-                std::mem::replace(
-                    &mut *i,
-                    ctx.eval("$[std:pop X, std:pop X]").unwrap().s());
-            }
-        });
-
-        sender.send("Y",           VVal::Nul);
-        sender.send("Y",           VVal::Nul);
-        sender.send("Y",           VVal::Nul);
-        ctx.eval("worker_call :G 45 44").unwrap();
-        ctx.eval("worker_send :H 11 13").unwrap();
-        sender.send("thread:quit", VVal::Nul);
-
-        std::thread::sleep(std::time::Duration::from_secs(2));
-
-        let i = r.lock().unwrap();
-        assert_eq!(*i, "$[24,\"$[45,44]\"]", "popping works");
-
-        t.join().unwrap();
+impl DefaultThreadHandle {
+    /// Joins the handle, and returns the result VVal of the thread.
+    pub fn join(&self, env: &mut Env) -> VVal {
+        let hdl = std::mem::replace(&mut (*self.0.borrow_mut()), None);
+        if let Some(h) = hdl {
+            h.join().unwrap().to_vval()
+        } else {
+            env.new_err(
+                "DefaultThreadHandle already joined!".to_string())
+        }
     }
+}
 
-    #[cfg(feature="rmp-serde")]
-    #[test]
-    fn check_rpc_msgs_from_eval() {
-        let r = std::sync::Arc::new(std::sync::Mutex::new(0));
-        let ri = r.clone();
-
-        // Get some random user thread:
-        let mut ctx = crate::compiler::EvalContext::new_default();
-
-        let mut msg_handle = crate::threads::MsgHandle::new();
-        let sender = msg_handle.sender();
-        sender.register_on_as(&mut ctx, "worker");
-
-        let t = std::thread::spawn(move || {
-            let mut ctx = crate::compiler::EvalContext::new_default();
-
-            ctx.eval(r#"
-                !:global X = $[13,2,3,4];
-                !:global Y = { std:pop X };
-            "#).unwrap();
-            msg_handle.run(&mut ctx);
-
-            {
-                let mut i = ri.lock().unwrap();
-                std::mem::replace(
-                    &mut *i,
-                    ctx.eval("std:pop X").unwrap().i());
-            }
-        });
-
-
-        ctx.eval(r#"
-            worker_send :Y;
-            worker_send :Y;
-            worker_send :Y;
-            worker_send :thread:quit;
-        "#).unwrap();
-
-        std::thread::sleep(std::time::Duration::from_secs(2));
-
-        let i = r.lock().unwrap();
-        assert_eq!(*i, 13, "popping works");
-
-        t.join().unwrap();
+impl VValUserData for DefaultThreadHandle {
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
+        Box::new(self.clone())
     }
+}
 
+impl ThreadCreator for DefaultThreadCreator {
+    fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+             code: String,
+             globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
 
-    #[cfg(feature="rmp-serde")]
-    #[test]
-    fn check_rpc_msgs_bytes() {
-        let r = std::sync::Arc::new(std::sync::Mutex::new(String::from("")));
-        let ri = r.clone();
+        let tcc = tc.clone();
+        let hdl =
+            std::thread::spawn(move || {
+                let genv = GlobalEnv::new_empty_default();
+                genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
 
-        // Get some random user thread:
-        let mut ctx = crate::compiler::EvalContext::new_default();
+                if let Some(globals) = globals {
+                    for (k, av) in globals {
+                        genv.borrow_mut().set_var(&k, &VVal::Usr(Box::new(av)));
+                    }
+                }
 
-        let mut msg_handle = crate::threads::MsgHandle::new();
-        let sender = msg_handle.sender();
-        sender.register_on_as(&mut ctx, "worker");
+                let mut ctx = EvalContext::new(genv);
 
-        let t = std::thread::spawn(move || {
-            let mut ctx = crate::compiler::EvalContext::new_default();
-
-            ctx.eval(r#"
-                !:global X = $[13,2,3,4];
-                !:global Y = { .X = _; };
-            "#).unwrap();
-            msg_handle.run(&mut ctx);
-
-            {
-                let mut i = ri.lock().unwrap();
-                std::mem::replace(
-                    &mut *i, ctx.eval("X").unwrap().s());
-            }
-        });
-
-        ctx.eval(r#"
-            worker_send :Y $b"ABC";
-            worker_send :thread:quit;
-        "#).unwrap();
-
-        std::thread::sleep(std::time::Duration::from_secs(2));
-
-        let i = r.lock().unwrap();
-        assert_eq!(*i, "$b\"ABC\"", "transmitting bytes works");
-
-        t.join().unwrap();
+                match ctx.eval(&code) {
+                    Ok(v) => AVal::from_vval(&v),
+                    Err(e) => {
+                        AVal::Err(
+                            Box::new(
+                                AVal::Str(format!("Error in Thread: {}", e))),
+                            String::from("?"))
+                    }
+                }
+            });
+        VVal::Usr(Box::new(DefaultThreadHandle(Rc::new(RefCell::new(Some(hdl))))))
     }
 }

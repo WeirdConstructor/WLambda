@@ -7,9 +7,13 @@ to make it more consistent naming to `trim_start` and `trim_end`.
 prelude or other pure Rust functions.
 * Change: Added recently defined variable name or key to syntax positions
 for functions. This might help finding the actual function where
-the error occured easier.
+the error occurred easier.
 * Incompatible Change: Renamed `neg` to `neg_i64`, `uneg` to `neg_u32`.
+* Incompatible Change: Rewrote the complete threading implementation
+of WLambda.
+* Optimization: Removed many unnecessary String allocations.
 * Feature: Added `not_i64` and `not_u32`.
+* Feature: Added compile time constant values: `!:const X = ...`.
 * Documentation: More!
 
 0.4.4 (2020-03-06)

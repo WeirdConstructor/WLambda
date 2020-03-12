@@ -1,6 +1,13 @@
 // Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
+/*!
+
+  Provides a convenience macro for creating OO interfaces from
+  Rust. See `set_vval_method` macro.
+
+*/
+
 /// This macro helps with exporting something with a more OO interface
 /// instead of using a VValUserData trait implementation.
 ///

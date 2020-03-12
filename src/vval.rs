@@ -14,6 +14,8 @@ use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Display, Debug, Formatter};
 
+use crate::compiler::{GlobalEnv, GlobalEnvRef};
+
 use fnv::FnvHashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -128,6 +130,7 @@ pub enum Syntax {
     CaptureRef,
     AssignRef,
     DefGlobRef,
+    DefConst,
     SelfObj,
     SelfData,
     Import,
@@ -209,14 +212,17 @@ pub struct Env {
     pub accum_val: VVal,
     /// Current accumulator function:
     pub accum_fun: VVal,
+    /// A pointer to the global environment, holding stuff like
+    /// the module loader and thread creator.
+    pub global: GlobalEnvRef,
 }
 
-impl Default for Env {
-    fn default() -> Self { Self::new() }
-}
-
+//impl Default for Env {
+//    fn default() -> Self { Self::new() }
+//}
+//
 impl Env {
-    pub fn new() -> Env {
+    pub fn new(global: GlobalEnvRef) -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             current_self:       VVal::Nul,
@@ -229,12 +235,13 @@ impl Env {
             accum_fun:          VVal::Nul,
             accum_val:          VVal::Nul,
             call_stack:         vec![],
+            global
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
     }
 
-    pub fn new_with_user(user: Rc<RefCell<dyn std::any::Any>>) -> Env {
+    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
             current_self:       VVal::Nul,
@@ -247,6 +254,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             user,
+            global,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
         e
@@ -334,12 +342,14 @@ impl Env {
         self.exports.insert(String::from(name), value.clone());
     }
 
+    #[inline]
     pub fn set_bp(&mut self, env_size: usize) -> usize {
         let new_bp = self.sp;
         self.sp += env_size;
         std::mem::replace(&mut self.bp, new_bp)
     }
 
+    #[inline]
     pub fn reset_bp(&mut self, env_size: usize, oldbp: usize) {
         for i in self.bp..self.sp {
             self.args[i] = VVal::Nul;
@@ -353,6 +363,7 @@ impl Env {
         self.current_self.clone()
     }
 
+    #[inline]
     pub fn with_object<T>(&mut self, object: VVal, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let old_self = std::mem::replace(&mut self.current_self, object);
@@ -361,6 +372,7 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn with_local_call_info<T>(&mut self, argc: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let local_size = 0;
@@ -375,6 +387,7 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let local_size = fu.local_size;
@@ -394,6 +407,7 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn with_restore_sp<T>(&mut self, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
 
@@ -403,6 +417,7 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn with_pushed_sp<T>(&mut self, n: usize, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
 
@@ -413,17 +428,20 @@ impl Env {
         ret
     }
 
+    #[inline]
     pub fn push_sp(&mut self, n: usize) {
         self.sp += n;
         //d// println!("PUSH_SP {} => {}", n, self.sp);
     }
 
+    #[inline]
     pub fn push(&mut self, v: VVal) -> usize {
         self.args[self.sp] = v;
         self.sp += 1;
         self.sp - 1
     }
 
+    #[inline]
     pub fn popn(&mut self, n: usize) {
         if self.sp < n {
             panic!(format!("Stack pointer underflow {} {}", self.sp, n));
@@ -458,19 +476,23 @@ impl Env {
         }
     }
 
+    #[inline]
     pub fn argv(&mut self) -> VVal {
         VVal::vec_from(&self.args[(self.bp - self.argc)..self.bp])
     }
 
+    #[inline]
     pub fn get_up_raw(&mut self, i: usize) -> VVal {
         //d// println!("GET UP {}: {:?}", i, self.fun.upvalues);
         self.call_stack.last().unwrap().upvalues[i].clone()
     }
 
+    #[inline]
     pub fn get_up_captured_ref(&mut self, i: usize) -> VVal {
         self.call_stack.last().unwrap().upvalues[i].to_ref()
     }
 
+    #[inline]
     pub fn get_up(&mut self, i: usize) -> VVal {
         self.call_stack.last().unwrap().upvalues[i].deref()
 //        match self.fun.upvalues[i].deref() {
@@ -484,16 +506,19 @@ impl Env {
 //        }
     }
 
+    #[inline]
     pub fn set_arg(&mut self, i: usize, v: VVal) {
         //d// println!("SET ARG [{}/{}]= {}", i, self.sp - (i + 1), v.s());
         self.args[self.sp - (i + 1)] = v;
     }
 
+    #[inline]
     pub fn arg_ref(&self, i: usize) -> Option<&VVal> {
         if i >= self.argc { return None; }
         Some(&self.args[self.bp - (i + 1)])
     }
 
+    #[inline]
     pub fn arg_err_internal(&self, i: usize) -> Option<VVal> {
         let v = &self.args[self.bp - (i + 1)];
         match v {
@@ -502,6 +527,7 @@ impl Env {
         }
     }
 
+    #[inline]
     pub fn arg(&self, i: usize) -> VVal {
         //d// println!("GET ARGC [{}] = {}", i, self.argc);
         if i >= self.argc { return VVal::Nul; }
@@ -531,6 +557,7 @@ impl Env {
         self.args[idx].to_ref()
     }
 
+    #[inline]
     pub fn get_local(&mut self, i: usize) -> VVal {
         let idx = self.bp + i;
         match &self.args[idx] {
@@ -635,6 +662,28 @@ impl Env {
         self.accum_fun.clone()
     }
 
+    /// Creates a new error VVal with the given string as error message.
+    /// Takes care to annotate the error value with the current function
+    /// information.
+    ///
+    ///```
+    /// use wlambda::compiler::EvalContext;
+    /// use wlambda::vval::{VVal, VValFun, Env};
+    ///
+    /// let mut ctx = EvalContext::new_default();
+    ///
+    /// ctx.set_global_var("xyz",
+    ///     &VValFun::new_fun(
+    ///         move |env: &mut Env, argc: usize| {
+    ///             let ok = false;
+    ///             if !ok {
+    ///                 Ok(env.new_err(
+    ///                     format!("Something was not ok!")))
+    ///             } else {
+    ///                 Ok(VVal::Bol(true))
+    ///             }
+    ///         }, None, None, false));
+    ///```
     pub fn new_err(&self, s: String) -> VVal {
         for i in self.call_stack.iter().rev() {
             if i.syn_pos.is_some() {
@@ -987,7 +1036,8 @@ pub struct DropVVal {
 impl Drop for DropVVal {
     #[allow(unused_must_use)]
     fn drop(&mut self) {
-        let mut e = Env::new();
+        let global = GlobalEnv::new_default();
+        let mut e = Env::new(global);
         e.push(self.v.clone());
         if let Err(e) = self.fun.call_internal(&mut e, 1) {
             eprintln!("Error in drop function: {}", e);
@@ -1176,6 +1226,9 @@ impl CycleCheck {
     }
 }
 
+pub type VValIter =
+    std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>>;
+
 #[allow(dead_code)]
 impl VVal {
     pub fn new_str(s: &str) -> VVal {
@@ -1244,7 +1297,7 @@ impl VVal {
     }
 
     pub fn compare_str(&self, b: &VVal) -> std::cmp::Ordering {
-        self.s_raw().cmp(&b.s_raw())
+        self.with_s_ref(|a: &str| b.with_s_ref(|b: &str| a.cmp(b)))
     }
 
     pub fn shallow_clone(&self) -> VVal {
@@ -1322,13 +1375,13 @@ impl VVal {
     /// some_vec.push(VVal::Int(36));
     ///
     /// let mut sum = 0;
-    /// for v in some_vec.iter() {
+    /// for (v, _) in some_vec.iter() {
     ///     sum += v.i();
     /// }
     ///
     /// assert_eq!(sum, 68);
     /// ```
-    pub fn iter(&self) -> std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>> {
+    pub fn iter(&self) -> VValIter {
         match self {
             VVal::Lst(l) => {
                 let l = l.clone();
@@ -1606,14 +1659,12 @@ impl VVal {
                                     first_arg.at(1).unwrap_or_else(
                                         || VVal::Int((vval_bytes.borrow().len() - from) as i64))
                                     .i() as usize;
-                                println!("FOFOFOFO {:?}", from);
-                                println!("FOFOFOF4 {:?} | {:?}", cnt, first_arg);
                                 let r : Vec<u8> =
                                     vval_bytes.borrow().iter().skip(from)
                                               .take(cnt).copied().collect();
                                 Ok(VVal::new_byt(r))
                             },
-                            VVal::Map(_) => Ok(first_arg.get_key(&self.s_raw()).unwrap_or(VVal::Nul)),
+                            VVal::Map(_) => Ok(self.with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::Nul))),
                             _ => Ok(VVal::Nul)
                         }
                     } else { Ok(self.clone()) }
@@ -1664,15 +1715,13 @@ impl VVal {
                             },
                             VVal::Str(s2) => {
                                 if argc > 1 {
-                                    // TODO: Fix the extra clone here:
-                                    let mut accum = vval_str.borrow().clone() + &s2.borrow().clone();
-                                    for i in 2..argc {
-                                        accum += &e.arg(i).s_raw();
+                                    let mut accum = vval_str.borrow().clone() + &s2.borrow();
+                                    for i in 1..argc {
+                                        e.arg_ref(i).unwrap().with_s_ref(|s: &str| accum += s);
                                     }
                                     Ok(VVal::new_str_mv(accum))
                                 } else {
-                                    // TODO: Fix the extra clone here:
-                                    Ok(VVal::new_str_mv(vval_str.borrow().clone() + &s2.borrow().clone()))
+                                    Ok(VVal::new_str_mv(vval_str.borrow().clone() + &s2.borrow()))
                                 }
                             },
                             VVal::Map(_) => Ok(first_arg.get_key(&vval_str.borrow()).unwrap_or(VVal::Nul)),
@@ -2178,7 +2227,7 @@ impl VVal {
                     VVal::Sym(s) => { acc.extend_from_slice(s.borrow().as_bytes()); },
                     VVal::Byt(s) => { acc.extend_from_slice(&s.borrow()); },
                     VVal::Bol(b) => { acc.push(*b as u8); },
-                    _ => { acc.extend_from_slice(val.s_raw().as_bytes()); }
+                    _ => { val.with_s_ref(|s: &str| acc.extend_from_slice(s.as_bytes())); }
                 }
             },
             VVal::Str(a) => {
@@ -2192,7 +2241,7 @@ impl VVal {
                             acc.push(b);
                         }
                     },
-                    _ => { acc.push_str(&val.s_raw()); }
+                    _ => { val.with_s_ref(|s: &str| acc.push_str(s)); }
                 }
             },
             VVal::Int(i) => { *i += val.i(); },
@@ -2235,13 +2284,18 @@ impl VVal {
         }
     }
 
-    /// Returns string data unescaped and also turns VVal::Nul into an empty string.
+    /// Returns the string data or converts the value to a string for displaying.
+    /// The conversion format is not for reading the value in again via
+    /// the WLambda parser, it's for accessing the data as pure as possible.
     ///
     /// Use this if you need the raw unescaped contents of VVal::Str, VVal::Sym,
     /// VVal::Byt and other VVals.
     ///
     /// As this is used usually for generating output a VVal::Nul is
     /// turned into an empty string
+    ///
+    /// **There is also `with_s_ref()` which allows you to work with a
+    /// reference to the string, in case you don't need to own the copy!**
     ///
     /// ```
     /// use wlambda::VVal;
@@ -2257,6 +2311,37 @@ impl VVal {
             VVal::Byt(s)  => s.borrow().iter().map(|b| *b as char).collect(),
             VVal::Nul     => String::from(""),
             _             => self.s(),
+        }
+    }
+
+    /// Like s_raw() but returns a reference to the string.
+    ///
+    /// Use this if you need the raw unescaped contents of VVal::Str, VVal::Sym,
+    /// VVal::Byt and other VVals.
+    ///
+    /// As this is used usually for generating output a VVal::Nul is
+    /// turned into an empty string
+    ///
+    /// ```
+    /// use wlambda::VVal;
+    ///
+    /// VVal::Nul.with_s_ref(
+    ///     |s: &str| assert_eq!(s, ""));
+    ///
+    /// VVal::new_str("Test").with_s_ref(
+    ///     |s: &str| assert_eq!(s, "Test"));
+    /// ```
+    #[inline]
+    pub fn with_s_ref<T, R>(&self, f: T) -> R
+        where T: FnOnce(&str) -> R
+    {
+        match self {
+            VVal::Str(s)  => f(&s.borrow()),
+            VVal::Sym(s)  => f(&s.borrow()),
+            VVal::Usr(s)  => f(&s.s_raw()),
+            VVal::Byt(_)  => f(&self.s_raw()),
+            VVal::Nul     => f(""),
+            _             => f(&self.s_raw()),
         }
     }
 
@@ -2436,6 +2521,19 @@ impl VVal {
     /// assert_eq!(v.v_s_raw(0), "12");
     ///```
     pub fn v_s_raw(&self, idx: usize) -> String { self.v_(idx).s_raw() }
+    /// Quick access of a raw string as reference at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::new_str("12"));
+    /// assert_eq!(v.v_with_s_ref(0, |s: &str| s.chars().nth(0).unwrap()), '1');
+    ///```
+    pub fn v_with_s_ref<T, R>(&self, idx: usize, f: T) -> R
+        where T: FnOnce(&str) -> R
+    {
+        self.v_(idx).with_s_ref(f)
+    }
     /// Quick access of the string at the given `key`.
     /// See also `v_k`.
     ///
@@ -2445,6 +2543,19 @@ impl VVal {
     /// assert_eq!(v.v_s_rawk("aaa"), "XYX");
     ///```
     pub fn v_s_rawk(&self, key: &str) -> String { self.v_k(key).s_raw() }
+    /// Quick access of the string as reference at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_map_key(String::from("aaa"), wlambda::VVal::new_str("XYX"));
+    /// assert!(v.v_with_s_refk("aaa", |s: &str| s == "XYX"));
+    ///```
+    pub fn v_with_s_refk<T, R>(&self, key: &str, f: T) -> R
+        where T: FnOnce(&str) -> R
+    {
+        self.v_k(key).with_s_ref(f)
+    }
     /// Quick access of the string representation at the given `idx`.
     /// See also `v_`.
     ///
@@ -2644,7 +2755,7 @@ impl VVal {
                     None    => std::vec::Vec::new(),
                 }
             },
-            _ => self.s_raw().as_bytes().to_vec(),
+            _ => self.with_s_ref(|s: &str| s.as_bytes().to_vec()),
         }
     }
 
@@ -2721,8 +2832,8 @@ impl serde::ser::Serialize for VVal {
         use serde::ser::{SerializeSeq, SerializeMap};
 
         match self {
-            VVal::Str(_)     => serializer.serialize_str(&self.s_raw()),
-            VVal::Sym(_)     => serializer.serialize_str(&self.s_raw()),
+            VVal::Str(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
+            VVal::Sym(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Byt(b)     => serializer.serialize_bytes(&b.borrow()[..]),
             VVal::Nul        => serializer.serialize_none(),
             VVal::Err(_)     => serializer.serialize_str(&self.s()),
@@ -2826,7 +2937,7 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
 
         while let Some((ke, ve)) = map.next_entry()? {
             let k : VVal = ke;
-            v.set_key(&VVal::new_sym(&k.s_raw()), ve).unwrap();
+            v.set_map_key(k.s_raw(), ve);
         }
 
         Ok(v)

@@ -15,7 +15,7 @@ Here are some of its properties:
 - Simple but unique syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
 - Easily embeddable into Rust programs due to a simple API.
 - The language is about getting things done quickly, so performance is not a main priority.
-  Current performance is roughly in the ball park of (C)Python, which means
+  Current performance is roughly in the ball park of (C)Python or Perl, which means
   the language is quite possibly too slow where speed is the focus, but fast enough if
   you do any heavy lifting in Rust.
 - No garbage collector. Memory and resource management relies only on reference counting and RAII.
@@ -27,6 +27,7 @@ of Rust's Result type.
 - Prototyped object orientation.
 - Easy maintenance and hackability of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
+- Threading support with shared atoms and message queues.
 - Has a testable wasm32 version: [WASM WLambda Evaluator](http://wlambda.m8geil.de/#!/main).
 
 The embedding API and all internal operations rely on a data structure
@@ -528,6 +529,9 @@ complete for real world use. So my current goals are:
 - DONE: Add prototyped inheritance for OOP paradigm.
 - There are no plans to change the internal evaluator to a VM and/or JIT speedup.
 It's one of WLambda's goals to have a simple and easily hackable implementation.
+The compiler transforms the AST directly into Rust closures. This
+allows a seamless integration of new functions via WLambda's embedding
+API.
 
 # License
 
@@ -627,6 +631,7 @@ pub use vval::VVal;
 pub use vval::Env;
 pub use vval::StackAction;
 pub use vval::VValUserData;
+pub use threads::AVal;
 pub use compiler::GlobalEnv;
 pub use compiler::EvalContext;
 pub use compiler::eval;
