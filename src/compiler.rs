@@ -664,9 +664,7 @@ impl EvalContext {
                 Ok(prog_closures) => {
                     l_env.sp = 0;
                     l_env.set_bp(local_env_size);
-                    match l_env.with_restore_sp(
-                        |e: &mut Env| { prog_closures(e) })
-                    {
+                    match l_env.with_restore_sp(|e: &mut Env| { prog_closures(e) }) {
                         Ok(v)   => Ok(v),
                         Err(je) => Err(EvalError::ExecError(je)),
                     }
