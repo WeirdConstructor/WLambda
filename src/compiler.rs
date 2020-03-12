@@ -623,13 +623,13 @@ impl EvalContext {
             local_compile: Rc::new(RefCell::new(CompileEnv {
                 parent:    None,
                 global: global.clone(),
-                local_map: std::collections::HashMap::new(),
-                locals:    Vec::new(),
+                block_env: BlockEnv::new(),
                 upvals:    Vec::new(),
                 recent_var: String::new(),
                 recent_sym: String::new(),
                 implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
                 explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+                quote_func: false,
             })),
             local: Rc::new(RefCell::new(Env::new_with_user(global, user))),
         }
@@ -790,6 +790,55 @@ enum ArityParam {
     Infinite,
 }
 
+struct BlockEnv {
+    local_map_stack: std::vec::Vec<Box<std::collections::HashMap<String, VarPos>>>,
+    locals:    std::vec::Vec<(String, CompileLocal)>,
+}
+
+impl BlockEnv {
+    fn new() -> Self {
+        Self {
+            local_map_stack: vec![Box::new(std::collections::HashMap::new())],
+            locals:          vec![],
+        }
+    }
+
+    fn push_env(&mut self) {
+        self.local_map_stack.push(Box::new(std::collections::HashMap::new()));
+    }
+
+    fn pop_env(&mut self) -> usize {
+        let block_env_vars = self.local_map_stack.pop().unwrap();
+        let block_env_var_count = block_env_vars.len();
+        for _i in 0..block_env_var_count {
+            self.locals.pop();
+        }
+        block_env_var_count
+    }
+
+    fn new_local(&mut self, var: &str) -> VarPos {
+        let next_index = self.locals.len();
+        self.locals.push((String::from(var), CompileLocal {
+            is_upvalue: false,
+        }));
+        let last_idx = self.local_map_stack.len() - 1;
+        self.local_map_stack[last_idx]
+            .insert(String::from(var),
+                    VarPos::Local(next_index));
+        VarPos::Local(next_index)
+    }
+
+    fn get(&self, var: &str) -> VarPos {
+        for map in self.local_map_stack.iter().rev() {
+            if let Some(pos) = map.get(var) {
+                return pos.clone();
+            }
+        }
+
+        VarPos::NoPos
+    }
+}
+
 /// Compile time environment for allocating and
 /// storing variables inside a function scope.
 ///
@@ -802,10 +851,8 @@ struct CompileEnv {
     global:    GlobalEnvRef,
     /// Reference to the environment of the _parent_ function.
     parent:    Option<Rc<RefCell<CompileEnv>>>,
-    /// Mapping of strings to where they can be found.
-    local_map: std::collections::HashMap<String, VarPos>,
-    /// List of local variables of this function.
-    locals:    std::vec::Vec<CompileLocal>,
+    /// Holds all function local variables and manages nesting of blocks.
+    block_env: BlockEnv,
     /// Stores position of the upvalues for copying the upvalues at runtime.
     upvals:    std::vec::Vec<VarPos>,
     /// Stores the implicitly calculated arity of this function.
@@ -816,6 +863,8 @@ struct CompileEnv {
     recent_var: String,
     /// Recently compiled symbol:
     recent_sym: String,
+    /// If set, the next compile() is compiling a function as block.
+    quote_func: bool,
 }
 
 /// Reference type to a `CompileEnv`.
@@ -831,13 +880,13 @@ impl CompileEnv {
         Rc::new(RefCell::new(CompileEnv {
             parent,
             global,
-            local_map: std::collections::HashMap::new(),
-            locals:    Vec::new(),
+            block_env: BlockEnv::new(),
             upvals:    Vec::new(),
             recent_var: String::new(),
             recent_sym: String::new(),
             implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+            quote_func: false,
         }))
     }
 
@@ -885,9 +934,9 @@ impl CompileEnv {
         }
 
         let next_index = self.locals.len();
-        self.locals.push(CompileLocal {
+        self.locals.push((String::from(s), CompileLocal {
             is_upvalue: false,
-        });
+        }));
         self.local_map.insert(String::from(s), VarPos::Local(next_index));
         VarPos::Local(next_index)
     }
@@ -915,7 +964,18 @@ impl CompileEnv {
     }
 
     fn mark_upvalue(&mut self, idx: usize) {
-        self.locals[idx].is_upvalue = true;
+        self.locals[idx].1.is_upvalue = true;
+    }
+
+    pub fn get_locals_count(&self) -> usize {
+        self.locals.len()
+    }
+
+    pub fn pop_locals_until_count(&mut self, count: usize) {
+        while self.locals.len() > count {
+            let (name, _) = self.locals.pop().unwrap();
+            self.local_map.remove(&name);
+        }
     }
 
     fn get(&mut self, s: &str) -> VarPos {
@@ -1747,7 +1807,22 @@ fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
     }
 }
 
+fn compile_block_env(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<EvalNode, CompileError>
+{
+    let old_local_count = ce.borrow().get_locals_count();
+    let block = compile(ast, ce)?;
+    let block_var_count = ce.borrow().get_locals_count() - old_local_count;
+    ce.borrow_mut().pop_locals_until_count(old_local_count);
+
+    Ok(Box::new(move |e: &mut Env| {
+        e.with_pushed_sp(block_var_count, |e: &mut Env| block(e))
+    }))
+}
+
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
+    let quote_func = ce.borrow_mut().quote_func;
+    ce.borrow_mut().quote_func = false;
     match ast {
         VVal::Lst(_l) => {
             let syn  = ast.at(0).unwrap_or(VVal::Nul);
@@ -2450,13 +2525,44 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         }
 
                     } else {
-                        let mut call_args : Vec<EvalNode> =
-                            ast.map_skip(|e| compile(e, ce), 1)?;
-                        call_args.reverse();
-                        let func = call_args.pop().expect("function in evaluation args list");
-                        call_args.reverse();
+                    println!("DDD {}", ast.s());
+                        let is_if =
+                            if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
+                                let var = ast.at(1).unwrap().at(1).unwrap();
+                                var.with_s_ref(|var_s: &str| var_s == "if")
+                            } else {
+                                false
+                            };
 
-                        Ok(generate_call(func, call_args, spos))
+                        if is_if {
+                            if ast.len() > 5 {
+                                return ast.to_compile_err(
+                                    format!("if can only have 2 arguments, got more: {}", ast.s()));
+                            }
+                            ce.borrow_mut().quote_func = true;
+                            let cond = compile_block_env(&ast.at(2).unwrap_or(VVal::Nul), ce)?;
+                            ce.borrow_mut().quote_func = true;
+                            let then = compile_block_env(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
+                            ce.borrow_mut().quote_func = true;
+                            let els  = compile_block_env(&ast.at(4).unwrap_or(VVal::Nul), ce)?;
+
+                            Ok(Box::new(move |e: &mut Env| {
+                                if cond(e)?.b() {
+                                    then(e)
+                                } else {
+                                    els(e)
+                                }
+                            }))
+
+                        } else {
+                            let mut call_args : Vec<EvalNode> =
+                                ast.map_skip(|e| compile(e, ce), 1)?;
+                            call_args.reverse();
+                            let func = call_args.pop().expect("function in evaluation args list");
+                            call_args.reverse();
+
+                            Ok(generate_call(func, call_args, spos))
+                        }
                     }
                 },
                 Syntax::Func => {
@@ -2537,15 +2643,24 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     };
 
                     let env_size = CompileEnv::local_env_size(&ce_sub);
-                    let upvs = ce_sub.borrow_mut().get_upval_pos();
-                    Ok(Box::new(move |e: &mut Env| {
-                        let mut upvalues = Vec::new();
-                        copy_upvs(&upvs, e, &mut upvalues);
-                        Ok(VValFun::new_val(
-                            fun_ref.clone(),
-                            upvalues, env_size, min_args, max_args, false,
-                            Some(fun_spos.clone())))
-                    }))
+
+                    if quote_func {
+                        Ok(Box::new(move |e: &mut Env| {
+                            let r = fun_ref.borrow();
+                            let r = r(e, 0);
+                            r
+                        }))
+                    } else {
+                        let upvs = ce_sub.borrow_mut().get_upval_pos();
+                        Ok(Box::new(move |e: &mut Env| {
+                            let mut upvalues = Vec::new();
+                            copy_upvs(&upvs, e, &mut upvalues);
+                            Ok(VValFun::new_val(
+                                fun_ref.clone(),
+                                upvalues, env_size, min_args, max_args, false,
+                                Some(fun_spos.clone())))
+                        }))
+                    }
                 },
                 _ => { ast.to_compile_err(format!("bad input: {}", ast.s())) }
             }
@@ -2572,9 +2687,9 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
     let mut ce = Rc::new(RefCell::new(CompileEnv {
         parent:    None,
         global:    g.clone(),
-        local_map: std::collections::HashMap::new(),
-        locals:    Vec::new(),
+        block_env: BlockEnv::new(),
         upvals:    Vec::new(),
+        quote_func: false,
         recent_var: String::new(),
         recent_sym: String::new(),
         implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
@@ -4797,5 +4912,22 @@ mod tests {
 
         assert_eq!(s_eval("int $p(3.3,4.4)"),   "3");
         assert_eq!(s_eval("float $p(3.3,4.4)"), "3.3");
+    }
+
+    #[test]
+    fn check_if() {
+        assert_eq!(s_eval("if 2 > 3 { 1 } { 2 }"), "2");
+        assert_eq!(s_eval("if 2 < 3 { 1 } { 2 }"), "1");
+        assert_eq!(s_eval(r"
+            !x = 10;
+            !y = if 2 < 3 {
+                !x = 20;
+                !@dump_stack;
+                1
+            } {
+                2
+            };
+            $[x, y]
+        "), "1");
     }
 }
