@@ -6,6 +6,7 @@ mod parser;
 mod compiler;
 mod prelude;
 mod util;
+mod nvec;
 mod vval_user_obj;
 mod csv;
 mod threads;

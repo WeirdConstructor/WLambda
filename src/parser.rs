@@ -445,6 +445,46 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     Ok(vec)
 }
 
+enum NVecKind {
+    Int,
+    Flt,
+}
+
+/// Parses the part of a numerical vector that comes after the declaration,
+/// in `$i(1, 2, 3)` `$i` is the declaration.
+fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
+    match ps.peek() {
+        Some('(') => {
+            ps.consume();
+            let vec = ps.syn(match kind {
+                NVecKind::Int => Syntax::IVec,
+                NVecKind::Flt => Syntax::FVec,
+            });
+            
+            vec.push(parse_expr(ps)?);
+            while ps.consume_if_eq_wsc(',') {
+                vec.push(parse_expr(ps)?);
+            }
+
+            // how many dimensions are in the numerical vector we just parsed?
+            let dim = vec.len() - 1;
+
+            if !ps.consume_if_eq(')') {
+                Err(ps.err(ParseErrorKind::UnexpectedToken(')', "")))
+            } else if dim > 4 || dim < 1 {
+                Err(ps.err(ParseValueError::VectorLength))
+            } else {
+                Ok(vec)
+            }
+        },
+        Some(t) => Err(ps.err(ParseErrorKind::UnexpectedToken(
+            t,
+            "To make a numerical vector, Parenthesis must follow $i and $f",
+        ))),
+        None => Err(ps.err(ParseErrorKind::EOF("numerical vector body"))),
+    }
+}
+
 
 /// Parsers a WLambda string or byte buffer.
 fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
@@ -719,6 +759,10 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             }
             Ok(VVal::Nul)
         },
+        'i' => {
+            ps.consume();
+            parse_nvec_body(ps, NVecKind::Int)
+        },
         'd' => {
             if ps.consume_lookahead("data") {
                 ps.skip_ws_and_comments();
@@ -746,10 +790,14 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         'f' => {
             if ps.consume_lookahead("false") {
                 ps.skip_ws_and_comments();
+                Ok(VVal::Bol(false))
+            } else if ps.lookahead("f(") {
+                ps.consume();
+                parse_nvec_body(ps, NVecKind::Flt)
             } else {
                 ps.consume_wsc();
+                Ok(VVal::Bol(false))
             }
-            Ok(VVal::Bol(false))
         },
         'e' => {
             if ps.consume_lookahead("error") {
@@ -1688,7 +1736,7 @@ mod tests {
         let mut ps = State::new(s, "<parser_test>");
         match parse_block(&mut ps, false) {
             Ok(v)  => v.s(),
-            Err(e) => { panic!(format!("Parse error: {}", e)); },
+            Err(e) => panic!(format!("Parse error: {}", e)),
         }
     }
 
@@ -1697,7 +1745,7 @@ mod tests {
         match parse_block(&mut ps, false) {
             Ok(v)  => panic!(format!("Expected error but got result: {} for input '{}'",
                                      v.s(), s)),
-            Err(e) => { format!("Parse error: {}", e) },
+            Err(e) => format!("Parse error: {}", e),
         }
     }
 
@@ -2009,5 +2057,19 @@ mod tests {
         assert_eq!(parse("!:const X = $[120];"),            "$[&Block,$[&DefConst,$[:\"X\"],$[&Lst,120]]]");
         assert_eq!(parse("!:const X = ${a=10};"),           "$[&Block,$[&DefConst,$[:\"X\"],$[&Map,$[:\"a\",10]]]]");
         assert_eq!(parse("!:const (A,B,X) = $[1,3,4];"),    "$[&Block,$[&DefConst,$[:\"A\",:\"B\",:\"X\"],$[&Lst,1,3,4],$true]]");
+    }
+
+    #[test]
+    fn check_nvec() {
+        assert_eq!(parse("$i(30, 18, 5)"),              "$[&Block,$[&IVec,30,18,5]]");
+        assert_eq!(parse("$i(30,18,5)"),                "$[&Block,$[&IVec,30,18,5]]");
+        assert_eq!(parse("$i(0b100,0xC,0o10)"),         "$[&Block,$[&IVec,4,12,8]]");
+        assert_eq!(parse("$i(0b101 +  1,  0xF *  4)"),  "$[&Block,$[&IVec,$[&BinOpAdd,5,1],$[&BinOpMul,15,4]]]");
+        //assert_eq!(parse("$i(0b100+2,0xC*4)"),          "$[&Block,$[&IVec,$[&BinOpAdd,4,2],$[&BinOpMul,12,4]]]");
+        assert_eq!(parse("$f(1.2, 3.4, 5.6, 7.8)"),     "$[&Block,$[&FVec,1.2,3.4,5.6,7.8]]");
+        assert_eq!(
+            parse("$f(1/2, 1/3, 1/4, 1/5)"),
+            "$[&Block,$[&FVec,$[&BinOpDiv,1,2],$[&BinOpDiv,1,3],$[&BinOpDiv,1,4],$[&BinOpDiv,1,5]]]"
+        );
     }
 }

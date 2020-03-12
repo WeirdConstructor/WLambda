@@ -624,6 +624,7 @@ pub mod compiler;
 pub mod prelude;
 pub mod threads;
 pub mod util;
+pub mod nvec;
 pub mod vval_user_obj;
 pub mod csv;
 
