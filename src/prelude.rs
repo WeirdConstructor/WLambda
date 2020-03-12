@@ -3890,6 +3890,9 @@ pub fn core_symbol_table() -> SymbolTable {
     func!(st, "is_float",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_float())) },
         Some(1), Some(1), true);
+    func!(st, "is_pair",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_pair())) },
+        Some(1), Some(1), true);
     func!(st, "is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) },
         Some(1), Some(1), true);
@@ -3909,6 +3912,11 @@ pub fn core_symbol_table() -> SymbolTable {
             if argc == 1 { return Ok(VVal::Nul) }
             match_next(env, &env.arg(0), 1, argc)
         }, Some(1), None, true);
+
+    func!(st, "cons",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Pair(Box::new((env.arg(0), env.arg(1)))))
+        }, Some(2), Some(2), true);
 
     func!(st, "while",
         |env: &mut Env, _argc: usize| {

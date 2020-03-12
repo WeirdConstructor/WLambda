@@ -25,7 +25,7 @@ pub struct State {
         chars:      Vec<char>,
         peek_char:  char,
         line_no:    u32,
-        col_no:     u32,
+        col_no:     u16,
         file:       FileRef,
     pub at_eof:     bool,
 }
@@ -133,7 +133,7 @@ pub struct ParseError {
     /// A snip of the code that caused this error.
     snip: String,
     line: u32,
-    col: u32,
+    col: u16,
     file: FileRef
 }
 
@@ -372,7 +372,7 @@ impl State {
         if self.at_eof { return }
 
         let c = self.peek_char;
-        self.col_no += 1;
+        self.col_no = self.col_no.wrapping_add(1);
         if c == '\n' {
             self.line_no += 1;
             self.col_no = 1;

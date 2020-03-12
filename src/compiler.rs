@@ -2550,6 +2550,14 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 _ => { ast.to_compile_err(format!("bad input: {}", ast.s())) }
             }
         },
+        VVal::Pair(bx) => {
+            let a = compile(&bx.0, ce)?;
+            let b = compile(&bx.1, ce)?;
+            Ok(Box::new(move |e: &mut Env| {
+                Ok(VVal::Pair(Box::new((a(e)?, b(e)?))))
+            }))
+
+        },
         _ => {
             let am = ast.clone();
             Ok(Box::new(move |_e: &mut Env| Ok(am.clone())))
@@ -4760,5 +4768,34 @@ mod tests {
             ];
         "),
         "$[$[1,2,${a=20},:\"x\",\"oo\",99],$[1,2,${a=20},:\"x\",\"oo\"]]");
+    }
+
+    #[test]
+    fn check_pairs() {
+        assert_eq!(s_eval("$p(1 + 2, 3 + 4)"),  "$p(3,7)");
+        assert_eq!(s_eval("$p(:a, :f).0"),      ":\"a\"");
+        assert_eq!(s_eval("$p(:a, :f).1"),      ":\"f\"");
+        assert_eq!(s_eval("$p(:a, :f).car"),    ":\"a\"");
+        assert_eq!(s_eval("$p(:a, :f).cdr"),    ":\"f\"");
+        assert_eq!(s_eval("$p(:a, :f).first"),  ":\"a\"");
+        assert_eq!(s_eval("$p(:a, :f).second"), ":\"f\"");
+        assert_eq!(s_eval("$p(:a, :f).head"),   ":\"a\"");
+        assert_eq!(s_eval("$p(:a, :f).tail"),   ":\"f\"");
+        assert_eq!(s_eval("$true $p(:a, :f)"),  ":\"f\"");
+        assert_eq!(s_eval("$false $p(:a, :f)"), ":\"a\"");
+        assert_eq!(s_eval("cons :a :f"),        "$p(:\"a\",:\"f\")");
+        assert_eq!(s_eval("cons :a :f |> 0"),   ":\"a\"");
+        assert_eq!(s_eval("cons :a :f |> 1"),   ":\"f\"");
+
+        assert_eq!(s_eval("(cons :a :f) == $p(:a,:f)"),   "$true");
+        assert_eq!(s_eval("(cons :b :f) == $p(:a,:f)"),   "$false");
+
+        assert_eq!(s_eval("bool $p($t,$t)"),   "$true");
+        assert_eq!(s_eval("bool $p($f,$t)"),   "$true");
+        assert_eq!(s_eval("bool $p($t,$f)"),   "$true");
+        assert_eq!(s_eval("bool $p($f,$f)"),   "$false");
+
+        assert_eq!(s_eval("int $p(3.3,4.4)"),   "3");
+        assert_eq!(s_eval("float $p(3.3,4.4)"), "3.3");
     }
 }
