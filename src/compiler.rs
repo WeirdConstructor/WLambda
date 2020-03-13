@@ -1765,7 +1765,7 @@ fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
 
 fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     match ast {
-        VVal::Lst(_l) => {
+        VVal::Lst(l) => {
             let syn  = ast.at(0).unwrap_or(VVal::Nul);
             let spos = syn.get_syn_pos();
             let syn  = syn.get_syn();
@@ -1778,6 +1778,32 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::DefConst    => { compile_const(ast, ce)         },
                 Syntax::Assign      => { compile_assign(ast, ce, false) },
                 Syntax::AssignRef   => { compile_assign(ast, ce, true)  },
+                Syntax::IVec        => {
+                    use crate::nvec::NVector;
+                    let lc = l
+                        .borrow()
+                        .iter()
+                        .map(|v| compile(v, ce))
+                        .collect::<Result<Vec<_>, CompileError>>()?;
+
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let mut c = lc.iter().map(|f| f(e).map(|v| v.i()));
+                        let _ = c.next();
+                        Ok(VVal::NVec(match (c.next(), c.next(), c.next(), c.next()) {
+                            (Some(x), Some(y), None   , None)    => NVector::IVec2(x?, y?),
+                            (Some(x), Some(y), Some(z), None)    => NVector::IVec3(x?, y?, z?),
+                            (Some(x), Some(y), Some(z), Some(w)) => NVector::IVec4(x?, y?, z?, w?),
+                            _ => return Err(
+                                StackAction::panic_str(
+                                    "Cannot create an IVector without between 2 and 4 (inclusive) integers."
+                                        .to_string(),
+                                    Some(spos.clone()),
+                                ),
+                            )
+                        }))
+                    }))
+                },
                 Syntax::SelfObj => {
                     Ok(Box::new(move |e: &mut Env| { Ok(e.self_object()) }))
                 },
@@ -4776,5 +4802,10 @@ mod tests {
             ];
         "),
         "$[$[1,2,${a=20},:\"x\",\"oo\",99],$[1,2,${a=20},:\"x\",\"oo\"]]");
+    }
+
+    #[test]
+    fn check_nvec() {
+        assert_eq!(s_eval("$i(1, 2)"), "$i(1,2)")
     }
 }

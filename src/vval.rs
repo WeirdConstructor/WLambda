@@ -2744,7 +2744,7 @@ impl VVal {
             VVal::DropFun(f) => format!("std:to_drop[{}]", f.v.s_cy(c)),
             VVal::Ref(l)     => format!("$&&{}", (*l).borrow().s_cy(c)),
             VVal::CRef(l)    => format!("$&{}", (*l).borrow().s_cy(c)),
-            VVal::NVec(_)    => unimplemented!(),
+            VVal::NVec(nvec) => nvec.s(),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => format!("$(&){}", v.borrow().s_cy(c)),
