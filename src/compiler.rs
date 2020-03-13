@@ -853,6 +853,7 @@ impl BlockEnv {
         self.local_map_stack[last_idx]
             .insert(String::from(var),
                     VarPos::Local(next_index));
+                    println!("LOC {:?}", self.local_map_stack);
         VarPos::Local(next_index)
     }
 
@@ -933,13 +934,13 @@ impl CompileEnv {
         let pos = self.block_env.get(s);
 //        match pos {
 //            VarPos::NoPos => {
-                if is_global {
-                    let v = VVal::Nul;
-                    let r = v.to_ref();
-                    //d// println!("GLOBAL: {} => {}", s, r.s());
-                    self.global.borrow_mut().env.insert(String::from(s), r.clone());
-                    return VarPos::Global(r);
-                }
+        if is_global {
+            let v = VVal::Nul;
+            let r = v.to_ref();
+            //d// println!("GLOBAL: {} => {}", s, r.s());
+            self.global.borrow_mut().env.insert(String::from(s), r.clone());
+            return VarPos::Global(r);
+        }
 //            },
 //            VarPos::UpValue(_)  => {},
 //            VarPos::Global(_)   => {},
@@ -2527,7 +2528,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let is_if =
                             if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
                                 let var = ast.at(1).unwrap().at(1).unwrap();
-                                var.with_s_ref(|var_s: &str| var_s == "if")
+                                var.with_s_ref(|var_s: &str| var_s == "?")
                             } else {
                                 false
                             };
@@ -2568,7 +2569,16 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let mut fun_spos = spos;
                     fun_spos.name = Some(Rc::new(last_def_varname));
 
-                    let mut ce_sub = CompileEnv::create_env(Some(ce.clone()));
+                    let mut cur_ce = ce.clone();
+                    let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
+
+                    let mut ce_sub =
+                        if quote_func {
+                            cur_ce
+                        } else {
+                            func_ce
+                        };
+
                     let label          = ast.at(1).unwrap();
                     let explicit_arity = ast.at(2).unwrap();
                     let stmts : Vec<EvalNode> =
@@ -2641,7 +2651,6 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     };
 
                     let env_size = ce_sub.borrow().local_env_size();
-
                     if quote_func {
                         Ok(Box::new(move |e: &mut Env| {
                             let r = fun_ref.borrow();
@@ -4914,18 +4923,21 @@ mod tests {
 
     #[test]
     fn check_if() {
-        assert_eq!(s_eval("if 2 > 3 { 1 } { 2 }"), "2");
-        assert_eq!(s_eval("if 2 < 3 { 1 } { 2 }"), "1");
+        assert_eq!(s_eval("? 2 > 3 { 1 } { 2 }"), "2");
+        assert_eq!(s_eval("? 2 < 3 { 1 } { 2 }"), "1");
         assert_eq!(s_eval(r"
             !x = 10;
-            !y = if 2 < 3 {
-                !x = 20;
+            !k = $n;
+            !y = ? 2 < 3 {
+                !x = $&& 20;
+                .k = { x };
                 !@dump_stack;
                 1
             } {
                 2
             };
-            $[x, y]
-        "), "1");
+            !@dump_stack;
+            $[x, y, k[]]
+        "), "$[10,1,20]");
     }
 }

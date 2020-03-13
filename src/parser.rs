@@ -29,7 +29,7 @@ In the following grammar, white space and comments are omitted:
 
 ```ebnf
 
-    ident_start   = ( ?alphabetic? | "_" | "@" )
+    ident_start   = ( ?alphabetic? | "_" | "@" | "?" )
     ident_end     = { ?any character?
                      - ( ?white space?
                          | "." | "," | ";"
@@ -1077,7 +1077,7 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
 }
 
 fn is_ident_start(c: char) -> bool {
-    c.is_alphabetic() || c == '_' || c == '@' || c == '`'
+    c.is_alphabetic() || c == '_' || c == '@' || c == '`' || c == '?'
 }
 
 fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
