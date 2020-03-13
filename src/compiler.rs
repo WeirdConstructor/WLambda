@@ -65,7 +65,6 @@ use fnv::FnvHashMap;
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 struct CompileLocal {
-    is_upvalue: bool,
 }
 
 #[derive(Debug)]
@@ -654,7 +653,7 @@ impl EvalContext {
     /// ```
     pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
         let prog = compile(ast, &mut self.local_compile);
-        let local_env_size = CompileEnv::local_env_size(&self.local_compile);
+        let local_env_size = self.local_compile.borrow().local_env_size();
 
         let env = self.local.borrow_mut();
         let mut res = Ok(VVal::Nul);
@@ -790,6 +789,7 @@ enum ArityParam {
     Infinite,
 }
 
+#[derive(Debug, Clone)]
 struct BlockEnv {
     local_map_stack: std::vec::Vec<Box<std::collections::HashMap<String, VarPos>>>,
     locals:    std::vec::Vec<(String, CompileLocal)>,
@@ -803,24 +803,52 @@ impl BlockEnv {
         }
     }
 
+/*
+
+    !x = $p(:Move, :Down);
+
+    ?* x
+        $p(:Move, pos) => {
+            std:displayln "Moving to " pos;
+        }
+        $p(:Jump, strength) => {
+            std:displayln "I Jumped: " strength;
+        };
+
+*/
+    fn env_size(&self) -> usize {
+        self.locals.len()
+    }
+
     fn push_env(&mut self) {
         self.local_map_stack.push(Box::new(std::collections::HashMap::new()));
     }
 
     fn pop_env(&mut self) -> usize {
         let block_env_vars = self.local_map_stack.pop().unwrap();
-        let block_env_var_count = block_env_vars.len();
-        for _i in 0..block_env_var_count {
-            self.locals.pop();
+
+        let mut local_count = 0;
+        for (_, v) in block_env_vars.iter() {
+            if let VarPos::Local(_) = v {
+                self.locals.pop();
+                local_count += 1;
+            }
         }
-        block_env_var_count
+
+        local_count
+    }
+
+    fn set_upvalue(&mut self, var: &str, idx: usize) -> VarPos {
+        let last_idx = self.local_map_stack.len() - 1;
+        self.local_map_stack[last_idx]
+            .insert(String::from(var),
+                    VarPos::UpValue(idx));
+        VarPos::UpValue(idx)
     }
 
     fn new_local(&mut self, var: &str) -> VarPos {
         let next_index = self.locals.len();
-        self.locals.push((String::from(var), CompileLocal {
-            is_upvalue: false,
-        }));
+        self.locals.push((String::from(var), CompileLocal { }));
         let last_idx = self.local_map_stack.len() - 1;
         self.local_map_stack[last_idx]
             .insert(String::from(var),
@@ -890,11 +918,10 @@ impl CompileEnv {
         }))
     }
 
-    fn def_up(&mut self, s: &str, pos: VarPos) -> usize {
+    fn def_up(&mut self, s: &str, parent_local_var: VarPos) -> VarPos {
         let next_index = self.upvals.len();
-        self.upvals.push(pos);
-        self.local_map.insert(String::from(s), VarPos::UpValue(next_index));
-        next_index
+        self.upvals.push(parent_local_var);
+        self.block_env.set_upvalue(s, next_index)
     }
 
     fn def_const(&mut self, s: &str, val: VVal) {
@@ -903,9 +930,9 @@ impl CompileEnv {
 
     fn def(&mut self, s: &str, is_global: bool) -> VarPos {
         //d// println!("DEF: {} global={}", s, is_global);
-        let pos = self.local_map.get(s);
-        match pos {
-            None => {
+        let pos = self.block_env.get(s);
+//        match pos {
+//            VarPos::NoPos => {
                 if is_global {
                     let v = VVal::Nul;
                     let r = v.to_ref();
@@ -913,32 +940,14 @@ impl CompileEnv {
                     self.global.borrow_mut().env.insert(String::from(s), r.clone());
                     return VarPos::Global(r);
                 }
-            },
-            Some(p) => {
-                match p {
-                    VarPos::NoPos => {
-                        if is_global {
-                            let v = VVal::Nul;
-                            let r = v.to_ref();
-                            //d// println!("GLOBAL: {} => {}", s, r.s());
-                            self.global.borrow_mut().env.insert(String::from(s), r.clone());
-                            return VarPos::Global(r);
-                        }
-                    },
-                    VarPos::UpValue(_)  => {},
-                    VarPos::Global(_)   => {},
-                    VarPos::Const(_)    => {},
-                    VarPos::Local(_i)   => return p.clone(),
-                }
-            },
-        }
-
-        let next_index = self.locals.len();
-        self.locals.push((String::from(s), CompileLocal {
-            is_upvalue: false,
-        }));
-        self.local_map.insert(String::from(s), VarPos::Local(next_index));
-        VarPos::Local(next_index)
+//            },
+//            VarPos::UpValue(_)  => {},
+//            VarPos::Global(_)   => {},
+//            VarPos::Const(_)    => {},
+//            VarPos::Local(_i)   => return pos.clone(),
+//        }
+//
+        self.block_env.new_local(s)
     }
 
     fn get_upval_pos(&self) -> std::vec::Vec<VarPos> {
@@ -946,7 +955,7 @@ impl CompileEnv {
         for p in self.upvals.iter() {
             match p {
                 VarPos::UpValue(_) => poses.push(p.clone()),
-                VarPos::Local(_) => poses.push(p.clone()),
+                VarPos::Local(_)   => poses.push(p.clone()),
                 VarPos::Global(_) => {
                     panic!("Globals can't be captured as upvalues!");
                 },
@@ -959,29 +968,22 @@ impl CompileEnv {
         poses
     }
 
-    fn local_env_size(ce: &CompileEnvRef) -> usize {
-        ce.borrow().locals.len()
+    fn local_env_size(&self) -> usize {
+        self.block_env.env_size()
     }
 
-    fn mark_upvalue(&mut self, idx: usize) {
-        self.locals[idx].1.is_upvalue = true;
+    pub fn push_block_env(&mut self) {
+        self.block_env.push_env();
     }
 
-    pub fn get_locals_count(&self) -> usize {
-        self.locals.len()
-    }
-
-    pub fn pop_locals_until_count(&mut self, count: usize) {
-        while self.locals.len() > count {
-            let (name, _) = self.locals.pop().unwrap();
-            self.local_map.remove(&name);
-        }
+    pub fn pop_block_env(&mut self) -> usize {
+        self.block_env.pop_env()
     }
 
     fn get(&mut self, s: &str) -> VarPos {
-        let pos = self.local_map.get(s);
+        let pos = self.block_env.get(s);
         match pos {
-            None => {
+            VarPos::NoPos => {
                 let opt_p = self.parent.as_mut();
                 if opt_p.is_none() {
                     if let Some(v) = self.global.borrow().env.get(s){
@@ -997,24 +999,20 @@ impl CompileEnv {
                 let parent = opt_p.unwrap().clone();
                 let mut par_mut = parent.borrow_mut();
 
-                let pos = par_mut.local_map.get(s).cloned();
-                let par_var_pos = if let Some(pp) = pos {
-                    pp
-                } else {
-                    par_mut.get(s)
+                let par_var_pos = par_mut.block_env.get(s);
+                let par_var_pos = match par_var_pos {
+                    VarPos::NoPos => par_mut.get(s),
+                    _             => par_var_pos,
                 };
                 match par_var_pos {
-                    VarPos::Local(i) => {
-                        par_mut.mark_upvalue(i);
-                        VarPos::UpValue(self.def_up(s, par_var_pos))
-                    },
-                    VarPos::UpValue(_) => VarPos::UpValue(self.def_up(s, par_var_pos)),
+                    VarPos::Local(i)   => self.def_up(s, par_var_pos),
+                    VarPos::UpValue(_) => self.def_up(s, par_var_pos),
                     VarPos::Global(g)  => VarPos::Global(g),
                     VarPos::Const(c)   => VarPos::Const(c),
                     VarPos::NoPos      => VarPos::NoPos
                 }
             }
-            Some(p) => { p.clone() },
+            _ => pos.clone(),
         }
     }
 }
@@ -1810,13 +1808,13 @@ fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
 fn compile_block_env(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<EvalNode, CompileError>
 {
-    let old_local_count = ce.borrow().get_locals_count();
+    let old_local_count = ce.borrow().local_env_size();
+    ce.borrow_mut().push_block_env();
     let block = compile(ast, ce)?;
-    let block_var_count = ce.borrow().get_locals_count() - old_local_count;
-    ce.borrow_mut().pop_locals_until_count(old_local_count);
+    let block_env_var_count = ce.borrow_mut().pop_block_env();
 
     Ok(Box::new(move |e: &mut Env| {
-        e.with_pushed_sp(block_var_count, |e: &mut Env| block(e))
+        e.with_pushed_sp(block_env_var_count, |e: &mut Env| block(e))
     }))
 }
 
@@ -2642,7 +2640,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         ArityParam::Limit(i)  => Some(i),
                     };
 
-                    let env_size = CompileEnv::local_env_size(&ce_sub);
+                    let env_size = ce_sub.borrow().local_env_size();
 
                     if quote_func {
                         Ok(Box::new(move |e: &mut Env| {
@@ -2703,7 +2701,7 @@ pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
             e.push(VVal::Flt(42.42)); // 2nd arg
             e.push(VVal::Int(13));    // 1st arg
             e.argc = 2;
-            e.set_bp(CompileEnv::local_env_size(&ce));
+            e.set_bp(ce.borrow().local_env_size());
 
             if runs > 1 {
                 let mut ret = VVal::Nul;
@@ -2853,7 +2851,7 @@ mod tests {
         assert_eq!(s_eval("!c1 = { !a = $& 1.2; !a = $n; { a }[] }; c1[]"),  "$n");
         assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&&1.2; { $*a + outer_a } }; c1[][]"), "3.5");
         assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; c1[][]"), "2.3");
-        assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; !outer_a = $n; c1[][]"), "0");
+        assert_eq!(s_eval("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; .outer_a = $n; c1[][]"), "0");
         assert_eq!(s_eval(r"
             !x = $&$[1,2,3];
             !y = $&&$[1,2,3];
