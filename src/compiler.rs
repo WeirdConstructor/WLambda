@@ -1823,7 +1823,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
     let quote_func = ce.borrow_mut().quote_func;
     ce.borrow_mut().quote_func = false;
     match ast {
-        VVal::Lst(_l) => {
+        VVal::Lst(l) => {
             let syn  = ast.at(0).unwrap_or(VVal::Nul);
             let spos = syn.get_syn_pos();
             let syn  = syn.get_syn();
@@ -1836,6 +1836,31 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::DefConst    => { compile_const(ast, ce)         },
                 Syntax::Assign      => { compile_assign(ast, ce, false) },
                 Syntax::AssignRef   => { compile_assign(ast, ce, true)  },
+                Syntax::IVec        => {
+                    use crate::nvec::NVector;
+                    let lc = l
+                        .borrow()
+                        .iter()
+                        .map(|v| compile(v, ce))
+                        .collect::<Result<Vec<_>, CompileError>>()?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let mut c = lc.iter().map(|f| f(e).map(|v| v.i()));
+                        let _ = c.next();
+                        Ok(VVal::IVec(match (c.next(), c.next(), c.next(), c.next()) {
+                            (Some(x), Some(y), None   , None)    => NVector::Vec2(x?, y?),
+                            (Some(x), Some(y), Some(z), None)    => NVector::Vec3(x?, y?, z?),
+                            (Some(x), Some(y), Some(z), Some(w)) => NVector::Vec4(x?, y?, z?, w?),
+                            _ => return Err(
+                                StackAction::panic_str(
+                                    "Cannot create an IVector without between 2 and 4 (inclusive) integers."
+                                        .to_string(),
+                                    Some(spos.clone()),
+                                ),
+                            )
+                        }))
+                    }))
+                },
                 Syntax::SelfObj => {
                     Ok(Box::new(move |e: &mut Env| { Ok(e.self_object()) }))
                 },
@@ -2350,13 +2375,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let right = compile(&ast.at(2).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let le = left(e)?;
-                        let re = right(e)?;
-                        if let VVal::Flt(f) = le {
-                            Ok(VVal::Flt(f + re.f()))
-                        } else {
-                            Ok(VVal::Int(le.i().wrapping_add(re.i())))
-                        }
+                        Ok(match (left(e)?, right(e)?) {
+                            (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
+                            (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
+                            (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
+                            (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
+                        })
                     }))
                 },
                 Syntax::BinOpSub => {
@@ -4892,6 +4916,11 @@ mod tests {
         "$[$[1,2,${a=20},:\"x\",\"oo\",99],$[1,2,${a=20},:\"x\",\"oo\"]]");
     }
 
+    #[test]
+    fn check_nvec() {
+        assert_eq!(s_eval("$i(1, 2)"), "$i(1,2)")
+    }
+    
     #[test]
     fn check_pairs() {
         assert_eq!(s_eval("$p(1 + 2, 3 + 4)"),  "$p(3,7)");

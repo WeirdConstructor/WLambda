@@ -463,7 +463,7 @@ enum NVecKind {
 fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
     match ps.peek() {
         Some('(') => {
-            ps.consume();
+            ps.consume_wsc();
             let vec = ps.syn(match kind {
                 NVecKind::Int => Syntax::IVec,
                 NVecKind::Flt => Syntax::FVec,
@@ -477,7 +477,7 @@ fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
             // how many dimensions are in the numerical vector we just parsed?
             let dim = vec.len() - 1;
 
-            if !ps.consume_if_eq(')') {
+            if !ps.consume_if_eq_wsc(')') {
                 Err(ps.err(ParseErrorKind::UnexpectedToken(')', "")))
             } else if dim > 4 || dim < 1 {
                 Err(ps.err(ParseValueError::VectorLength))
@@ -1359,7 +1359,9 @@ fn get_op_prec(op: &str) -> i32 {
 
 fn parse_binop(mut left: VVal, ps: &mut State, op: &str) -> Result<VVal, ParseError> {
     let prec = get_op_prec(op);
+    println!("before right parse");
     let mut right = parse_call(ps, true)?;
+    println!("after right parse: {:?}", right);
 
     while let Some(next_op) = ps.peek_op() {
         ps.consume_wsc_n(next_op.len());
@@ -1427,6 +1429,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                 return Ok(res_call);
             },
             ';' | ')' | ',' | ']' | '|' | '}' => {
+                println!("end char breaks call parse");
                 break;
             },
             _ if op.is_some() => {
