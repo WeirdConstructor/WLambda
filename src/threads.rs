@@ -218,8 +218,10 @@ impl Default for AtomicAVal {
     fn default() -> Self { AtomicAVal::new() }
 }
 
+#[allow(dead_code)]
 pub struct AValSender(Rc<Sender<AVal>>);
 
+#[allow(dead_code)]
 impl AValSender {
     pub fn send(&self, v: &VVal) -> VVal {
         if let Err(e) = self.0.send(AVal::from_vval(v)) {
@@ -230,10 +232,12 @@ impl AValSender {
     }
 }
 
+#[allow(dead_code)]
 pub struct AValReceiver(Arc<Mutex<Receiver<AVal>>>);
 
+#[allow(dead_code)]
 impl AValReceiver {
-    pub fn try_recv(&self, timeout: i64) -> VVal {
+    pub fn try_recv(&self, _timeout: i64) -> VVal {
         match self.0.lock() {
             Ok(guard) => {
                 match guard.try_recv() {

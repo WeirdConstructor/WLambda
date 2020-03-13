@@ -109,7 +109,11 @@ In the following grammar, white space and comments are omitted:
                   ;
     none          = "n" | "none
                   ;
+    pair          = "p", "(", expr, "," expr, ")"
+                  ;
     err           = ("e" | "error"), expr
+                  ;
+    nvec          = ("i" | "f"), "(", expr, { ",", expr }, ")"
                   ;
     ref           = "&&", value
                   ;
@@ -139,6 +143,8 @@ In the following grammar, white space and comments are omitted:
                   | false
                   | self
                   | err
+                  | nvec
+                  | pair
                   | ref
                   | wref
                   | deref
@@ -213,6 +219,8 @@ In the following grammar, white space and comments are omitted:
                                      expr is appended to the argument list *)
                   ;
     expr          = call, { "|", call }
+                  | call, { "|>", call }
+                  | call, { "||", call }
                   ;
     simple_assign = qident, "=", expr
                   ;
@@ -816,6 +824,26 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             r.push(parse_value(ps)?);
             Ok(r)
         },
+        'p' => {
+            ps.consume_wsc();
+            if !ps.consume_if_eq_wsc('(') {
+                return Err(ps.err(ParseErrorKind::UnexpectedToken(')', "At the end of a pair")))
+            }
+            let a = parse_expr(ps)?;
+            let ret =
+                if ps.consume_if_eq_wsc(',') {
+                    let b = parse_expr(ps)?;
+                    VVal::Pair(Box::new((a, b)))
+                } else {
+                    VVal::Pair(Box::new((a, VVal::Nul)))
+                };
+
+            if ps.consume_if_eq_wsc(')') {
+                Ok(ret)
+            } else {
+                Err(ps.err(ParseErrorKind::UnexpectedToken(')', "At the end of a pair")))
+            }
+        },
         ':' => {
             ps.consume_wsc();
             let capture = ps.syn(Syntax::CaptureRef);
@@ -1365,6 +1393,18 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
     while let Some(c) = ps.peek() {
         //println!("PC c={}", c);
         let op = ps.peek_op();
+
+//        if let Some(s) = self.peek2() {
+//            match s.chars().nth(0).unwrap_or(' ') {
+//                '+' | '-' => true,
+//                _         => false,
+//            } && (if s.chars().nth(1).unwrap_or(' ').is_digit(10) {
+//                      true
+//                  } else {
+//                      false
+//                  })
+//        } else {
+//
         match c {
             '[' => {
                 let mut call = make_to_call(ps, value);
@@ -1433,23 +1473,6 @@ fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
                     let new_call = make_to_call(ps, call);
                     new_call.push(call_right);
                     call = new_call;
-
-                } else if ps.lookahead("|<") {
-//                    ps.consume();
-//                    ps.consume_wsc();
-//
-////                    a |< b |< c |< d
-//
-////                    a |< b |< c |< d
-//                    (b a)
-//                    ((c b) a)
-//                    (((d c) b) a)
-//
-//                    ((b c) a)
-//                    ((b c) a)
-//
-//
-////                    (((d c) b) a)
 
                 } else {
                     let push_front =

@@ -43,7 +43,7 @@ impl FileRef {
 pub struct SynPos {
     pub syn:        Syntax,
     pub line:       u32,
-    pub col:        u32,
+    pub col:        u16,
     pub file:       FileRef,
     pub name:       Option<std::rc::Rc<String>>,
 }
@@ -1078,6 +1078,8 @@ pub enum VVal {
     Flt(f64),
     /// A syntax node in the AST, records the position too.
     Syn(SynPos),
+    /// A pair
+    Pair(Box<(VVal, VVal)>),
     /// A list (or vector) of VVals.
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
     /// A mapping of strings to VVals.
@@ -1161,6 +1163,10 @@ impl CycleCheck {
 
         match v {
             VVal::Err(e) => self.touch_walk(&(*e).borrow().0),
+            VVal::Pair(b) => {
+                self.touch_walk(&b.0);
+                self.touch_walk(&b.1);
+            },
             VVal::Lst(l) => {
                 for v in l.borrow().iter() { self.touch_walk(v); }
             },
@@ -1525,6 +1531,9 @@ impl VVal {
                         // Calling a boolean on a list converts the boolean into an integer
                         // and fetches the value at that index.
                         VVal::Lst(_) => Ok(first.at(*b as usize).unwrap_or(VVal::Nul)),
+                        // Calling a boolean on a pair converts the boolean into an integer
+                        // and fetches the value at that index.
+                        VVal::Pair(_) => Ok(first.at(*b as usize).unwrap_or(VVal::Nul)),
                         // Calling a boolean with anything else becomes an implicit `if`,
                         // calling the first parameter if the boolean is true
                         // and the second if the boolean is false.
@@ -1743,6 +1752,11 @@ impl VVal {
                     else { Ok(self.clone()) }
                 })
             },
+            VVal::Pair(_) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    Ok(self.at(e.arg(0).i() as usize).unwrap_or(VVal::Nul))
+                })
+            },
             VVal::Usr(ud) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let mut args = vec![];
@@ -1873,6 +1887,10 @@ impl VVal {
             VVal::Syn(s)  => { if let VVal::Syn(ib) = v { *s == *ib } else { false } },
             VVal::Str(s)  => { if let VVal::Str(ib) = v { *s == *ib } else { false } },
             VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s.borrow()[..] == s2.borrow()[..] } else { false } },
+            VVal::Pair(b)  => {
+                if let VVal::Pair(b2) = v { b.0.eqv(&b2.0) && b.1.eqv(&b2.1) }
+                else { false }
+            },
             VVal::Lst(l)  => {
                 if let VVal::Lst(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
@@ -2052,6 +2070,9 @@ impl VVal {
                     },
                 }
             },
+            VVal::Pair(b) => {
+                Some(if index % 2 == 0 { b.0.clone() } else { b.1.clone() })
+            },
             VVal::Lst(b) => {
                 if b.borrow().len() > index {
                     Some(b.borrow()[index].clone())
@@ -2112,6 +2133,21 @@ impl VVal {
             VVal::CRef(_)  => self.deref().get_key(key),
             VVal::WWRef(_) => self.deref().get_key(key),
             VVal::Map(m) => m.borrow().get(key).cloned(),
+            VVal::Pair(_) => {
+                let idx =
+                    match key {
+                        "0"         => 0,
+                        "1"         => 1,
+                        "car"       => 0,
+                        "cdr"       => 1,
+                        "head"      => 0,
+                        "tail"      => 1,
+                        "first"     => 0,
+                        "second"    => 1,
+                        _ => usize::from_str_radix(key, 10).unwrap_or(0),
+                    };
+                self.at(idx)
+            },
             VVal::Lst(l) => {
                 let idx = usize::from_str_radix(key, 10).unwrap_or(0);
                 if idx < l.borrow().len() {
@@ -2408,6 +2444,10 @@ impl VVal {
         })
     }
 
+    pub fn is_pair(&self) -> bool {
+        match self { VVal::Pair(_) => true, _ => false }
+    }
+
     pub fn is_ref(&self) -> bool {
         match self { VVal::Ref(_) => true, VVal::CRef(_) => true, VVal::WWRef(_) => true, _ => false }
     }
@@ -2459,6 +2499,7 @@ impl VVal {
             VVal::Syn(_)     => String::from("syntax"),
             VVal::Int(_)     => String::from("integer"),
             VVal::Flt(_)     => String::from("float"),
+            VVal::Pair(_)    => String::from("pair"),
             VVal::Lst(_)     => String::from("vector"),
             VVal::Map(_)     => String::from("map"),
             VVal::Usr(_)     => String::from("userdata"),
@@ -2627,6 +2668,7 @@ impl VVal {
             VVal::Syn(s)     => (s.syn.clone() as i64) as f64,
             VVal::Int(i)     => *i as f64,
             VVal::Flt(f)     => *f,
+            VVal::Pair(b)    => b.0.f(),
             VVal::Lst(l)     => l.borrow().len() as f64,
             VVal::Map(l)     => l.borrow().len() as f64,
             VVal::Usr(u)     => u.f(),
@@ -2656,6 +2698,7 @@ impl VVal {
             VVal::Syn(s)     => s.syn.clone() as i64,
             VVal::Int(i)     => *i,
             VVal::Flt(f)     => (*f as i64),
+            VVal::Pair(b)    => b.0.i(),
             VVal::Lst(l)     => l.borrow().len() as i64,
             VVal::Map(l)     => l.borrow().len() as i64,
             VVal::Usr(u)     => u.i(),
@@ -2683,6 +2726,7 @@ impl VVal {
             VVal::Err(_)     => false,
             VVal::Bol(b)     => *b,
             VVal::Syn(s)     => (s.syn.clone() as i64) != 0,
+            VVal::Pair(b)    => b.0.b() || b.1.b(),
             VVal::Int(i)     => (*i) != 0,
             VVal::Flt(f)     => (*f as i64) != 0,
             VVal::Lst(l)     => (l.borrow().len() as i64) != 0,
@@ -2719,6 +2763,7 @@ impl VVal {
             VVal::Syn(s)     => format!("&{:?}", s.syn),
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
+            VVal::Pair(b)    => format!("$p({},{})", b.0.s_cy(c), b.1.s_cy(c)),
             VVal::Lst(l)     => VVal::dump_vec_as_str(l, c),
             VVal::Map(l)     => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
             VVal::Usr(u)     => u.s(),
@@ -2853,6 +2898,12 @@ impl serde::ser::Serialize for VVal {
             VVal::Syn(_)     => serializer.serialize_str(&self.s()),
             VVal::Int(i)     => serializer.serialize_i64(*i),
             VVal::Flt(f)     => serializer.serialize_f64(*f),
+            VVal::Pair(b)    => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&b.0)?;
+                seq.serialize_element(&b.1)?;
+                seq.end()
+            },
             VVal::Lst(l)     => {
                 let mut seq = serializer.serialize_seq(Some(l.borrow().len()))?;
                 for v in l.borrow().iter() {
@@ -2872,7 +2923,6 @@ impl serde::ser::Serialize for VVal {
             VVal::Usr(_)     => serializer.serialize_str(&self.s()),
             VVal::Fun(_)     => serializer.serialize_str(&self.s()),
             VVal::DropFun(_) => serializer.serialize_str(&self.s()),
-            VVal::Ref(_)     => self.deref().serialize(serializer),
             VVal::Ref(_)     => self.deref().serialize(serializer),
             VVal::CRef(_)    => self.deref().serialize(serializer),
             VVal::WWRef(_)   => self.deref().serialize(serializer),
