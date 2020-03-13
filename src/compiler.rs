@@ -853,7 +853,6 @@ impl BlockEnv {
         self.local_map_stack[last_idx]
             .insert(String::from(var),
                     VarPos::Local(next_index));
-                    println!("LOC {:?}", self.local_map_stack);
         VarPos::Local(next_index)
     }
 
@@ -930,25 +929,14 @@ impl CompileEnv {
     }
 
     fn def(&mut self, s: &str, is_global: bool) -> VarPos {
-        //d// println!("DEF: {} global={}", s, is_global);
-        let pos = self.block_env.get(s);
-//        match pos {
-//            VarPos::NoPos => {
         if is_global {
             let v = VVal::Nul;
             let r = v.to_ref();
-            //d// println!("GLOBAL: {} => {}", s, r.s());
             self.global.borrow_mut().env.insert(String::from(s), r.clone());
-            return VarPos::Global(r);
+            VarPos::Global(r)
+        } else {
+            self.block_env.new_local(s)
         }
-//            },
-//            VarPos::UpValue(_)  => {},
-//            VarPos::Global(_)   => {},
-//            VarPos::Const(_)    => {},
-//            VarPos::Local(_i)   => return pos.clone(),
-//        }
-//
-        self.block_env.new_local(s)
     }
 
     fn get_upval_pos(&self) -> std::vec::Vec<VarPos> {
@@ -1006,7 +994,7 @@ impl CompileEnv {
                     _             => par_var_pos,
                 };
                 match par_var_pos {
-                    VarPos::Local(i)   => self.def_up(s, par_var_pos),
+                    VarPos::Local(_)   => self.def_up(s, par_var_pos),
                     VarPos::UpValue(_) => self.def_up(s, par_var_pos),
                     VarPos::Global(g)  => VarPos::Global(g),
                     VarPos::Const(c)   => VarPos::Const(c),
@@ -1172,8 +1160,6 @@ fn compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                 Syntax::Map => {
                     let m = VVal::map();
                     for i in l.iter().skip(1) {
-                        println!("IIII {}!", i.at(0).unwrap().s());
-                        println!("IIII {}!", i.at(1).unwrap().s());
                         let key = compile_const_value(&i.at(0).unwrap_or(VVal::Nul))?;
                         let val = compile_const_value(&i.at(1).unwrap_or(VVal::Nul))?;
                         m.set_key_mv(key.s_raw(), val);
@@ -1809,7 +1795,6 @@ fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
 fn compile_block_env(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<EvalNode, CompileError>
 {
-    let old_local_count = ce.borrow().local_env_size();
     ce.borrow_mut().push_block_env();
     let block = compile(ast, ce)?;
     let block_env_var_count = ce.borrow_mut().pop_block_env();
@@ -2548,7 +2533,6 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         }
 
                     } else {
-                    println!("DDD {}", ast.s());
                         let is_if =
                             if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
                                 let var = ast.at(1).unwrap().at(1).unwrap();
@@ -2593,8 +2577,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let mut fun_spos = spos;
                     fun_spos.name = Some(Rc::new(last_def_varname));
 
-                    let mut cur_ce = ce.clone();
-                    let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
+                    let cur_ce = ce.clone();
+                    let func_ce = CompileEnv::create_env(Some(ce.clone()));
 
                     let mut ce_sub =
                         if quote_func {
@@ -2625,7 +2609,6 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                             match s(env) {
                                 Ok(v)  => { res = v; },
                                 Err(StackAction::Return((v_lbl, v))) => {
-                                    //d// println!("RETTETE {} {} {}", v_lbl.s(), label.s(), v.s());
                                     return
                                         if v_lbl.eqv(&label) { Ok(v) }
                                         else { Err(StackAction::Return((v_lbl, v))) }
