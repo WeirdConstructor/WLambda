@@ -463,7 +463,7 @@ enum NVecKind {
 fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
     match ps.peek() {
         Some('(') => {
-            ps.consume();
+            ps.consume_wsc();
             let vec = ps.syn(match kind {
                 NVecKind::Int => Syntax::IVec,
                 NVecKind::Flt => Syntax::FVec,
@@ -477,7 +477,7 @@ fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
             // how many dimensions are in the numerical vector we just parsed?
             let dim = vec.len() - 1;
 
-            if !ps.consume_if_eq(')') {
+            if !ps.consume_if_eq_wsc(')') {
                 Err(ps.err(ParseErrorKind::UnexpectedToken(')', "")))
             } else if dim > 4 || dim < 1 {
                 Err(ps.err(ParseValueError::VectorLength))
