@@ -1359,9 +1359,7 @@ fn get_op_prec(op: &str) -> i32 {
 
 fn parse_binop(mut left: VVal, ps: &mut State, op: &str) -> Result<VVal, ParseError> {
     let prec = get_op_prec(op);
-    println!("before right parse");
     let mut right = parse_call(ps, true)?;
-    println!("after right parse: {:?}", right);
 
     while let Some(next_op) = ps.peek_op() {
         ps.consume_wsc_n(next_op.len());
@@ -1429,7 +1427,6 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                 return Ok(res_call);
             },
             ';' | ')' | ',' | ']' | '|' | '}' => {
-                println!("end char breaks call parse");
                 break;
             },
             _ if op.is_some() => {
