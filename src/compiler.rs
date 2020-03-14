@@ -1770,14 +1770,13 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         .map(|v| compile(v, ce))
                         .collect::<Result<Vec<_>, CompileError>>()?;
 
-
                     Ok(Box::new(move |e: &mut Env| {
                         let mut c = lc.iter().map(|f| f(e).map(|v| v.i()));
                         let _ = c.next();
-                        Ok(VVal::NVec(match (c.next(), c.next(), c.next(), c.next()) {
-                            (Some(x), Some(y), None   , None)    => NVector::IVec2(x?, y?),
-                            (Some(x), Some(y), Some(z), None)    => NVector::IVec3(x?, y?, z?),
-                            (Some(x), Some(y), Some(z), Some(w)) => NVector::IVec4(x?, y?, z?, w?),
+                        Ok(VVal::IVec(match (c.next(), c.next(), c.next(), c.next()) {
+                            (Some(x), Some(y), None   , None)    => NVector::Vec2(x?, y?),
+                            (Some(x), Some(y), Some(z), None)    => NVector::Vec3(x?, y?, z?),
+                            (Some(x), Some(y), Some(z), Some(w)) => NVector::Vec4(x?, y?, z?, w?),
                             _ => return Err(
                                 StackAction::panic_str(
                                     "Cannot create an IVector without between 2 and 4 (inclusive) integers."
@@ -2302,13 +2301,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let right = compile(&ast.at(2).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let le = left(e)?;
-                        let re = right(e)?;
-                        if let VVal::Flt(f) = le {
-                            Ok(VVal::Flt(f + re.f()))
-                        } else {
-                            Ok(VVal::Int(le.i().wrapping_add(re.i())))
-                        }
+                        Ok(match (left(e)?, right(e)?) {
+                            (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
+                            (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
+                            (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
+                            (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
+                        })
                     }))
                 },
                 Syntax::BinOpSub => {

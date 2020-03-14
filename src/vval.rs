@@ -1091,8 +1091,10 @@ pub enum VVal {
     DropFun(Rc<DropVVal>),
     /// A (strong) reference to a VVal.
     Ref(Rc<RefCell<VVal>>),
-    /// A numerical (mathematical) vector. See NVector for more information.
-    NVec(NVector),
+    /// A numerical (mathematical) vector storing integers. See NVector for more information.
+    FVec(NVector<f64>),
+    /// A numerical (mathematical) vector storing floats. See NVector for more information.
+    IVec(NVector<i64>),
     /// A (still strong) reference to a VVal, which becomes a weak reference if
     /// captured by a closure.
     CRef(Rc<RefCell<VVal>>),
@@ -1192,7 +1194,8 @@ impl CycleCheck {
             | VVal::Bol(_)
             | VVal::Sym(_)
             | VVal::Syn(_)
-            | VVal::NVec(_)
+            | VVal::FVec(_)
+            | VVal::IVec(_)
             | VVal::Int(_)
             | VVal::Flt(_)
             | VVal::Usr(_) => {},
@@ -1900,7 +1903,8 @@ impl VVal {
             VVal::Fun(l)  => {
                 if let VVal::Fun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
-            VVal::NVec(_) => unimplemented!(),
+            VVal::IVec(_) => unimplemented!(),
+            VVal::FVec(_) => unimplemented!(),
             VVal::DropFun(l)  => {
                 if let VVal::DropFun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
@@ -2504,7 +2508,8 @@ impl VVal {
             VVal::Map(_)     => String::from("map"),
             VVal::Usr(_)     => String::from("userdata"),
             VVal::Fun(_)     => String::from("function"),
-            VVal::NVec(_)    => String::from("numerical_vector"),
+            VVal::IVec(_)    => String::from("integer_vector"),
+            VVal::FVec(_)    => String::from("float_vector"),
             VVal::DropFun(_) => String::from("drop_function"),
             VVal::Ref(_)     => String::from("strong"),
             VVal::CRef(_)    => String::from("weakable"),
@@ -2673,7 +2678,8 @@ impl VVal {
             VVal::Map(l)     => l.borrow().len() as f64,
             VVal::Usr(u)     => u.f(),
             VVal::Fun(_)     => 1.0,
-            VVal::NVec(_)    => unimplemented!(),
+            VVal::FVec(_)    => unimplemented!(),
+            VVal::IVec(_)    => unimplemented!(),
             VVal::DropFun(f) => f.v.f(),
             VVal::Ref(l)     => (*l).borrow().f(),
             VVal::CRef(l)    => (*l).borrow().f(),
@@ -2703,7 +2709,8 @@ impl VVal {
             VVal::Map(l)     => l.borrow().len() as i64,
             VVal::Usr(u)     => u.i(),
             VVal::Fun(_)     => 1,
-            VVal::NVec(_)    => unimplemented!(),
+            VVal::FVec(_)    => unimplemented!(),
+            VVal::IVec(_)    => unimplemented!(),
             VVal::DropFun(f) => f.v.i(),
             VVal::Ref(l)     => (*l).borrow().i(),
             VVal::CRef(l)    => (*l).borrow().i(),
@@ -2733,7 +2740,8 @@ impl VVal {
             VVal::Map(l)     => (l.borrow().len() as i64) != 0,
             VVal::Usr(u)     => u.b(),
             VVal::Fun(_)     => true,
-            VVal::NVec(_)    => unimplemented!(),
+            VVal::FVec(_)    => unimplemented!(),
+            VVal::IVec(_)    => unimplemented!(),
             VVal::DropFun(f) => f.v.b(),
             VVal::Ref(l)     => (*l).borrow().i() != 0,
             VVal::CRef(l)    => (*l).borrow().i() != 0,
@@ -2789,7 +2797,8 @@ impl VVal {
             VVal::DropFun(f) => format!("std:to_drop[{}]", f.v.s_cy(c)),
             VVal::Ref(l)     => format!("$&&{}", (*l).borrow().s_cy(c)),
             VVal::CRef(l)    => format!("$&{}", (*l).borrow().s_cy(c)),
-            VVal::NVec(nvec) => nvec.s(),
+            VVal::FVec(nvec) => nvec.s(),
+            VVal::IVec(nvec) => nvec.s(),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => format!("$(&){}", v.borrow().s_cy(c)),
@@ -2926,7 +2935,8 @@ impl serde::ser::Serialize for VVal {
             VVal::Ref(_)     => self.deref().serialize(serializer),
             VVal::CRef(_)    => self.deref().serialize(serializer),
             VVal::WWRef(_)   => self.deref().serialize(serializer),
-            VVal::NVec(_)    => unimplemented!(),
+            VVal::FVec(_)    => unimplemented!(),
+            VVal::IVec(_)    => unimplemented!(),
         }
     }
 }
