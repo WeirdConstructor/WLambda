@@ -42,6 +42,7 @@ impl Prog {
                 | Op::NewMap
                 | Op::MapSetKey
                 | Op::MapSplice
+                | Op::NewErr
                 | Op::Ret(_)
                 | Op::Call(_)
                 | Op::Pop
@@ -140,6 +141,7 @@ impl Prog {
                 | Op::NewMap
                 | Op::MapSetKey
                 | Op::MapSplice
+                | Op::NewErr
                 | Op::Ret(_)
                 | Op::Call(_)
                 | Op::Pop
@@ -206,6 +208,7 @@ enum Op {
     NewMap,
     MapSetKey,
     MapSplice,
+    NewErr,
     Ret(u32),
     Pop,
     Add,
@@ -402,6 +405,10 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     map.set_key(&k.unwrap(), e);
                 }
                 env.push(map);
+            },
+            Op::NewErr => {
+                let val = env.pop();
+                env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
             },
         }
         env.dump_stack();
@@ -702,6 +709,119 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                     prog.append(right);
                     Ok(prog.op(Op::Eq).consume(2).result())
                 },
+                Syntax::Func => {
+                    let last_def_varname = ce.borrow().recent_var.clone();
+                    let mut fun_spos = spos;
+                    fun_spos.name = Some(Rc::new(last_def_varname));
+
+                    let cur_ce = ce.clone();
+                    let func_ce = CompileEnv::create_env(Some(ce.clone()));
+
+                    let mut ce_sub =
+                        if quote_func {
+                            cur_ce
+                        } else {
+                            func_ce
+                        };
+
+                    let label          = ast.at(1).unwrap();
+                    let explicit_arity = ast.at(2).unwrap();
+                    let stmts : Vec<Prog> =
+                        ast.map_skip(|e| vm_compile(e, &mut ce_sub), 3)?;
+
+                    let spos_inner = fun_spos.clone();
+                    #[allow(unused_assignments)]
+                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
+                        let mut res = VVal::Nul;
+                        // TODO: Create stmts prog and move it here.
+                        // TODO: call the vm() function to execute the prog stmts
+                        //       as block.
+                        for s in stmts.iter() {
+                            if let VVal::Err(ev) = res {
+                                return
+                                    Err(StackAction::panic_str(
+                                        format!("Error value '{}' dropped.",
+                                                ev.borrow().0.s()),
+                                        Some(ev.borrow().1.clone())));
+                            }
+
+                            res = VVal::Nul; // drop any previous value now.
+                            match s(env) {
+                                Ok(v)  => { res = v; },
+                                Err(StackAction::Return((v_lbl, v))) => {
+                                    return
+                                        if v_lbl.eqv(&label) { Ok(v) }
+                                        else { Err(StackAction::Return((v_lbl, v))) }
+                                },
+                                Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
+                            }
+                        }
+                        Ok(res)
+                    }));
+
+                    ce_sub.borrow_mut().explicit_arity.0 =
+                        match explicit_arity.at(0).unwrap_or(VVal::Nul) {
+                            VVal::Int(i) => ArityParam::Limit(i as usize),
+                            VVal::Bol(true) => ArityParam::Limit(0),
+                            _ => ArityParam::Undefined,
+                        };
+
+                    ce_sub.borrow_mut().explicit_arity.1 =
+                        match explicit_arity.at(1).unwrap_or(VVal::Nul) {
+                            VVal::Int(i) => ArityParam::Limit(i as usize),
+                            VVal::Bol(true) => ArityParam::Infinite,
+                            _ => ArityParam::Undefined,
+                        };
+
+                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
+                        ce_sub.borrow().explicit_arity.0.clone()
+                    } else {
+                        ce_sub.borrow().implicit_arity.0.clone()
+                    };
+
+                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
+                        ce_sub.borrow().explicit_arity.1.clone()
+                    } else {
+                        ce_sub.borrow().implicit_arity.1.clone()
+                    };
+
+                    let min_args : Option<usize> = match deciding_min_arity {
+                        ArityParam::Infinite  => None,
+                        ArityParam::Undefined => Some(0),
+                        ArityParam::Limit(i)  => Some(i),
+                    };
+
+                    let max_args : Option<usize> = match deciding_max_arity {
+                        ArityParam::Infinite  => None,
+                        ArityParam::Undefined => Some(0),
+                        ArityParam::Limit(i)  => Some(i),
+                    };
+
+                    let env_size = ce_sub.borrow().local_env_size();
+//                    if quote_func {
+//                        Ok(Box::new(move |e: &mut Env| {
+//                            let r = fun_ref.borrow();
+//                            let r = r(e, 0);
+//                            r
+//                        }))
+//                    } else {
+                    // TODO: implement VVal::clone_and_rebind_upvalues(...) -> VVal!
+                    // TODO: Create a VValFun with no upvalues
+                    // make a: Op::NewClos(Rc<RefCell<upvs>>) (TODO: alternatively add a upvs-vec to prog!),
+                    //          it takes the
+                    //          VValFun-Data item, creates a new
+                    //          clone with the upvalues added.
+                    let upvs = ce_sub.borrow_mut().get_upval_pos();
+                    Ok(Box::new(move |e: &mut Env| {
+                        let mut upvalues = Vec::new();
+                        copy_upvs(&upvs, e, &mut upvalues);
+                        Ok(VValFun::new_val(
+                            fun_ref.clone(),
+                            upvalues, env_size, min_args, max_args, false,
+                            Some(fun_spos.clone())))
+                    }))
+//                    }
+                },
                 Syntax::Call => {
                     let mut call_args : Vec<Prog> =
                         ast.map_skip(|e: &VVal| vm_compile(e, ce), 1)?;
@@ -776,6 +896,20 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                         }
                     }
                     Ok(prog.result())
+                },
+                Syntax::Err => {
+                    let err_val = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    Ok(err_val.debug(spos).op(Op::NewErr).consume(1).result())
+                },
+                Syntax::Key => {
+                    let sym = ast.at(1).unwrap();
+                    ce.borrow_mut().recent_sym = sym.s_raw();
+                    Ok(Prog::new().data_op(Op::Push(0), sym).result())
+                },
+                Syntax::Str => {
+                    let sym = ast.at(1).unwrap();
+                    ce.borrow_mut().recent_sym = sym.s_raw();
+                    Ok(Prog::new().data_op(Op::Push(0), sym).result())
                 },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
@@ -893,4 +1027,48 @@ mod tests {
         assert_eq!(gen("${a=$p(1,2)}"),     "${a=$p(1,2)}");
         assert_eq!(gen("${*${b=10}}"),      "${b=10}");
     }
+
+    #[test]
+    fn vm_func() {
+        assert_eq!(gen("!x = 10; { x }[]"), "10");
+    }
+
+    #[test]
+    fn vm_check_bytes_impl() {
+        #[cfg(feature="serde_json")]
+        assert_eq!(gen("std:ser:json $b\"abc\""),                         "\"[\\n  97,\\n  98,\\n  99\\n]\"", "JSON serializer for bytes ok");
+
+        assert_eq!(gen("str $b\"abc\""),                              "\"abc\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
+        assert_eq!(gen("str $b\"äbcß\""),                             "\"Ã¤bcÃ\\u{9f}\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
+        assert_eq!(gen("std:str:from_utf8 $b\"äbcß\""),                   "\"äbcß\"", "Bytes to String from UTF8");
+        assert_eq!(gen("std:str:from_utf8 $b\"\\xC4\\xC3\""),             "$e \"str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0\"", "Bytes to String from invalid UTF8");
+        assert_eq!(gen("std:str:from_utf8_lossy $b\"\\xC4\\xC3\""),       "\"��\"", "Bytes to String from invalid UTF8 lossy");
+        assert_eq!(gen("std:str:to_bytes \"aäß\""),                       "$b\"a\\xC3\\xA4\\xC3\\x9F\"", "Bytes from String as UTF8");
+        assert_eq!(gen("std:str:from_utf8 ~ std:str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
+        assert_eq!(gen("$b\"abc\" 1"),                                "$b\"b\"", "Get single byte from bytes");
+        assert_eq!(gen("$b\"abcdef\" 0 2"),                           "$b\"ab\"", "Substring bytes operation");
+        assert_eq!(gen("$b\"abcdef\" 3 3"),                           "$b\"def\"", "Substring bytes operation");
+        assert_eq!(gen("$b\"abcdef\" $[3, 3]"),                       "$b\"def\"", "Substring bytes operation");
+        assert_eq!(gen("$b\"abcdef\" $[3]"),                          "$b\"def\"", "Substring bytes operation");
+        assert_eq!(gen("$b\"abcdef\" ${abcdef = 10}"),                "10", "Bytes as map key");
+        assert_eq!(gen("std:bytes:to_vec $b\"abcdef\""),                  "$[97,98,99,100,101,102]", "bytes:to_vec");
+        assert_eq!(gen("std:bytes:from_vec ~ std:bytes:to_vec $b\"abcdef\""), "$b\"abcdef\"", "bytes:from_vec");
+        assert_eq!(gen("std:bytes:from_vec $[]"),                         "$b\"\"", "bytes:from_vec");
+        assert_eq!(gen("std:bytes:from_vec $[1,2,3]"),                    "$b\"\\x01\\x02\\x03\"", "bytes:from_vec");
+
+        assert_eq!(gen("std:bytes:to_hex $b\"abc\\xFF\""),                  "\"616263FF\"");
+        assert_eq!(gen("std:bytes:to_hex $b\"abc\\xFF\" 6"),                "\"616263 FF\"");
+        assert_eq!(gen("std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""),          "\"616263:FF\"");
+        assert_eq!(gen("std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""),          "\"6:1:6:2:6:3:F:F\"");
+
+        assert_eq!(gen("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\""),         "$b\"abc\\xFF\"");
+        assert_eq!(gen("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6"),       "$b\"abc\\xFF\"");
+        assert_eq!(gen("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""), "$b\"abc\\xFF\"");
+        assert_eq!(gen("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""), "$b\"abc\\xFF\"");
+        assert_eq!(gen("std:bytes:from_hex ~ std:bytes:to_hex $b\"\\x00abc\\xFF\" 1 \":\""), "$b\"\\0abc\\xFF\"");
+
+        assert_eq!(gen("std:str:to_char_vec $q ABC "), "$[65,66,67]");
+        assert_eq!(gen("$q ABC | std:str:to_char_vec | std:str:from_char_vec"), "\"ABC\"");
+    }
+
 }
