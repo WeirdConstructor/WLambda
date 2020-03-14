@@ -7,9 +7,11 @@ use std::cell::RefCell;
 
 struct Prog {
     results: i64,
+    debug:  std::vec::Vec<Option<SynPos>>,
     clos:   std::vec::Vec<EvalNode>,
     data:   std::vec::Vec<VVal>,
     ops:    std::vec::Vec<Op>,
+    nxt_debug: Option<SynPos>,
 }
 
 impl Prog {
@@ -35,7 +37,18 @@ impl Prog {
                 },
                 Op::NewPair
                 | Op::Ret(_)
+                | Op::Call(_)
                 | Op::Pop
+                | Op::Add
+                | Op::Sub
+                | Op::Div
+                | Op::Mul
+                | Op::Mod
+                | Op::Lt
+                | Op::Le
+                | Op::Gt
+                | Op::Ge
+                | Op::Eq
                 | Op::ResvLocals(_)
                 | Op::SetLocal(_)
                 | Op::GetLocal(_)
@@ -51,6 +64,7 @@ impl Prog {
         }
 
         self.results += prog.results;
+        self.debug.append(&mut prog.debug);
         self.clos.append(&mut prog.clos);
         self.data.append(&mut prog.data);
         self.ops.append(&mut prog.ops);
@@ -58,10 +72,12 @@ impl Prog {
 
     fn new() -> Self {
         Self {
-            clos: vec![],
-            data: vec![],
-            ops:  vec![],
-            results: 0,
+            clos:       vec![],
+            data:       vec![],
+            ops:        vec![],
+            debug:      vec![],
+            nxt_debug:  None,
+            results:    0,
         }
     }
 
@@ -92,10 +108,13 @@ impl Prog {
 
     fn unshift_op(&mut self, o: Op) -> &mut Self {
         self.ops.insert(0, o);
+        self.debug.insert(0, std::mem::replace(&mut self.nxt_debug, None));
         self
     }
+
     fn push_op(&mut self, o: Op) -> &mut Self {
         self.ops.push(o);
+        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
         self
     }
 
@@ -110,7 +129,18 @@ impl Prog {
                 Op::GetGlobal(_) => Op::GetGlobal(idx as u32),
                 Op::NewPair
                 | Op::Ret(_)
+                | Op::Call(_)
                 | Op::Pop
+                | Op::Add
+                | Op::Sub
+                | Op::Div
+                | Op::Mul
+                | Op::Mod
+                | Op::Lt
+                | Op::Le
+                | Op::Gt
+                | Op::Ge
+                | Op::Eq
                 | Op::ResvLocals(_)
                 | Op::SetLocal(_)
                 | Op::GetLocal(_)
@@ -123,17 +153,25 @@ impl Prog {
                 | Op::ArgvRef
                 => panic!("data_op for non data Op called!"),
             });
+        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
         self
     }
 
     fn op(mut self, o: Op) -> Self {
         self.ops.push(o);
+        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
+        self
+    }
+
+    fn debug(mut self, sp: SynPos) -> Self {
+        self.nxt_debug = Some(sp);
         self
     }
 }
 
 #[derive(Debug,Copy,Clone)]
 enum Op {
+    Call(u32),
     Push(u32),
     PushRef(u32),
     ResvLocals(u32),
@@ -152,6 +190,16 @@ enum Op {
     NewPair,
     Ret(u32),
     Pop,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Le,
+    Lt,
+    Ge,
+    Gt,
+    Eq,
 }
 
 fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
@@ -161,7 +209,10 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     let mut ret = VVal::Nul;
     loop {
         let op = prog.ops[pc];
-        println!("OP: {:<15}      | sp: {:>3}, bp: {:>3}", format!("{:?}", op), env.sp, env.bp);
+        let syn =
+            if let Some(sp) = &prog.debug[pc] { format!("{}", sp) }
+            else { "".to_string() };
+        println!("OP: {:<15}      | sp: {:>3}, bp: {:>3} | {}", format!("{:?}", op), env.sp, env.bp, syn);
         match op {
             Op::Push(data_idx) => {
                 env.push(prog.data[data_idx as usize].clone());
@@ -197,6 +248,112 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::ArgRef(arg_idx)        => { env.push(env.arg(arg_idx as usize).to_ref()); },
             Op::Argv                   => { env.push(env.argv()); },
             Op::ArgvRef                => { env.push(env.argv().to_ref()); },
+            Op::Add => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    match (a, b) {
+                        (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
+                        (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
+                        (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
+                        (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
+                    };
+                env.push(res);
+            },
+            Op::Sub => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    if let VVal::Flt(f) = a { VVal::Flt(f - b.f()) }
+                    else { VVal::Int(a.i().wrapping_sub(b.i())) };
+                env.push(res);
+            },
+            Op::Div => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    if let VVal::Flt(f) = a {
+                        VVal::Flt(f / b.f())
+
+                    } else if b.i() == 0 {
+                        return
+                            Err(StackAction::panic_str(
+                                format!("Division by 0: {}/{}", a.i(), b.i()),
+                                prog.debug[pc].clone()))
+
+                    } else {
+                        VVal::Int(a.i().wrapping_div(b.i()))
+                    };
+                env.push(res);
+            },
+            Op::Mul => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    if let VVal::Flt(f) = a { VVal::Flt(f * b.f()) }
+                    else { VVal::Int(a.i().wrapping_mul(b.i())) };
+                env.push(res);
+            },
+            Op::Mod => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    if let VVal::Flt(f) = a {
+                        VVal::Flt(f % b.f())
+                    } else {
+                        VVal::Int(a.i().wrapping_rem(b.i()))
+                    };
+                env.push(res);
+            },
+            Op::Le => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
+                    else { VVal::Bol(a.i() <= b.i()) };
+                env.push(res);
+            },
+            Op::Lt => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    if let VVal::Flt(f) = a { VVal::Bol(f < b.f()) }
+                    else { VVal::Bol(a.i() < b.i()) };
+                env.push(res);
+            },
+            Op::Ge => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
+                    else { VVal::Bol(a.i() >= b.i()) };
+                env.push(res);
+            },
+            Op::Gt => {
+                let b = env.pop();
+                let a = env.pop();
+                let res =
+                    if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
+                    else { VVal::Bol(a.i() > b.i()) };
+                env.push(res);
+            },
+            Op::Eq => {
+                let b = env.pop();
+                let a = env.pop();
+                let res = VVal::Bol(a.eqv(&b));
+                env.push(res);
+            },
+            Op::Call(argc) => {
+                let argc = argc as usize;
+                let f = env.pop();
+                let ret = f.call_internal(env, argc);
+                env.popn(argc);
+                match ret {
+                    Ok(v) => { env.push(v); },
+                    Err(sa) =>
+                        return Err(sa.wrap_panic(prog.debug[pc].clone())),
+                }
+            },
         }
         env.dump_stack();
         pc += 1;
@@ -400,7 +557,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                     ce.borrow_mut().push_block_env();
                     let exprs : Vec<Prog> = ast.map_skip(|e| vm_compile(e, ce), 1)?;
 
-                    let mut p = Prog::new();
+                    let mut p = Prog::new().debug(spos);
                     for e in exprs.into_iter() {
                         p.pop_result();
                         p.append(e);
@@ -412,10 +569,102 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                 },
 //                Syntax::Assign      => { compile_assign(ast, ce, false) },
 //                Syntax::AssignRef   => { compile_assign(ast, ce, true)  },
-                Syntax::Var        => vm_compile_var(ast, ce, false),
-                Syntax::CaptureRef => vm_compile_var(ast, ce, true),
-                Syntax::Def        => vm_compile_def(ast, ce, false),
-                Syntax::DefGlobRef => vm_compile_def(ast, ce, true),
+                Syntax::Var        => vm_compile_var(ast, ce, false).map(|p| p.debug(spos)),
+                Syntax::CaptureRef => vm_compile_var(ast, ce, true).map(|p| p.debug(spos)),
+                Syntax::Def        => vm_compile_def(ast, ce, false).map(|p| p.debug(spos)),
+                Syntax::DefGlobRef => vm_compile_def(ast, ce, true).map(|p| p.debug(spos)),
+                Syntax::BinOpAdd => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Add).consume(2).result())
+                },
+                Syntax::BinOpSub => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Sub).consume(2).result())
+                },
+                Syntax::BinOpDiv => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Div).consume(2).result())
+                },
+                Syntax::BinOpMul => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Mul).consume(2).result())
+                },
+                Syntax::BinOpMod => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Mod).consume(2).result())
+                },
+                Syntax::BinOpGe => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Ge).consume(2).result())
+                },
+                Syntax::BinOpGt => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Gt).consume(2).result())
+                },
+                Syntax::BinOpLe => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Le).consume(2).result())
+                },
+                Syntax::BinOpLt => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Lt).consume(2).result())
+                },
+                Syntax::BinOpEq => {
+                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+                    let mut prog = Prog::new().debug(spos);
+                    prog.append(left);
+                    prog.append(right);
+                    Ok(prog.op(Op::Eq).consume(2).result())
+                },
+                Syntax::Call => {
+                    let mut call_args : Vec<Prog> =
+                        ast.map_skip(|e: &VVal| vm_compile(e, ce), 1)?;
+                    call_args.reverse();
+
+                    let argc = call_args.len();
+                    let mut prog = Prog::new().debug(spos);
+                    for a in call_args.into_iter() {
+                        prog.append(a);
+                    }
+                    Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result())
+                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },
@@ -480,5 +729,39 @@ mod tests {
         assert_eq!(gen("!:global x = 10; !y = 11; $:_"),              "$&&14.4");
         assert_eq!(gen("!:global x = 10; !y = 11; $p(_, $p(_1, $p(_2, y)))"),
                    "$p(14.4,$p(10,$p($n,11)))");
+    }
+
+    #[test]
+    fn vm_call() {
+        assert_eq!(gen("1 + 2"),         "3");
+        assert_eq!(gen("1 + 2 + 3 + 4"), "10");
+        assert_eq!(gen("1 > 2"),         "$false");
+        assert_eq!(gen("2 > 1"),         "$true");
+        assert_eq!(gen("1 < 2"),         "$true");
+        assert_eq!(gen("2 < 1"),         "$false");
+        assert_eq!(gen("1 >= 2"),        "$false");
+        assert_eq!(gen("2 >= 1"),        "$true");
+        assert_eq!(gen("1 <= 2"),        "$true");
+        assert_eq!(gen("2 <= 1"),        "$false");
+
+        assert_eq!(gen("10 < 20"),     "$true");
+        assert_eq!(gen("11 < 10"),     "$false");
+        assert_eq!(gen("10 < 10"),     "$false");
+        assert_eq!(gen("10 > 20"),     "$false");
+        assert_eq!(gen("11 > 10"),     "$true");
+        assert_eq!(gen("10 > 10"),     "$false");
+        assert_eq!(gen("10 <= 20"),    "$true");
+        assert_eq!(gen("11 <= 10"),    "$false");
+        assert_eq!(gen("10 <= 10"),    "$true");
+        assert_eq!(gen("10 >= 20"),    "$false");
+        assert_eq!(gen("11 >= 10"),    "$true");
+        assert_eq!(gen("10 >= 10"),    "$true");
+        assert_eq!(gen("10.1 < 20.4"), "$true");
+        assert_eq!(gen("11.2 < 10.2"), "$false");
+        assert_eq!(gen("10.3 < 10.4"), "$true");
+        assert_eq!(gen("22 == 22"),    "$true");
+        assert_eq!(gen("22 == 23"),    "$false");
+        assert_eq!(gen("22 != 22"),    "$false");
+        assert_eq!(gen("21 != 22"),    "$true");
     }
 }
