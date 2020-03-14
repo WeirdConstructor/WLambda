@@ -36,6 +36,12 @@ impl Prog {
                     *data_idx = *data_idx + self_data_next_idx;
                 },
                 Op::NewPair
+                | Op::NewList
+                | Op::ListPush
+                | Op::ListSplice
+                | Op::NewMap
+                | Op::MapSetKey
+                | Op::MapSplice
                 | Op::Ret(_)
                 | Op::Call(_)
                 | Op::Pop
@@ -128,6 +134,12 @@ impl Prog {
                 Op::GetGlobalRef(_) => Op::GetGlobalRef(idx as u32),
                 Op::GetGlobal(_) => Op::GetGlobal(idx as u32),
                 Op::NewPair
+                | Op::NewList
+                | Op::ListPush
+                | Op::ListSplice
+                | Op::NewMap
+                | Op::MapSetKey
+                | Op::MapSplice
                 | Op::Ret(_)
                 | Op::Call(_)
                 | Op::Pop
@@ -188,6 +200,12 @@ enum Op {
     Argv,
     ArgvRef,
     NewPair,
+    NewList,
+    ListPush,
+    ListSplice,
+    NewMap,
+    MapSetKey,
+    MapSplice,
     Ret(u32),
     Pop,
     Add,
@@ -353,6 +371,37 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     Err(sa) =>
                         return Err(sa.wrap_panic(prog.debug[pc].clone())),
                 }
+            },
+            Op::NewList => { env.push(VVal::vec()); },
+            Op::ListPush => {
+                let elem = env.pop();
+                let lst  = env.pop();
+                lst.push(check_error_value(elem, "list element")?);
+                env.push(lst);
+            },
+            Op::ListSplice => {
+                let elem = env.pop();
+                let lst  = env.pop();
+                for (e, _) in elem.iter() {
+                    lst.push(e);
+                }
+                env.push(lst);
+            },
+            Op::NewMap => { env.push(VVal::map()); },
+            Op::MapSetKey => {
+                let value = check_error_value(env.pop(), "map value")?;
+                let key   = check_error_value(env.pop(), "map key")?;
+                let map   = env.pop();
+                map.set_key(&key, value)?;
+                env.push(map);
+            },
+            Op::MapSplice => {
+                let value = check_error_value(env.pop(), "map splice value")?;
+                let map   = env.pop();
+                for (e, k) in value.iter() {
+                    map.set_key(&k.unwrap(), e);
+                }
+                env.push(map);
             },
         }
         env.dump_stack();
@@ -665,6 +714,69 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                     }
                     Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result())
                 },
+                Syntax::Lst => {
+                    let mut list_elems : Vec<(bool, Prog)> =
+                        ast.map_skip(|e| {
+                            if e.is_vec() {
+                                if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
+                                    e.at(0).unwrap_or(VVal::Nul)
+                                {
+                                    return Ok((true, vm_compile(&e.at(1).unwrap(), ce)?));
+                                }
+                            }
+                            Ok((false, vm_compile(e, ce)?))
+                        }, 1)?;
+
+                    let mut prog = Prog::new().debug(spos.clone());
+                    prog.push_op(Op::NewList);
+                    for (is_splice, elem) in list_elems.into_iter() {
+                        prog.append(elem);
+                        if is_splice {
+                            prog.push_op(Op::ListSplice);
+                        } else {
+                            prog.push_op(Op::ListPush);
+                        }
+                    }
+                    Ok(prog.result())
+                },
+                Syntax::Map => {
+                    let map_elems : Result<Vec<(Prog,Option<Prog>)>, CompileError> =
+                        ast.map_skip(|e| {
+                                let k = e.at(0).unwrap();
+                                let v = e.at(1).unwrap();
+                                if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
+                                    let sc = vm_compile(&v, ce)?;
+                                    Ok((sc, None))
+                                } else {
+                                    let kc = vm_compile(&k, ce)?;
+                                    if let VVal::Sym(y) = k {
+                                        ce.borrow_mut().recent_var = y.borrow().clone();
+                                    } else {
+                                        let recent_sym = ce.borrow().recent_sym.clone();
+                                        ce.borrow_mut().recent_var = recent_sym;
+                                    }
+                                    let vc = vm_compile(&v, ce)?;
+                                    Ok((kc, Some(vc)))
+                                }
+                            }, 1);
+                    if let Err(e) = map_elems { return Err(e); }
+                    let map_elems = map_elems.unwrap();
+
+                    let mut prog = Prog::new().debug(spos.clone());
+                    prog.push_op(Op::NewMap);
+
+                    for x in map_elems.into_iter() {
+                        let key_prog = x.0;
+                        prog.append(key_prog);
+                        if let Some(value_prog) = x.1 {
+                            prog.append(value_prog);
+                            prog.push_op(Op::MapSetKey);
+                        } else {
+                            prog.push_op(Op::MapSplice);
+                        }
+                    }
+                    Ok(prog.result())
+                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },
@@ -763,5 +875,22 @@ mod tests {
         assert_eq!(gen("22 == 23"),    "$false");
         assert_eq!(gen("22 != 22"),    "$false");
         assert_eq!(gen("21 != 22"),    "$true");
+    }
+
+    #[test]
+    fn vm_lists() {
+        assert_eq!(gen("$[]"),              "$[]");
+        assert_eq!(gen("$[1, 2, 4]"),       "$[1,2,4]");
+        assert_eq!(gen("$[1, $[3,5], 4]"),  "$[1,$[3,5],4]");
+        assert_eq!(gen("$[1, *$[3,5], 4]"),  "$[1,3,5,4]");
+        assert_eq!(gen("$[1, *${a=30}, 4]"),  "$[1,30,4]");
+    }
+
+    #[test]
+    fn vm_maps() {
+        assert_eq!(gen("${}"),              "${}");
+        assert_eq!(gen("${a=$n}"),          "${a=$n}");
+        assert_eq!(gen("${a=$p(1,2)}"),     "${a=$p(1,2)}");
+        assert_eq!(gen("${*${b=10}}"),      "${b=10}");
     }
 }

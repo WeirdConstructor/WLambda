@@ -890,7 +890,7 @@ pub struct CompileEnv {
     /// Recently accessed variable name:
     pub recent_var: String,
     /// Recently compiled symbol:
-    recent_sym: String,
+    pub recent_sym: String,
     /// If set, the next compile() is compiling a function as block.
     quote_func: bool,
 }
@@ -1541,7 +1541,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
     }
 }
 
-fn check_error_value(v: VVal, at: &str) -> Result<VVal, StackAction> {
+pub fn check_error_value(v: VVal, at: &str) -> Result<VVal, StackAction> {
     if let VVal::Err(ev) = v {
         return
             Err(StackAction::panic_str(
