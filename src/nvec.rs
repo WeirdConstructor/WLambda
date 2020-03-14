@@ -40,6 +40,7 @@ impl NVecNum for f64 {
         'f'
     }
 }
+
 impl NVecNum for i64 {
     fn zero() -> Self {
         0
@@ -126,12 +127,11 @@ impl<N: NVecNum> NVector<N> {
 
     #[inline]
     pub fn tuplify(self) -> (N, N, Option<N>, Option<N>) {
-        (
-            self.x_raw(),
-            self.y_raw(),
-            self.z_raw(),
-            self.w_raw(),
-        )
+        match self {
+            Vec2(x, y)       => (x, y, None   , None),
+            Vec3(x, y, z)    => (x, y, Some(z), None),
+            Vec4(x, y, z, w) => (x, y, Some(z), Some(w)),
+        }
     }
 
     #[inline]
