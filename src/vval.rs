@@ -472,7 +472,7 @@ impl Env {
 
     /// Prints a dump of the stack state.
     pub fn dump_stack(&self) {
-        println!("* SP={}, BP={}", self.sp, self.bp);
+        //d// println!("* SP={}, BP={}", self.sp, self.bp);
         for (i, v) in self.args.iter().enumerate() {
             let mut mark = String::from("");
             if i == self.bp { mark = format!("{} BP", mark); }
@@ -480,7 +480,7 @@ impl Env {
             if !mark.is_empty() { mark = format!("{} ->", mark); }
 
             println!("    {:9} [{:3}] = {}", mark, i, v.s());
-            if i >= (10 + self.sp) { break; }
+            if i >= (1 + self.sp) { break; }
         }
         if !self.call_stack.is_empty() {
             for (i, u) in self.call_stack.last().unwrap().upvalues.iter().enumerate() {
@@ -490,7 +490,7 @@ impl Env {
     }
 
     #[inline]
-    pub fn argv(&mut self) -> VVal {
+    pub fn argv(&self) -> VVal {
         VVal::vec_from(&self.args[(self.bp - self.argc)..self.bp])
     }
 
@@ -501,12 +501,12 @@ impl Env {
     }
 
     #[inline]
-    pub fn get_up_captured_ref(&mut self, i: usize) -> VVal {
+    pub fn get_up_captured_ref(&self, i: usize) -> VVal {
         self.call_stack.last().unwrap().upvalues[i].to_ref()
     }
 
     #[inline]
-    pub fn get_up(&mut self, i: usize) -> VVal {
+    pub fn get_up(&self, i: usize) -> VVal {
         self.call_stack.last().unwrap().upvalues[i].deref()
 //        match self.fun.upvalues[i].deref() {
 //            VVal::WWRef(l) => { 
@@ -565,13 +565,13 @@ impl Env {
         }
     }
 
-    pub fn get_local_captured_ref(&mut self, i: usize) -> VVal {
+    pub fn get_local_captured_ref(&self, i: usize) -> VVal {
         let idx = self.bp + i;
         self.args[idx].to_ref()
     }
 
     #[inline]
-    pub fn get_local(&mut self, i: usize) -> VVal {
+    pub fn get_local(&self, i: usize) -> VVal {
         let idx = self.bp + i;
         match &self.args[idx] {
             VVal::CRef(r)  => r.borrow().clone(),

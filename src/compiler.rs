@@ -445,7 +445,7 @@ impl GlobalEnv {
 
 /// Position of a variable represented in the `CompileEnv`.
 #[derive(Debug, Clone)]
-enum VarPos {
+pub enum VarPos {
     /// No position of the variable. Mostly placeholder value for non existing variable.
     NoPos,
     /// Variable is stored in upvalue at the specified position.
@@ -783,7 +783,7 @@ impl EvalContext {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum ArityParam {
+pub enum ArityParam {
     Undefined,
     Limit(usize),
     Infinite,
@@ -884,11 +884,11 @@ pub struct CompileEnv {
     /// Stores position of the upvalues for copying the upvalues at runtime.
     upvals:    std::vec::Vec<VarPos>,
     /// Stores the implicitly calculated arity of this function.
-    implicit_arity: (ArityParam, ArityParam),
+    pub implicit_arity: (ArityParam, ArityParam),
     /// Stores the explicitly defined arity of this function.
     explicit_arity: (ArityParam, ArityParam),
     /// Recently accessed variable name:
-    recent_var: String,
+    pub recent_var: String,
     /// Recently compiled symbol:
     recent_sym: String,
     /// If set, the next compile() is compiling a function as block.
@@ -899,6 +899,20 @@ pub struct CompileEnv {
 type CompileEnvRef = Rc<RefCell<CompileEnv>>;
 
 impl CompileEnv {
+    pub fn new(g: GlobalEnvRef) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(CompileEnv {
+            parent:    None,
+            global:    g,
+            block_env: BlockEnv::new(),
+            upvals:    Vec::new(),
+            quote_func: false,
+            recent_var: String::new(),
+            recent_sym: String::new(),
+            implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+            explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+        }))
+    }
+
     fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
         let global = if let Some(p) = &parent {
             p.borrow_mut().global.clone()
@@ -928,7 +942,7 @@ impl CompileEnv {
         self.global.borrow_mut().env.insert(String::from(s), val);
     }
 
-    fn def(&mut self, s: &str, is_global: bool) -> VarPos {
+    pub fn def(&mut self, s: &str, is_global: bool) -> VarPos {
         if is_global {
             let v = VVal::Nul;
             let r = v.to_ref();
@@ -969,7 +983,7 @@ impl CompileEnv {
         self.block_env.pop_env()
     }
 
-    fn get(&mut self, s: &str) -> VarPos {
+    pub fn get(&mut self, s: &str) -> VarPos {
         let pos = self.block_env.get(s);
         match pos {
             VarPos::NoPos => {
@@ -1032,7 +1046,7 @@ fn compile_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNod
     }))
 }
 
-fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
+pub fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
     let min = ce.borrow().implicit_arity.0.clone();
     match min {
         ArityParam::Undefined => { ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i); },
@@ -1127,7 +1141,7 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Re
     })
 }
 
-fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, vars: &VVal) {
+pub fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, vars: &VVal) {
     // If we have an destructuring assignment directly from "@", then we conclude
     // the implicit max arity to be minimum of number of vars:
     if ast.at(2).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() == Syntax::Var {
@@ -2708,17 +2722,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 /// some benchmarking information.
 #[allow(clippy::cast_lossless)]
 pub fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
-    let mut ce = Rc::new(RefCell::new(CompileEnv {
-        parent:    None,
-        global:    g.clone(),
-        block_env: BlockEnv::new(),
-        upvals:    Vec::new(),
-        quote_func: false,
-        recent_var: String::new(),
-        recent_sym: String::new(),
-        implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-        explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-    }));
+    let mut ce = CompileEnv::new(g.clone());
 
     let prog = compile(&v, &mut ce);
     match prog {
