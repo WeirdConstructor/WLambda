@@ -1024,6 +1024,12 @@ fn make_binop(ps: &State, op: &str, left: VVal, right: VVal) -> VVal {
         or.push(right);
         or
 
+    } else if op == "==" {
+        let or = ps.syn(Syntax::BinOpEq);
+        or.push(left);
+        or.push(right);
+        or
+
     } else {
         let call = make_to_call(ps, make_var(ps, op));
         call.push(left);

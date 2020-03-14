@@ -112,6 +112,7 @@ pub enum Syntax {
     BinOpLt,
     BinOpGe,
     BinOpGt,
+    BinOpEq,
     Str,
     Lst,
     IVec,
@@ -442,6 +443,15 @@ impl Env {
         self.args[self.sp] = v;
         self.sp += 1;
         self.sp - 1
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> VVal {
+        if self.sp < 1 {
+            panic!(format!("Stack pointer underflow {} {}", self.sp, 1));
+        }
+        self.sp -= 1;
+        std::mem::replace(&mut self.args[self.sp], VVal::Nul)
     }
 
     #[inline]
@@ -2441,11 +2451,15 @@ impl VVal {
         }
     }
 
-    pub fn to_compile_err(&self, msg: String) -> Result<EvalNode, CompileError> {
-        Err(CompileError {
+    pub fn compile_err(&self, msg: String) -> CompileError {
+        CompileError {
             msg,
             pos: self.at(0).unwrap_or(VVal::Nul).get_syn_pos(),
-        })
+        }
+    }
+
+    pub fn to_compile_err(&self, msg: String) -> Result<EvalNode, CompileError> {
+        Err(self.compile_err(msg))
     }
 
     pub fn is_pair(&self) -> bool {

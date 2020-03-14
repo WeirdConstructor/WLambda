@@ -874,7 +874,7 @@ impl BlockEnv {
 /// scope that they are passed through until they are needed.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-struct CompileEnv {
+pub struct CompileEnv {
     /// Reference to the global environment
     global:    GlobalEnvRef,
     /// Reference to the environment of the _parent_ function.
@@ -2484,6 +2484,16 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         } else {
                             Ok(VVal::Bol(le.i() > re.i()))
                         }
+                    }))
+                },
+                Syntax::BinOpEq => {
+                    let left  = compile(&ast.at(1).unwrap(), ce)?;
+                    let right = compile(&ast.at(2).unwrap(), ce)?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let le = left(e)?;
+                        let re = right(e)?;
+                        Ok(VVal::Bol(le.eqv(&re)))
                     }))
                 },
                 Syntax::Call => {

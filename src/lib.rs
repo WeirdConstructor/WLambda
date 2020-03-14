@@ -621,6 +621,7 @@ without any additional terms or conditions.
 pub mod vval;
 pub mod parser;
 pub mod compiler;
+pub mod vm;
 pub mod prelude;
 pub mod threads;
 pub mod util;
