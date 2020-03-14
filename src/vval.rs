@@ -782,6 +782,22 @@ impl StackAction {
     }
 }
 
+/// Position of a variable represented in the `CompileEnv`.
+#[derive(Debug, Clone)]
+pub enum VarPos {
+    /// No position of the variable. Mostly placeholder value for non existing variable.
+    NoPos,
+    /// Variable is stored in upvalue at the specified position.
+    UpValue(usize),
+    /// Variable is stored in local variables on the stack at the specified position.
+    Local(usize),
+    /// Variable is stored in the global variables with the given value.
+    Global(VVal),
+    /// A constant value, major difference to Global is, that it is not a reference
+    /// and a slight bit faster.
+    Const(VVal),
+}
+
 pub type EvalNode = Box<dyn Fn(&mut Env) -> Result<VVal,StackAction>>;
 pub type ClosNodeRef = Rc<RefCell<dyn Fn(&mut Env, usize) -> Result<VVal,StackAction>>>;
 
@@ -790,6 +806,8 @@ pub type ClosNodeRef = Rc<RefCell<dyn Fn(&mut Env, usize) -> Result<VVal,StackAc
 pub struct VValFun {
     /// The closure that runs the function.
     pub fun:        ClosNodeRef,
+    /// The positions of the upvalues that are being captured by this function.
+    pub upvalue_pos: Rc<std::vec::Vec<VarPos>>,
     /// Contains any caught upvalues.
     pub upvalues:   std::vec::Vec<VVal>,
     /// The number of local variables defined in this functions.
@@ -836,20 +854,22 @@ impl VValFun {
     pub fn new_fun<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool) -> VVal
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
 
-        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, err_arg_ok, None)
+        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, err_arg_ok, None, Rc::new(vec![]))
     }
 
     pub fn new_fun_with_pos<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool, spos: SynPos) -> VVal
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
 
-        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, err_arg_ok, Some(spos))
+        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, err_arg_ok, Some(spos), Rc::new(vec![]))
     }
 
     /// Internal utility function. Use at your own risk, API might change.
     pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>,
                    env_size: usize, min_args: Option<usize>,
-                   max_args: Option<usize>, err_arg_ok: bool, syn_pos: Option<SynPos>) -> VVal {
+                   max_args: Option<usize>, err_arg_ok: bool, syn_pos: Option<SynPos>,
+                   upvalue_pos: Rc<std::vec::Vec<VarPos>>) -> VVal {
         VVal::Fun(Rc::new(VValFun {
+            upvalue_pos,
             upvalues,
             fun,
             local_size: env_size,
@@ -863,13 +883,14 @@ impl VValFun {
     /// Returns a dummy function that does nothing.
     pub fn new_dummy() -> Rc<VValFun> {
         Rc::new(VValFun {
-            fun:        Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) })),
-            upvalues:   Vec::new(),
-            local_size: 0,
-            min_args:   None,
-            max_args:   None,
-            err_arg_ok: false,
-            syn_pos:    None,
+            fun:         Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) })),
+            upvalue_pos: Rc::new(vec![]),
+            upvalues:    Vec::new(),
+            local_size:  0,
+            min_args:    None,
+            max_args:    None,
+            err_arg_ok:  false,
+            syn_pos:     None,
         })
     }
 
@@ -1487,6 +1508,20 @@ impl VVal {
             VVal::Fun(Rc::new(new_fu))
         } else {
             self.clone()
+        }
+    }
+
+    /// This function is an internal function that clones a function reference
+    /// and assigns new upvalues to it for making a new closure instance.
+    pub fn clone_and_rebind_upvalues<T>(&self, f: T) -> VVal
+        where T: FnOnce(&std::vec::Vec<VarPos>, &mut std::vec::Vec<VVal>) -> ()
+    {
+        if let VVal::Fun(fu) = self {
+            let mut new_fu = fu.as_ref().clone();
+            f(&new_fu.upvalue_pos, &mut new_fu.upvalues);
+            VVal::Fun(Rc::new(new_fu))
+        } else {
+            panic!("clone_and_rebind_upvalues does not work on non functions!");
         }
     }
 

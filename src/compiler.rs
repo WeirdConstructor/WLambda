@@ -52,6 +52,7 @@ use crate::vval::VValFun;
 use crate::vval::EvalNode;
 use crate::vval::StackAction;
 use crate::vval::CompileError;
+use crate::vval::VarPos;
 use crate::threads::*;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -441,22 +442,6 @@ impl GlobalEnv {
     {
         self.thread_creator.clone()
     }
-}
-
-/// Position of a variable represented in the `CompileEnv`.
-#[derive(Debug, Clone)]
-pub enum VarPos {
-    /// No position of the variable. Mostly placeholder value for non existing variable.
-    NoPos,
-    /// Variable is stored in upvalue at the specified position.
-    UpValue(usize),
-    /// Variable is stored in local variables on the stack at the specified position.
-    Local(usize),
-    /// Variable is stored in the global variables with the given value.
-    Global(VVal),
-    /// A constant value, major difference to Global is, that it is not a reference
-    /// and a slight bit faster.
-    Const(VVal),
 }
 
 #[derive(Debug)]
@@ -886,7 +871,7 @@ pub struct CompileEnv {
     /// Stores the implicitly calculated arity of this function.
     pub implicit_arity: (ArityParam, ArityParam),
     /// Stores the explicitly defined arity of this function.
-    explicit_arity: (ArityParam, ArityParam),
+    pub explicit_arity: (ArityParam, ArityParam),
     /// Recently accessed variable name:
     pub recent_var: String,
     /// Recently compiled symbol:
@@ -913,7 +898,7 @@ impl CompileEnv {
         }))
     }
 
-    fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
+    pub fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
         let global = if let Some(p) = &parent {
             p.borrow_mut().global.clone()
         } else {
@@ -953,7 +938,7 @@ impl CompileEnv {
         }
     }
 
-    fn get_upval_pos(&self) -> std::vec::Vec<VarPos> {
+    pub fn get_upval_pos(&self) -> std::vec::Vec<VarPos> {
         let mut poses = vec![];
         for p in self.upvals.iter() {
             match p {
@@ -971,7 +956,7 @@ impl CompileEnv {
         poses
     }
 
-    fn local_env_size(&self) -> usize {
+    pub fn local_env_size(&self) -> usize {
         self.block_env.env_size()
     }
 
@@ -1794,7 +1779,7 @@ fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
     }
 }
 
-fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
+pub fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
     for u in upvs.iter() {
         match u {
             VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
@@ -2690,13 +2675,16 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         }))
                     } else {
                         let upvs = ce_sub.borrow_mut().get_upval_pos();
-                        Ok(Box::new(move |e: &mut Env| {
-                            let mut upvalues = Vec::new();
-                            copy_upvs(&upvs, e, &mut upvalues);
-                            Ok(VValFun::new_val(
+                        let fun =
+                            VValFun::new_val(
                                 fun_ref.clone(),
-                                upvalues, env_size, min_args, max_args, false,
-                                Some(fun_spos.clone())))
+                                vec![], env_size, min_args, max_args, false,
+                                Some(fun_spos.clone()),
+                                Rc::new(upvs));
+                        Ok(Box::new(move |e: &mut Env| {
+                            Ok(fun.clone_and_rebind_upvalues(|upvs, upvalues| {
+                                copy_upvs(upvs, e, upvalues);
+                            }))
                         }))
                     }
                 },

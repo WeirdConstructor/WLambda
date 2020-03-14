@@ -35,6 +35,9 @@ impl Prog {
                 Op::GetGlobalRef(ref mut data_idx) => {
                     *data_idx = *data_idx + self_data_next_idx;
                 },
+                Op::NewClos(ref mut data_idx) => {
+                    *data_idx = *data_idx + self_data_next_idx;
+                },
                 Op::NewPair
                 | Op::NewList
                 | Op::ListPush
@@ -129,11 +132,12 @@ impl Prog {
         let idx = self.push_data(v);
         self.ops.push(
             match o {
-                Op::SetGlobal(_) => Op::SetGlobal(idx as u32),
-                Op::Push(_)      => Op::Push(idx as u32),
+                Op::SetGlobal(_)    => Op::SetGlobal(idx as u32),
+                Op::Push(_)         => Op::Push(idx as u32),
                 Op::PushRef(_)      => Op::PushRef(idx as u32),
                 Op::GetGlobalRef(_) => Op::GetGlobalRef(idx as u32),
-                Op::GetGlobal(_) => Op::GetGlobal(idx as u32),
+                Op::GetGlobal(_)    => Op::GetGlobal(idx as u32),
+                Op::NewClos(_)      => Op::NewClos(idx as u32),
                 Op::NewPair
                 | Op::NewList
                 | Op::ListPush
@@ -209,6 +213,7 @@ enum Op {
     MapSetKey,
     MapSplice,
     NewErr,
+    NewClos(u32),
     Ret(u32),
     Pop,
     Add,
@@ -247,7 +252,15 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 env.push(VVal::Pair(Box::new((a, b))));
             },
             Op::ResvLocals(count)      => env.push_sp(count as usize),
-            Op::Pop                    => { env.pop(); },
+            Op::Pop                    => {
+                if let VVal::Err(ev) = env.pop() {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("Error value '{}' dropped.",
+                                    ev.borrow().0.s()),
+                            Some(ev.borrow().1.clone())));
+                }
+            },
             Op::Ret(count)             => {
                 let value = env.pop();
                 env.popn(count as usize);
@@ -409,6 +422,13 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::NewErr => {
                 let val = env.pop();
                 env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
+            },
+            Op::NewClos(data_idx) => {
+                let fun = prog.data[data_idx as usize].clone();
+                let fun = fun.clone_and_rebind_upvalues(|upvs, upvalues| {
+                    copy_upvs(upvs, env, upvalues);
+                });
+                env.push(fun);
             },
         }
         env.dump_stack();
@@ -714,49 +734,35 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                     let mut fun_spos = spos;
                     fun_spos.name = Some(Rc::new(last_def_varname));
 
-                    let cur_ce = ce.clone();
                     let func_ce = CompileEnv::create_env(Some(ce.clone()));
-
-                    let mut ce_sub =
-                        if quote_func {
-                            cur_ce
-                        } else {
-                            func_ce
-                        };
+                    let mut ce_sub = func_ce;
 
                     let label          = ast.at(1).unwrap();
                     let explicit_arity = ast.at(2).unwrap();
                     let stmts : Vec<Prog> =
                         ast.map_skip(|e| vm_compile(e, &mut ce_sub), 3)?;
 
+                    let mut func_prog = Prog::new().debug(fun_spos.clone());
+                    for s in stmts.into_iter() {
+                        func_prog.pop_result();
+                        func_prog.append(s);
+                    }
+                    func_prog.push_op(Op::Ret(0));
+                    let func_prog = func_prog.result();
+
                     let spos_inner = fun_spos.clone();
                     #[allow(unused_assignments)]
                     let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
-                        let mut res = VVal::Nul;
-                        // TODO: Create stmts prog and move it here.
-                        // TODO: call the vm() function to execute the prog stmts
-                        //       as block.
-                        for s in stmts.iter() {
-                            if let VVal::Err(ev) = res {
+                        let res = vm(&func_prog, env);
+                        match res {
+                            Ok(v)  => Ok(v),
+                            Err(StackAction::Return((v_lbl, v))) => {
                                 return
-                                    Err(StackAction::panic_str(
-                                        format!("Error value '{}' dropped.",
-                                                ev.borrow().0.s()),
-                                        Some(ev.borrow().1.clone())));
-                            }
-
-                            res = VVal::Nul; // drop any previous value now.
-                            match s(env) {
-                                Ok(v)  => { res = v; },
-                                Err(StackAction::Return((v_lbl, v))) => {
-                                    return
-                                        if v_lbl.eqv(&label) { Ok(v) }
-                                        else { Err(StackAction::Return((v_lbl, v))) }
-                                },
-                                Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
-                            }
+                                    if v_lbl.eqv(&label) { Ok(v) }
+                                    else { Err(StackAction::Return((v_lbl, v))) }
+                            },
+                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
                         }
-                        Ok(res)
                     }));
 
                     ce_sub.borrow_mut().explicit_arity.0 =
@@ -798,29 +804,15 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                     };
 
                     let env_size = ce_sub.borrow().local_env_size();
-//                    if quote_func {
-//                        Ok(Box::new(move |e: &mut Env| {
-//                            let r = fun_ref.borrow();
-//                            let r = r(e, 0);
-//                            r
-//                        }))
-//                    } else {
-                    // TODO: implement VVal::clone_and_rebind_upvalues(...) -> VVal!
-                    // TODO: Create a VValFun with no upvalues
-                    // make a: Op::NewClos(Rc<RefCell<upvs>>) (TODO: alternatively add a upvs-vec to prog!),
-                    //          it takes the
-                    //          VValFun-Data item, creates a new
-                    //          clone with the upvalues added.
-                    let upvs = ce_sub.borrow_mut().get_upval_pos();
-                    Ok(Box::new(move |e: &mut Env| {
-                        let mut upvalues = Vec::new();
-                        copy_upvs(&upvs, e, &mut upvalues);
-                        Ok(VValFun::new_val(
+                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
+                    let upvalues = vec![];
+                    let fun_template =
+                        VValFun::new_val(
                             fun_ref.clone(),
                             upvalues, env_size, min_args, max_args, false,
-                            Some(fun_spos.clone())))
-                    }))
-//                    }
+                            Some(fun_spos.clone()),
+                            Rc::new(upvs));
+                    Ok(Prog::new().data_op(Op::NewClos(0), fun_template).result())
                 },
                 Syntax::Call => {
                     let mut call_args : Vec<Prog> =
@@ -1031,6 +1023,14 @@ mod tests {
     #[test]
     fn vm_func() {
         assert_eq!(gen("!x = 10; { x }[]"), "10");
+        assert_eq!(gen("!x = 10; { !y = 4; !k = 5; y + k + x }[]"), "19");
+        assert_eq!(gen(r"
+            !x = 10;
+            !huh = { x };
+            !j = { !y = 4; !k = 5; y + k + huh[] }[];
+            !u = j[];
+            u
+        "), "19");
     }
 
     #[test]
