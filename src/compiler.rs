@@ -877,7 +877,7 @@ pub struct CompileEnv {
     /// Recently compiled symbol:
     pub recent_sym: String,
     /// If set, the next compile() is compiling a function as block.
-    quote_func: bool,
+    pub quote_func: bool,
 }
 
 /// Reference type to a `CompileEnv`.
@@ -1330,7 +1330,7 @@ fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, v: VVal) -> Option<String> {
 
 fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
     match pos {
-        VarPos::UpValue(d) => { e.set_up(*d, v); None },
+        VarPos::UpValue(d) => { e.set_up(*d, v.clone()); None },
         VarPos::Local(d)   => { e.set_consume(*d, v.clone()); None },
         VarPos::Const(_)   => { Some("Can't assign to constant!".to_string()) },
         VarPos::Global(d)  => {
@@ -1491,7 +1491,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
                 VarPos::UpValue(i) => {
                     Ok(Box::new(move |e: &mut Env| {
                         let v = cv(e)?;
-                        e.set_up(i, &v);
+                        e.set_up(i, v);
                         Ok(VVal::Nul)
                     }))
                 },

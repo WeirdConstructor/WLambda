@@ -446,6 +446,20 @@ impl Env {
     }
 
     #[inline]
+    pub fn next_i(&mut self, inc: i16) -> bool {
+        if let VVal::Int(i) = &mut self.args[self.sp - 1] {
+            if inc > 0 {
+                if *i == 0 { return false; }
+                *i += 1;
+            } else {
+                if *i == 0 { return false; }
+                *i -= 1;
+            }
+        }
+        return true;
+    }
+
+    #[inline]
     pub fn pop(&mut self) -> VVal {
         if self.sp < 1 {
             panic!(format!("Stack pointer underflow {} {}", self.sp, 1));
@@ -609,16 +623,16 @@ impl Env {
         }
     }
 
-    pub fn set_up(&mut self, index: usize, value: &VVal) {
+    pub fn set_up(&mut self, index: usize, value: VVal) {
         let fun = self.call_stack.last().unwrap().clone();
         let upv = &fun.upvalues[index];
 
         match upv {
-            VVal::Ref(r)   => { r.replace(value.clone()); }
-            VVal::CRef(r)  => { r.replace(value.clone()); }
+            VVal::Ref(r)   => { r.replace(value); }
+            VVal::CRef(r)  => { r.replace(value); }
             VVal::WWRef(r) => {
                 if let Some(r) = Weak::upgrade(r) {
-                    r.replace(value.clone());
+                    r.replace(value);
                 }
             },
             _ => {}
