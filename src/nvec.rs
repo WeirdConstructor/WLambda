@@ -308,43 +308,6 @@ impl<N: NVecNum> NVec<N> {
     }
 }
 
-impl<N: NVecNum, W: AsRef<VVal>> From<W> for NVec<N> {
-    #[inline]
-    fn from(v: W) -> Self {
-        match v.as_ref() {
-            VVal::IVec(i) => N::from_ivec(i.clone()),
-            VVal::FVec(f) => N::from_fvec(f.clone()),
-            VVal::Map(map)  => {
-                let m = map.borrow();
-                let o = N::zero().into_vval();
-                NVec::from_vval_tpl(
-                    (m.get("x").unwrap_or(&o), m.get("y").unwrap_or(&o), m.get("z"), m.get("w"))
-                ).unwrap_or_else(|| {
-                    // The only way from_vval_tpl can fail is if the fourth
-                    // parameter is Some(_) but the third is None.
-                    // That means that the following will always succeed
-                    // (even if the above did not):
-                    NVec::from_vval_tpl(
-                        (m.get("x").unwrap_or(&o), m.get("y").unwrap_or(&o), Some(&o), m.get("w"))
-                    ).unwrap()
-                })
-            },
-            VVal::Lst(lst) => {
-                let list = lst.borrow();
-                let mut l = list.iter();
-                let o = N::zero().into_vval();
-                let (x, y, z, w) = (l.next(), l.next(), l.next(), l.next());
-                // The only way from_vval_tpl can fail is if the fourth
-                // parameter is Some(_) but the third is None.
-                // That means that the following will always succeed,
-                // because lists can't have holes.
-                NVec::from_vval_tpl((x.unwrap_or(&o), y.unwrap_or(&o), z, w)).unwrap()
-            },
-            _ => Vec2(N::from_vval(v.as_ref()), N::zero()),
-        }
-    }
-}
-
 macro_rules! euler_binop { ( $( $trait:ident | $fn:ident ; )* ) => { $(
     impl<N: NVecNum> $trait for NVec<N> {
         type Output = Self;

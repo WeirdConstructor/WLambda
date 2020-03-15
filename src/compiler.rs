@@ -2327,8 +2327,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 
                     Ok(Box::new(move |e: &mut Env| {
                         Ok(match (left(e)?, right(e)?) {
-                            (VVal::IVec(ln), re) => VVal::IVec(ln + re.into()),
-                            (VVal::FVec(ln), re) => VVal::FVec(ln + re.into()),
+                            (VVal::IVec(ln), re) => VVal::IVec(ln + re.nvec()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln + re.nvec()),
                             (VVal::Flt(f), re)   => VVal::Flt(f + re.f()),
                             (le, re)             => VVal::Int(le.i().wrapping_add(re.i()))
                         })
@@ -2340,8 +2340,8 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 
                     Ok(Box::new(move |e: &mut Env| {
                         Ok(match (left(e)?, right(e)?) {
-                            (VVal::IVec(ln), re) => VVal::IVec(ln - re.into()),
-                            (VVal::FVec(ln), re) => VVal::FVec(ln - re.into()),
+                            (VVal::IVec(ln), re) => VVal::IVec(ln - re.nvec()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln - re.nvec()),
                             (VVal::Flt(f), re)   => VVal::Flt(f - re.f()),
                             (le, re)             => VVal::Int(le.i().wrapping_sub(re.i()))
                         })
