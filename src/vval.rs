@@ -15,7 +15,7 @@ use std::fmt;
 use std::fmt::{Display, Debug, Formatter};
 
 use crate::compiler::{GlobalEnv, GlobalEnvRef};
-use crate::nvec::NVector;
+use crate::nvec::NVec;
 
 use fnv::FnvHashMap;
 
@@ -1091,10 +1091,10 @@ pub enum VVal {
     DropFun(Rc<DropVVal>),
     /// A (strong) reference to a VVal.
     Ref(Rc<RefCell<VVal>>),
-    /// A numerical (mathematical) vector storing integers. See NVector for more information.
-    FVec(NVector<f64>),
-    /// A numerical (mathematical) vector storing floats. See NVector for more information.
-    IVec(NVector<i64>),
+    /// A numerical (mathematical) vector storing integers. See NVec for more information.
+    FVec(NVec<f64>),
+    /// A numerical (mathematical) vector storing floats. See NVec for more information.
+    IVec(NVec<i64>),
     /// A (still strong) reference to a VVal, which becomes a weak reference if
     /// captured by a closure.
     CRef(Rc<RefCell<VVal>>),
@@ -1903,8 +1903,8 @@ impl VVal {
             VVal::Fun(l)  => {
                 if let VVal::Fun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
-            VVal::IVec(_) => unimplemented!(),
-            VVal::FVec(_) => unimplemented!(),
+            VVal::IVec(iv) => match v { VVal::IVec(v) => *v == *iv, _ => false },
+            VVal::FVec(fv) => match v { VVal::FVec(v) => *v == *fv, _ => false },
             VVal::DropFun(l)  => {
                 if let VVal::DropFun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
@@ -2678,8 +2678,8 @@ impl VVal {
             VVal::Map(l)     => l.borrow().len() as f64,
             VVal::Usr(u)     => u.f(),
             VVal::Fun(_)     => 1.0,
-            VVal::FVec(_)    => unimplemented!(),
-            VVal::IVec(_)    => unimplemented!(),
+            VVal::IVec(iv)   => iv.x_raw() as f64,
+            VVal::FVec(fv)   => fv.x_raw(),
             VVal::DropFun(f) => f.v.f(),
             VVal::Ref(l)     => (*l).borrow().f(),
             VVal::CRef(l)    => (*l).borrow().f(),
@@ -2709,8 +2709,8 @@ impl VVal {
             VVal::Map(l)     => l.borrow().len() as i64,
             VVal::Usr(u)     => u.i(),
             VVal::Fun(_)     => 1,
-            VVal::FVec(_)    => unimplemented!(),
-            VVal::IVec(_)    => unimplemented!(),
+            VVal::IVec(iv)   => iv.x_raw(),
+            VVal::FVec(fv)   => fv.x_raw() as i64,
             VVal::DropFun(f) => f.v.i(),
             VVal::Ref(l)     => (*l).borrow().i(),
             VVal::CRef(l)    => (*l).borrow().i(),
@@ -2740,8 +2740,8 @@ impl VVal {
             VVal::Map(l)     => (l.borrow().len() as i64) != 0,
             VVal::Usr(u)     => u.b(),
             VVal::Fun(_)     => true,
-            VVal::FVec(_)    => unimplemented!(),
-            VVal::IVec(_)    => unimplemented!(),
+            VVal::IVec(iv)   => iv.x().b(),
+            VVal::FVec(fv)   => fv.x().b(),
             VVal::DropFun(f) => f.v.b(),
             VVal::Ref(l)     => (*l).borrow().i() != 0,
             VVal::CRef(l)    => (*l).borrow().i() != 0,
@@ -2931,12 +2931,12 @@ impl serde::ser::Serialize for VVal {
             },
             VVal::Usr(_)     => serializer.serialize_str(&self.s()),
             VVal::Fun(_)     => serializer.serialize_str(&self.s()),
+            VVal::FVec(fv)   => fv.serialize(serializer),
+            VVal::IVec(iv)   => iv.serialize(serializer),
             VVal::DropFun(_) => serializer.serialize_str(&self.s()),
             VVal::Ref(_)     => self.deref().serialize(serializer),
             VVal::CRef(_)    => self.deref().serialize(serializer),
             VVal::WWRef(_)   => self.deref().serialize(serializer),
-            VVal::FVec(_)    => unimplemented!(),
-            VVal::IVec(_)    => unimplemented!(),
         }
     }
 }
