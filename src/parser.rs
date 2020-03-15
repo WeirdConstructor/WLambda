@@ -96,7 +96,7 @@ In the following grammar, white space and comments are omitted:
     list          = "[", [ list_expr, { ",", list_expr }, [ "," ] ],"]"
                   ;
     map_expr      = (ident | expr), "=", expr
-                  | "*" expr    (* splices the map result of 'expr'
+                  | "*", expr   (* splices the map result of 'expr'
                                    into the currently parsed map *)
                   ;
     map           = "{", [ map_expr, { ",", map_expr }, [ "," ] ], "}"
