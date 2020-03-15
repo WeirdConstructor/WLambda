@@ -184,7 +184,7 @@ impl<N: NVecNum> NVec<N> {
     }
 
     #[inline]
-    pub fn dimensions(&self) -> NVecDim {
+    pub fn dims(&self) -> NVecDim {
         match self {
             Vec2(_, _)       => NVecDim::Two,
             Vec3(_, _, _)    => NVecDim::Three,
@@ -284,7 +284,7 @@ impl<N: NVecNum> NVec<N> {
 
     #[inline]
     pub fn dot(self, o: NVec<N>) -> N {
-        let max_dims = self.dimensions().max(o.dimensions());
+        let max_dims = self.dims().max(o.dims());
         let (lx, ly, lz, lw) = self.into_zero_tpl();
         let (rx, ry, rz, rw) = o.into_zero_tpl();
 
@@ -308,12 +308,12 @@ impl<N: NVecNum> NVec<N> {
     }
 }
 
-impl<N: NVecNum> From<VVal> for NVec<N> {
+impl<N: NVecNum, W: AsRef<VVal>> From<W> for NVec<N> {
     #[inline]
-    fn from(v: VVal) -> Self {
-        match v {
-            VVal::IVec(i) => N::from_ivec(i),
-            VVal::FVec(f) => N::from_fvec(f),
+    fn from(v: W) -> Self {
+        match v.as_ref() {
+            VVal::IVec(i) => N::from_ivec(i.clone()),
+            VVal::FVec(f) => N::from_fvec(f.clone()),
             VVal::Map(map)  => {
                 let m = map.borrow();
                 let o = N::zero().into_vval();
@@ -340,7 +340,7 @@ impl<N: NVecNum> From<VVal> for NVec<N> {
                 // because lists can't have holes.
                 NVec::from_vval_tpl((x.unwrap_or(&o), y.unwrap_or(&o), z, w)).unwrap()
             },
-            _ => Vec2(N::from_vval(&v), N::zero()),
+            _ => Vec2(N::from_vval(v.as_ref()), N::zero()),
         }
     }
 }
@@ -351,7 +351,7 @@ macro_rules! euler_binop { ( $( $trait:ident | $fn:ident ; )* ) => { $(
 
         #[inline]
         fn $fn(self, o: NVec<N>) -> NVec<N> {
-            let max_dims = self.dimensions().max(o.dimensions());
+            let max_dims = self.dims().max(o.dims());
             let (lx, ly, lz, lw) = self.into_zero_tpl();
             let (rx, ry, rz, rw) = o.into_zero_tpl();
 

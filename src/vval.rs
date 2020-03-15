@@ -2754,6 +2754,10 @@ impl VVal {
         }
     }
 
+    pub fn nvec<N: crate::nvec::NVecNum>(&self) -> NVec<N> {
+        self.into()
+    }
+
     fn s_cy(&self, c: &mut CycleCheck) -> String {
         let br = if let Some((do_continue, backref_str)) = c.backref(self) {
             if !do_continue { return backref_str; }
