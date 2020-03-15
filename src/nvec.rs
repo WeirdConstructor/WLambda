@@ -5,7 +5,7 @@ use std::ops::{Add, Sub, Div, Mul};
 
 
 /// WLambda supports Integer and Float vectors in two, three, and four dimensions.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum NVec<N: NVecNum> {
     Vec2(N, N),
@@ -48,8 +48,10 @@ pub trait NVecNum: Sized + Copy + Clone + PartialEq {
     fn mul(self, o: Self) -> Self;
     fn div(self, o: Self) -> Self;
 
-    fn from_ivec(ivec: NVec<i64>) -> NVec<Self>;
-    fn from_fvec(fvec: NVec<f64>) -> NVec<Self>;
+    fn from_ivec(ivec: NVec<i64>)       -> NVec<Self>;
+    fn into_fvec(s: NVec<Self>)         -> NVec<f64>;
+    fn from_fvec(fvec: NVec<f64>)       -> NVec<Self>;
+    fn from_fvec_round(fvec: NVec<f64>) -> NVec<Self>;
 }
 
 impl NVecNum for i64 {
@@ -79,10 +81,20 @@ impl NVecNum for i64 {
     fn div(self, o: Self)  -> Self { self / o }
 
     #[inline]
-    fn from_ivec(i: NVec<i64>) -> NVec<Self> { i }
+    fn from_ivec(i: NVec<i64>)       -> NVec<Self> { i }
     #[inline]
-    fn from_fvec(f: NVec<f64>) -> NVec<Self> {
-        NVec::from_vval_tpl(f.into_vval_tpl()).unwrap()
+    fn into_fvec(i: NVec<Self>)      -> NVec<f64>  { NVec::from_vval_tpl(i.into_vval_tpl()).unwrap() }
+    #[inline]
+    fn from_fvec(f: NVec<f64>)       -> NVec<Self> { NVec::from_vval_tpl(f.into_vval_tpl()).unwrap() }
+    #[inline]
+    fn from_fvec_round(f: NVec<f64>) -> NVec<Self> {
+        let (x, y, z, w) = f.into_tpl();
+        NVec::from_tpl((
+            x.round() as i64,
+            y.round() as i64,
+            z.map(|z| z.round() as i64),
+            w.map(|w| w.round() as i64)
+        )).unwrap()
     }
 }
 
@@ -113,11 +125,13 @@ impl NVecNum for f64 {
     fn div(self, o: Self)  -> Self { self / o }
 
     #[inline]
-    fn from_ivec(i: NVec<i64>) -> NVec<Self> {
-        NVec::from_vval_tpl(i.into_vval_tpl()).unwrap()
-    }
+    fn from_ivec(i: NVec<i64>)       -> NVec<Self> { NVec::from_vval_tpl(i.into_vval_tpl()).unwrap() }
     #[inline]
-    fn from_fvec(f: NVec<f64>) -> NVec<Self> { f }
+    fn into_fvec(f: NVec<Self>)      -> NVec<f64>  { f }
+    #[inline]
+    fn from_fvec(f: NVec<f64>)       -> NVec<Self> { f }
+    #[inline]
+    fn from_fvec_round(f: NVec<f64>) -> NVec<Self> { f }
 }
 
 impl AsRef<VVal> for VVal {
@@ -247,7 +261,7 @@ impl<N: NVecNum> NVec<N> {
 
     #[inline]
     pub fn s(&self) -> String {
-        match self.clone().into_vval_tpl() {
+        match self.into_vval_tpl() {
             (x, y, None,    None)    => format!("${}({},{})", N::sign(), x.s(), y.s()),
             (x, y, Some(z), None)    => format!("${}({},{},{})", N::sign(), x.s(), y.s(), z.s()),
             (x, y, Some(z), Some(w)) => format!("${}({},{},{},{})", N::sign(), x.s(), y.s(), z.s(), w.s()),
@@ -338,6 +352,39 @@ impl<N: NVecNum> NVec<N> {
             a.1.mul(b.2).sub(a.2.mul(b.1)),
             a.2.mul(b.0).sub(a.0.mul(b.2)),
             a.0.mul(b.1).sub(a.1.mul(b.0)),
+        )
+    }
+
+    #[inline]
+    pub fn lerp(self, o: NVec<N>, t: f64) -> Self {
+        N::from_fvec_round(
+            (N::into_fvec(self) * (1.0 - t))
+            + (N::into_fvec(o) * t)
+        )
+    }
+
+    #[inline]
+    /// The resulting NVec will almost always have a length of 1,
+    /// except for in cases where `o` and `self` are collinear opposites.
+    /// To work around this, the resulting vector may be normalized.
+    /// 
+    /// # Panics
+    /// Panics if input vectors aren't unit vectors.
+    pub fn slerp(self, o: NVec<N>, t: f64) -> Self {
+        let (p0, p1) = {
+            let (p0, p1) = (N::into_fvec(self), N::into_fvec(o));
+            // work around the edge case wherein p0 and p1 are collinear opposites
+            if (p0 + p1).mag2() == 0.0 {
+                ((p0 + Vec2(1e-5, 1e-5)).norm(), p1)
+            } else {
+                (p0, p1)
+            }
+        };
+        let omega = p0.dot(p1).acos();
+        let sin_omega = omega.sin();
+        N::from_fvec_round(
+            (p0 * (((1.0 - t) * omega).sin() / sin_omega))
+            + (p1 * ((t * omega).sin() / sin_omega))
         )
     }
 }

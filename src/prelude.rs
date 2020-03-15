@@ -5251,6 +5251,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(2), Some(2), false);
 
+
     func!(st, "v:dims",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Int(match env.arg(0) {
@@ -5298,6 +5299,23 @@ pub fn std_symbol_table() -> SymbolTable {
                 v => VVal::IVec(v.nvec::<i64>().cross(env.arg(1).nvec())),
             })
         }, Some(2), Some(2), false);
+
+    func!(st, "v:lerp",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::FVec(fv.lerp(env.arg(1).nvec(), env.arg(2).f())),
+                v => VVal::IVec(v.nvec::<i64>().lerp(env.arg(1).nvec(), env.arg(2).f())),
+            })
+        }, Some(3), Some(3), false);
+
+    func!(st, "v:slerp",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::FVec(fv.slerp(env.arg(1).nvec(), env.arg(2).f())),
+                v => VVal::IVec(v.nvec::<i64>().slerp(env.arg(1).nvec(), env.arg(2).f())),
+            })
+        }, Some(3), Some(3), false);
+
 
     func!(st, "sort",
         |env: &mut Env, argc: usize| {
