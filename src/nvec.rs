@@ -256,6 +256,40 @@ impl<N: NVecNum> NVec<N> {
     }
 
     #[inline]
+    /// Converts this vector into one with three dimensions, discarding the unnecessary values.
+    pub fn vec2(self) -> Self {
+        match self {
+            Vec2(_, _)       => self,
+            Vec3(x, y, _)    => Vec2(x, y),
+            Vec4(x, y, _, _) => Vec2(x, y),
+        }
+    }
+
+    #[inline]
+    /// Converts this vector into one with three dimensions, discarding the unnecessary values
+    /// and filling in the missing values with 0s if necessary.
+    pub fn vec3(self) -> Self {
+        match self {
+            Vec2(x, y)       => Vec3(x, y, N::zero()),
+            Vec3(_, _, _)    => self,
+            Vec4(x, y, z, _) => Vec3(x, y, z),
+        }
+    }
+
+    /// Converts this vector into one with four dimensions,
+    /// filling in the missing values with 0s if necessary.
+    #[inline]
+    pub fn vec4(self) -> Self {
+        let o = N::zero();
+        match self {
+            Vec2(x, y)       => Vec4(x, y, o, o),
+            Vec3(x, y, z)    => Vec4(x, y, z, o),
+            Vec4(_, _, _, _) => self,
+        }
+    }
+
+
+    #[inline]
     pub fn mag2(&self) -> f64 {
         match self {
             Vec2(x, y)       =>

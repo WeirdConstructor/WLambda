@@ -3836,6 +3836,31 @@ pub fn core_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| Ok(if env.arg(0).b() { env.arg(1) } else { env.arg(2) }),
         Some(3), Some(3), false);
 
+    func!(st, "fvec",
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec())),
+        Some(1), Some(1), false);
+    func!(st, "ivec2",
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec2())),
+        Some(1), Some(1), false);
+    func!(st, "ivec3",
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec3())),
+        Some(1), Some(1), false);
+    func!(st, "ivec4",
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec4())),
+        Some(1), Some(1), false);
+    func!(st, "fvec",
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec())),
+        Some(1), Some(1), false);
+    func!(st, "fvec2",
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec2())),
+        Some(1), Some(1), false);
+    func!(st, "fvec3",
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec3())),
+        Some(1), Some(1), false);
+    func!(st, "fvec4",
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec4())),
+        Some(1), Some(1), false);
+
     func!(st, "bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).b())) },
         Some(1), Some(1), true);
