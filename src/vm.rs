@@ -819,6 +819,74 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) ->
     })
 }
 
+fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, CompileError> {
+    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    ce.borrow_mut().push_block_env();
+    let exprs : Vec<Prog> = ast.map_skip(|e| vm_compile(e, ce), skip_cnt)?;
+
+    let mut p = Prog::new().debug(spos);
+    for e in exprs.into_iter() {
+        p.pop_result();
+        p.append(e);
+    }
+    let block_env_var_count = ce.borrow_mut().pop_block_env();
+    p.unshift_op(Op::ResvLocals(block_env_var_count as u32));
+    p.push_return(block_env_var_count);
+    Ok(p.result())
+}
+
+fn vm_compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<Prog, CompileError>
+{
+    match ast {
+        VVal::Lst(l) => {
+            let syn  = ast.at(0).unwrap_or(VVal::Nul);
+            let spos = syn.get_syn_pos();
+            let syn  = syn.get_syn();
+
+            match syn {
+                Syntax::Func => {
+                    let label          = ast.at(1).unwrap();
+                    let explicit_arity = ast.at(2).unwrap();
+
+                    if !label.is_none() {
+                        return Err(
+                            ast.compile_err(
+                                format!("direct blocks don't support labels: {}",
+                                        ast.s())));
+                    }
+
+                    if !explicit_arity.is_none() {
+                        return Err(
+                            ast.compile_err(
+                                format!("direct blocks don't support arity: {}",
+                                        ast.s())));
+                    }
+
+                    vm_compile_block(ast, 3, ce)
+                },
+                _ => vm_compile(ast, ce),
+            }
+        },
+        _ => vm_compile(ast, ce),
+    }
+}
+
+fn vm_compile_binop(ast: &VVal, op: Op, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<Prog, CompileError>
+{
+    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
+    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
+    let mut prog = Prog::new().debug(spos);
+    prog.append(left);
+    prog.append(right);
+    Ok(prog.op(op).consume(2).result())
+}
 
 fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, CompileError> {
     match ast {
@@ -828,106 +896,23 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
             let syn  = syn.get_syn();
 
             match syn {
-                Syntax::Block => {
-                    ce.borrow_mut().push_block_env();
-                    let exprs : Vec<Prog> = ast.map_skip(|e| vm_compile(e, ce), 1)?;
-
-                    let mut p = Prog::new().debug(spos);
-                    for e in exprs.into_iter() {
-                        p.pop_result();
-                        p.append(e);
-                    }
-                    let block_env_var_count = ce.borrow_mut().pop_block_env();
-                    p.unshift_op(Op::ResvLocals(block_env_var_count as u32));
-                    p.push_return(block_env_var_count);
-                    Ok(p.result())
-                },
+                Syntax::Block      => vm_compile_block(ast, 1, ce),
                 Syntax::Assign     => vm_compile_assign(ast, ce, false).map(|p| p.debug(spos)),
-                Syntax::AssignRef  => vm_compile_assign(ast, ce, true).map(|p| p.debug(spos)),
-                Syntax::Var        => vm_compile_var(ast, ce, false).map(|p| p.debug(spos)),
-                Syntax::CaptureRef => vm_compile_var(ast, ce, true).map(|p| p.debug(spos)),
-                Syntax::Def        => vm_compile_def(ast, ce, false).map(|p| p.debug(spos)),
-                Syntax::DefGlobRef => vm_compile_def(ast, ce, true).map(|p| p.debug(spos)),
-                Syntax::BinOpAdd => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Add).consume(2).result())
-                },
-                Syntax::BinOpSub => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Sub).consume(2).result())
-                },
-                Syntax::BinOpDiv => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Div).consume(2).result())
-                },
-                Syntax::BinOpMul => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Mul).consume(2).result())
-                },
-                Syntax::BinOpMod => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Mod).consume(2).result())
-                },
-                Syntax::BinOpGe => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Ge).consume(2).result())
-                },
-                Syntax::BinOpGt => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Gt).consume(2).result())
-                },
-                Syntax::BinOpLe => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Le).consume(2).result())
-                },
-                Syntax::BinOpLt => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Lt).consume(2).result())
-                },
-                Syntax::BinOpEq => {
-                    let left  = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    let right = vm_compile(&ast.at(2).unwrap(), ce)?;
-                    let mut prog = Prog::new().debug(spos);
-                    prog.append(left);
-                    prog.append(right);
-                    Ok(prog.op(Op::Eq).consume(2).result())
-                },
+                Syntax::AssignRef  => vm_compile_assign(ast, ce, true) .map(|p| p.debug(spos)),
+                Syntax::Var        => vm_compile_var(ast, ce, false)   .map(|p| p.debug(spos)),
+                Syntax::CaptureRef => vm_compile_var(ast, ce, true)    .map(|p| p.debug(spos)),
+                Syntax::Def        => vm_compile_def(ast, ce, false)   .map(|p| p.debug(spos)),
+                Syntax::DefGlobRef => vm_compile_def(ast, ce, true)    .map(|p| p.debug(spos)),
+                Syntax::BinOpAdd   => vm_compile_binop(ast, Op::Add, ce),
+                Syntax::BinOpSub   => vm_compile_binop(ast, Op::Sub, ce),
+                Syntax::BinOpDiv   => vm_compile_binop(ast, Op::Div, ce),
+                Syntax::BinOpMod   => vm_compile_binop(ast, Op::Mod, ce),
+                Syntax::BinOpMul   => vm_compile_binop(ast, Op::Mul, ce),
+                Syntax::BinOpGe    => vm_compile_binop(ast, Op::Ge, ce),
+                Syntax::BinOpGt    => vm_compile_binop(ast, Op::Gt, ce),
+                Syntax::BinOpLe    => vm_compile_binop(ast, Op::Le, ce),
+                Syntax::BinOpLt    => vm_compile_binop(ast, Op::Lt, ce),
+                Syntax::BinOpEq    => vm_compile_binop(ast, Op::Eq, ce),
                 Syntax::Func => {
                     let last_def_varname = ce.borrow().recent_var.clone();
                     let mut fun_spos = spos;
@@ -1029,7 +1014,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                         ce.borrow_mut().quote_func = true;
                         let mut count = vm_compile(&ast.at(2).unwrap_or(VVal::Nul), ce)?;
                         ce.borrow_mut().quote_func = true;
-                        let mut body = vm_compile(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
+                        let mut body = vm_compile_direct_block(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
                         body.pop_result();
                         let body_cnt = body.op_count();
                         body.push_op(Op::Jmp(-(body_cnt as i32 + 2)));
@@ -1271,8 +1256,8 @@ mod tests {
 //        } }"), "");
         assert_eq!(gen(r"
             std:measure_time :ms {||
-                !x = 0;
-                for_n 100 { .x = x + 1};
+                !x = 2;
+                for_n 100 { !y = 1; .x = x + y };
                 x
             };
         "), "");
