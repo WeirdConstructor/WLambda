@@ -1034,18 +1034,18 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                                 panic!("Local variable for counting loop not local!");
                             };
 
-                        ce.borrow_mut().quote_func = true;
                         let mut count = vm_compile(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
-                        ce.borrow_mut().quote_func = true;
+
                         let mut body = vm_compile_direct_block(&ast.at(4).unwrap_or(VVal::Nul), ce)?;
                         let body_cnt = body.op_count();
                         body.push_op(Op::Jmp(-(body_cnt as i32 + 2)));
+                        body.pop_result();
 
                         count.push_op(Op::PushI(0));
                         count.push_op(Op::SetLocal(idx_pos as u32));
                         count.push_op(Op::NextI(idx_pos as u16, body.op_count() as u16));
                         count.append(body);
-                        return Ok(count.result());
+                        return Ok(count);
                     }
 
                     let mut call_args : Vec<Prog> =

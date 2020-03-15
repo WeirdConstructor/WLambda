@@ -776,14 +776,14 @@ pub enum ArityParam {
 
 #[derive(Debug, Clone)]
 struct BlockEnv {
-    local_map_stack: std::vec::Vec<Box<std::collections::HashMap<String, VarPos>>>,
+    local_map_stack: std::vec::Vec<(usize, Box<std::collections::HashMap<String, VarPos>>)>,
     locals:    std::vec::Vec<(String, CompileLocal)>,
 }
 
 impl BlockEnv {
     fn new() -> Self {
         Self {
-            local_map_stack: vec![Box::new(std::collections::HashMap::new())],
+            local_map_stack: vec![(0, Box::new(std::collections::HashMap::new()))],
             locals:          vec![],
         }
     }
@@ -806,18 +806,15 @@ impl BlockEnv {
     }
 
     fn push_env(&mut self) {
-        self.local_map_stack.push(Box::new(std::collections::HashMap::new()));
+        self.local_map_stack.push((0, Box::new(std::collections::HashMap::new())));
     }
 
     fn pop_env(&mut self) -> usize {
         let block_env_vars = self.local_map_stack.pop().unwrap();
 
-        let mut local_count = 0;
-        for (_, v) in block_env_vars.iter() {
-            if let VarPos::Local(_) = v {
-                self.locals.pop();
-                local_count += 1;
-            }
+        let mut local_count = block_env_vars.0;
+        for _ in 0..local_count {
+            self.locals.pop();
         }
 
         local_count
@@ -825,30 +822,33 @@ impl BlockEnv {
 
     fn set_upvalue(&mut self, var: &str, idx: usize) -> VarPos {
         let last_idx = self.local_map_stack.len() - 1;
-        if let Some(_) = self.local_map_stack[last_idx].get(var) {
-            panic!("Overriding local variable with upvalue?!");
-        }
-        self.local_map_stack[last_idx]
+        self.local_map_stack[last_idx].1
             .insert(String::from(var),
                     VarPos::UpValue(idx));
         VarPos::UpValue(idx)
+    }
+
+    fn reserve_register(&mut self) -> usize {
+        let next_index = self.locals.len();
+        self.locals.push((String::from(""), CompileLocal { }));
+        let last_idx = self.local_map_stack.len() - 1;
+        self.local_map_stack[last_idx].0 += 1;
+        next_index
     }
 
     fn new_local(&mut self, var: &str) -> VarPos {
         let next_index = self.locals.len();
         self.locals.push((String::from(var), CompileLocal { }));
         let last_idx = self.local_map_stack.len() - 1;
-        if let Some(_) = self.local_map_stack[last_idx].get(var) {
-            panic!("Overriding local variables will break pop_env!");
-        }
-        self.local_map_stack[last_idx]
+        self.local_map_stack[last_idx].1
             .insert(String::from(var),
                     VarPos::Local(next_index));
+        self.local_map_stack[last_idx].0 += 1;
         VarPos::Local(next_index)
     }
 
     fn get(&self, var: &str) -> VarPos {
-        for map in self.local_map_stack.iter().rev() {
+        for (_locals, map) in self.local_map_stack.iter().rev() {
             if let Some(pos) = map.get(var) {
                 return pos.clone();
             }
@@ -968,6 +968,10 @@ impl CompileEnv {
 
     pub fn push_block_env(&mut self) {
         self.block_env.push_env();
+    }
+
+    pub fn reserve_register(&mut self) -> usize {
+        self.block_env.reserve_register()
     }
 
     pub fn pop_block_env(&mut self) -> usize {
