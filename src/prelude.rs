@@ -3484,6 +3484,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 use crate::compiler::*;
 use crate::vval::*;
 use crate::util;
+use crate::nvec::NVec;
 use std::rc::Rc;
 use crate::threads::*;
 
@@ -5224,6 +5225,72 @@ pub fn std_symbol_table() -> SymbolTable {
                 std::cmp::Ordering::Less    => Ok(VVal::Int(-1)),
                 std::cmp::Ordering::Equal   => Ok(VVal::Int(0)),
             }
+        }, Some(2), Some(2), false);
+
+    func!(st, "v:dims",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Int(match env.arg(0) {
+                VVal::FVec(fv) => fv.dimensions(),
+                _ => {
+                    let iv: NVec<i64> = env.arg(0).into();
+                    iv.dimensions()
+                }
+            } as i64))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:mag2",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Flt(match env.arg(0) {
+                VVal::FVec(fv) => fv.mag2(),
+                _ => {
+                    let iv: NVec<i64> = env.arg(0).into();
+                    iv.mag2()
+                }
+            }))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:mag",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Flt(match env.arg(0) {
+                VVal::FVec(fv) => fv.mag(),
+                _ => {
+                    let iv: NVec<i64> = env.arg(0).into();
+                    iv.mag()
+                }
+            }))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:norm",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::FVec(fv.norm()),
+                _ => {
+                    let iv: NVec<i64> = env.arg(0).into();
+                    VVal::IVec(iv.norm())
+                }
+            })
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:dot",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::Flt(fv.dot(env.arg(1).into())),
+                _ => {
+                    let iv: NVec<i64> = env.arg(0).into();
+                    VVal::Int(iv.dot(env.arg(1).into()))
+                }
+            })
+        }, Some(2), Some(2), false);
+
+    func!(st, "v:cross",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::FVec(fv.cross(env.arg(1).into())),
+                _ => {
+                    let iv: NVec<i64> = env.arg(0).into();
+                    VVal::IVec(iv.cross(env.arg(1).into()))
+                }
+            })
         }, Some(2), Some(2), false);
 
     func!(st, "sort",

@@ -487,7 +487,7 @@ fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
         },
         Some(t) => Err(ps.err(ParseErrorKind::UnexpectedToken(
             t,
-            "To make a numerical vector, Parenthesis must follow $i and $f",
+            "To make a numerical vector, parenthesis must follow $i and $f",
         ))),
         None => Err(ps.err(ParseErrorKind::EOF("numerical vector body"))),
     }
