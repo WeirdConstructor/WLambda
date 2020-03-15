@@ -4825,6 +4825,8 @@ mod tests {
         assert_eq!(s_eval("$i(2, 0) + ${y=2,x=1,z=0}"), "$i(3,2,0)");
         assert_eq!(s_eval("$f(2, 0) == ${x=2,y=0}"), "$false");
         assert_eq!(s_eval("$i(0, 0) == ${}"), "$false");
+        assert_eq!(s_eval("$i(0, 0) == ${}"), "$false");
+        assert_eq!(s_eval("$i(0, 0) == $f(0, 0)"), "$false");
     }
     
     #[test]
