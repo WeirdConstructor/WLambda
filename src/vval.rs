@@ -446,17 +446,24 @@ impl Env {
     }
 
     #[inline]
-    pub fn next_i(&mut self, inc: i16) -> bool {
-        if let VVal::Int(i) = &mut self.args[self.sp - 1] {
-            if inc > 0 {
-                if *i == 0 { return false; }
-                *i += 1;
-            } else {
-                if *i == 0 { return false; }
-                *i -= 1;
-            }
+    pub fn stk_i(&self, offs: usize) -> i64 {
+        if let VVal::Int(i) = &self.args[(self.sp - 1) +  offs] {
+            *i
+        } else {
+            0
         }
-        return true;
+    }
+
+    #[inline]
+    pub fn inc_local(&mut self, idx: usize, inc: i16) -> i64 {
+        if let VVal::Int(i) = &mut self.args[self.bp + idx] {
+            if inc > 0 { *i += 1; }
+            else { *i -= 1; }
+
+            *i
+        } else {
+            0
+        }
     }
 
     #[inline]

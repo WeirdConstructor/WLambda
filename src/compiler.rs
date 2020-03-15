@@ -825,6 +825,9 @@ impl BlockEnv {
 
     fn set_upvalue(&mut self, var: &str, idx: usize) -> VarPos {
         let last_idx = self.local_map_stack.len() - 1;
+        if let Some(_) = self.local_map_stack[last_idx].get(var) {
+            panic!("Overriding local variable with upvalue?!");
+        }
         self.local_map_stack[last_idx]
             .insert(String::from(var),
                     VarPos::UpValue(idx));
@@ -835,6 +838,9 @@ impl BlockEnv {
         let next_index = self.locals.len();
         self.locals.push((String::from(var), CompileLocal { }));
         let last_idx = self.local_map_stack.len() - 1;
+        if let Some(_) = self.local_map_stack[last_idx].get(var) {
+            panic!("Overriding local variables will break pop_env!");
+        }
         self.local_map_stack[last_idx]
             .insert(String::from(var),
                     VarPos::Local(next_index));

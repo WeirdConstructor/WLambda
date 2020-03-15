@@ -47,9 +47,12 @@ impl Prog {
                 | Op::MapSplice
                 | Op::NewErr
                 | Op::Ret(_)
+                | Op::End
                 | Op::Call(_)
                 | Op::NextI(_, _)
                 | Op::Jmp(_)
+                | Op::PushI(_)
+                | Op::PushNul
                 | Op::Pop
                 | Op::Add
                 | Op::Sub
@@ -135,10 +138,10 @@ impl Prog {
 
     fn push_return(&mut self, local_count: usize) -> &mut Self {
         if self.results <= 0 {
-            let idx = self.push_data(VVal::Nul);
-            self.push_op(Op::Push(idx as u32));
+            self.push_op(Op::PushNul);
         }
         self.push_op(Op::Ret(local_count as u32));
+        self.results = 0;
         self
     }
 
@@ -161,9 +164,12 @@ impl Prog {
                 | Op::MapSplice
                 | Op::NewErr
                 | Op::Ret(_)
+                | Op::End
                 | Op::Call(_)
                 | Op::NextI(_, _)
                 | Op::Jmp(_)
+                | Op::PushI(_)
+                | Op::PushNul
                 | Op::Pop
                 | Op::Add
                 | Op::Sub
@@ -208,6 +214,8 @@ impl Prog {
 enum Op {
     Call(u32),
     Push(u32),
+    PushI(i32),
+    PushNul,
     PushRef(u32),
     ResvLocals(u32),
     SetGlobal(u32),
@@ -219,7 +227,7 @@ enum Op {
     SetUp(u32),
     GetUp(u32),
     GetUpRef(u32),
-    NextI(i16,u16),
+    NextI(u16,u16),
     Jmp(i32),
     Arg(u32),
     ArgRef(u32),
@@ -235,6 +243,7 @@ enum Op {
     NewErr,
     NewClos(u32),
     Ret(u32),
+    End,
     Pop,
     Add,
     Sub,
@@ -258,8 +267,10 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         let syn =
             if let Some(sp) = &prog.debug[pc] { format!("{}", sp) }
             else { "".to_string() };
-        println!("OP: {:<15}      | sp: {:>3}, bp: {:>3} | {}", format!("{:?}", op), env.sp, env.bp, syn);
+        println!("OP[{:>3}]: {:<15}      | sp: {:>3}, bp: {:>3} | {}", pc, format!("{:?}", op), env.sp, env.bp, syn);
         match op {
+            Op::PushNul    => { env.push(VVal::Nul); },
+            Op::PushI(int) => { env.push(VVal::Int(int as i64)); },
             Op::Push(data_idx) => {
                 env.push(prog.data[data_idx as usize].clone());
             },
@@ -284,8 +295,9 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Jmp(jmp_offs) => {
                 pc = (pc as i32 + jmp_offs) as usize;
             },
-            Op::NextI(inc, jmp_offs) => {
-                if !env.next_i(inc) {
+            Op::NextI(idx, jmp_offs) => {
+                let counter = env.inc_local(idx as usize, 1);
+                if counter >= env.stk_i(0) {
                     pc = (pc as i32 + jmp_offs as i32) as usize;
                 }
             },
@@ -293,8 +305,8 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 let value = env.pop();
                 env.popn(count as usize);
                 ret = value;
-                break;
             },
+            Op::End => { break; },
             Op::SetLocal(idx)          => {
                 let v = env.pop();
                 env.set_consume(idx as usize, v);
@@ -896,7 +908,10 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
             let syn  = syn.get_syn();
 
             match syn {
-                Syntax::Block      => vm_compile_block(ast, 1, ce),
+                Syntax::Block      => {
+                    let prog = vm_compile_block(ast, 1, ce)?;
+                    Ok(prog.op(Op::End))
+                },
                 Syntax::Assign     => vm_compile_assign(ast, ce, false).map(|p| p.debug(spos)),
                 Syntax::AssignRef  => vm_compile_assign(ast, ce, true) .map(|p| p.debug(spos)),
                 Syntax::Var        => vm_compile_var(ast, ce, false)   .map(|p| p.debug(spos)),
@@ -932,6 +947,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                         func_prog.append(s);
                     }
                     func_prog.push_return(0);
+                    func_prog.push_op(Op::End);
                     let func_prog = func_prog.result();
 
                     let spos_inner = fun_spos.clone();
@@ -1011,14 +1027,23 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
 //                            return Err(ast.compile_err(
 //                                format!("if can only have 2 arguments, got more: {}", ast.s())));
 //                        }
+                        let idx_pos = ce.borrow_mut().def(&ast.at(2).unwrap_or(VVal::Nul).s_raw(), false);
+                        let idx_pos =
+                            if let VarPos::Local(i) = idx_pos { i }
+                            else {
+                                panic!("Local variable for counting loop not local!");
+                            };
+
                         ce.borrow_mut().quote_func = true;
-                        let mut count = vm_compile(&ast.at(2).unwrap_or(VVal::Nul), ce)?;
+                        let mut count = vm_compile(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
                         ce.borrow_mut().quote_func = true;
-                        let mut body = vm_compile_direct_block(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
-                        body.pop_result();
+                        let mut body = vm_compile_direct_block(&ast.at(4).unwrap_or(VVal::Nul), ce)?;
                         let body_cnt = body.op_count();
                         body.push_op(Op::Jmp(-(body_cnt as i32 + 2)));
-                        count.push_op(Op::NextI(-1, body.op_count() as u16));
+
+                        count.push_op(Op::PushI(0));
+                        count.push_op(Op::SetLocal(idx_pos as u32));
+                        count.push_op(Op::NextI(idx_pos as u16, body.op_count() as u16));
                         count.append(body);
                         return Ok(count.result());
                     }
@@ -1257,7 +1282,7 @@ mod tests {
         assert_eq!(gen(r"
             std:measure_time :ms {||
                 !x = 2;
-                for_n 100 { !y = 1; .x = x + y };
+                for_n i 100 { !y = 1; .x = x + y };
                 x
             };
         "), "");
