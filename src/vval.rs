@@ -2077,6 +2077,24 @@ impl VVal {
             VVal::Pair(b) => {
                 Some(if index % 2 == 0 { b.0.clone() } else { b.1.clone() })
             },
+            VVal::IVec(b) => {
+                Some(match index {
+                    0 => b.x(),
+                    1 => b.y(),
+                    2 => b.z().unwrap_or(VVal::Nul),
+                    3 => b.w().unwrap_or(VVal::Nul),
+                    _ => VVal::Nul
+                })
+            },
+            VVal::FVec(b) => {
+                Some(match index {
+                    0 => b.x(),
+                    1 => b.y(),
+                    2 => b.z().unwrap_or(VVal::Nul),
+                    3 => b.w().unwrap_or(VVal::Nul),
+                    _ => VVal::Nul
+                })
+            },
             VVal::Lst(b) => {
                 if b.borrow().len() > index {
                     Some(b.borrow()[index].clone())
@@ -2137,20 +2155,30 @@ impl VVal {
             VVal::CRef(_)  => self.deref().get_key(key),
             VVal::WWRef(_) => self.deref().get_key(key),
             VVal::Map(m) => m.borrow().get(key).cloned(),
+            VVal::IVec(b) => {
+                Some(match key {
+                    "first"  | "x" => b.x(),
+                    "second" | "y" => b.y(),
+                    "third"  | "z" => b.z().unwrap_or(VVal::Nul),
+                    "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
+                    _ => VVal::Nul
+                })
+            },
+            VVal::FVec(b) => {
+                Some(match key {
+                    "first"  | "x" => b.x(),
+                    "second" | "y" => b.y(),
+                    "third"  | "z" => b.z().unwrap_or(VVal::Nul),
+                    "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
+                    _ => VVal::Nul
+                })
+            },
             VVal::Pair(_) => {
-                let idx =
-                    match key {
-                        "0"         => 0,
-                        "1"         => 1,
-                        "car"       => 0,
-                        "cdr"       => 1,
-                        "head"      => 0,
-                        "tail"      => 1,
-                        "first"     => 0,
-                        "second"    => 1,
-                        _ => usize::from_str_radix(key, 10).unwrap_or(0),
-                    };
-                self.at(idx)
+                self.at(match key {
+                    "0" | "car" | "head" | "first"  => 0,
+                    "1" | "cdr" | "tail" | "second" => 1,
+                    _ => usize::from_str_radix(key, 10).unwrap_or(0),
+                })
             },
             VVal::Lst(l) => {
                 let idx = usize::from_str_radix(key, 10).unwrap_or(0);

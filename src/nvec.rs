@@ -363,6 +363,17 @@ impl<N: NVecNum> NVec<N> {
         )
     }
 
+    /// Turns the first two components of this vector into an angle in radians.
+    pub fn vec2rad(self) -> f64 {
+        N::into_flt(self.y_raw()).atan2(N::into_flt(self.x_raw()))
+    }
+
+    /// Produces a Vec2 based on the radians provided to this function as a float.
+    pub fn rad2vec(f: f64) -> Self {
+        let (y, x) = f.sin_cos();
+        N::from_fvec(Vec2(x, y))
+    }
+
     #[inline]
     /// The resulting NVec will almost always have a length of 1,
     /// except for in cases where `o` and `self` are collinear opposites.
