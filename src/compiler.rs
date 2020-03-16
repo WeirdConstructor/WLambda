@@ -1763,7 +1763,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::Assign      => { compile_assign(ast, ce, false) },
                 Syntax::AssignRef   => { compile_assign(ast, ce, true)  },
                 Syntax::IVec        => {
-                    use crate::nvec::NVector;
+                    use crate::nvec::NVec;
                     let lc = l
                         .borrow()
                         .iter()
@@ -1774,9 +1774,34 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let mut c = lc.iter().map(|f| f(e).map(|v| v.i()));
                         let _ = c.next();
                         Ok(VVal::IVec(match (c.next(), c.next(), c.next(), c.next()) {
-                            (Some(x), Some(y), None   , None)    => NVector::Vec2(x?, y?),
-                            (Some(x), Some(y), Some(z), None)    => NVector::Vec3(x?, y?, z?),
-                            (Some(x), Some(y), Some(z), Some(w)) => NVector::Vec4(x?, y?, z?, w?),
+                            (Some(x), Some(y), None   , None)    => NVec::Vec2(x?, y?),
+                            (Some(x), Some(y), Some(z), None)    => NVec::Vec3(x?, y?, z?),
+                            (Some(x), Some(y), Some(z), Some(w)) => NVec::Vec4(x?, y?, z?, w?),
+                            _ => return Err(
+                                StackAction::panic_str(
+                                    "Cannot create an IVector without between 2 and 4 (inclusive) integers."
+                                        .to_string(),
+                                    Some(spos.clone()),
+                                ),
+                            )
+                        }))
+                    }))
+                },
+                Syntax::FVec        => {
+                    use crate::nvec::NVec;
+                    let lc = l
+                        .borrow()
+                        .iter()
+                        .map(|v| compile(v, ce))
+                        .collect::<Result<Vec<_>, CompileError>>()?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let mut c = lc.iter().map(|f| f(e).map(|v| v.f()));
+                        let _ = c.next();
+                        Ok(VVal::FVec(match (c.next(), c.next(), c.next(), c.next()) {
+                            (Some(x), Some(y), None   , None)    => NVec::Vec2(x?, y?),
+                            (Some(x), Some(y), Some(z), None)    => NVec::Vec3(x?, y?, z?),
+                            (Some(x), Some(y), Some(z), Some(w)) => NVec::Vec4(x?, y?, z?, w?),
                             _ => return Err(
                                 StackAction::panic_str(
                                     "Cannot create an IVector without between 2 and 4 (inclusive) integers."
@@ -2302,10 +2327,10 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 
                     Ok(Box::new(move |e: &mut Env| {
                         Ok(match (left(e)?, right(e)?) {
-                            (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
-                            (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
-                            (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
-                            (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
+                            (VVal::IVec(ln), re) => VVal::IVec(ln + re.nvec()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln + re.nvec()),
+                            (VVal::Flt(f), re)   => VVal::Flt(f + re.f()),
+                            (le, re)             => VVal::Int(le.i().wrapping_add(re.i()))
                         })
                     }))
                 },
@@ -2314,13 +2339,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let right = compile(&ast.at(2).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let le = left(e)?;
-                        let re = right(e)?;
-                        if let VVal::Flt(f) = le {
-                            Ok(VVal::Flt(f - re.f()))
-                        } else {
-                            Ok(VVal::Int(le.i().wrapping_sub(re.i())))
-                        }
+                        Ok(match (left(e)?, right(e)?) {
+                            (VVal::IVec(ln), re) => VVal::IVec(ln - re.nvec()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln - re.nvec()),
+                            (VVal::Flt(f), re)   => VVal::Flt(f - re.f()),
+                            (le, re)             => VVal::Int(le.i().wrapping_sub(re.i()))
+                        })
                     }))
                 },
                 Syntax::BinOpMul => {
@@ -2328,13 +2352,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let right = compile(&ast.at(2).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let le = left(e)?;
-                        let re = right(e)?;
-                        if let VVal::Flt(f) = le {
-                            Ok(VVal::Flt(f * re.f()))
-                        } else {
-                            Ok(VVal::Int(le.i().wrapping_mul(re.i())))
-                        }
+                        Ok(match (left(e)?, right(e)?) {
+                            (VVal::IVec(ln), re) => VVal::IVec(ln * re.i()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln * re.f()),
+                            (VVal::Flt(f),   re) => VVal::Flt(f   * re.f()),
+                            (le, re)             => VVal::Int(le.i().wrapping_mul(re.i()))
+                        })
                     }))
                 },
                 Syntax::BinOpDiv => {
@@ -2342,19 +2365,16 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let right = compile(&ast.at(2).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let le = left(e)?;
-                        let re = right(e)?;
-                        if let VVal::Flt(f) = le {
-                            Ok(VVal::Flt(f / re.f()))
-
-                        } else if re.i() == 0 {
-                            Err(StackAction::panic_str(
-                                format!("Division by 0: {}/{}", le.i(), re.i()),
-                                Some(spos.clone())))
-
-                        } else {
-                            Ok(VVal::Int(le.i().wrapping_div(re.i())))
-                        }
+                        Ok(match (left(e)?, right(e)?) {
+                            (VVal::IVec(ln), re) => VVal::IVec(ln / re.i()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln / re.f()),
+                            (VVal::Flt(f),   re) => VVal::Flt(f   / re.f()),
+                            (le, VVal::Int(0))   => return Err(StackAction::panic_str(
+                                    format!("Division by 0: {}/{}", le.i(), 0),
+                                    Some(spos.clone())
+                                )),
+                            (le, re)             => VVal::Int(le.i().wrapping_div(re.i()))
+                        })
                     }))
                 },
                 Syntax::BinOpMod => {
@@ -4796,7 +4816,17 @@ mod tests {
 
     #[test]
     fn check_nvec() {
-        assert_eq!(s_eval("$i(1, 2)"), "$i(1,2)")
+        assert_eq!(s_eval("$i(1, 2)"), "$i(1,2)");
+        assert_eq!(s_eval("$i(1, 2) * 2"), "$i(2,4)");
+        assert_eq!(s_eval("$f(1, 2) / 2"), "$f(0.5,1)");
+        assert_eq!(s_eval("$f(2, 0) - $f(2, 0)"), "$f(0,0)");
+        assert_eq!(s_eval("$f(2, 0) + $f(0, 2)"), "$f(2,2)");
+        assert_eq!(s_eval("$f(2, 0) + $f(2, 2)"), "$f(4,2)");
+        assert_eq!(s_eval("$i(2, 0) + ${y=2,x=1,z=0}"), "$i(3,2,0)");
+        assert_eq!(s_eval("$f(2, 0) == ${x=2,y=0}"), "$false");
+        assert_eq!(s_eval("$i(0, 0) == ${}"), "$false");
+        assert_eq!(s_eval("$i(0, 0) == ${}"), "$false");
+        assert_eq!(s_eval("$i(0, 0) == $f(0, 0)"), "$false");
     }
     
     #[test]

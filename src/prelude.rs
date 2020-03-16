@@ -102,50 +102,64 @@ Smalltalk, LISP and Perl.
     - [4.6.33](#4633-stdnumtrunc-float) - std:num:trunc _float_
   - [4.7](#47-numeric-functions) - Numeric Functions
     - [4.7.1](#471-stdnumabs-number) - std:num:abs _number_
-  - [4.8](#48-strings) - Strings
-    - [4.8.1](#481-str-value) - str _value_
-    - [4.8.2](#482-isstr-value) - is_str _value_
-    - [4.8.3](#483-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
-    - [4.8.4](#484-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
-    - [4.8.5](#485-stdstrlen-value) - std:str:len _value_
-    - [4.8.6](#486-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
-    - [4.8.7](#487-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
-    - [4.8.8](#488-stdstrtrim-value) - std:str:trim _value_
-    - [4.8.9](#489-stdstrtrimstart-value) - std:str:trim_start _value_
-    - [4.8.10](#4810-stdstrtrimend-value) - std:str:trim_end _value_
-    - [4.8.11](#4811-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
-    - [4.8.12](#4812-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
-    - [4.8.13](#4813-stdstrtobytes-string) - std:str:to_bytes _string_
-    - [4.8.14](#4814-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
-    - [4.8.15](#4815-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
-    - [4.8.16](#4816-stdstrtocharvec-string) - std:str:to_char_vec _string_
-    - [4.8.17](#4817-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
-    - [4.8.18](#4818-stdstrtolowercase-string) - std:str:to_lowercase _string_
-    - [4.8.19](#4819-stdstrtouppercase-string) - std:str:to_uppercase _string_
-  - [4.9](#49-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
-    - [4.9.1](#491-call-properties-of-bytes) - Call Properties of Bytes
-    - [4.9.2](#492-byte-conversion-functions) - Byte Conversion Functions
-    - [4.9.3](#493-isbytes-value) - is_bytes _value_
-  - [4.10](#410-symbols) - Symbols
-  - [4.11](#411-vectors-or-lists) - Vectors (or Lists)
-    - [4.11.1](#4111-stdpush-vector-item) - std:push _vector_ _item_
-    - [4.11.2](#4112-stdpop-vector) - std:pop _vector_
-    - [4.11.3](#4113-stdunshift-vector-item) - std:unshift _vector_ _item_
-    - [4.11.4](#4114-vector-splicing) - Vector Splicing
-    - [4.11.5](#4115-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
-    - [4.11.6](#4116-stdprepend-vec-a-value-or-vec-) - std:prepend _vec-a_ _value-or-vec_ ...
-    - [4.11.7](#4117-stdtake-count-vector) - std:take _count_ _vector_
-    - [4.11.8](#4118-stddrop-count-vector) - std:drop _count_ _vector_
-  - [4.12](#412-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
-    - [4.12.1](#4121-map-splicing) - Map Splicing
-  - [4.13](#413-references) - References
-    - [4.13.1](#4131-stdtoref-value) - std:to_ref _value_
-    - [4.13.2](#4132-stdweaken-ref) - std:weaken _ref_
-    - [4.13.3](#4133-isref-value) - is_ref _value_
-    - [4.13.4](#4134-iswref-value) - is_wref _value_
-    - [4.13.5](#4135-stdstrengthen-ref) - std:strengthen _ref_
-    - [4.13.6](#4136-stdsetref-ref-value) - std:set_ref _ref_ _value_
-  - [4.14](#414-calling-semantics-of-data-types) - Calling Semantics of Data Types
+  - [4.8](#48-numerical-mathematical-vectors) - Numerical Mathematical Vectors
+    - [4.8.1](#481-vector-conversions) - Vector Conversions
+    - [4.8.2](#482-euler-additionsubtraction) - Euler Addition/Subtraction
+    - [4.8.3](#483-scalar-multiplicationdivision) - Scalar Multiplication/Division
+    - [4.8.4](#484-stdvdims) - std:v:dims
+    - [4.8.5](#485-stdvmag2) - std:v:mag2
+    - [4.8.6](#486-stdvmag) - std:v:mag
+    - [4.8.7](#487-stdvnorm) - std:v:norm
+    - [4.8.8](#488-stdvdot) - std:v:dot
+    - [4.8.9](#489-stdvcross) - std:v:cross
+    - [4.8.10](#4810-stdvlerp) - std:v:lerp
+    - [4.8.11](#4811-stdvslerp) - std:v:slerp
+    - [4.8.12](#4812-stdvvec2rad) - std:v:vec2rad
+    - [4.8.13](#4813-stdvrad2vec) - std:v:rad2vec
+  - [4.9](#49-strings) - Strings
+    - [4.9.1](#491-str-value) - str _value_
+    - [4.9.2](#492-isstr-value) - is_str _value_
+    - [4.9.3](#493-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
+    - [4.9.4](#494-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
+    - [4.9.5](#495-stdstrlen-value) - std:str:len _value_
+    - [4.9.6](#496-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
+    - [4.9.7](#497-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+    - [4.9.8](#498-stdstrtrim-value) - std:str:trim _value_
+    - [4.9.9](#499-stdstrtrimstart-value) - std:str:trim_start _value_
+    - [4.9.10](#4910-stdstrtrimend-value) - std:str:trim_end _value_
+    - [4.9.11](#4911-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
+    - [4.9.12](#4912-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
+    - [4.9.13](#4913-stdstrtobytes-string) - std:str:to_bytes _string_
+    - [4.9.14](#4914-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
+    - [4.9.15](#4915-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
+    - [4.9.16](#4916-stdstrtocharvec-string) - std:str:to_char_vec _string_
+    - [4.9.17](#4917-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
+    - [4.9.18](#4918-stdstrtolowercase-string) - std:str:to_lowercase _string_
+    - [4.9.19](#4919-stdstrtouppercase-string) - std:str:to_uppercase _string_
+  - [4.10](#410-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
+    - [4.10.1](#4101-call-properties-of-bytes) - Call Properties of Bytes
+    - [4.10.2](#4102-byte-conversion-functions) - Byte Conversion Functions
+    - [4.10.3](#4103-isbytes-value) - is_bytes _value_
+  - [4.11](#411-symbols) - Symbols
+  - [4.12](#412-vectors-or-lists) - Vectors (or Lists)
+    - [4.12.1](#4121-stdpush-vector-item) - std:push _vector_ _item_
+    - [4.12.2](#4122-stdpop-vector) - std:pop _vector_
+    - [4.12.3](#4123-stdunshift-vector-item) - std:unshift _vector_ _item_
+    - [4.12.4](#4124-vector-splicing) - Vector Splicing
+    - [4.12.5](#4125-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
+    - [4.12.6](#4126-stdprepend-vec-a-value-or-vec-) - std:prepend _vec-a_ _value-or-vec_ ...
+    - [4.12.7](#4127-stdtake-count-vector) - std:take _count_ _vector_
+    - [4.12.8](#4128-stddrop-count-vector) - std:drop _count_ _vector_
+  - [4.13](#413-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
+    - [4.13.1](#4131-map-splicing) - Map Splicing
+  - [4.14](#414-references) - References
+    - [4.14.1](#4141-stdtoref-value) - std:to_ref _value_
+    - [4.14.2](#4142-stdweaken-ref) - std:weaken _ref_
+    - [4.14.3](#4143-isref-value) - is_ref _value_
+    - [4.14.4](#4144-iswref-value) - is_wref _value_
+    - [4.14.5](#4145-stdstrengthen-ref) - std:strengthen _ref_
+    - [4.14.6](#4146-stdsetref-ref-value) - std:set_ref _ref_ _value_
+  - [4.15](#415-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
   - [5.1](#51-function-call-composition) - Function call composition
     - [5.1.1](#511--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
@@ -1286,7 +1300,285 @@ std:assert_eq (std:num:abs -10)     10;
 std:assert_eq (std:num:abs -13.3)   13.3;
 ```
 
-### <a name="48-strings"></a>4.8 - Strings
+### <a name="48-numerical-mathematical-vectors"></a>4.8 - Numerical Mathematical Vectors
+
+In order to aid in the development of GUIs, games, and other physics/geometry adjacent software,
+WLambda comes with a built in datatype for mathematical vectors, which can contain floats and integers
+and have between two and four dimensions.
+
+```wlambda
+# integer vectors
+std:assert ~ $i(-1, 2).y                == 2;
+std:assert ~ (ivec ${z=3})              == $i(0,0,3);
+std:assert ~ (ivec4 $[])                == $i(0,0,0,0);
+std:assert ~ $i(1.49, -2.72)            ==  $i(1,-2);
+# float vectors
+std:assert ~ $f(1.00, -33).x            == $f(1, 200).first;
+std:assert ~ $f(-0, 2.4).y              == $f(1.6, 2.4).second;
+std:assert ~ (fvec3 ${w=0.1})           ==  $f(0,0,0);
+# conversion
+std:assert ~ (fvec3 $i(1, 2))/10        == $f(0.1, 0.2, 0);
+std:assert ~ (ivec2 $f(1.3, 2.7, -5.8)) == $i(1, 2);
+std:assert ~ (ivec $f(1.3, 2.7, -5.8))  == $i(1, 2, -5);
+```
+
+#### <a name="481-vector-conversions"></a>4.8.1 - Vector Conversions
+
+There are eight functions for converting other values into vectors
+and vectors of integers into vectors of floats:
+
+- `ivec` 
+- `ivec2`
+- `ivec3`
+- `ivec4`
+- `fvec`
+- `fvec2`
+- `fvec3`
+- `fvec4`
+
+The functions without a dimension suffix fill in as many dimensions
+as are present in the object being converted.
+The functions with dimension suffixes fill in any missing dimensions
+with `0`s and ignore dimensions as necessary.
+
+NOTE: `ivec` will always truncate (i.e. round down) floats into integers when converting,
+just like when converting floats into integers implicitly elsewhere in WLambda.
+
+#### <a name="482-euler-additionsubtraction"></a>4.8.2 - Euler Addition/Subtraction
+
+You can add vectors to each other and subtract them from each other.
+
+The type of the resulting vector will be the same as the vector on the left.
+
+The number of dimensions in the resulting vector will be the same as the vector
+with the highest number of dimensions that was involved in the operation.
+
+If the value on the right isn't a vector, it will be converted into one,
+just as if it were passed through `ivec` or `fvec`, meaning that as many
+dimensions are kept as are present.
+
+```wlambda
+std:assert_eq[ $i(0.1, 0.9) + $i(1, 0) , $i(1, 0) ];
+std:assert_eq[ $f(0.1, 0.9) + $i(1, 0) , $f(1.1, 0.9) ];
+std:assert_eq[ $f(0.1, 0.9) + ${ w=7 } , $f(0.1, 0.9, 0, 7) ];
+std:assert_eq[ std:v:mag2 $i(-1, 5) + $i(1, -5) , 0.0 ];
+```
+
+#### <a name="483-scalar-multiplicationdivision"></a>4.8.3 - Scalar Multiplication/Division
+
+You can multiply and divide integer and float vectors by single numbers.
+This multiplies or divides each component of the vector by the single number.
+
+NOTE: Dividing `ivec`s will always truncate (i.e. round down) floats into integers.
+
+```wlambda
+std:assert ~ $i(3, 6)/2       == $i(1, 3);
+std:assert ~ $f(3, 6)/2       == $f(1.5, 3);
+std:assert ~ $f(0.5, 0) * 1.3 == $f(0.65,0);
+std:assert ~ (std:v:mag (std:v:norm $[40.19, 0.399]) * 10) == 10.0;
+```
+
+#### <a name="484-stdvdims"></a>4.8.4 - std:v:dims
+
+You can use this function to retrieve the number of dimensions a vector has.
+
+Like most other std:v functions,
+it will coerce whatever value is passed into it into a `ivec`,
+if that value is not a `fvec`.
+
+This function always returns an integer, regardless of whether an `ivec` or `fvec` is passed in.
+
+```wlambda
+# the least number of dimensions a vector can have is 2.
+std:assert_eq (std:v:dims $[]) 2;
+# while the most is 4.
+std:assert_eq (std:v:dims ${w=0}) 4;
+std:assert_eq (std:v:dims $f(1,2)) (std:v:dims $i(1,2));
+```
+
+#### <a name="485-stdvmag2"></a>4.8.5 - std:v:mag2
+
+Returns the magnitude of a vector, squared.
+
+Calculating the squared magnitude is a little bit faster,
+so you should prefer this method where performance is paramount.
+
+The magnitude is always a float, regardless of whether the parameter is an `ivec` or `fvec`.
+
+```wlambda
+std:assert_eq (std:v:mag2 ${w=4}) 16.0;
+```
+
+#### <a name="486-stdvmag"></a>4.8.6 - std:v:mag
+
+Returns the magnitude (also known as the length) of a vector.
+
+The magnitude is always a float, regardless of whether the parameter is an `ivec` or `fvec`.
+
+```wlambda
+std:assert_eq (std:v:mag ${w=4}) 4.0;
+```
+
+#### <a name="487-stdvnorm"></a>4.8.7 - std:v:norm
+
+Returns a new vector which has a magnitude of `1`.
+Vectors with a length of one are also known as unit vectors.
+
+Note that this still returns an `ivec` when used on `ivec`s,
+meaning that when used on an `ivec2` only four values are possible:
+- `$i(1, 0)`
+- `$i(-1, 0)`
+- `$i(0, 1)`
+- `$i(0, -1)`
+These are the only `ivec2`s that have a length of `1`.
+
+```wlambda
+!p1 = fvec ${ x = 20, y = 30.5 };
+!p2 = fvec ${ x = -10, y = 0.5 };
+
+# get the delta representing how far you'd have to travel to get from p1 to p2
+!delta = p2 - p1;
+# the normalized delta represents a single 1 sized step you could take to get to p2 from p1.
+!n = std:v:norm delta;
+
+std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
+```
+
+#### <a name="488-stdvdot"></a>4.8.8 - std:v:dot
+
+Returns the sum after multiplying each component in one vector with the corresponding component of another.
+
+This can be used to represent the "sameness" of two vectors (especially unit vectors):
+the degree to which they are pointing in the same direction.
+
+Returns an integer when used on an `ivec`, and a float when used on an `fvec`.
+If the input value isn't an `fvec`, then it's coerced into an `ivec`, just like the other `std:v` functions.
+
+```wlambda
+!at = fvec ${ x = 20, y = 30.5 }; # where you're at
+!goal = fvec ${ x = -10, y = 0.5 }; # where you want to look
+!looking = std:v:norm $[1, 0];    # direction you're looking in
+
+# do you need to turn left or right to look at `goal`,
+# if you're standing at `at` looking in `looking`?
+
+# find the unit vector representing the space between where you want to look and where you're at.
+!delta = std:v:norm goal - at;
+
+# the direction you need to turn in can be found by checking the sign of
+# the dot product of where you're currently looking and where you're at.
+!dir = std:v:dot delta looking;
+
+std:assert_eq[ (dir < 0) "left" "right", "left" ];
+```
+
+#### <a name="489-stdvcross"></a>4.8.9 - std:v:cross
+
+Similar to the dot product, but instead of returning a single value it returns another vector,
+and is only useful in three (and seven, but WLambda's vectors don't support so many) dimensions.
+
+Regardless of the number of dimensions in the input vectors, this function will return a 3d vector.
+
+```wlambda
+!x = fvec ${x=1};
+!y = fvec ${y=1};
+
+# the cross product of these two values will represent the third axis, z, and will be
+# perpendicular to both other vectors.
+
+!z = std:v:cross x y;
+
+std:assert_eq z (fvec ${z=1});
+
+# because all three vectors are perpindicular, they'll all have the same dot product from each other.
+std:assert_eq[(std:v:dot x y), (std:v:dot y z)];
+std:assert_eq[(std:v:dot y z), (std:v:dot z x)];
+```
+
+#### <a name="4810-stdvlerp"></a>4.8.10 - std:v:lerp
+
+`lerp` stands for linear interpolation.
+This function is useful when animating positions, whereas slerp is useful for animating rotations.
+
+Creates a new vector in an intermediate position in between two other vectors.
+Aside from the two reference vectors, this function also takes a variable, `t`.
+`t` which represents how far between the first and second vector the new vector should be.
+
+If `t` is `0`, the first vector is returned. If `t` is `1`, the second vector is returned.
+If `t` is `0.5`, the resulting vector will be halfway in between the first and second vector.
+
+```wlambda
+std:assert_eq[ std:v:lerp $f(1,0) $f(0,1) 0.5 , $f(0.5, 0.5) ];
+std:assert_eq[ std:v:lerp $f(5,10) ${y=10} 0.75 , $f(1.25, 10) ];
+std:assert_eq[ std:v:lerp $[-2,5] $[2,-5] 0.5 , $i(0, 0) ];
+!a = $f(83, -49.5);
+std:assert_eq[ (std:v:mag a) / 2 , std:v:mag (std:v:lerp a $[] 0.5) ];
+std:assert_eq[ (std:v:mag a) * 2 , std:v:mag (std:v:lerp $f(0,0) a 2.0) ];
+!b = $f(-484.58, -19);
+std:assert_eq[ std:v:lerp b a 1.5 , std:v:lerp a b -0.5 ];
+```
+
+#### <a name="4811-stdvslerp"></a>4.8.11 - std:v:slerp
+
+`slerp` stands for spherical linear interpolation.
+This function is useful when animating rotations, whereas lerp is useful for animating positions.
+
+In most cases, you'll want to pass in unit vectors representing rotations to slerp.
+You should get back unit vectors in the vast majority of cases,
+but if perfect accuracy is required normalizing the output of this function is suggested.
+
+Creates a new vector in an intermediate position in between two other vectors.
+Aside from the two reference vectors, this function also takes a variable, `t`.
+`t` which represents how far between the first and second vector the new vector should be.
+
+If `t` is `0`, the first vector is returned. If `t` is `1`, the second vector is returned.
+If `t` is `0.5`, the resulting vector will be halfway in between the first and second vector.
+
+```wlambda
+# compare this to the one for std:v:lerp! Note that the length of this one is almost 1;
+# it's right on the unit circle.
+std:assert_eq[ std:v:slerp $f(1,0) $f(0,1) 0.5 , $f(0.7071067811865476,0.7071067811865476) ];
+
+# The values are interpolated around a circle, so if you raise t high enough you'll start
+# getting the same values as you get with a lower t, although not quite because of float rounding.
+!almost_0 = (std:v:slerp $f(1,0) $f(0,1) 0.5) - (std:v:slerp $f(1,0) $f(0,1) 4.5);
+std:assert ~ (std:num:abs (std:v:mag almost_0)) < 0.0005;
+```
+
+#### <a name="4812-stdvvec2rad"></a>4.8.12 - std:v:vec2rad
+
+Create a rotation in radians from the x and y component of a vector.
+
+Always returns a float.
+
+Coerces the argument into an `ivec` unless it's a `fvec`.
+```wlambda
+std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${x=1}) , 0.0 ];
+std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
+
+# halfway in between 0.0 and 90.0 should be 45.
+# note that lerp would work here as well
+!h = std:v:slerp $f(1, 0) $f(0, 1) 0.5;
+std:assert_eq[ std:num:to_degrees (std:v:vec2rad h) , 45.0 ];
+```
+
+#### <a name="4813-stdvrad2vec"></a>4.8.13 - std:v:rad2vec
+
+Create a unit vector from radians.
+
+Always returns an `fvec`.
+
+```wlambda
+std:assert_eq[ std:v:rad2vec (std:num:to_radians 0.0) , $f(1, 0)];
+std:assert_eq[ ivec (std:v:rad2vec (std:num:to_radians 90.0)), $i(0, 1)];
+
+# halfway in between 0.0 and 90.0 should be 45.
+# note that lerp would NOT work here as well, rad2vec returns a unit vector.
+!h = std:v:slerp $f(1, 0) $f(0, 1) 0.5; # slerp because rotations
+std:assert_eq[ std:v:rad2vec (std:num:to_radians 45.0) , h ];
+```
+
+### <a name="49-strings"></a>4.9 - Strings
 
 Strings in WLambda are like Rust UTF-8 encoded Unicode strings.
 There is no character data type however. There are two types of literal
@@ -1300,7 +1592,7 @@ std:assert_eq $q/any delimiter may be used instead of/
 std:assert_eq "\u{2211}" "∑";
 ```
 
-#### <a name="481-str-value"></a>4.8.1 - str _value_
+#### <a name="491-str-value"></a>4.9.1 - str _value_
 
 Casts _value_ to a string and returns it.
 
@@ -1320,7 +1612,7 @@ std:assert_eq (str $[1,2,3])   "$[1,2,3]";
 std:assert_eq (str ~ std:weaken x)   "$(&)10";
 ```
 
-#### <a name="482-isstr-value"></a>4.8.2 - is_str _value_
+#### <a name="492-isstr-value"></a>4.9.2 - is_str _value_
 
 Returns `$true` if _value_ is a string.
 
@@ -1335,7 +1627,7 @@ std:assert ~ not ~ is_str $&&"foo";
 std:assert ~ is_str $*$&&"foo";
 ```
 
-#### <a name="483-stdstrcat-a-b-"></a>4.8.3 - std:str:cat _a_ _b_ ...
+#### <a name="493-stdstrcat-a-b-"></a>4.9.3 - std:str:cat _a_ _b_ ...
 
 Stringifies (like with `str`) and concatenates all its arguments.
 If an argument is a vector, it's elements will be stringified and concatenated.
@@ -1359,7 +1651,7 @@ std:push out "XXX";
 std:assert_eq s "abc123XXX";
 ```
 
-#### <a name="484-stdstrjoin-sep-vector"></a>4.8.4 - std:str:join _sep_ _vector_
+#### <a name="494-stdstrjoin-sep-vector"></a>4.9.4 - std:str:join _sep_ _vector_
 
 Join's the stringified elements of _vector_ with the _sep_ string.
 Will return an error if _vector_ is not a vector.
@@ -1370,7 +1662,7 @@ std:assert_eq
     "1::2::3";
 ```
 
-#### <a name="485-stdstrlen-value"></a>4.8.5 - std:str:len _value_
+#### <a name="495-stdstrlen-value"></a>4.9.5 - std:str:len _value_
 
 Returns the length of the stringified _value_ in unicode characters.
 The core function `len` does return the number of bytes in the string
@@ -1385,7 +1677,7 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### <a name="486-stdstrreplace-pattern-replacement-string"></a>4.8.6 - std:str:replace _pattern_ _replacement_ _string_
+#### <a name="496-stdstrreplace-pattern-replacement-string"></a>4.9.6 - std:str:replace _pattern_ _replacement_ _string_
 
 Replaces every occurence of _pattern_ in _string_ with _replacement_
 and returns a new string. All values will be casted to a string if
@@ -1401,7 +1693,7 @@ std:assert_eq s
 std:assert_eq s "1111";
 ```
 
-#### <a name="487-stdstrreplacen-pattern-replacement-count-string"></a>4.8.7 - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+#### <a name="497-stdstrreplacen-pattern-replacement-count-string"></a>4.9.7 - std:str:replace_n _pattern_ _replacement_ _count_ _string_
 
 Replaces _count_ occurences of _pattern_ in _string_ with _replacement_
 and returns a new string. All values will be casted to a string if
@@ -1417,7 +1709,7 @@ std:assert_eq s
 std:assert_eq s "1119";
 ```
 
-#### <a name="488-stdstrtrim-value"></a>4.8.8 - std:str:trim _value_
+#### <a name="498-stdstrtrim-value"></a>4.9.8 - std:str:trim _value_
 
 Trims off any (unicode) white space from the start and end of the
 stringified _value_.
@@ -1428,7 +1720,7 @@ std:assert_eq
     "fooo bar";
 ```
 
-#### <a name="489-stdstrtrimstart-value"></a>4.8.9 - std:str:trim_start _value_
+#### <a name="499-stdstrtrimstart-value"></a>4.9.9 - std:str:trim_start _value_
 
 Trims off any (unicode) white space from the start of the stringified _value_.
 
@@ -1438,7 +1730,7 @@ std:assert_eq
     "fooo bar \n";
 ```
 
-#### <a name="4810-stdstrtrimend-value"></a>4.8.10 - std:str:trim_end _value_
+#### <a name="4910-stdstrtrimend-value"></a>4.9.10 - std:str:trim_end _value_
 
 Trims off any (unicode) white space from the end of the stringified _value_.
 
@@ -1448,7 +1740,7 @@ std:assert_eq
     "  \nfooo bar";
 ```
 
-#### <a name="4811-stdstrpadstart-len-pad-str-value"></a>4.8.11 - std:str:pad_start _len_ _pad-str_ _value_
+#### <a name="4911-stdstrpadstart-len-pad-str-value"></a>4.9.11 - std:str:pad_start _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
 at the start of the string.
@@ -1472,7 +1764,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="4812-stdstrpadend-len-pad-str-value"></a>4.8.12 - std:str:pad_end _len_ _pad-str_ _value_
+#### <a name="4912-stdstrpadend-len-pad-str-value"></a>4.9.12 - std:str:pad_end _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters,
 appending at the end.
@@ -1496,7 +1788,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="4813-stdstrtobytes-string"></a>4.8.13 - std:str:to_bytes _string_
+#### <a name="4913-stdstrtobytes-string"></a>4.9.13 - std:str:to_bytes _string_
 
 Encodes _string_ in UTF-8 and returns a byte vector containing all it's bytes.
 
@@ -1508,7 +1800,7 @@ std:assert_eq b $b"1234";
 std:assert_eq b $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
 ```
 
-#### <a name="4814-stdstrfromutf8-byte-vector"></a>4.8.14 - std:str:from_utf8 _byte-vector_
+#### <a name="4914-stdstrfromutf8-byte-vector"></a>4.9.14 - std:str:from_utf8 _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences an
@@ -1522,7 +1814,7 @@ std:assert_eq s "Äß日本人";
 std:assert_eq r "str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0";
 ```
 
-#### <a name="4815-stdstrfromutf8lossy-byte-vector"></a>4.8.15 - std:str:from_utf8_lossy _byte-vector_
+#### <a name="4915-stdstrfromutf8lossy-byte-vector"></a>4.9.15 - std:str:from_utf8_lossy _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences a `"�"` will be
@@ -1534,7 +1826,7 @@ inserted.
 std:assert_eq s "Ä�ß日本人��\0";
 ```
 
-#### <a name="4816-stdstrtocharvec-string"></a>4.8.16 - std:str:to_char_vec _string_
+#### <a name="4916-stdstrtocharvec-string"></a>4.9.16 - std:str:to_char_vec _string_
 
 Converts the _string_ into a vector of integers which represent the Unicode
 character number.
@@ -1547,7 +1839,7 @@ std:assert_eq (str v) ~ str $[49,50,51,52];
 std:assert_eq (str v) ~ str $[196,223,0x65E5,0x672C,0x4EBA];
 ```
 
-#### <a name="4817-stdstrfromcharvec-vector"></a>4.8.17 - std:str:from_char_vec _vector_
+#### <a name="4917-stdstrfromcharvec-vector"></a>4.9.17 - std:str:from_char_vec _vector_
 
 The reverse operation of `std:str:to_char_vec`. It converts
 a vector of integers to a unicode string. Any integer that has
@@ -1561,7 +1853,7 @@ std:assert_eq
     "12Äß日本人";
 ```
 
-#### <a name="4818-stdstrtolowercase-string"></a>4.8.18 - std:str:to_lowercase _string_
+#### <a name="4918-stdstrtolowercase-string"></a>4.9.18 - std:str:to_lowercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -1569,7 +1861,7 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_lowercase "ZABzabÄßÜÖ") "zabzabäßüö";
 ```
 
-#### <a name="4819-stdstrtouppercase-string"></a>4.8.19 - std:str:to_uppercase _string_
+#### <a name="4919-stdstrtouppercase-string"></a>4.9.19 - std:str:to_uppercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -1577,7 +1869,7 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 ```
 
-### <a name="49-bytes-or-byte-vectors"></a>4.9 - Bytes (or Byte Vectors)
+### <a name="410-bytes-or-byte-vectors"></a>4.10 - Bytes (or Byte Vectors)
 
 Bytes are a special kind of strings. Their literal form is:
 
@@ -1587,7 +1879,7 @@ $b"\xFF\xFD\x00";
 $Q/ABCDEF\xFD/;      # \xFD is not an escape sequence here!
 ```
 
-#### <a name="491-call-properties-of-bytes"></a>4.9.1 - Call Properties of Bytes
+#### <a name="4101-call-properties-of-bytes"></a>4.10.1 - Call Properties of Bytes
 
 You can index inside a byte array by calling it with an integer:
 
@@ -1614,7 +1906,7 @@ std:assert_eq ($b"b" some_map) 30;
 std:assert_eq some_map.$b"a" 20;   # with method call syntax
 ```
 
-#### <a name="492-byte-conversion-functions"></a>4.9.2 - Byte Conversion Functions
+#### <a name="4102-byte-conversion-functions"></a>4.10.2 - Byte Conversion Functions
 
 You can convert bytes to strings in a multitude of ways:
 
@@ -1662,7 +1954,7 @@ There is also an inverse operation to `bytes:to_hex`:
 std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 ```
 
-#### <a name="493-isbytes-value"></a>4.9.3 - is_bytes _value_
+#### <a name="4103-isbytes-value"></a>4.10.3 - is_bytes _value_
 
 Returns `$true` if _value_ is a byte vector.
 
@@ -1671,7 +1963,7 @@ std:assert ~ is_bytes $b"ABC";
 std:assert ~ not ~ is_bytes "ABC";
 ```
 
-### <a name="410-symbols"></a>4.10 - Symbols
+### <a name="411-symbols"></a>4.11 - Symbols
 
 Symbols are a special kind of strings. Use them however you see fit. They will
 do a key lookup (on maps, vectors (as indices) and user values) if they are
@@ -1716,7 +2008,7 @@ match y
 std:assert_eq state "is off";
 ```
 
-### <a name="411-vectors-or-lists"></a>4.11 - Vectors (or Lists)
+### <a name="412-vectors-or-lists"></a>4.12 - Vectors (or Lists)
 
 The literal syntax for vectors (or sometimes also called lists in WLambda)
 is `$[...]`. You may write any kind of expression in it and you will get
@@ -1744,7 +2036,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="4111-stdpush-vector-item"></a>4.11.1 - std:push _vector_ _item_
+#### <a name="4121-stdpush-vector-item"></a>4.12.1 - std:push _vector_ _item_
 
 Pushes _item_ to the end of _vector_. Returns _item_.
 
@@ -1756,7 +2048,7 @@ std:push v 3;
 std:assert_eq (str v) (str $[1,2,3]);
 ```
 
-#### <a name="4112-stdpop-vector"></a>4.11.2 - std:pop _vector_
+#### <a name="4122-stdpop-vector"></a>4.12.2 - std:pop _vector_
 
 Pops off the last element of _vector_. Returns `$none` if the vector is empty
 or if _vector_ is not a vector.
@@ -1768,7 +2060,7 @@ std:assert_eq (std:pop v) 3;
 std:assert_eq (str v) (str $[1,2]);
 ```
 
-#### <a name="4113-stdunshift-vector-item"></a>4.11.3 - std:unshift _vector_ _item_
+#### <a name="4123-stdunshift-vector-item"></a>4.12.3 - std:unshift _vector_ _item_
 
 Inserts _item_ at the front of _vector_. Returns _item_ and mutates _vector_
 inplace. Be aware that this operation is of O(n) complexity.
@@ -1781,7 +2073,7 @@ std:unshift v 3;
 std:assert_eq (str v) (str $[3,1,2]);
 ```
 
-#### <a name="4114-vector-splicing"></a>4.11.4 - Vector Splicing
+#### <a name="4124-vector-splicing"></a>4.12.4 - Vector Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -1801,7 +2093,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-#### <a name="4115-stdappend-vec-a-value-or-vec-"></a>4.11.5 - std:append _vec-a_ _value-or-vec_ ...
+#### <a name="4125-stdappend-vec-a-value-or-vec-"></a>4.12.5 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
 If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
@@ -1820,7 +2112,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
 ```
 
-#### <a name="4116-stdprepend-vec-a-value-or-vec-"></a>4.11.6 - std:prepend _vec-a_ _value-or-vec_ ...
+#### <a name="4126-stdprepend-vec-a-value-or-vec-"></a>4.12.6 - std:prepend _vec-a_ _value-or-vec_ ...
 
 Prepends _value-or-vec_ and all following items to the front of _vec-a_.
 If _value-or-vec_ is a vector, all its items will be prepended to _vec-a_.
@@ -1839,7 +2131,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) (str $[:d, :c, :b, :a, 1]);
 ```
 
-#### <a name="4117-stdtake-count-vector"></a>4.11.7 - std:take _count_ _vector_
+#### <a name="4127-stdtake-count-vector"></a>4.12.7 - std:take _count_ _vector_
 
 Takes and returns the first _count_ elements of _vector_. Does not
 mutate _vector_.
@@ -1853,7 +2145,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[1,2,3,4]";
 ```
 
-#### <a name="4118-stddrop-count-vector"></a>4.11.8 - std:drop _count_ _vector_
+#### <a name="4128-stddrop-count-vector"></a>4.12.8 - std:drop _count_ _vector_
 
 Drops _count_ elements from _vector_ and returns them as new vector.
 Does not mutate _vector_.
@@ -1867,7 +2159,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[5,6]";
 ```
 
-### <a name="412-associative-maps-or-string-to-value-mappings"></a>4.12 - Associative Maps (or String to Value mappings)
+### <a name="413-associative-maps-or-string-to-value-mappings"></a>4.13 - Associative Maps (or String to Value mappings)
 
 Aside from vectors there are associative maps in WLambda. Their syntax is
 `${ key = expr, ... }`. The keys of these maps have to be strings,
@@ -1911,7 +2203,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4121-map-splicing"></a>4.12.1 - Map Splicing
+#### <a name="4131-map-splicing"></a>4.13.1 - Map Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -1930,7 +2222,7 @@ std:assert_eq (str ${*${a=10}}) "${a=10}";
 std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 ```
 
-### <a name="413-references"></a>4.13 - References
+### <a name="414-references"></a>4.14 - References
 
 Some data structures already have reference characteristics, such as strings,
 vectors and maps. There are 3 types of references in WLambda that handle
@@ -1986,7 +2278,7 @@ std:assert_eq $*x 20;
 
 Strong references can also be created using the `std:to_ref` function.
 
-#### <a name="4131-stdtoref-value"></a>4.13.1 - std:to_ref _value_
+#### <a name="4141-stdtoref-value"></a>4.14.1 - std:to_ref _value_
 
 Creates a new strong reference that refers to a cell that stores _value_.
 
@@ -1998,7 +2290,7 @@ std:assert_eq (std:ser:wlambda x) "$&&10";
 std:assert_eq $*x 10;
 ```
 
-#### <a name="4132-stdweaken-ref"></a>4.13.2 - std:weaken _ref_
+#### <a name="4142-stdweaken-ref"></a>4.14.2 - std:weaken _ref_
 
 You can weaken any of those two types of references manually using the
 `std:weaken` function.
@@ -2026,7 +2318,7 @@ std:assert_eq $*y $n;
 std:assert drop_check;
 ```
 
-#### <a name="4133-isref-value"></a>4.13.3 - is_ref _value_
+#### <a name="4143-isref-value"></a>4.14.3 - is_ref _value_
 
 Returns `$true` if _value_ is a reference (strong, weakable or weak).
 
@@ -2042,7 +2334,7 @@ std:assert ~ not ~ is_ref $true;
 std:assert ~ not ~ is_ref $none;
 ```
 
-#### <a name="4134-iswref-value"></a>4.13.4 - is_wref _value_
+#### <a name="4144-iswref-value"></a>4.14.4 - is_wref _value_
 
 Returns `$true` if _value_ is a weak reference.
 
@@ -2053,14 +2345,14 @@ std:assert ~ is_wref y;
 std:assert ~ not ~ is_wref x;
 ```
 
-#### <a name="4135-stdstrengthen-ref"></a>4.13.5 - std:strengthen _ref_
+#### <a name="4145-stdstrengthen-ref"></a>4.14.5 - std:strengthen _ref_
 
 You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
 
-#### <a name="4136-stdsetref-ref-value"></a>4.13.6 - std:set_ref _ref_ _value_
+#### <a name="4146-stdsetref-ref-value"></a>4.14.6 - std:set_ref _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -2085,7 +2377,7 @@ std:set_ref w3 14;      # Set reference via the weak reference in w3 to r3.
 std:assert_eq $*r3 14;
 ```
 
-### <a name="414-calling-semantics-of-data-types"></a>4.14 - Calling Semantics of Data Types
+### <a name="415-calling-semantics-of-data-types"></a>4.15 - Calling Semantics of Data Types
 
 You can call almost all basic data types of WLambda.
 Here is an overview of the data type calling semantics:
@@ -3836,6 +4128,31 @@ pub fn core_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| Ok(if env.arg(0).b() { env.arg(1) } else { env.arg(2) }),
         Some(3), Some(3), false);
 
+    func!(st, "ivec",
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec())),
+        Some(1), Some(1), false);
+    func!(st, "ivec2",
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec2())),
+        Some(1), Some(1), false);
+    func!(st, "ivec3",
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec3())),
+        Some(1), Some(1), false);
+    func!(st, "ivec4",
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec4())),
+        Some(1), Some(1), false);
+    func!(st, "fvec",
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec())),
+        Some(1), Some(1), false);
+    func!(st, "fvec2",
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec2())),
+        Some(1), Some(1), false);
+    func!(st, "fvec3",
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec3())),
+        Some(1), Some(1), false);
+    func!(st, "fvec4",
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec4())),
+        Some(1), Some(1), false);
+
     func!(st, "bool",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).b())) },
         Some(1), Some(1), true);
@@ -4547,6 +4864,8 @@ pub fn std_symbol_table() -> SymbolTable {
     add_num_fun_flt!(st, "num:cbrt",       cbrt);
     add_num_fun_flt!(st, "num:floor",      floor);
     add_num_fun_flt!(st, "num:round",      round);
+    add_num_fun_flt!(st, "num:signum",     signum);
+    add_num_fun_flt!(st, "num:abs",        abs);
     add_num_fun_flt!(st, "num:trunc",      trunc);
     add_num_fun_flt!(st, "num:to_degrees", to_degrees);
     add_num_fun_flt!(st, "num:to_radians", to_radians);
@@ -5225,6 +5544,85 @@ pub fn std_symbol_table() -> SymbolTable {
                 std::cmp::Ordering::Equal   => Ok(VVal::Int(0)),
             }
         }, Some(2), Some(2), false);
+
+
+    func!(st, "v:dims",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Int(match env.arg(0) {
+                VVal::FVec(fv) => fv.dims(),
+                v => v.nvec::<i64>().dims(),
+            } as i64))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:mag2",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Flt(match env.arg(0) {
+                VVal::FVec(fv) => fv.mag2(),
+                v => v.nvec::<i64>().mag2(),
+            }))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:mag",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Flt(match env.arg(0) {
+                VVal::FVec(fv) => fv.mag(),
+                v => v.nvec::<i64>().mag(),
+            }))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:norm",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::FVec(fv.norm()),
+                v => VVal::IVec(v.nvec::<i64>().norm()),
+            })
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:dot",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::Flt(fv.dot(env.arg(1).nvec())),
+                v => VVal::Int(v.nvec::<i64>().dot(env.arg(1).nvec())),
+            })
+        }, Some(2), Some(2), false);
+
+    func!(st, "v:cross",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::FVec(fv.cross(env.arg(1).nvec())),
+                v => VVal::IVec(v.nvec::<i64>().cross(env.arg(1).nvec())),
+            })
+        }, Some(2), Some(2), false);
+
+    func!(st, "v:lerp",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::FVec(fv.lerp(env.arg(1).nvec(), env.arg(2).f())),
+                v => VVal::IVec(v.nvec::<i64>().lerp(env.arg(1).nvec(), env.arg(2).f())),
+            })
+        }, Some(3), Some(3), false);
+
+    func!(st, "v:slerp",
+        |env: &mut Env, _argc: usize| {
+            Ok(match env.arg(0) {
+                VVal::FVec(fv) => VVal::FVec(fv.slerp(env.arg(1).nvec(), env.arg(2).f())),
+                v => VVal::IVec(v.nvec::<i64>().slerp(env.arg(1).nvec(), env.arg(2).f())),
+            })
+        }, Some(3), Some(3), false);
+
+    func!(st, "v:vec2rad",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Flt(match env.arg(0) {
+                VVal::FVec(fv) => fv.vec2rad(),
+                v => v.nvec::<i64>().vec2rad(),
+            }))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:rad2vec",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::FVec(crate::nvec::NVec::rad2vec(env.arg(0).f())))
+        }, Some(1), Some(1), false);
+
 
     func!(st, "sort",
         |env: &mut Env, argc: usize| {
