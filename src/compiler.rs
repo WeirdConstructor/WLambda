@@ -2816,6 +2816,13 @@ mod tests {
     }
 
     #[test]
+    fn check_unary_plus_minus() {
+        assert_eq!(s_eval("!x = 10; -x"), "-10");
+        assert_eq!(s_eval("!x = 10; +x"), "10");
+        assert_eq!(s_eval("- (+ 0xF)"),   "-15");
+    }
+
+    #[test]
     fn check_compile_env() {
 //        let ce = CompileEnv::create_env(None);
 //

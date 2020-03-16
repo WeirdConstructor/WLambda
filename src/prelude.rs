@@ -1345,6 +1345,31 @@ with `0`s and ignore dimensions as necessary.
 NOTE: `ivec` will always truncate (i.e. round down) floats into integers when converting,
 just like when converting floats into integers implicitly elsewhere in WLambda.
 
+#### - Vector Component Access
+
+There are 12 functions for accessing the components of vectors,
+but only four have unique behavior (the rest are aliases).
+
+- `x`/`0`/`first`,
+- `y`/`1`/`second`,
+- `z`/`2`/`third`,
+- `w`/`3`/`fourth`
+
+```wlambda
+!my_vec = $f(39.3, 404.504, 333.8);
+std:assert_eq my_vec.x my_vec.0; 
+std:assert_eq my_vec.x my_vec.first; 
+
+std:assert_eq my_vec.y my_vec.1; 
+std:assert_eq my_vec.y my_vec.second; 
+
+std:assert_eq my_vec.z my_vec.2; 
+std:assert_eq my_vec.z my_vec.third; 
+
+std:assert_eq my_vec.w my_vec.3; 
+std:assert_eq my_vec.w my_vec.fourth; 
+```
+
 #### <a name="482-euler-additionsubtraction"></a>4.8.2 - Euler Addition/Subtraction
 
 You can add vectors to each other and subtract them from each other.
@@ -1368,7 +1393,8 @@ std:assert_eq[ std:v:mag2 $i(-1, 5) + $i(1, -5) , 0.0 ];
 #### <a name="483-scalar-multiplicationdivision"></a>4.8.3 - Scalar Multiplication/Division
 
 You can multiply and divide integer and float vectors by single numbers.
-This multiplies or divides each component of the vector by the single number.
+This copies the vector, multiplies or divides each component of the vector by the single number,
+and returns the result.
 
 NOTE: Dividing `ivec`s will always truncate (i.e. round down) floats into integers.
 
@@ -1377,6 +1403,22 @@ std:assert ~ $i(3, 6)/2       == $i(1, 3);
 std:assert ~ $f(3, 6)/2       == $f(1.5, 3);
 std:assert ~ $f(0.5, 0) * 1.3 == $f(0.65,0);
 std:assert ~ (std:v:mag (std:v:norm $[40.19, 0.399]) * 10) == 10.0;
+```
+
+#### - Unary Vector Operations
+
+Calling `-` on a vector returns a new vector with all of its fields negated.
+This is equivalent to multiplying the vector by `-1`.
+
+Calling `+` on a vector returns a copy of the exact same vector.
+This is equivalent to multiplying the vector by `1`.
+
+```wlambda
+!my_vec = $f(1.2, 2.3, 3.4);
+std:assert_eq (ivec (-my_vec)) $i(-1, -2, -3);
+std:assert_eq (+my_vec) my_vec;
+# adding something to its inverse yields all 0s
+std:assert_eq[ my_vec + (-my_vec), my_vec * 0 ];
 ```
 
 #### <a name="484-stdvdims-vec"></a>4.8.4 - std:v:dims _vec_
@@ -1431,6 +1473,7 @@ meaning that when used on an `ivec2` only four values are possible:
 - `$i(-1, 0)`
 - `$i(0, 1)`
 - `$i(0, -1)`
+
 These are the only `ivec2`s that have a length of `1`.
 
 ```wlambda
@@ -1442,6 +1485,7 @@ These are the only `ivec2`s that have a length of `1`.
 # the normalized delta represents a single 1 sized step you could take to get to p2 from p1.
 !n = std:v:norm delta;
 
+# the length of this step is reflected in the magnitude of the vectors
 std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
 ```
 
@@ -1454,12 +1498,14 @@ This can be used to represent the "sameness" of two vectors (especially unit vec
 the degree to which they are pointing in the same direction.
 
 Returns an integer when used on an `ivec`, and a float when used on an `fvec`.
-If the input value isn't an `fvec`, then it's coerced into an `ivec`, just like the other `std:v` functions.
+
+If _vec1_ is an `fvec`, then _vec2_ will also be coerced into one.
+If _vec1_ isn't an `fvec`, then it's coerced into an `ivec`, just like the other `std:v` functions.
 
 ```wlambda
-!at = fvec ${ x = 20, y = 30.5 }; # where you're at
-!goal = fvec ${ x = -10, y = 0.5 }; # where you want to look
-!looking = std:v:norm $[1, 0];    # direction you're looking in
+!at      = fvec ${ x = 20 , y = 30.5 };           # where you're at
+!goal    = fvec ${ x = -10, y = 0.5  };           # where you want to look
+!looking = std:v:rad2vec (std:num:to_radians 90); # direction you're looking in
 
 # do you need to turn left or right to look at `goal`,
 # if you're standing at `at` looking in `looking`?
@@ -4011,8 +4057,48 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
 pub fn core_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
 
-    add_multi_op!(st, +);
-    add_multi_op!(st, -);
+    // The implementations for +/- are essentially just like the `add_multi_op`
+    // implementations, except for how they accept down to 1 parameter for
+    // unary +/-.
+    add_func!(st, +, env, argc, {
+        Ok(match (argc, env.arg(0)) {
+            (0, _) => VVal::Nul,
+            (1, VVal::Flt(f)) => VVal::Flt(f),
+            (1, VVal::Int(i)) => VVal::Int(i),
+            (1, VVal::FVec(fv)) => VVal::FVec(fv),
+            (1, VVal::IVec(iv)) => VVal::IVec(iv),
+            (a, VVal::Flt(f)) => {
+                let mut accum = f;
+                for i in 1..a { accum = accum + env.arg(i).f() }
+                VVal::Flt(accum)
+            }
+            (a, v) => {
+                let mut accum = v.i();
+                for i in 1..a { accum = accum + env.arg(i).i() }
+                VVal::Int(accum)
+            }
+        })
+    }, Some(1), None, false);
+    add_func!(st, -, env, argc, {
+        Ok(match (argc, env.arg(0)) {
+            (0, _) => VVal::Nul,
+            (1, VVal::Int(i))   => VVal::Int(-i),
+            (1, VVal::Flt(f))   => VVal::Flt(-f),
+            (1, VVal::FVec(fv)) => VVal::FVec(-fv),
+            (1, VVal::IVec(iv)) => VVal::IVec(-iv),
+            (a, VVal::Flt(f))   => {
+                let mut accum = f;
+                for i in 1..a { accum = accum - env.arg(i).f() }
+                VVal::Flt(accum)
+            }
+            (a, v) => {
+                let mut accum = v.i();
+                for i in 1..a { accum = accum - env.arg(i).i() }
+                VVal::Int(accum)
+            }
+        })
+    }, Some(1), None, false);
+
     add_multi_op!(st, *);
     add_multi_op!(st, /);
     add_multi_op!(st, %);

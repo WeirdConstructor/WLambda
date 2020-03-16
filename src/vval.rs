@@ -2157,19 +2157,19 @@ impl VVal {
             VVal::Map(m) => m.borrow().get(key).cloned(),
             VVal::IVec(b) => {
                 Some(match key {
-                    "first"  | "x" => b.x(),
-                    "second" | "y" => b.y(),
-                    "third"  | "z" => b.z().unwrap_or(VVal::Nul),
-                    "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
+                    "0" | "first"  | "x" => b.x(),
+                    "1" | "second" | "y" => b.y(),
+                    "2" | "third"  | "z" => b.z().unwrap_or(VVal::Nul),
+                    "3" | "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
                     _ => VVal::Nul
                 })
             },
             VVal::FVec(b) => {
                 Some(match key {
-                    "first"  | "x" => b.x(),
-                    "second" | "y" => b.y(),
-                    "third"  | "z" => b.z().unwrap_or(VVal::Nul),
-                    "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
+                    "0" | "first"  | "x" => b.x(),
+                    "1" | "second" | "y" => b.y(),
+                    "2" | "third"  | "z" => b.z().unwrap_or(VVal::Nul),
+                    "3" | "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
                     _ => VVal::Nul
                 })
             },

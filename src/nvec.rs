@@ -1,7 +1,7 @@
 use crate::vval::VVal;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, Sub, Div, Mul};
+use std::ops::{Neg, Add, Sub, Div, Mul};
 
 
 /// WLambda supports Integer and Float vectors in two, three, and four dimensions.
@@ -397,6 +397,14 @@ impl<N: NVecNum> NVec<N> {
             (p0 * (((1.0 - t) * omega).sin() / sin_omega))
             + (p1 * ((t * omega).sin() / sin_omega))
         )
+    }
+}
+
+impl<N: NVecNum> Neg for NVec<N> {
+    type Output = NVec<N>;
+
+    fn neg(self) -> Self::Output {
+        self * N::from_flt(-1.0)
     }
 }
 
