@@ -106,16 +106,16 @@ Smalltalk, LISP and Perl.
     - [4.8.1](#481-vector-conversions) - Vector Conversions
     - [4.8.2](#482-euler-additionsubtraction) - Euler Addition/Subtraction
     - [4.8.3](#483-scalar-multiplicationdivision) - Scalar Multiplication/Division
-    - [4.8.4](#484-stdvdims) - std:v:dims
-    - [4.8.5](#485-stdvmag2) - std:v:mag2
-    - [4.8.6](#486-stdvmag) - std:v:mag
-    - [4.8.7](#487-stdvnorm) - std:v:norm
-    - [4.8.8](#488-stdvdot) - std:v:dot
-    - [4.8.9](#489-stdvcross) - std:v:cross
-    - [4.8.10](#4810-stdvlerp) - std:v:lerp
-    - [4.8.11](#4811-stdvslerp) - std:v:slerp
-    - [4.8.12](#4812-stdvvec2rad) - std:v:vec2rad
-    - [4.8.13](#4813-stdvrad2vec) - std:v:rad2vec
+    - [4.8.4](#484-stdvdims-vec) - std:v:dims _vec_
+    - [4.8.5](#485-stdvmag2-vec) - std:v:mag2 _vec_
+    - [4.8.6](#486-stdvmag-vec) - std:v:mag _vec_
+    - [4.8.7](#487-stdvnorm-vec) - std:v:norm _vec_
+    - [4.8.8](#488-stdvdot-vec1-vec2) - std:v:dot _vec1_ _vec2_
+    - [4.8.9](#489-stdvcross-vec1-vec2) - std:v:cross _vec1_ _vec2_
+    - [4.8.10](#4810-stdvlerp-vec1-vec2-t) - std:v:lerp _vec1_ _vec2_ _t_
+    - [4.8.11](#4811-stdvslerp-vec1-vec2-t) - std:v:slerp _vec1_ _vec2_ _t_
+    - [4.8.12](#4812-stdvvec2rad-vec) - std:v:vec2rad _vec_
+    - [4.8.13](#4813-stdvrad2vec-radians) - std:v:rad2vec _radians_
   - [4.9](#49-strings) - Strings
     - [4.9.1](#491-str-value) - str _value_
     - [4.9.2](#492-isstr-value) - is_str _value_
@@ -231,12 +231,13 @@ Smalltalk, LISP and Perl.
     - [11.0.8](#1108-stdeval-code-string) - std:eval _code-string_
     - [11.0.9](#1109-stdassert-bool-message) - std:assert _bool_ \[_message_]
     - [11.0.10](#11010-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
-    - [11.0.11](#11011-stdwlambdaversion) - std:wlambda:version
-  - [11.1](#111-io) - I/O
-    - [11.1.1](#1111-stdiofilereadtext-filename) - std:io:file:read_text _filename_
-    - [11.1.2](#1112-stdiofileread-filename) - std:io:file:read _filename_
-    - [11.1.3](#1113-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
-    - [11.1.4](#1114-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
+  - [11.1](#111-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+    - [11.1.1](#1111-stdwlambdaversion) - std:wlambda:version
+  - [11.2](#112-io) - I/O
+    - [11.2.1](#1121-stdiofilereadtext-filename) - std:io:file:read_text _filename_
+    - [11.2.2](#1122-stdiofileread-filename) - std:io:file:read _filename_
+    - [11.2.3](#1123-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
+    - [11.2.4](#1124-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
 - [12](#12-optional-standard-library) - Optional Standard Library
   - [12.1](#121-serialization) - serialization
     - [12.1.1](#1211-stdserwlambda-arg) - std:ser:wlambda _arg_
@@ -1311,11 +1312,11 @@ and have between two and four dimensions.
 std:assert ~ $i(-1, 2).y                == 2;
 std:assert ~ (ivec ${z=3})              == $i(0,0,3);
 std:assert ~ (ivec4 $[])                == $i(0,0,0,0);
-std:assert ~ $i(1.49, -2.72)            ==  $i(1,-2);
+std:assert ~ $i(1.49, -2.72)            == $i(1,-2);
 # float vectors
 std:assert ~ $f(1.00, -33).x            == $f(1, 200).first;
 std:assert ~ $f(-0, 2.4).y              == $f(1.6, 2.4).second;
-std:assert ~ (fvec3 ${w=0.1})           ==  $f(0,0,0);
+std:assert ~ (fvec3 ${w=0.1})           == $f(0,0,0);
 # conversion
 std:assert ~ (fvec3 $i(1, 2))/10        == $f(0.1, 0.2, 0);
 std:assert ~ (ivec2 $f(1.3, 2.7, -5.8)) == $i(1, 2);
@@ -1378,9 +1379,9 @@ std:assert ~ $f(0.5, 0) * 1.3 == $f(0.65,0);
 std:assert ~ (std:v:mag (std:v:norm $[40.19, 0.399]) * 10) == 10.0;
 ```
 
-#### <a name="484-stdvdims"></a>4.8.4 - std:v:dims
+#### <a name="484-stdvdims-vec"></a>4.8.4 - std:v:dims _vec_
 
-You can use this function to retrieve the number of dimensions a vector has.
+You can use this function to retrieve the number of dimensions in _vec_.
 
 Like most other std:v functions,
 it will coerce whatever value is passed into it into a `ivec`,
@@ -1396,9 +1397,9 @@ std:assert_eq (std:v:dims ${w=0}) 4;
 std:assert_eq (std:v:dims $f(1,2)) (std:v:dims $i(1,2));
 ```
 
-#### <a name="485-stdvmag2"></a>4.8.5 - std:v:mag2
+#### <a name="485-stdvmag2-vec"></a>4.8.5 - std:v:mag2 _vec_
 
-Returns the magnitude of a vector, squared.
+Returns the magnitude of _vec_, squared.
 
 Calculating the squared magnitude is a little bit faster,
 so you should prefer this method where performance is paramount.
@@ -1409,9 +1410,9 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag2 ${w=4}) 16.0;
 ```
 
-#### <a name="486-stdvmag"></a>4.8.6 - std:v:mag
+#### <a name="486-stdvmag-vec"></a>4.8.6 - std:v:mag _vec_
 
-Returns the magnitude (also known as the length) of a vector.
+Returns the magnitude (also known as the length) of _vec_.
 
 The magnitude is always a float, regardless of whether the parameter is an `ivec` or `fvec`.
 
@@ -1419,9 +1420,9 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag ${w=4}) 4.0;
 ```
 
-#### <a name="487-stdvnorm"></a>4.8.7 - std:v:norm
+#### <a name="487-stdvnorm-vec"></a>4.8.7 - std:v:norm _vec_
 
-Returns a new vector which has a magnitude of `1`.
+Returns a new vector which has a magnitude of `1`, but points in the same direction as _vec_.
 Vectors with a length of one are also known as unit vectors.
 
 Note that this still returns an `ivec` when used on `ivec`s,
@@ -1444,9 +1445,10 @@ These are the only `ivec2`s that have a length of `1`.
 std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
 ```
 
-#### <a name="488-stdvdot"></a>4.8.8 - std:v:dot
+#### <a name="488-stdvdot-vec1-vec2"></a>4.8.8 - std:v:dot _vec1_ _vec2_
 
-Returns the sum after multiplying each component in one vector with the corresponding component of another.
+Returns the sum of all components after multiplying each component
+in _vec1_ with the corresponding component of _vec2_.
 
 This can be used to represent the "sameness" of two vectors (especially unit vectors):
 the degree to which they are pointing in the same direction.
@@ -1472,7 +1474,9 @@ If the input value isn't an `fvec`, then it's coerced into an `ivec`, just like 
 std:assert_eq[ (dir < 0) "left" "right", "left" ];
 ```
 
-#### <a name="489-stdvcross"></a>4.8.9 - std:v:cross
+#### <a name="489-stdvcross-vec1-vec2"></a>4.8.9 - std:v:cross _vec1_ _vec2_
+
+Returns a vector perpendicular to _vec1_ and _vec2_.
 
 Similar to the dot product, but instead of returning a single value it returns another vector,
 and is only useful in three (and seven, but WLambda's vectors don't support so many) dimensions.
@@ -1495,17 +1499,17 @@ std:assert_eq[(std:v:dot x y), (std:v:dot y z)];
 std:assert_eq[(std:v:dot y z), (std:v:dot z x)];
 ```
 
-#### <a name="4810-stdvlerp"></a>4.8.10 - std:v:lerp
+#### <a name="4810-stdvlerp-vec1-vec2-t"></a>4.8.10 - std:v:lerp _vec1_ _vec2_ _t_
 
 `lerp` stands for linear interpolation.
 This function is useful when animating positions, whereas slerp is useful for animating rotations.
 
-Creates a new vector in an intermediate position in between two other vectors.
-Aside from the two reference vectors, this function also takes a variable, `t`.
-`t` which represents how far between the first and second vector the new vector should be.
+Creates a new vector in a new position relative to _vec1_ and _vec2_.
+Aside from the two reference vectors, this function also takes a variable, _t_,
+which represents how far relative to the first and second vector the new vector should be.
 
-If `t` is `0`, the first vector is returned. If `t` is `1`, the second vector is returned.
-If `t` is `0.5`, the resulting vector will be halfway in between the first and second vector.
+If _t_ is `0`, _vec1_ is returned. If _t_ is `1`, then _vec2_ is returned.
+If _t_ is `0.5`, the resulting vector will be halfway in between the first and second vector.
 
 ```wlambda
 std:assert_eq[ std:v:lerp $f(1,0) $f(0,1) 0.5 , $f(0.5, 0.5) ];
@@ -1518,7 +1522,7 @@ std:assert_eq[ (std:v:mag a) * 2 , std:v:mag (std:v:lerp $f(0,0) a 2.0) ];
 std:assert_eq[ std:v:lerp b a 1.5 , std:v:lerp a b -0.5 ];
 ```
 
-#### <a name="4811-stdvslerp"></a>4.8.11 - std:v:slerp
+#### <a name="4811-stdvslerp-vec1-vec2-t"></a>4.8.11 - std:v:slerp _vec1_ _vec2_ _t_
 
 `slerp` stands for spherical linear interpolation.
 This function is useful when animating rotations, whereas lerp is useful for animating positions.
@@ -1527,31 +1531,38 @@ In most cases, you'll want to pass in unit vectors representing rotations to sle
 You should get back unit vectors in the vast majority of cases,
 but if perfect accuracy is required normalizing the output of this function is suggested.
 
-Creates a new vector in an intermediate position in between two other vectors.
-Aside from the two reference vectors, this function also takes a variable, `t`.
-`t` which represents how far between the first and second vector the new vector should be.
+Creates a new vector in a new position relative to _vec1_ and _vec2_.
+Aside from the two reference vectors, this function also takes a variable, _t_,
+which represents how far relative to the first and second vector the new vector should be.
 
-If `t` is `0`, the first vector is returned. If `t` is `1`, the second vector is returned.
-If `t` is `0.5`, the resulting vector will be halfway in between the first and second vector.
+If _t_ is `0`, _vec1_ is returned. If _t_ is `1`, then _vec2_ is returned.
+If _t_ is `0.5`, the resulting vector will be halfway in between _vec1_ and _vec2_.
 
 ```wlambda
-# compare this to the one for std:v:lerp! Note that the length of this one is almost 1;
-# it's right on the unit circle.
-std:assert_eq[ std:v:slerp $f(1,0) $f(0,1) 0.5 , $f(0.7071067811865476,0.7071067811865476) ];
+# compare this to the one for std:v:lerp! note that the length of this one is almost 1.
+# this is definitely not the case for std:v:lerp's output with the same input.
+!v = std:v:slerp $f(1,0) $f(0,1) 0.5;
+# the values may not be exact because of floating point rounding errors,
+# but they should be pretty close.
+std:assert_rel_eq v.x 0.7071067811865476 0.000001;
+std:assert_rel_eq v.y 0.7071067811865476 0.000001;
 
 # The values are interpolated around a circle, so if you raise t high enough you'll start
 # getting the same values as you get with a lower t, although not quite because of float rounding.
-!almost_0 = (std:v:slerp $f(1,0) $f(0,1) 0.5) - (std:v:slerp $f(1,0) $f(0,1) 4.5);
-std:assert ~ (std:num:abs (std:v:mag almost_0)) < 0.0005;
+!half = (std:v:slerp $f(1,0) $f(0,1) 0.5);
+!four = (std:v:slerp $f(1,0) $f(0,1) 4.5);
+std:assert_rel_eq half.x four.x 0.000001;
+std:assert_rel_eq half.y four.y 0.000001;
 ```
 
-#### <a name="4812-stdvvec2rad"></a>4.8.12 - std:v:vec2rad
+#### <a name="4812-stdvvec2rad-vec"></a>4.8.12 - std:v:vec2rad _vec_
 
-Create a rotation in radians from the x and y component of a vector.
+Creates a rotation in radians from the x and y components of _vec_.
 
 Always returns a float.
 
 Coerces the argument into an `ivec` unless it's a `fvec`.
+
 ```wlambda
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${x=1}) , 0.0 ];
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
@@ -1562,9 +1573,9 @@ std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad h) , 45.0 ];
 ```
 
-#### <a name="4813-stdvrad2vec"></a>4.8.13 - std:v:rad2vec
+#### <a name="4813-stdvrad2vec-radians"></a>4.8.13 - std:v:rad2vec _radians_
 
-Create a unit vector from radians.
+Creates a unit vector from _radians_.
 
 Always returns an `fvec`.
 
@@ -3578,7 +3589,7 @@ std:assert 120;    #=> 120
 
 #### <a name="11010-stdasserteq-actual-expected-message"></a>11.0.10 - std:assert_eq _actual_ _expected_ \[_message_]
 
-This function check if the _actual_ value is equal to the
+This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
 passed in the panic for reference.
 
@@ -3587,13 +3598,29 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### <a name="11011-stdwlambdaversion"></a>11.0.11 - std:wlambda:version
+### <a name="111-stdassertreleq-l-r-epsilon-message"></a>11.1 - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+
+This function checks if `l` is within `epsilon` of `r`.
+If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
+this function will panic, also displaying the optional message if present.
+
+```wlambda
+# these two are within 1 of each other
+!x = 10.5;
+!y = 11.3;
+std:assert_rel_eq x y 1;
+
+# but not within 0.5 of each other, so this line is commented out.
+# std:assert_eq x y 0.5;
+```
+
+#### <a name="1111-stdwlambdaversion"></a>11.1.1 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
-### <a name="111-io"></a>11.1 - I/O
+### <a name="112-io"></a>11.2 - I/O
 
-#### <a name="1111-stdiofilereadtext-filename"></a>11.1.1 - std:io:file:read_text _filename_
+#### <a name="1121-stdiofilereadtext-filename"></a>11.2.1 - std:io:file:read_text _filename_
 
 Opens the file _filename_ and returns its contents interpreted as UTF8
 text as string.
@@ -3605,7 +3632,7 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading text from file works";
 ```
 
-#### <a name="1112-stdiofileread-filename"></a>11.1.2 - std:io:file:read _filename_
+#### <a name="1122-stdiofileread-filename"></a>11.2.2 - std:io:file:read _filename_
 
 Opens the file _filename_ and returns its contents as byte buffer.
 
@@ -3617,13 +3644,13 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading binary from file works";
 ```
 
-#### <a name="1113-stdiofilewritesafe-filename-bytes-or-string"></a>11.1.3 - std:io:file:write_safe _filename_ _bytes-or-string_
+#### <a name="1123-stdiofilewritesafe-filename-bytes-or-string"></a>11.2.3 - std:io:file:write_safe _filename_ _bytes-or-string_
 
 Creates a new file with the given filename but with a "~" appended
 and writes the contents into it. After successful write, it renames
 the file to the given filename.
 
-#### <a name="1114-stdiofileappend-filename-bytes-or-string"></a>11.1.4 - std:io:file:append _filename_ _bytes-or-string_
+#### <a name="1124-stdiofileappend-filename-bytes-or-string"></a>11.2.4 - std:io:file:append _filename_ _bytes-or-string_
 
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
@@ -5212,6 +5239,29 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::Bol(true))
             }
         }, Some(2), Some(3), true);
+
+    func!(st, "assert_rel_eq",
+        |env: &mut Env, _argc: usize| {
+            let l = env.arg(0);
+            let r = env.arg(1);
+            let epsilon = env.arg(2).f();
+            let delta = (l.f() - r.f()).abs();
+
+            if delta < epsilon {
+                Ok(VVal::Bol(true))
+            } else {
+                Err(StackAction::panic_msg(format!(
+                    "assertion{}failed: delta[{}] was more than epsilon[{}],\
+                        left['{}', f:'{}'], right['{}', f:'{}']",
+                    if env.arg(3).is_none() {
+                        " ".to_string()
+                    } else {
+                        format!(" '{}' ", env.arg(3).s_raw())
+                    },
+                    delta, epsilon, l.s(), l.f(), r.s(), r.f()
+                )))
+            }
+        }, Some(3), Some(4), true);
 
     func!(st, "set_ref",
         |env: &mut Env, _argc: usize| {
