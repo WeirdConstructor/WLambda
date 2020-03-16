@@ -37,8 +37,17 @@ pub trait NVecNum: Sized + Copy + Clone + PartialEq {
     fn from_vval(v: &VVal) -> Self;
     fn into_vval(self)     -> VVal;
 
-    fn into_flt(self)      -> f64;
-    fn from_flt(f: f64)    -> Self;
+    fn into_f64(self)      -> f64;
+    fn from_f64(f: f64)    -> Self;
+
+    fn into_f32(self)      -> f32;
+    fn from_f32(f: f32)    -> Self;
+
+    fn into_i64(self)      -> i64;
+    fn from_i64(i: i64)    -> Self;
+
+    fn into_i32(self)      -> i32;
+    fn from_i32(i: i32)    -> Self;
 
     /// When added/subtracted to something, has no effect
     fn zero() -> Self;
@@ -64,9 +73,24 @@ impl NVecNum for i64 {
     fn into_vval(self)     -> VVal { VVal::Int(self) }
 
     #[inline]
-    fn into_flt(self)      -> f64  { self as f64 }
+    fn into_f64(self)      -> f64  { self as f64 }
     #[inline]
-    fn from_flt(f: f64)    -> Self { f as i64 }
+    fn from_f64(f: f64)    -> Self { f as i64 }
+
+    #[inline]
+    fn into_f32(self)      -> f32  { self as f32 }
+    #[inline]
+    fn from_f32(f: f32)    -> Self { f as i64 }
+
+    #[inline]
+    fn into_i64(self)      -> i64  { self }
+    #[inline]
+    fn from_i64(i: i64)    -> Self { i }
+
+    #[inline]
+    fn into_i32(self)      -> i32  { self as i32 }
+    #[inline]
+    fn from_i32(i: i32)    -> Self { i as i64 }
 
     #[inline]
     fn zero()              -> Self { 0 }
@@ -108,9 +132,24 @@ impl NVecNum for f64 {
     fn into_vval(self)     -> VVal { VVal::Flt(self) }
 
     #[inline]
-    fn into_flt(self)      -> f64  { self }
+    fn into_f64(self)      -> f64  { self }
     #[inline]
-    fn from_flt(f: f64)    -> Self { f }
+    fn from_f64(f: f64)    -> Self { f }
+
+    #[inline]
+    fn into_f32(self)      -> f32  { self as f32 }
+    #[inline]
+    fn from_f32(f: f32)    -> Self { f as f64 }
+
+    #[inline]
+    fn into_i64(self)      -> i64  { self as i64 }
+    #[inline]
+    fn from_i64(f: i64)    -> Self { f as f64 }
+
+    #[inline]
+    fn into_i32(self)      -> i32  { self as i32 }
+    #[inline]
+    fn from_i32(f: i32)    -> Self { f as f64 }
 
     #[inline]
     fn zero()              -> Self { 0.0 }
@@ -307,11 +346,11 @@ impl<N: NVecNum> NVec<N> {
     pub fn mag2(&self) -> f64 {
         match self {
             Vec2(x, y)       =>
-                x.into_flt().powi(2) + y.into_flt().powi(2),
+                x.into_f64().powi(2) + y.into_f64().powi(2),
             Vec3(x, y, z)    =>
-                x.into_flt().powi(2) + y.into_flt().powi(2) + z.into_flt().powi(2),
+                x.into_f64().powi(2) + y.into_f64().powi(2) + z.into_f64().powi(2),
             Vec4(x, y, z, w) =>
-                x.into_flt().powi(2) + y.into_flt().powi(2) + z.into_flt().powi(2) + w.into_flt().powi(2),
+                x.into_f64().powi(2) + y.into_f64().powi(2) + z.into_f64().powi(2) + w.into_f64().powi(2),
         }
     }
 
@@ -322,7 +361,7 @@ impl<N: NVecNum> NVec<N> {
 
     #[inline]
     pub fn norm(self) -> Self {
-        let m = N::from_flt(self.mag());
+        let m = N::from_f64(self.mag());
         if m == N::zero() {
             self
         } else {
@@ -365,7 +404,7 @@ impl<N: NVecNum> NVec<N> {
 
     /// Turns the first two components of this vector into an angle in radians.
     pub fn vec2rad(self) -> f64 {
-        N::into_flt(self.y_raw()).atan2(N::into_flt(self.x_raw()))
+        N::into_f64(self.y_raw()).atan2(N::into_f64(self.x_raw()))
     }
 
     /// Produces a Vec2 based on the radians provided to this function as a float.
@@ -400,11 +439,57 @@ impl<N: NVecNum> NVec<N> {
     }
 }
 
+#[cfg(feature = "mint")]
+macro_rules! mint_vec_to_from { ( $( $ty:ident : $to:ident -> $from:ident ; )* ) => { $(
+impl<N: NVecNum> From<mint::Vector2<$ty>> for NVec<N> {
+    fn from(o: mint::Vector2<$ty>) -> Self {
+        Vec2(N::$from(o.x), N::$from(o.y))
+    }
+}
+impl<N: NVecNum> From<mint::Vector3<$ty>> for NVec<N> {
+    fn from(o: mint::Vector3<$ty>) -> Self {
+        Vec3(N::$from(o.x), N::$from(o.y), N::$from(o.z))
+    }
+}
+impl<N: NVecNum> From<mint::Vector4<$ty>> for NVec<N> {
+    fn from(o: mint::Vector4<$ty>) -> Self {
+        Vec4(N::$from(o.x), N::$from(o.y), N::$from(o.z), N::$from(o.w))
+    }
+}
+
+impl<N: NVecNum> Into<mint::Vector2<$ty>> for NVec<N> {
+    fn into(self) -> mint::Vector2<$ty> {
+        let (x, y, _, _) = self.into_zero_tpl();
+        mint::Vector2 { x: N::$to(x), y: N::$to(y) }
+    }
+}
+impl<N: NVecNum> Into<mint::Vector3<$ty>> for NVec<N> {
+    fn into(self) -> mint::Vector3<$ty> {
+        let (x, y, z, _) = self.into_zero_tpl();
+        mint::Vector3 { x: N::$to(x), y: N::$to(y), z: N::$to(z) }
+    }
+}
+impl<N: NVecNum> Into<mint::Vector4<$ty>> for NVec<N> {
+    fn into(self) -> mint::Vector4<$ty> {
+        let (x, y, z, w) = self.into_zero_tpl();
+        mint::Vector4 { x: N::$to(x), y: N::$to(y), z: N::$to(z), w: N::$to(w) }
+    }
+}
+)* } }
+
+#[cfg(feature = "mint")]
+mint_vec_to_from! {
+    f64 : into_f64 -> from_f64;
+    f32 : into_f32 -> from_f32;
+    i64 : into_i64 -> from_i64;
+    i32 : into_i32 -> from_i32;
+}
+
 impl<N: NVecNum> Neg for NVec<N> {
     type Output = NVec<N>;
 
     fn neg(self) -> Self::Output {
-        self * N::from_flt(-1.0)
+        self * N::from_f64(-1.0)
     }
 }
 
