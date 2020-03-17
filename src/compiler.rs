@@ -4871,4 +4871,10 @@ mod tests {
         assert_eq!(s_eval("int $p(3.3,4.4)"),   "3");
         assert_eq!(s_eval("float $p(3.3,4.4)"), "3.3");
     }
+
+    #[test]
+    fn check_backslash_function() {
+        assert_eq!(s_eval("!x = $[\\1,\\2,\\3 + _,5]; $[x.1[],x.2 4,x.3[]]"), "$[2,7,5]");
+        assert_eq!(s_eval("!x = ${a = \\1, b = \\2 * _, c = 9}; $[x.a[],x.b 4,x.c[]]"), "$[1,8,9]");
+    }
 }
