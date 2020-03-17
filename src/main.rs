@@ -19,6 +19,18 @@ use crate::compiler::{GlobalEnv, EvalContext};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
+    println!("GEN: {}", crate::vm::gen(r"
+            range 1 5 1 {||
+            std:displayln ~ std:measure_time :ms {||
+                !x = 0;
+                for_n { x < 10000000 } { !y = 1; .x = x + y };
+                x
+            };
+            };
+    "));
+    return;
+
+
     let global = GlobalEnv::new_default();
     global.borrow_mut().add_func(
         "dump_stack",

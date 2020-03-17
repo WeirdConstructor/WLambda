@@ -446,6 +446,11 @@ impl Env {
     }
 
     #[inline]
+    pub fn stk(&self, offs: usize) -> &VVal {
+        &self.args[self.sp - offs] // implicit self.sp - 1! We must not call with 0!
+    }
+
+    #[inline]
     pub fn stk_i(&self, offs: usize) -> i64 {
         if let VVal::Int(i) = &self.args[(self.sp - 1) +  offs] {
             *i
@@ -592,9 +597,17 @@ impl Env {
     }
 
     #[inline]
+    pub fn reg(&self, i: i32) -> VVal {
+        if i >= 0 {
+            self.get_local(i as usize)
+        } else {
+            self.stk((-i) as usize).clone()
+        }
+    }
+
+    #[inline]
     pub fn get_local(&self, i: usize) -> VVal {
-        let idx = self.bp + i;
-        match &self.args[idx] {
+        match &self.args[self.bp + i] {
             VVal::CRef(r)  => r.borrow().clone(),
             v              => v.clone(),
         }
@@ -646,9 +659,9 @@ impl Env {
         }
     }
 
+    #[inline]
     pub fn set_consume(&mut self, i: usize, value: VVal) {
-        let idx = self.bp + i;
-        match &mut self.args[idx] {
+        match &mut self.args[self.bp + i] {
             VVal::CRef(r)  => { r.replace(value); }
             v              => { *v = value }
         }
