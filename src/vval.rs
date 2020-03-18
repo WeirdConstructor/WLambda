@@ -1104,6 +1104,11 @@ pub enum VVal {
     /// from inside user supplied Rust functions via std::any::Any.
     Usr(Box<dyn VValUserData>),
 }
+impl PartialEq for VVal {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.eqv(rhs)
+    }
+}
 
 impl std::fmt::Debug for VValFun {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

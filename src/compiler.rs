@@ -165,15 +165,15 @@ impl SymbolTable {
     }
     
     /// Retrieves a value from the SymbolTable, if present.
-    /// ```rust
+    /// ```
     /// use wlambda::{VVal, EvalContext};
     /// let mut ctx = EvalContext::new_default();
     /// ctx.eval("!@export to_rust = 42.0");
     ///
-    /// assert_eq!(ctx.get_exports().get("to_rust"), Some(VVal::Flt(42.0)));
+    /// assert_eq!(ctx.get_exports().get("to_rust").cloned(), Some(VVal::Flt(42.0)));
     /// ```
     #[allow(dead_code)]
-    pub fn get(&mut self, name: &str) -> Option<VVal> {
+    pub fn get(&mut self, name: &str) -> Option<&VVal> {
         self.symbols.get(name)
     }
 
