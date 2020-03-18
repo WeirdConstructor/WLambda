@@ -777,7 +777,45 @@ pub enum ArityParam {
 #[derive(Debug, Clone)]
 struct BlockEnv {
     local_map_stack: std::vec::Vec<(usize, Box<std::collections::HashMap<String, VarPos>>)>,
-    locals:    std::vec::Vec<(String, CompileLocal)>,
+    reuse_temporaries: Rc<RefCell<std::vec::Vec<usize>>>,
+    locals:          std::vec::Vec<(String, CompileLocal)>,
+}
+
+#[derive(Debug, Clone)]
+struct TemporaryRegister {
+    local_index:       usize,
+    reuse_temporaries: Rc<RefCell<std::vec::Vec<usize>>>,
+    detached:          bool,
+}
+
+impl TemporaryRegister {
+    fn new(local_index: usize, reuse_temporaries: Rc<RefCell<std::vec::Vec<usize>>>) -> Self {
+        Self {
+            local_index,
+            reuse_temporaries,
+            detached: false,
+        }
+    }
+
+    fn get(&self) -> ResPos { ResPos::Local(self.local_index as u16) }
+
+    fn detach(&mut self) { self.detached = true; }
+}
+
+impl Drop for TemporaryRegister {
+    fn drop(&mut self) {
+        if !self.detached {
+            self.reuse_temporaries.borrow_mut().push(self.local_index);
+        }
+    }
+}
+
+#[derive(Debug,Clone,Copy,PartialEq)]
+pub enum ResPos {
+    Local(u16),
+    Arg(u16),
+    Ret,
+    Nul,
 }
 
 impl BlockEnv {
@@ -785,6 +823,7 @@ impl BlockEnv {
         Self {
             local_map_stack: vec![(0, Box::new(std::collections::HashMap::new()))],
             locals:          vec![],
+            reuse_temporaries: Rc::new(RefCell::new(vec![])),
         }
     }
 
@@ -828,12 +867,12 @@ impl BlockEnv {
         VarPos::UpValue(idx)
     }
 
-    fn reserve_register(&mut self) -> usize {
+    fn temporary(&mut self) -> TemporaryRegister {
         let next_index = self.locals.len();
         self.locals.push((String::from(""), CompileLocal { }));
         let last_idx = self.local_map_stack.len() - 1;
         self.local_map_stack[last_idx].0 += 1;
-        next_index
+        TemporaryRegister::new(next_index, self.reuse_temporaries.clone())
     }
 
     fn new_local(&mut self, var: &str) -> VarPos {
@@ -970,8 +1009,8 @@ impl CompileEnv {
         self.block_env.push_env();
     }
 
-    pub fn reserve_register(&mut self) -> usize {
-        self.block_env.reserve_register()
+    pub fn temporary(&mut self) -> TemporaryRegister {
+        self.block_env.temporary()
     }
 
     pub fn pop_block_env(&mut self) -> usize {
