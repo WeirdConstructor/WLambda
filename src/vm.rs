@@ -8,13 +8,16 @@ use std::cell::RefCell;
 const DEBUG_VM: bool = false;
 
 #[derive(Debug,Clone,Copy,PartialEq)]
-enum ResultAddr {
-    Stack(usize),
-    Local(usize),
+enum ResPos {
+    Stack(u16),
+    Local(u16),
+    Arg(u16),
+    Ret,
+    Nul,
 }
 
 struct Prog {
-    results: std::vec::Vec<ResultAddr>,
+    results: std::vec::Vec<ResPos>,
     debug:   std::vec::Vec<Option<SynPos>>,
     data:    std::vec::Vec<VVal>,
     ops:     std::vec::Vec<Op>,
@@ -54,8 +57,7 @@ impl Prog {
                 | Op::MapSetKey
                 | Op::MapSplice
                 | Op::NewErr
-                | Op::PushRet
-                | Op::Ret(_)
+                | Op::Ret(_, _)
                 | Op::End
                 | Op::Call(_)
                 | Op::NextI(_, _)
@@ -90,7 +92,20 @@ impl Prog {
             }
         }
 
-        self.results += prog.results;
+        let mut stack_results = 0;
+        for r in prog.results.iter() {
+            if let ResPos::Stack(_) = r {
+                stack_results += 1;
+            }
+        }
+
+        for r in self.results.iter_mut() {
+            if let ResPos::Stack(stk_offs) = r {
+                *stk_offs += stack_results;
+            }
+        }
+
+        self.results.append(&mut prog.results);
         self.debug.append(&mut prog.debug);
         self.data.append(&mut prog.data);
         self.ops.append(&mut prog.ops);
@@ -103,33 +118,33 @@ impl Prog {
             data:       vec![],
             ops:        vec![],
             debug:      vec![],
+            results:    vec![],
             nxt_debug:  None,
-            results:    0,
         }
     }
 
     fn consume(mut self, n: usize) -> Self {
-        self.results -= n as i64;
+        for i in 0..n { self.results.pop(); }
         self
     }
 
-    fn add_result(&mut self, res: ResultAddr) -> Self {
+    fn add_result(&mut self, res: ResPos) -> &mut Self {
         self.results.push(res);
+        self
     }
 
-    fn result(mut self) -> Self {
+    fn result(mut self, res: ResPos) -> Self {
         self.results.push(res);
         self
     }
 
     fn pop_result(&mut self) {
-        if self.results < 0 {
-            panic!("Can't pop from negative results!");
+        for i in self.results.iter() {
+            if let ResPos::Stack(_) = i {
+                self.push_op(Op::Pop);
+            }
         }
-        for i in 0..self.results {
-            self.push_op(Op::Pop);
-        }
-        self.results = 0;
+        self.results.clear();
     }
 
     fn push_data(&mut self, v: VVal) -> usize {
@@ -150,14 +165,13 @@ impl Prog {
     }
 
     fn push_return(&mut self, local_count: usize, return_func: bool) -> &mut Self {
-        if self.results <= 0 {
-            self.push_op(Op::PushNul);
-        }
-        self.push_op(Op::Ret(local_count as u32));
-        if !return_func {
-            self.push_op(Op::PushRet);
-        }
-        self.results = 0;
+        if let Some(res) = self.results.pop() {
+            self.push_op(Op::Ret(local_count as u16, res));
+        } else {
+            self.push_op(Op::Ret(local_count as u16, ResPos::Nul));
+        };
+        self.results.clear();
+        self.results.push(ResPos::Ret);
         self
     }
 
@@ -180,8 +194,7 @@ impl Prog {
                 | Op::MapSetKey
                 | Op::MapSplice
                 | Op::NewErr
-                | Op::PushRet
-                | Op::Ret(_)
+                | Op::Ret(_, _)
                 | Op::End
                 | Op::Call(_)
                 | Op::NextI(_, _)
@@ -228,6 +241,13 @@ impl Prog {
         self.nxt_debug = Some(sp);
         self
     }
+
+    fn dump(&self) {
+        println!("PROG:");
+        for (i, o) in self.ops.iter().enumerate() {
+            println!("[{:>3}] {:?}", i, o);
+        }
+    }
 }
 
 #[derive(Debug,Clone)]
@@ -265,8 +285,7 @@ enum Op {
     MapSplice,
     NewErr,
     NewClos(u32),
-    PushRet,
-    Ret(u32),
+    Ret(u16, ResPos),
     End,
     Pop,
     Add,
@@ -281,9 +300,50 @@ enum Op {
     Eq,
 }
 
+macro_rules! op_reg {
+    ($env: ident, $ret: ident, $respos_var: ident, $pop_n: ident) => {
+        let $respos_var =
+            match $respos_var {
+                ResPos::Stack(o) => {
+                    $pop_n += 1;
+                    $env.stk(*o as usize + 1).clone()
+                },
+                ResPos::Local(o) => $env.get_local(*o as usize),
+                ResPos::Arg(o)   => $env.arg(*o as usize),
+                ResPos::Ret      => std::mem::replace(&mut $ret, VVal::Nul),
+                ResPos::Nul      => VVal::Nul,
+            };
+    }
+}
+
+macro_rules! op_1_stk {
+    ($env: ident, $ret: ident, $var: ident, $b: block) => {
+        {
+            let mut pop_n = 0;
+            op_reg!($env, $ret, $var, pop_n);
+            let r = $b;
+            $env.popn(pop_n);
+            $env.push(r);
+        }
+    }
+}
+
+macro_rules! op_1_ret {
+    ($env: ident, $ret: ident, $var: ident, $b: block) => {
+        {
+            let mut pop_n = 0;
+            op_reg!($env, $ret, $var, pop_n);
+            std::mem::replace(&mut $ret, $b);
+            $env.popn(pop_n);
+        }
+    }
+}
+
 fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     let old_sp = env.sp;
     let mut pc : usize = 0;
+    println!("# EXEC PROG:###################################");
+    prog.dump();
     if DEBUG_VM {
         println!("-- START -------------------------------------");
     }
@@ -340,14 +400,7 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     pc = (pc as i32 + *jmp_offs as i32) as usize;
                 }
             },
-            Op::PushRet => {
-                env.push(std::mem::replace(&mut ret, VVal::Nul));
-            },
-            Op::Ret(count)             => {
-                let value = env.pop();
-                env.popn(*count as usize);
-                ret = value;
-            },
+            Op::Ret(count, rp) => op_1_ret!(env, ret, rp, { rp }),
             Op::End => { break; },
             Op::SetLocal(idx)          => {
                 let v = env.pop();
@@ -812,66 +865,67 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) ->
     let var = ast.at(1).unwrap();
     var.with_s_ref(|var_s: &str| -> Result<Prog, CompileError> {
         if to_ref {
-            match var_s {
-                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::ArgRef(0)).result()) },
-                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::ArgRef(1)).result()) },
-                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().op(Op::ArgRef(2)).result()) },
-                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().op(Op::ArgRef(3)).result()) },
-                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().op(Op::ArgRef(4)).result()) },
-                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().op(Op::ArgRef(5)).result()) },
-                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().op(Op::ArgRef(6)).result()) },
-                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().op(Op::ArgRef(7)).result()) },
-                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().op(Op::ArgRef(8)).result()) },
-                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().op(Op::ArgRef(9)).result()) },
-                "@"  => {
-                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                    Ok(Prog::new().op(Op::ArgvRef).result())
-                },
-                _ => {
-                    let pos = ce.borrow_mut().get(var_s);
-                    match pos {
-                        VarPos::UpValue(i) =>
-                            Ok(Prog::new().op(Op::GetUpRef(i as u32)).result()),
-                        VarPos::Local(i) =>
-                            Ok(Prog::new().op(Op::GetLocalRef(i as u32)).result()),
-                        VarPos::Global(v) =>
-                            Ok(Prog::new().data_op(Op::GetGlobalRef(0), v.clone()).result()),
-                        VarPos::Const(v) =>
-                            Ok(Prog::new().data_op(Op::PushRef(0), v.clone()).result()),
-                        VarPos::NoPos => {
-                            Err(ast.compile_err(
-                                format!("Variable '{}' undefined", var_s)))
-                        }
-                    }
-                }
-            }
+//            match var_s {
+//                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::ArgRef(0)).result()) },
+//                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::ArgRef(1)).result()) },
+//                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().op(Op::ArgRef(2)).result()) },
+//                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().op(Op::ArgRef(3)).result()) },
+//                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().op(Op::ArgRef(4)).result()) },
+//                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().op(Op::ArgRef(5)).result()) },
+//                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().op(Op::ArgRef(6)).result()) },
+//                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().op(Op::ArgRef(7)).result()) },
+//                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().op(Op::ArgRef(8)).result()) },
+//                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().op(Op::ArgRef(9)).result()) },
+//                "@"  => {
+//                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+//                    Ok(Prog::new().op(Op::ArgvRef).result())
+//                },
+//                _ => {
+//                    let pos = ce.borrow_mut().get(var_s);
+//                    match pos {
+//                        VarPos::UpValue(i) =>
+//                            Ok(Prog::new().op(Op::GetUpRef(i as u32)).result()),
+//                        VarPos::Local(i) =>
+//                            Ok(Prog::new().op(Op::GetLocalRef(i as u32)).result()),
+//                        VarPos::Global(v) =>
+//                            Ok(Prog::new().data_op(Op::GetGlobalRef(0), v.clone()).result()),
+//                        VarPos::Const(v) =>
+//                            Ok(Prog::new().data_op(Op::PushRef(0), v.clone()).result()),
+//                        VarPos::NoPos => {
+//                            Err(ast.compile_err(
+//                                format!("Variable '{}' undefined", var_s)))
+//                        }
+//                    }
+//                }
+//            }
+            Ok(Prog::new().op(Op::PushNul))
         } else {
             match var_s {
-                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::Arg(0)).result()) },
-                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::Arg(1)).result()) },
-                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().op(Op::Arg(2)).result()) },
-                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().op(Op::Arg(3)).result()) },
-                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().op(Op::Arg(4)).result()) },
-                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().op(Op::Arg(5)).result()) },
-                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().op(Op::Arg(6)).result()) },
-                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().op(Op::Arg(7)).result()) },
-                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().op(Op::Arg(8)).result()) },
-                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().op(Op::Arg(9)).result()) },
+                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().result(ResPos::Arg(0))) },
+                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().result(ResPos::Arg(1))) },
+                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().result(ResPos::Arg(2))) },
+                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().result(ResPos::Arg(3))) },
+                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().result(ResPos::Arg(4))) },
+                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().result(ResPos::Arg(5))) },
+                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().result(ResPos::Arg(6))) },
+                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().result(ResPos::Arg(7))) },
+                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().result(ResPos::Arg(8))) },
+                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().result(ResPos::Arg(9))) },
                 "@"  => {
                     ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                    Ok(Prog::new().op(Op::Argv).result())
+                    Ok(Prog::new().op(Op::Argv).result(ResPos::Stack(0)))
                 },
                 _ => {
                     let pos = ce.borrow_mut().get(var_s);
                     match pos {
                         VarPos::UpValue(i) =>
-                            Ok(Prog::new().op(Op::GetUp(i as u32)).result()),
+                            Ok(Prog::new().op(Op::GetUp(i as u32)).result(ResPos::Stack(0))),
                         VarPos::Local(i) =>
-                            Ok(Prog::new().op(Op::GetLocal(i as u32)).result()),
+                            Ok(Prog::new().result(ResPos::Local(i as u16))),
                         VarPos::Global(v) =>
-                            Ok(Prog::new().data_op(Op::GetGlobal(0), v.clone()).result()),
+                            Ok(Prog::new().data_op(Op::GetGlobal(0), v.clone()).result(ResPos::Stack(0))),
                         VarPos::Const(v) =>
-                            Ok(Prog::new().data_op(Op::Push(0), v.clone()).result()),
+                            Ok(Prog::new().op(Op::PushV(v.clone())).result(ResPos::Stack(0))),
                         VarPos::NoPos => {
                             Err(ast.compile_err(
                                 format!("Variable '{}' undefined", var_s)))
@@ -899,7 +953,7 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     if return_func || block_env_var_count > 0 {
         p.unshift_op(Op::ResvLocals(block_env_var_count as u32));
         p.push_return(block_env_var_count, return_func);
-        return Ok(p.result());
+        return Ok(p);
     }
     Ok(p)
 }
@@ -952,7 +1006,7 @@ fn vm_compile_binop(ast: &VVal, op: Op, ce: &mut Rc<RefCell<CompileEnv>>)
     let mut prog = Prog::new().debug(spos);
     prog.append(left);
     prog.append(right);
-    Ok(prog.op(op).consume(2).result())
+    Ok(prog.op(op).consume(2).result(ResPos::Stack(0)))
 }
 
 fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, CompileError> {

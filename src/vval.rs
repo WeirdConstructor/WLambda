@@ -572,9 +572,7 @@ impl Env {
         if i >= self.argc { return VVal::Nul; }
         let v = &self.args[self.bp - (i + 1)];
         //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
-        match v {
-            v => v.clone(),
-        }
+        v.clone()
     }
 
     pub fn get_local_up_promotion(&mut self, i: usize) -> VVal {
