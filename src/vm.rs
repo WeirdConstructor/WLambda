@@ -9,7 +9,6 @@ const DEBUG_VM: bool = false;
 
 #[derive(Debug,Clone,Copy,PartialEq)]
 enum ResPos {
-    Stack(u16),
     Local(u16),
     Arg(u16),
     Ret,
@@ -50,9 +49,9 @@ impl Prog {
                 },
                 Op::NewPair
                 | Op::PushV(_)
-                | Op::NewList
-                | Op::ListPush
-                | Op::ListSplice
+                | Op::NewList(_)
+                | Op::ListPush(_, _)
+                | Op::ListSplice(_, _)
                 | Op::NewMap
                 | Op::MapSetKey
                 | Op::MapSplice
@@ -92,19 +91,6 @@ impl Prog {
             }
         }
 
-        let mut stack_results = 0;
-        for r in prog.results.iter() {
-            if let ResPos::Stack(_) = r {
-                stack_results += 1;
-            }
-        }
-
-        for r in self.results.iter_mut() {
-            if let ResPos::Stack(stk_offs) = r {
-                *stk_offs += stack_results;
-            }
-        }
-
         self.results.append(&mut prog.results);
         self.debug.append(&mut prog.debug);
         self.data.append(&mut prog.data);
@@ -138,13 +124,8 @@ impl Prog {
         self
     }
 
-    fn pop_result(&mut self) {
-        for i in self.results.iter() {
-            if let ResPos::Stack(_) = i {
-                self.push_op(Op::Pop);
-            }
-        }
-        self.results.clear();
+    fn get_result(&mut self) -> ResPos {
+        self.results.pop().expect("Result on of expression")
     }
 
     fn push_data(&mut self, v: VVal) -> usize {
@@ -187,9 +168,9 @@ impl Prog {
                 Op::NewClos(_)      => Op::NewClos(idx as u32),
                 Op::NewPair
                 | Op::PushV(_)
-                | Op::NewList
-                | Op::ListPush
-                | Op::ListSplice
+                | Op::NewList(_)
+                | Op::ListPush(_, _)
+                | Op::ListSplice(_, _)
                 | Op::NewMap
                 | Op::MapSetKey
                 | Op::MapSplice
@@ -277,9 +258,9 @@ enum Op {
     Argv,
     ArgvRef,
     NewPair,
-    NewList,
-    ListPush,
-    ListSplice,
+    NewList(ResPos),
+    ListPush(ResPos, ResPos),
+    ListSplice(ResPos, ResPos),
     NewMap,
     MapSetKey,
     MapSplice,
@@ -300,14 +281,10 @@ enum Op {
     Eq,
 }
 
-macro_rules! op_reg {
-    ($env: ident, $ret: ident, $respos_var: ident, $pop_n: ident) => {
+macro_rules! in_reg {
+    ($env: ident, $ret: ident, $respos_var: ident) => {
         let $respos_var =
             match $respos_var {
-                ResPos::Stack(o) => {
-                    $pop_n += 1;
-                    $env.stk(*o as usize + 1).clone()
-                },
                 ResPos::Local(o) => $env.get_local(*o as usize),
                 ResPos::Arg(o)   => $env.arg(*o as usize),
                 ResPos::Ret      => std::mem::replace(&mut $ret, VVal::Nul),
@@ -316,25 +293,38 @@ macro_rules! op_reg {
     }
 }
 
+macro_rules! out_reg {
+    ($env: ident, $ret: ident, $respos_var: ident, $val: expr) => {
+        match $respos_var {
+            ResPos::Local(o) => $env.set_consume(*o as usize, $val),
+            ResPos::Arg(o)   => $env.set_arg(*o as usize, $val),
+            ResPos::Ret      => { std::mem::replace(&mut $ret, $val); },
+            ResPos::Nul      => (),
+        };
+    }
+}
+
 macro_rules! op_1_stk {
     ($env: ident, $ret: ident, $var: ident, $b: block) => {
         {
-            let mut pop_n = 0;
-            op_reg!($env, $ret, $var, pop_n);
+            in_reg!($env, $ret, $var);
             let r = $b;
-            $env.popn(pop_n);
             $env.push(r);
         }
+    }
+}
+
+macro_rules! op_0_r {
+    ($env: ident, $ret: ident, $out: ident, $b: block) => {
+        out_reg!($env, $ret, $out, $b);
     }
 }
 
 macro_rules! op_1_ret {
     ($env: ident, $ret: ident, $var: ident, $b: block) => {
         {
-            let mut pop_n = 0;
-            op_reg!($env, $ret, $var, pop_n);
+            in_reg!($env, $ret, $var);
             std::mem::replace(&mut $ret, $b);
-            $env.popn(pop_n);
         }
     }
 }
@@ -535,7 +525,7 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         return Err(sa.wrap_panic(prog.debug[pc].clone())),
                 }
             },
-            Op::NewList => { env.push(VVal::vec()); },
+            Op::NewList(a) => op_1_stk!(env, ret, a, { VVal::vec() }),
             Op::ListPush => {
                 let elem = env.pop();
                 let lst  = env.pop();
@@ -570,13 +560,13 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 let val = env.pop();
                 env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
             },
-            Op::NewClos(data_idx) => {
+            Op::NewClos(data_idx, a) => op_0_r!(env, res, a, {
                 let fun = prog.data[*data_idx as usize].clone();
                 let fun = fun.clone_and_rebind_upvalues(|upvs, upvalues| {
                     copy_upvs(upvs, env, upvalues);
                 });
-                env.push(fun);
-            },
+                fun
+            }),
         }
         if DEBUG_VM {
             env.dump_stack();
@@ -946,7 +936,6 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
 
     let mut p = Prog::new().debug(spos);
     for e in exprs.into_iter() {
-        p.pop_result();
         p.append(e);
     }
     let block_env_var_count = ce.borrow_mut().pop_block_env();
@@ -1009,7 +998,7 @@ fn vm_compile_binop(ast: &VVal, op: Op, ce: &mut Rc<RefCell<CompileEnv>>)
     Ok(prog.op(op).consume(2).result(ResPos::Stack(0)))
 }
 
-fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, CompileError> {
+fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, res: ResPos) -> Result<Prog, CompileError> {
     match ast {
         VVal::Lst(l) => {
             let syn  = ast.at(0).unwrap_or(VVal::Nul);
@@ -1018,7 +1007,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
 
             match syn {
                 Syntax::Block      => {
-                    let prog = vm_compile_block(ast, 1, ce, true)?;
+                    let prog = vm_compile_block(ast, 1, ce, true, res)?;
                     Ok(prog.op(Op::End))
                 },
                 Syntax::Assign     => vm_compile_assign(ast, ce, false).map(|p| p.debug(spos)),
@@ -1027,16 +1016,16 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                 Syntax::CaptureRef => vm_compile_var(ast, ce, true)    .map(|p| p.debug(spos)),
                 Syntax::Def        => vm_compile_def(ast, ce, false)   .map(|p| p.debug(spos)),
                 Syntax::DefGlobRef => vm_compile_def(ast, ce, true)    .map(|p| p.debug(spos)),
-                Syntax::BinOpAdd   => vm_compile_binop(ast, Op::Add, ce),
-                Syntax::BinOpSub   => vm_compile_binop(ast, Op::Sub, ce),
-                Syntax::BinOpDiv   => vm_compile_binop(ast, Op::Div, ce),
-                Syntax::BinOpMod   => vm_compile_binop(ast, Op::Mod, ce),
-                Syntax::BinOpMul   => vm_compile_binop(ast, Op::Mul, ce),
-                Syntax::BinOpGe    => vm_compile_binop(ast, Op::Ge, ce),
-                Syntax::BinOpGt    => vm_compile_binop(ast, Op::Gt, ce),
-                Syntax::BinOpLe    => vm_compile_binop(ast, Op::Le, ce),
-                Syntax::BinOpLt    => vm_compile_binop(ast, Op::Lt, ce),
-                Syntax::BinOpEq    => vm_compile_binop(ast, Op::Eq, ce),
+                Syntax::BinOpAdd   => vm_compile_binop(ast, Op::Add, ce, res),
+                Syntax::BinOpSub   => vm_compile_binop(ast, Op::Sub, ce, res),
+                Syntax::BinOpDiv   => vm_compile_binop(ast, Op::Div, ce, res),
+                Syntax::BinOpMod   => vm_compile_binop(ast, Op::Mod, ce, res),
+                Syntax::BinOpMul   => vm_compile_binop(ast, Op::Mul, ce, res),
+                Syntax::BinOpGe    => vm_compile_binop(ast, Op::Ge,  ce, res),
+                Syntax::BinOpGt    => vm_compile_binop(ast, Op::Gt,  ce, res),
+                Syntax::BinOpLe    => vm_compile_binop(ast, Op::Le,  ce, res),
+                Syntax::BinOpLt    => vm_compile_binop(ast, Op::Lt,  ce, res),
+                Syntax::BinOpEq    => vm_compile_binop(ast, Op::Eq,  ce, res),
                 Syntax::Func => {
                     let last_def_varname = ce.borrow().recent_var.clone();
                     let mut fun_spos = spos;
@@ -1052,12 +1041,10 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
 
                     let mut func_prog = Prog::new().debug(fun_spos.clone());
                     for s in stmts.into_iter() {
-                        func_prog.pop_result();
                         func_prog.append(s);
                     }
                     func_prog.push_return(0, true);
                     func_prog.push_op(Op::End);
-                    let func_prog = func_prog.result();
 
                     let spos_inner = fun_spos.clone();
                     let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
@@ -1120,7 +1107,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                             upvalues, env_size, min_args, max_args, false,
                             Some(fun_spos.clone()),
                             Rc::new(upvs));
-                    Ok(Prog::new().data_op(Op::NewClos(0), fun_template).result())
+                    Ok(Prog::new().data_op(Op::NewClos(0, ResPos), fun_template))
                 },
                 Syntax::Call => {
                     let is_for_n =
@@ -1146,7 +1133,6 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                         let mut cond = vm_compile_direct_block(&ast.at(2).unwrap_or(VVal::Nul), ce)?;
 
                         let mut body = vm_compile_direct_block(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
-                        body.pop_result();
 
                         let body_cnt = body.op_count();
                         cond.push_op(Op::JmpIfN(body_cnt as i32 + 1));
@@ -1167,7 +1153,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                     for a in call_args.into_iter() {
                         prog.append(a);
                     }
-                    Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result())
+                    Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result(ResPos::Stack(0)))
                 },
                 Syntax::Lst => {
                     let mut list_elems : Vec<(bool, Prog)> =
@@ -1183,13 +1169,14 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<Prog, Comp
                         }, 1)?;
 
                     let mut prog = Prog::new().debug(spos.clone());
-                    prog.push_op(Op::NewList);
+                    prog.push_op(Op::NewList(ResPos::Stack(0)));
                     for (is_splice, elem) in list_elems.into_iter() {
                         prog.append(elem);
+                        let res = prog.get_result();
                         if is_splice {
-                            prog.push_op(Op::ListSplice);
+                            prog.push_op(Op::ListSplice(res));
                         } else {
-                            prog.push_op(Op::ListPush);
+                            prog.push_op(Op::ListPush(res));
                         }
                     }
                     Ok(prog.result())
