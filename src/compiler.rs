@@ -168,7 +168,7 @@ impl SymbolTable {
     /// ```
     /// use wlambda::{VVal, EvalContext};
     /// let mut ctx = EvalContext::new_default();
-    /// ctx.eval("!@export to_rust = 42.0");
+    /// ctx.eval("!@export to_rust = 42.0;");
     ///
     /// assert_eq!(ctx.get_exports().get("to_rust").cloned(), Some(VVal::Flt(42.0)));
     /// ```
