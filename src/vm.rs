@@ -290,16 +290,6 @@ macro_rules! out_reg {
     }
 }
 
-macro_rules! op_1_stk {
-    ($env: ident, $ret: ident, $var: ident, $b: block) => {
-        {
-            in_reg!($env, $ret, $var);
-            let r = $b;
-            $env.push(r);
-        }
-    }
-}
-
 macro_rules! op_0_r {
     ($env: ident, $ret: ident, $out: ident, $b: block) => {
         out_reg!($env, $ret, $out, $b);
@@ -511,7 +501,7 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         return Err(sa.wrap_panic(prog.debug[pc].clone())),
                 }
             },
-            Op::NewList(a) => op_1_stk!(env, ret, a, { VVal::vec() }),
+            Op::NewList(a) => op_0_r!(env, ret, a, { VVal::vec() }),
             Op::ListPush => {
                 let elem = env.pop();
                 let lst  = env.pop();
@@ -976,8 +966,8 @@ fn vm_compile_binop(ast: &VVal, op: Op, ce: &mut Rc<RefCell<CompileEnv>>, res: R
     let syn  = ast.at(0).unwrap_or(VVal::Nul);
     let spos = syn.get_syn_pos();
 
-    let t1 = ce.temporary();
-    let t2 = ce.temporary();
+    let t1 = ce.tmp_stk_slot();
+    let t2 = ce.tmp_stk_slot();
     let left  = vm_compile(&ast.at(1).unwrap(), ce, t1.get())?;
     let right = vm_compile(&ast.at(2).unwrap(), ce, t2.get())?;
     let mut prog = Prog::new().debug(spos);

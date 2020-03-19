@@ -777,22 +777,22 @@ pub enum ArityParam {
 #[derive(Debug, Clone)]
 struct BlockEnv {
     local_map_stack: std::vec::Vec<(usize, Box<std::collections::HashMap<String, VarPos>>)>,
-    reuse_temporaries: Rc<RefCell<std::vec::Vec<usize>>>,
+    reuse_stk_slot: Rc<RefCell<std::vec::Vec<usize>>>,
     locals:          std::vec::Vec<(String, CompileLocal)>,
 }
 
 #[derive(Debug, Clone)]
-struct TemporaryRegister {
+struct TmpStackSlot {
     local_index:       usize,
-    reuse_temporaries: Rc<RefCell<std::vec::Vec<usize>>>,
+    reuse_stk_slot: Rc<RefCell<std::vec::Vec<usize>>>,
     detached:          bool,
 }
 
-impl TemporaryRegister {
-    fn new(local_index: usize, reuse_temporaries: Rc<RefCell<std::vec::Vec<usize>>>) -> Self {
+impl TmpStackSlot {
+    fn new(local_index: usize, reuse_stk_slot: Rc<RefCell<std::vec::Vec<usize>>>) -> Self {
         Self {
             local_index,
-            reuse_temporaries,
+            reuse_stk_slot,
             detached: false,
         }
     }
@@ -802,10 +802,10 @@ impl TemporaryRegister {
     fn detach(&mut self) { self.detached = true; }
 }
 
-impl Drop for TemporaryRegister {
+impl Drop for TmpStackSlot {
     fn drop(&mut self) {
         if !self.detached {
-            self.reuse_temporaries.borrow_mut().push(self.local_index);
+            self.reuse_stk_slot.borrow_mut().push(self.local_index);
         }
     }
 }
@@ -823,7 +823,7 @@ impl BlockEnv {
         Self {
             local_map_stack: vec![(0, Box::new(std::collections::HashMap::new()))],
             locals:          vec![],
-            reuse_temporaries: Rc::new(RefCell::new(vec![])),
+            reuse_stk_slot: Rc::new(RefCell::new(vec![])),
         }
     }
 
@@ -867,12 +867,30 @@ impl BlockEnv {
         VarPos::UpValue(idx)
     }
 
-    fn temporary(&mut self) -> TemporaryRegister {
+    // Temporaries are for registering stack space for calling
+    // other functions.
+    //
+    // call a b (call2 c d e) f g
+    //
+    // GT[x] - gets temporary for x
+    // - GT[a]     = 5
+    // - GT[b]     = 6
+    // - GT[call2] = local(call2)
+    // - GT[c]     = 7
+    // - GT[d]     = 8
+    // - GT[e]     = 9
+    // - => CALL call2
+    // - give back GT[c, d, e]
+    // - GT[f]     = 7
+    // - GT[g]     = 8
+    fn tmp_stk_slot(&mut self) -> Rc<RefCell<TmpStackSlot>> {
         let next_index = self.locals.len();
         self.locals.push((String::from(""), CompileLocal { }));
         let last_idx = self.local_map_stack.len() - 1;
         self.local_map_stack[last_idx].0 += 1;
-        TemporaryRegister::new(next_index, self.reuse_temporaries.clone())
+        Rc::new(RefCell::new(
+            TmpStackSlot::new(
+                next_index, self.reuse_stk_slot.clone())))
     }
 
     fn new_local(&mut self, var: &str) -> VarPos {
@@ -927,6 +945,16 @@ pub struct CompileEnv {
 
 /// Reference type to a `CompileEnv`.
 type CompileEnvRef = Rc<RefCell<CompileEnv>>;
+
+pub fn with_stack_space<T>(ce: CompileEnvRef, f: T) -> usize
+    where T: FnOnce(F2) -> (),
+          F2: Fn() -> usize
+{
+    ce.borrow_mut().push_block_env();
+    f(|| ce.borrow_mut().new_local("tmp"));
+    ce.borrow_mut().pop_block_env()
+}
+
 
 impl CompileEnv {
     pub fn new(g: GlobalEnvRef) -> Rc<RefCell<Self>> {
@@ -1009,8 +1037,8 @@ impl CompileEnv {
         self.block_env.push_env();
     }
 
-    pub fn temporary(&mut self) -> TemporaryRegister {
-        self.block_env.temporary()
+    pub fn tmp_stk_slot(&mut self) -> TmpStackSlot {
+        self.block_env.tmp_stk_slot()
     }
 
     pub fn pop_block_env(&mut self) -> usize {
