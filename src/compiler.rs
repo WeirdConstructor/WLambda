@@ -609,6 +609,7 @@ impl EvalContext {
                 global: global.clone(),
                 block_env: BlockEnv::new(),
                 upvals:    Vec::new(),
+                locals_space: 0,
                 recent_var: String::new(),
                 recent_sym: String::new(),
                 implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
@@ -823,7 +824,7 @@ impl BlockEnv {
         self.local_map_stack.push((0, Box::new(std::collections::HashMap::new())));
     }
 
-    fn pop_env(&mut self) -> usize {
+    fn pop_env(&mut self) -> (usize, usize) {
         let block_env_vars = self.local_map_stack.pop().unwrap();
 
         let mut local_count = block_env_vars.0;
@@ -831,7 +832,7 @@ impl BlockEnv {
             self.locals.pop();
         }
 
-        local_count
+        (self.locals.len(), self.locals.len() + local_count)
     }
 
     fn set_upvalue(&mut self, var: &str, idx: usize) -> VarPos {
@@ -917,6 +918,8 @@ pub struct CompileEnv {
     parent:    Option<Rc<RefCell<CompileEnv>>>,
     /// Holds all function local variables and manages nesting of blocks.
     block_env: BlockEnv,
+    /// Holds the maximum number of locals ever used:
+    locals_space: usize,
     /// Stores position of the upvalues for copying the upvalues at runtime.
     upvals:    std::vec::Vec<VarPos>,
     /// Stores the implicitly calculated arity of this function.
@@ -941,6 +944,7 @@ impl CompileEnv {
             global:    g,
             block_env: BlockEnv::new(),
             upvals:    Vec::new(),
+            locals_space: 0,
             quote_func: false,
             recent_var: String::new(),
             recent_sym: String::new(),
@@ -960,6 +964,7 @@ impl CompileEnv {
             global,
             block_env: BlockEnv::new(),
             upvals:    Vec::new(),
+            locals_space: 0,
             recent_var: String::new(),
             recent_sym: String::new(),
             implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
@@ -983,8 +988,14 @@ impl CompileEnv {
     }
 
     pub fn next_local(&mut self) -> usize {
-        self.block_env.next_local()
+        let idx = self.block_env.next_local();
+        if (idx + 1) > self.locals_space {
+            self.locals_space = idx + 1;
+        }
+        idx
     }
+
+    pub fn get_local_space(&self) -> usize { self.locals_space }
 
     pub fn def(&mut self, s: &str, is_global: bool) -> VarPos {
         if is_global {
@@ -994,6 +1005,9 @@ impl CompileEnv {
             VarPos::Global(r)
         } else {
             let idx = self.block_env.next_local();
+            if (idx + 1) > self.locals_space {
+                self.locals_space = idx + 1;
+            }
             self.block_env.def_local(s, idx);
             VarPos::Local(idx)
         }
@@ -1029,7 +1043,7 @@ impl CompileEnv {
         self.block_env.tmp_stk_slot()
     }
 
-    pub fn pop_block_env(&mut self) -> usize {
+    pub fn pop_block_env(&mut self) -> (usize, usize) {
         self.block_env.pop_env()
     }
 
@@ -1862,6 +1876,7 @@ fn compile_block_env(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     ce.borrow_mut().push_block_env();
     let block = compile(ast, ce)?;
     let block_env_var_count = ce.borrow_mut().pop_block_env();
+    let block_env_var_count = block_env_var_count.1 - block_env_var_count.0;
 
     Ok(Box::new(move |e: &mut Env| {
         e.with_pushed_sp(block_env_var_count, |e: &mut Env| block(e))

@@ -129,7 +129,8 @@ impl StorePos {
             self.res = Some(rp);
         } else {
             if !self.res_mov.is_none() {
-                panic!("Can't set store pos twice, not even mov!");
+                panic!(format!("Can't set store pos twice, not even mov ({:?} = {:?})!",
+                        self, rp));
             }
             self.res_mov = Some(rp);
         }
@@ -238,6 +239,7 @@ impl Prog {
                 },
                 Op::Argv(_)
                 | Op::End
+                | Op::ClearLocals(_, _)
                     => (),
             }
         }
@@ -355,6 +357,7 @@ enum Op {
     Mov(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
     Argv(ResPos),
+    ClearLocals(u16, u16),
     End,
     //    Call(u32),
     //    Push(u32),
@@ -362,7 +365,6 @@ enum Op {
     //    PushNul,
     //    PushV(VVal),
     //    PushRef(u32),
-    //    ResvLocals(u32),
     //    SetGlobal(u32),
     //    GetGlobal(u32),
     //    GetGlobalRef(u32),
@@ -501,8 +503,9 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
                 VVal::Pair(Box::new((a, b)))
             }),
-            Op::Argv(r) => op_r!(env, ret, prog, r, { env.argv() }),
-            Op::End       => { break; },
+            Op::Argv(r)             => op_r!(env, ret, prog, r, { env.argv() }),
+            Op::End                 => { break; },
+            Op::ClearLocals(from, to) => env.null_locals(*from as usize, *to as usize),
                 //            Op::PushNul    => { env.push(VVal::Nul); },
                 //            Op::PushI(int) => { env.push(VVal::Int(*int as i64)); },
                 //            Op::PushV(v) => {
@@ -519,7 +522,6 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 //                let a = env.pop();
                 //                env.push(VVal::Pair(Box::new((a, b))));
                 //            },
-                //            Op::ResvLocals(count)      => env.push_sp(*count as usize),
                 //            Op::Pop                    => {
                 //                if let VVal::Err(ev) = env.pop() {
                 //                    return
@@ -1106,7 +1108,6 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     let syn  = ast.at(0).unwrap_or(VVal::Nul);
     let spos = syn.get_syn_pos();
 
-    let mut devnull = StorePos::new_dev_null();
     let mut block_sp = StorePos::new();
     block_sp.set(ResPos::Ret);
 
@@ -1115,6 +1116,7 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     let ast_len = ast.len() - skip_cnt;
     let exprs : Vec<Prog> =
         ast.map_skip( |e| {
+            let mut devnull = StorePos::new_dev_null();
             let sp =
                 if i == ast_len - 1 { println!("block_sp {:?}", block_sp); &mut block_sp }
                 else {println!("devnull");  &mut devnull };
@@ -1128,8 +1130,9 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     for e in exprs.into_iter() {
         p.append(e);
     }
-    let block_env_var_count = ce.borrow_mut().pop_block_env();
+    let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
     sp.set(ResPos::Ret);
+    p.push_op(Op::ClearLocals(from_local_idx as u16, to_local_idx as u16));
 
     // TODO: clear variables in one Op (Op::ClearLocals(a, b))
     // TODO: cargo test
@@ -1207,7 +1210,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
 //                Syntax::AssignRef  => vm_compile_assign(ast, ce, true, res) .map(|p| p.debug(spos)),
                 Syntax::Var        => vm_compile_var(ast, ce, false, sp)   .map(|p| p.debug(spos)),
                 Syntax::CaptureRef => vm_compile_var(ast, ce, true, sp)    .map(|p| p.debug(spos)),
-//                Syntax::Def        => vm_compile_def(ast, ce, false, res)   .map(|p| p.debug(spos)),
+                Syntax::Def        => vm_compile_def(ast, ce, false, sp)   .map(|p| p.debug(spos)),
                 Syntax::DefGlobRef => vm_compile_def(ast, ce, true, sp)    .map(|p| p.debug(spos)),
 //                Syntax::BinOpAdd   => vm_compile_binop(ast, Op::Add, ce, res),
 //                Syntax::BinOpSub   => vm_compile_binop(ast, Op::Sub, ce, res),
@@ -1466,6 +1469,7 @@ pub fn gen(s: &str) -> String {
             dest.set(ResPos::Ret);
             match vm_compile(&ast, &mut ce, &mut dest) {
                 Ok(mut prog) => {
+                    let local_space = ce.borrow().get_local_space();
                     dest.to_load_pos(&mut prog);
                     prog.op_end();
 
@@ -1474,6 +1478,7 @@ pub fn gen(s: &str) -> String {
                     e.push(VVal::Flt(14.4));
                     e.argc = 2;
                     e.set_bp(0);
+                    e.push_sp(local_space);
 
                     match vm(&prog, &mut e) {
                         Ok(v) => v.s(),
@@ -1512,8 +1517,11 @@ mod tests {
     fn vm_vars() {
         assert_eq!(gen("!:global x = 10; x"),                         "10");
         assert_eq!(gen("!:global x = 10; !:global y = 11; $p(x, y)"), "$p(10,11)");
+        assert_eq!(gen("!x = 10; x; 13"),                             "13");
         assert_eq!(gen("!x = 10; !y = 11; $p(x, y)"),                 "$p(10,11)");
         assert_eq!(gen("!x = 10; !y = 11; x; y; $p(x, y)"),           "$p(10,11)");
+        assert_eq!(gen("!x = 10; !y = 20; $p($p(1,2),$p(3,4))"),         "$p($p(1,2),$p(3,4))");
+        assert_eq!(gen("!x = 10; !y = 20; !z = $p($p(1,2),$p(3,4)); z"), "$p($p(1,2),$p(3,4))");
         assert_eq!(gen("!x = 10; !y = 11; $:x"),                      "$&&10");
         assert_eq!(gen("!:global x = 10; !y = 11; $:x"),              "$&&10");
         assert_eq!(gen("!:global x = 10; !y = 11; _"),                "14.4");

@@ -481,6 +481,13 @@ impl Env {
     }
 
     #[inline]
+    pub fn null_locals(&mut self, from: usize, to: usize) {
+        for i in from..to {
+            self.args[self.bp + i] = VVal::Nul;
+        }
+    }
+
+    #[inline]
     pub fn popn(&mut self, n: usize) {
         if self.sp < n {
             panic!(format!("Stack pointer underflow {} {}", self.sp, n));
