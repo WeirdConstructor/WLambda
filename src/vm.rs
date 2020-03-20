@@ -5,7 +5,7 @@ use crate::vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = false;
+const DEBUG_VM: bool = true;
 
 /*
 
@@ -52,8 +52,16 @@ struct Prog {
 }
 
 fn patch_respos_data(rp: &mut ResPos, idx: u16) {
-    if let ResPos::Data(i) = rp {
-        *i = *i + idx;
+    match rp {
+        ResPos::Data(i)   => { *i = *i + idx; },
+        ResPos::Global(i) => { *i = *i + idx; },
+        ResPos::Local(_)
+        | ResPos::Up(_)
+        | ResPos::Arg(_)
+        | ResPos::Stack(_)
+        | ResPos::Ret
+        | ResPos::Nul
+            => (),
     }
 }
 
@@ -186,22 +194,28 @@ impl StorePos {
                 return ResPos::Nul;
             }
 
-            if let ResPos::Data(_) = rp {
-                prog.data_pos(self.data.clone())
-            } else if let ResPos::Global(_) = rp {
-                prog.global_pos(self.data.clone())
-            } else {
-                if let Some(rmov) = self.res_mov {
-                    if let ResPos::Data(_) = rmov {
-                        let dpos = prog.data_pos(self.data.clone());
-                        prog.op_mov(dpos, rp);
-                    } else if rmov != rp {
-                        prog.op_mov(rmov, rp);
-                    }
-                }
+            let rp =
+                if let ResPos::Data(_) = rp {
+                    prog.data_pos(self.data.clone())
+                } else if let ResPos::Global(_) = rp {
+                    prog.global_pos(self.data.clone())
+                } else {
+                    rp
+                };
 
-                rp
+            if let Some(rmov) = self.res_mov {
+                if let ResPos::Data(_) = rmov {
+                    let dpos = prog.data_pos(self.data_mov.clone());
+                    prog.op_mov(dpos, rp);
+                } else if let ResPos::Global(_) = rmov {
+                    let dpos = prog.global_pos(self.data_mov.clone());
+                    prog.op_mov(dpos, rp);
+                } else if rmov != rp {
+                    prog.op_mov(rmov, rp);
+                }
             }
+
+            rp
         } else {
             panic!("Can't make undefined pos to pos! Compiler-Bug!");
         }
@@ -327,7 +341,11 @@ impl Prog {
     fn dump(&self) {
         println!("PROG:");
         for (i, o) in self.ops.iter().enumerate() {
-            println!("[{:>3}] {:?}", i, o);
+            println!("    [{:>3}] {:?}", i, o);
+        }
+        println!("  DATA:");
+        for (i, o) in self.data.iter().enumerate() {
+            println!("    [{:>3}] {:?}", i, o);
         }
     }
 }
@@ -807,20 +825,22 @@ fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool,
         if is_global {
             let mut dp = StorePos::new();
             let mut prog = Prog::new();
-            let gp = prog.data_pos(VVal::Nul);
+            let gp = prog.global_pos(VVal::Nul);
             dp.set(gp);
             let mut prog_val = vm_compile(&value, ce, &mut dp)?;
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
-                prog.set_at_data_pos(gp, r);
+                dp.data = r;
             }
             prog.append(prog_val);
+            dp.to_load_pos(&mut prog);
             Ok(prog)
         } else {
             let mut dp = StorePos::new();
             let next_local = ce.borrow_mut().next_local();
             dp.set(ResPos::Local(next_local as u16));
-            let prog = vm_compile(&value, ce, &mut dp)?;
+            let mut prog = vm_compile(&value, ce, &mut dp)?;
             ce.borrow_mut().def_local(&varname, next_local);
+            dp.to_load_pos(&mut prog);
             Ok(prog)
         }
     }
@@ -1096,9 +1116,12 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     let exprs : Vec<Prog> =
         ast.map_skip( |e| {
             let sp =
-                if i == ast_len - 1 { &mut block_sp }
-                else { &mut devnull };
-            vm_compile(e, ce, sp)
+                if i == ast_len - 1 { println!("block_sp {:?}", block_sp); &mut block_sp }
+                else {println!("devnull");  &mut devnull };
+            i += 1;
+            let mut prog = vm_compile(e, ce, sp)?;
+            sp.to_load_pos(&mut prog);
+            Ok(prog)
         }, skip_cnt)?;
 
     let mut p = Prog::new().debug(spos);
@@ -1106,7 +1129,6 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
         p.append(e);
     }
     let block_env_var_count = ce.borrow_mut().pop_block_env();
-    let pos = block_sp.to_load_pos(&mut p);
     sp.set(ResPos::Ret);
 
     // TODO: clear variables in one Op (Op::ClearLocals(a, b))
