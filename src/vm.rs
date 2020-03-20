@@ -237,6 +237,9 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
+                Op::ToRef(p1, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
                 Op::Argv(_)
                 | Op::End
                 | Op::ClearLocals(_, _)
@@ -357,6 +360,7 @@ enum Op {
     Mov(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
     Argv(ResPos),
+    ToRef(ResPos, ResPos),
     ClearLocals(u16, u16),
     End,
     //    Call(u32),
@@ -503,6 +507,20 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
                 VVal::Pair(Box::new((a, b)))
             }),
+            Op::ToRef(a, r) => {
+                match a {
+                    ResPos::Local(i) => out_reg!(env, ret, prog, r, {
+                        env.get_local_captured_ref(*i as usize)
+                    }),
+                    ResPos::Global(i) => out_reg!(env, ret, prog, r, {
+                        prog.data[*i as usize].clone()
+                    }),
+                    ResPos::Up(i) => out_reg!(env, ret, prog, r, {
+                        env.get_up_captured_ref(*i as usize)
+                    }),
+                    _ => op_a_r!(env, ret, prog, a, r, { a.to_ref() }),
+                }
+            },
             Op::Argv(r)             => op_r!(env, ret, prog, r, { env.argv() }),
             Op::End                 => { break; },
             Op::ClearLocals(from, to) => env.null_locals(*from as usize, *to as usize),
@@ -1019,6 +1037,34 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
     let var = ast.at(1).unwrap();
     var.with_s_ref(|var_s: &str| -> Result<Prog, CompileError> {
         if to_ref {
+            let pos = ce.borrow_mut().get(var_s);
+            match pos {
+                VarPos::UpValue(i) => {
+                    let mut prog = Prog::new();
+                    prog.push_op(Op::ToRef(ResPos::Up(i as u16), sp.to_store_pos()));
+                    return Ok(prog);
+                },
+                VarPos::Local(i) => {
+                    let mut prog = Prog::new();
+                    prog.push_op(Op::ToRef(ResPos::Local(i as u16), sp.to_store_pos()));
+                    return Ok(prog);
+                },
+                VarPos::Global(v) => {
+                    let mut prog = Prog::new();
+                    let mut ssp = StorePos::new();
+                    ssp.set_global(v);
+                    let ssp = ssp.to_load_pos(&mut prog);
+                    prog.push_op(Op::ToRef(ssp, sp.to_store_pos()));
+                    return Ok(prog);
+                },
+                _ => (),
+            }
+
+            let mut ssp = StorePos::new();
+            let mut prog = vm_compile_var(ast, ce, false, &mut ssp)?;
+            let ssp = ssp.to_load_pos(&mut prog);
+            prog.push_op(Op::ToRef(ssp, sp.to_store_pos()));
+            Ok(prog)
 //            match var_s {
 //                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::ArgRef(0)).result()) },
 //                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::ArgRef(1)).result()) },
@@ -1052,8 +1098,8 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
 //                    }
 //                }
 //            }
-            sp.set(ResPos::Nul);
-            Ok(Prog::new())
+//            sp.set(ResPos::Nul);
+//            Ok(Prog::new())
         } else {
             match var_s {
                 "_"  => { set_impl_arity(1,  ce); sp.set(ResPos::Arg(0)); Ok(Prog::new()) },
@@ -1523,6 +1569,8 @@ mod tests {
         assert_eq!(gen("!x = 10; !y = 20; $p($p(1,2),$p(3,4))"),         "$p($p(1,2),$p(3,4))");
         assert_eq!(gen("!x = 10; !y = 20; !z = $p($p(1,2),$p(3,4)); z"), "$p($p(1,2),$p(3,4))");
         assert_eq!(gen("!x = 10; !y = 11; $:x"),                      "$&&10");
+        assert_eq!(gen("!x = 11; $:x"),                               "$&&11");
+        assert_eq!(gen("!:global x = 12; $:x"),                       "$&&12");
         assert_eq!(gen("!:global x = 10; !y = 11; $:x"),              "$&&10");
         assert_eq!(gen("!:global x = 10; !y = 11; _"),                "14.4");
         assert_eq!(gen("!:global x = 10; !y = 11; $:_"),              "$&&14.4");
