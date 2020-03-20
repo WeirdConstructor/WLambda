@@ -785,6 +785,8 @@ struct BlockEnv {
 pub enum ResPos {
     Local(u16),
     Arg(u16),
+    Up(u16),
+    Global(u16),
     Data(u16),
     Stack(u16),
     Ret,
@@ -976,8 +978,12 @@ impl CompileEnv {
         self.global.borrow_mut().env.insert(String::from(s), val);
     }
 
-    fn def_local(&mut self, s: &str, idx: usize) {
+    pub fn def_local(&mut self, s: &str, idx: usize) {
         self.block_env.def_local(s, idx);
+    }
+
+    pub fn next_local(&mut self) -> usize {
+        self.block_env.next_local()
     }
 
     pub fn def(&mut self, s: &str, is_global: bool) -> VarPos {

@@ -89,20 +89,29 @@ impl StorePos {
 
     /// Tells the parent AST-node that this node provides
     /// a direct literal value.
-    fn set_data(&mut self, data: VVal) {
+    fn set_data_rp(&mut self, data: VVal, rp: ResPos) {
         if self.res.is_none() {
-            self.res = Some(ResPos::Data(0));
+            self.res = Some(rp);
             self.data = data;
         } else {
-            if let Some(ResPos::Data(_)) = self.res {
-                panic!("Can't set data on data!");
-            }
             if !self.res_mov.is_none() {
                 panic!("Can't set data to res_mov twice!");
             }
-            self.res_mov = Some(ResPos::Data(0));
+            self.res_mov = Some(rp);
             self.data_mov = data;
         }
+    }
+
+    /// Tells the parent AST-node that this node provides
+    /// a direct literal value.
+    fn set_data(&mut self, data: VVal) {
+        self.set_data_rp(data, ResPos::Data(0));
+    }
+
+    /// Tells the parent AST-node that this node provides
+    /// a global value.
+    fn set_global(&mut self, global: VVal) {
+        self.set_data_rp(global, ResPos::Global(0));
     }
 
     /// Tells the parent-AST where to find the value after
@@ -140,6 +149,8 @@ impl StorePos {
             // Following are all non volatile:
             ResPos::Arg(_)
             | ResPos::Local(_)
+            | ResPos::Global(_)
+            | ResPos::Up(_)
             | ResPos::Data(_)
             | ResPos::Nul
                 => (),
@@ -152,9 +163,13 @@ impl StorePos {
         if let Some(rp) = self.res {
             match rp {
                 ResPos::Arg(_)   => panic!("Can't store to Arg!"),
-                ResPos::Data(_)  => panic!("Can't store to Data!"),
                 ResPos::Stack(_) => ResPos::Stack(0),
-                ResPos::Local(_) | ResPos::Nul | ResPos::Ret
+                ResPos::Up(_)
+                | ResPos::Global(_)
+                | ResPos::Data(_)
+                | ResPos::Local(_)
+                | ResPos::Nul
+                | ResPos::Ret
                     => rp,
             }
         } else {
@@ -173,6 +188,8 @@ impl StorePos {
 
             if let ResPos::Data(_) = rp {
                 prog.data_pos(self.data.clone())
+            } else if let ResPos::Global(_) = rp {
+                prog.global_pos(self.data.clone())
             } else {
                 if let Some(rmov) = self.res_mov {
                     if let ResPos::Data(_) = rmov {
@@ -205,7 +222,8 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
-                Op::End
+                Op::Argv(_)
+                | Op::End
                     => (),
             }
         }
@@ -228,9 +246,25 @@ impl Prog {
 
     fn op_end(&mut self) -> &mut Self { self.push_op(Op::End); self }
 
+    fn set_at_data_pos(&mut self, rp: ResPos, data: VVal) {
+        if let ResPos::Data(i) = rp {
+            self.data[i as usize] = data;
+        }
+    }
+
+    fn global_pos(&mut self, data: VVal) -> ResPos {
+        self.data.push(data);
+        ResPos::Global((self.data.len() - 1) as u16)
+    }
+
     fn data_pos(&mut self, data: VVal) -> ResPos {
         self.data.push(data);
         ResPos::Data((self.data.len() - 1) as u16)
+    }
+
+    fn op_argv(&mut self, dest: ResPos) -> &mut Self {
+        self.push_op(Op::Argv(dest));
+        self
     }
 
     fn op_new_pair(&mut self, a: ResPos, b: ResPos, dest: ResPos) -> &mut Self {
@@ -302,6 +336,7 @@ impl Prog {
 enum Op {
     Mov(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
+    Argv(ResPos),
     End,
     //    Call(u32),
     //    Push(u32),
@@ -372,26 +407,38 @@ macro_rules! in_reg {
     ($env: ident, $ret: ident, $prog: ident, $respos_var: ident) => {
         let $respos_var =
             match $respos_var {
-                ResPos::Local(o) => $env.get_local(*o as usize),
-                ResPos::Arg(o)   => $env.arg(*o as usize),
-                ResPos::Data(i)  => $prog.data[*i as usize].clone(),
-                ResPos::Stack(o) => $env.pop(),
-                ResPos::Ret      => std::mem::replace(&mut $ret, VVal::Nul),
-                ResPos::Nul      => VVal::Nul,
+                ResPos::Local(o)    => $env.get_local(*o as usize),
+                ResPos::Up(i)       => $env.get_up(*i as usize),
+                ResPos::Global(i)   => $prog.data[*i as usize].deref(),
+                ResPos::Arg(o)      => $env.arg(*o as usize),
+                ResPos::Data(i)     => $prog.data[*i as usize].clone(),
+                ResPos::Stack(o)    => $env.pop(),
+                ResPos::Ret         => std::mem::replace(&mut $ret, VVal::Nul),
+                ResPos::Nul         => VVal::Nul,
             };
     }
 }
 
 macro_rules! out_reg {
-    ($env: ident, $ret: ident, $respos_var: ident, $val: expr) => {
+    ($env: ident, $ret: ident, $prog: ident, $respos_var: ident, $val: expr) => {
         match $respos_var {
-            ResPos::Local(o) => $env.set_consume(*o as usize, $val),
-                ResPos::Arg(o)   => $env.set_arg(*o as usize, $val),
-                ResPos::Stack(_) => { $env.push($val); },
-                ResPos::Ret      => { $ret = $val; },
-                ResPos::Nul      => (),
-                ResPos::Data(_)  => (),
+            ResPos::Local(o)  => $env.set_consume(*o as usize, $val),
+            ResPos::Arg(o)    => $env.set_arg(*o as usize, $val),
+            ResPos::Up(i)     => $env.set_up(*i as usize, $val),
+            ResPos::Stack(_)  => { $env.push($val); },
+            ResPos::Ret       => { $ret = $val; },
+            ResPos::Nul       => (),
+            ResPos::Global(i) => { $prog.data[*i as usize].set_ref($val); },
+            ResPos::Data(i)   => { $prog.data[*i as usize].set_ref($val); },
         };
+    }
+}
+
+macro_rules! op_r {
+    ($env: ident, $ret: ident, $prog: ident, $r: ident, $block: block) => {
+        {
+            out_reg!($env, $ret, $prog, $r, $block);
+        }
     }
 }
 
@@ -399,7 +446,7 @@ macro_rules! op_a_r {
     ($env: ident, $ret: ident, $prog: ident, $a: ident, $r: ident, $block: block) => {
         {
             in_reg!($env, $ret, $prog, $a);
-            out_reg!($env, $ret, $r, $block);
+            out_reg!($env, $ret, $prog, $r, $block);
         }
     }
 }
@@ -409,7 +456,7 @@ macro_rules! op_a_b_r {
         {
             in_reg!($env, $ret, $prog, $a);
             in_reg!($env, $ret, $prog, $b);
-            out_reg!($env, $ret, $r, $block);
+            out_reg!($env, $ret, $prog, $r, $block);
         }
     }
 }
@@ -436,6 +483,7 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
                 VVal::Pair(Box::new((a, b)))
             }),
+            Op::Argv(r) => op_r!(env, ret, prog, r, { env.argv() }),
             Op::End       => { break; },
                 //            Op::PushNul    => { env.push(VVal::Nul); },
                 //            Op::PushI(int) => { env.push(VVal::Int(*int as i64)); },
@@ -671,106 +719,112 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
     Ok(ret)
 }
+
+fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool, sp: &mut StorePos) -> Result<Prog, CompileError> {
+    let prev_max_arity = ce.borrow().implicit_arity.clone();
+
+    let vars    = ast.at(1).unwrap();
+    let value   = ast.at(2).unwrap();
+    let destr   = ast.at(3).unwrap_or(VVal::Nul);
+
+    //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
+
+    if destr.b() {
+        return Err(ast.compile_err("UNIMPL: DESTR!".to_string()));
+//        let cv = compile(&value, ce)?;
 //
-//fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool, res: ResPos) -> Result<Prog, CompileError> {
-//    let prev_max_arity = ce.borrow().implicit_arity.clone();
+//        check_for_at_arity(prev_max_arity, ast, ce, &vars);
 //
-//    let vars    = ast.at(1).unwrap();
-//    let value   = ast.at(2).unwrap();
-//    let destr   = ast.at(3).unwrap_or(VVal::Nul);
+//        let poses =
+//            vars.map_ok_skip(
+//                |v| ce.borrow_mut().def(&v.s_raw(), is_global),
+//                0);
 //
-//    //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
+//        Ok(Box::new(move |e: &mut Env| {
+//            let v = cv(e)?;
+//            match v {
+//                VVal::Lst(l) => {
+//                    for (i, vi) in poses.iter().enumerate() {
+//                        if l.borrow().len() <= i {
+//                            if let VarPos::Local(vip) = vi {
+//                                e.set_consume(*vip, VVal::Nul);
+//                            }
+//                        } else {
+//                            let val = &mut l.borrow_mut()[i];
 //
-//    if destr.b() {
-//        return Err(ast.compile_err("UNIMPL: DESTR!".to_string()));
-////        let cv = compile(&value, ce)?;
-////
-////        check_for_at_arity(prev_max_arity, ast, ce, &vars);
-////
-////        let poses =
-////            vars.map_ok_skip(
-////                |v| ce.borrow_mut().def(&v.s_raw(), is_global),
-////                0);
-////
-////        Ok(Box::new(move |e: &mut Env| {
-////            let v = cv(e)?;
-////            match v {
-////                VVal::Lst(l) => {
-////                    for (i, vi) in poses.iter().enumerate() {
-////                        if l.borrow().len() <= i {
-////                            if let VarPos::Local(vip) = vi {
-////                                e.set_consume(*vip, VVal::Nul);
-////                            }
-////                        } else {
-////                            let val = &mut l.borrow_mut()[i];
-////
-////                            let set_val = val.clone();
-////                            match vi {
-////                                VarPos::Local(vip) => {
-////                                    e.set_consume(*vip, set_val);
-////                                },
-////                                VarPos::Global(r) => {
-////                                    if let VVal::Ref(gr) = r {
-////                                        gr.replace(set_val);
-////                                    }
-////                                },
-////                                _ => {}
-////                            }
-////                        }
-////                    }
-////                },
-////                VVal::Map(m) => {
-////                    for (i, vi) in poses.iter().enumerate() {
-////                        let vname = vars.at(i).unwrap().s_raw();
-////                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-////
-////                        match vi {
-////                            VarPos::Local(vip) => e.set_consume(*vip, val),
-////                            VarPos::Global(r) => {
-////                                if let VVal::Ref(gr) = r {
-////                                    gr.replace(val);
-////                                }
-////                            },
-////                            _ => {}
-////                        }
-////                    }
-////                },
-////                _ => {
-////                    for vi in poses.iter() {
-////                        match vi {
-////                            VarPos::Local(vip) => e.set_consume(*vip, v.clone()),
-////                            VarPos::Global(r) => {
-////                                if let VVal::Ref(gr) = r {
-////                                    gr.replace(v.clone());
-////                                }
-////                            },
-////                            _ => {},
-////                        }
-////                    }
-////                }
-////            }
-////
-////            Ok(VVal::Nul)
-////        }))
-//    } else {
-//        let varname = vars.at(0).unwrap().s_raw();
-//        ce.borrow_mut().recent_var = varname.clone();
+//                            let set_val = val.clone();
+//                            match vi {
+//                                VarPos::Local(vip) => {
+//                                    e.set_consume(*vip, set_val);
+//                                },
+//                                VarPos::Global(r) => {
+//                                    if let VVal::Ref(gr) = r {
+//                                        gr.replace(set_val);
+//                                    }
+//                                },
+//                                _ => {}
+//                            }
+//                        }
+//                    }
+//                },
+//                VVal::Map(m) => {
+//                    for (i, vi) in poses.iter().enumerate() {
+//                        let vname = vars.at(i).unwrap().s_raw();
+//                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
 //
-//        if is_global {
-//            let t1 = ce.tmp_stk_slot();
-//            let mut prog = vm_compile(&value, ce, ResPos::Stack(0))?
-//            if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
-//                prog.append(Prog::new().data_op(Op::SetGlobal(0), r));
+//                        match vi {
+//                            VarPos::Local(vip) => e.set_consume(*vip, val),
+//                            VarPos::Global(r) => {
+//                                if let VVal::Ref(gr) = r {
+//                                    gr.replace(val);
+//                                }
+//                            },
+//                            _ => {}
+//                        }
+//                    }
+//                },
+//                _ => {
+//                    for vi in poses.iter() {
+//                        match vi {
+//                            VarPos::Local(vip) => e.set_consume(*vip, v.clone()),
+//                            VarPos::Global(r) => {
+//                                if let VVal::Ref(gr) = r {
+//                                    gr.replace(v.clone());
+//                                }
+//                            },
+//                            _ => {},
+//                        }
+//                    }
+//                }
 //            }
-//            Ok(prog)
-//        } else {
-//            let next_local = ce.borrow().reserve_local();
-//            let prog = vm_compile(&value, ce, ResPos::Local(next_local as u16))?
-//            ce.borrow_mut().def_local(&varname, next_local);
-//            Ok(prog)
-//        }
-//    }
-//}
+//
+//            Ok(VVal::Nul)
+//        }))
+    } else {
+        let varname = vars.at(0).unwrap().s_raw();
+        ce.borrow_mut().recent_var = varname.clone();
+
+        if is_global {
+            let mut dp = StorePos::new();
+            let mut prog = Prog::new();
+            let gp = prog.data_pos(VVal::Nul);
+            dp.set(gp);
+            let mut prog_val = vm_compile(&value, ce, &mut dp)?;
+            if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
+                prog.set_at_data_pos(gp, r);
+            }
+            prog.append(prog_val);
+            Ok(prog)
+        } else {
+            let mut dp = StorePos::new();
+            let next_local = ce.borrow_mut().next_local();
+            dp.set(ResPos::Local(next_local as u16));
+            let prog = vm_compile(&value, ce, &mut dp)?;
+            ce.borrow_mut().def_local(&varname, next_local);
+            Ok(prog)
+        }
+    }
+}
 
 //fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, res: ResPos) -> Result<Prog, CompileError> {
 //    let prev_max_arity = ce.borrow().implicit_arity.clone();
@@ -939,71 +993,36 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 //}
 
 
-//fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, res: ResPos) -> Result<Prog, CompileError> {
-//    let var = ast.at(1).unwrap();
-//    var.with_s_ref(|var_s: &str| -> Result<Prog, CompileError> {
-//        if to_ref {
-////            match var_s {
-////                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::ArgRef(0)).result()) },
-////                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::ArgRef(1)).result()) },
-////                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().op(Op::ArgRef(2)).result()) },
-////                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().op(Op::ArgRef(3)).result()) },
-////                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().op(Op::ArgRef(4)).result()) },
-////                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().op(Op::ArgRef(5)).result()) },
-////                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().op(Op::ArgRef(6)).result()) },
-////                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().op(Op::ArgRef(7)).result()) },
-////                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().op(Op::ArgRef(8)).result()) },
-////                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().op(Op::ArgRef(9)).result()) },
-////                "@"  => {
-////                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-////                    Ok(Prog::new().op(Op::ArgvRef).result())
-////                },
-////                _ => {
-////                    let pos = ce.borrow_mut().get(var_s);
-////                    match pos {
-////                        VarPos::UpValue(i) =>
-////                            Ok(Prog::new().op(Op::GetUpRef(i as u32)).result()),
-////                        VarPos::Local(i) =>
-////                            Ok(Prog::new().op(Op::GetLocalRef(i as u32)).result()),
-////                        VarPos::Global(v) =>
-////                            Ok(Prog::new().data_op(Op::GetGlobalRef(0), v.clone()).result()),
-////                        VarPos::Const(v) =>
-////                            Ok(Prog::new().data_op(Op::PushRef(0), v.clone()).result()),
-////                        VarPos::NoPos => {
-////                            Err(ast.compile_err(
-////                                format!("Variable '{}' undefined", var_s)))
-////                        }
-////                    }
-////                }
-////            }
-//            Ok(Prog::new().op(Op::PushNul))
-//        } else {
+fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp: &mut StorePos) -> Result<Prog, CompileError> {
+    let var = ast.at(1).unwrap();
+    var.with_s_ref(|var_s: &str| -> Result<Prog, CompileError> {
+        if to_ref {
 //            match var_s {
-//                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().result(ResPos::Arg(0))) },
-//                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().result(ResPos::Arg(1))) },
-//                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().result(ResPos::Arg(2))) },
-//                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().result(ResPos::Arg(3))) },
-//                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().result(ResPos::Arg(4))) },
-//                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().result(ResPos::Arg(5))) },
-//                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().result(ResPos::Arg(6))) },
-//                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().result(ResPos::Arg(7))) },
-//                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().result(ResPos::Arg(8))) },
-//                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().result(ResPos::Arg(9))) },
+//                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::ArgRef(0)).result()) },
+//                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::ArgRef(1)).result()) },
+//                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().op(Op::ArgRef(2)).result()) },
+//                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().op(Op::ArgRef(3)).result()) },
+//                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().op(Op::ArgRef(4)).result()) },
+//                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().op(Op::ArgRef(5)).result()) },
+//                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().op(Op::ArgRef(6)).result()) },
+//                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().op(Op::ArgRef(7)).result()) },
+//                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().op(Op::ArgRef(8)).result()) },
+//                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().op(Op::ArgRef(9)).result()) },
 //                "@"  => {
 //                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-//                    Ok(Prog::new().op(Op::Argv).result(ResPos::Stack(0)))
+//                    Ok(Prog::new().op(Op::ArgvRef).result())
 //                },
 //                _ => {
 //                    let pos = ce.borrow_mut().get(var_s);
 //                    match pos {
 //                        VarPos::UpValue(i) =>
-//                            Ok(Prog::new().op(Op::GetUp(i as u32)).result(ResPos::Stack(0))),
+//                            Ok(Prog::new().op(Op::GetUpRef(i as u32)).result()),
 //                        VarPos::Local(i) =>
-//                            Ok(Prog::new().result(ResPos::Local(i as u16))),
+//                            Ok(Prog::new().op(Op::GetLocalRef(i as u32)).result()),
 //                        VarPos::Global(v) =>
-//                            Ok(Prog::new().data_op(Op::GetGlobal(0), v.clone()).result(ResPos::Stack(0))),
+//                            Ok(Prog::new().data_op(Op::GetGlobalRef(0), v.clone()).result()),
 //                        VarPos::Const(v) =>
-//                            Ok(Prog::new().op(Op::PushV(v.clone())).result(ResPos::Stack(0))),
+//                            Ok(Prog::new().data_op(Op::PushRef(0), v.clone()).result()),
 //                        VarPos::NoPos => {
 //                            Err(ast.compile_err(
 //                                format!("Variable '{}' undefined", var_s)))
@@ -1011,9 +1030,57 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 //                    }
 //                }
 //            }
-//        }
-//    })
-//}
+            sp.set(ResPos::Nul);
+            Ok(Prog::new())
+        } else {
+            match var_s {
+                "_"  => { set_impl_arity(1,  ce); sp.set(ResPos::Arg(0)); Ok(Prog::new()) },
+                "_1" => { set_impl_arity(2,  ce); sp.set(ResPos::Arg(1)); Ok(Prog::new()) },
+                "_2" => { set_impl_arity(3,  ce); sp.set(ResPos::Arg(2)); Ok(Prog::new()) },
+                "_3" => { set_impl_arity(4,  ce); sp.set(ResPos::Arg(3)); Ok(Prog::new()) },
+                "_4" => { set_impl_arity(5,  ce); sp.set(ResPos::Arg(4)); Ok(Prog::new()) },
+                "_5" => { set_impl_arity(6,  ce); sp.set(ResPos::Arg(5)); Ok(Prog::new()) },
+                "_6" => { set_impl_arity(7,  ce); sp.set(ResPos::Arg(6)); Ok(Prog::new()) },
+                "_7" => { set_impl_arity(8,  ce); sp.set(ResPos::Arg(7)); Ok(Prog::new()) },
+                "_8" => { set_impl_arity(9,  ce); sp.set(ResPos::Arg(8)); Ok(Prog::new()) },
+                "_9" => { set_impl_arity(10, ce); sp.set(ResPos::Arg(9)); Ok(Prog::new()) },
+                "@"  => {
+                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+                    let mut prog = Prog::new();
+                    prog.op_argv(sp.to_store_pos());
+                    Ok(prog)
+                },
+                _ => {
+                    let pos = ce.borrow_mut().get(var_s);
+                    match pos {
+                        VarPos::UpValue(i) => {
+                            sp.set(ResPos::Up(i as u16));
+                            Ok(Prog::new())
+                        },
+                        VarPos::Local(i) => {
+                            sp.set(ResPos::Local(i as u16));
+                            Ok(Prog::new())
+                        },
+                        VarPos::Global(v) => {
+                            let mut prog = Prog::new();
+                            sp.set_global(v);
+                            Ok(Prog::new())
+                        },
+                        VarPos::Const(v) => {
+                            let mut prog = Prog::new();
+                            sp.set_data(v.clone());
+                            Ok(Prog::new())
+                        },
+                        VarPos::NoPos => {
+                            Err(ast.compile_err(
+                                format!("Variable '{}' undefined", var_s)))
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
 
 fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, return_func: bool, sp: &mut StorePos) -> Result<Prog, CompileError> {
     let syn  = ast.at(0).unwrap_or(VVal::Nul);
@@ -1116,10 +1183,10 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
                 Syntax::Block      => vm_compile_block(ast, 1, ce, true, sp),
 //                Syntax::Assign     => vm_compile_assign(ast, ce, false, res).map(|p| p.debug(spos)),
 //                Syntax::AssignRef  => vm_compile_assign(ast, ce, true, res) .map(|p| p.debug(spos)),
-//                Syntax::Var        => vm_compile_var(ast, ce, false, res)   .map(|p| p.debug(spos)),
-//                Syntax::CaptureRef => vm_compile_var(ast, ce, true, res)    .map(|p| p.debug(spos)),
+                Syntax::Var        => vm_compile_var(ast, ce, false, sp)   .map(|p| p.debug(spos)),
+                Syntax::CaptureRef => vm_compile_var(ast, ce, true, sp)    .map(|p| p.debug(spos)),
 //                Syntax::Def        => vm_compile_def(ast, ce, false, res)   .map(|p| p.debug(spos)),
-//                Syntax::DefGlobRef => vm_compile_def(ast, ce, true, res)    .map(|p| p.debug(spos)),
+                Syntax::DefGlobRef => vm_compile_def(ast, ce, true, sp)    .map(|p| p.debug(spos)),
 //                Syntax::BinOpAdd   => vm_compile_binop(ast, Op::Add, ce, res),
 //                Syntax::BinOpSub   => vm_compile_binop(ast, Op::Sub, ce, res),
 //                Syntax::BinOpDiv   => vm_compile_binop(ast, Op::Div, ce, res),
