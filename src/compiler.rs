@@ -781,39 +781,12 @@ struct BlockEnv {
     locals:          std::vec::Vec<(String, CompileLocal)>,
 }
 
-#[derive(Debug, Clone)]
-struct TmpStackSlot {
-    local_index:       usize,
-    reuse_stk_slot: Rc<RefCell<std::vec::Vec<usize>>>,
-    detached:          bool,
-}
-
-impl TmpStackSlot {
-    fn new(local_index: usize, reuse_stk_slot: Rc<RefCell<std::vec::Vec<usize>>>) -> Self {
-        Self {
-            local_index,
-            reuse_stk_slot,
-            detached: false,
-        }
-    }
-
-    fn get(&self) -> ResPos { ResPos::Local(self.local_index as u16) }
-
-    fn detach(&mut self) { self.detached = true; }
-}
-
-impl Drop for TmpStackSlot {
-    fn drop(&mut self) {
-        if !self.detached {
-            self.reuse_stk_slot.borrow_mut().push(self.local_index);
-        }
-    }
-}
-
 #[derive(Debug,Clone,Copy,PartialEq)]
 pub enum ResPos {
     Local(u16),
     Arg(u16),
+    Data(u16),
+    Stack(u16),
     Ret,
     Nul,
 }
@@ -883,14 +856,27 @@ impl BlockEnv {
     // - give back GT[c, d, e]
     // - GT[f]     = 7
     // - GT[g]     = 8
-    fn tmp_stk_slot(&mut self) -> Rc<RefCell<TmpStackSlot>> {
+    fn tmp_stk_slot(&mut self) -> ResPos {
         let next_index = self.locals.len();
         self.locals.push((String::from(""), CompileLocal { }));
         let last_idx = self.local_map_stack.len() - 1;
         self.local_map_stack[last_idx].0 += 1;
-        Rc::new(RefCell::new(
-            TmpStackSlot::new(
-                next_index, self.reuse_stk_slot.clone())))
+        ResPos::Local(next_index as u16)
+    }
+
+    fn next_local(&mut self) -> usize {
+        let next_index = self.locals.len();
+        self.locals.push((String::from(""), CompileLocal { }));
+        next_index
+    }
+
+    fn def_local(&mut self, var: &str, idx: usize) {
+        self.locals[idx].0 = String::from(var);
+        let last_idx = self.local_map_stack.len() - 1;
+        self.local_map_stack[last_idx].1
+            .insert(String::from(var),
+                    VarPos::Local(idx));
+        self.local_map_stack[last_idx].0 += 1;
     }
 
     fn new_local(&mut self, var: &str) -> VarPos {
@@ -946,16 +932,6 @@ pub struct CompileEnv {
 /// Reference type to a `CompileEnv`.
 type CompileEnvRef = Rc<RefCell<CompileEnv>>;
 
-pub fn with_stack_space<T>(ce: CompileEnvRef, f: T) -> usize
-    where T: FnOnce(F2) -> (),
-          F2: Fn() -> usize
-{
-    ce.borrow_mut().push_block_env();
-    f(|| ce.borrow_mut().new_local("tmp"));
-    ce.borrow_mut().pop_block_env()
-}
-
-
 impl CompileEnv {
     pub fn new(g: GlobalEnvRef) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(CompileEnv {
@@ -1000,6 +976,10 @@ impl CompileEnv {
         self.global.borrow_mut().env.insert(String::from(s), val);
     }
 
+    fn def_local(&mut self, s: &str, idx: usize) {
+        self.block_env.def_local(s, idx);
+    }
+
     pub fn def(&mut self, s: &str, is_global: bool) -> VarPos {
         if is_global {
             let v = VVal::Nul;
@@ -1007,7 +987,9 @@ impl CompileEnv {
             self.global.borrow_mut().env.insert(String::from(s), r.clone());
             VarPos::Global(r)
         } else {
-            self.block_env.new_local(s)
+            let idx = self.block_env.next_local();
+            self.block_env.def_local(s, idx);
+            VarPos::Local(idx)
         }
     }
 
@@ -1037,7 +1019,7 @@ impl CompileEnv {
         self.block_env.push_env();
     }
 
-    pub fn tmp_stk_slot(&mut self) -> TmpStackSlot {
+    pub fn tmp_stk_slot(&mut self) -> ResPos {
         self.block_env.tmp_stk_slot()
     }
 

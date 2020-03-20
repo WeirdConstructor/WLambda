@@ -7,6 +7,43 @@ use std::cell::RefCell;
 
 const DEBUG_VM: bool = false;
 
+/*
+
+Function call:
+    sp => bp    for referencing the arguments (bp - 1) and locals (bp + 0)
+
+
+{   old_bp <= bp, sp => bp, sp => sp + local_count
+!x, y = (_, _1);    | (bp + 0, bp + 1) = (bp - 1, bp - 2)
+                    | GetArg(0, ResPos::Local(0))
+                    | GetArg(1, ResPos::Local(1))
+
+.x = 1 + 2;         | Add(ResPos::Data(V:1), ResPos::Data(V:2), ResPos::Local(0))
+
+.y = add x 1;       | Mov(ResPos::Data(V:1), ResPos::Stack) (sp++)
+                    | Mov(ResPos::Local(0), ResPos::Stack)  (sp++)
+                    | GetGlobal(324, ResPos::Stack(0))  (sp++)
+                    | Call(2, ResPos::Local(1))         (sp -= 3)
+
+.y = add 2 (add 3 4) | Mov(ResPos::Data(V:4), ResPos::Stack)            (sp++)
+                     | Mov(ResPos::Data(V:3), ResPos::Stack)            (sp++)
+                     | GetGlobal(324, ResPos::Stack)                    (sp++)
+                     | Call(2, ResPos::Stack)                           (sp -= 3, sp++)
+                     | Mov(ResPos::Data(V:2), ResPos::Stack)            (sp++)
+                     | GetGlobal(324, ResPos::Stack)                    (sp++)
+                     | Call(2, ResPos::Local(1))                        (sp -= 3)
+
+.y = 10 + block {    | 
+    !g = 10;         | Mov(ResPos::Data(V:10), ResPos::Local(2))
+    g                | Mov(ResPos::Local(2), ResPos::Stack)
+};                   | 
+                     | Add(ResPos::Data(V:10), ResPos::Stack(0)) (sp -= 1, sp++)
+
+} bp <= old_bp, sp <= sp - local_count / old_sp
+
+
+*/
+
 struct Prog {
     debug:   std::vec::Vec<Option<SynPos>>,
     data:    std::vec::Vec<VVal>,
@@ -14,71 +51,162 @@ struct Prog {
     nxt_debug: Option<SynPos>,
 }
 
+fn patch_respos_data(rp: &mut ResPos, idx: u16) {
+    if let ResPos::Data(i) = rp {
+        *i = *i + idx;
+    }
+}
+
+/// This structure handles determination where to store or load
+/// a value from when compiling to a VM prog.
+#[derive(Debug,Clone)]
+pub struct StorePos {
+    res:        Option<ResPos>,
+    data:       VVal,
+    res_mov:    Option<ResPos>,
+    data_mov:   VVal,
+}
+
+impl StorePos {
+    fn new() -> Self {
+        Self { res: None, data: VVal::Nul, res_mov: None, data_mov: VVal::Nul }
+    }
+
+    fn clear(&mut self) {
+        self.res           = None;
+        self.data          = VVal::Nul;
+        self.res_mov       = None;
+        self.data_mov      = VVal::Nul;
+    }
+
+    /// Tells any compilation routine, that storing the result
+    /// is not necessary and should not create additional Mov operations.
+    fn new_dev_null() -> Self {
+        let mut s = Self::new();
+        s.res = Some(ResPos::Nul);
+        s
+    }
+
+    /// Tells the parent AST-node that this node provides
+    /// a direct literal value.
+    fn set_data(&mut self, data: VVal) {
+        if self.res.is_none() {
+            self.res = Some(ResPos::Data(0));
+            self.data = data;
+        } else {
+            if let Some(ResPos::Data(_)) = self.res {
+                panic!("Can't set data on data!");
+            }
+            if !self.res_mov.is_none() {
+                panic!("Can't set data to res_mov twice!");
+            }
+            self.res_mov = Some(ResPos::Data(0));
+            self.data_mov = data;
+        }
+    }
+
+    /// Tells the parent-AST where to find the value after
+    /// the corresponding piece of VM prog code is done.
+    fn set(&mut self, rp: ResPos) {
+        if self.res.is_none() {
+            self.res = Some(rp);
+        } else {
+            if !self.res_mov.is_none() {
+                panic!("Can't set store pos twice, not even mov!");
+            }
+            self.res_mov = Some(rp);
+        }
+    }
+
+    /// Checks if the value is stored at a volatile place.
+    fn volatile_to_stack(&mut self, prog: &mut Prog, offs: &mut usize) {
+        match self.res.expect("Need destination in volatile_to_stack!") {
+            // Ret is volatile, as the next block of code overwrites it!
+            ResPos::Ret => {
+                let rp = self.to_load_pos(prog);
+                prog.op_mov(rp, ResPos::Stack(*offs as u16));
+                self.clear();
+                self.res = Some(ResPos::Stack(*offs as u16));
+                *offs += 1;
+            },
+            // ::Stack(_) is just a marker, that the called piece of
+            // code wants to store the value somehow.
+            // Usually set by to_store_pos() (see below)
+            ResPos::Stack(_) => {
+                self.clear();
+                self.res = Some(ResPos::Stack(*offs as u16));
+                *offs += 1;
+            },
+            // Following are all non volatile:
+            ResPos::Arg(_)
+            | ResPos::Local(_)
+            | ResPos::Data(_)
+            | ResPos::Nul
+                => (),
+        }
+    }
+
+    /// Called when a AST node produces a value at runtime and wants
+    /// to store it.
+    fn to_store_pos(&mut self) -> ResPos {
+        if let Some(rp) = self.res {
+            match rp {
+                ResPos::Arg(_)   => panic!("Can't store to Arg!"),
+                ResPos::Data(_)  => panic!("Can't store to Data!"),
+                ResPos::Stack(_) => ResPos::Stack(0),
+                ResPos::Local(_) | ResPos::Nul | ResPos::Ret
+                    => rp,
+            }
+        } else {
+            self.res = Some(ResPos::Stack(0));
+            self.res.unwrap()
+        }
+    }
+
+    /// Called when the AST node requires an actual position
+    /// at runtime where to read the value from.
+    fn to_load_pos(&self, prog: &mut Prog) -> ResPos {
+        if let Some(rp) = self.res {
+            if let ResPos::Nul = rp {
+                return ResPos::Nul;
+            }
+
+            if let ResPos::Data(_) = rp {
+                prog.data_pos(self.data.clone())
+            } else {
+                if let Some(rmov) = self.res_mov {
+                    if let ResPos::Data(_) = rmov {
+                        let dpos = prog.data_pos(self.data.clone());
+                        prog.op_mov(dpos, rp);
+                    } else if rmov != rp {
+                        prog.op_mov(rmov, rp);
+                    }
+                }
+
+                rp
+            }
+        } else {
+            panic!("Can't make undefined pos to pos! Compiler-Bug!");
+        }
+    }
+}
+
 impl Prog {
     fn append(&mut self, mut prog: Prog) {
-        let mut self_data_next_idx : u32 = self.data.len() as u32;
+        let self_data_next_idx : u16 = self.data.len() as u16;
 
         for o in prog.ops.iter_mut() {
             match o {
-                Op::Push(ref mut data_idx) => {
-                    *data_idx = *data_idx + self_data_next_idx;
+                Op::NewPair(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
                 },
-                Op::PushRef(ref mut data_idx) => {
-                    *data_idx = *data_idx + self_data_next_idx;
+                Op::Mov(p1, p2) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
                 },
-                Op::SetGlobal(ref mut data_idx) => {
-                    *data_idx = *data_idx + self_data_next_idx;
-                },
-                Op::GetGlobal(ref mut data_idx) => {
-                    *data_idx = *data_idx + self_data_next_idx;
-                },
-                Op::GetGlobalRef(ref mut data_idx) => {
-                    *data_idx = *data_idx + self_data_next_idx;
-                },
-                Op::NewClos(ref mut data_idx) => {
-                    *data_idx = *data_idx + self_data_next_idx;
-                },
-                Op::NewPair
-                | Op::PushV(_)
-                | Op::NewList(_)
-                | Op::ListPush(_, _)
-                | Op::ListSplice(_, _)
-                | Op::NewMap
-                | Op::MapSetKey
-                | Op::MapSplice
-                | Op::NewErr
-                | Op::Ret(_, _)
-                | Op::End
-                | Op::Call(_)
-                | Op::NextI(_, _)
-                | Op::Jmp(_)
-                | Op::JmpIf(_)
-                | Op::JmpIfN(_)
-                | Op::PushI(_)
-                | Op::PushNul
-                | Op::Pop
-                | Op::Add
-                | Op::Sub
-                | Op::Div
-                | Op::Mul
-                | Op::Mod
-                | Op::Lt
-                | Op::Le
-                | Op::Gt
-                | Op::Ge
-                | Op::Eq
-                | Op::ResvLocals(_)
-                | Op::SetLocal(_)
-                | Op::GetLocal(_)
-                | Op::GetLocalRef(_)
-                | Op::SetUp(_)
-                | Op::GetUp(_)
-                | Op::GetUpRef(_)
-                | Op::Arg(_)
-                | Op::ArgRef(_)
-                | Op::Argv
-                | Op::ArgvRef
-                => (),
+                Op::End
+                    => (),
             }
         }
 
@@ -98,11 +226,28 @@ impl Prog {
         }
     }
 
-    fn push_data(&mut self, v: VVal) -> usize {
-        self.data.push(v);
-        self.data.len() - 1
+    fn op_end(&mut self) -> &mut Self { self.push_op(Op::End); self }
+
+    fn data_pos(&mut self, data: VVal) -> ResPos {
+        self.data.push(data);
+        ResPos::Data((self.data.len() - 1) as u16)
     }
 
+    fn op_new_pair(&mut self, a: ResPos, b: ResPos, dest: ResPos) -> &mut Self {
+        self.push_op(Op::NewPair(a, b, dest));
+        self
+    }
+
+    fn op_mov(&mut self, from: ResPos, dest: ResPos) -> &mut Self {
+        self.push_op(Op::Mov(from, dest));
+        self
+    }
+
+    //    fn push_data(&mut self, v: VVal) -> usize {
+    //        self.data.push(v);
+    //        self.data.len() - 1
+    //    }
+    //
     fn unshift_op(&mut self, o: Op) -> &mut Self {
         self.ops.insert(0, o);
         self.debug.insert(0, std::mem::replace(&mut self.nxt_debug, None));
@@ -114,83 +259,37 @@ impl Prog {
         self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
         self
     }
-
-    fn push_return(&mut self, local_count: usize, return_func: bool) -> &mut Self {
-//        if let Some(res) = self.results.pop() {
-//            self.push_op(Op::Ret(local_count as u16, res));
-//        } else {
-        self.push_op(Op::Ret(local_count as u16, ResPos::Nul));
-//        };
-        self
-    }
-
-    fn data_op(mut self, o: Op, v: VVal) -> Self {
-        let idx = self.push_data(v);
-        self.ops.push(
-            match o {
-                Op::SetGlobal(_)    => Op::SetGlobal(idx as u32),
-                Op::Push(_)         => Op::Push(idx as u32),
-                Op::PushRef(_)      => Op::PushRef(idx as u32),
-                Op::GetGlobalRef(_) => Op::GetGlobalRef(idx as u32),
-                Op::GetGlobal(_)    => Op::GetGlobal(idx as u32),
-                Op::NewClos(_)      => Op::NewClos(idx as u32),
-                Op::NewPair
-                | Op::PushV(_)
-                | Op::NewList(_)
-                | Op::ListPush(_, _)
-                | Op::ListSplice(_, _)
-                | Op::NewMap
-                | Op::MapSetKey
-                | Op::MapSplice
-                | Op::NewErr
-                | Op::Ret(_, _)
-                | Op::End
-                | Op::Call(_)
-                | Op::NextI(_, _)
-                | Op::Jmp(_)
-                | Op::JmpIf(_)
-                | Op::JmpIfN(_)
-                | Op::PushI(_)
-                | Op::PushNul
-                | Op::Pop
-                | Op::Add
-                | Op::Sub
-                | Op::Div
-                | Op::Mul
-                | Op::Mod
-                | Op::Lt
-                | Op::Le
-                | Op::Gt
-                | Op::Ge
-                | Op::Eq
-                | Op::ResvLocals(_)
-                | Op::SetLocal(_)
-                | Op::GetLocal(_)
-                | Op::GetLocalRef(_)
-                | Op::SetUp(_)
-                | Op::GetUp(_)
-                | Op::GetUpRef(_)
-                | Op::Arg(_)
-                | Op::ArgRef(_)
-                | Op::Argv
-                | Op::ArgvRef
-                => panic!("data_op for non data Op called!"),
-            });
-        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
-        self
-    }
-
-    fn op(mut self, o: Op) -> Self {
-        self.ops.push(o);
-        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
-        self
-    }
-
+    //
+    //    fn push_return(&mut self, local_count: usize, return_func: bool) -> &mut Self {
+    ////        if let Some(res) = self.results.pop() {
+    ////            self.push_op(Op::Ret(local_count as u16, res));
+    ////        } else {
+    //        self.push_op(Op::Ret(local_count as u16, ResPos::Nul));
+    ////        };
+    //        self
+    //    }
+    //
+    //    fn data_op(mut self, o: Op, v: VVal) -> Self {
+    //        let idx = self.push_data(v);
+    //        self.ops.push(
+    //            match o {
+    //                => panic!("data_op for non data Op called!"),
+    //            });
+    //        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
+    //        self
+    //    }
+    //
+    //    fn op(mut self, o: Op) -> Self {
+    //        self.ops.push(o);
+    //        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
+    //        self
+    //    }
+    //
     fn debug(mut self, sp: SynPos) -> Self {
         self.nxt_debug = Some(sp);
         self
     }
-
+    //
     fn dump(&self) {
         println!("PROG:");
         for (i, o) in self.ops.iter().enumerate() {
@@ -201,78 +300,82 @@ impl Prog {
 
 #[derive(Debug,Clone)]
 enum Op {
-    Call(u32),
-    Push(u32),
-    PushI(i32),
-    PushNul,
-    PushV(VVal),
-    PushRef(u32),
-    ResvLocals(u32),
-    SetGlobal(u32),
-    GetGlobal(u32),
-    GetGlobalRef(u32),
-    SetLocal(u32),
-    GetLocal(u32),
-    GetLocalRef(u32),
-    SetUp(u32),
-    GetUp(u32),
-    GetUpRef(u32),
-    NextI(u16,u16),
-    Jmp(i32),
-    JmpIf(i32),
-    JmpIfN(i32),
-    Arg(u32),
-    ArgRef(u32),
-    Argv,
-    ArgvRef,
-    NewPair,
-    NewList(ResPos),
-    ListPush(ResPos, ResPos),
-    ListSplice(ResPos, ResPos),
-    NewMap,
-    MapSetKey,
-    MapSplice,
-    NewErr,
-    NewClos(u32),
-    Ret(u16, ResPos),
+    Mov(ResPos, ResPos),
+    NewPair(ResPos, ResPos, ResPos),
     End,
-    Pop,
-    Add(ResPos, ResPos, ResPos),
-    Sub(ResPos, ResPos, ResPos),
-    Mul(ResPos, ResPos, ResPos),
-    Div(ResPos, ResPos, ResPos),
-    Mod(ResPos, ResPos, ResPos),
-    Le(ResPos, ResPos, ResPos),
-    Lt(ResPos, ResPos, ResPos),
-    Ge(ResPos, ResPos, ResPos),
-    Gt(ResPos, ResPos, ResPos),
-    Eq(ResPos, ResPos, ResPos),
+    //    Call(u32),
+    //    Push(u32),
+    //    PushI(i32),
+    //    PushNul,
+    //    PushV(VVal),
+    //    PushRef(u32),
+    //    ResvLocals(u32),
+    //    SetGlobal(u32),
+    //    GetGlobal(u32),
+    //    GetGlobalRef(u32),
+    //    SetLocal(u32),
+    //    GetLocal(u32),
+    //    GetLocalRef(u32),
+    //    SetUp(u32),
+    //    GetUp(u32),
+    //    GetUpRef(u32),
+    //    NextI(u16,u16),
+    //    Jmp(i32),
+    //    JmpIf(i32),
+    //    JmpIfN(i32),
+    //    Arg(u32),
+    //    ArgRef(u32),
+    //    Argv,
+    //    ArgvRef,
+    //    NewList(ResPos),
+    //    ListPush(ResPos, ResPos),
+    //    ListSplice(ResPos, ResPos),
+    //    NewMap,
+    //    MapSetKey,
+    //    MapSplice,
+    //    NewErr,
+    //    NewClos(u32),
+    //    Ret(u16, ResPos),
+    //    End,
+    //    Pop,
+    //    Add(ResPos, ResPos, ResPos),
+    //    Sub(ResPos, ResPos, ResPos),
+    //    Mul(ResPos, ResPos, ResPos),
+    //    Div(ResPos, ResPos, ResPos),
+    //    Mod(ResPos, ResPos, ResPos),
+    //    Le(ResPos, ResPos, ResPos),
+    //    Lt(ResPos, ResPos, ResPos),
+    //    Ge(ResPos, ResPos, ResPos),
+    //    Gt(ResPos, ResPos, ResPos),
+    //    Eq(ResPos, ResPos, ResPos),
 }
 
 impl Op {
-    fn set_out(&mut self, out: ResPos) -> Self {
-        match self {
-            Op::Add(a, b, _) => Op::Add(a, b, out),
-            Op::Sub(a, b, _) => Op::Sub(a, b, out),
-            Op::Mul(a, b, _) => Op::Mul(a, b, out),
-            Op::Div(a, b, _) => Op::Div(a, b, out),
-            Op::Mod(a, b, _) => Op::Mod(a, b, out),
-            Op::Le(a, b, _)  => Op::Le(a, b, out),
-            Op::Lt(a, b, _)  => Op::Lt(a, b, out),
-            Op::Ge(a, b, _)  => Op::Ge(a, b, out),
-            Op::Gt(a, b, _)  => Op::Gt(a, b, out),
-            Op::Eq(a, b, _)  => Op::Eq(a, b, out),
-            _                => self.clone(),
-        }
-    }
+    //    fn set_out(&mut self, out: ResPos) -> Self {
+    //        match self {
+    //            Op::Add(a, b, _) => Op::Add(*a, *b, out),
+    //            Op::Sub(a, b, _) => Op::Sub(*a, *b, out),
+    //            Op::Mul(a, b, _) => Op::Mul(*a, *b, out),
+    //            Op::Div(a, b, _) => Op::Div(*a, *b, out),
+    //            Op::Mod(a, b, _) => Op::Mod(*a, *b, out),
+    //            Op::Le(a, b, _)  => Op::Le( *a, *b, out),
+    //            Op::Lt(a, b, _)  => Op::Lt( *a, *b, out),
+    //            Op::Ge(a, b, _)  => Op::Ge( *a, *b, out),
+    //            Op::Gt(a, b, _)  => Op::Gt( *a, *b, out),
+    //            Op::Eq(a, b, _)  => Op::Eq( *a, *b, out),
+    //            _                => self.clone(),
+    //        }
+    //    }
 }
 
 macro_rules! in_reg {
-    ($env: ident, $ret: ident, $respos_var: ident) => {
+    ($env: ident, $ret: ident, $prog: ident, $respos_var: ident) => {
         let $respos_var =
             match $respos_var {
                 ResPos::Local(o) => $env.get_local(*o as usize),
                 ResPos::Arg(o)   => $env.arg(*o as usize),
+                ResPos::Data(i)  => $prog.data[*i as usize].clone(),
+                ResPos::Stack(o) => $env.pop(),
                 ResPos::Ret      => std::mem::replace(&mut $ret, VVal::Nul),
                 ResPos::Nul      => VVal::Nul,
             };
@@ -283,24 +386,30 @@ macro_rules! out_reg {
     ($env: ident, $ret: ident, $respos_var: ident, $val: expr) => {
         match $respos_var {
             ResPos::Local(o) => $env.set_consume(*o as usize, $val),
-            ResPos::Arg(o)   => $env.set_arg(*o as usize, $val),
-            ResPos::Ret      => { std::mem::replace(&mut $ret, $val); },
-            ResPos::Nul      => (),
+                ResPos::Arg(o)   => $env.set_arg(*o as usize, $val),
+                ResPos::Stack(_) => { $env.push($val); },
+                ResPos::Ret      => { $ret = $val; },
+                ResPos::Nul      => (),
+                ResPos::Data(_)  => (),
         };
     }
 }
 
-macro_rules! op_0_r {
-    ($env: ident, $ret: ident, $out: ident, $b: block) => {
-        out_reg!($env, $ret, $out, $b);
+macro_rules! op_a_r {
+    ($env: ident, $ret: ident, $prog: ident, $a: ident, $r: ident, $block: block) => {
+        {
+            in_reg!($env, $ret, $prog, $a);
+            out_reg!($env, $ret, $r, $block);
+        }
     }
 }
 
-macro_rules! op_1_ret {
-    ($env: ident, $ret: ident, $var: ident, $b: block) => {
+macro_rules! op_a_b_r {
+    ($env: ident, $ret: ident, $prog: ident, $a: ident, $b: ident, $r: ident, $block: block) => {
         {
-            in_reg!($env, $ret, $var);
-            std::mem::replace(&mut $ret, $b);
+            in_reg!($env, $ret, $prog, $a);
+            in_reg!($env, $ret, $prog, $b);
+            out_reg!($env, $ret, $r, $block);
         }
     }
 }
@@ -323,226 +432,231 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             println!("OP[{:>3}]: {:<15}      | sp: {:>3}, bp: {:>3} | {}", pc, format!("{:?}", op), env.sp, env.bp, syn);
         }
         match op {
-            Op::PushNul    => { env.push(VVal::Nul); },
-            Op::PushI(int) => { env.push(VVal::Int(*int as i64)); },
-            Op::PushV(v) => {
-                env.push(v.clone());
-            },
-            Op::Push(data_idx) => {
-                env.push(prog.data[*data_idx as usize].clone());
-            },
-            Op::PushRef(data_idx) => {
-                env.push(prog.data[*data_idx as usize].to_ref());
-            },
-            Op::NewPair => {
-                let b = env.pop();
-                let a = env.pop();
-                env.push(VVal::Pair(Box::new((a, b))));
-            },
-            Op::ResvLocals(count)      => env.push_sp(*count as usize),
-            Op::Pop                    => {
-                if let VVal::Err(ev) = env.pop() {
-                    return
-                        Err(StackAction::panic_str(
-                            format!("Error value '{}' dropped.",
-                                    ev.borrow().0.s()),
-                            Some(ev.borrow().1.clone())));
-                }
-            },
-            Op::Jmp(jmp_offs) => {
-                pc = (pc as i32 + *jmp_offs) as usize;
-            },
-            Op::JmpIf(jmp_offs) => {
-                let v = env.pop();
-                if v.b() { pc = (pc as i32 + *jmp_offs) as usize; }
-            },
-            Op::JmpIfN(jmp_offs) => {
-                let v = env.pop();
-                if !v.b() { pc = (pc as i32 + *jmp_offs) as usize; }
-            },
-            Op::NextI(idx, jmp_offs) => {
-                let counter = env.inc_local(*idx as usize, 1);
-                if counter >= env.stk_i(0) {
-                    pc = (pc as i32 + *jmp_offs as i32) as usize;
-                }
-            },
-            Op::Ret(count, rp) => op_1_ret!(env, ret, rp, { rp }),
-            Op::End => { break; },
-            Op::SetLocal(idx)          => {
-                let v = env.pop();
-                env.set_consume(*idx as usize, v);
-            },
-            Op::SetUp(idx)             => {
-                let v = env.pop();
-                env.set_up(*idx as usize, v);
-            },
-            Op::SetGlobal(data_idx)    => { prog.data[*data_idx as usize].set_ref(env.pop()); },
-            Op::GetGlobal(data_idx)    => { env.push(prog.data[*data_idx as usize].deref()); },
-            Op::GetGlobalRef(data_idx) => { env.push(prog.data[*data_idx as usize].clone()); },
-            Op::GetUp(idx)             => { env.push(env.get_up(*idx as usize)); },
-            Op::GetUpRef(idx)          => { env.push(env.get_up_captured_ref(*idx as usize)); },
-            Op::GetLocal(idx)          => { env.push(env.get_local(*idx as usize)); },
-            Op::GetLocalRef(idx)       => { env.push(env.get_local_captured_ref(*idx as usize)); },
-            Op::Arg(arg_idx)           => { env.push(env.arg(*arg_idx as usize)); },
-            Op::ArgRef(arg_idx)        => { env.push(env.arg(*arg_idx as usize).to_ref()); },
-            Op::Argv                   => { env.push(env.argv()); },
-            Op::ArgvRef                => { env.push(env.argv().to_ref()); },
-            Op::Add => {
-                let a = env.reg(-1);
-                let b = env.reg(-2);
-
-                let res =
-                    if let VVal::Int(a) = a {
-                        VVal::Int(a.wrapping_add(b.i()))
-                    } else {
-                        match (a.clone(), b.clone()) {
-                            (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
-                            (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
-                            (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
-                            (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
-                        }
-                    };
-
-                env.popn(2);
-                env.push(res);
-            },
-            Op::Sub => {
-                let b = env.pop();
-                let a = env.pop();
-                let res =
-                    if let VVal::Flt(f) = a { VVal::Flt(f - b.f()) }
-                    else { VVal::Int(a.i().wrapping_sub(b.i())) };
-                env.push(res);
-            },
-            Op::Div => {
-                let b = env.pop();
-                let a = env.pop();
-                let res =
-                    if let VVal::Flt(f) = a {
-                        VVal::Flt(f / b.f())
-
-                    } else if b.i() == 0 {
-                        return
-                            Err(StackAction::panic_str(
-                                format!("Division by 0: {}/{}", a.i(), b.i()),
-                                prog.debug[pc].clone()))
-
-                    } else {
-                        VVal::Int(a.i().wrapping_div(b.i()))
-                    };
-                env.push(res);
-            },
-            Op::Mul => {
-                let b = env.pop();
-                let a = env.pop();
-                let res =
-                    if let VVal::Flt(f) = a { VVal::Flt(f * b.f()) }
-                    else { VVal::Int(a.i().wrapping_mul(b.i())) };
-                env.push(res);
-            },
-            Op::Mod => {
-                let b = env.pop();
-                let a = env.pop();
-                let res =
-                    if let VVal::Flt(f) = a {
-                        VVal::Flt(f % b.f())
-                    } else {
-                        VVal::Int(a.i().wrapping_rem(b.i()))
-                    };
-                env.push(res);
-            },
-            Op::Le => {
-                let b = env.pop();
-                let a = env.pop();
-                let res =
-                    if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
-                    else { VVal::Bol(a.i() <= b.i()) };
-                env.push(res);
-            },
-            Op::Lt => {
-                let b = env.stk(1);
-                let a = env.stk(2);
-                let res =
-                    if let VVal::Flt(f) = a { VVal::Bol(*f < b.f()) }
-                    else { VVal::Bol(a.i() < b.i()) };
-                env.popn(2);
-                env.push(res);
-            },
-            Op::Ge => {
-                let b = env.pop();
-                let a = env.pop();
-                let res =
-                    if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
-                    else { VVal::Bol(a.i() >= b.i()) };
-                env.push(res);
-            },
-            Op::Gt => {
-                let b = env.pop();
-                let a = env.pop();
-                let res =
-                    if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
-                    else { VVal::Bol(a.i() > b.i()) };
-                env.push(res);
-            },
-            Op::Eq => {
-                let b = env.pop();
-                let a = env.pop();
-                let res = VVal::Bol(a.eqv(&b));
-                env.push(res);
-            },
-            Op::Call(argc) => {
-                let argc = *argc as usize;
-                let f = env.pop();
-                let ret = f.call_internal(env, argc);
-                env.popn(argc);
-                match ret {
-                    Ok(v) => { env.push(v); },
-                    Err(sa) =>
-                        return Err(sa.wrap_panic(prog.debug[pc].clone())),
-                }
-            },
-            Op::NewList(a) => op_0_r!(env, ret, a, { VVal::vec() }),
-            Op::ListPush => {
-                let elem = env.pop();
-                let lst  = env.pop();
-                lst.push(check_error_value(elem, "list element")?);
-                env.push(lst);
-            },
-            Op::ListSplice => {
-                let elem = env.pop();
-                let lst  = env.pop();
-                for (e, _) in elem.iter() {
-                    lst.push(e);
-                }
-                env.push(lst);
-            },
-            Op::NewMap => { env.push(VVal::map()); },
-            Op::MapSetKey => {
-                let value = check_error_value(env.pop(), "map value")?;
-                let key   = check_error_value(env.pop(), "map key")?;
-                let map   = env.pop();
-                map.set_key(&key, value)?;
-                env.push(map);
-            },
-            Op::MapSplice => {
-                let value = check_error_value(env.pop(), "map splice value")?;
-                let map   = env.pop();
-                for (e, k) in value.iter() {
-                    map.set_key(&k.unwrap(), e);
-                }
-                env.push(map);
-            },
-            Op::NewErr => {
-                let val = env.pop();
-                env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
-            },
-            Op::NewClos(data_idx, a) => op_0_r!(env, res, a, {
-                let fun = prog.data[*data_idx as usize].clone();
-                let fun = fun.clone_and_rebind_upvalues(|upvs, upvalues| {
-                    copy_upvs(upvs, env, upvalues);
-                });
-                fun
+            Op::Mov(a, r) => op_a_r!(env, ret, prog, a, r, { a }),
+            Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                VVal::Pair(Box::new((a, b)))
             }),
+            Op::End       => { break; },
+                //            Op::PushNul    => { env.push(VVal::Nul); },
+                //            Op::PushI(int) => { env.push(VVal::Int(*int as i64)); },
+                //            Op::PushV(v) => {
+                //                env.push(v.clone());
+                //            },
+                //            Op::Push(data_idx) => {
+                //                env.push(prog.data[*data_idx as usize].clone());
+                //            },
+                //            Op::PushRef(data_idx) => {
+                //                env.push(prog.data[*data_idx as usize].to_ref());
+                //            },
+                //            Op::NewPair => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                env.push(VVal::Pair(Box::new((a, b))));
+                //            },
+                //            Op::ResvLocals(count)      => env.push_sp(*count as usize),
+                //            Op::Pop                    => {
+                //                if let VVal::Err(ev) = env.pop() {
+                //                    return
+                //                        Err(StackAction::panic_str(
+                //                            format!("Error value '{}' dropped.",
+                //                                    ev.borrow().0.s()),
+                //                            Some(ev.borrow().1.clone())));
+                //                }
+                //            },
+                //            Op::Jmp(jmp_offs) => {
+                //                pc = (pc as i32 + *jmp_offs) as usize;
+                //            },
+                //            Op::JmpIf(jmp_offs) => {
+                //                let v = env.pop();
+                //                if v.b() { pc = (pc as i32 + *jmp_offs) as usize; }
+                //            },
+                //            Op::JmpIfN(jmp_offs) => {
+                //                let v = env.pop();
+                //                if !v.b() { pc = (pc as i32 + *jmp_offs) as usize; }
+                //            },
+                //            Op::NextI(idx, jmp_offs) => {
+                //                let counter = env.inc_local(*idx as usize, 1);
+                //                if counter >= env.stk_i(0) {
+                //                    pc = (pc as i32 + *jmp_offs as i32) as usize;
+                //                }
+                //            },
+                //            Op::Ret(count, rp) => op_1_ret!(env, ret, rp, { rp }),
+                //            Op::End => { break; },
+                //            Op::SetLocal(idx)          => {
+                //                let v = env.pop();
+                //                env.set_consume(*idx as usize, v);
+                //            },
+                //            Op::SetUp(idx)             => {
+                //                let v = env.pop();
+                //                env.set_up(*idx as usize, v);
+                //            },
+                //            Op::SetGlobal(data_idx)    => { prog.data[*data_idx as usize].set_ref(env.pop()); },
+                //            Op::GetGlobal(data_idx)    => { env.push(prog.data[*data_idx as usize].deref()); },
+                //            Op::GetGlobalRef(data_idx) => { env.push(prog.data[*data_idx as usize].clone()); },
+                //            Op::GetUp(idx)             => { env.push(env.get_up(*idx as usize)); },
+                //            Op::GetUpRef(idx)          => { env.push(env.get_up_captured_ref(*idx as usize)); },
+                //            Op::GetLocal(idx)          => { env.push(env.get_local(*idx as usize)); },
+                //            Op::GetLocalRef(idx)       => { env.push(env.get_local_captured_ref(*idx as usize)); },
+                //            Op::Arg(arg_idx)           => { env.push(env.arg(*arg_idx as usize)); },
+                //            Op::ArgRef(arg_idx)        => { env.push(env.arg(*arg_idx as usize).to_ref()); },
+                //            Op::Argv                   => { env.push(env.argv()); },
+                //            Op::ArgvRef                => { env.push(env.argv().to_ref()); },
+                //            Op::Add => {
+                //                let a = env.reg(-1);
+                //                let b = env.reg(-2);
+                //
+                //                let res =
+                //                    if let VVal::Int(a) = a {
+                //                        VVal::Int(a.wrapping_add(b.i()))
+                //                    } else {
+                //                        match (a.clone(), b.clone()) {
+                //                            (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
+                //                            (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
+                //                            (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
+                //                            (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
+                //                        }
+                //                    };
+                //
+                //                env.popn(2);
+                //                env.push(res);
+                //            },
+                //            Op::Sub => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                let res =
+                //                    if let VVal::Flt(f) = a { VVal::Flt(f - b.f()) }
+                //                    else { VVal::Int(a.i().wrapping_sub(b.i())) };
+                //                env.push(res);
+                //            },
+                //            Op::Div => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                let res =
+                //                    if let VVal::Flt(f) = a {
+                //                        VVal::Flt(f / b.f())
+                //
+                //                    } else if b.i() == 0 {
+                //                        return
+                //                            Err(StackAction::panic_str(
+                //                                format!("Division by 0: {}/{}", a.i(), b.i()),
+                //                                prog.debug[pc].clone()))
+                //
+                //                    } else {
+                //                        VVal::Int(a.i().wrapping_div(b.i()))
+                //                    };
+                //                env.push(res);
+                //            },
+                //            Op::Mul => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                let res =
+                //                    if let VVal::Flt(f) = a { VVal::Flt(f * b.f()) }
+                //                    else { VVal::Int(a.i().wrapping_mul(b.i())) };
+                //                env.push(res);
+                //            },
+                //            Op::Mod => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                let res =
+                //                    if let VVal::Flt(f) = a {
+                //                        VVal::Flt(f % b.f())
+                //                    } else {
+                //                        VVal::Int(a.i().wrapping_rem(b.i()))
+                //                    };
+                //                env.push(res);
+                //            },
+                //            Op::Le => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                let res =
+                //                    if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
+                //                    else { VVal::Bol(a.i() <= b.i()) };
+                //                env.push(res);
+                //            },
+                //            Op::Lt => {
+                //                let b = env.stk(1);
+                //                let a = env.stk(2);
+                //                let res =
+                //                    if let VVal::Flt(f) = a { VVal::Bol(*f < b.f()) }
+                //                    else { VVal::Bol(a.i() < b.i()) };
+                //                env.popn(2);
+                //                env.push(res);
+                //            },
+                //            Op::Ge => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                let res =
+                //                    if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
+                //                    else { VVal::Bol(a.i() >= b.i()) };
+                //                env.push(res);
+                //            },
+                //            Op::Gt => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                let res =
+                //                    if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
+                //                    else { VVal::Bol(a.i() > b.i()) };
+                //                env.push(res);
+                //            },
+                //            Op::Eq => {
+                //                let b = env.pop();
+                //                let a = env.pop();
+                //                let res = VVal::Bol(a.eqv(&b));
+                //                env.push(res);
+                //            },
+                //            Op::Call(argc) => {
+                //                let argc = *argc as usize;
+                //                let f = env.pop();
+                //                let ret = f.call_internal(env, argc);
+                //                env.popn(argc);
+                //                match ret {
+                //                    Ok(v) => { env.push(v); },
+                //                    Err(sa) =>
+                //                        return Err(sa.wrap_panic(prog.debug[pc].clone())),
+                //                }
+                //            },
+                //            Op::NewList(a) => op_0_r!(env, ret, a, { VVal::vec() }),
+                //            Op::ListPush => {
+                //                let elem = env.pop();
+                //                let lst  = env.pop();
+                //                lst.push(check_error_value(elem, "list element")?);
+                //                env.push(lst);
+                //            },
+                //            Op::ListSplice => {
+                //                let elem = env.pop();
+                //                let lst  = env.pop();
+                //                for (e, _) in elem.iter() {
+                //                    lst.push(e);
+                //                }
+                //                env.push(lst);
+                //            },
+                //            Op::NewMap => { env.push(VVal::map()); },
+                //            Op::MapSetKey => {
+                //                let value = check_error_value(env.pop(), "map value")?;
+                //                let key   = check_error_value(env.pop(), "map key")?;
+                //                let map   = env.pop();
+                //                map.set_key(&key, value)?;
+                //                env.push(map);
+                //            },
+                //            Op::MapSplice => {
+                //                let value = check_error_value(env.pop(), "map splice value")?;
+                //                let map   = env.pop();
+                //                for (e, k) in value.iter() {
+                //                    map.set_key(&k.unwrap(), e);
+                //                }
+                //                env.push(map);
+                //            },
+                //            Op::NewErr => {
+                //                let val = env.pop();
+                //                env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
+                //            },
+                //            Op::NewClos(data_idx, a) => op_0_r!(env, res, a, {
+                //                let fun = prog.data[*data_idx as usize].clone();
+                //                let fun = fun.clone_and_rebind_upvalues(|upvs, upvalues| {
+                //                    copy_upvs(upvs, env, upvalues);
+                //                });
+                //                fun
+                //            }),
         }
         if DEBUG_VM {
             env.dump_stack();
@@ -557,306 +671,339 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
     Ok(ret)
 }
-
-fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool, res: ResPos) -> Result<Prog, CompileError> {
-    let prev_max_arity = ce.borrow().implicit_arity.clone();
-
-    let vars    = ast.at(1).unwrap();
-    let value   = ast.at(2).unwrap();
-    let destr   = ast.at(3).unwrap_or(VVal::Nul);
-
-    //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
-
-    if destr.b() {
-        return Err(ast.compile_err("UNIMPL: DESTR!".to_string()));
-//        let cv = compile(&value, ce)?;
 //
-//        check_for_at_arity(prev_max_arity, ast, ce, &vars);
+//fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool, res: ResPos) -> Result<Prog, CompileError> {
+//    let prev_max_arity = ce.borrow().implicit_arity.clone();
 //
-//        let poses =
-//            vars.map_ok_skip(
-//                |v| ce.borrow_mut().def(&v.s_raw(), is_global),
-//                0);
+//    let vars    = ast.at(1).unwrap();
+//    let value   = ast.at(2).unwrap();
+//    let destr   = ast.at(3).unwrap_or(VVal::Nul);
 //
-//        Ok(Box::new(move |e: &mut Env| {
-//            let v = cv(e)?;
-//            match v {
-//                VVal::Lst(l) => {
-//                    for (i, vi) in poses.iter().enumerate() {
-//                        if l.borrow().len() <= i {
-//                            if let VarPos::Local(vip) = vi {
-//                                e.set_consume(*vip, VVal::Nul);
-//                            }
-//                        } else {
-//                            let val = &mut l.borrow_mut()[i];
+//    //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 //
-//                            let set_val = val.clone();
-//                            match vi {
-//                                VarPos::Local(vip) => {
-//                                    e.set_consume(*vip, set_val);
-//                                },
-//                                VarPos::Global(r) => {
-//                                    if let VVal::Ref(gr) = r {
-//                                        gr.replace(set_val);
-//                                    }
-//                                },
-//                                _ => {}
-//                            }
-//                        }
-//                    }
-//                },
-//                VVal::Map(m) => {
-//                    for (i, vi) in poses.iter().enumerate() {
-//                        let vname = vars.at(i).unwrap().s_raw();
-//                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+//    if destr.b() {
+//        return Err(ast.compile_err("UNIMPL: DESTR!".to_string()));
+////        let cv = compile(&value, ce)?;
+////
+////        check_for_at_arity(prev_max_arity, ast, ce, &vars);
+////
+////        let poses =
+////            vars.map_ok_skip(
+////                |v| ce.borrow_mut().def(&v.s_raw(), is_global),
+////                0);
+////
+////        Ok(Box::new(move |e: &mut Env| {
+////            let v = cv(e)?;
+////            match v {
+////                VVal::Lst(l) => {
+////                    for (i, vi) in poses.iter().enumerate() {
+////                        if l.borrow().len() <= i {
+////                            if let VarPos::Local(vip) = vi {
+////                                e.set_consume(*vip, VVal::Nul);
+////                            }
+////                        } else {
+////                            let val = &mut l.borrow_mut()[i];
+////
+////                            let set_val = val.clone();
+////                            match vi {
+////                                VarPos::Local(vip) => {
+////                                    e.set_consume(*vip, set_val);
+////                                },
+////                                VarPos::Global(r) => {
+////                                    if let VVal::Ref(gr) = r {
+////                                        gr.replace(set_val);
+////                                    }
+////                                },
+////                                _ => {}
+////                            }
+////                        }
+////                    }
+////                },
+////                VVal::Map(m) => {
+////                    for (i, vi) in poses.iter().enumerate() {
+////                        let vname = vars.at(i).unwrap().s_raw();
+////                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+////
+////                        match vi {
+////                            VarPos::Local(vip) => e.set_consume(*vip, val),
+////                            VarPos::Global(r) => {
+////                                if let VVal::Ref(gr) = r {
+////                                    gr.replace(val);
+////                                }
+////                            },
+////                            _ => {}
+////                        }
+////                    }
+////                },
+////                _ => {
+////                    for vi in poses.iter() {
+////                        match vi {
+////                            VarPos::Local(vip) => e.set_consume(*vip, v.clone()),
+////                            VarPos::Global(r) => {
+////                                if let VVal::Ref(gr) = r {
+////                                    gr.replace(v.clone());
+////                                }
+////                            },
+////                            _ => {},
+////                        }
+////                    }
+////                }
+////            }
+////
+////            Ok(VVal::Nul)
+////        }))
+//    } else {
+//        let varname = vars.at(0).unwrap().s_raw();
+//        ce.borrow_mut().recent_var = varname.clone();
 //
-//                        match vi {
-//                            VarPos::Local(vip) => e.set_consume(*vip, val),
-//                            VarPos::Global(r) => {
-//                                if let VVal::Ref(gr) = r {
-//                                    gr.replace(val);
-//                                }
-//                            },
-//                            _ => {}
-//                        }
-//                    }
-//                },
-//                _ => {
-//                    for vi in poses.iter() {
-//                        match vi {
-//                            VarPos::Local(vip) => e.set_consume(*vip, v.clone()),
-//                            VarPos::Global(r) => {
-//                                if let VVal::Ref(gr) = r {
-//                                    gr.replace(v.clone());
-//                                }
-//                            },
-//                            _ => {},
-//                        }
-//                    }
-//                }
+//        if is_global {
+//            let t1 = ce.tmp_stk_slot();
+//            let mut prog = vm_compile(&value, ce, ResPos::Stack(0))?
+//            if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
+//                prog.append(Prog::new().data_op(Op::SetGlobal(0), r));
 //            }
-//
-//            Ok(VVal::Nul)
-//        }))
-    } else {
-        let varname = vars.at(0).unwrap().s_raw();
-        ce.borrow_mut().recent_var = varname.clone();
-        let mut val_prog = vm_compile(&value, ce)?;
-
-        let pos = ce.borrow_mut().def(&varname, is_global);
-
-        match pos {
-            VarPos::Local(vip) => {
-                val_prog.append(Prog::new().op(Op::SetLocal(vip as u32)).consume(1));
-                Ok(val_prog)
-            },
-            VarPos::Global(r) => {
-                val_prog.append(Prog::new().data_op(Op::SetGlobal(0), r).consume(1));
-                Ok(val_prog)
-            },
-            _ => Err(ast.compile_err(
-                    "Can't define badly positioned variable!".to_string())),
-        }
-    }
-}
-
-fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, res: ResPos) -> Result<Prog, CompileError> {
-    let prev_max_arity = ce.borrow().implicit_arity.clone();
-
-    let syn  = ast.at(0).unwrap_or(VVal::Nul);
-    let spos = syn.get_syn_pos();
-
-    let vars          = ast.at(1).unwrap();
-    let value         = ast.at(2).unwrap();
-    let destr         = ast.at(3).unwrap_or(VVal::Nul);
-    let mut val_prog  = vm_compile(&value, ce)?;
-
-    if destr.b() {
-//        check_for_at_arity(prev_max_arity, ast, ce, &vars);
-//
-//        let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
-//
-//        for (i, pos) in poses.iter().enumerate() {
-//            if let VarPos::NoPos = pos {
-//                return 
-//                    ast.to_compile_err(
-//                        format!("Can't assign to undefined local variable '{}'",
-//                                vars.at(i).unwrap_or(VVal::Nul).s_raw()));
-//            }
+//            Ok(prog)
+//        } else {
+//            let next_local = ce.borrow().reserve_local();
+//            let prog = vm_compile(&value, ce, ResPos::Local(next_local as u16))?
+//            ce.borrow_mut().def_local(&varname, next_local);
+//            Ok(prog)
 //        }
+//    }
+//}
+
+//fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, res: ResPos) -> Result<Prog, CompileError> {
+//    let prev_max_arity = ce.borrow().implicit_arity.clone();
+//
+//    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+//    let spos = syn.get_syn_pos();
+//
+//    let vars          = ast.at(1).unwrap();
+//    let value         = ast.at(2).unwrap();
+//    let destr         = ast.at(3).unwrap_or(VVal::Nul);
+//    let mut val_prog  = vm_compile(&value, ce)?;
+//
+//    if destr.b() {
+////        check_for_at_arity(prev_max_arity, ast, ce, &vars);
+////
+////        let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
+////
+////        for (i, pos) in poses.iter().enumerate() {
+////            if let VarPos::NoPos = pos {
+////                return 
+////                    ast.to_compile_err(
+////                        format!("Can't assign to undefined local variable '{}'",
+////                                vars.at(i).unwrap_or(VVal::Nul).s_raw()));
+////            }
+////        }
+////
+////        if is_ref {
+////            Ok(Box::new(move |e: &mut Env| {
+////                let v = cv(e)?;
+////                match v {
+////                    VVal::Lst(l) => {
+////                        for (i, pos) in poses.iter().enumerate() {
+////                            let val = &mut l.borrow_mut()[i];
+////                            if let Some(err) = set_ref_at_varpos(e, pos, val.clone()) {
+////                                return Err(
+////                                    StackAction::panic_str(err, Some(spos.clone())));
+////                            }
+////                        }
+////                    },
+////                    VVal::Map(m) => {
+////                        for (i, pos) in poses.iter().enumerate() {
+////                            let vname = vars.at(i).unwrap().s_raw();
+////                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+////                            if let Some(err) = set_ref_at_varpos(e, pos, val) {
+////                                return Err(
+////                                    StackAction::panic_str(err, Some(spos.clone())));
+////                            }
+////                        }
+////                    },
+////                    _ => {
+////                        for pos in poses.iter() {
+////                            if let Some(err) = set_ref_at_varpos(e, pos, v.clone()) {
+////                                return Err(
+////                                    StackAction::panic_str(err, Some(spos.clone())));
+////                            }
+////                        }
+////                    }
+////                }
+////
+////                Ok(VVal::Nul)
+////            }))
+////        } else {
+////            Ok(Box::new(move |e: &mut Env| {
+////                let v = cv(e)?;
+////                match v {
+////                    VVal::Lst(l) => {
+////                        for (i, pos) in poses.iter().enumerate() {
+////                            let val = &mut l.borrow_mut()[i];
+////
+////                            if let Some(err) = set_env_at_varpos(e, pos, val) {
+////                                return Err(
+////                                    StackAction::panic_str(err, Some(spos.clone())));
+////                            }
+////                        }
+////                    },
+////                    VVal::Map(m) => {
+////                        for (i, pos) in poses.iter().enumerate() {
+////                            let vname = vars.at(i).unwrap().s_raw();
+////                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+////
+////                            if let Some(err) = set_env_at_varpos(e, pos, &val) {
+////                                return Err(
+////                                    StackAction::panic_str(err, Some(spos.clone())));
+////                            }
+////                        }
+////                    },
+////                    _ => {
+////                        for pos in poses.iter() {
+////                            if let Some(err) = set_env_at_varpos(e, pos, &v) {
+////                                return Err(
+////                                    StackAction::panic_str(err, Some(spos.clone())));
+////                            }
+////                        }
+////                    }
+////                }
+////
+////                Ok(VVal::Nul)
+////            }))
+////        }
+//
+//        Err(ast.compile_err("NOT IMPLEMENTED".to_string()))
+//    } else {
+//        let s   = &vars.at(0).unwrap().s_raw();
+//        let pos = ce.borrow_mut().get(s);
 //
 //        if is_ref {
-//            Ok(Box::new(move |e: &mut Env| {
-//                let v = cv(e)?;
-//                match v {
-//                    VVal::Lst(l) => {
-//                        for (i, pos) in poses.iter().enumerate() {
-//                            let val = &mut l.borrow_mut()[i];
-//                            if let Some(err) = set_ref_at_varpos(e, pos, val.clone()) {
-//                                return Err(
-//                                    StackAction::panic_str(err, Some(spos.clone())));
-//                            }
-//                        }
-//                    },
-//                    VVal::Map(m) => {
-//                        for (i, pos) in poses.iter().enumerate() {
-//                            let vname = vars.at(i).unwrap().s_raw();
-//                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-//                            if let Some(err) = set_ref_at_varpos(e, pos, val) {
-//                                return Err(
-//                                    StackAction::panic_str(err, Some(spos.clone())));
-//                            }
-//                        }
-//                    },
-//                    _ => {
-//                        for pos in poses.iter() {
-//                            if let Some(err) = set_ref_at_varpos(e, pos, v.clone()) {
-//                                return Err(
-//                                    StackAction::panic_str(err, Some(spos.clone())));
-//                            }
-//                        }
-//                    }
-//                }
-//
-//                Ok(VVal::Nul)
-//            }))
+////            match pos {
+////                VarPos::UpValue(i) => {
+////                    Ok(Box::new(move |e: &mut Env| {
+////                        let v = cv(e)?;
+////                        e.assign_ref_up(i, v);
+////                        Ok(VVal::Nul)
+////                    }))
+////                },
+////                VarPos::Local(i) => {
+////                    Ok(Box::new(move |e: &mut Env| {
+////                        let v = cv(e)?;
+////                        e.assign_ref_local(i, v);
+////                        Ok(VVal::Nul)
+////                    }))
+////                },
+////                VarPos::Global(glob_v) => {
+////                    if let VVal::Ref(glob_r) = glob_v {
+////                        Ok(Box::new(move |e: &mut Env| {
+////                            let v = cv(e)?;
+////                            glob_r.borrow().set_ref(v);
+////                            Ok(VVal::Nul)
+////                        }))
+////                    } else {
+////                        ast.to_compile_err(
+////                            format!("Can't assign to read only global variable '{}'",
+////                                    s))
+////                    }
+////                },
+////                VarPos::Const(_) =>
+////                    ast.to_compile_err(
+////                        format!("Can't assign to constant '{}'", s)),
+////                VarPos::NoPos =>
+////                    ast.to_compile_err(
+////                        format!("Can't assign to undefined local variable '{}'", s)),
+////            }
+//            Err(ast.compile_err("NOT IMPLEMENTED".to_string()))
 //        } else {
-//            Ok(Box::new(move |e: &mut Env| {
-//                let v = cv(e)?;
-//                match v {
-//                    VVal::Lst(l) => {
-//                        for (i, pos) in poses.iter().enumerate() {
-//                            let val = &mut l.borrow_mut()[i];
-//
-//                            if let Some(err) = set_env_at_varpos(e, pos, val) {
-//                                return Err(
-//                                    StackAction::panic_str(err, Some(spos.clone())));
-//                            }
-//                        }
-//                    },
-//                    VVal::Map(m) => {
-//                        for (i, pos) in poses.iter().enumerate() {
-//                            let vname = vars.at(i).unwrap().s_raw();
-//                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-//
-//                            if let Some(err) = set_env_at_varpos(e, pos, &val) {
-//                                return Err(
-//                                    StackAction::panic_str(err, Some(spos.clone())));
-//                            }
-//                        }
-//                    },
-//                    _ => {
-//                        for pos in poses.iter() {
-//                            if let Some(err) = set_env_at_varpos(e, pos, &v) {
-//                                return Err(
-//                                    StackAction::panic_str(err, Some(spos.clone())));
-//                            }
-//                        }
-//                    }
-//                }
-//
-//                Ok(VVal::Nul)
-//            }))
-//        }
-
-        Err(ast.compile_err("NOT IMPLEMENTED".to_string()))
-    } else {
-        let s   = &vars.at(0).unwrap().s_raw();
-        let pos = ce.borrow_mut().get(s);
-
-        if is_ref {
 //            match pos {
-//                VarPos::UpValue(i) => {
-//                    Ok(Box::new(move |e: &mut Env| {
-//                        let v = cv(e)?;
-//                        e.assign_ref_up(i, v);
-//                        Ok(VVal::Nul)
-//                    }))
+//                VarPos::Local(vip) => {
+//                    val_prog.append(Prog::new().debug(spos).op(Op::SetLocal(vip as u32)).consume(1));
+//                    Ok(val_prog)
 //                },
-//                VarPos::Local(i) => {
-//                    Ok(Box::new(move |e: &mut Env| {
-//                        let v = cv(e)?;
-//                        e.assign_ref_local(i, v);
-//                        Ok(VVal::Nul)
-//                    }))
+//                VarPos::Global(r) => {
+//                    val_prog.append(Prog::new().debug(spos).data_op(Op::SetGlobal(0), r).consume(1));
+//                    Ok(val_prog)
 //                },
-//                VarPos::Global(glob_v) => {
-//                    if let VVal::Ref(glob_r) = glob_v {
-//                        Ok(Box::new(move |e: &mut Env| {
-//                            let v = cv(e)?;
-//                            glob_r.borrow().set_ref(v);
-//                            Ok(VVal::Nul)
-//                        }))
-//                    } else {
-//                        ast.to_compile_err(
-//                            format!("Can't assign to read only global variable '{}'",
-//                                    s))
-//                    }
+//                VarPos::UpValue(vip) => {
+//                    val_prog.append(Prog::new().debug(spos).op(Op::SetUp(vip as u32)).consume(1));
+//                    Ok(val_prog)
 //                },
 //                VarPos::Const(_) =>
-//                    ast.to_compile_err(
-//                        format!("Can't assign to constant '{}'", s)),
+//                    Err(ast.compile_err(
+//                        format!("Can't assign to constant '{}'", s))),
 //                VarPos::NoPos =>
-//                    ast.to_compile_err(
-//                        format!("Can't assign to undefined local variable '{}'", s)),
+//                    Err(ast.compile_err(
+//                        format!("Can't assign to undefined local variable '{}'", s))),
 //            }
-            Err(ast.compile_err("NOT IMPLEMENTED".to_string()))
-        } else {
-            match pos {
-                VarPos::Local(vip) => {
-                    val_prog.append(Prog::new().debug(spos).op(Op::SetLocal(vip as u32)).consume(1));
-                    Ok(val_prog)
-                },
-                VarPos::Global(r) => {
-                    val_prog.append(Prog::new().debug(spos).data_op(Op::SetGlobal(0), r).consume(1));
-                    Ok(val_prog)
-                },
-                VarPos::UpValue(vip) => {
-                    val_prog.append(Prog::new().debug(spos).op(Op::SetUp(vip as u32)).consume(1));
-                    Ok(val_prog)
-                },
-                VarPos::Const(_) =>
-                    Err(ast.compile_err(
-                        format!("Can't assign to constant '{}'", s))),
-                VarPos::NoPos =>
-                    Err(ast.compile_err(
-                        format!("Can't assign to undefined local variable '{}'", s))),
-            }
-        }
-    }
-}
+//        }
+//    }
+//}
 
 
-fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, res: ResPos) -> Result<Prog, CompileError> {
-    let var = ast.at(1).unwrap();
-    var.with_s_ref(|var_s: &str| -> Result<Prog, CompileError> {
-        if to_ref {
+//fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, res: ResPos) -> Result<Prog, CompileError> {
+//    let var = ast.at(1).unwrap();
+//    var.with_s_ref(|var_s: &str| -> Result<Prog, CompileError> {
+//        if to_ref {
+////            match var_s {
+////                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::ArgRef(0)).result()) },
+////                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::ArgRef(1)).result()) },
+////                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().op(Op::ArgRef(2)).result()) },
+////                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().op(Op::ArgRef(3)).result()) },
+////                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().op(Op::ArgRef(4)).result()) },
+////                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().op(Op::ArgRef(5)).result()) },
+////                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().op(Op::ArgRef(6)).result()) },
+////                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().op(Op::ArgRef(7)).result()) },
+////                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().op(Op::ArgRef(8)).result()) },
+////                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().op(Op::ArgRef(9)).result()) },
+////                "@"  => {
+////                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+////                    Ok(Prog::new().op(Op::ArgvRef).result())
+////                },
+////                _ => {
+////                    let pos = ce.borrow_mut().get(var_s);
+////                    match pos {
+////                        VarPos::UpValue(i) =>
+////                            Ok(Prog::new().op(Op::GetUpRef(i as u32)).result()),
+////                        VarPos::Local(i) =>
+////                            Ok(Prog::new().op(Op::GetLocalRef(i as u32)).result()),
+////                        VarPos::Global(v) =>
+////                            Ok(Prog::new().data_op(Op::GetGlobalRef(0), v.clone()).result()),
+////                        VarPos::Const(v) =>
+////                            Ok(Prog::new().data_op(Op::PushRef(0), v.clone()).result()),
+////                        VarPos::NoPos => {
+////                            Err(ast.compile_err(
+////                                format!("Variable '{}' undefined", var_s)))
+////                        }
+////                    }
+////                }
+////            }
+//            Ok(Prog::new().op(Op::PushNul))
+//        } else {
 //            match var_s {
-//                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::ArgRef(0)).result()) },
-//                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::ArgRef(1)).result()) },
-//                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().op(Op::ArgRef(2)).result()) },
-//                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().op(Op::ArgRef(3)).result()) },
-//                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().op(Op::ArgRef(4)).result()) },
-//                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().op(Op::ArgRef(5)).result()) },
-//                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().op(Op::ArgRef(6)).result()) },
-//                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().op(Op::ArgRef(7)).result()) },
-//                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().op(Op::ArgRef(8)).result()) },
-//                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().op(Op::ArgRef(9)).result()) },
+//                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().result(ResPos::Arg(0))) },
+//                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().result(ResPos::Arg(1))) },
+//                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().result(ResPos::Arg(2))) },
+//                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().result(ResPos::Arg(3))) },
+//                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().result(ResPos::Arg(4))) },
+//                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().result(ResPos::Arg(5))) },
+//                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().result(ResPos::Arg(6))) },
+//                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().result(ResPos::Arg(7))) },
+//                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().result(ResPos::Arg(8))) },
+//                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().result(ResPos::Arg(9))) },
 //                "@"  => {
 //                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-//                    Ok(Prog::new().op(Op::ArgvRef).result())
+//                    Ok(Prog::new().op(Op::Argv).result(ResPos::Stack(0)))
 //                },
 //                _ => {
 //                    let pos = ce.borrow_mut().get(var_s);
 //                    match pos {
 //                        VarPos::UpValue(i) =>
-//                            Ok(Prog::new().op(Op::GetUpRef(i as u32)).result()),
+//                            Ok(Prog::new().op(Op::GetUp(i as u32)).result(ResPos::Stack(0))),
 //                        VarPos::Local(i) =>
-//                            Ok(Prog::new().op(Op::GetLocalRef(i as u32)).result()),
+//                            Ok(Prog::new().result(ResPos::Local(i as u16))),
 //                        VarPos::Global(v) =>
-//                            Ok(Prog::new().data_op(Op::GetGlobalRef(0), v.clone()).result()),
+//                            Ok(Prog::new().data_op(Op::GetGlobal(0), v.clone()).result(ResPos::Stack(0))),
 //                        VarPos::Const(v) =>
-//                            Ok(Prog::new().data_op(Op::PushRef(0), v.clone()).result()),
+//                            Ok(Prog::new().op(Op::PushV(v.clone())).result(ResPos::Stack(0))),
 //                        VarPos::NoPos => {
 //                            Err(ast.compile_err(
 //                                format!("Variable '{}' undefined", var_s)))
@@ -864,365 +1011,360 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, re
 //                    }
 //                }
 //            }
-            Ok(Prog::new().op(Op::PushNul))
-        } else {
-            match var_s {
-                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().result(ResPos::Arg(0))) },
-                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().result(ResPos::Arg(1))) },
-                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().result(ResPos::Arg(2))) },
-                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().result(ResPos::Arg(3))) },
-                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().result(ResPos::Arg(4))) },
-                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().result(ResPos::Arg(5))) },
-                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().result(ResPos::Arg(6))) },
-                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().result(ResPos::Arg(7))) },
-                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().result(ResPos::Arg(8))) },
-                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().result(ResPos::Arg(9))) },
-                "@"  => {
-                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                    Ok(Prog::new().op(Op::Argv).result(ResPos::Stack(0)))
-                },
-                _ => {
-                    let pos = ce.borrow_mut().get(var_s);
-                    match pos {
-                        VarPos::UpValue(i) =>
-                            Ok(Prog::new().op(Op::GetUp(i as u32)).result(ResPos::Stack(0))),
-                        VarPos::Local(i) =>
-                            Ok(Prog::new().result(ResPos::Local(i as u16))),
-                        VarPos::Global(v) =>
-                            Ok(Prog::new().data_op(Op::GetGlobal(0), v.clone()).result(ResPos::Stack(0))),
-                        VarPos::Const(v) =>
-                            Ok(Prog::new().op(Op::PushV(v.clone())).result(ResPos::Stack(0))),
-                        VarPos::NoPos => {
-                            Err(ast.compile_err(
-                                format!("Variable '{}' undefined", var_s)))
-                        }
-                    }
-                }
-            }
-        }
-    })
-}
+//        }
+//    })
+//}
 
-fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, return_func: bool, res: ResPos) -> Result<Prog, CompileError> {
+fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, return_func: bool, sp: &mut StorePos) -> Result<Prog, CompileError> {
     let syn  = ast.at(0).unwrap_or(VVal::Nul);
     let spos = syn.get_syn_pos();
 
+    let mut devnull = StorePos::new_dev_null();
+    let mut block_sp = StorePos::new();
+    block_sp.set(ResPos::Ret);
+
     ce.borrow_mut().push_block_env();
-    let exprs : Vec<Prog> = ast.map_skip(|e| vm_compile(e, ce), skip_cnt)?;
+    let mut i = 0;
+    let ast_len = ast.len() - skip_cnt;
+    let exprs : Vec<Prog> =
+        ast.map_skip( |e| {
+            let sp =
+                if i == ast_len - 1 { &mut block_sp }
+                else { &mut devnull };
+            vm_compile(e, ce, sp)
+        }, skip_cnt)?;
 
     let mut p = Prog::new().debug(spos);
     for e in exprs.into_iter() {
         p.append(e);
     }
     let block_env_var_count = ce.borrow_mut().pop_block_env();
-    if return_func || block_env_var_count > 0 {
-        p.unshift_op(Op::ResvLocals(block_env_var_count as u32));
-        p.push_return(block_env_var_count, return_func);
-        return Ok(p);
-    }
+    let pos = block_sp.to_load_pos(&mut p);
+    sp.set(ResPos::Ret);
+
+    // TODO: clear variables in one Op (Op::ClearLocals(a, b))
+    // TODO: cargo test
+//    if return_func || block_env_var_count > 0 {
+//        p.unshift_op(Op::ResvLocals(block_env_var_count as u32));
+//        p.push_return(block_env_var_count, return_func);
+//        return Ok(p);
+//    }
     Ok(p)
 }
 
-fn vm_compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, res: ResPos)
-    -> Result<Prog, CompileError>
-{
-    match ast {
-        VVal::Lst(l) => {
-            let syn  = ast.at(0).unwrap_or(VVal::Nul);
-            let spos = syn.get_syn_pos();
-            let syn  = syn.get_syn();
-
-            match syn {
-                Syntax::Func => {
-                    let label          = ast.at(1).unwrap();
-                    let explicit_arity = ast.at(2).unwrap();
-
-                    if !label.is_none() {
-                        return Err(
-                            ast.compile_err(
-                                format!("direct blocks don't support labels: {}",
-                                        ast.s())));
-                    }
-
-                    if !explicit_arity.is_none() {
-                        return Err(
-                            ast.compile_err(
-                                format!("direct blocks don't support arity: {}",
-                                        ast.s())));
-                    }
-
-                    vm_compile_block(ast, 3, ce, false)
-                },
-                _ => vm_compile(ast, ce),
-            }
-        },
-        _ => vm_compile(ast, ce),
-    }
-}
-
-fn vm_compile_binop(ast: &VVal, op: Op, ce: &mut Rc<RefCell<CompileEnv>>, res: ResPos)
-    -> Result<Prog, CompileError>
-{
-    let syn  = ast.at(0).unwrap_or(VVal::Nul);
-    let spos = syn.get_syn_pos();
-
-    let t1 = ce.tmp_stk_slot();
-    let t2 = ce.tmp_stk_slot();
-    let left  = vm_compile(&ast.at(1).unwrap(), ce, t1.get())?;
-    let right = vm_compile(&ast.at(2).unwrap(), ce, t2.get())?;
-    let mut prog = Prog::new().debug(spos);
-    prog.append(left);
-    prog.append(right);
-    Ok(prog.op(op.set_out(res))
-}
-
-fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, res: ResPos) -> Result<Prog, CompileError> {
-    match ast {
-        VVal::Lst(l) => {
-            let syn  = ast.at(0).unwrap_or(VVal::Nul);
-            let spos = syn.get_syn_pos();
-            let syn  = syn.get_syn();
-
-            match syn {
-                Syntax::Block      => {
-                    let prog = vm_compile_block(ast, 1, ce, true, res)?;
-                    Ok(prog.op(Op::End))
-                },
-                Syntax::Assign     => vm_compile_assign(ast, ce, false, res).map(|p| p.debug(spos)),
-                Syntax::AssignRef  => vm_compile_assign(ast, ce, true, res) .map(|p| p.debug(spos)),
-                Syntax::Var        => vm_compile_var(ast, ce, false, res)   .map(|p| p.debug(spos)),
-                Syntax::CaptureRef => vm_compile_var(ast, ce, true, res)    .map(|p| p.debug(spos)),
-                Syntax::Def        => vm_compile_def(ast, ce, false, res)   .map(|p| p.debug(spos)),
-                Syntax::DefGlobRef => vm_compile_def(ast, ce, true, res)    .map(|p| p.debug(spos)),
-                Syntax::BinOpAdd   => vm_compile_binop(ast, Op::Add, ce, res),
-                Syntax::BinOpSub   => vm_compile_binop(ast, Op::Sub, ce, res),
-                Syntax::BinOpDiv   => vm_compile_binop(ast, Op::Div, ce, res),
-                Syntax::BinOpMod   => vm_compile_binop(ast, Op::Mod, ce, res),
-                Syntax::BinOpMul   => vm_compile_binop(ast, Op::Mul, ce, res),
-                Syntax::BinOpGe    => vm_compile_binop(ast, Op::Ge,  ce, res),
-                Syntax::BinOpGt    => vm_compile_binop(ast, Op::Gt,  ce, res),
-                Syntax::BinOpLe    => vm_compile_binop(ast, Op::Le,  ce, res),
-                Syntax::BinOpLt    => vm_compile_binop(ast, Op::Lt,  ce, res),
-                Syntax::BinOpEq    => vm_compile_binop(ast, Op::Eq,  ce, res),
-                Syntax::Func => {
-                    let last_def_varname = ce.borrow().recent_var.clone();
-                    let mut fun_spos = spos;
-                    fun_spos.name = Some(Rc::new(last_def_varname));
-
-                    let func_ce = CompileEnv::create_env(Some(ce.clone()));
-                    let mut ce_sub = func_ce;
-
-                    let label          = ast.at(1).unwrap();
-                    let explicit_arity = ast.at(2).unwrap();
-                    let stmts : Vec<Prog> =
-                        ast.map_skip(|e| vm_compile(e, &mut ce_sub), 3)?;
-
-                    let mut func_prog = Prog::new().debug(fun_spos.clone());
-                    for s in stmts.into_iter() {
-                        func_prog.append(s);
-                    }
-                    func_prog.push_return(0, true);
-                    func_prog.push_op(Op::End);
-
-                    let spos_inner = fun_spos.clone();
-                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
-                        let res = vm(&func_prog, env);
-                        match res {
-                            Ok(v)  => Ok(v),
-                            Err(StackAction::Return((v_lbl, v))) => {
-                                return
-                                    if v_lbl.eqv(&label) { Ok(v) }
-                                    else { Err(StackAction::Return((v_lbl, v))) }
-                            },
-                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
-                        }
-                    }));
-
-                    ce_sub.borrow_mut().explicit_arity.0 =
-                        match explicit_arity.at(0).unwrap_or(VVal::Nul) {
-                            VVal::Int(i) => ArityParam::Limit(i as usize),
-                            VVal::Bol(true) => ArityParam::Limit(0),
-                            _ => ArityParam::Undefined,
-                        };
-
-                    ce_sub.borrow_mut().explicit_arity.1 =
-                        match explicit_arity.at(1).unwrap_or(VVal::Nul) {
-                            VVal::Int(i) => ArityParam::Limit(i as usize),
-                            VVal::Bol(true) => ArityParam::Infinite,
-                            _ => ArityParam::Undefined,
-                        };
-
-                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
-                        ce_sub.borrow().explicit_arity.0.clone()
-                    } else {
-                        ce_sub.borrow().implicit_arity.0.clone()
-                    };
-
-                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
-                        ce_sub.borrow().explicit_arity.1.clone()
-                    } else {
-                        ce_sub.borrow().implicit_arity.1.clone()
-                    };
-
-                    let min_args : Option<usize> = match deciding_min_arity {
-                        ArityParam::Infinite  => None,
-                        ArityParam::Undefined => Some(0),
-                        ArityParam::Limit(i)  => Some(i),
-                    };
-
-                    let max_args : Option<usize> = match deciding_max_arity {
-                        ArityParam::Infinite  => None,
-                        ArityParam::Undefined => Some(0),
-                        ArityParam::Limit(i)  => Some(i),
-                    };
-
-                    let env_size = ce_sub.borrow().local_env_size();
-                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
-                    let upvalues = vec![];
-                    let fun_template =
-                        VValFun::new_val(
-                            fun_ref.clone(),
-                            upvalues, env_size, min_args, max_args, false,
-                            Some(fun_spos.clone()),
-                            Rc::new(upvs));
-                    Ok(Prog::new().data_op(Op::NewClos(0, ResPos), fun_template))
-                },
-                Syntax::Call => {
-                    let is_for_n =
-                        if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
-                            let var = ast.at(1).unwrap().at(1).unwrap();
-                            var.with_s_ref(|var_s: &str| var_s == "for_n")
-                        } else {
-                            false
-                        };
-
-                    if is_for_n {
-////                        if ast.len() > 5 {
-////                            return Err(ast.compile_err(
-////                                format!("if can only have 2 arguments, got more: {}", ast.s())));
-////                        }
-//                        let idx_pos = ce.borrow_mut().def(&ast.at(2).unwrap_or(VVal::Nul).s_raw(), false);
-//                        let idx_pos =
-//                            if let VarPos::Local(i) = idx_pos { i }
-//                            else {
-//                                panic!("Local variable for counting loop not local!");
-//                            };
+//fn vm_compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, res: ResPos)
+//    -> Result<Prog, CompileError>
+//{
+//    match ast {
+//        VVal::Lst(l) => {
+//            let syn  = ast.at(0).unwrap_or(VVal::Nul);
+//            let spos = syn.get_syn_pos();
+//            let syn  = syn.get_syn();
 //
-                        let mut cond = vm_compile_direct_block(&ast.at(2).unwrap_or(VVal::Nul), ce)?;
+//            match syn {
+//                Syntax::Func => {
+//                    let label          = ast.at(1).unwrap();
+//                    let explicit_arity = ast.at(2).unwrap();
+//
+//                    if !label.is_none() {
+//                        return Err(
+//                            ast.compile_err(
+//                                format!("direct blocks don't support labels: {}",
+//                                        ast.s())));
+//                    }
+//
+//                    if !explicit_arity.is_none() {
+//                        return Err(
+//                            ast.compile_err(
+//                                format!("direct blocks don't support arity: {}",
+//                                        ast.s())));
+//                    }
+//
+//                    vm_compile_block(ast, 3, ce, false)
+//                },
+//                _ => vm_compile(ast, ce),
+//            }
+//        },
+//        _ => vm_compile(ast, ce),
+//    }
+//}
+//
+//fn vm_compile_binop(ast: &VVal, op: Op, ce: &mut Rc<RefCell<CompileEnv>>, res: ResPos)
+//    -> Result<Prog, CompileError>
+//{
+//    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+//    let spos = syn.get_syn_pos();
+//
+//    let t1 = ce.tmp_stk_slot();
+//    let t2 = ce.tmp_stk_slot();
+//    let left  = vm_compile(&ast.at(1).unwrap(), ce, t1.get())?;
+//    let right = vm_compile(&ast.at(2).unwrap(), ce, t2.get())?;
+//    let mut prog = Prog::new().debug(spos);
+//    prog.append(left);
+//    prog.append(right);
+//    Ok(prog.op(op.set_out(res))
+//}
 
-                        let mut body = vm_compile_direct_block(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
+fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
+    match ast {
+        VVal::Lst(l) => {
+            let syn  = ast.at(0).unwrap_or(VVal::Nul);
+            let spos = syn.get_syn_pos();
+            let syn  = syn.get_syn();
 
-                        let body_cnt = body.op_count();
-                        cond.push_op(Op::JmpIfN(body_cnt as i32 + 1));
-                        let mut cond = cond.consume(1);
-                        let cond_cnt = cond.op_count();
-                        cond.append(body);
-                        cond.push_op(Op::Jmp(-(body_cnt as i32 + (cond_cnt + 1) as i32)));
-
-                        return Ok(cond);
-                    }
-
-                    let mut call_args : Vec<Prog> =
-                        ast.map_skip(|e: &VVal| vm_compile(e, ce), 1)?;
-                    call_args.reverse();
-
-                    let argc = call_args.len();
-                    let mut prog = Prog::new().debug(spos);
-                    for a in call_args.into_iter() {
-                        prog.append(a);
-                    }
-                    Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result(ResPos::Stack(0)))
-                },
-                Syntax::Lst => {
-                    let mut list_elems : Vec<(bool, Prog)> =
-                        ast.map_skip(|e| {
-                            if e.is_vec() {
-                                if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
-                                    e.at(0).unwrap_or(VVal::Nul)
-                                {
-                                    return Ok((true, vm_compile(&e.at(1).unwrap(), ce)?));
-                                }
-                            }
-                            Ok((false, vm_compile(e, ce)?))
-                        }, 1)?;
-
-                    let mut prog = Prog::new().debug(spos.clone());
-                    prog.push_op(Op::NewList(ResPos::Stack(0)));
-                    for (is_splice, elem) in list_elems.into_iter() {
-                        prog.append(elem);
-                        let res = prog.get_result();
-                        if is_splice {
-                            prog.push_op(Op::ListSplice(res));
-                        } else {
-                            prog.push_op(Op::ListPush(res));
-                        }
-                    }
-                    Ok(prog.result())
-                },
-                Syntax::Map => {
-                    let map_elems : Result<Vec<(Prog,Option<Prog>)>, CompileError> =
-                        ast.map_skip(|e| {
-                                let k = e.at(0).unwrap();
-                                let v = e.at(1).unwrap();
-                                if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
-                                    let sc = vm_compile(&v, ce)?;
-                                    Ok((sc, None))
-                                } else {
-                                    let kc = vm_compile(&k, ce)?;
-                                    if let VVal::Sym(y) = k {
-                                        ce.borrow_mut().recent_var = y.borrow().clone();
-                                    } else {
-                                        let recent_sym = ce.borrow().recent_sym.clone();
-                                        ce.borrow_mut().recent_var = recent_sym;
-                                    }
-                                    let vc = vm_compile(&v, ce)?;
-                                    Ok((kc, Some(vc)))
-                                }
-                            }, 1);
-                    if let Err(e) = map_elems { return Err(e); }
-                    let map_elems = map_elems.unwrap();
-
-                    let mut prog = Prog::new().debug(spos.clone());
-                    prog.push_op(Op::NewMap);
-
-                    for x in map_elems.into_iter() {
-                        let key_prog = x.0;
-                        prog.append(key_prog);
-                        if let Some(value_prog) = x.1 {
-                            prog.append(value_prog);
-                            prog.push_op(Op::MapSetKey);
-                        } else {
-                            prog.push_op(Op::MapSplice);
-                        }
-                    }
-                    Ok(prog.result())
-                },
-                Syntax::Err => {
-                    let err_val = vm_compile(&ast.at(1).unwrap(), ce)?;
-                    Ok(err_val.debug(spos).op(Op::NewErr).consume(1).result())
-                },
+            match syn {
+                Syntax::Block      => vm_compile_block(ast, 1, ce, true, sp),
+//                Syntax::Assign     => vm_compile_assign(ast, ce, false, res).map(|p| p.debug(spos)),
+//                Syntax::AssignRef  => vm_compile_assign(ast, ce, true, res) .map(|p| p.debug(spos)),
+//                Syntax::Var        => vm_compile_var(ast, ce, false, res)   .map(|p| p.debug(spos)),
+//                Syntax::CaptureRef => vm_compile_var(ast, ce, true, res)    .map(|p| p.debug(spos)),
+//                Syntax::Def        => vm_compile_def(ast, ce, false, res)   .map(|p| p.debug(spos)),
+//                Syntax::DefGlobRef => vm_compile_def(ast, ce, true, res)    .map(|p| p.debug(spos)),
+//                Syntax::BinOpAdd   => vm_compile_binop(ast, Op::Add, ce, res),
+//                Syntax::BinOpSub   => vm_compile_binop(ast, Op::Sub, ce, res),
+//                Syntax::BinOpDiv   => vm_compile_binop(ast, Op::Div, ce, res),
+//                Syntax::BinOpMod   => vm_compile_binop(ast, Op::Mod, ce, res),
+//                Syntax::BinOpMul   => vm_compile_binop(ast, Op::Mul, ce, res),
+//                Syntax::BinOpGe    => vm_compile_binop(ast, Op::Ge,  ce, res),
+//                Syntax::BinOpGt    => vm_compile_binop(ast, Op::Gt,  ce, res),
+//                Syntax::BinOpLe    => vm_compile_binop(ast, Op::Le,  ce, res),
+//                Syntax::BinOpLt    => vm_compile_binop(ast, Op::Lt,  ce, res),
+//                Syntax::BinOpEq    => vm_compile_binop(ast, Op::Eq,  ce, res),
+//                Syntax::Func => {
+//                    let last_def_varname = ce.borrow().recent_var.clone();
+//                    let mut fun_spos = spos;
+//                    fun_spos.name = Some(Rc::new(last_def_varname));
+//
+//                    let func_ce = CompileEnv::create_env(Some(ce.clone()));
+//                    let mut ce_sub = func_ce;
+//
+//                    let label          = ast.at(1).unwrap();
+//                    let explicit_arity = ast.at(2).unwrap();
+//                    let stmts : Vec<Prog> =
+//                        ast.map_skip(|e| vm_compile(e, &mut ce_sub), 3)?;
+//
+//                    let mut func_prog = Prog::new().debug(fun_spos.clone());
+//                    for s in stmts.into_iter() {
+//                        func_prog.append(s);
+//                    }
+//                    func_prog.push_return(0, true);
+//                    func_prog.push_op(Op::End);
+//
+//                    let spos_inner = fun_spos.clone();
+//                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
+//                        let res = vm(&func_prog, env);
+//                        match res {
+//                            Ok(v)  => Ok(v),
+//                            Err(StackAction::Return((v_lbl, v))) => {
+//                                return
+//                                    if v_lbl.eqv(&label) { Ok(v) }
+//                                    else { Err(StackAction::Return((v_lbl, v))) }
+//                            },
+//                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
+//                        }
+//                    }));
+//
+//                    ce_sub.borrow_mut().explicit_arity.0 =
+//                        match explicit_arity.at(0).unwrap_or(VVal::Nul) {
+//                            VVal::Int(i) => ArityParam::Limit(i as usize),
+//                            VVal::Bol(true) => ArityParam::Limit(0),
+//                            _ => ArityParam::Undefined,
+//                        };
+//
+//                    ce_sub.borrow_mut().explicit_arity.1 =
+//                        match explicit_arity.at(1).unwrap_or(VVal::Nul) {
+//                            VVal::Int(i) => ArityParam::Limit(i as usize),
+//                            VVal::Bol(true) => ArityParam::Infinite,
+//                            _ => ArityParam::Undefined,
+//                        };
+//
+//                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
+//                        ce_sub.borrow().explicit_arity.0.clone()
+//                    } else {
+//                        ce_sub.borrow().implicit_arity.0.clone()
+//                    };
+//
+//                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
+//                        ce_sub.borrow().explicit_arity.1.clone()
+//                    } else {
+//                        ce_sub.borrow().implicit_arity.1.clone()
+//                    };
+//
+//                    let min_args : Option<usize> = match deciding_min_arity {
+//                        ArityParam::Infinite  => None,
+//                        ArityParam::Undefined => Some(0),
+//                        ArityParam::Limit(i)  => Some(i),
+//                    };
+//
+//                    let max_args : Option<usize> = match deciding_max_arity {
+//                        ArityParam::Infinite  => None,
+//                        ArityParam::Undefined => Some(0),
+//                        ArityParam::Limit(i)  => Some(i),
+//                    };
+//
+//                    let env_size = ce_sub.borrow().local_env_size();
+//                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
+//                    let upvalues = vec![];
+//                    let fun_template =
+//                        VValFun::new_val(
+//                            fun_ref.clone(),
+//                            upvalues, env_size, min_args, max_args, false,
+//                            Some(fun_spos.clone()),
+//                            Rc::new(upvs));
+//                    Ok(Prog::new().data_op(Op::NewClos(0, ResPos), fun_template))
+//                },
+//                Syntax::Call => {
+//                    let is_for_n =
+//                        if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
+//                            let var = ast.at(1).unwrap().at(1).unwrap();
+//                            var.with_s_ref(|var_s: &str| var_s == "for_n")
+//                        } else {
+//                            false
+//                        };
+//
+//                    if is_for_n {
+//////                        if ast.len() > 5 {
+//////                            return Err(ast.compile_err(
+//////                                format!("if can only have 2 arguments, got more: {}", ast.s())));
+//////                        }
+////                        let idx_pos = ce.borrow_mut().def(&ast.at(2).unwrap_or(VVal::Nul).s_raw(), false);
+////                        let idx_pos =
+////                            if let VarPos::Local(i) = idx_pos { i }
+////                            else {
+////                                panic!("Local variable for counting loop not local!");
+////                            };
+////
+//                        let mut cond = vm_compile_direct_block(&ast.at(2).unwrap_or(VVal::Nul), ce)?;
+//
+//                        let mut body = vm_compile_direct_block(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
+//
+//                        let body_cnt = body.op_count();
+//                        cond.push_op(Op::JmpIfN(body_cnt as i32 + 1));
+//                        let mut cond = cond.consume(1);
+//                        let cond_cnt = cond.op_count();
+//                        cond.append(body);
+//                        cond.push_op(Op::Jmp(-(body_cnt as i32 + (cond_cnt + 1) as i32)));
+//
+//                        return Ok(cond);
+//                    }
+//
+//                    let mut call_args : Vec<Prog> =
+//                        ast.map_skip(|e: &VVal| vm_compile(e, ce), 1)?;
+//                    call_args.reverse();
+//
+//                    let argc = call_args.len();
+//                    let mut prog = Prog::new().debug(spos);
+//                    for a in call_args.into_iter() {
+//                        prog.append(a);
+//                    }
+//                    Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result(ResPos::Stack(0)))
+//                },
+//                Syntax::Lst => {
+//                    let mut list_elems : Vec<(bool, Prog)> =
+//                        ast.map_skip(|e| {
+//                            if e.is_vec() {
+//                                if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
+//                                    e.at(0).unwrap_or(VVal::Nul)
+//                                {
+//                                    return Ok((true, vm_compile(&e.at(1).unwrap(), ce)?));
+//                                }
+//                            }
+//                            Ok((false, vm_compile(e, ce)?))
+//                        }, 1)?;
+//
+//                    let mut prog = Prog::new().debug(spos.clone());
+//                    prog.push_op(Op::NewList(ResPos::Stack(0)));
+//                    for (is_splice, elem) in list_elems.into_iter() {
+//                        prog.append(elem);
+//                        let res = prog.get_result();
+//                        if is_splice {
+//                            prog.push_op(Op::ListSplice(res));
+//                        } else {
+//                            prog.push_op(Op::ListPush(res));
+//                        }
+//                    }
+//                    Ok(prog.result())
+//                },
+//                Syntax::Map => {
+//                    let map_elems : Result<Vec<(Prog,Option<Prog>)>, CompileError> =
+//                        ast.map_skip(|e| {
+//                                let k = e.at(0).unwrap();
+//                                let v = e.at(1).unwrap();
+//                                if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
+//                                    let sc = vm_compile(&v, ce)?;
+//                                    Ok((sc, None))
+//                                } else {
+//                                    let kc = vm_compile(&k, ce)?;
+//                                    if let VVal::Sym(y) = k {
+//                                        ce.borrow_mut().recent_var = y.borrow().clone();
+//                                    } else {
+//                                        let recent_sym = ce.borrow().recent_sym.clone();
+//                                        ce.borrow_mut().recent_var = recent_sym;
+//                                    }
+//                                    let vc = vm_compile(&v, ce)?;
+//                                    Ok((kc, Some(vc)))
+//                                }
+//                            }, 1);
+//                    if let Err(e) = map_elems { return Err(e); }
+//                    let map_elems = map_elems.unwrap();
+//
+//                    let mut prog = Prog::new().debug(spos.clone());
+//                    prog.push_op(Op::NewMap);
+//
+//                    for x in map_elems.into_iter() {
+//                        let key_prog = x.0;
+//                        prog.append(key_prog);
+//                        if let Some(value_prog) = x.1 {
+//                            prog.append(value_prog);
+//                            prog.push_op(Op::MapSetKey);
+//                        } else {
+//                            prog.push_op(Op::MapSplice);
+//                        }
+//                    }
+//                    Ok(prog.result())
+//                },
+//                Syntax::Err => {
+//                    let err_val = vm_compile(&ast.at(1).unwrap(), ce)?;
+//                    Ok(err_val.debug(spos).op(Op::NewErr).consume(1).result())
+//                },
                 Syntax::Key => {
                     let sym = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = sym.s_raw();
-                    Ok(Prog::new().data_op(Op::Push(0), sym).result())
+                    sp.set_data(sym.clone());
+                    Ok(Prog::new())
                 },
                 Syntax::Str => {
                     let sym = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = sym.s_raw();
-                    Ok(Prog::new().data_op(Op::Push(0), sym).result())
+                    sp.set_data(sym.clone());
+                    Ok(Prog::new())
                 },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },
         VVal::Pair(bx) => {
-            let a = vm_compile(&bx.0, ce)?;
-            let b = vm_compile(&bx.1, ce)?;
+            let mut ap = StorePos::new();
+            let mut bp = StorePos::new();
+
+            let a = vm_compile(&bx.0, ce, &mut ap)?;
+            let b = vm_compile(&bx.1, ce, &mut bp)?;
+
             let mut p = Prog::new();
-            p.append(a);
+            let mut stack_offs : usize = 0;
             p.append(b);
-            Ok(p.op(Op::NewPair).consume(2).result())
+            bp.volatile_to_stack(&mut p, &mut stack_offs);
+            p.append(a);
+            ap.volatile_to_stack(&mut p, &mut stack_offs);
+
+            let ap = ap.to_load_pos(&mut p);
+            let bp = bp.to_load_pos(&mut p);
+            p.op_new_pair(ap, bp, sp.to_store_pos());
+            Ok(p)
         },
-        _ => Ok(Prog::new().op(Op::PushV(ast.clone())).result()),
+        _ => {
+            sp.set_data(ast.clone());
+            Ok(Prog::new())
+        },
     }
 }
 
@@ -1231,13 +1373,19 @@ pub fn gen(s: &str) -> String {
     match parser::parse(s, "<compiler:s_eval>") {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
-            match vm_compile(&ast, &mut ce) {
+            let mut dest = StorePos::new();
+            dest.set(ResPos::Ret);
+            match vm_compile(&ast, &mut ce, &mut dest) {
                 Ok(mut prog) => {
+                    dest.to_load_pos(&mut prog);
+                    prog.op_end();
+
                     let mut e = Env::new(global);
                     e.push(VVal::Int(10));
                     e.push(VVal::Flt(14.4));
                     e.argc = 2;
                     e.set_bp(0);
+
                     match vm(&prog, &mut e) {
                         Ok(v) => v.s(),
                         Err(je) => {
@@ -1255,6 +1403,14 @@ pub fn gen(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vm_data() {
+        assert_eq!(gen("10"),      "10");
+        assert_eq!(gen("\"foo\""), "\"foo\"");
+        assert_eq!(gen(":foo"),    ":\"foo\"");
+    }
+
     #[test]
     fn vm_pair() {
         assert_eq!(gen("$p(1,2)"),          "$p(1,2)");
