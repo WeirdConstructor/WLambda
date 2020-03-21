@@ -229,6 +229,46 @@ impl Prog {
 
         for o in prog.ops.iter_mut() {
             match o {
+                Op::Add(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Sub(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Mul(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Div(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Mod(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Le(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Lt(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Ge(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Gt(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::Eq(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
                 Op::NewPair(p1, p2, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
@@ -240,8 +280,17 @@ impl Prog {
                 Op::ToRef(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
+                Op::ListPush(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::ListSplice(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
                 Op::Argv(_)
                 | Op::End
+                | Op::NewList(_)
                 | Op::ClearLocals(_, _)
                     => (),
             }
@@ -355,6 +404,37 @@ impl Prog {
     }
 }
 
+#[derive(Debug, Clone)]
+enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Le,
+    Lt,
+    Ge,
+    Gt,
+    Eq,
+}
+
+impl BinOp {
+    fn to_op(&self, a: ResPos, b: ResPos, out: ResPos) -> Op {
+        match self {
+            BinOp::Add => Op::Add(a, b, out),
+            BinOp::Sub => Op::Sub(a, b, out),
+            BinOp::Mul => Op::Mul(a, b, out),
+            BinOp::Div => Op::Div(a, b, out),
+            BinOp::Mod => Op::Mod(a, b, out),
+            BinOp::Le  => Op::Le(a, b, out),
+            BinOp::Lt  => Op::Lt(a, b, out),
+            BinOp::Ge  => Op::Ge(a, b, out),
+            BinOp::Gt  => Op::Gt(a, b, out),
+            BinOp::Eq  => Op::Eq(a, b, out),
+        }
+    }
+}
+
 #[derive(Debug,Clone)]
 enum Op {
     Mov(ResPos, ResPos),
@@ -362,6 +442,19 @@ enum Op {
     Argv(ResPos),
     ToRef(ResPos, ResPos),
     ClearLocals(u16, u16),
+    Add(ResPos, ResPos, ResPos),
+    Sub(ResPos, ResPos, ResPos),
+    Mul(ResPos, ResPos, ResPos),
+    Div(ResPos, ResPos, ResPos),
+    Mod(ResPos, ResPos, ResPos),
+    Le(ResPos, ResPos, ResPos),
+    Lt(ResPos, ResPos, ResPos),
+    Ge(ResPos, ResPos, ResPos),
+    Gt(ResPos, ResPos, ResPos),
+    Eq(ResPos, ResPos, ResPos),
+    NewList(ResPos),
+    ListPush(ResPos, ResPos, ResPos),
+    ListSplice(ResPos, ResPos, ResPos),
     End,
     //    Call(u32),
     //    Push(u32),
@@ -386,9 +479,6 @@ enum Op {
     //    ArgRef(u32),
     //    Argv,
     //    ArgvRef,
-    //    NewList(ResPos),
-    //    ListPush(ResPos, ResPos),
-    //    ListSplice(ResPos, ResPos),
     //    NewMap,
     //    MapSetKey,
     //    MapSplice,
@@ -397,16 +487,6 @@ enum Op {
     //    Ret(u16, ResPos),
     //    End,
     //    Pop,
-    //    Add(ResPos, ResPos, ResPos),
-    //    Sub(ResPos, ResPos, ResPos),
-    //    Mul(ResPos, ResPos, ResPos),
-    //    Div(ResPos, ResPos, ResPos),
-    //    Mod(ResPos, ResPos, ResPos),
-    //    Le(ResPos, ResPos, ResPos),
-    //    Lt(ResPos, ResPos, ResPos),
-    //    Ge(ResPos, ResPos, ResPos),
-    //    Gt(ResPos, ResPos, ResPos),
-    //    Eq(ResPos, ResPos, ResPos),
 }
 
 impl Op {
@@ -524,6 +604,77 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Argv(r)             => op_r!(env, ret, prog, r, { env.argv() }),
             Op::End                 => { break; },
             Op::ClearLocals(from, to) => env.null_locals(*from as usize, *to as usize),
+            Op::Add(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Int(a) = a {
+                    VVal::Int(a.wrapping_add(b.i()))
+                } else {
+                    match (a.clone(), b.clone()) {
+                        (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
+                        (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
+                        (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
+                        (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
+                    }
+                }
+            }),
+            Op::Sub(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Flt(f) = a { VVal::Flt(f - b.f()) }
+                else { VVal::Int(a.i().wrapping_sub(b.i())) }
+            }),
+            Op::Div(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Flt(f) = a {
+                    VVal::Flt(f / b.f())
+
+                } else if b.i() == 0 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("Division by 0: {}/{}", a.i(), b.i()),
+                            prog.debug[pc].clone()))
+
+                } else {
+                    VVal::Int(a.i().wrapping_div(b.i()))
+                }
+            }),
+            Op::Mul(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Flt(f) = a { VVal::Flt(f * b.f()) }
+                else { VVal::Int(a.i().wrapping_mul(b.i())) }
+            }),
+            Op::Mod(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Flt(f) = a {
+                    VVal::Flt(f % b.f())
+                } else {
+                    VVal::Int(a.i().wrapping_rem(b.i()))
+                }
+            }),
+            Op::Le(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
+                else { VVal::Bol(a.i() <= b.i()) }
+            }),
+            Op::Lt(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Flt(f) = a { VVal::Bol(f < b.f()) }
+                else { VVal::Bol(a.i() < b.i()) }
+            }),
+            Op::Ge(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
+                else { VVal::Bol(a.i() >= b.i()) }
+            }),
+            Op::Gt(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
+                else { VVal::Bol(a.i() > b.i()) }
+            }),
+            Op::Eq(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                VVal::Bol(a.eqv(&b))
+            }),
+            Op::NewList(r) => op_r!(env, ret, prog, r, { VVal::vec() }),
+            Op::ListPush(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                b.push(check_error_value(a, "list element")?);
+                b
+            }),
+            Op::ListSplice(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+                for (e, _) in a.iter() {
+                    b.push(e);
+                }
+                b
+            }),
                 //            Op::PushNul    => { env.push(VVal::Nul); },
                 //            Op::PushI(int) => { env.push(VVal::Int(*int as i64)); },
                 //            Op::PushV(v) => {
@@ -587,109 +738,6 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 //            Op::ArgRef(arg_idx)        => { env.push(env.arg(*arg_idx as usize).to_ref()); },
                 //            Op::Argv                   => { env.push(env.argv()); },
                 //            Op::ArgvRef                => { env.push(env.argv().to_ref()); },
-                //            Op::Add => {
-                //                let a = env.reg(-1);
-                //                let b = env.reg(-2);
-                //
-                //                let res =
-                //                    if let VVal::Int(a) = a {
-                //                        VVal::Int(a.wrapping_add(b.i()))
-                //                    } else {
-                //                        match (a.clone(), b.clone()) {
-                //                            (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
-                //                            (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
-                //                            (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
-                //                            (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
-                //                        }
-                //                    };
-                //
-                //                env.popn(2);
-                //                env.push(res);
-                //            },
-                //            Op::Sub => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                let res =
-                //                    if let VVal::Flt(f) = a { VVal::Flt(f - b.f()) }
-                //                    else { VVal::Int(a.i().wrapping_sub(b.i())) };
-                //                env.push(res);
-                //            },
-                //            Op::Div => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                let res =
-                //                    if let VVal::Flt(f) = a {
-                //                        VVal::Flt(f / b.f())
-                //
-                //                    } else if b.i() == 0 {
-                //                        return
-                //                            Err(StackAction::panic_str(
-                //                                format!("Division by 0: {}/{}", a.i(), b.i()),
-                //                                prog.debug[pc].clone()))
-                //
-                //                    } else {
-                //                        VVal::Int(a.i().wrapping_div(b.i()))
-                //                    };
-                //                env.push(res);
-                //            },
-                //            Op::Mul => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                let res =
-                //                    if let VVal::Flt(f) = a { VVal::Flt(f * b.f()) }
-                //                    else { VVal::Int(a.i().wrapping_mul(b.i())) };
-                //                env.push(res);
-                //            },
-                //            Op::Mod => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                let res =
-                //                    if let VVal::Flt(f) = a {
-                //                        VVal::Flt(f % b.f())
-                //                    } else {
-                //                        VVal::Int(a.i().wrapping_rem(b.i()))
-                //                    };
-                //                env.push(res);
-                //            },
-                //            Op::Le => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                let res =
-                //                    if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
-                //                    else { VVal::Bol(a.i() <= b.i()) };
-                //                env.push(res);
-                //            },
-                //            Op::Lt => {
-                //                let b = env.stk(1);
-                //                let a = env.stk(2);
-                //                let res =
-                //                    if let VVal::Flt(f) = a { VVal::Bol(*f < b.f()) }
-                //                    else { VVal::Bol(a.i() < b.i()) };
-                //                env.popn(2);
-                //                env.push(res);
-                //            },
-                //            Op::Ge => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                let res =
-                //                    if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
-                //                    else { VVal::Bol(a.i() >= b.i()) };
-                //                env.push(res);
-                //            },
-                //            Op::Gt => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                let res =
-                //                    if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
-                //                    else { VVal::Bol(a.i() > b.i()) };
-                //                env.push(res);
-                //            },
-                //            Op::Eq => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                let res = VVal::Bol(a.eqv(&b));
-                //                env.push(res);
-                //            },
                 //            Op::Call(argc) => {
                 //                let argc = *argc as usize;
                 //                let f = env.pop();
@@ -700,21 +748,6 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 //                    Err(sa) =>
                 //                        return Err(sa.wrap_panic(prog.debug[pc].clone())),
                 //                }
-                //            },
-                //            Op::NewList(a) => op_0_r!(env, ret, a, { VVal::vec() }),
-                //            Op::ListPush => {
-                //                let elem = env.pop();
-                //                let lst  = env.pop();
-                //                lst.push(check_error_value(elem, "list element")?);
-                //                env.push(lst);
-                //            },
-                //            Op::ListSplice => {
-                //                let elem = env.pop();
-                //                let lst  = env.pop();
-                //                for (e, _) in elem.iter() {
-                //                    lst.push(e);
-                //                }
-                //                env.push(lst);
                 //            },
                 //            Op::NewMap => { env.push(VVal::map()); },
                 //            Op::MapSetKey => {
@@ -1226,22 +1259,32 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
 //        _ => vm_compile(ast, ce),
 //    }
 //}
-//
-//fn vm_compile_binop(ast: &VVal, op: Op, ce: &mut Rc<RefCell<CompileEnv>>, res: ResPos)
-//    -> Result<Prog, CompileError>
-//{
-//    let syn  = ast.at(0).unwrap_or(VVal::Nul);
-//    let spos = syn.get_syn_pos();
-//
-//    let t1 = ce.tmp_stk_slot();
-//    let t2 = ce.tmp_stk_slot();
-//    let left  = vm_compile(&ast.at(1).unwrap(), ce, t1.get())?;
-//    let right = vm_compile(&ast.at(2).unwrap(), ce, t2.get())?;
-//    let mut prog = Prog::new().debug(spos);
-//    prog.append(left);
-//    prog.append(right);
-//    Ok(prog.op(op.set_out(res))
-//}
+
+fn vm_compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos)
+    -> Result<Prog, CompileError>
+{
+    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    let mut ap = StorePos::new();
+    let mut bp = StorePos::new();
+
+    let a = vm_compile(&ast.at(1).unwrap(), ce, &mut ap)?;
+    let b = vm_compile(&ast.at(2).unwrap(), ce, &mut bp)?;
+
+    let mut p = Prog::new().debug(spos);
+    let mut stack_offs : usize = 0;
+    p.append(b);
+    bp.volatile_to_stack(&mut p, &mut stack_offs);
+    p.append(a);
+    ap.volatile_to_stack(&mut p, &mut stack_offs);
+
+    let ap = ap.to_load_pos(&mut p);
+    let bp = bp.to_load_pos(&mut p);
+
+    p.push_op(op.to_op(ap, bp, sp.to_store_pos()));
+    Ok(p)
+}
 
 fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
     match ast {
@@ -1258,16 +1301,49 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
                 Syntax::CaptureRef => vm_compile_var(ast, ce, true, sp)    .map(|p| p.debug(spos)),
                 Syntax::Def        => vm_compile_def(ast, ce, false, sp)   .map(|p| p.debug(spos)),
                 Syntax::DefGlobRef => vm_compile_def(ast, ce, true, sp)    .map(|p| p.debug(spos)),
-//                Syntax::BinOpAdd   => vm_compile_binop(ast, Op::Add, ce, res),
-//                Syntax::BinOpSub   => vm_compile_binop(ast, Op::Sub, ce, res),
-//                Syntax::BinOpDiv   => vm_compile_binop(ast, Op::Div, ce, res),
-//                Syntax::BinOpMod   => vm_compile_binop(ast, Op::Mod, ce, res),
-//                Syntax::BinOpMul   => vm_compile_binop(ast, Op::Mul, ce, res),
-//                Syntax::BinOpGe    => vm_compile_binop(ast, Op::Ge,  ce, res),
-//                Syntax::BinOpGt    => vm_compile_binop(ast, Op::Gt,  ce, res),
-//                Syntax::BinOpLe    => vm_compile_binop(ast, Op::Le,  ce, res),
-//                Syntax::BinOpLt    => vm_compile_binop(ast, Op::Lt,  ce, res),
-//                Syntax::BinOpEq    => vm_compile_binop(ast, Op::Eq,  ce, res),
+                Syntax::BinOpAdd   => vm_compile_binop(ast, BinOp::Add, ce, sp),
+                Syntax::BinOpSub   => vm_compile_binop(ast, BinOp::Sub, ce, sp),
+                Syntax::BinOpDiv   => vm_compile_binop(ast, BinOp::Div, ce, sp),
+                Syntax::BinOpMod   => vm_compile_binop(ast, BinOp::Mod, ce, sp),
+                Syntax::BinOpMul   => vm_compile_binop(ast, BinOp::Mul, ce, sp),
+                Syntax::BinOpGe    => vm_compile_binop(ast, BinOp::Ge,  ce, sp),
+                Syntax::BinOpGt    => vm_compile_binop(ast, BinOp::Gt,  ce, sp),
+                Syntax::BinOpLe    => vm_compile_binop(ast, BinOp::Le,  ce, sp),
+                Syntax::BinOpLt    => vm_compile_binop(ast, BinOp::Lt,  ce, sp),
+                Syntax::BinOpEq    => vm_compile_binop(ast, BinOp::Eq,  ce, sp),
+                Syntax::Lst => {
+                    let mut stack_offs : usize = 0;
+                    let mut p = Prog::new();
+                    p.push_op(Op::NewList(ResPos::Stack(0)));
+
+                    for (a, _) in ast.iter().skip(1) {
+                        let mut ap = StorePos::new();
+
+                        if a.is_vec() {
+                            if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
+                                a.at(0).unwrap_or(VVal::Nul)
+                            {
+                                let splice = vm_compile(&a.at(1).unwrap(), ce, &mut ap)?;
+                                p.append(splice);
+                                ap.volatile_to_stack(&mut p, &mut stack_offs);
+                                let ap = ap.to_load_pos(&mut p);
+                                p.push_op(Op::ListSplice(
+                                    ap, ResPos::Stack(0), ResPos::Stack(0)));
+                                continue;
+                            }
+                        }
+
+                        let a = vm_compile(&a, ce, &mut ap)?;
+                        p.append(a);
+                        ap.volatile_to_stack(&mut p, &mut stack_offs);
+                        let ap = ap.to_load_pos(&mut p);
+                        p.push_op(Op::ListPush(
+                            ap, ResPos::Stack(0), ResPos::Stack(0)));
+                    }
+
+                    sp.set(ResPos::Stack(0));
+                    Ok(p)
+                },
 //                Syntax::Func => {
 //                    let last_def_varname = ce.borrow().recent_var.clone();
 //                    let mut fun_spos = spos;
@@ -1396,32 +1472,6 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
 //                        prog.append(a);
 //                    }
 //                    Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result(ResPos::Stack(0)))
-//                },
-//                Syntax::Lst => {
-//                    let mut list_elems : Vec<(bool, Prog)> =
-//                        ast.map_skip(|e| {
-//                            if e.is_vec() {
-//                                if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
-//                                    e.at(0).unwrap_or(VVal::Nul)
-//                                {
-//                                    return Ok((true, vm_compile(&e.at(1).unwrap(), ce)?));
-//                                }
-//                            }
-//                            Ok((false, vm_compile(e, ce)?))
-//                        }, 1)?;
-//
-//                    let mut prog = Prog::new().debug(spos.clone());
-//                    prog.push_op(Op::NewList(ResPos::Stack(0)));
-//                    for (is_splice, elem) in list_elems.into_iter() {
-//                        prog.append(elem);
-//                        let res = prog.get_result();
-//                        if is_splice {
-//                            prog.push_op(Op::ListSplice(res));
-//                        } else {
-//                            prog.push_op(Op::ListPush(res));
-//                        }
-//                    }
-//                    Ok(prog.result())
 //                },
 //                Syntax::Map => {
 //                    let map_elems : Result<Vec<(Prog,Option<Prog>)>, CompileError> =
