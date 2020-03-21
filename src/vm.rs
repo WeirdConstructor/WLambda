@@ -280,6 +280,9 @@ impl Prog {
                 Op::ToRef(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
+                Op::NewClos(p1, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
                 Op::ListPush(p1, p2, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
@@ -288,8 +291,18 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
+                Op::MapSetKey(p1, p2, p3, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::MapSplice(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
                 Op::Argv(_)
                 | Op::End
+                | Op::NewMap(_)
                 | Op::NewList(_)
                 | Op::ClearLocals(_, _)
                     => (),
@@ -455,6 +468,10 @@ enum Op {
     NewList(ResPos),
     ListPush(ResPos, ResPos, ResPos),
     ListSplice(ResPos, ResPos, ResPos),
+    NewMap(ResPos),
+    MapSetKey(ResPos, ResPos, ResPos, ResPos),
+    MapSplice(ResPos, ResPos, ResPos),
+    NewClos(ResPos, ResPos),
     End,
     //    Call(u32),
     //    Push(u32),
@@ -479,11 +496,7 @@ enum Op {
     //    ArgRef(u32),
     //    Argv,
     //    ArgvRef,
-    //    NewMap,
-    //    MapSetKey,
-    //    MapSplice,
     //    NewErr,
-    //    NewClos(u32),
     //    Ret(u16, ResPos),
     //    End,
     //    Pop,
@@ -516,7 +529,7 @@ macro_rules! in_reg {
                 ResPos::Global(i)   => $prog.data[*i as usize].deref(),
                 ResPos::Arg(o)      => $env.arg(*o as usize),
                 ResPos::Data(i)     => $prog.data[*i as usize].clone(),
-                ResPos::Stack(o)    => $env.pop(),
+                ResPos::Stack(_o)   => $env.pop(),
                 ResPos::Ret         => std::mem::replace(&mut $ret, VVal::Nul),
                 ResPos::Nul         => VVal::Nul,
             };
@@ -550,7 +563,8 @@ macro_rules! op_a_r {
     ($env: ident, $ret: ident, $prog: ident, $a: ident, $r: ident, $block: block) => {
         {
             in_reg!($env, $ret, $prog, $a);
-            out_reg!($env, $ret, $prog, $r, $block);
+            let res = $block;
+            out_reg!($env, $ret, $prog, $r, res);
         }
     }
 }
@@ -560,6 +574,17 @@ macro_rules! op_a_b_r {
         {
             in_reg!($env, $ret, $prog, $a);
             in_reg!($env, $ret, $prog, $b);
+            out_reg!($env, $ret, $prog, $r, $block);
+        }
+    }
+}
+
+macro_rules! op_a_b_c_r {
+    ($env: ident, $ret: ident, $prog: ident, $a: ident, $b: ident, $c: ident, $r: ident, $block: block) => {
+        {
+            in_reg!($env, $ret, $prog, $a);
+            in_reg!($env, $ret, $prog, $b);
+            in_reg!($env, $ret, $prog, $c);
             out_reg!($env, $ret, $prog, $r, $block);
         }
     }
@@ -675,31 +700,23 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
                 b
             }),
-                //            Op::PushNul    => { env.push(VVal::Nul); },
-                //            Op::PushI(int) => { env.push(VVal::Int(*int as i64)); },
-                //            Op::PushV(v) => {
-                //                env.push(v.clone());
-                //            },
-                //            Op::Push(data_idx) => {
-                //                env.push(prog.data[*data_idx as usize].clone());
-                //            },
-                //            Op::PushRef(data_idx) => {
-                //                env.push(prog.data[*data_idx as usize].to_ref());
-                //            },
-                //            Op::NewPair => {
-                //                let b = env.pop();
-                //                let a = env.pop();
-                //                env.push(VVal::Pair(Box::new((a, b))));
-                //            },
-                //            Op::Pop                    => {
-                //                if let VVal::Err(ev) = env.pop() {
-                //                    return
-                //                        Err(StackAction::panic_str(
-                //                            format!("Error value '{}' dropped.",
-                //                                    ev.borrow().0.s()),
-                //                            Some(ev.borrow().1.clone())));
-                //                }
-                //            },
+            Op::NewMap(r) => op_r!(env, ret, prog, r, { VVal::map() }),
+            Op::MapSetKey(k, v, m, r) => op_a_b_c_r!(env, ret, prog, k, v, m, r, {
+                m.set_key(&k, v)?;
+                m
+            }),
+            Op::NewClos(f, r) => op_a_r!(env, ret, prog, f, r, {
+                let fun = f.clone_and_rebind_upvalues(|upvs, upvalues| {
+                    copy_upvs(upvs, env, upvalues);
+                });
+                fun
+            }),
+            Op::MapSplice(s, m, r) => op_a_b_r!(env, ret, prog, s, m, r, {
+                for (e, k) in s.iter() {
+                    m.set_key(&k.unwrap(), e);
+                }
+                m
+            }),
                 //            Op::Jmp(jmp_offs) => {
                 //                pc = (pc as i32 + *jmp_offs) as usize;
                 //            },
@@ -749,33 +766,10 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 //                        return Err(sa.wrap_panic(prog.debug[pc].clone())),
                 //                }
                 //            },
-                //            Op::NewMap => { env.push(VVal::map()); },
-                //            Op::MapSetKey => {
-                //                let value = check_error_value(env.pop(), "map value")?;
-                //                let key   = check_error_value(env.pop(), "map key")?;
-                //                let map   = env.pop();
-                //                map.set_key(&key, value)?;
-                //                env.push(map);
-                //            },
-                //            Op::MapSplice => {
-                //                let value = check_error_value(env.pop(), "map splice value")?;
-                //                let map   = env.pop();
-                //                for (e, k) in value.iter() {
-                //                    map.set_key(&k.unwrap(), e);
-                //                }
-                //                env.push(map);
-                //            },
                 //            Op::NewErr => {
                 //                let val = env.pop();
                 //                env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
                 //            },
-                //            Op::NewClos(data_idx, a) => op_0_r!(env, res, a, {
-                //                let fun = prog.data[*data_idx as usize].clone();
-                //                let fun = fun.clone_and_rebind_upvalues(|upvs, upvalues| {
-                //                    copy_upvs(upvs, env, upvalues);
-                //                });
-                //                fun
-                //            }),
         }
         if DEBUG_VM {
             env.dump_stack();
@@ -1098,41 +1092,6 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
             let ssp = ssp.to_load_pos(&mut prog);
             prog.push_op(Op::ToRef(ssp, sp.to_store_pos()));
             Ok(prog)
-//            match var_s {
-//                "_"  => { set_impl_arity(1,  ce); Ok(Prog::new().op(Op::ArgRef(0)).result()) },
-//                "_1" => { set_impl_arity(2,  ce); Ok(Prog::new().op(Op::ArgRef(1)).result()) },
-//                "_2" => { set_impl_arity(3,  ce); Ok(Prog::new().op(Op::ArgRef(2)).result()) },
-//                "_3" => { set_impl_arity(4,  ce); Ok(Prog::new().op(Op::ArgRef(3)).result()) },
-//                "_4" => { set_impl_arity(5,  ce); Ok(Prog::new().op(Op::ArgRef(4)).result()) },
-//                "_5" => { set_impl_arity(6,  ce); Ok(Prog::new().op(Op::ArgRef(5)).result()) },
-//                "_6" => { set_impl_arity(7,  ce); Ok(Prog::new().op(Op::ArgRef(6)).result()) },
-//                "_7" => { set_impl_arity(8,  ce); Ok(Prog::new().op(Op::ArgRef(7)).result()) },
-//                "_8" => { set_impl_arity(9,  ce); Ok(Prog::new().op(Op::ArgRef(8)).result()) },
-//                "_9" => { set_impl_arity(10, ce); Ok(Prog::new().op(Op::ArgRef(9)).result()) },
-//                "@"  => {
-//                    ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-//                    Ok(Prog::new().op(Op::ArgvRef).result())
-//                },
-//                _ => {
-//                    let pos = ce.borrow_mut().get(var_s);
-//                    match pos {
-//                        VarPos::UpValue(i) =>
-//                            Ok(Prog::new().op(Op::GetUpRef(i as u32)).result()),
-//                        VarPos::Local(i) =>
-//                            Ok(Prog::new().op(Op::GetLocalRef(i as u32)).result()),
-//                        VarPos::Global(v) =>
-//                            Ok(Prog::new().data_op(Op::GetGlobalRef(0), v.clone()).result()),
-//                        VarPos::Const(v) =>
-//                            Ok(Prog::new().data_op(Op::PushRef(0), v.clone()).result()),
-//                        VarPos::NoPos => {
-//                            Err(ast.compile_err(
-//                                format!("Variable '{}' undefined", var_s)))
-//                        }
-//                    }
-//                }
-//            }
-//            sp.set(ResPos::Nul);
-//            Ok(Prog::new())
         } else {
             match var_s {
                 "_"  => { set_impl_arity(1,  ce); sp.set(ResPos::Arg(0)); Ok(Prog::new()) },
@@ -1183,24 +1142,24 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
     })
 }
 
-fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, return_func: bool, sp: &mut StorePos) -> Result<Prog, CompileError> {
+fn vm_compile_stmts(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
     let syn  = ast.at(0).unwrap_or(VVal::Nul);
     let spos = syn.get_syn_pos();
 
     let mut block_sp = StorePos::new();
     block_sp.set(ResPos::Ret);
 
-    ce.borrow_mut().push_block_env();
     let mut i = 0;
     let ast_len = ast.len() - skip_cnt;
     let exprs : Vec<Prog> =
         ast.map_skip( |e| {
             let mut devnull = StorePos::new_dev_null();
             let sp =
-                if i == ast_len - 1 { println!("block_sp {:?}", block_sp); &mut block_sp }
-                else {println!("devnull");  &mut devnull };
+                if i == ast_len - 1 { &mut block_sp }
+                else { &mut devnull };
             i += 1;
             let mut prog = vm_compile(e, ce, sp)?;
+            let mut prog = prog.debug(spos.clone());
             sp.to_load_pos(&mut prog);
             Ok(prog)
         }, skip_cnt)?;
@@ -1209,17 +1168,18 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     for e in exprs.into_iter() {
         p.append(e);
     }
+
+    Ok(p)
+}
+
+fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
+
+    ce.borrow_mut().push_block_env();
+    let mut p = vm_compile_stmts(ast, skip_cnt, ce, sp)?;
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
     sp.set(ResPos::Ret);
     p.push_op(Op::ClearLocals(from_local_idx as u16, to_local_idx as u16));
 
-    // TODO: clear variables in one Op (Op::ClearLocals(a, b))
-    // TODO: cargo test
-//    if return_func || block_env_var_count > 0 {
-//        p.unshift_op(Op::ResvLocals(block_env_var_count as u32));
-//        p.push_return(block_env_var_count, return_func);
-//        return Ok(p);
-//    }
     Ok(p)
 }
 
@@ -1294,7 +1254,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
             let syn  = syn.get_syn();
 
             match syn {
-                Syntax::Block      => vm_compile_block(ast, 1, ce, true, sp),
+                Syntax::Block      => vm_compile_block(ast, 1, ce, sp),
 //                Syntax::Assign     => vm_compile_assign(ast, ce, false, res).map(|p| p.debug(spos)),
 //                Syntax::AssignRef  => vm_compile_assign(ast, ce, true, res) .map(|p| p.debug(spos)),
                 Syntax::Var        => vm_compile_var(ast, ce, false, sp)   .map(|p| p.debug(spos)),
@@ -1344,89 +1304,134 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
                     sp.set(ResPos::Stack(0));
                     Ok(p)
                 },
-//                Syntax::Func => {
-//                    let last_def_varname = ce.borrow().recent_var.clone();
-//                    let mut fun_spos = spos;
-//                    fun_spos.name = Some(Rc::new(last_def_varname));
-//
-//                    let func_ce = CompileEnv::create_env(Some(ce.clone()));
-//                    let mut ce_sub = func_ce;
-//
-//                    let label          = ast.at(1).unwrap();
-//                    let explicit_arity = ast.at(2).unwrap();
-//                    let stmts : Vec<Prog> =
-//                        ast.map_skip(|e| vm_compile(e, &mut ce_sub), 3)?;
-//
-//                    let mut func_prog = Prog::new().debug(fun_spos.clone());
-//                    for s in stmts.into_iter() {
-//                        func_prog.append(s);
-//                    }
-//                    func_prog.push_return(0, true);
-//                    func_prog.push_op(Op::End);
-//
-//                    let spos_inner = fun_spos.clone();
-//                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
-//                        let res = vm(&func_prog, env);
-//                        match res {
-//                            Ok(v)  => Ok(v),
-//                            Err(StackAction::Return((v_lbl, v))) => {
-//                                return
-//                                    if v_lbl.eqv(&label) { Ok(v) }
-//                                    else { Err(StackAction::Return((v_lbl, v))) }
-//                            },
-//                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
-//                        }
-//                    }));
-//
-//                    ce_sub.borrow_mut().explicit_arity.0 =
-//                        match explicit_arity.at(0).unwrap_or(VVal::Nul) {
-//                            VVal::Int(i) => ArityParam::Limit(i as usize),
-//                            VVal::Bol(true) => ArityParam::Limit(0),
-//                            _ => ArityParam::Undefined,
-//                        };
-//
-//                    ce_sub.borrow_mut().explicit_arity.1 =
-//                        match explicit_arity.at(1).unwrap_or(VVal::Nul) {
-//                            VVal::Int(i) => ArityParam::Limit(i as usize),
-//                            VVal::Bol(true) => ArityParam::Infinite,
-//                            _ => ArityParam::Undefined,
-//                        };
-//
-//                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
-//                        ce_sub.borrow().explicit_arity.0.clone()
-//                    } else {
-//                        ce_sub.borrow().implicit_arity.0.clone()
-//                    };
-//
-//                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
-//                        ce_sub.borrow().explicit_arity.1.clone()
-//                    } else {
-//                        ce_sub.borrow().implicit_arity.1.clone()
-//                    };
-//
-//                    let min_args : Option<usize> = match deciding_min_arity {
-//                        ArityParam::Infinite  => None,
-//                        ArityParam::Undefined => Some(0),
-//                        ArityParam::Limit(i)  => Some(i),
-//                    };
-//
-//                    let max_args : Option<usize> = match deciding_max_arity {
-//                        ArityParam::Infinite  => None,
-//                        ArityParam::Undefined => Some(0),
-//                        ArityParam::Limit(i)  => Some(i),
-//                    };
-//
-//                    let env_size = ce_sub.borrow().local_env_size();
-//                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
-//                    let upvalues = vec![];
-//                    let fun_template =
-//                        VValFun::new_val(
-//                            fun_ref.clone(),
-//                            upvalues, env_size, min_args, max_args, false,
-//                            Some(fun_spos.clone()),
-//                            Rc::new(upvs));
-//                    Ok(Prog::new().data_op(Op::NewClos(0, ResPos), fun_template))
-//                },
+                Syntax::Map => {
+                    let mut stack_offs : usize = 0;
+                    let mut p = Prog::new();
+                    p.push_op(Op::NewMap(ResPos::Stack(0)));
+
+                    for (e, _) in ast.iter().skip(1) {
+                        let mut ap = StorePos::new();
+
+                        let k = e.at(0).unwrap();
+                        let v = e.at(1).unwrap();
+
+                        if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
+                            let sc = vm_compile(&v, ce, &mut ap)?;
+                            p.append(sc);
+                            ap.volatile_to_stack(&mut p, &mut stack_offs);
+                            let ap = ap.to_load_pos(&mut p);
+                            p.push_op(Op::MapSplice(
+                                ap, ResPos::Stack(0), ResPos::Stack(0)));
+                            continue;
+                        }
+
+                        let kc = vm_compile(&k, ce, &mut ap)?;
+                        if let VVal::Sym(y) = k {
+                            ce.borrow_mut().recent_var = y.borrow().clone();
+                        } else {
+                            let recent_sym = ce.borrow().recent_sym.clone();
+                            ce.borrow_mut().recent_var = recent_sym;
+                        }
+
+                        let mut ap_v = StorePos::new();
+                        let vc = vm_compile(&v, ce, &mut ap_v)?;
+
+                        p.append(kc);
+                        ap.volatile_to_stack(&mut p, &mut stack_offs);
+                        p.append(vc);
+                        ap_v.volatile_to_stack(&mut p, &mut stack_offs);
+
+                        let ap = ap.to_load_pos(&mut p);
+                        let ap_v = ap_v.to_load_pos(&mut p);
+                        p.push_op(Op::MapSetKey(
+                            ap_v, ap, ResPos::Stack(0), ResPos::Stack(0)));
+                    }
+
+                    sp.set(ResPos::Stack(0));
+                    Ok(p)
+                },
+                Syntax::Func => {
+                    let last_def_varname = ce.borrow().recent_var.clone();
+                    let mut fun_spos = spos.clone();
+                    fun_spos.name = Some(Rc::new(last_def_varname));
+
+                    let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
+                    let mut ce_sub = func_ce.clone();
+
+                    let label          = ast.at(1).unwrap();
+                    let explicit_arity = ast.at(2).unwrap();
+
+                    let mut func_prog = vm_compile_stmts(ast, 3, &mut func_ce, sp)?;
+                    func_prog.push_op(Op::End);
+
+                    let spos_inner = fun_spos.clone();
+                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
+                        let res = vm(&func_prog, env);
+                        match res {
+                            Ok(v)  => Ok(v),
+                            Err(StackAction::Return((v_lbl, v))) => {
+                                return
+                                    if v_lbl.eqv(&label) { Ok(v) }
+                                    else { Err(StackAction::Return((v_lbl, v))) }
+                            },
+                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
+                        }
+                    }));
+
+                    ce_sub.borrow_mut().explicit_arity.0 =
+                        match explicit_arity.at(0).unwrap_or(VVal::Nul) {
+                            VVal::Int(i) => ArityParam::Limit(i as usize),
+                            VVal::Bol(true) => ArityParam::Limit(0),
+                            _ => ArityParam::Undefined,
+                        };
+
+                    ce_sub.borrow_mut().explicit_arity.1 =
+                        match explicit_arity.at(1).unwrap_or(VVal::Nul) {
+                            VVal::Int(i) => ArityParam::Limit(i as usize),
+                            VVal::Bol(true) => ArityParam::Infinite,
+                            _ => ArityParam::Undefined,
+                        };
+
+                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
+                        ce_sub.borrow().explicit_arity.0.clone()
+                    } else {
+                        ce_sub.borrow().implicit_arity.0.clone()
+                    };
+
+                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
+                        ce_sub.borrow().explicit_arity.1.clone()
+                    } else {
+                        ce_sub.borrow().implicit_arity.1.clone()
+                    };
+
+                    let min_args : Option<usize> = match deciding_min_arity {
+                        ArityParam::Infinite  => None,
+                        ArityParam::Undefined => Some(0),
+                        ArityParam::Limit(i)  => Some(i),
+                    };
+
+                    let max_args : Option<usize> = match deciding_max_arity {
+                        ArityParam::Infinite  => None,
+                        ArityParam::Undefined => Some(0),
+                        ArityParam::Limit(i)  => Some(i),
+                    };
+
+                    let env_size = ce_sub.borrow().local_env_size();
+                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
+                    let upvalues = vec![];
+                    let fun_template =
+                        VValFun::new_val(
+                            fun_ref.clone(),
+                            upvalues, env_size, min_args, max_args, false,
+                            Some(fun_spos.clone()),
+                            Rc::new(upvs));
+                    let mut prog = Prog::new().debug(spos);
+                    let mut fsp = StorePos::new();
+                    fsp.set_data(fun_template);
+                    let fsp = fsp.to_load_pos(&mut prog);
+                    prog.push_op(Op::NewClos(fsp, sp.to_store_pos()));
+                    Ok(prog)
+                },
 //                Syntax::Call => {
 //                    let is_for_n =
 //                        if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
@@ -1472,44 +1477,6 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
 //                        prog.append(a);
 //                    }
 //                    Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result(ResPos::Stack(0)))
-//                },
-//                Syntax::Map => {
-//                    let map_elems : Result<Vec<(Prog,Option<Prog>)>, CompileError> =
-//                        ast.map_skip(|e| {
-//                                let k = e.at(0).unwrap();
-//                                let v = e.at(1).unwrap();
-//                                if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
-//                                    let sc = vm_compile(&v, ce)?;
-//                                    Ok((sc, None))
-//                                } else {
-//                                    let kc = vm_compile(&k, ce)?;
-//                                    if let VVal::Sym(y) = k {
-//                                        ce.borrow_mut().recent_var = y.borrow().clone();
-//                                    } else {
-//                                        let recent_sym = ce.borrow().recent_sym.clone();
-//                                        ce.borrow_mut().recent_var = recent_sym;
-//                                    }
-//                                    let vc = vm_compile(&v, ce)?;
-//                                    Ok((kc, Some(vc)))
-//                                }
-//                            }, 1);
-//                    if let Err(e) = map_elems { return Err(e); }
-//                    let map_elems = map_elems.unwrap();
-//
-//                    let mut prog = Prog::new().debug(spos.clone());
-//                    prog.push_op(Op::NewMap);
-//
-//                    for x in map_elems.into_iter() {
-//                        let key_prog = x.0;
-//                        prog.append(key_prog);
-//                        if let Some(value_prog) = x.1 {
-//                            prog.append(value_prog);
-//                            prog.push_op(Op::MapSetKey);
-//                        } else {
-//                            prog.push_op(Op::MapSplice);
-//                        }
-//                    }
-//                    Ok(prog.result())
 //                },
 //                Syntax::Err => {
 //                    let err_val = vm_compile(&ast.at(1).unwrap(), ce)?;
@@ -1681,6 +1648,7 @@ mod tests {
 
     #[test]
     fn vm_func() {
+        assert_eq!(gen("!x = 10; { x; 20 }"), "&F{@[1,10:<compiler:s_eval>(Func)@x],amin=0,amax=0,locals=0,upvalues=$[$n]}");
         assert_eq!(gen("!x = 10; { x }[]"), "10");
         assert_eq!(gen("!x = 10; { !y = 4; !k = 5; y + k + x }[]"), "19");
         assert_eq!(gen(r"
