@@ -302,6 +302,7 @@ impl Prog {
                 },
                 Op::Argv(_)
                 | Op::End
+                | Op::Call(_)
                 | Op::NewMap(_)
                 | Op::NewList(_)
                 | Op::ClearLocals(_, _)
@@ -472,6 +473,7 @@ enum Op {
     MapSetKey(ResPos, ResPos, ResPos, ResPos),
     MapSplice(ResPos, ResPos, ResPos),
     NewClos(ResPos, ResPos),
+    Call(u16),
     End,
     //    Call(u32),
     //    Push(u32),
@@ -717,6 +719,17 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
                 m
             }),
+            Op::Call(argc) => {
+                let argc = *argc as usize;
+                let f = env.pop();
+                let ret = f.call_internal(env, argc);
+                env.popn(argc);
+                match ret {
+                    Ok(v) => { env.push(v); },
+                    Err(sa) =>
+                        return Err(sa.wrap_panic(prog.debug[pc].clone())),
+                }
+            },
                 //            Op::Jmp(jmp_offs) => {
                 //                pc = (pc as i32 + *jmp_offs) as usize;
                 //            },
@@ -755,17 +768,6 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 //            Op::ArgRef(arg_idx)        => { env.push(env.arg(*arg_idx as usize).to_ref()); },
                 //            Op::Argv                   => { env.push(env.argv()); },
                 //            Op::ArgvRef                => { env.push(env.argv().to_ref()); },
-                //            Op::Call(argc) => {
-                //                let argc = *argc as usize;
-                //                let f = env.pop();
-                //                let ret = f.call_internal(env, argc);
-                //                env.popn(argc);
-                //                match ret {
-                //                    Ok(v) => { env.push(v); },
-                //                    Err(sa) =>
-                //                        return Err(sa.wrap_panic(prog.debug[pc].clone())),
-                //                }
-                //            },
                 //            Op::NewErr => {
                 //                let val = env.pop();
                 //                env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
@@ -1178,7 +1180,11 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     let mut p = vm_compile_stmts(ast, skip_cnt, ce, sp)?;
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
     sp.set(ResPos::Ret);
-    p.push_op(Op::ClearLocals(from_local_idx as u16, to_local_idx as u16));
+    if from_local_idx != to_local_idx {
+        p.push_op(Op::ClearLocals(
+            from_local_idx as u16,
+            to_local_idx   as u16));
+    }
 
     Ok(p)
 }
@@ -1432,7 +1438,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
                     prog.push_op(Op::NewClos(fsp, sp.to_store_pos()));
                     Ok(prog)
                 },
-//                Syntax::Call => {
+                Syntax::Call => {
 //                    let is_for_n =
 //                        if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
 //                            let var = ast.at(1).unwrap().at(1).unwrap();
@@ -1466,18 +1472,28 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
 //
 //                        return Ok(cond);
 //                    }
-//
-//                    let mut call_args : Vec<Prog> =
-//                        ast.map_skip(|e: &VVal| vm_compile(e, ce), 1)?;
-//                    call_args.reverse();
-//
-//                    let argc = call_args.len();
-//                    let mut prog = Prog::new().debug(spos);
-//                    for a in call_args.into_iter() {
-//                        prog.append(a);
-//                    }
-//                    Ok(prog.op(Op::Call(argc as u32 - 1)).consume(argc).result(ResPos::Stack(0)))
-//                },
+
+                    let mut args = vec![];
+                    for (e, _) in ast.iter().skip(1) {
+                        args.push(e);
+                    }
+                    args.reverse();
+
+                    let mut argc = 0;
+                    let mut prog = Prog::new().debug(spos);
+                    for e in args.iter() {
+                        let mut sp = StorePos::new();
+                        sp.set(ResPos::Stack(0));
+                        let mut p = vm_compile(&e, ce, &mut sp)?;
+                        sp.to_load_pos(&mut p);
+                        prog.append(p);
+                        argc += 1;
+                    }
+
+                    prog.push_op(Op::Call(argc as u16 - 1));
+                    sp.set(ResPos::Ret);
+                    Ok(prog)
+                },
 //                Syntax::Err => {
 //                    let err_val = vm_compile(&ast.at(1).unwrap(), ce)?;
 //                    Ok(err_val.debug(spos).op(Op::NewErr).consume(1).result())
