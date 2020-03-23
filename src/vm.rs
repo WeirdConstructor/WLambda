@@ -302,7 +302,7 @@ impl Prog {
                 },
                 Op::Argv(_)
                 | Op::End
-                | Op::Call(_)
+                | Op::Call(_, _)
                 | Op::NewMap(_)
                 | Op::NewList(_)
                 | Op::ClearLocals(_, _)
@@ -473,7 +473,7 @@ enum Op {
     MapSetKey(ResPos, ResPos, ResPos, ResPos),
     MapSplice(ResPos, ResPos, ResPos),
     NewClos(ResPos, ResPos),
-    Call(u16),
+    Call(u16, ResPos),
     End,
     //    Call(u32),
     //    Push(u32),
@@ -719,15 +719,18 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
                 m
             }),
-            Op::Call(argc) => {
+            Op::Call(argc, r) => {
                 let argc = *argc as usize;
                 let f = env.pop();
-                let ret = f.call_internal(env, argc);
+                let call_ret = f.call_internal(env, argc);
                 env.popn(argc);
-                match ret {
-                    Ok(v) => { env.push(v); },
-                    Err(sa) =>
-                        return Err(sa.wrap_panic(prog.debug[pc].clone())),
+                match call_ret {
+                    Ok(v) => {
+                        out_reg!(env, ret, prog, r, v);
+                    },
+                    Err(sa) => {
+                        return Err(sa.wrap_panic(prog.debug[pc].clone()));
+                    },
                 }
             },
                 //            Op::Jmp(jmp_offs) => {
@@ -1490,8 +1493,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
                         argc += 1;
                     }
 
-                    prog.push_op(Op::Call(argc as u16 - 1));
-                    sp.set(ResPos::Ret);
+                    prog.push_op(Op::Call(argc as u16 - 1, sp.to_store_pos()));
                     Ok(prog)
                 },
 //                Syntax::Err => {
