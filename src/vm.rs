@@ -7,43 +7,6 @@ use std::cell::RefCell;
 
 const DEBUG_VM: bool = false;
 
-/*
-
-Function call:
-    sp => bp    for referencing the arguments (bp - 1) and locals (bp + 0)
-
-
-{   old_bp <= bp, sp => bp, sp => sp + local_count
-!x, y = (_, _1);    | (bp + 0, bp + 1) = (bp - 1, bp - 2)
-                    | GetArg(0, ResPos::Local(0))
-                    | GetArg(1, ResPos::Local(1))
-
-.x = 1 + 2;         | Add(ResPos::Data(V:1), ResPos::Data(V:2), ResPos::Local(0))
-
-.y = add x 1;       | Mov(ResPos::Data(V:1), ResPos::Stack) (sp++)
-                    | Mov(ResPos::Local(0), ResPos::Stack)  (sp++)
-                    | GetGlobal(324, ResPos::Stack(0))  (sp++)
-                    | Call(2, ResPos::Local(1))         (sp -= 3)
-
-.y = add 2 (add 3 4) | Mov(ResPos::Data(V:4), ResPos::Stack)            (sp++)
-                     | Mov(ResPos::Data(V:3), ResPos::Stack)            (sp++)
-                     | GetGlobal(324, ResPos::Stack)                    (sp++)
-                     | Call(2, ResPos::Stack)                           (sp -= 3, sp++)
-                     | Mov(ResPos::Data(V:2), ResPos::Stack)            (sp++)
-                     | GetGlobal(324, ResPos::Stack)                    (sp++)
-                     | Call(2, ResPos::Local(1))                        (sp -= 3)
-
-.y = 10 + block {    | 
-    !g = 10;         | Mov(ResPos::Data(V:10), ResPos::Local(2))
-    g                | Mov(ResPos::Local(2), ResPos::Stack)
-};                   | 
-                     | Add(ResPos::Data(V:10), ResPos::Stack(0)) (sp -= 1, sp++)
-
-} bp <= old_bp, sp <= sp - local_count / old_sp
-
-
-*/
-
 struct Prog {
     debug:   std::vec::Vec<Option<SynPos>>,
     data:    std::vec::Vec<VVal>,
@@ -366,11 +329,6 @@ impl Prog {
         self
     }
 
-    //    fn push_data(&mut self, v: VVal) -> usize {
-    //        self.data.push(v);
-    //        self.data.len() - 1
-    //    }
-    //
     fn unshift_op(&mut self, o: Op) -> &mut Self {
         self.ops.insert(0, o);
         self.debug.insert(0, std::mem::replace(&mut self.nxt_debug, None));
@@ -382,37 +340,12 @@ impl Prog {
         self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
         self
     }
-    //
-    //    fn push_return(&mut self, local_count: usize, return_func: bool) -> &mut Self {
-    ////        if let Some(res) = self.results.pop() {
-    ////            self.push_op(Op::Ret(local_count as u16, res));
-    ////        } else {
-    //        self.push_op(Op::Ret(local_count as u16, ResPos::Nul));
-    ////        };
-    //        self
-    //    }
-    //
-    //    fn data_op(mut self, o: Op, v: VVal) -> Self {
-    //        let idx = self.push_data(v);
-    //        self.ops.push(
-    //            match o {
-    //                => panic!("data_op for non data Op called!"),
-    //            });
-    //        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
-    //        self
-    //    }
-    //
-    //    fn op(mut self, o: Op) -> Self {
-    //        self.ops.push(o);
-    //        self.debug.push(std::mem::replace(&mut self.nxt_debug, None));
-    //        self
-    //    }
-    //
+
     fn debug(mut self, sp: SynPos) -> Self {
         self.nxt_debug = Some(sp);
         self
     }
-    //
+
     fn dump(&self) {
         println!("PROG:");
         for (i, o) in self.ops.iter().enumerate() {
@@ -485,48 +418,7 @@ enum Op {
     JmpIf(ResPos, i32),
     JmpIfN(ResPos, i32),
     End,
-    //    Call(u32),
-    //    Push(u32),
-    //    PushI(i32),
-    //    PushNul,
-    //    PushV(VVal),
-    //    PushRef(u32),
-    //    SetGlobal(u32),
-    //    GetGlobal(u32),
-    //    GetGlobalRef(u32),
-    //    SetLocal(u32),
-    //    GetLocal(u32),
-    //    GetLocalRef(u32),
-    //    SetUp(u32),
-    //    GetUp(u32),
-    //    GetUpRef(u32),
-    //    NextI(u16,u16),
-    //    Arg(u32),
-    //    ArgRef(u32),
-    //    Argv,
-    //    ArgvRef,
     //    NewErr,
-    //    Ret(u16, ResPos),
-    //    End,
-    //    Pop,
-}
-
-impl Op {
-    //    fn set_out(&mut self, out: ResPos) -> Self {
-    //        match self {
-    //            Op::Add(a, b, _) => Op::Add(*a, *b, out),
-    //            Op::Sub(a, b, _) => Op::Sub(*a, *b, out),
-    //            Op::Mul(a, b, _) => Op::Mul(*a, *b, out),
-    //            Op::Div(a, b, _) => Op::Div(*a, *b, out),
-    //            Op::Mod(a, b, _) => Op::Mod(*a, *b, out),
-    //            Op::Le(a, b, _)  => Op::Le( *a, *b, out),
-    //            Op::Lt(a, b, _)  => Op::Lt( *a, *b, out),
-    //            Op::Ge(a, b, _)  => Op::Ge( *a, *b, out),
-    //            Op::Gt(a, b, _)  => Op::Gt( *a, *b, out),
-    //            Op::Eq(a, b, _)  => Op::Eq( *a, *b, out),
-    //            _                => self.clone(),
-    //        }
-    //    }
 }
 
 macro_rules! in_reg {
@@ -751,33 +643,6 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 in_reg!(env, ret, prog, a);
                 if !a.b() { pc = (pc as i32 + *jmp_offs) as usize; }
             },
-                //            Op::NextI(idx, jmp_offs) => {
-                //                let counter = env.inc_local(*idx as usize, 1);
-                //                if counter >= env.stk_i(0) {
-                //                    pc = (pc as i32 + *jmp_offs as i32) as usize;
-                //                }
-                //            },
-                //            Op::Ret(count, rp) => op_1_ret!(env, ret, rp, { rp }),
-                //            Op::End => { break; },
-                //            Op::SetLocal(idx)          => {
-                //                let v = env.pop();
-                //                env.set_consume(*idx as usize, v);
-                //            },
-                //            Op::SetUp(idx)             => {
-                //                let v = env.pop();
-                //                env.set_up(*idx as usize, v);
-                //            },
-                //            Op::SetGlobal(data_idx)    => { prog.data[*data_idx as usize].set_ref(env.pop()); },
-                //            Op::GetGlobal(data_idx)    => { env.push(prog.data[*data_idx as usize].deref()); },
-                //            Op::GetGlobalRef(data_idx) => { env.push(prog.data[*data_idx as usize].clone()); },
-                //            Op::GetUp(idx)             => { env.push(env.get_up(*idx as usize)); },
-                //            Op::GetUpRef(idx)          => { env.push(env.get_up_captured_ref(*idx as usize)); },
-                //            Op::GetLocal(idx)          => { env.push(env.get_local(*idx as usize)); },
-                //            Op::GetLocalRef(idx)       => { env.push(env.get_local_captured_ref(*idx as usize)); },
-                //            Op::Arg(arg_idx)           => { env.push(env.arg(*arg_idx as usize)); },
-                //            Op::ArgRef(arg_idx)        => { env.push(env.arg(*arg_idx as usize).to_ref()); },
-                //            Op::Argv                   => { env.push(env.argv()); },
-                //            Op::ArgvRef                => { env.push(env.argv().to_ref()); },
                 //            Op::NewErr => {
                 //                let val = env.pop();
                 //                env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
@@ -1468,17 +1333,6 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
                         };
 
                     if is_for_n {
-////                        if ast.len() > 5 {
-////                            return Err(ast.compile_err(
-////                                format!("if can only have 2 arguments, got more: {}", ast.s())));
-////                        }
-//                        let idx_pos = ce.borrow_mut().def(&ast.at(2).unwrap_or(VVal::Nul).s_raw(), false);
-//                        let idx_pos =
-//                            if let VarPos::Local(i) = idx_pos { i }
-//                            else {
-//                                panic!("Local variable for counting loop not local!");
-//                            };
-//
                         let mut sp_cond = StorePos::new();
                         let mut cond =
                             vm_compile_direct_block(
