@@ -15,7 +15,7 @@ use std::fmt;
 use std::fmt::{Display, Debug, Formatter};
 
 use crate::compiler::{GlobalEnv, GlobalEnvRef};
-use crate::nvec::NVector;
+use crate::nvec::NVec;
 
 use fnv::FnvHashMap;
 
@@ -1161,10 +1161,10 @@ pub enum VVal {
     DropFun(Rc<DropVVal>),
     /// A (strong) reference to a VVal.
     Ref(Rc<RefCell<VVal>>),
-    /// A numerical (mathematical) vector storing integers. See NVector for more information.
-    FVec(NVector<f64>),
-    /// A numerical (mathematical) vector storing floats. See NVector for more information.
-    IVec(NVector<i64>),
+    /// A numerical (mathematical) vector storing integers. See NVec for more information.
+    FVec(NVec<f64>),
+    /// A numerical (mathematical) vector storing floats. See NVec for more information.
+    IVec(NVec<i64>),
     /// A (still strong) reference to a VVal, which becomes a weak reference if
     /// captured by a closure.
     CRef(Rc<RefCell<VVal>>),
@@ -1173,6 +1173,11 @@ pub enum VVal {
     /// A vval that can box some user data which can later be accessed
     /// from inside user supplied Rust functions via std::any::Any.
     Usr(Box<dyn VValUserData>),
+}
+impl PartialEq for VVal {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.eqv(rhs)
+    }
 }
 
 impl std::fmt::Debug for VValFun {
@@ -1987,8 +1992,8 @@ impl VVal {
             VVal::Fun(l)  => {
                 if let VVal::Fun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
-            VVal::IVec(_) => unimplemented!(),
-            VVal::FVec(_) => unimplemented!(),
+            VVal::IVec(iv) => match v { VVal::IVec(v) => *v == *iv, _ => false },
+            VVal::FVec(fv) => match v { VVal::FVec(v) => *v == *fv, _ => false },
             VVal::DropFun(l)  => {
                 if let VVal::DropFun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
@@ -2161,6 +2166,24 @@ impl VVal {
             VVal::Pair(b) => {
                 Some(if index % 2 == 0 { b.0.clone() } else { b.1.clone() })
             },
+            VVal::IVec(b) => {
+                Some(match index {
+                    0 => b.x(),
+                    1 => b.y(),
+                    2 => b.z().unwrap_or(VVal::Nul),
+                    3 => b.w().unwrap_or(VVal::Nul),
+                    _ => VVal::Nul
+                })
+            },
+            VVal::FVec(b) => {
+                Some(match index {
+                    0 => b.x(),
+                    1 => b.y(),
+                    2 => b.z().unwrap_or(VVal::Nul),
+                    3 => b.w().unwrap_or(VVal::Nul),
+                    _ => VVal::Nul
+                })
+            },
             VVal::Lst(b) => {
                 if b.borrow().len() > index {
                     Some(b.borrow()[index].clone())
@@ -2221,20 +2244,30 @@ impl VVal {
             VVal::CRef(_)  => self.deref().get_key(key),
             VVal::WWRef(_) => self.deref().get_key(key),
             VVal::Map(m) => m.borrow().get(key).cloned(),
+            VVal::IVec(b) => {
+                Some(match key {
+                    "0" | "first"  | "x" => b.x(),
+                    "1" | "second" | "y" => b.y(),
+                    "2" | "third"  | "z" => b.z().unwrap_or(VVal::Nul),
+                    "3" | "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
+                    _ => VVal::Nul
+                })
+            },
+            VVal::FVec(b) => {
+                Some(match key {
+                    "0" | "first"  | "x" => b.x(),
+                    "1" | "second" | "y" => b.y(),
+                    "2" | "third"  | "z" => b.z().unwrap_or(VVal::Nul),
+                    "3" | "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
+                    _ => VVal::Nul
+                })
+            },
             VVal::Pair(_) => {
-                let idx =
-                    match key {
-                        "0"         => 0,
-                        "1"         => 1,
-                        "car"       => 0,
-                        "cdr"       => 1,
-                        "head"      => 0,
-                        "tail"      => 1,
-                        "first"     => 0,
-                        "second"    => 1,
-                        _ => usize::from_str_radix(key, 10).unwrap_or(0),
-                    };
-                self.at(idx)
+                self.at(match key {
+                    "0" | "car" | "head" | "first"  => 0,
+                    "1" | "cdr" | "tail" | "second" => 1,
+                    _ => usize::from_str_radix(key, 10).unwrap_or(0),
+                })
             },
             VVal::Lst(l) => {
                 let idx = usize::from_str_radix(key, 10).unwrap_or(0);
@@ -2766,8 +2799,8 @@ impl VVal {
             VVal::Map(l)     => l.borrow().len() as f64,
             VVal::Usr(u)     => u.f(),
             VVal::Fun(_)     => 1.0,
-            VVal::FVec(_)    => unimplemented!(),
-            VVal::IVec(_)    => unimplemented!(),
+            VVal::IVec(iv)   => iv.x_raw() as f64,
+            VVal::FVec(fv)   => fv.x_raw(),
             VVal::DropFun(f) => f.v.f(),
             VVal::Ref(l)     => (*l).borrow().f(),
             VVal::CRef(l)    => (*l).borrow().f(),
@@ -2797,8 +2830,8 @@ impl VVal {
             VVal::Map(l)     => l.borrow().len() as i64,
             VVal::Usr(u)     => u.i(),
             VVal::Fun(_)     => 1,
-            VVal::FVec(_)    => unimplemented!(),
-            VVal::IVec(_)    => unimplemented!(),
+            VVal::IVec(iv)   => iv.x_raw(),
+            VVal::FVec(fv)   => fv.x_raw() as i64,
             VVal::DropFun(f) => f.v.i(),
             VVal::Ref(l)     => (*l).borrow().i(),
             VVal::CRef(l)    => (*l).borrow().i(),
@@ -2828,8 +2861,8 @@ impl VVal {
             VVal::Map(l)     => (l.borrow().len() as i64) != 0,
             VVal::Usr(u)     => u.b(),
             VVal::Fun(_)     => true,
-            VVal::FVec(_)    => unimplemented!(),
-            VVal::IVec(_)    => unimplemented!(),
+            VVal::IVec(iv)   => iv.x().b(),
+            VVal::FVec(fv)   => fv.x().b(),
             VVal::DropFun(f) => f.v.b(),
             VVal::Ref(l)     => (*l).borrow().i() != 0,
             VVal::CRef(l)    => (*l).borrow().i() != 0,
@@ -2839,6 +2872,41 @@ impl VVal {
                     None => false,
                 }
             },
+        }
+    }
+
+    pub fn nvec<N: crate::nvec::NVecNum>(&self) -> NVec<N> {
+        use NVec::*;
+        match self {
+            VVal::IVec(i) => N::from_ivec(i.clone()),
+            VVal::FVec(f) => N::from_fvec(f.clone()),
+            VVal::Map(map)  => {
+                let m = map.borrow();
+                let o = N::zero().into_vval();
+                NVec::from_vval_tpl(
+                    (m.get("x").unwrap_or(&o), m.get("y").unwrap_or(&o), m.get("z"), m.get("w"))
+                ).unwrap_or_else(|| {
+                    // The only way from_vval_tpl can fail is if the fourth
+                    // parameter is Some(_) but the third is None.
+                    // That means that the following will always succeed
+                    // (even if the above did not):
+                    NVec::from_vval_tpl(
+                        (m.get("x").unwrap_or(&o), m.get("y").unwrap_or(&o), Some(&o), m.get("w"))
+                    ).unwrap()
+                })
+            },
+            VVal::Lst(lst) => {
+                let list = lst.borrow();
+                let mut l = list.iter();
+                let o = N::zero().into_vval();
+                let (x, y, z, w) = (l.next(), l.next(), l.next(), l.next());
+                // The only way from_vval_tpl can fail is if the fourth
+                // parameter is Some(_) but the third is None.
+                // That means that the following will always succeed,
+                // because lists can't have holes.
+                NVec::from_vval_tpl((x.unwrap_or(&o), y.unwrap_or(&o), z, w)).unwrap()
+            },
+            _ => Vec2(N::from_vval(self), N::zero()),
         }
     }
 
@@ -3019,12 +3087,12 @@ impl serde::ser::Serialize for VVal {
             },
             VVal::Usr(_)     => serializer.serialize_str(&self.s()),
             VVal::Fun(_)     => serializer.serialize_str(&self.s()),
+            VVal::FVec(fv)   => fv.serialize(serializer),
+            VVal::IVec(iv)   => iv.serialize(serializer),
             VVal::DropFun(_) => serializer.serialize_str(&self.s()),
             VVal::Ref(_)     => self.deref().serialize(serializer),
             VVal::CRef(_)    => self.deref().serialize(serializer),
             VVal::WWRef(_)   => self.deref().serialize(serializer),
-            VVal::FVec(_)    => unimplemented!(),
-            VVal::IVec(_)    => unimplemented!(),
         }
     }
 }

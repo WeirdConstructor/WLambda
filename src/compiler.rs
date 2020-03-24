@@ -163,6 +163,19 @@ impl SymbolTable {
     pub fn set(&mut self, name: &str, value: VVal) {
         self.symbols.insert(String::from(name), value);
     }
+    
+    /// Retrieves a value from the SymbolTable, if present.
+    /// ```
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
+    /// ctx.eval("!@export to_rust = 42.0;");
+    ///
+    /// assert_eq!(ctx.get_exports().get("to_rust").cloned(), Some(VVal::Flt(42.0)));
+    /// ```
+    #[allow(dead_code)]
+    pub fn get(&mut self, name: &str) -> Option<&VVal> {
+        self.symbols.get(name)
+    }
 
     /// Helper function for building symbol tables with functions in them.
     ///
@@ -1302,63 +1315,13 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
 
         Ok(Box::new(move |e: &mut Env| {
             let v = cv(e)?;
-            match v {
-                VVal::Lst(l) => {
-                    for (i, vi) in poses.iter().enumerate() {
-                        if l.borrow().len() <= i {
-                            if let VarPos::Local(vip) = vi {
-                                e.set_consume(*vip, VVal::Nul);
-                            }
-                        } else {
-                            let val = &mut l.borrow_mut()[i];
+            
+            match set_consume_at_varposes_from_vval(e, v, &poses, &vars) {
+                Ok(_) => Ok(VVal::Nul),
 
-                            let set_val = val.clone();
-                            match vi {
-                                VarPos::Local(vip) => {
-                                    e.set_consume(*vip, set_val);
-                                },
-                                VarPos::Global(r) => {
-                                    if let VVal::Ref(gr) = r {
-                                        gr.replace(set_val);
-                                    }
-                                },
-                                _ => {}
-                            }
-                        }
-                    }
-                },
-                VVal::Map(m) => {
-                    for (i, vi) in poses.iter().enumerate() {
-                        let vname = vars.at(i).unwrap().s_raw();
-                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-
-                        match vi {
-                            VarPos::Local(vip) => e.set_consume(*vip, val),
-                            VarPos::Global(r) => {
-                                if let VVal::Ref(gr) = r {
-                                    gr.replace(val);
-                                }
-                            },
-                            _ => {}
-                        }
-                    }
-                },
-                _ => {
-                    for vi in poses.iter() {
-                        match vi {
-                            VarPos::Local(vip) => e.set_consume(*vip, v.clone()),
-                            VarPos::Global(r) => {
-                                if let VVal::Ref(gr) = r {
-                                    gr.replace(v.clone());
-                                }
-                            },
-                            _ => {},
-                        }
-                    }
-                }
+                // the set_consume_at_varpos that the above function is generated from can't err
+                Err(_) => unreachable!(),
             }
-
-            Ok(VVal::Nul)
         }))
     } else {
         let varname = vars.at(0).unwrap().s_raw();
@@ -1388,43 +1351,100 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
     }
 }
 
-fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, v: VVal) -> Option<String> {
-    match pos {
-        VarPos::UpValue(d) => { e.assign_ref_up(*d, v); None },
-        VarPos::Local(d)   => { e.assign_ref_local(*d, v); None },
-        VarPos::Const(_)   => { Some("Can't assign to constant!".to_string()) },
-        VarPos::Global(d)  => {
-            if let VVal::Ref(r) = d {
-                r.borrow().set_ref(v);
-                None
-            } else {
-                Some("Can't assign to global read only variable!".to_string())
-            }
-        },
-        VarPos::NoPos => {
-            Some(format!("Unknown pos to assign value '{}' to!", v.s()))
+enum SetVarPosErr {
+    ConstantAssignment,
+    GlobalReadOnlyAssignment,
+    UnknownPosFor(String),
+}
+impl Display for SetVarPosErr {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        use SetVarPosErr::*;
+        match self {
+            ConstantAssignment       => write!(f, "Can't assign to constant!"),
+            GlobalReadOnlyAssignment => write!(f, "Can't assign to global read only variable!"),
+            UnknownPosFor(v)         => write!(f, "Unknown pos to assign value '{}' to!", v),
         }
     }
 }
 
-fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Option<String> {
+fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, rv: &VVal) -> Result<(), SetVarPosErr> {
+    let v = rv.clone();
     match pos {
-        VarPos::UpValue(d) => { e.set_up(*d, v.clone()); None },
-        VarPos::Local(d)   => { e.set_consume(*d, v.clone()); None },
-        VarPos::Const(_)   => { Some("Can't assign to constant!".to_string()) },
-        VarPos::Global(d)  => {
-            if let VVal::Ref(r) = d {
-                r.replace(v.clone());
-                None
-            } else {
-                Some("Can't assign to global read only variable!".to_string())
-            }
-        },
-        VarPos::NoPos => {
-            Some(format!("Unknown pos to assign value '{}' to!", v.s()))
-        }
+        VarPos::UpValue(d)           => e.assign_ref_up(*d, v),
+        VarPos::Local(d)             => e.assign_ref_local(*d, v),
+        VarPos::Global(VVal::Ref(r)) => { r.borrow().set_ref(v); },
+        VarPos::Global(_)            => Err(SetVarPosErr::GlobalReadOnlyAssignment)?,
+        VarPos::Const(_)             => Err(SetVarPosErr::ConstantAssignment)?,
+        VarPos::NoPos                => Err(SetVarPosErr::UnknownPosFor(v.s()))?,
     }
+
+    Ok(())
 }
+
+fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) -> Result<(), SetVarPosErr> {
+    match pos {
+        VarPos::UpValue(d)           => e.set_up(*d, v.clone()),
+        VarPos::Local(d)             => e.set_consume(*d, v.clone()),
+        VarPos::Global(VVal::Ref(r)) => { r.replace(v.clone()); },
+        VarPos::Global(_)            => Err(SetVarPosErr::GlobalReadOnlyAssignment)?,
+        VarPos::Const(_)             => Err(SetVarPosErr::ConstantAssignment)?,
+        VarPos::NoPos                => Err(SetVarPosErr::UnknownPosFor(v.s()))?,
+    }
+
+    Ok(())
+}
+
+fn set_consume_at_varpos(e: &mut Env, pos: &VarPos, val: &VVal) -> Result<(), SetVarPosErr> {
+    let v = val.clone();
+    match pos {
+        VarPos::Local(vip)            => e.set_consume(*vip, v),
+        VarPos::Global(VVal::Ref(gr)) => { gr.replace(v); },
+        _                             => {}
+    }
+
+    Ok(())
+}
+
+macro_rules! set_varposes_from_vval { ($fn:ident, $set_fn:ident) => {
+    fn $fn(e: &mut Env, v: VVal, poses: &Vec<VarPos>, vars: &VVal) -> Result<(), SetVarPosErr> {
+        match v {
+            VVal::Lst(lst) => {
+                let l = lst.borrow();
+                for (i, pos) in poses.iter().enumerate() {
+                    let n = VVal::Nul;
+                    let val = l.get(i).unwrap_or(&n);
+                    $set_fn(e, pos, val)?;
+                }
+            },
+            VVal::Map(map) => {
+                let m = map.borrow();
+                for (i, pos) in poses.iter().enumerate() {
+                    let n = VVal::Nul;
+                    let val = m.get(&vars.at(i).unwrap().s_raw()).unwrap_or(&n);
+                    $set_fn(e, pos, val)?;
+                }
+            },
+            VVal::Pair(p) => {
+                let (lv, rv) = *p;
+                if let Some(pos) = poses.get(0) {
+                    $set_fn(e, pos, &lv)?;
+                }
+                if let Some(pos) = poses.get(1) {
+                    $set_fn(e, pos, &rv)?;
+                }
+            },
+            _ => {
+                for pos in poses.iter() {
+                    $set_fn(e, pos, &v)?;
+                }
+            }
+        }
+        Ok(())
+    }
+} }
+set_varposes_from_vval!( set_ref_at_varposes_from_vval     , set_ref_at_varpos );
+set_varposes_from_vval!( set_env_at_varposes_from_vval     , set_env_at_varpos );
+set_varposes_from_vval!( set_consume_at_varposes_from_vval , set_consume_at_varpos );
 
 fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) -> Result<EvalNode, CompileError> {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
@@ -1454,74 +1474,20 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
         if is_ref {
             Ok(Box::new(move |e: &mut Env| {
                 let v = cv(e)?;
-                match v {
-                    VVal::Lst(l) => {
-                        for (i, pos) in poses.iter().enumerate() {
-                            let val = &mut l.borrow_mut()[i];
-                            if let Some(err) = set_ref_at_varpos(e, pos, val.clone()) {
-                                return Err(
-                                    StackAction::panic_str(err, Some(spos.clone())));
-                            }
-                        }
-                    },
-                    VVal::Map(m) => {
-                        for (i, pos) in poses.iter().enumerate() {
-                            let vname = vars.at(i).unwrap().s_raw();
-                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-                            if let Some(err) = set_ref_at_varpos(e, pos, val) {
-                                return Err(
-                                    StackAction::panic_str(err, Some(spos.clone())));
-                            }
-                        }
-                    },
-                    _ => {
-                        for pos in poses.iter() {
-                            if let Some(err) = set_ref_at_varpos(e, pos, v.clone()) {
-                                return Err(
-                                    StackAction::panic_str(err, Some(spos.clone())));
-                            }
-                        }
-                    }
-                }
 
-                Ok(VVal::Nul)
+                match set_ref_at_varposes_from_vval(e, v, &poses, &vars) {
+                    Err(e) => Err(StackAction::panic_str(format!("{}", e), Some(spos.clone()))),
+                    Ok(_) => Ok(VVal::Nul)
+                }
             }))
         } else {
             Ok(Box::new(move |e: &mut Env| {
                 let v = cv(e)?;
-                match v {
-                    VVal::Lst(l) => {
-                        for (i, pos) in poses.iter().enumerate() {
-                            let val = &mut l.borrow_mut()[i];
 
-                            if let Some(err) = set_env_at_varpos(e, pos, val) {
-                                return Err(
-                                    StackAction::panic_str(err, Some(spos.clone())));
-                            }
-                        }
-                    },
-                    VVal::Map(m) => {
-                        for (i, pos) in poses.iter().enumerate() {
-                            let vname = vars.at(i).unwrap().s_raw();
-                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
-
-                            if let Some(err) = set_env_at_varpos(e, pos, &val) {
-                                return Err(
-                                    StackAction::panic_str(err, Some(spos.clone())));
-                            }
-                        }
-                    },
-                    _ => {
-                        for pos in poses.iter() {
-                            if let Some(err) = set_env_at_varpos(e, pos, &v) {
-                                return Err(
-                                    StackAction::panic_str(err, Some(spos.clone())));
-                            }
-                        }
-                    }
+                match set_env_at_varposes_from_vval(e, v, &poses, &vars) {
+                    Err(e) => Err(StackAction::panic_str(format!("{}", e), Some(spos.clone()))),
+                    Ok(_) => Ok(VVal::Nul)
                 }
-
-                Ok(VVal::Nul)
             }))
         }
 
@@ -1901,7 +1867,7 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                 Syntax::Assign      => { compile_assign(ast, ce, false) },
                 Syntax::AssignRef   => { compile_assign(ast, ce, true)  },
                 Syntax::IVec        => {
-                    use crate::nvec::NVector;
+                    use crate::nvec::NVec;
                     let lc = l
                         .borrow()
                         .iter()
@@ -1912,9 +1878,34 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                         let mut c = lc.iter().map(|f| f(e).map(|v| v.i()));
                         let _ = c.next();
                         Ok(VVal::IVec(match (c.next(), c.next(), c.next(), c.next()) {
-                            (Some(x), Some(y), None   , None)    => NVector::Vec2(x?, y?),
-                            (Some(x), Some(y), Some(z), None)    => NVector::Vec3(x?, y?, z?),
-                            (Some(x), Some(y), Some(z), Some(w)) => NVector::Vec4(x?, y?, z?, w?),
+                            (Some(x), Some(y), None   , None)    => NVec::Vec2(x?, y?),
+                            (Some(x), Some(y), Some(z), None)    => NVec::Vec3(x?, y?, z?),
+                            (Some(x), Some(y), Some(z), Some(w)) => NVec::Vec4(x?, y?, z?, w?),
+                            _ => return Err(
+                                StackAction::panic_str(
+                                    "Cannot create an IVector without between 2 and 4 (inclusive) integers."
+                                        .to_string(),
+                                    Some(spos.clone()),
+                                ),
+                            )
+                        }))
+                    }))
+                },
+                Syntax::FVec        => {
+                    use crate::nvec::NVec;
+                    let lc = l
+                        .borrow()
+                        .iter()
+                        .map(|v| compile(v, ce))
+                        .collect::<Result<Vec<_>, CompileError>>()?;
+
+                    Ok(Box::new(move |e: &mut Env| {
+                        let mut c = lc.iter().map(|f| f(e).map(|v| v.f()));
+                        let _ = c.next();
+                        Ok(VVal::FVec(match (c.next(), c.next(), c.next(), c.next()) {
+                            (Some(x), Some(y), None   , None)    => NVec::Vec2(x?, y?),
+                            (Some(x), Some(y), Some(z), None)    => NVec::Vec3(x?, y?, z?),
+                            (Some(x), Some(y), Some(z), Some(w)) => NVec::Vec4(x?, y?, z?, w?),
                             _ => return Err(
                                 StackAction::panic_str(
                                     "Cannot create an IVector without between 2 and 4 (inclusive) integers."
@@ -2440,10 +2431,10 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
 
                     Ok(Box::new(move |e: &mut Env| {
                         Ok(match (left(e)?, right(e)?) {
-                            (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
-                            (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
-                            (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
-                            (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
+                            (VVal::IVec(ln), re) => VVal::IVec(ln + re.nvec()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln + re.nvec()),
+                            (VVal::Flt(f), re)   => VVal::Flt(f + re.f()),
+                            (le, re)             => VVal::Int(le.i().wrapping_add(re.i()))
                         })
                     }))
                 },
@@ -2452,13 +2443,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let right = compile(&ast.at(2).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let le = left(e)?;
-                        let re = right(e)?;
-                        if let VVal::Flt(f) = le {
-                            Ok(VVal::Flt(f - re.f()))
-                        } else {
-                            Ok(VVal::Int(le.i().wrapping_sub(re.i())))
-                        }
+                        Ok(match (left(e)?, right(e)?) {
+                            (VVal::IVec(ln), re) => VVal::IVec(ln - re.nvec()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln - re.nvec()),
+                            (VVal::Flt(f), re)   => VVal::Flt(f - re.f()),
+                            (le, re)             => VVal::Int(le.i().wrapping_sub(re.i()))
+                        })
                     }))
                 },
                 Syntax::BinOpMul => {
@@ -2466,13 +2456,12 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let right = compile(&ast.at(2).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let le = left(e)?;
-                        let re = right(e)?;
-                        if let VVal::Flt(f) = le {
-                            Ok(VVal::Flt(f * re.f()))
-                        } else {
-                            Ok(VVal::Int(le.i().wrapping_mul(re.i())))
-                        }
+                        Ok(match (left(e)?, right(e)?) {
+                            (VVal::IVec(ln), re) => VVal::IVec(ln * re.i()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln * re.f()),
+                            (VVal::Flt(f),   re) => VVal::Flt(f   * re.f()),
+                            (le, re)             => VVal::Int(le.i().wrapping_mul(re.i()))
+                        })
                     }))
                 },
                 Syntax::BinOpDiv => {
@@ -2480,19 +2469,16 @@ fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, Com
                     let right = compile(&ast.at(2).unwrap(), ce)?;
 
                     Ok(Box::new(move |e: &mut Env| {
-                        let le = left(e)?;
-                        let re = right(e)?;
-                        if let VVal::Flt(f) = le {
-                            Ok(VVal::Flt(f / re.f()))
-
-                        } else if re.i() == 0 {
-                            Err(StackAction::panic_str(
-                                format!("Division by 0: {}/{}", le.i(), re.i()),
-                                Some(spos.clone())))
-
-                        } else {
-                            Ok(VVal::Int(le.i().wrapping_div(re.i())))
-                        }
+                        Ok(match (left(e)?, right(e)?) {
+                            (VVal::IVec(ln), re) => VVal::IVec(ln / re.i()),
+                            (VVal::FVec(ln), re) => VVal::FVec(ln / re.f()),
+                            (VVal::Flt(f),   re) => VVal::Flt(f   / re.f()),
+                            (le, VVal::Int(0))   => return Err(StackAction::panic_str(
+                                    format!("Division by 0: {}/{}", le.i(), 0),
+                                    Some(spos.clone())
+                                )),
+                            (le, re)             => VVal::Int(le.i().wrapping_div(re.i()))
+                        })
                     }))
                 },
                 Syntax::BinOpMod => {
@@ -2983,6 +2969,13 @@ mod tests {
     }
 
     #[test]
+    fn check_unary_plus_minus() {
+        assert_eq!(s_eval("!x = 10; -x"), "-10");
+        assert_eq!(s_eval("!x = 10; +x"), "10");
+        assert_eq!(s_eval("- (+ 0xF)"),   "-15");
+    }
+
+    #[test]
     fn check_compile_env() {
 //        let ce = CompileEnv::create_env(None);
 //
@@ -3330,6 +3323,60 @@ mod tests {
             while { x > 0 } { .c = c + 1; .x = x - 1; };
             c
         "#), "30");
+    }
+
+    #[test]
+    fn check_destructure_pair() {
+        assert_eq!(s_eval("!(e, m) = $p(1, $f); $p(m, e)"),       "$p($false,1)");
+        assert_eq!(s_eval("!(e, m) = $p(1); $p(m, e)"),           "$p($n,1)");
+        assert_eq!(s_eval("!(e, m) = $p($n,1); $p(m, m)"),        "$p(1,1)");
+        assert_eq!(s_eval("!(e, m) = $p($n,1); $p(e, m)"),        "$p($n,1)");
+        assert_eq!(s_eval("!(a, b) = $p($&10, $&20); { .a = 33; }[]; $p(a, b)"), "$p(33,20)");
+        assert_eq!(s_eval(r#"
+            !fun = {
+                !(a, b) = $p($&&10, $&&20);
+                $p({a}, { .a = 33; });
+            }[];
+            (1 fun)[];
+            (0 fun)[]
+        "#),
+        "33");
+        assert_eq!(s_eval(r#"
+            !fun = {
+                !(a, b) = $p($&10, $&20);
+                $p({$p(a, b)}, { .a = 33; });
+            }[];
+            (1 fun)[];
+            (0 fun)[]
+        "#),
+        "$p($n,$n)");
+        assert_eq!(s_eval(r#"
+            !fun = {
+                !(a, b) = $p($&10, $&20);
+                !(wa, wb) = $p(std:weaken a, std:weaken b);
+                $p({$p(wa, wb)}, { .wa = 33; });
+            }[];
+            (1 fun)[];
+            (0 fun)[]
+        "#),
+        "$p($n,$n)");
+        assert_eq!(s_eval(r#"
+            !fun = {
+                !(a, b) = $p($&&10, $&&20);
+                $p({$p(a, b)}, { .a = 33; });
+            }[];
+            (1 fun)[];
+            (0 fun)[]
+        "#),
+        "$p(33,20)");
+
+        assert_eq!(
+            s_eval("!a = 0; !b = 0; .(a, b) = $p(10, 20); $p(a, b)"),
+            "$p(10,20)");
+
+        assert_eq!(
+            s_eval("!a = 0; !b = 0; .(a, b) = 40; $p(a, b)"),
+            "$p(40,40)");
     }
 
     #[test]
@@ -4983,7 +5030,17 @@ mod tests {
 
     #[test]
     fn check_nvec() {
-        assert_eq!(s_eval("$i(1, 2)"), "$i(1,2)")
+        assert_eq!(s_eval("$i(1, 2)"), "$i(1,2)");
+        assert_eq!(s_eval("$i(1, 2) * 2"), "$i(2,4)");
+        assert_eq!(s_eval("$f(1, 2) / 2"), "$f(0.5,1)");
+        assert_eq!(s_eval("$f(2, 0) - $f(2, 0)"), "$f(0,0)");
+        assert_eq!(s_eval("$f(2, 0) + $f(0, 2)"), "$f(2,2)");
+        assert_eq!(s_eval("$f(2, 0) + $f(2, 2)"), "$f(4,2)");
+        assert_eq!(s_eval("$i(2, 0) + ${y=2,x=1,z=0}"), "$i(3,2,0)");
+        assert_eq!(s_eval("$f(2, 0) == ${x=2,y=0}"), "$false");
+        assert_eq!(s_eval("$i(0, 0) == ${}"), "$false");
+        assert_eq!(s_eval("$i(0, 0) == ${}"), "$false");
+        assert_eq!(s_eval("$i(0, 0) == $f(0, 0)"), "$false");
     }
     
     #[test]
@@ -5058,5 +5115,10 @@ mod tests {
             };
             $[x, y, k[]]
         "), "$[10,1,$n]");
+    }
+
+    fn check_backslash_function() {
+        assert_eq!(s_eval("!x = $[\\1,\\2,\\3 + _,5]; $[x.1[],x.2 4,x.3[]]"), "$[2,7,5]");
+        assert_eq!(s_eval("!x = ${a = \\1, b = \\2 * _, c = 9}; $[x.a[],x.b 4,x.c[]]"), "$[1,8,9]");
     }
 }

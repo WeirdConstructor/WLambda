@@ -1711,7 +1711,7 @@ mod tests {
         assert_eq!(gen("!:global x = 10; { .x = 11; }[]; x"), "11");
         assert_eq!(gen("range 1 5 1 {|| std:displayln ~ std:measure_time :ms {||
             !x = 0;
-            range 1 10000000 1 {||
+            range 1 1000 1 {||
                 .x = x + 1;
             };
             x
@@ -1720,7 +1720,7 @@ mod tests {
             std:measure_time :ms {||
                 !:global x = 0;
                 !inc = { .x = x + 1 };
-                for_n { x < 10000000 } inc[];
+                for_n { x < 1000 } inc[];
                 x
             };
         "), "");

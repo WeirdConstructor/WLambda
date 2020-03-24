@@ -96,7 +96,7 @@ In the following grammar, white space and comments are omitted:
     list          = "[", [ list_expr, { ",", list_expr }, [ "," ] ],"]"
                   ;
     map_expr      = (ident | expr), "=", expr
-                  | "*" expr    (* splices the map result of 'expr'
+                  | "*", expr   (* splices the map result of 'expr'
                                    into the currently parsed map *)
                   ;
     map           = "{", [ map_expr, { ",", map_expr }, [ "," ] ], "}"
@@ -487,7 +487,7 @@ fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
         },
         Some(t) => Err(ps.err(ParseErrorKind::UnexpectedToken(
             t,
-            "To make a numerical vector, Parenthesis must follow $i and $f",
+            "To make a numerical vector, parenthesis must follow $i and $f",
         ))),
         None => Err(ps.err(ParseErrorKind::EOF("numerical vector body"))),
     }
@@ -1365,9 +1365,7 @@ fn get_op_prec(op: &str) -> i32 {
 
 fn parse_binop(mut left: VVal, ps: &mut State, op: &str) -> Result<VVal, ParseError> {
     let prec = get_op_prec(op);
-    println!("before right parse");
     let mut right = parse_call(ps, true)?;
-    println!("after right parse: {:?}", right);
 
     while let Some(next_op) = ps.peek_op() {
         ps.consume_wsc_n(next_op.len());
@@ -1435,7 +1433,6 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                 return Ok(res_call);
             },
             ';' | ')' | ',' | ']' | '|' | '}' => {
-                println!("end char breaks call parse");
                 break;
             },
             _ if op.is_some() => {
@@ -1886,7 +1883,7 @@ mod tests {
         assert_eq!(parse("foo.a = 10"),               "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],10]]");
         assert_eq!(parse("foo.a = 10 | 20"),          "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],$[&Call,20,10]]]");
         assert_eq!(parse("foo.a = 10 ~ 20"),          "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Key,:\"a\"],$[&Call,10,20]]]");
-        assert_eq!(parse("4 == 5 ~ 10"),              "$[&Block,$[&Call,$[&Var,:\"==\"],4,$[&Call,5,10]]]");
+        assert_eq!(parse("4 == 5 ~ 10"),              "$[&Block,$[&BinOpEq,4,$[&Call,5,10]]]");
         assert_eq!(parse("foo.(i) = 10"),             "$[&Block,$[&SetKey,$[&Var,:\"foo\"],$[&Var,:\"i\"],10]]");
         assert_eq!(parse("foo :x :y 10"),             "$[&Block,$[&Call,$[&Var,:\"foo\"],$[&Key,:\"x\"],$[&Key,:\"y\"],10]]");
     }
@@ -1904,9 +1901,9 @@ mod tests {
         assert_eq!(parse("+ 10 20"),    "$[&Block,$[&Call,$[&Var,:\"+\"],10,20]]");
         assert_eq!(parse("13 + 10 20"), "$[&Block,$[&Call,$[&BinOpAdd,13,10],20]]");
         assert_eq!(parse("13 + 10 == 23"),
-                                        "$[&Block,$[&Call,$[&Var,:\"==\"],$[&BinOpAdd,13,10],23]]");
+                                        "$[&Block,$[&BinOpEq,$[&BinOpAdd,13,10],23]]");
         assert_eq!(parse("(+ 12 ~ - 24 23) == 13"),
-           "$[&Block,$[&Call,$[&Var,:\"==\"],$[&Call,$[&Var,:\"+\"],12,$[&Call,$[&Var,:\"-\"],24,23]],13]]");
+           "$[&Block,$[&BinOpEq,$[&Call,$[&Var,:\"+\"],12,$[&Call,$[&Var,:\"-\"],24,23]],13]]");
         assert_eq!(parse("_"),          "$[&Block,$[&Var,:\"_\"]]");
         assert_eq!(parse("ten"),        "$[&Block,$[&Var,:\"ten\"]]");
         assert_eq!(parse("tenäß foo"),  "$[&Block,$[&Call,$[&Var,:\"tenäß\"],$[&Var,:\"foo\"]]]");
@@ -2003,7 +2000,7 @@ mod tests {
 
     #[test]
     fn check_parse_field_access() {
-        assert_eq!(parse("foo.(bar) == 2019"), "$[&Block,$[&Call,$[&Var,:\"==\"],$[&GetKey,$[&Var,:\"foo\"],$[&Var,:\"bar\"]],2019]]");
+        assert_eq!(parse("foo.(bar) == 2019"), "$[&Block,$[&BinOpEq,$[&GetKey,$[&Var,:\"foo\"],$[&Var,:\"bar\"]],2019]]");
         assert_eq!(parse("o.x[]"),             "$[&Block,$[&Call,$[&GetSym,$[&Var,:\"o\"],:\"x\"]]]");
 
         assert_eq!(parse("o.1"),                       "$[&Block,$[&GetIdx,$[&Var,:\"o\"],1]]");
