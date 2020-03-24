@@ -300,8 +300,15 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
+                Op::JmpIf(p1, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::JmpIfN(p1, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
                 Op::Argv(_)
                 | Op::End
+                | Op::Jmp(_)
                 | Op::Call(_, _)
                 | Op::NewMap(_)
                 | Op::NewList(_)
@@ -474,6 +481,9 @@ enum Op {
     MapSplice(ResPos, ResPos, ResPos),
     NewClos(ResPos, ResPos),
     Call(u16, ResPos),
+    Jmp(i32),
+    JmpIf(ResPos, i32),
+    JmpIfN(ResPos, i32),
     End,
     //    Call(u32),
     //    Push(u32),
@@ -491,9 +501,6 @@ enum Op {
     //    GetUp(u32),
     //    GetUpRef(u32),
     //    NextI(u16,u16),
-    //    Jmp(i32),
-    //    JmpIf(i32),
-    //    JmpIfN(i32),
     //    Arg(u32),
     //    ArgRef(u32),
     //    Argv,
@@ -733,17 +740,17 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     },
                 }
             },
-                //            Op::Jmp(jmp_offs) => {
-                //                pc = (pc as i32 + *jmp_offs) as usize;
-                //            },
-                //            Op::JmpIf(jmp_offs) => {
-                //                let v = env.pop();
-                //                if v.b() { pc = (pc as i32 + *jmp_offs) as usize; }
-                //            },
-                //            Op::JmpIfN(jmp_offs) => {
-                //                let v = env.pop();
-                //                if !v.b() { pc = (pc as i32 + *jmp_offs) as usize; }
-                //            },
+            Op::Jmp(jmp_offs) => {
+                pc = (pc as i32 + *jmp_offs) as usize;
+            },
+            Op::JmpIf(a, jmp_offs) => {
+                in_reg!(env, ret, prog, a);
+                if a.b() { pc = (pc as i32 + *jmp_offs) as usize; }
+            },
+            Op::JmpIfN(a, jmp_offs) => {
+                in_reg!(env, ret, prog, a);
+                if !a.b() { pc = (pc as i32 + *jmp_offs) as usize; }
+            },
                 //            Op::NextI(idx, jmp_offs) => {
                 //                let counter = env.inc_local(*idx as usize, 1);
                 //                if counter >= env.stk_i(0) {
@@ -1192,42 +1199,42 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     Ok(p)
 }
 
-//fn vm_compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, res: ResPos)
-//    -> Result<Prog, CompileError>
-//{
-//    match ast {
-//        VVal::Lst(l) => {
-//            let syn  = ast.at(0).unwrap_or(VVal::Nul);
-//            let spos = syn.get_syn_pos();
-//            let syn  = syn.get_syn();
-//
-//            match syn {
-//                Syntax::Func => {
-//                    let label          = ast.at(1).unwrap();
-//                    let explicit_arity = ast.at(2).unwrap();
-//
-//                    if !label.is_none() {
-//                        return Err(
-//                            ast.compile_err(
-//                                format!("direct blocks don't support labels: {}",
-//                                        ast.s())));
-//                    }
-//
-//                    if !explicit_arity.is_none() {
-//                        return Err(
-//                            ast.compile_err(
-//                                format!("direct blocks don't support arity: {}",
-//                                        ast.s())));
-//                    }
-//
-//                    vm_compile_block(ast, 3, ce, false)
-//                },
-//                _ => vm_compile(ast, ce),
-//            }
-//        },
-//        _ => vm_compile(ast, ce),
-//    }
-//}
+fn vm_compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos)
+    -> Result<Prog, CompileError>
+{
+    match ast {
+        VVal::Lst(l) => {
+            let syn  = ast.at(0).unwrap_or(VVal::Nul);
+            let spos = syn.get_syn_pos();
+            let syn  = syn.get_syn();
+
+            match syn {
+                Syntax::Func => {
+                    let label          = ast.at(1).unwrap();
+                    let explicit_arity = ast.at(2).unwrap();
+
+                    if !label.is_none() {
+                        return Err(
+                            ast.compile_err(
+                                format!("direct blocks don't support labels: {}",
+                                        ast.s())));
+                    }
+
+                    if !explicit_arity.is_none() {
+                        return Err(
+                            ast.compile_err(
+                                format!("direct blocks don't support arity: {}",
+                                        ast.s())));
+                    }
+
+                    vm_compile_block(ast, 3, ce, sp)
+                },
+                _ => vm_compile(ast, ce, sp),
+            }
+        },
+        _ => vm_compile(ast, ce, sp),
+    }
+}
 
 fn vm_compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos)
     -> Result<Prog, CompileError>
@@ -1442,39 +1449,47 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
                     Ok(prog)
                 },
                 Syntax::Call => {
-//                    let is_for_n =
-//                        if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
-//                            let var = ast.at(1).unwrap().at(1).unwrap();
-//                            var.with_s_ref(|var_s: &str| var_s == "for_n")
-//                        } else {
-//                            false
-//                        };
+                    let is_for_n =
+                        if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
+                            let var = ast.at(1).unwrap().at(1).unwrap();
+                            var.with_s_ref(|var_s: &str| var_s == "for_n")
+                        } else {
+                            false
+                        };
+
+                    if is_for_n {
+////                        if ast.len() > 5 {
+////                            return Err(ast.compile_err(
+////                                format!("if can only have 2 arguments, got more: {}", ast.s())));
+////                        }
+//                        let idx_pos = ce.borrow_mut().def(&ast.at(2).unwrap_or(VVal::Nul).s_raw(), false);
+//                        let idx_pos =
+//                            if let VarPos::Local(i) = idx_pos { i }
+//                            else {
+//                                panic!("Local variable for counting loop not local!");
+//                            };
 //
-//                    if is_for_n {
-//////                        if ast.len() > 5 {
-//////                            return Err(ast.compile_err(
-//////                                format!("if can only have 2 arguments, got more: {}", ast.s())));
-//////                        }
-////                        let idx_pos = ce.borrow_mut().def(&ast.at(2).unwrap_or(VVal::Nul).s_raw(), false);
-////                        let idx_pos =
-////                            if let VarPos::Local(i) = idx_pos { i }
-////                            else {
-////                                panic!("Local variable for counting loop not local!");
-////                            };
-////
-//                        let mut cond = vm_compile_direct_block(&ast.at(2).unwrap_or(VVal::Nul), ce)?;
-//
-//                        let mut body = vm_compile_direct_block(&ast.at(3).unwrap_or(VVal::Nul), ce)?;
-//
-//                        let body_cnt = body.op_count();
-//                        cond.push_op(Op::JmpIfN(body_cnt as i32 + 1));
-//                        let mut cond = cond.consume(1);
-//                        let cond_cnt = cond.op_count();
-//                        cond.append(body);
-//                        cond.push_op(Op::Jmp(-(body_cnt as i32 + (cond_cnt + 1) as i32)));
-//
-//                        return Ok(cond);
-//                    }
+                        let mut sp_cond = StorePos::new();
+                        let mut cond =
+                            vm_compile_direct_block(
+                                &ast.at(2).unwrap_or(VVal::Nul), ce, &mut sp_cond)?;
+
+                        let mut sp_body = StorePos::new();
+                        sp_body.set(ResPos::Nul);
+                        let mut body =
+                            vm_compile_direct_block(
+                                &ast.at(3).unwrap_or(VVal::Nul), ce, &mut sp_body)?;
+
+                        let sp_cond = sp_cond.to_load_pos(&mut cond);
+                        let body_cnt = body.op_count();
+                        cond.push_op(Op::JmpIfN(sp_cond, body_cnt as i32 + 1));
+
+                        let cond_cnt = cond.op_count();
+                        cond.append(body);
+                        cond.push_op(Op::Jmp(-(body_cnt as i32 + (cond_cnt + 1) as i32)));
+
+                        return Ok(cond);
+                    }
 
                     let mut args = vec![];
                     for (e, _) in ast.iter().skip(1) {
