@@ -602,7 +602,7 @@ fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 b
             }),
             Op::NewMap(r) => op_r!(env, ret, prog, r, { VVal::map() }),
-            Op::MapSetKey(k, v, m, r) => op_a_b_c_r!(env, ret, prog, k, v, m, r, {
+            Op::MapSetKey(v, k, m, r) => op_a_b_c_r!(env, ret, prog, v, k, m, r, {
                 m.set_key(&k, v)?;
                 m
             }),
@@ -1327,7 +1327,7 @@ fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -
                     let is_for_n =
                         if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
                             let var = ast.at(1).unwrap().at(1).unwrap();
-                            var.with_s_ref(|var_s: &str| var_s == "for_n")
+                            var.with_s_ref(|var_s: &str| var_s == "while")
                         } else {
                             false
                         };
@@ -1563,21 +1563,18 @@ mod tests {
         assert_eq!(gen("!x = 10; { .x = 11; }[]; x"),         "11");
         assert_eq!(gen("!:global x = 10; .x = 11; x"),        "11");
         assert_eq!(gen("!:global x = 10; { .x = 11; }[]; x"), "11");
-        assert_eq!(gen("range 1 5 1 {|| std:displayln ~ std:measure_time :ms {||
+        assert_eq!(gen(r"
             !x = 0;
             range 1 1000 1 {||
                 .x = x + 1;
             };
-            x
-        } }"), "");
+            x"), "1000");
         assert_eq!(gen(r"
-            std:measure_time :ms {||
-                !:global x = 0;
-                !inc = { .x = x + 1 };
-                for_n { x < 1000 } inc[];
-                x
-            };
-        "), "");
+            !:global x = 0;
+            !inc = { .x = x + 1 };
+            while { x < 1000 } inc[];
+            x
+        "), "1000");
     }
 
 #[test]
