@@ -19,16 +19,10 @@ use crate::compiler::{GlobalEnv, EvalContext};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
-//    println!("GEN: {}", crate::vm::gen(r"
-//            range 1 5 1 {||
-//            std:displayln ~ std:measure_time :ms {||
-//                !x = 0;
-//                for_n { x < 10000000 } { !y = 1; .x = x + y };
-//                x
-//            };
-//            };
-//    "));
-//    return;
+    let argv : Vec<String> = std::env::args().collect();
+    let contents = std::fs::read_to_string(&argv[1]).unwrap();
+    crate::vm::gen(&contents);
+    return;
 
 
     let global = GlobalEnv::new_default();
