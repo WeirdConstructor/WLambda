@@ -1,5 +1,6 @@
 use wlambda::*;
-use wlambda::compiler::{compile, CompileEnv, GlobalEnvRef};
+use wlambda::compiler::{compile, CompileEnv, GlobalEnvRef, ResPos};
+use wlambda::vm::*;
 use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -15,7 +16,6 @@ fn s_eval(s: &str) -> String {
         Err(e)  => { panic!(format!("EVAL ERROR: {}", e)); },
     }
 }
-
 
 /// Evaluates a string of WLambda code, executes it and returns a string representation of the VVal.
 /// Any critical error (parse error for instance) is not panic!'ed, but
@@ -72,16 +72,51 @@ fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
     }
 }
 
+pub fn ve(s: &str) -> String {
+    let global = GlobalEnv::new_default();
+    match parser::parse(s, "<compiler:s_eval>") {
+        Ok(ast) => {
+            let mut ce = CompileEnv::new(global.clone());
+            let mut dest = StorePos::new();
+            dest.set(ResPos::Ret);
+            match vm_compile(&ast, &mut ce, &mut dest) {
+                Ok(mut prog) => {
+                    let local_space = ce.borrow().get_local_space();
+                    dest.to_load_pos(&mut prog);
+                    prog.op_end();
+
+                    let mut e = Env::new(global);
+                    e.push(VVal::Int(10));
+                    e.push(VVal::Flt(14.4));
+                    e.argc = 2;
+                    e.set_bp(0);
+                    e.push_sp(local_space);
+
+                    match vm(&prog, &mut e) {
+                        Ok(v) => v.s(),
+                        Err(je) => {
+                            format!("EXEC ERR: Caught {:?}", je)
+                        }
+                    }
+                },
+                Err(re) => format!("COMPILE ERROR: {}", re),
+            }
+        }
+        Err(e)  => format!("PARSE ERROR: {}", e),
+    }
+}
+
+
 
 #[test]
 fn check_function_string_rep() {
-    assert_eq!(s_eval("!upv1 = \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
+    assert_eq!(ve("!upv1 = \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
                "\"&F{@[1,21:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$(&)\\\"lol!\\\"]}\"");
-    assert_eq!(s_eval("!upv1 = $&& \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
+    assert_eq!(ve("!upv1 = $&& \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
                "\"&F{@[1,23:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&&\\\"lol!\\\"]}\"");
-    assert_eq!(s_eval("!upv1 = \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
+    assert_eq!(ve("!upv1 = \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
                "&F{@[1,17:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$n]}");
-    assert_eq!(s_eval("!upv1 = $&& \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
+    assert_eq!(ve("!upv1 = $&& \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
                "&F{@[1,19:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&&\"lol!\"]}");
 }
 

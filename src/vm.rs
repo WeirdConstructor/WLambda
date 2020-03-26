@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 const DEBUG_VM: bool = false;
 
-struct Prog {
+pub struct Prog {
     debug:   std::vec::Vec<Option<SynPos>>,
     data:    std::vec::Vec<VVal>,
     ops:     std::vec::Vec<Op>,
@@ -39,11 +39,11 @@ pub struct StorePos {
 }
 
 impl StorePos {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { res: None, data: VVal::Nul, res_mov: None, data_mov: VVal::Nul }
     }
 
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.res           = None;
         self.data          = VVal::Nul;
         self.res_mov       = None;
@@ -87,7 +87,7 @@ impl StorePos {
 
     /// Tells the parent-AST where to find the value after
     /// the corresponding piece of VM prog code is done.
-    fn set(&mut self, rp: ResPos) {
+    pub fn set(&mut self, rp: ResPos) {
         if self.res.is_none() {
             self.res = Some(rp);
         } else {
@@ -131,7 +131,7 @@ impl StorePos {
 
     /// Called when a AST node produces a value at runtime and wants
     /// to store it.
-    fn to_store_pos(&mut self) -> ResPos {
+    pub fn to_store_pos(&mut self) -> ResPos {
         if let Some(rp) = self.res {
             match rp {
                 ResPos::Arg(_)   => panic!("Can't store to Arg!"),
@@ -152,7 +152,7 @@ impl StorePos {
 
     /// Called when the AST node requires an actual position
     /// at runtime where to read the value from.
-    fn to_load_pos(&self, prog: &mut Prog) -> ResPos {
+    pub fn to_load_pos(&self, prog: &mut Prog) -> ResPos {
         if let Some(rp) = self.res {
             if let ResPos::Nul = rp {
                 return ResPos::Nul;
@@ -296,7 +296,7 @@ impl Prog {
         }
     }
 
-    fn op_end(&mut self) -> &mut Self { self.push_op(Op::End); self }
+    pub fn op_end(&mut self) -> &mut Self { self.push_op(Op::End); self }
 
     fn set_at_data_pos(&mut self, rp: ResPos, data: VVal) {
         if let ResPos::Data(i) = rp {
@@ -491,7 +491,7 @@ macro_rules! op_a_b_c_r {
     }
 }
 
-fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
+pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     let old_sp = env.sp;
     let mut pc : usize = 0;
     if DEBUG_VM {
@@ -1137,7 +1137,7 @@ fn vm_compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>, sp:
     Ok(p)
 }
 
-fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
+pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
     match ast {
         VVal::Lst(l) => {
             let syn  = ast.at(0).unwrap_or(VVal::Nul);
