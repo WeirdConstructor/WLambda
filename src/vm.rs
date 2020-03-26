@@ -1579,7 +1579,7 @@ mod tests {
 
 #[test]
     fn vm_check_bytes_impl() {
-#[cfg(feature="serde_json")]
+        #[cfg(feature="serde_json")]
         assert_eq!(gen("std:ser:json $b\"abc\""),                         "\"[\\n  97,\\n  98,\\n  99\\n]\"", "JSON serializer for bytes ok");
 
         assert_eq!(gen("str $b\"abc\""),                              "\"abc\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");

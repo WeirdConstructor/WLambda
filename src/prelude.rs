@@ -1634,7 +1634,9 @@ std:assert_eq[ ivec (std:v:rad2vec (std:num:to_radians 90.0)), $i(0, 1)];
 # halfway in between 0.0 and 90.0 should be 45.
 # note that lerp would NOT work here as well, rad2vec returns a unit vector.
 !h = std:v:slerp $f(1, 0) $f(0, 1) 0.5; # slerp because rotations
-std:assert_eq[ std:v:rad2vec (std:num:to_radians 45.0) , h ];
+!r = std:v:rad2vec (std:num:to_radians 45.0);
+std:assert_rel_eq r.x h.x 0.0001;
+std:assert_rel_eq r.y h.y 0.0001;
 ```
 
 ### <a name="49-strings"></a>4.9 - Strings
