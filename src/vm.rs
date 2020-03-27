@@ -103,10 +103,14 @@ impl StorePos {
         match self.res.expect("Need destination in volatile_to_stack!") {
             // Ret is volatile, as the next block of code overwrites it!
             ResPos::Value(ResValue::Ret)
-            | ResPos::Value(ResValue::SelfObj)
-            | ResPos::Value(ResValue::SelfData)
-            | ResPos::Value(ResValue::AccumFun)
-            | ResPos::Value(ResValue::AccumVal)
+            // XXX: I don't know yet if these are really volatile values.
+            //      because they just have a dynamic extend, but should not
+            //      be volatile between instructions. They don't have to be
+            //      saved when a routine or block returns.
+//            | ResPos::Value(ResValue::SelfObj)
+//            | ResPos::Value(ResValue::SelfData)
+//            | ResPos::Value(ResValue::AccumFun)
+//            | ResPos::Value(ResValue::AccumVal)
                 => {
                     let rp = self.to_load_pos(prog);
                     prog.op_mov(rp, ResPos::Stack(*offs as u16));
@@ -296,6 +300,8 @@ impl Prog {
                 },
                 Op::Argv(_)
                 | Op::End
+                | Op::Unwind
+                | Op::Accumulator(_)
                 | Op::Jmp(_)
                 | Op::Call(_, _)
                 | Op::NewMap(_)
@@ -415,6 +421,16 @@ impl BinOp {
 }
 
 #[derive(Debug,Clone)]
+enum AccumType {
+    String,
+    Bytes,
+    Float,
+    Int,
+    Map,
+    Vec,
+}
+
+#[derive(Debug,Clone)]
 enum ToRefType {
     Ref,
     Deref,
@@ -428,6 +444,7 @@ enum Op {
     Argv(ResPos),
     ToRef(ResPos, ResPos, ToRefType),
     ClearLocals(u16, u16),
+    Accumulator(AccumType),
     Add(ResPos, ResPos, ResPos),
     Sub(ResPos, ResPos, ResPos),
     Mul(ResPos, ResPos, ResPos),
@@ -456,6 +473,7 @@ enum Op {
     Jmp(i32),
     JmpIf(ResPos, i32),
     JmpIfN(ResPos, i32),
+    Unwind,
     End,
     //    NewErr,
 }
@@ -602,7 +620,20 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             },
             Op::Argv(r)             => op_r!(env, ret, prog, r, { env.argv() }),
             Op::End                 => { break; },
+            Op::Unwind              => { env.unwind_one(); },
             Op::ClearLocals(from, to) => env.null_locals(*from as usize, *to as usize),
+            Op::Accumulator(typ) => {
+                let v =
+                    match typ {
+                        AccumType::String => VVal::new_str(""),
+                        AccumType::Bytes  => VVal::new_byt(vec![]),
+                        AccumType::Float  => VVal::Flt(0.0),
+                        AccumType::Int    => VVal::Int(0),
+                        AccumType::Map    => VVal::map(),
+                        AccumType::Vec    => VVal::vec(),
+                    };
+                env.setup_accumulator(v);
+            },
             Op::Add(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
                 if let VVal::Int(a) = a {
                     VVal::Int(a.wrapping_add(b.i()))
@@ -1544,72 +1575,44 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     Ok(Prog::new())
                 },
                 Syntax::Accum => {
-//                    match ast.at(1) {
-//                        Some(s) => {
-//                            match &s.s_raw()[..] {
-//                                "string" => {
-//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
-//                                    Ok(Box::new(move |e: &mut Env| {
-//                                        e.with_accum(
-//                                            VVal::new_str(""),
-//                                            |e: &mut Env| Ok(ex(e)?))
-//                                    }))
-//                                },
-//                                "bytes" => {
-//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
-//                                    Ok(Box::new(move |e: &mut Env| {
-//                                        e.with_accum(
-//                                            VVal::new_byt(vec![]),
-//                                            |e: &mut Env| Ok(ex(e)?))
-//                                    }))
-//                                },
-//                                "float" => {
-//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
-//                                    Ok(Box::new(move |e: &mut Env| {
-//                                        e.with_accum(
-//                                            VVal::Flt(0.0),
-//                                            |e: &mut Env| Ok(ex(e)?))
-//                                    }))
-//                                },
-//                                "int" => {
-//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
-//                                    Ok(Box::new(move |e: &mut Env| {
-//                                        e.with_accum(
-//                                            VVal::Int(0),
-//                                            |e: &mut Env| Ok(ex(e)?))
-//                                    }))
-//                                },
-//                                "map" => {
-//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
-//                                    Ok(Box::new(move |e: &mut Env| {
-//                                        e.with_accum(
-//                                            VVal::map(),
-//                                            |e: &mut Env| Ok(ex(e)?))
-//                                    }))
-//                                },
-//                                "vec" => {
-//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
-//                                    Ok(Box::new(move |e: &mut Env| {
-//                                        e.with_accum(
-//                                            VVal::vec(),
-//                                            |e: &mut Env| Ok(ex(e)?))
-//                                    }))
-//                                },
-//                                "@" => {
-//                                    sp.set(ResPos::Value(ResValue::AccumVal));
-//                                    Ok(Prog::new())
-//                                },
-//                                _ => {
-//                                    panic!("COMPILER ERROR: BAD ACCUM SYM");
-//                                }
-//                            }
-//                        },
-//                        None => {
-//                            sp.set(ResPos::Value(ResValue::AccumFun));
-//                            Ok(Prog::new())
-//                        }
-//                    }
-                    Ok(Prog::new())
+                    match ast.at(1) {
+                        Some(s) => {
+                            if s.s_raw() == "@" {
+                                sp.set(ResPos::Value(ResValue::AccumVal));
+                                Ok(Prog::new())
+                            } else {
+                                let accum_type =
+                                    match &s.s_raw()[..] {
+                                        "string" => AccumType::String,
+                                        "bytes"  => AccumType::Bytes,
+                                        "float"  => AccumType::Float,
+                                        "int"    => AccumType::Int,
+                                        "map"    => AccumType::Map,
+                                        "vec"    => AccumType::Vec,
+                                        _ => {
+                                            panic!("COMPILER ERROR: BAD ACCUM SYM");
+                                        }
+                                    };
+                                let mut devnull = StorePos::new_dev_null();
+                                let mut prog =
+                                    vm_compile(
+                                        &ast.at(2).unwrap(),
+                                        ce,
+                                        &mut devnull)?;
+                                prog.unshift_op(Op::Accumulator(accum_type));
+                                prog.push_op(
+                                    Op::Mov(
+                                        ResPos::Value(ResValue::AccumVal),
+                                        sp.to_store_pos()));
+                                prog.push_op(Op::Unwind);
+                                Ok(prog)
+                            }
+                        },
+                        None => {
+                            sp.set(ResPos::Value(ResValue::AccumFun));
+                            Ok(Prog::new())
+                        }
+                    }
                 },
                 Syntax::GetIdx => {
                     let mut opos = StorePos::new();

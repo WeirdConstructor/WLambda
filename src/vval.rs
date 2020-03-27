@@ -699,9 +699,7 @@ impl Env {
         self.unwind(ua);
     }
 
-    pub fn with_accum<T>(&mut self, v: VVal, acfun: T) -> Result<VVal, StackAction>
-        where T: Fn(&mut Env) -> Result<VVal, StackAction>
-    {
+    pub fn setup_accumulator(&mut self, v: VVal) {
         let f =
             match v {
                 VVal::Map(_) => {
@@ -727,11 +725,16 @@ impl Env {
             UnwindAction::RestoreAccum(
                 std::mem::replace(&mut self.accum_fun, f),
                 std::mem::replace(&mut self.accum_val, v)));
+    }
+
+    pub fn with_accum<T>(&mut self, v: VVal, acfun: T) -> Result<VVal, StackAction>
+        where T: Fn(&mut Env) -> Result<VVal, StackAction>
+    {
+        self.setup_accumulator(v);
 
         let ret = acfun(self);
 
         let val = self.accum_val.clone();
-
         self.unwind_one();
 
         ret?;

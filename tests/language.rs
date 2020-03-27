@@ -2180,41 +2180,57 @@ fn check_trim() {
 
 #[test]
 fn check_accumulator() {
-    assert_eq!(s_eval(r"$@v   $[1,2,3]\$+2*_"),         "$[2,4,6]");
-    assert_eq!(s_eval(r"$@vec $[1,2,3]\$+2*_"),         "$[2,4,6]");
+    assert_eq!(ve(r"$@v   $[1,2,3]\$+2*_"),         "$[2,4,6]");
+    assert_eq!(ve(r"$@vec $[1,2,3]\$+2*_"),         "$[2,4,6]");
 
-    assert_eq!(s_eval(r"$@i   $[1,2,3]\$+_"),           "6");
-    assert_eq!(s_eval(r"$@int $[1,2,3]\$+_"),           "6");
+    assert_eq!(ve(r"$@i   $[1,2,3]\$+_"),           "6");
+    assert_eq!(ve(r"$@int $[1,2,3]\$+_"),           "6");
 
-    assert_eq!(s_eval(r"$@s      $[1,2,3]\$+_"),        "\"123\"");
-    assert_eq!(s_eval(r"$@string $[1,2,3]\$+_"),        "\"123\"");
+    assert_eq!(ve(r"$@s      $[1,2,3]\$+_"),        "\"123\"");
+    assert_eq!(ve(r"$@string $[1,2,3]\$+_"),        "\"123\"");
 
-    assert_eq!(s_eval(r"$@b      $[1,2,3]\$+_"),        "$b\"\\x01\\x02\\x03\"");
-    assert_eq!(s_eval(r"$@bytes  $[1,2,3]\$+_"),        "$b\"\\x01\\x02\\x03\"");
+    assert_eq!(ve(r"$@b      $[1,2,3]\$+_"),        "$b\"\\x01\\x02\\x03\"");
+    assert_eq!(ve(r"$@bytes  $[1,2,3]\$+_"),        "$b\"\\x01\\x02\\x03\"");
 
-    assert_eq!(s_eval(r"std:num:round ~ 10.0 * $@f     $[1.1,2.1,3.1]\$+_"), "63");
-    assert_eq!(s_eval(r"std:num:round ~ 10.0 * $@float $[1.1,2.1,3.1]\$+_"), "63");
+    assert_eq!(ve(r"std:num:round ~ 10.0 * $@f     $[1.1,2.1,3.1]\$+_"), "63");
+    assert_eq!(ve(r"std:num:round ~ 10.0 * $@float $[1.1,2.1,3.1]\$+_"), "63");
 
-    assert_eq!(s_eval(r"($@m   $[1,2,3]\$+_ 2*_).2"),   "4");
-    assert_eq!(s_eval(r"($@map $[1,2,3]\$+_ 2*_).2"),   "4");
+    assert_eq!(ve(r"($@m   $[1,2,3]\$+_ 2*_).2"),   "4");
+    assert_eq!(ve(r"($@map $[1,2,3]\$+_ 2*_).2"),   "4");
 
-    assert_eq!(s_eval("$@s $+10"),        "\"10\"");
-    assert_eq!(s_eval("$@s $+10.1"),      "\"10.1\"");
-    assert_eq!(s_eval("$@s $+$b\"ABC\""), "\"ABC\"");
-    assert_eq!(s_eval("$@s $+$t"),        "\"$true\"");
-    assert_eq!(s_eval("$@s $+$f"),        "\"$false\"");
-    assert_eq!(s_eval("$@s $+\"ABC\""),   "\"ABC\"");
+    assert_eq!(ve("$@s $+10"),        "\"10\"");
+    assert_eq!(ve("$@s $+10.1"),      "\"10.1\"");
+    assert_eq!(ve("$@s $+$b\"ABC\""), "\"ABC\"");
+    assert_eq!(ve("$@s $+$t"),        "\"$true\"");
+    assert_eq!(ve("$@s $+$f"),        "\"$false\"");
+    assert_eq!(ve("$@s $+\"ABC\""),   "\"ABC\"");
 
-    assert_eq!(s_eval("$@b $+10"),        "$b\"\\n\"");
-    assert_eq!(s_eval("$@b $+10.1"),      "$b\"\\n\"");
-    assert_eq!(s_eval("$@b $+$b\"ABC\""), "$b\"ABC\"");
-    assert_eq!(s_eval("$@b $+$t"),        "$b\"\\x01\"");
-    assert_eq!(s_eval("$@b $+$f"),        "$b\"\\0\"");
-    assert_eq!(s_eval("$@b $+\"ABC\""),   "$b\"ABC\"");
+    assert_eq!(ve("$@b $+10"),        "$b\"\\n\"");
+    assert_eq!(ve("$@b $+10.1"),      "$b\"\\n\"");
+    assert_eq!(ve("$@b $+$b\"ABC\""), "$b\"ABC\"");
+    assert_eq!(ve("$@b $+$t"),        "$b\"\\x01\"");
+    assert_eq!(ve("$@b $+$f"),        "$b\"\\0\"");
+    assert_eq!(ve("$@b $+\"ABC\""),   "$b\"ABC\"");
 
-    assert_eq!(s_eval(r"
+    assert_eq!(ve(r"
         $@v { !s = $@s { $+ :a; $+ :b }[]; $+ s; $+ s }[]
     "), "$[$<1=>\"ab\",$<1>]");
+    assert_eq!(ve(r"
+        $@v $+ ($@s $[1,2,3] \$+ _)
+    "), "$[\"123\"]");
+    assert_eq!(ve(r"
+        !f = {
+            $@v $+ ($@s $[1,2,3] \$+ _)
+        };
+        $@m $+ :k f[]
+    "), "${k=$[\"123\"]}");
+    assert_eq!(ve(r"
+        !f = \:x{
+            $@v $+ ($@s
+                (return 10))
+        };
+        $@m $+ :k f[]
+    "), "${k=10}");
 }
 
 #[test]

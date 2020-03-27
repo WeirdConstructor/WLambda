@@ -58,18 +58,18 @@
 #$[1624,10000000]
 #$[1666,10000000]
 
-#range 1 5 1 {||
-#    std:displayln "time:" ~ std:measure_time :ms {
-#        !fib = $n;
-#        .fib = \:fib {!n = _;
-#            match n
-#                0 {|| return :fib 0 }
-#                1 {|| return :fib 1 }
-#                {|| return :fib (fib n - 1) + (fib n - 2); };
-#        };
-#        std:displayln ~ fib 30;
-#    };
-#};
+range 1 5 1 {||
+    std:displayln "time:" ~ std:measure_time :ms {
+        !fib = $n;
+        .fib = \:fib {!n = _;
+            match n
+                0 {|| return :fib 0 }
+                1 {|| return :fib 1 }
+                {|| return :fib (fib n - 1) + (fib n - 2); };
+        };
+        std:displayln ~ fib 30;
+    };
+};
 
 range 1 5 1 {|| std:displayln ~ std:measure_time :ms {||
     !x = 0;
