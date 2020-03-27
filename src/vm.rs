@@ -257,7 +257,7 @@ impl Prog {
                 Op::MapSetKey(p1, p2, p3, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                    patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
                 Op::MapSplice(p1, p2, _) => {
                     patch_respos_data(p1, self_data_next_idx);
@@ -669,7 +669,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::NewMap(r) => op_r!(env, ret, prog, r, { VVal::map() }),
             Op::MapSetKey(v, k, m, r) => op_a_b_c_r!(env, ret, prog, v, k, m, r, {
-                m.set_key(&handle_err!(k, "map key"), handle_err!(v, "map value"))?;
+                let v = handle_err!(v, "map value");
+                let k = handle_err!(k, "map key");
+                m.set_key(&k, v)?;
                 m
             }),
             Op::GetIdx(o, idx, r) => op_a_r!(env, ret, prog, o, r, {
@@ -694,7 +696,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::GetSym2(o, sym, sym2, r) => op_a_r!(env, ret, prog, o, r, {
                 handle_err!(o, "map/list")
                 .get_key(&sym).unwrap_or_else(|| VVal::Nul)
-                 .get_key(&sym2).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym2).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetSym3(o, sym, sym2, sym3, r) => op_a_r!(env, ret, prog, o, r, {
                 handle_err!(o, "map/list")
