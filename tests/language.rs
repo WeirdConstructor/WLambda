@@ -2211,6 +2211,10 @@ fn check_accumulator() {
     assert_eq!(s_eval("$@b $+$t"),        "$b\"\\x01\"");
     assert_eq!(s_eval("$@b $+$f"),        "$b\"\\0\"");
     assert_eq!(s_eval("$@b $+\"ABC\""),   "$b\"ABC\"");
+
+    assert_eq!(s_eval(r"
+        $@v { !s = $@s { $+ :a; $+ :b }[]; $+ s; $+ s }[]
+    "), "$[$<1=>\"ab\",$<1>]");
 }
 
 #[test]

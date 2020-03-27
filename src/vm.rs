@@ -102,12 +102,17 @@ impl StorePos {
     fn volatile_to_stack(&mut self, prog: &mut Prog, offs: &mut usize) {
         match self.res.expect("Need destination in volatile_to_stack!") {
             // Ret is volatile, as the next block of code overwrites it!
-            ResPos::Value(ResValue::Ret) => {
-                let rp = self.to_load_pos(prog);
-                prog.op_mov(rp, ResPos::Stack(*offs as u16));
-                self.clear();
-                self.res = Some(ResPos::Stack(*offs as u16));
-                *offs += 1;
+            ResPos::Value(ResValue::Ret)
+            | ResPos::Value(ResValue::SelfObj)
+            | ResPos::Value(ResValue::SelfData)
+            | ResPos::Value(ResValue::AccumFun)
+            | ResPos::Value(ResValue::AccumVal)
+                => {
+                    let rp = self.to_load_pos(prog);
+                    prog.op_mov(rp, ResPos::Stack(*offs as u16));
+                    self.clear();
+                    self.res = Some(ResPos::Stack(*offs as u16));
+                    *offs += 1;
             },
             // ::Stack(_) is just a marker, that the called piece of
             // code wants to store the value somehow.
@@ -1536,6 +1541,74 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let sym = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = sym.s_raw();
                     sp.set_data(sym.clone());
+                    Ok(Prog::new())
+                },
+                Syntax::Accum => {
+//                    match ast.at(1) {
+//                        Some(s) => {
+//                            match &s.s_raw()[..] {
+//                                "string" => {
+//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+//                                    Ok(Box::new(move |e: &mut Env| {
+//                                        e.with_accum(
+//                                            VVal::new_str(""),
+//                                            |e: &mut Env| Ok(ex(e)?))
+//                                    }))
+//                                },
+//                                "bytes" => {
+//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+//                                    Ok(Box::new(move |e: &mut Env| {
+//                                        e.with_accum(
+//                                            VVal::new_byt(vec![]),
+//                                            |e: &mut Env| Ok(ex(e)?))
+//                                    }))
+//                                },
+//                                "float" => {
+//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+//                                    Ok(Box::new(move |e: &mut Env| {
+//                                        e.with_accum(
+//                                            VVal::Flt(0.0),
+//                                            |e: &mut Env| Ok(ex(e)?))
+//                                    }))
+//                                },
+//                                "int" => {
+//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+//                                    Ok(Box::new(move |e: &mut Env| {
+//                                        e.with_accum(
+//                                            VVal::Int(0),
+//                                            |e: &mut Env| Ok(ex(e)?))
+//                                    }))
+//                                },
+//                                "map" => {
+//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+//                                    Ok(Box::new(move |e: &mut Env| {
+//                                        e.with_accum(
+//                                            VVal::map(),
+//                                            |e: &mut Env| Ok(ex(e)?))
+//                                    }))
+//                                },
+//                                "vec" => {
+//                                    let ex = compile(&ast.at(2).unwrap(), ce)?;
+//                                    Ok(Box::new(move |e: &mut Env| {
+//                                        e.with_accum(
+//                                            VVal::vec(),
+//                                            |e: &mut Env| Ok(ex(e)?))
+//                                    }))
+//                                },
+//                                "@" => {
+//                                    sp.set(ResPos::Value(ResValue::AccumVal));
+//                                    Ok(Prog::new())
+//                                },
+//                                _ => {
+//                                    panic!("COMPILER ERROR: BAD ACCUM SYM");
+//                                }
+//                            }
+//                        },
+//                        None => {
+//                            sp.set(ResPos::Value(ResValue::AccumFun));
+//                            Ok(Prog::new())
+//                        }
+//                    }
                     Ok(Prog::new())
                 },
                 Syntax::GetIdx => {

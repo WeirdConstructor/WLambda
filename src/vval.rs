@@ -181,6 +181,13 @@ impl std::fmt::Debug for Stdio {
 /// Currently hardcoded, but later the API user will be able to specify it.
 const STACK_SIZE : usize = 10240;
 
+/// Describes an action that needs to be done when returning from a function
+/// or somehow jumps unpredictably around the VM prog.
+#[derive(Debug, Clone)]
+pub enum UnwindAction {
+    RestoreAccum(VVal, VVal),
+}
+
 /// The runtime environment of the evaluator.
 #[derive(Debug, Clone)]
 pub struct Env {
@@ -191,6 +198,8 @@ pub struct Env {
     /// Used for accessing the up values, backtrace
     /// and other details about the function.
     pub call_stack: std::vec::Vec<Rc<VValFun>>,
+    /// A stack that holds cleanup routines that need to be handled:
+    pub unwind_stack: std::vec::Vec<UnwindAction>,
     /// Holds the object of the currently called method:
     pub current_self: VVal,
     /// The basepointer to reference arguments and
@@ -239,6 +248,7 @@ impl Env {
             accum_fun:          VVal::Nul,
             accum_val:          VVal::Nul,
             call_stack:         vec![],
+            unwind_stack:       vec![],
             global
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
@@ -257,6 +267,7 @@ impl Env {
             accum_fun:          VVal::Nul,
             accum_val:          VVal::Nul,
             call_stack:         vec![],
+            unwind_stack:       vec![],
             user,
             global,
         };
@@ -672,6 +683,22 @@ impl Env {
         }
     }
 
+    #[inline]
+    pub fn unwind(&mut self, ua: UnwindAction) {
+        match ua {
+            UnwindAction::RestoreAccum(fun, val) => {
+                std::mem::replace(&mut self.accum_fun, fun);
+                std::mem::replace(&mut self.accum_val, val);
+            },
+        }
+    }
+
+    #[inline]
+    pub fn unwind_one(&mut self) {
+        let ua = self.unwind_stack.pop().unwrap();
+        self.unwind(ua);
+    }
+
     pub fn with_accum<T>(&mut self, v: VVal, acfun: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction>
     {
@@ -696,14 +723,19 @@ impl Env {
                 }
             };
 
-        let old_val = std::mem::replace(&mut self.accum_val, v);
-        let old_fun = std::mem::replace(&mut self.accum_fun, f);
+        self.unwind_stack.push(
+            UnwindAction::RestoreAccum(
+                std::mem::replace(&mut self.accum_fun, f),
+                std::mem::replace(&mut self.accum_val, v)));
 
-        acfun(self)?;
+        let ret = acfun(self);
 
-        std::mem::replace(&mut self.accum_fun, old_fun);
+        let val = self.accum_val.clone();
 
-        Ok(std::mem::replace(&mut self.accum_val, old_val))
+        self.unwind_one();
+
+        ret?;
+        Ok(val)
     }
 
     pub fn get_accum_value(&self) -> VVal {
