@@ -269,6 +269,28 @@ impl Prog {
                 Op::JmpIfN(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
+                Op::GetIdx(p1, _, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::GetIdx2(p1, _, _, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::GetIdx3(p1, _, _, _, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::GetSym(p1, _, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::GetSym2(p1, _, _, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::GetSym3(p1, _, _, _, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::GetKey(p1, p2, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
                 Op::Argv(_)
                 | Op::End
                 | Op::Jmp(_)
@@ -420,6 +442,13 @@ enum Op {
     MapSetKey(ResPos, ResPos, ResPos, ResPos),
     MapSplice(ResPos, ResPos, ResPos),
     NewClos(ResPos, ResPos),
+    GetIdx(ResPos, u32, ResPos),
+    GetIdx2(ResPos, u32, u32, ResPos),
+    GetIdx3(ResPos, u32, u32, u32, ResPos),
+    GetSym(ResPos, String, ResPos),
+    GetSym2(ResPos, String, String, ResPos),
+    GetSym3(ResPos, String, String, String, ResPos),
+    GetKey(ResPos, ResPos, ResPos),
     Call(u16, ResPos),
     Jmp(i32),
     JmpIf(ResPos, i32),
@@ -624,6 +653,56 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 m.set_key(&k, v)?;
                 m
             }),
+            Op::GetIdx(o, idx, r) => op_a_r!(env, ret, prog, o, r, {
+                o.at(*idx as usize).unwrap_or(VVal::Nul)
+            }),
+            Op::GetIdx2(o, idx, idx2, r) => op_a_r!(env, ret, prog, o, r, {
+                o.at(*idx  as usize).unwrap_or(VVal::Nul)
+                 .at(*idx2 as usize).unwrap_or(VVal::Nul)
+            }),
+            Op::GetIdx3(o, idx, idx2, idx3, r) => op_a_r!(env, ret, prog, o, r, {
+                o.at(*idx  as usize).unwrap_or(VVal::Nul)
+                 .at(*idx2 as usize).unwrap_or(VVal::Nul)
+                 .at(*idx3 as usize).unwrap_or(VVal::Nul)
+            }),
+            Op::GetSym(o, sym, r) => op_a_r!(env, ret, prog, o, r, {
+                o.get_key(&sym).unwrap_or(VVal::Nul)
+            }),
+            Op::GetSym2(o, sym, sym2, r) => op_a_r!(env, ret, prog, o, r, {
+                o.get_key(&sym).unwrap_or(VVal::Nul)
+                 .get_key(&sym2).unwrap_or(VVal::Nul)
+            }),
+            Op::GetSym3(o, sym, sym2, sym3, r) => op_a_r!(env, ret, prog, o, r, {
+                o.get_key(&sym).unwrap_or(VVal::Nul)
+                 .get_key(&sym2).unwrap_or(VVal::Nul)
+                 .get_key(&sym3).unwrap_or(VVal::Nul)
+            }),
+            Op::GetKey(o, k, r) => {
+                in_reg!(env, ret, prog, o);
+                in_reg!(env, ret, prog, k);
+
+                let o = check_error_value(o, "field idx/key")?;
+                let k = check_error_value(k, "map/list")?;
+                let res =
+                    match k {
+                        VVal::Int(i)  => o.at(i as usize).unwrap_or(VVal::Nul),
+                        VVal::Bol(b)  => o.at(b as usize).unwrap_or(VVal::Nul),
+                        VVal::Sym(sy) => o.get_key(&sy.borrow()).unwrap_or(VVal::Nul),
+                        VVal::Str(sy) => o.get_key(&sy.borrow()).unwrap_or(VVal::Nul),
+                        _ => {
+                            env.push(o.clone());
+                            let call_ret = k.call_internal(env, 1);
+                            env.pop();
+                            match call_ret {
+                                Ok(v) => v,
+                                Err(sa) => {
+                                    return Err(sa.wrap_panic(prog.debug[pc].clone()));
+                                },
+                            }
+                        }
+                    };
+                out_reg!(env, ret, prog, r, res);
+            },
             Op::NewClos(f, r) => op_a_r!(env, ret, prog, f, r, {
                 let fun = f.clone_and_rebind_upvalues(|upvs, upvalues| {
                     copy_upvs(upvs, env, upvalues);
@@ -1429,6 +1508,33 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     ce.borrow_mut().recent_sym = sym.s_raw();
                     sp.set_data(sym.clone());
                     Ok(Prog::new())
+                },
+                Syntax::GetIdx => {
+                    let mut opos = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+                    let opos = opos.to_load_pos(&mut prog);
+                    let idx = ast.at(2).unwrap().i() as u32;
+                    prog.push_op(Op::GetIdx(opos, idx, sp.to_store_pos()));
+                    Ok(prog)
+                },
+                Syntax::GetIdx2 => {
+                    let mut opos = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+                    let opos = opos.to_load_pos(&mut prog);
+                    let idx = ast.at(2).unwrap().i() as u32;
+                    let idx2 = ast.at(3).unwrap().i() as u32;
+                    prog.push_op(Op::GetIdx2(opos, idx, idx2, sp.to_store_pos()));
+                    Ok(prog)
+                },
+                Syntax::GetIdx3 => {
+                    let mut opos = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+                    let opos = opos.to_load_pos(&mut prog);
+                    let idx = ast.at(2).unwrap().i() as u32;
+                    let idx2 = ast.at(3).unwrap().i() as u32;
+                    let idx3 = ast.at(4).unwrap().i() as u32;
+                    prog.push_op(Op::GetIdx3(opos, idx, idx2, idx3, sp.to_store_pos()));
+                    Ok(prog)
                 },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }

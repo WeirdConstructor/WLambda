@@ -1163,19 +1163,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
 fn optimize_get_key(ps: &mut State, obj: VVal, value: VVal) -> VVal {
     let mut first_syn = obj.v_(0);
 
-    if first_syn.get_syn() == Syntax::GetKey {
-        first_syn.set_syn(Syntax::GetKey2);
-        obj.set_at(0, first_syn);
-        obj.push(value);
-        obj
-
-    } else if first_syn.get_syn() == Syntax::GetKey2 {
-        first_syn.set_syn(Syntax::GetKey3);
-        obj.set_at(0, first_syn);
-        obj.push(value);
-        obj
-
-    } else if first_syn.get_syn() == Syntax::GetIdx && value.is_int() {
+    if first_syn.get_syn() == Syntax::GetIdx && value.is_int() {
         first_syn.set_syn(Syntax::GetIdx2);
         obj.set_at(0, first_syn);
         obj.push(value);
@@ -2014,8 +2002,8 @@ mod tests {
         assert_eq!(parse("o.(\"x\").(\"y\")"),         "$[&Block,$[&GetSym2,$[&Var,:\"o\"],\"x\",\"y\"]]");
         assert_eq!(parse("o.(\"x\").(\"y\").(\"z\")"), "$[&Block,$[&GetSym3,$[&Var,:\"o\"],\"x\",\"y\",\"z\"]]");
         assert_eq!(parse("o.(1 \"x\")"),                     "$[&Block,$[&GetKey,$[&Var,:\"o\"],$[&Call,1,$[&Str,\"x\"]]]]");
-        assert_eq!(parse("o.(1 \"x\").(1 \"y\")"),           "$[&Block,$[&GetKey2,$[&Var,:\"o\"],$[&Call,1,$[&Str,\"x\"]],$[&Call,1,$[&Str,\"y\"]]]]");
-        assert_eq!(parse("o.(1 \"x\").(1 \"y\").(1 \"z\")"), "$[&Block,$[&GetKey3,$[&Var,:\"o\"],$[&Call,1,$[&Str,\"x\"]],$[&Call,1,$[&Str,\"y\"]],$[&Call,1,$[&Str,\"z\"]]]]");
+        assert_eq!(parse("o.(1 \"x\").(1 \"y\")"),           "$[&Block,$[&GetKey,$[&GetKey,$[&Var,:\"o\"],$[&Call,1,$[&Str,\"x\"]]],$[&Call,1,$[&Str,\"y\"]]]]");
+        assert_eq!(parse("o.(1 \"x\").(1 \"y\").(1 \"z\")"), "$[&Block,$[&GetKey,$[&GetKey,$[&GetKey,$[&Var,:\"o\"],$[&Call,1,$[&Str,\"x\"]]],$[&Call,1,$[&Str,\"y\"]]],$[&Call,1,$[&Str,\"z\"]]]]");
     }
 
     #[test]

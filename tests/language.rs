@@ -127,6 +127,16 @@ fn check_pick() {
 }
 
 #[test]
+fn check_simple_indexing() {
+    assert_eq!(ve("$[1,2].0"),               "1");
+    assert_eq!(ve("$[$[3,2],2].0.0"),        "3");
+    assert_eq!(ve("$[$[$[5,6],2],2].0.0.0"), "5");
+    assert_eq!(ve("${a=30}.a"),              "30");
+    assert_eq!(ve("${a=${b=31}}.a.b"),       "31");
+    assert_eq!(ve("${a=${b=${c=32}}}.a.b.c"),"32");
+}
+
+#[test]
 fn check_list_boolean_indexing() {
     assert_eq!(ve("$[\"hi\", \"there\"].$t"),
                ve("pick $f \"hi\" \"there\""));
