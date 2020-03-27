@@ -5,7 +5,7 @@ use crate::vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = false;
+const DEBUG_VM: bool = true;
 
 pub struct Prog {
     debug:   std::vec::Vec<Option<SynPos>>,
@@ -1534,6 +1534,33 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let idx2 = ast.at(3).unwrap().i() as u32;
                     let idx3 = ast.at(4).unwrap().i() as u32;
                     prog.push_op(Op::GetIdx3(opos, idx, idx2, idx3, sp.to_store_pos()));
+                    Ok(prog)
+                },
+                Syntax::GetSym => {
+                    let mut opos = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+                    let opos = opos.to_load_pos(&mut prog);
+                    let sym = ast.at(2).unwrap().s_raw();
+                    prog.push_op(Op::GetSym(opos, sym, sp.to_store_pos()));
+                    Ok(prog)
+                },
+                Syntax::GetSym2 => {
+                    let mut opos = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+                    let opos = opos.to_load_pos(&mut prog);
+                    let sym = ast.at(2).unwrap().s_raw();
+                    let sym2 = ast.at(3).unwrap().s_raw();
+                    prog.push_op(Op::GetSym2(opos, sym, sym2, sp.to_store_pos()));
+                    Ok(prog)
+                },
+                Syntax::GetSym3 => {
+                    let mut opos = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+                    let opos = opos.to_load_pos(&mut prog);
+                    let sym = ast.at(2).unwrap().s_raw();
+                    let sym2 = ast.at(3).unwrap().s_raw();
+                    let sym3 = ast.at(4).unwrap().s_raw();
+                    prog.push_op(Op::GetSym3(opos, sym, sym2, sym3, sp.to_store_pos()));
                     Ok(prog)
                 },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
