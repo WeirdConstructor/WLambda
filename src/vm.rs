@@ -5,7 +5,7 @@ use crate::vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = true;
+const DEBUG_VM: bool = false;
 
 pub struct Prog {
     debug:   std::vec::Vec<Option<SynPos>>,
@@ -527,6 +527,22 @@ macro_rules! op_a_b_c_r {
     }
 }
 
+macro_rules! handle_err {
+    ($v: ident, $msg: expr) => {
+        {
+            match $v {
+                VVal::Err(ev) => {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("Error value in {}: {}", $msg, ev.borrow().0.s()),
+                            Some(ev.borrow().1.clone())))
+                },
+                v => v,
+            }
+        }
+    }
+}
+
 pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     let old_sp = env.sp;
     let mut pc : usize = 0;
@@ -639,7 +655,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::NewList(r) => op_r!(env, ret, prog, r, { VVal::vec() }),
             Op::ListPush(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
-                b.push(check_error_value(a, "list element")?);
+                b.push(handle_err!(a, "list element"));
                 b
             }),
             Op::ListSplice(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
@@ -650,45 +666,51 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::NewMap(r) => op_r!(env, ret, prog, r, { VVal::map() }),
             Op::MapSetKey(v, k, m, r) => op_a_b_c_r!(env, ret, prog, v, k, m, r, {
-                m.set_key(&k, v)?;
+                m.set_key(&handle_err!(k, "map key"), handle_err!(v, "map value"))?;
                 m
             }),
             Op::GetIdx(o, idx, r) => op_a_r!(env, ret, prog, o, r, {
-                o.at(*idx as usize).unwrap_or(VVal::Nul)
+                handle_err!(o, "map/list")
+                .at(*idx as usize).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetIdx2(o, idx, idx2, r) => op_a_r!(env, ret, prog, o, r, {
-                o.at(*idx  as usize).unwrap_or(VVal::Nul)
-                 .at(*idx2 as usize).unwrap_or(VVal::Nul)
+                handle_err!(o, "map/list")
+                .at(*idx  as usize).unwrap_or_else(|| VVal::Nul)
+                .at(*idx2 as usize).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetIdx3(o, idx, idx2, idx3, r) => op_a_r!(env, ret, prog, o, r, {
-                o.at(*idx  as usize).unwrap_or(VVal::Nul)
-                 .at(*idx2 as usize).unwrap_or(VVal::Nul)
-                 .at(*idx3 as usize).unwrap_or(VVal::Nul)
+                handle_err!(o, "map/list")
+                .at(*idx  as usize).unwrap_or_else(|| VVal::Nul)
+                 .at(*idx2 as usize).unwrap_or_else(|| VVal::Nul)
+                 .at(*idx3 as usize).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetSym(o, sym, r) => op_a_r!(env, ret, prog, o, r, {
-                o.get_key(&sym).unwrap_or(VVal::Nul)
+                handle_err!(o, "map/list")
+                .get_key(&sym).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetSym2(o, sym, sym2, r) => op_a_r!(env, ret, prog, o, r, {
-                o.get_key(&sym).unwrap_or(VVal::Nul)
-                 .get_key(&sym2).unwrap_or(VVal::Nul)
+                handle_err!(o, "map/list")
+                .get_key(&sym).unwrap_or_else(|| VVal::Nul)
+                 .get_key(&sym2).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetSym3(o, sym, sym2, sym3, r) => op_a_r!(env, ret, prog, o, r, {
-                o.get_key(&sym).unwrap_or(VVal::Nul)
-                 .get_key(&sym2).unwrap_or(VVal::Nul)
-                 .get_key(&sym3).unwrap_or(VVal::Nul)
+                handle_err!(o, "map/list")
+                .get_key(&sym).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym2).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym3).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetKey(o, k, r) => {
-                in_reg!(env, ret, prog, o);
                 in_reg!(env, ret, prog, k);
+                in_reg!(env, ret, prog, o);
 
-                let o = check_error_value(o, "field idx/key")?;
-                let k = check_error_value(k, "map/list")?;
+                let o = handle_err!(o, "field idx/key");
+                let k = handle_err!(k, "map/list");
                 let res =
                     match k {
-                        VVal::Int(i)  => o.at(i as usize).unwrap_or(VVal::Nul),
-                        VVal::Bol(b)  => o.at(b as usize).unwrap_or(VVal::Nul),
-                        VVal::Sym(sy) => o.get_key(&sy.borrow()).unwrap_or(VVal::Nul),
-                        VVal::Str(sy) => o.get_key(&sy.borrow()).unwrap_or(VVal::Nul),
+                        VVal::Int(i)  => o.at(i as usize).unwrap_or_else(|| VVal::Nul),
+                        VVal::Bol(b)  => o.at(b as usize).unwrap_or_else(|| VVal::Nul),
+                        VVal::Sym(sy) => o.get_key(&sy.borrow()).unwrap_or_else(|| VVal::Nul),
+                        VVal::Str(sy) => o.get_key(&sy.borrow()).unwrap_or_else(|| VVal::Nul),
                         _ => {
                             env.push(o.clone());
                             let call_ret = k.call_internal(env, 1);
@@ -764,7 +786,7 @@ fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool,
 
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
-    let destr   = ast.at(3).unwrap_or(VVal::Nul);
+    let destr   = ast.at(3).unwrap_or_else(|| VVal::Nul);
 
     //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
@@ -809,7 +831,7 @@ fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool,
 //                VVal::Map(m) => {
 //                    for (i, vi) in poses.iter().enumerate() {
 //                        let vname = vars.at(i).unwrap().s_raw();
-//                        let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+//                        let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::Nul);
 //
 //                        match vi {
 //                            VarPos::Local(vip) => e.set_consume(*vip, val),
@@ -872,12 +894,12 @@ fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool,
 {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
-    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
     let spos = syn.get_syn_pos();
 
     let vars          = ast.at(1).unwrap();
     let value         = ast.at(2).unwrap();
-    let destr         = ast.at(3).unwrap_or(VVal::Nul);
+    let destr         = ast.at(3).unwrap_or_else(|| VVal::Nul);
 
     if destr.b() {
 //        check_for_at_arity(prev_max_arity, ast, ce, &vars);
@@ -889,7 +911,7 @@ fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool,
 //                return 
 //                    ast.to_compile_err(
 //                        format!("Can't assign to undefined local variable '{}'",
-//                                vars.at(i).unwrap_or(VVal::Nul).s_raw()));
+//                                vars.at(i).unwrap_or_else(|| VVal::Nul).s_raw()));
 //            }
 //        }
 //
@@ -909,7 +931,7 @@ fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool,
 //                    VVal::Map(m) => {
 //                        for (i, pos) in poses.iter().enumerate() {
 //                            let vname = vars.at(i).unwrap().s_raw();
-//                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+//                            let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::Nul);
 //                            if let Some(err) = set_ref_at_varpos(e, pos, val) {
 //                                return Err(
 //                                    StackAction::panic_str(err, Some(spos.clone())));
@@ -945,7 +967,7 @@ fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool,
 //                    VVal::Map(m) => {
 //                        for (i, pos) in poses.iter().enumerate() {
 //                            let vname = vars.at(i).unwrap().s_raw();
-//                            let val = m.borrow().get(&vname).cloned().unwrap_or(VVal::Nul);
+//                            let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::Nul);
 //
 //                            if let Some(err) = set_env_at_varpos(e, pos, &val) {
 //                                return Err(
@@ -1127,7 +1149,7 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
 }
 
 fn vm_compile_stmts(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
-    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
     let spos = syn.get_syn_pos();
 
     let mut block_sp = StorePos::new();
@@ -1176,7 +1198,7 @@ fn vm_compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mu
 {
     match ast {
         VVal::Lst(l) => {
-            let syn  = ast.at(0).unwrap_or(VVal::Nul);
+            let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
             let spos = syn.get_syn_pos();
             let syn  = syn.get_syn();
 
@@ -1211,7 +1233,7 @@ fn vm_compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mu
 fn vm_compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos)
     -> Result<Prog, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or(VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
     let spos = syn.get_syn_pos();
 
     let mut ap = StorePos::new();
@@ -1237,7 +1259,7 @@ fn vm_compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>, sp:
 pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
     match ast {
         VVal::Lst(l) => {
-            let syn  = ast.at(0).unwrap_or(VVal::Nul);
+            let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
             let spos = syn.get_syn_pos();
             let syn  = syn.get_syn();
 
@@ -1290,7 +1312,7 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
 
                         if a.is_vec() {
                             if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
-                                a.at(0).unwrap_or(VVal::Nul)
+                                a.at(0).unwrap_or_else(|| VVal::Nul)
                             {
                                 let splice = vm_compile(&a.at(1).unwrap(), ce, &mut ap)?;
                                 p.append(splice);
@@ -1388,14 +1410,14 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     }));
 
                     ce_sub.borrow_mut().explicit_arity.0 =
-                        match explicit_arity.at(0).unwrap_or(VVal::Nul) {
+                        match explicit_arity.at(0).unwrap_or_else(|| VVal::Nul) {
                             VVal::Int(i) => ArityParam::Limit(i as usize),
                             VVal::Bol(true) => ArityParam::Limit(0),
                             _ => ArityParam::Undefined,
                         };
 
                     ce_sub.borrow_mut().explicit_arity.1 =
-                        match explicit_arity.at(1).unwrap_or(VVal::Nul) {
+                        match explicit_arity.at(1).unwrap_or_else(|| VVal::Nul) {
                             VVal::Int(i) => ArityParam::Limit(i as usize),
                             VVal::Bol(true) => ArityParam::Infinite,
                             _ => ArityParam::Undefined,
@@ -1443,7 +1465,7 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                 },
                 Syntax::Call => {
                     let is_for_n =
-                        if let Syntax::Var = ast.at(1).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() {
+                        if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
                             let var = ast.at(1).unwrap().at(1).unwrap();
                             var.with_s_ref(|var_s: &str| var_s == "while")
                         } else {
@@ -1454,13 +1476,13 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                         let mut sp_cond = StorePos::new();
                         let mut cond =
                             vm_compile_direct_block(
-                                &ast.at(2).unwrap_or(VVal::Nul), ce, &mut sp_cond)?;
+                                &ast.at(2).unwrap_or_else(|| VVal::Nul), ce, &mut sp_cond)?;
 
                         let mut sp_body = StorePos::new();
                         sp_body.set(ResPos::Nul);
                         let mut body =
                             vm_compile_direct_block(
-                                &ast.at(3).unwrap_or(VVal::Nul), ce, &mut sp_body)?;
+                                &ast.at(3).unwrap_or_else(|| VVal::Nul), ce, &mut sp_body)?;
 
                         let sp_cond = sp_cond.to_load_pos(&mut cond);
                         let body_cnt = body.op_count();
@@ -1562,6 +1584,23 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let sym3 = ast.at(4).unwrap().s_raw();
                     prog.push_op(Op::GetSym3(opos, sym, sym2, sym3, sp.to_store_pos()));
                     Ok(prog)
+                },
+                Syntax::GetKey => {
+                    let mut mp = StorePos::new();
+                    let mut ip = StorePos::new();
+
+                    let mut map_prog = vm_compile(&ast.at(1).unwrap(), ce, &mut mp)?;
+                    let mut idx_prog = vm_compile(&ast.at(2).unwrap(), ce, &mut ip)?;
+
+                    let mut stack_offs = 0;
+                    mp.volatile_to_stack(&mut map_prog, &mut stack_offs);
+                    map_prog.append(idx_prog);
+                    ip.volatile_to_stack(&mut map_prog, &mut stack_offs);
+                    let mp = mp.to_load_pos(&mut map_prog);
+                    let ip = ip.to_load_pos(&mut map_prog);
+
+                    map_prog.push_op(Op::GetKey(mp, ip, sp.to_store_pos()));
+                    Ok(map_prog)
                 },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }

@@ -134,6 +134,9 @@ fn check_simple_indexing() {
     assert_eq!(ve("${a=30}.a"),              "30");
     assert_eq!(ve("${a=${b=31}}.a.b"),       "31");
     assert_eq!(ve("${a=${b=${c=32}}}.a.b.c"),"32");
+    assert_eq!(ve("${a=30}.(\"\" \"a\")"),              "30");
+    assert_eq!(ve("${a=${b=31}}.(\"\" \"a\").b"),       "31");
+    assert_eq!(ve("${a=${b=${c=32}}}.(\"\" \"a\").b.c"),"32");
 }
 
 #[test]

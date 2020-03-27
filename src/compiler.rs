@@ -1571,6 +1571,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool) ->
     }
 }
 
+#[inline]
 pub fn check_error_value(v: VVal, at: &str) -> Result<VVal, StackAction> {
     if let VVal::Err(ev) = v {
         return
