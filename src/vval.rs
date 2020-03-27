@@ -684,6 +684,18 @@ impl Env {
     }
 
     #[inline]
+    pub fn unwind_depth(&self) -> usize {
+        self.unwind_stack.len()
+    }
+
+    #[inline]
+    pub fn unwind_to_depth(&mut self, depth: usize) {
+        while self.unwind_stack.len() > depth {
+            self.unwind_one();
+        }
+    }
+
+    #[inline]
     pub fn unwind(&mut self, ua: UnwindAction) {
         match ua {
             UnwindAction::RestoreAccum(fun, val) => {

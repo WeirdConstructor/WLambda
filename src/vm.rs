@@ -580,6 +580,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         println!("-- START -------------------------------------");
     }
     let mut ret = VVal::Nul;
+    let uw_depth = env.unwind_depth();
     loop {
         let op = &prog.ops[pc];
         if DEBUG_VM {
@@ -655,6 +656,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     VVal::Flt(f / b.f())
 
                 } else if b.i() == 0 {
+                    env.unwind_to_depth(uw_depth);
                     return
                         Err(StackAction::panic_str(
                             format!("Division by 0: {}/{}", a.i(), b.i()),
@@ -761,6 +763,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             match call_ret {
                                 Ok(v) => v,
                                 Err(sa) => {
+                                    env.unwind_to_depth(uw_depth);
                                     return Err(sa.wrap_panic(prog.debug[pc].clone()));
                                 },
                             }
@@ -786,10 +789,13 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 let call_ret = f.call_internal(env, argc);
                 env.popn(argc);
                 match call_ret {
-                    Ok(v) => {
-                        out_reg!(env, ret, prog, r, v);
+                    Ok(v) => { out_reg!(env, ret, prog, r, v); },
+                    Err(StackAction::Return((v_lbl, v))) => {
+                        env.unwind_to_depth(uw_depth);
+                        return Err(StackAction::Return((v_lbl, v)));
                     },
                     Err(sa) => {
+                        env.unwind_to_depth(uw_depth);
                         return Err(sa.wrap_panic(prog.debug[pc].clone()));
                     },
                 }
@@ -815,6 +821,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         }
         pc += 1;
     }
+
+    env.unwind_to_depth(uw_depth);
 
     if env.sp != old_sp {
         env.dump_stack();

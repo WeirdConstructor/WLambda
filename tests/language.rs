@@ -2227,7 +2227,7 @@ fn check_accumulator() {
     assert_eq!(ve(r"
         !f = \:x{
             $@v $+ ($@s
-                (return 10))
+                (return :x 10))
         };
         $@m $+ :k f[]
     "), "${k=10}");
