@@ -796,6 +796,16 @@ struct BlockEnv {
 }
 
 #[derive(Debug,Clone,Copy,PartialEq)]
+pub enum ResValue {
+    Nul,
+    Ret,
+    AccumVal,
+    AccumFun,
+    SelfObj,
+    SelfData,
+}
+
+#[derive(Debug,Clone,Copy,PartialEq)]
 pub enum ResPos {
     Local(u16),
     Arg(u16),
@@ -803,8 +813,7 @@ pub enum ResPos {
     Global(u16),
     Data(u16),
     Stack(u16),
-    Ret,
-    Nul,
+    Value(ResValue),
 }
 
 impl BlockEnv {

@@ -1,5 +1,5 @@
 use wlambda::*;
-use wlambda::compiler::{compile, CompileEnv, GlobalEnvRef, ResPos};
+use wlambda::compiler::{compile, CompileEnv, GlobalEnvRef, ResPos, ResValue};
 use wlambda::vm::*;
 use std::time::Instant;
 use std::rc::Rc;
@@ -78,7 +78,7 @@ pub fn ve(s: &str) -> String {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
             let mut dest = StorePos::new();
-            dest.set(ResPos::Ret);
+            dest.set(ResPos::Value(ResValue::Ret));
             match vm_compile(&ast, &mut ce, &mut dest) {
                 Ok(mut prog) => {
                     let local_space = ce.borrow().get_local_space();

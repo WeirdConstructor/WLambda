@@ -22,8 +22,7 @@ fn patch_respos_data(rp: &mut ResPos, idx: u16) {
         | ResPos::Up(_)
         | ResPos::Arg(_)
         | ResPos::Stack(_)
-        | ResPos::Ret
-        | ResPos::Nul
+        | ResPos::Value(_)
             => (),
     }
 }
@@ -54,7 +53,7 @@ impl StorePos {
     /// is not necessary and should not create additional Mov operations.
     fn new_dev_null() -> Self {
         let mut s = Self::new();
-        s.res = Some(ResPos::Nul);
+        s.res = Some(ResPos::Value(ResValue::Nul));
         s
     }
 
@@ -103,7 +102,7 @@ impl StorePos {
     fn volatile_to_stack(&mut self, prog: &mut Prog, offs: &mut usize) {
         match self.res.expect("Need destination in volatile_to_stack!") {
             // Ret is volatile, as the next block of code overwrites it!
-            ResPos::Ret => {
+            ResPos::Value(ResValue::Ret) => {
                 let rp = self.to_load_pos(prog);
                 prog.op_mov(rp, ResPos::Stack(*offs as u16));
                 self.clear();
@@ -124,7 +123,7 @@ impl StorePos {
             | ResPos::Global(_)
             | ResPos::Up(_)
             | ResPos::Data(_)
-            | ResPos::Nul
+            | ResPos::Value(_)
                 => (),
         }
     }
@@ -140,8 +139,7 @@ impl StorePos {
                 | ResPos::Global(_)
                 | ResPos::Data(_)
                 | ResPos::Local(_)
-                | ResPos::Nul
-                | ResPos::Ret
+                | ResPos::Value(_)
                     => rp,
             }
         } else {
@@ -154,8 +152,8 @@ impl StorePos {
     /// at runtime where to read the value from.
     pub fn to_load_pos(&self, prog: &mut Prog) -> ResPos {
         if let Some(rp) = self.res {
-            if let ResPos::Nul = rp {
-                return ResPos::Nul;
+            if let ResPos::Value(ResValue::Nul) = rp {
+                return ResPos::Value(ResValue::Nul);
             }
 
             let rp =
@@ -467,8 +465,12 @@ macro_rules! in_reg {
                 ResPos::Arg(o)      => $env.arg(*o as usize),
                 ResPos::Data(i)     => $prog.data[*i as usize].clone(),
                 ResPos::Stack(_o)   => $env.pop(),
-                ResPos::Ret         => std::mem::replace(&mut $ret, VVal::Nul),
-                ResPos::Nul         => VVal::Nul,
+                ResPos::Value(ResValue::Ret) => std::mem::replace(&mut $ret, VVal::Nul),
+                ResPos::Value(ResValue::Nul) => VVal::Nul,
+                ResPos::Value(ResValue::SelfObj) => $env.self_object(),
+                ResPos::Value(ResValue::SelfData) => $env.self_object().proto_data(),
+                ResPos::Value(ResValue::AccumVal) => $env.get_accum_value(),
+                ResPos::Value(ResValue::AccumFun) => $env.get_accum_function(),
             };
     }
 }
@@ -477,13 +479,13 @@ macro_rules! out_reg {
     ($env: ident, $ret: ident, $prog: ident, $respos_var: ident, $val: expr) => {
         match $respos_var {
             ResPos::Local(o)  => $env.set_consume(*o as usize, $val),
-            ResPos::Arg(o)    => $env.set_arg(*o as usize, $val),
             ResPos::Up(i)     => $env.set_up(*i as usize, $val),
-            ResPos::Stack(_)  => { $env.push($val); },
-            ResPos::Ret       => { $ret = $val; },
-            ResPos::Nul       => (),
             ResPos::Global(i) => { $prog.data[*i as usize].set_ref($val); },
+            ResPos::Arg(o)    => $env.set_arg(*o as usize, $val),
             ResPos::Data(i)   => { $prog.data[*i as usize].set_ref($val); },
+            ResPos::Stack(_)  => { $env.push($val); },
+            ResPos::Value(ResValue::Ret) => { $ret = $val; },
+            ResPos::Value(_) => (),
         };
     }
 }
@@ -1158,7 +1160,7 @@ fn vm_compile_stmts(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     let spos = syn.get_syn_pos();
 
     let mut block_sp = StorePos::new();
-    block_sp.set(ResPos::Ret);
+    block_sp.set(ResPos::Value(ResValue::Ret));
 
     let mut i = 0;
     let ast_len = ast.len() - skip_cnt;
@@ -1188,7 +1190,7 @@ fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     ce.borrow_mut().push_block_env();
     let mut p = vm_compile_stmts(ast, skip_cnt, ce, sp)?;
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
-    sp.set(ResPos::Ret);
+    sp.set(ResPos::Value(ResValue::Ret));
     if from_local_idx != to_local_idx {
         p.push_op(Op::ClearLocals(
             from_local_idx as u16,
@@ -1484,7 +1486,7 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                                 &ast.at(2).unwrap_or_else(|| VVal::Nul), ce, &mut sp_cond)?;
 
                         let mut sp_body = StorePos::new();
-                        sp_body.set(ResPos::Nul);
+                        sp_body.set(ResPos::Value(ResValue::Nul));
                         let mut body =
                             vm_compile_direct_block(
                                 &ast.at(3).unwrap_or_else(|| VVal::Nul), ce, &mut sp_body)?;
@@ -1642,7 +1644,7 @@ pub fn gen(s: &str) -> String {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
             let mut dest = StorePos::new();
-            dest.set(ResPos::Ret);
+            dest.set(ResPos::Value(ResValue::Ret));
             match vm_compile(&ast, &mut ce, &mut dest) {
                 Ok(mut prog) => {
                     let local_space = ce.borrow().get_local_space();
