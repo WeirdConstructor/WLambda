@@ -240,7 +240,7 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
-                Op::ToRef(p1, _) => {
+                Op::ToRef(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
                 Op::NewClos(p1, _) => {
@@ -390,11 +390,18 @@ impl BinOp {
 }
 
 #[derive(Debug,Clone)]
+enum ToRefType {
+    Ref,
+    Deref,
+    Weakable,
+}
+
+#[derive(Debug,Clone)]
 enum Op {
     Mov(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
     Argv(ResPos),
-    ToRef(ResPos, ResPos),
+    ToRef(ResPos, ResPos, ToRefType),
     ClearLocals(u16, u16),
     Add(ResPos, ResPos, ResPos),
     Sub(ResPos, ResPos, ResPos),
@@ -513,18 +520,29 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
                 VVal::Pair(Box::new((a, b)))
             }),
-            Op::ToRef(a, r) => {
-                match a {
-                    ResPos::Local(i) => out_reg!(env, ret, prog, r, {
-                        env.get_local_captured_ref(*i as usize)
-                    }),
-                    ResPos::Global(i) => out_reg!(env, ret, prog, r, {
-                        prog.data[*i as usize].clone()
-                    }),
-                    ResPos::Up(i) => out_reg!(env, ret, prog, r, {
-                        env.get_up_captured_ref(*i as usize)
-                    }),
-                    _ => op_a_r!(env, ret, prog, a, r, { a.to_ref() }),
+            Op::ToRef(a, r, trtype) => {
+                match trtype {
+                    ToRefType::Ref =>
+                        match a {
+                            ResPos::Local(i) => out_reg!(env, ret, prog, r, {
+                                env.get_local_captured_ref(*i as usize)
+                            }),
+                            ResPos::Global(i) => out_reg!(env, ret, prog, r, {
+                                prog.data[*i as usize].clone()
+                            }),
+                            ResPos::Up(i) => out_reg!(env, ret, prog, r, {
+                                env.get_up_captured_ref(*i as usize)
+                            }),
+                            _ => op_a_r!(env, ret, prog, a, r, { a.to_ref() }),
+                        },
+                    ToRefType::Weakable =>
+                        op_a_r!(env, ret, prog, a, r, {
+                            a.to_weakened_upvalue_ref()
+                        }),
+                    ToRefType::Deref =>
+                        op_a_r!(env, ret, prog, a, r, {
+                            a.deref()
+                        }),
                 }
             },
             Op::Argv(r)             => op_r!(env, ret, prog, r, { env.argv() }),
@@ -955,12 +973,12 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
             match pos {
                 VarPos::UpValue(i) => {
                     let mut prog = Prog::new();
-                    prog.push_op(Op::ToRef(ResPos::Up(i as u16), sp.to_store_pos()));
+                    prog.push_op(Op::ToRef(ResPos::Up(i as u16), sp.to_store_pos(), ToRefType::Ref));
                     return Ok(prog);
                 },
                 VarPos::Local(i) => {
                     let mut prog = Prog::new();
-                    prog.push_op(Op::ToRef(ResPos::Local(i as u16), sp.to_store_pos()));
+                    prog.push_op(Op::ToRef(ResPos::Local(i as u16), sp.to_store_pos(), ToRefType::Ref));
                     return Ok(prog);
                 },
                 VarPos::Global(v) => {
@@ -968,7 +986,7 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
                     let mut ssp = StorePos::new();
                     ssp.set_global(v);
                     let ssp = ssp.to_load_pos(&mut prog);
-                    prog.push_op(Op::ToRef(ssp, sp.to_store_pos()));
+                    prog.push_op(Op::ToRef(ssp, sp.to_store_pos(), ToRefType::Ref));
                     return Ok(prog);
                 },
                 _ => (),
@@ -977,7 +995,7 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
             let mut ssp = StorePos::new();
             let mut prog = vm_compile_var(ast, ce, false, &mut ssp)?;
             let ssp = ssp.to_load_pos(&mut prog);
-            prog.push_op(Op::ToRef(ssp, sp.to_store_pos()));
+            prog.push_op(Op::ToRef(ssp, sp.to_store_pos(), ToRefType::Ref));
             Ok(prog)
         } else {
             match var_s {
@@ -1162,6 +1180,27 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                 Syntax::BinOpLe    => vm_compile_binop(ast, BinOp::Le,  ce, sp),
                 Syntax::BinOpLt    => vm_compile_binop(ast, BinOp::Lt,  ce, sp),
                 Syntax::BinOpEq    => vm_compile_binop(ast, BinOp::Eq,  ce, sp),
+                Syntax::Ref => {
+                    let mut rp = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
+                    let rp = rp.to_load_pos(&mut prog);
+                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Ref));
+                    Ok(prog)
+                },
+                Syntax::WRef => {
+                    let mut rp = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
+                    let rp = rp.to_load_pos(&mut prog);
+                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Weakable));
+                    Ok(prog)
+                },
+                Syntax::Deref => {
+                    let mut rp = StorePos::new();
+                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
+                    let rp = rp.to_load_pos(&mut prog);
+                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Deref));
+                    Ok(prog)
+                },
                 Syntax::Lst => {
                     let mut stack_offs : usize = 0;
                     let mut p = Prog::new();
