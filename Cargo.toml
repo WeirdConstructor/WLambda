@@ -27,5 +27,5 @@ mint       = { version = "0.5.4",  optional = true }
 [profile.release]
 debug = true
 #opt-level="z"
-#lto = true
+lto = true
 #panic = 'abort'

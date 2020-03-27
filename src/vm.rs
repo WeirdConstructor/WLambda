@@ -491,7 +491,8 @@ macro_rules! out_reg {
 macro_rules! op_r {
     ($env: ident, $ret: ident, $prog: ident, $r: ident, $block: block) => {
         {
-            out_reg!($env, $ret, $prog, $r, $block);
+            let res = $block;
+            out_reg!($env, $ret, $prog, $r, res);
         }
     }
 }
@@ -511,7 +512,8 @@ macro_rules! op_a_b_r {
         {
             in_reg!($env, $ret, $prog, $a);
             in_reg!($env, $ret, $prog, $b);
-            out_reg!($env, $ret, $prog, $r, $block);
+            let res = $block;
+            out_reg!($env, $ret, $prog, $r, res);
         }
     }
 }
@@ -522,7 +524,8 @@ macro_rules! op_a_b_c_r {
             in_reg!($env, $ret, $prog, $a);
             in_reg!($env, $ret, $prog, $b);
             in_reg!($env, $ret, $prog, $c);
-            out_reg!($env, $ret, $prog, $r, $block);
+            let res = $block;
+            out_reg!($env, $ret, $prog, $r, res);
         }
     }
 }
@@ -597,11 +600,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 if let VVal::Int(a) = a {
                     VVal::Int(a.wrapping_add(b.i()))
                 } else {
-                    match (a.clone(), b.clone()) {
-                        (VVal::IVec(ln), VVal::IVec(rn)) => VVal::IVec(ln + rn),
-                        (VVal::FVec(ln), VVal::FVec(rn)) => VVal::FVec(ln + rn),
-                        (VVal::Flt(f), re)               => VVal::Flt(f + re.f()),
-                        (le, re)                         => VVal::Int(le.i().wrapping_add(re.i()))
+                    match (a, b) {
+                        (VVal::IVec(ln), re) => VVal::IVec(ln + re.nvec()),
+                        (VVal::FVec(ln), re) => VVal::FVec(ln + re.nvec()),
+                        (VVal::Flt(f), re)   => VVal::Flt(f + re.f()),
+                        (le, re)             => VVal::Int(le.i().wrapping_add(re.i()))
                     }
                 }
             }),
