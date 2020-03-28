@@ -16,10 +16,13 @@ pub struct Prog {
 
 fn patch_respos_data(rp: &mut ResPos, idx: u16) {
     match rp {
-        ResPos::Data(i)   => { *i = *i + idx; },
-        ResPos::Global(i) => { *i = *i + idx; },
+        ResPos::Data(i)         => { *i = *i + idx; },
+        ResPos::Global(i)       => { *i = *i + idx; },
+        ResPos::GlobalRef(i)    => { *i = *i + idx; },
         ResPos::Local(_)
+        | ResPos::LocalRef(_)
         | ResPos::Up(_)
+        | ResPos::UpRef(_)
         | ResPos::Arg(_)
         | ResPos::Stack(_)
         | ResPos::Value(_)
@@ -129,8 +132,11 @@ impl StorePos {
             // Following are all non volatile:
             ResPos::Arg(_)
             | ResPos::Local(_)
+            | ResPos::LocalRef(_)
             | ResPos::Global(_)
+            | ResPos::GlobalRef(_)
             | ResPos::Up(_)
+            | ResPos::UpRef(_)
             | ResPos::Data(_)
             | ResPos::Value(_)
                 => (),
@@ -145,9 +151,12 @@ impl StorePos {
                 ResPos::Arg(_)   => panic!("Can't store to Arg!"),
                 ResPos::Stack(_) => ResPos::Stack(0),
                 ResPos::Up(_)
+                | ResPos::UpRef(_)
                 | ResPos::Global(_)
+                | ResPos::GlobalRef(_)
                 | ResPos::Data(_)
                 | ResPos::Local(_)
+                | ResPos::LocalRef(_)
                 | ResPos::Value(_)
                     => rp,
             }
@@ -279,19 +288,19 @@ impl Prog {
                 Op::GetIdx(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::GetIdx2(p1, _, _, _) => {
+                Op::GetIdx2(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::GetIdx3(p1, _, _, _, _) => {
+                Op::GetIdx3(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
                 Op::GetSym(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::GetSym2(p1, _, _, _) => {
+                Op::GetSym2(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::GetSym3(p1, _, _, _, _) => {
+                Op::GetSym3(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
                 Op::GetKey(p1, p2, _) => {
@@ -390,6 +399,7 @@ impl Prog {
 }
 
 #[derive(Debug, Clone)]
+#[repr(u8)]
 enum BinOp {
     Add,
     Sub,
@@ -421,7 +431,8 @@ impl BinOp {
 }
 
 #[derive(Debug,Clone)]
-enum AccumType {
+#[repr(u8)]
+pub enum AccumType {
     String,
     Bytes,
     Float,
@@ -431,14 +442,16 @@ enum AccumType {
 }
 
 #[derive(Debug,Clone)]
-enum ToRefType {
+#[repr(u8)]
+pub enum ToRefType {
     Ref,
     Deref,
     Weakable,
 }
 
 #[derive(Debug,Clone)]
-enum Op {
+#[repr(u8)]
+pub enum Op {
     Mov(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
     Argv(ResPos),
@@ -463,11 +476,11 @@ enum Op {
     MapSplice(ResPos, ResPos, ResPos),
     NewClos(ResPos, ResPos),
     GetIdx(ResPos, u32, ResPos),
-    GetIdx2(ResPos, u32, u32, ResPos),
-    GetIdx3(ResPos, u32, u32, u32, ResPos),
-    GetSym(ResPos, String, ResPos),
-    GetSym2(ResPos, String, String, ResPos),
-    GetSym3(ResPos, String, String, String, ResPos),
+    GetIdx2(ResPos, Box<(u32, u32)>, ResPos),
+    GetIdx3(ResPos, Box<(u32, u32, u32)>, ResPos),
+    GetSym(ResPos, Box<String>, ResPos),
+    GetSym2(ResPos, Box<(String, String)>, ResPos),
+    GetSym3(ResPos, Box<(String, String, String)>, ResPos),
     GetKey(ResPos, ResPos, ResPos),
     Call(u16, ResPos),
     Jmp(i32),
@@ -483,8 +496,11 @@ macro_rules! in_reg {
         let $respos_var =
             match $respos_var {
                 ResPos::Local(o)    => $env.get_local(*o as usize),
+                ResPos::LocalRef(o) => $env.get_local(*o as usize).deref(),
                 ResPos::Up(i)       => $env.get_up(*i as usize),
+                ResPos::UpRef(i)    => $env.get_up(*i as usize).deref(),
                 ResPos::Global(i)   => $prog.data[*i as usize].deref(),
+                ResPos::GlobalRef(i)=> $prog.data[*i as usize].deref().deref(),
                 ResPos::Arg(o)      => $env.arg(*o as usize),
                 ResPos::Data(i)     => $prog.data[*i as usize].clone(),
                 ResPos::Stack(_o)   => $env.pop(),
@@ -501,12 +517,15 @@ macro_rules! in_reg {
 macro_rules! out_reg {
     ($env: ident, $ret: ident, $prog: ident, $respos_var: ident, $val: expr) => {
         match $respos_var {
-            ResPos::Local(o)  => $env.set_consume(*o as usize, $val),
-            ResPos::Up(i)     => $env.set_up(*i as usize, $val),
-            ResPos::Global(i) => { $prog.data[*i as usize].set_ref($val); },
-            ResPos::Arg(o)    => $env.set_arg(*o as usize, $val),
-            ResPos::Data(i)   => { $prog.data[*i as usize].set_ref($val); },
-            ResPos::Stack(_)  => { $env.push($val); },
+            ResPos::Local(o)        => $env.set_consume(*o as usize, $val),
+            ResPos::LocalRef(o)     => $env.assign_ref_local(*o as usize, $val),
+            ResPos::Up(i)           => $env.set_up(*i as usize, $val),
+            ResPos::UpRef(i)        => $env.assign_ref_up(*i as usize, $val),
+            ResPos::Global(i)       => { $prog.data[*i as usize].set_ref($val); },
+            ResPos::GlobalRef(i)    => { $prog.data[*i as usize].deref().set_ref($val); },
+            ResPos::Arg(o)          => $env.set_arg(*o as usize, $val),
+            ResPos::Data(i)         => { $prog.data[*i as usize].set_ref($val); },
+            ResPos::Stack(_)        => { $env.push($val); },
             ResPos::Value(ResValue::Ret) => { $ret = $val; },
             ResPos::Value(_) => (),
         };
@@ -718,31 +737,31 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 handle_err!(o, "map/list")
                 .at(*idx as usize).unwrap_or_else(|| VVal::Nul)
             }),
-            Op::GetIdx2(o, idx, idx2, r) => op_a_r!(env, ret, prog, o, r, {
+            Op::GetIdx2(o, idx, r) => op_a_r!(env, ret, prog, o, r, {
                 handle_err!(o, "map/list")
-                .at(*idx  as usize).unwrap_or_else(|| VVal::Nul)
-                .at(*idx2 as usize).unwrap_or_else(|| VVal::Nul)
+                .at(idx.0 as usize).unwrap_or_else(|| VVal::Nul)
+                .at(idx.1 as usize).unwrap_or_else(|| VVal::Nul)
             }),
-            Op::GetIdx3(o, idx, idx2, idx3, r) => op_a_r!(env, ret, prog, o, r, {
+            Op::GetIdx3(o, idx, r) => op_a_r!(env, ret, prog, o, r, {
                 handle_err!(o, "map/list")
-                .at(*idx  as usize).unwrap_or_else(|| VVal::Nul)
-                 .at(*idx2 as usize).unwrap_or_else(|| VVal::Nul)
-                 .at(*idx3 as usize).unwrap_or_else(|| VVal::Nul)
+                .at(idx.0 as usize).unwrap_or_else(|| VVal::Nul)
+                .at(idx.1 as usize).unwrap_or_else(|| VVal::Nul)
+                .at(idx.2 as usize).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetSym(o, sym, r) => op_a_r!(env, ret, prog, o, r, {
                 handle_err!(o, "map/list")
                 .get_key(&sym).unwrap_or_else(|| VVal::Nul)
             }),
-            Op::GetSym2(o, sym, sym2, r) => op_a_r!(env, ret, prog, o, r, {
+            Op::GetSym2(o, sym, r) => op_a_r!(env, ret, prog, o, r, {
                 handle_err!(o, "map/list")
-                .get_key(&sym).unwrap_or_else(|| VVal::Nul)
-                .get_key(&sym2).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym.0).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym.1).unwrap_or_else(|| VVal::Nul)
             }),
-            Op::GetSym3(o, sym, sym2, sym3, r) => op_a_r!(env, ret, prog, o, r, {
+            Op::GetSym3(o, sym, r) => op_a_r!(env, ret, prog, o, r, {
                 handle_err!(o, "map/list")
-                .get_key(&sym).unwrap_or_else(|| VVal::Nul)
-                .get_key(&sym2).unwrap_or_else(|| VVal::Nul)
-                .get_key(&sym3).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym.0).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym.1).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym.2).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetKey(o, k, r) => {
                 in_reg!(env, ret, prog, k);
@@ -832,6 +851,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     Ok(ret)
 }
 
+
 fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool, sp: &mut StorePos) -> Result<Prog, CompileError> {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
@@ -842,7 +862,29 @@ fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool,
     //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
     if destr.b() {
-        return Err(ast.compile_err("UNIMPL: DESTR!".to_string()));
+        let mut sp = StorePos::new();
+        let val_prog = vm_compile(&value, ce, &mut sp)?;
+
+        check_for_at_arity(prev_max_arity, ast, ce, &vars);
+
+        let poses =
+            vars.map_ok_skip(
+                |v| ce.borrow_mut().def(&v.s_raw(), is_global),
+                0);
+
+        Ok(Prog::new())
+
+//        Ok(Box::new(move |e: &mut Env| {
+//            let v = cv(e)?;
+//            
+//            match set_consume_at_varposes_from_vval(e, v, &poses, &vars) {
+//                Ok(_) => Ok(VVal::Nul),
+//
+//                // the set_consume_at_varpos that the above function is generated from can't err
+//                Err(_) => unreachable!(),
+//            }
+//        }))
+
 //        let cv = compile(&value, ce)?;
 //
 //        check_for_at_arity(prev_max_arity, ast, ce, &vars);
@@ -1636,7 +1678,7 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let opos = opos.to_load_pos(&mut prog);
                     let idx = ast.at(2).unwrap().i() as u32;
                     let idx2 = ast.at(3).unwrap().i() as u32;
-                    prog.push_op(Op::GetIdx2(opos, idx, idx2, sp.to_store_pos()));
+                    prog.push_op(Op::GetIdx2(opos, Box::new((idx, idx2)), sp.to_store_pos()));
                     Ok(prog)
                 },
                 Syntax::GetIdx3 => {
@@ -1646,7 +1688,7 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let idx = ast.at(2).unwrap().i() as u32;
                     let idx2 = ast.at(3).unwrap().i() as u32;
                     let idx3 = ast.at(4).unwrap().i() as u32;
-                    prog.push_op(Op::GetIdx3(opos, idx, idx2, idx3, sp.to_store_pos()));
+                    prog.push_op(Op::GetIdx3(opos, Box::new((idx, idx2, idx3)), sp.to_store_pos()));
                     Ok(prog)
                 },
                 Syntax::GetSym => {
@@ -1654,7 +1696,7 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
                     let opos = opos.to_load_pos(&mut prog);
                     let sym = ast.at(2).unwrap().s_raw();
-                    prog.push_op(Op::GetSym(opos, sym, sp.to_store_pos()));
+                    prog.push_op(Op::GetSym(opos, Box::new(sym), sp.to_store_pos()));
                     Ok(prog)
                 },
                 Syntax::GetSym2 => {
@@ -1663,7 +1705,7 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let opos = opos.to_load_pos(&mut prog);
                     let sym = ast.at(2).unwrap().s_raw();
                     let sym2 = ast.at(3).unwrap().s_raw();
-                    prog.push_op(Op::GetSym2(opos, sym, sym2, sp.to_store_pos()));
+                    prog.push_op(Op::GetSym2(opos, Box::new((sym, sym2)), sp.to_store_pos()));
                     Ok(prog)
                 },
                 Syntax::GetSym3 => {
@@ -1673,7 +1715,7 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let sym = ast.at(2).unwrap().s_raw();
                     let sym2 = ast.at(3).unwrap().s_raw();
                     let sym3 = ast.at(4).unwrap().s_raw();
-                    prog.push_op(Op::GetSym3(opos, sym, sym2, sym3, sp.to_store_pos()));
+                    prog.push_op(Op::GetSym3(opos, Box::new((sym, sym2, sym3)), sp.to_store_pos()));
                     Ok(prog)
                 },
                 Syntax::GetKey => {

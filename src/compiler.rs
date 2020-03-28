@@ -796,6 +796,7 @@ struct BlockEnv {
 }
 
 #[derive(Debug,Clone,Copy,PartialEq)]
+#[repr(u8)]
 pub enum ResValue {
     Nul,
     Ret,
@@ -806,11 +807,15 @@ pub enum ResValue {
 }
 
 #[derive(Debug,Clone,Copy,PartialEq)]
+#[repr(u8)]
 pub enum ResPos {
     Local(u16),
+    LocalRef(u16),
     Arg(u16),
     Up(u16),
+    UpRef(u16),
     Global(u16),
+    GlobalRef(u16),
     Data(u16),
     Stack(u16),
     Value(ResValue),

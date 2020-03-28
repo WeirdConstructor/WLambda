@@ -1306,54 +1306,54 @@ fn check_userdata() {
 #[test]
 fn check_bytes_impl() {
     #[cfg(feature="serde_json")]
-    assert_eq!(s_eval("std:ser:json $b\"abc\""),                         "\"[\\n  97,\\n  98,\\n  99\\n]\"", "JSON serializer for bytes ok");
+    assert_eq!(ve("std:ser:json $b\"abc\""),                         "\"[\\n  97,\\n  98,\\n  99\\n]\"", "JSON serializer for bytes ok");
 
-    assert_eq!(s_eval("str $b\"abc\""),                              "\"abc\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
-    assert_eq!(s_eval("str $b\"äbcß\""),                             "\"Ã¤bcÃ\\u{9f}\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
-    assert_eq!(s_eval("std:str:from_utf8 $b\"äbcß\""),                   "\"äbcß\"", "Bytes to String from UTF8");
-    assert_eq!(s_eval("std:str:from_utf8 $b\"\\xC4\\xC3\""),             "$e \"str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0\"", "Bytes to String from invalid UTF8");
-    assert_eq!(s_eval("std:str:from_utf8_lossy $b\"\\xC4\\xC3\""),       "\"��\"", "Bytes to String from invalid UTF8 lossy");
-    assert_eq!(s_eval("std:str:to_bytes \"aäß\""),                       "$b\"a\\xC3\\xA4\\xC3\\x9F\"", "Bytes from String as UTF8");
-    assert_eq!(s_eval("std:str:from_utf8 ~ std:str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
-    assert_eq!(s_eval("$b\"abc\" 1"),                                "$b\"b\"", "Get single byte from bytes");
-    assert_eq!(s_eval("$b\"abcdef\" 0 2"),                           "$b\"ab\"", "Substring bytes operation");
-    assert_eq!(s_eval("$b\"abcdef\" 3 3"),                           "$b\"def\"", "Substring bytes operation");
-    assert_eq!(s_eval("$b\"abcdef\" $[3, 3]"),                       "$b\"def\"", "Substring bytes operation");
-    assert_eq!(s_eval("$b\"abcdef\" $[3]"),                          "$b\"def\"", "Substring bytes operation");
-    assert_eq!(s_eval("$b\"abcdef\" ${abcdef = 10}"),                "10", "Bytes as map key");
-    assert_eq!(s_eval("std:bytes:to_vec $b\"abcdef\""),                  "$[97,98,99,100,101,102]", "bytes:to_vec");
-    assert_eq!(s_eval("std:bytes:from_vec ~ std:bytes:to_vec $b\"abcdef\""), "$b\"abcdef\"", "bytes:from_vec");
-    assert_eq!(s_eval("std:bytes:from_vec $[]"),                         "$b\"\"", "bytes:from_vec");
-    assert_eq!(s_eval("std:bytes:from_vec $[1,2,3]"),                    "$b\"\\x01\\x02\\x03\"", "bytes:from_vec");
+    assert_eq!(ve("str $b\"abc\""),                              "\"abc\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
+    assert_eq!(ve("str $b\"äbcß\""),                             "\"Ã¤bcÃ\\u{9f}\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
+    assert_eq!(ve("std:str:from_utf8 $b\"äbcß\""),                   "\"äbcß\"", "Bytes to String from UTF8");
+    assert_eq!(ve("std:str:from_utf8 $b\"\\xC4\\xC3\""),             "$e \"str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0\"", "Bytes to String from invalid UTF8");
+    assert_eq!(ve("std:str:from_utf8_lossy $b\"\\xC4\\xC3\""),       "\"��\"", "Bytes to String from invalid UTF8 lossy");
+    assert_eq!(ve("std:str:to_bytes \"aäß\""),                       "$b\"a\\xC3\\xA4\\xC3\\x9F\"", "Bytes from String as UTF8");
+    assert_eq!(ve("std:str:from_utf8 ~ std:str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
+    assert_eq!(ve("$b\"abc\" 1"),                                "$b\"b\"", "Get single byte from bytes");
+    assert_eq!(ve("$b\"abcdef\" 0 2"),                           "$b\"ab\"", "Substring bytes operation");
+    assert_eq!(ve("$b\"abcdef\" 3 3"),                           "$b\"def\"", "Substring bytes operation");
+    assert_eq!(ve("$b\"abcdef\" $[3, 3]"),                       "$b\"def\"", "Substring bytes operation");
+    assert_eq!(ve("$b\"abcdef\" $[3]"),                          "$b\"def\"", "Substring bytes operation");
+    assert_eq!(ve("$b\"abcdef\" ${abcdef = 10}"),                "10", "Bytes as map key");
+    assert_eq!(ve("std:bytes:to_vec $b\"abcdef\""),                  "$[97,98,99,100,101,102]", "bytes:to_vec");
+    assert_eq!(ve("std:bytes:from_vec ~ std:bytes:to_vec $b\"abcdef\""), "$b\"abcdef\"", "bytes:from_vec");
+    assert_eq!(ve("std:bytes:from_vec $[]"),                         "$b\"\"", "bytes:from_vec");
+    assert_eq!(ve("std:bytes:from_vec $[1,2,3]"),                    "$b\"\\x01\\x02\\x03\"", "bytes:from_vec");
 
-    assert_eq!(s_eval("std:bytes:to_hex $b\"abc\\xFF\""),                  "\"616263FF\"");
-    assert_eq!(s_eval("std:bytes:to_hex $b\"abc\\xFF\" 6"),                "\"616263 FF\"");
-    assert_eq!(s_eval("std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""),          "\"616263:FF\"");
-    assert_eq!(s_eval("std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""),          "\"6:1:6:2:6:3:F:F\"");
+    assert_eq!(ve("std:bytes:to_hex $b\"abc\\xFF\""),                  "\"616263FF\"");
+    assert_eq!(ve("std:bytes:to_hex $b\"abc\\xFF\" 6"),                "\"616263 FF\"");
+    assert_eq!(ve("std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""),          "\"616263:FF\"");
+    assert_eq!(ve("std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""),          "\"6:1:6:2:6:3:F:F\"");
 
-    assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\""),         "$b\"abc\\xFF\"");
-    assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6"),       "$b\"abc\\xFF\"");
-    assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""), "$b\"abc\\xFF\"");
-    assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""), "$b\"abc\\xFF\"");
-    assert_eq!(s_eval("std:bytes:from_hex ~ std:bytes:to_hex $b\"\\x00abc\\xFF\" 1 \":\""), "$b\"\\0abc\\xFF\"");
+    assert_eq!(ve("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\""),         "$b\"abc\\xFF\"");
+    assert_eq!(ve("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6"),       "$b\"abc\\xFF\"");
+    assert_eq!(ve("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 6 \":\""), "$b\"abc\\xFF\"");
+    assert_eq!(ve("std:bytes:from_hex ~ std:bytes:to_hex $b\"abc\\xFF\" 1 \":\""), "$b\"abc\\xFF\"");
+    assert_eq!(ve("std:bytes:from_hex ~ std:bytes:to_hex $b\"\\x00abc\\xFF\" 1 \":\""), "$b\"\\0abc\\xFF\"");
 
-    assert_eq!(s_eval("std:str:to_char_vec $q ABC "), "$[65,66,67]");
-    assert_eq!(s_eval("$q ABC | std:str:to_char_vec | std:str:from_char_vec"), "\"ABC\"");
+    assert_eq!(ve("std:str:to_char_vec $q ABC "), "$[65,66,67]");
+    assert_eq!(ve("$q ABC | std:str:to_char_vec | std:str:from_char_vec"), "\"ABC\"");
 }
 
 #[test]
 fn check_ref() {
-    assert_eq!(s_eval("!x = $&&1; $*x"),             "1");
-    assert_eq!(s_eval("!x = $&&1; .*x = 2; $*x"),    "2");
-    assert_eq!(s_eval("!(x, y) = $[$&&1, $&&2]; $[$*x, $*y]"), "$[1,2]");
-    assert_eq!(s_eval("!(x, y) = $[$&&1, $&&2]; $[x, y]"), "$[$&&1,$&&2]");
-    assert_eq!(s_eval("!(x, y) = $[$&&1, $&&2]; .*(x, y) = $[33, 34]; $[x, y]"), "$[$&&33,$&&34]");
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve("!x = $&&1; $*x"),             "1");
+    assert_eq!(ve("!x = $&&1; .*x = 2; $*x"),    "2");
+    assert_eq!(ve("!(x, y) = $[$&&1, $&&2]; $[$*x, $*y]"), "$[1,2]");
+    assert_eq!(ve("!(x, y) = $[$&&1, $&&2]; $[x, y]"), "$[$&&1,$&&2]");
+    assert_eq!(ve("!(x, y) = $[$&&1, $&&2]; .*(x, y) = $[33, 34]; $[x, y]"), "$[$&&33,$&&34]");
+    assert_eq!(ve(r#"
             !:global (x, y) = $[$&&1, $&&2];
             .*(x, y) = $[33, 34];
             $[x, y]
         "#), "$[$&&33,$&&34]");
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve(r#"
             !(x, y) = $[$&&1, $&&2];
             !z = std:weaken y;
             !f = { .x = x + 1; .z = z + 2; $[$:x, $:z] };
@@ -1364,7 +1364,7 @@ fn check_ref() {
             std:push r ~ str f[];
             $[r, z]
         "#), "$[$[\"$[$&&2,$&&4]\",\"$[$&&3,$&&$n]\"],$n]");
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve(r#"
         !self = $&&${};
         !wself = std:weaken self;
         self.x = { wself.g = 10; wself.g };
@@ -1382,17 +1382,17 @@ fn check_ref() {
 
 #[test]
 fn check_append_prepend() {
-    assert_eq!(s_eval("std:append 1 2"),                    "$[1,2]");
-    assert_eq!(s_eval("std:append $[1, 2] 3"),              "$[1,2,3]");
-    assert_eq!(s_eval("std:append $[1, 2] 3 4 $[5]"),       "$[1,2,3,4,5]");
-    assert_eq!(s_eval("std:append 1 2 3 4 $[5, 6, 7, 8]"),  "$[1,2,3,4,5,6,7,8]");
-    assert_eq!(s_eval("std:append 1"),                      "$[1]");
+    assert_eq!(ve("std:append 1 2"),                    "$[1,2]");
+    assert_eq!(ve("std:append $[1, 2] 3"),              "$[1,2,3]");
+    assert_eq!(ve("std:append $[1, 2] 3 4 $[5]"),       "$[1,2,3,4,5]");
+    assert_eq!(ve("std:append 1 2 3 4 $[5, 6, 7, 8]"),  "$[1,2,3,4,5,6,7,8]");
+    assert_eq!(ve("std:append 1"),                      "$[1]");
 
-    assert_eq!(s_eval("std:prepend 1 2"),                   "$[2,1]");
-    assert_eq!(s_eval("std:prepend $[1, 2] 3"),             "$[3,1,2]");
-    assert_eq!(s_eval("std:prepend $[1, 2] 3 4 $[5]"),      "$[5,4,3,1,2]");
-    assert_eq!(s_eval("std:prepend 1 2 3 4 $[5, 6, 7, 8]"), "$[8,7,6,5,4,3,2,1]");
-    assert_eq!(s_eval("std:prepend 1"),                     "$[1]");
+    assert_eq!(ve("std:prepend 1 2"),                   "$[2,1]");
+    assert_eq!(ve("std:prepend $[1, 2] 3"),             "$[3,1,2]");
+    assert_eq!(ve("std:prepend $[1, 2] 3 4 $[5]"),      "$[5,4,3,1,2]");
+    assert_eq!(ve("std:prepend 1 2 3 4 $[5, 6, 7, 8]"), "$[8,7,6,5,4,3,2,1]");
+    assert_eq!(ve("std:prepend 1"),                     "$[1]");
 }
 
 #[test]
@@ -2235,29 +2235,29 @@ fn check_accumulator() {
 
 #[test]
 fn check_accum() {
-    assert_eq!(s_eval("std:accum $b\"a\" 1"),           "$b\"a\\x01\"");
-    assert_eq!(s_eval("std:accum $b\"a\" 2.2"),         "$b\"a\\x02\"");
-    assert_eq!(s_eval("std:accum $b\"a\" \"abcde\""),   "$b\"aabcde\"");
-    assert_eq!(s_eval("std:accum $b\"a\" $b\"abcde\""), "$b\"aabcde\"");
-    assert_eq!(s_eval("std:accum $b\"a\" $t"),          "$b\"a\\x01\"");
+    assert_eq!(ve("std:accum $b\"a\" 1"),           "$b\"a\\x01\"");
+    assert_eq!(ve("std:accum $b\"a\" 2.2"),         "$b\"a\\x02\"");
+    assert_eq!(ve("std:accum $b\"a\" \"abcde\""),   "$b\"aabcde\"");
+    assert_eq!(ve("std:accum $b\"a\" $b\"abcde\""), "$b\"aabcde\"");
+    assert_eq!(ve("std:accum $b\"a\" $t"),          "$b\"a\\x01\"");
 
-    assert_eq!(s_eval("std:accum \"a\" 1"),             "\"a1\"");
-    assert_eq!(s_eval("std:accum \"a\" 2.2"),           "\"a2.2\"");
-    assert_eq!(s_eval("std:accum \"a\" \"abcde\""),     "\"aabcde\"");
-    assert_eq!(s_eval("std:accum \"a\" $b\"abcde\""),   "\"aabcde\"");
-    assert_eq!(s_eval("std:accum \"a\" $t"),            "\"a$true\"");
+    assert_eq!(ve("std:accum \"a\" 1"),             "\"a1\"");
+    assert_eq!(ve("std:accum \"a\" 2.2"),           "\"a2.2\"");
+    assert_eq!(ve("std:accum \"a\" \"abcde\""),     "\"aabcde\"");
+    assert_eq!(ve("std:accum \"a\" $b\"abcde\""),   "\"aabcde\"");
+    assert_eq!(ve("std:accum \"a\" $t"),            "\"a$true\"");
 
-    assert_eq!(s_eval("std:accum 10 1"),                "11");
-    assert_eq!(s_eval("std:accum 11 2.2"),              "13");
-    assert_eq!(s_eval("std:accum 12 \"3\""),            "15");
+    assert_eq!(ve("std:accum 10 1"),                "11");
+    assert_eq!(ve("std:accum 11 2.2"),              "13");
+    assert_eq!(ve("std:accum 12 \"3\""),            "15");
 
-    assert_eq!(s_eval("std:accum 10.2 1"),              "11.2");
-    assert_eq!(s_eval("std:num:round 10.0 * (std:accum 11.2 2.1)"),
+    assert_eq!(ve("std:accum 10.2 1"),              "11.2");
+    assert_eq!(ve("std:num:round 10.0 * (std:accum 11.2 2.1)"),
                "133");
-    assert_eq!(s_eval("std:accum 12.2 \"3\""),          "15.2");
+    assert_eq!(ve("std:accum 12.2 \"3\""),          "15.2");
 
-    assert_eq!(s_eval("std:accum $[1] \"3\""),          "$[1,\"3\"]");
-    assert_eq!(s_eval("std:accum $[1] $[2,3]"),         "$[1,$[2,3]]");
+    assert_eq!(ve("std:accum $[1] \"3\""),          "$[1,\"3\"]");
+    assert_eq!(ve("std:accum $[1] $[2,3]"),         "$[1,$[2,3]]");
 }
 
 #[test]
@@ -2296,11 +2296,11 @@ fn check_const() {
 
 #[test]
 fn check_threads() {
-    assert_eq!(s_eval("
+    assert_eq!(ve("
         !h = std:thread:spawn $q( $[1,2,${a=20},:x] );
         std:thread:join h;
     "), "$[1,2,${a=20},:\"x\"]");
-    assert_eq!(s_eval("
+    assert_eq!(ve("
         !at = std:sync:atom:new 99;
         !h = std:thread:spawn $q{
             !@wlambda;
@@ -2409,6 +2409,6 @@ fn check_if() {
 }
 
 fn check_backslash_function() {
-    assert_eq!(s_eval("!x = $[\\1,\\2,\\3 + _,5]; $[x.1[],x.2 4,x.3[]]"), "$[2,7,5]");
-    assert_eq!(s_eval("!x = ${a = \\1, b = \\2 * _, c = 9}; $[x.a[],x.b 4,x.c[]]"), "$[1,8,9]");
+    assert_eq!(ve("!x = $[\\1,\\2,\\3 + _,5]; $[x.1[],x.2 4,x.3[]]"), "$[2,7,5]");
+    assert_eq!(ve("!x = ${a = \\1, b = \\2 * _, c = 9}; $[x.a[],x.b 4,x.c[]]"), "$[1,8,9]");
 }
