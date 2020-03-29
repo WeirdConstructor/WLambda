@@ -5,7 +5,7 @@ use crate::vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = false;
+const DEBUG_VM: bool = true;
 
 pub struct Prog {
     debug:   std::vec::Vec<Option<SynPos>>,
@@ -85,6 +85,12 @@ impl StorePos {
     /// a global value.
     fn set_global(&mut self, global: VVal) {
         self.set_data_rp(global, ResPos::Global(0));
+    }
+
+    /// Tells the parent AST-node that this node provides
+    /// a global (ref) value.
+    fn set_global_ref(&mut self, global: VVal) {
+        self.set_data_rp(global, ResPos::GlobalRef(0));
     }
 
     /// Tells the parent-AST where to find the value after
@@ -965,7 +971,9 @@ fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool,
             dp.set(gp);
             let mut prog_val = vm_compile(&value, ce, &mut dp)?;
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
-                dp.data = r;
+                if let ResPos::Global(idx) = gp {
+                    prog.data[idx as usize] = r;
+                }
             }
             prog.append(prog_val);
             dp.to_load_pos(&mut prog);
@@ -1087,7 +1095,6 @@ fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool,
         let s   = &vars.at(0).unwrap().s_raw();
         let pos = ce.borrow_mut().get(s);
 
-        if is_ref {
 //            match pos {
 //                VarPos::UpValue(i) => {
 //                    Ok(Box::new(move |e: &mut Env| {
@@ -1123,37 +1130,46 @@ fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool,
 //                    ast.to_compile_err(
 //                        format!("Can't assign to undefined local variable '{}'", s)),
 //            }
-            Err(ast.compile_err("NOT IMPLEMENTED".to_string()))
-        } else {
-            match pos {
-                VarPos::Local(vip) => {
-                    let mut dp = StorePos::new();
+        match pos {
+            VarPos::Local(vip) => {
+                let mut dp = StorePos::new();
+                if is_ref {
+                    dp.set(ResPos::LocalRef(vip as u16));
+                } else {
                     dp.set(ResPos::Local(vip as u16));
-                    let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
-                    dp.to_load_pos(&mut val_prog);
-                    Ok(val_prog)
-                },
-                VarPos::Global(r) => {
-                    let mut dp = StorePos::new();
+                }
+                let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
+                dp.to_load_pos(&mut val_prog);
+                Ok(val_prog)
+            },
+            VarPos::Global(r) => {
+                let mut dp = StorePos::new();
+                if is_ref {
+                    dp.set_global_ref(r);
+                } else {
                     dp.set_global(r);
-                    let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
-                    dp.to_load_pos(&mut val_prog);
-                    Ok(val_prog)
-                },
-                VarPos::UpValue(vip) => {
-                    let mut dp = StorePos::new();
+                }
+                let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
+                dp.to_load_pos(&mut val_prog);
+                Ok(val_prog)
+            },
+            VarPos::UpValue(vip) => {
+                let mut dp = StorePos::new();
+                if is_ref {
+                    dp.set(ResPos::UpRef(vip as u16));
+                } else {
                     dp.set(ResPos::Up(vip as u16));
-                    let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
-                    dp.to_load_pos(&mut val_prog);
-                    Ok(val_prog)
-                },
-                VarPos::Const(_) =>
-                    Err(ast.compile_err(
-                        format!("Can't assign to constant '{}'", s))),
-                VarPos::NoPos =>
-                    Err(ast.compile_err(
-                        format!("Can't assign to undefined local variable '{}'", s))),
-            }
+                }
+                let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
+                dp.to_load_pos(&mut val_prog);
+                Ok(val_prog)
+            },
+            VarPos::Const(_) =>
+                Err(ast.compile_err(
+                    format!("Can't assign to constant '{}'", s))),
+            VarPos::NoPos =>
+                Err(ast.compile_err(
+                    format!("Can't assign to undefined local variable '{}'", s))),
         }
     }
 }
