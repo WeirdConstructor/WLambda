@@ -999,6 +999,10 @@ fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool,
             let gp = prog.global_pos(VVal::Nul);
             dp.set(gp);
             let mut prog_val = vm_compile(&value, ce, &mut dp)?;
+            println!("GLOBDEF1");
+            prog.dump();
+            println!("PRV:");
+            prog_val.dump();
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
                 if let ResPos::Global(idx) = gp {
                     prog.data[idx as usize] = r;
@@ -1182,6 +1186,8 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
                     let mut prog = Prog::new();
                     let vp = vp.to_load_pos(&mut prog);
                     prog.push_op(Op::ToRef(vp, sp.to_store_pos(), ToRefType::Ref));
+            println!("TOREF0");
+            prog.dump();
                     return Ok(prog);
                 },
                 Err(_) => (),
@@ -1191,6 +1197,8 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
             let mut prog = vm_compile_var(ast, ce, false, &mut ssp)?;
             let ssp = ssp.to_load_pos(&mut prog);
             prog.push_op(Op::ToRef(ssp, sp.to_store_pos(), ToRefType::Ref));
+            println!("TOREF1");
+            prog.dump();
             Ok(prog)
         } else {
             match var_s {
@@ -1380,6 +1388,8 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
                     let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
                     let rp = rp.to_load_pos(&mut prog);
                     prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Ref));
+            println!("TOREFX");
+            prog.dump();
                     Ok(prog)
                 },
                 Syntax::WRef => {
