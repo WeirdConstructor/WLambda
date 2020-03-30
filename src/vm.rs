@@ -185,6 +185,8 @@ impl StorePos {
                     prog.data_pos(self.data.clone())
                 } else if let ResPos::Global(_) = rp {
                     prog.global_pos(self.data.clone())
+                } else if let ResPos::GlobalRef(_) = rp {
+                    prog.global_ref_pos(self.data.clone())
                 } else {
                     rp
                 };
@@ -195,6 +197,9 @@ impl StorePos {
                     prog.op_mov(dpos, rp);
                 } else if let ResPos::Global(_) = rmov {
                     let dpos = prog.global_pos(self.data_mov.clone());
+                    prog.op_mov(dpos, rp);
+                } else if let ResPos::GlobalRef(_) = rmov {
+                    let dpos = prog.global_ref_pos(self.data_mov.clone());
                     prog.op_mov(dpos, rp);
                 } else if rmov != rp {
                     prog.op_mov(rmov, rp);
@@ -214,76 +219,93 @@ impl Prog {
 
         for o in prog.ops.iter_mut() {
             match o {
-                Op::Add(p1, p2, _) => {
+                Op::Add(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Sub(p1, p2, _) => {
+                Op::Sub(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Mul(p1, p2, _) => {
+                Op::Mul(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Div(p1, p2, _) => {
+                Op::Div(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Mod(p1, p2, _) => {
+                Op::Mod(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Le(p1, p2, _) => {
+                Op::Le(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Lt(p1, p2, _) => {
+                Op::Lt(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Ge(p1, p2, _) => {
+                Op::Ge(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Gt(p1, p2, _) => {
+                Op::Gt(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::Eq(p1, p2, _) => {
+                Op::Eq(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::NewPair(p1, p2, _) => {
+                Op::NewPair(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
                 Op::Mov(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
-                Op::ToRef(p1, _, _) => {
-                    patch_respos_data(p1, self_data_next_idx);
-                },
-                Op::NewClos(p1, _) => {
-                    patch_respos_data(p1, self_data_next_idx);
-                },
-                Op::ListPush(p1, p2, _) => {
+                Op::ToRef(p1, p2, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
-                Op::ListSplice(p1, p2, _) => {
+                Op::NewClos(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
-                Op::MapSetKey(p1, p2, p3, _) => {
+                Op::ListPush(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::MapSplice(p1, p2, _) => {
+                Op::ListSplice(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
+                },
+                Op::MapSetKey(p1, p2, p3, p4) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
+                    patch_respos_data(p4, self_data_next_idx);
+                },
+                Op::MapSplice(p1, p2, p3) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
                 },
                 Op::JmpIf(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
@@ -313,14 +335,16 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
-                Op::Argv(_)
-                | Op::End
+                Op::Call(_, p1) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::NewMap(p1) => { patch_respos_data(p1, self_data_next_idx); },
+                Op::NewList(p1) => { patch_respos_data(p1, self_data_next_idx); },
+                Op::Argv(p1) => { patch_respos_data(p1, self_data_next_idx); },
+                Op::End
                 | Op::Unwind
                 | Op::Accumulator(_)
                 | Op::Jmp(_)
-                | Op::Call(_, _)
-                | Op::NewMap(_)
-                | Op::NewList(_)
                 | Op::ClearLocals(_, _)
                     => (),
             }
@@ -348,6 +372,11 @@ impl Prog {
         if let ResPos::Data(i) = rp {
             self.data[i as usize] = data;
         }
+    }
+
+    fn global_ref_pos(&mut self, data: VVal) -> ResPos {
+        self.data.push(data);
+        ResPos::GlobalRef((self.data.len() - 1) as u16)
     }
 
     fn global_pos(&mut self, data: VVal) -> ResPos {
@@ -990,6 +1019,44 @@ fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool,
     }
 }
 
+fn varpos_to_storepos(ast: &VVal, varname: &str, pos: VarPos, is_ref: bool) -> Result<StorePos, CompileError> {
+    match pos {
+        VarPos::Local(vip) => {
+            let mut dp = StorePos::new();
+            if is_ref {
+                dp.set(ResPos::LocalRef(vip as u16));
+            } else {
+                dp.set(ResPos::Local(vip as u16));
+            }
+            Ok(dp)
+        },
+        VarPos::Global(r) => {
+            let mut dp = StorePos::new();
+            if is_ref {
+                dp.set_global_ref(r);
+            } else {
+                dp.set_global(r);
+            }
+            Ok(dp)
+        },
+        VarPos::UpValue(vip) => {
+            let mut dp = StorePos::new();
+            if is_ref {
+                dp.set(ResPos::UpRef(vip as u16));
+            } else {
+                dp.set(ResPos::Up(vip as u16));
+            }
+            Ok(dp)
+        },
+        VarPos::Const(_) =>
+            Err(ast.compile_err(
+                format!("Can't assign to constant '{}'", varname))),
+        VarPos::NoPos =>
+            Err(ast.compile_err(
+                format!("Can't assign to undefined local variable '{}'", varname))),
+    }
+}
+
 fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool, sp: &mut StorePos)
     -> Result<Prog, CompileError>
 {
@@ -1095,82 +1162,12 @@ fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool,
         let s   = &vars.at(0).unwrap().s_raw();
         let pos = ce.borrow_mut().get(s);
 
-//            match pos {
-//                VarPos::UpValue(i) => {
-//                    Ok(Box::new(move |e: &mut Env| {
-//                        let v = cv(e)?;
-//                        e.assign_ref_up(i, v);
-//                        Ok(VVal::Nul)
-//                    }))
-//                },
-//                VarPos::Local(i) => {
-//                    Ok(Box::new(move |e: &mut Env| {
-//                        let v = cv(e)?;
-//                        e.assign_ref_local(i, v);
-//                        Ok(VVal::Nul)
-//                    }))
-//                },
-//                VarPos::Global(glob_v) => {
-//                    if let VVal::Ref(glob_r) = glob_v {
-//                        Ok(Box::new(move |e: &mut Env| {
-//                            let v = cv(e)?;
-//                            glob_r.borrow().set_ref(v);
-//                            Ok(VVal::Nul)
-//                        }))
-//                    } else {
-//                        ast.to_compile_err(
-//                            format!("Can't assign to read only global variable '{}'",
-//                                    s))
-//                    }
-//                },
-//                VarPos::Const(_) =>
-//                    ast.to_compile_err(
-//                        format!("Can't assign to constant '{}'", s)),
-//                VarPos::NoPos =>
-//                    ast.to_compile_err(
-//                        format!("Can't assign to undefined local variable '{}'", s)),
-//            }
-        match pos {
-            VarPos::Local(vip) => {
-                let mut dp = StorePos::new();
-                if is_ref {
-                    dp.set(ResPos::LocalRef(vip as u16));
-                } else {
-                    dp.set(ResPos::Local(vip as u16));
-                }
-                let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
-                dp.to_load_pos(&mut val_prog);
-                Ok(val_prog)
-            },
-            VarPos::Global(r) => {
-                let mut dp = StorePos::new();
-                if is_ref {
-                    dp.set_global_ref(r);
-                } else {
-                    dp.set_global(r);
-                }
-                let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
-                dp.to_load_pos(&mut val_prog);
-                Ok(val_prog)
-            },
-            VarPos::UpValue(vip) => {
-                let mut dp = StorePos::new();
-                if is_ref {
-                    dp.set(ResPos::UpRef(vip as u16));
-                } else {
-                    dp.set(ResPos::Up(vip as u16));
-                }
-                let mut val_prog = vm_compile(&value, ce, &mut dp)?.debug(spos);
-                dp.to_load_pos(&mut val_prog);
-                Ok(val_prog)
-            },
-            VarPos::Const(_) =>
-                Err(ast.compile_err(
-                    format!("Can't assign to constant '{}'", s))),
-            VarPos::NoPos =>
-                Err(ast.compile_err(
-                    format!("Can't assign to undefined local variable '{}'", s))),
-        }
+        let mut dp = varpos_to_storepos(ast, &s, pos, is_ref)?;
+        let mut rsp = StorePos::new();
+        let mut val_prog = vm_compile(&value, ce, &mut rsp)?.debug(spos);
+        let rsp = rsp.to_load_pos(&mut val_prog);
+        val_prog.push_op(Op::Mov(rsp, dp.to_store_pos()));
+        Ok(val_prog)
     }
 }
 
@@ -1180,26 +1177,14 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
     var.with_s_ref(|var_s: &str| -> Result<Prog, CompileError> {
         if to_ref {
             let pos = ce.borrow_mut().get(var_s);
-            match pos {
-                VarPos::UpValue(i) => {
+            match varpos_to_storepos(ast, var_s, pos, false) {
+                Ok(vp) => {
                     let mut prog = Prog::new();
-                    prog.push_op(Op::ToRef(ResPos::Up(i as u16), sp.to_store_pos(), ToRefType::Ref));
+                    let vp = vp.to_load_pos(&mut prog);
+                    prog.push_op(Op::ToRef(vp, sp.to_store_pos(), ToRefType::Ref));
                     return Ok(prog);
                 },
-                VarPos::Local(i) => {
-                    let mut prog = Prog::new();
-                    prog.push_op(Op::ToRef(ResPos::Local(i as u16), sp.to_store_pos(), ToRefType::Ref));
-                    return Ok(prog);
-                },
-                VarPos::Global(v) => {
-                    let mut prog = Prog::new();
-                    let mut ssp = StorePos::new();
-                    ssp.set_global(v);
-                    let ssp = ssp.to_load_pos(&mut prog);
-                    prog.push_op(Op::ToRef(ssp, sp.to_store_pos(), ToRefType::Ref));
-                    return Ok(prog);
-                },
-                _ => (),
+                Err(_) => (),
             }
 
             let mut ssp = StorePos::new();
