@@ -30,6 +30,87 @@ fn patch_respos_data(rp: &mut ResPos, idx: u16) {
     }
 }
 
+/*
+
+        ResPos::Data(i)         source
+        ResPos::Global(i)       sink & source
+        ResPos::GlobalRef(i)    sink & source
+        ResPos::Local(_)        sink & source
+        ResPos::LocalRef(_)     sink & source
+        ResPos::Up(_)           sink & source
+        ResPos::UpRef(_)        sink & source
+        ResPos::Arg(_)          source
+        ResPos::Stack(_)        sink & source
+        ResPos::Value(Ret)      sink & source (volatile!)
+
+New Op Structure: 1 sink, 1+ Argument
+
+    Op:Add(ResPos, ResPos, ResPos)
+    - Last is usually the sink
+
+    The sink can be:
+    - Global Var (Ref / Not Ref)
+    - Local Var (Ref / Not Ref)
+    - Ret
+    - Stack (push)
+
+    The sources can be:
+    - A sink
+    - (constant) Data
+    - special Value(Nul, SelfObj, AccumVal, ...)
+
+    - vm_compile() returns
+      a Template, which is a closure and
+      additional information:
+        - A sink is required for storing the output
+        - Or the value does not require a sink and can just
+          be used 1:1.
+      The template gets a Prog as input
+
+      the specification if the value can be a
+      pure source.
+    a Prog with two versions of the attached:
+        - A (mutable) sink
+        - An immutable source
+
+    The calling compiler procedure then decides which it needs.
+    Realizing the return value is done via:
+
+        let mut p = vm_compile(...);
+
+        if need_arg {
+            let rp = p.source();
+        } else if need_res {
+            let rp = p.sink();
+        }
+
+    
+
+    Sink / Source construct the op depending on the Op type and the specified
+    arguments.
+
+    source() and sink() might have to dynamically (re) construct the
+    desired Op.
+
+
+
+vm_compile_block:
+    ce.borrow_mut().push_block_env();
+
+    let mut p = vm_compile_stmts(ast, skip_cnt, ce, sp)?;
+
+    let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
+
+    p.source_to_arg()
+
+    sp.set(ResPos::Value(ResValue::Ret));
+    if from_local_idx != to_local_idx {
+        p.push_op(Op::ClearLocals(
+            from_local_idx as u16,
+            to_local_idx   as u16));
+
+*/
+
 /// This structure handles determination where to store or load
 /// a value from when compiling to a VM prog.
 #[derive(Debug,Clone)]

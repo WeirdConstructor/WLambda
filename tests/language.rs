@@ -1343,8 +1343,10 @@ fn check_bytes_impl() {
 
 #[test]
 fn check_ref() {
-    assert_eq!(ve("!x = $&&1; $*x"),             "1");
-    assert_eq!(ve("!x = $&&1; .*x = 2; $*x"),    "2");
+    assert_eq!(ve("!:global x = 1; x"),              "3");
+
+    assert_eq!(ve("!x = $&&1; $*x"),                     "1");
+    assert_eq!(ve("!x = $&&1; .*x = 2; $*x"),            "2");
     assert_eq!(ve("!:global x = $&&1; x"),               "$&&1");
     assert_eq!(ve("!:global x = $&&1; $*x"),             "1");
     assert_eq!(ve("!:global x = $&&1; .*x = 2; $*x"),    "2");
