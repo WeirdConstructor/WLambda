@@ -14,6 +14,22 @@ pub struct Prog {
     nxt_debug: Option<SynPos>,
 }
 
+pub type ProgWriteNode = Box<dyn Fn(&mut Prog, Option<ResPos>) -> ResPos>;
+
+pub struct ProgWriter {
+    node:  ProgWriteNode,
+//    value: Option<VVal>,
+//    res:   ResPos,
+}
+
+pub fn pw(f: ProgWriteNode) -> ProgWriter {
+    ProgWriter {
+        node:   Box::new(f),
+//        value:  Some(v),
+//        res:    ResPos::Data(0),
+    }
+}
+
 fn patch_respos_data(rp: &mut ResPos, idx: u16) {
     match rp {
         ResPos::Data(i)         => { *i = *i + idx; },
@@ -497,6 +513,11 @@ impl Prog {
         self
     }
 
+    fn set_dbg(&mut self, sp: SynPos) -> &mut Self {
+        self.nxt_debug = Some(sp);
+        self
+    }
+
     fn debug(mut self, sp: SynPos) -> Self {
         self.nxt_debug = Some(sp);
         self
@@ -727,7 +748,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         match op {
             Op::Mov(a, r) => op_a_r!(env, ret, prog, a, r, { a }),
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
-                VVal::Pair(Box::new((a, b)))
+                VVal::Pair(Box::new((b, a)))
             }),
             Op::ToRef(a, r, trtype) => {
                 match trtype {
@@ -1361,6 +1382,51 @@ fn vm_compile_stmts(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>
     Ok(p)
 }
 
+fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    let exprs : Vec<ProgWriter> =
+        ast.map_skip( |e| { vm_compile2(e, ce) }, skip_cnt)?;
+
+    Ok(pw(Box::new(move |prog, store| {
+        let expr_count = exprs.len();
+        let mut i      = 0;
+        let mut res    = store.unwrap_or(ResPos::Stack(0));
+
+        for e in exprs.iter() {
+            prog.set_dbg(spos.clone());
+
+            if i == expr_count - 1 {
+                res = (*e.node)(prog, Some(res));
+            } else {
+                (*e.node)(prog, Some(ResPos::Value(ResValue::Nul)));
+            }
+        }
+
+        res
+    })))
+}
+
+
+fn vm_compile_block2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
+
+    ce.borrow_mut().push_block_env();
+    let mut stmts = vm_compile_stmts2(ast, skip_cnt, ce)?;
+    let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
+
+    Ok(pw(Box::new(move |prog, store| {
+        let res = (*stmts.node)(prog, store);
+        if from_local_idx != to_local_idx {
+            prog.push_op(Op::ClearLocals(
+                from_local_idx as u16,
+                to_local_idx   as u16));
+        }
+        res
+    })))
+}
+
+
 fn vm_compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
 
     ce.borrow_mut().push_block_env();
@@ -1856,18 +1922,461 @@ pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePo
     }
 }
 
+pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
+    match ast {
+        VVal::Lst(l) => {
+            let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+            let spos = syn.get_syn_pos();
+            let syn  = syn.get_syn();
+
+            match syn {
+                Syntax::Block      => vm_compile_block2(ast, 1, ce),
+//                Syntax::Assign     => vm_compile_assign(ast, ce, false, sp).map(|p| p.debug(spos)),
+//                Syntax::AssignRef  => vm_compile_assign(ast, ce, true, sp) .map(|p| p.debug(spos)),
+//                Syntax::Var        => vm_compile_var(ast, ce, false, sp)   .map(|p| p.debug(spos)),
+//                Syntax::CaptureRef => vm_compile_var(ast, ce, true, sp)    .map(|p| p.debug(spos)),
+//                Syntax::Def        => vm_compile_def(ast, ce, false, sp)   .map(|p| p.debug(spos)),
+//                Syntax::DefGlobRef => vm_compile_def(ast, ce, true, sp)    .map(|p| p.debug(spos)),
+//                Syntax::BinOpAdd   => vm_compile_binop(ast, BinOp::Add, ce, sp),
+//                Syntax::BinOpSub   => vm_compile_binop(ast, BinOp::Sub, ce, sp),
+//                Syntax::BinOpDiv   => vm_compile_binop(ast, BinOp::Div, ce, sp),
+//                Syntax::BinOpMod   => vm_compile_binop(ast, BinOp::Mod, ce, sp),
+//                Syntax::BinOpMul   => vm_compile_binop(ast, BinOp::Mul, ce, sp),
+//                Syntax::BinOpGe    => vm_compile_binop(ast, BinOp::Ge,  ce, sp),
+//                Syntax::BinOpGt    => vm_compile_binop(ast, BinOp::Gt,  ce, sp),
+//                Syntax::BinOpLe    => vm_compile_binop(ast, BinOp::Le,  ce, sp),
+//                Syntax::BinOpLt    => vm_compile_binop(ast, BinOp::Lt,  ce, sp),
+//                Syntax::BinOpEq    => vm_compile_binop(ast, BinOp::Eq,  ce, sp),
+//                Syntax::Ref => {
+//                    let mut rp = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
+//                    let rp = rp.to_load_pos(&mut prog);
+//                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Ref));
+//            println!("TOREFX");
+//            prog.dump();
+//                    Ok(prog)
+//                },
+//                Syntax::WRef => {
+//                    let mut rp = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
+//                    let rp = rp.to_load_pos(&mut prog);
+//                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Weakable));
+//                    Ok(prog)
+//                },
+//                Syntax::Deref => {
+//                    let mut rp = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
+//                    let rp = rp.to_load_pos(&mut prog);
+//                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Deref));
+//                    Ok(prog)
+//                },
+//                Syntax::Lst => {
+//                    let mut stack_offs : usize = 0;
+//                    let mut p = Prog::new();
+//                    p.push_op(Op::NewList(ResPos::Stack(0)));
+//
+//                    for (a, _) in ast.iter().skip(1) {
+//                        let mut ap = StorePos::new();
+//
+//                        if a.is_vec() {
+//                            if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
+//                                a.at(0).unwrap_or_else(|| VVal::Nul)
+//                            {
+//                                let splice = vm_compile(&a.at(1).unwrap(), ce, &mut ap)?;
+//                                p.append(splice);
+//                                ap.volatile_to_stack(&mut p, &mut stack_offs);
+//                                let ap = ap.to_load_pos(&mut p);
+//                                p.push_op(Op::ListSplice(
+//                                    ap, ResPos::Stack(0), ResPos::Stack(0)));
+//                                continue;
+//                            }
+//                        }
+//
+//                        let a = vm_compile(&a, ce, &mut ap)?;
+//                        p.append(a);
+//                        ap.volatile_to_stack(&mut p, &mut stack_offs);
+//                        let ap = ap.to_load_pos(&mut p);
+//                        p.push_op(Op::ListPush(
+//                            ap, ResPos::Stack(0), ResPos::Stack(0)));
+//                    }
+//
+//                    sp.set(ResPos::Stack(0));
+//                    Ok(p)
+//                },
+//                Syntax::Map => {
+//                    let mut stack_offs : usize = 0;
+//                    let mut p = Prog::new();
+//                    p.push_op(Op::NewMap(ResPos::Stack(0)));
+//
+//                    for (e, _) in ast.iter().skip(1) {
+//                        let mut ap = StorePos::new();
+//
+//                        let k = e.at(0).unwrap();
+//                        let v = e.at(1).unwrap();
+//
+//                        if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
+//                            let sc = vm_compile(&v, ce, &mut ap)?;
+//                            p.append(sc);
+//                            ap.volatile_to_stack(&mut p, &mut stack_offs);
+//                            let ap = ap.to_load_pos(&mut p);
+//                            p.push_op(Op::MapSplice(
+//                                ap, ResPos::Stack(0), ResPos::Stack(0)));
+//                            continue;
+//                        }
+//
+//                        let kc = vm_compile(&k, ce, &mut ap)?;
+//                        if let VVal::Sym(y) = k {
+//                            ce.borrow_mut().recent_var = y.borrow().clone();
+//                        } else {
+//                            let recent_sym = ce.borrow().recent_sym.clone();
+//                            ce.borrow_mut().recent_var = recent_sym;
+//                        }
+//
+//                        let mut ap_v = StorePos::new();
+//                        let vc = vm_compile(&v, ce, &mut ap_v)?;
+//
+//                        p.append(kc);
+//                        ap.volatile_to_stack(&mut p, &mut stack_offs);
+//                        p.append(vc);
+//                        ap_v.volatile_to_stack(&mut p, &mut stack_offs);
+//
+//                        let ap = ap.to_load_pos(&mut p);
+//                        let ap_v = ap_v.to_load_pos(&mut p);
+//                        p.push_op(Op::MapSetKey(
+//                            ap_v, ap, ResPos::Stack(0), ResPos::Stack(0)));
+//                    }
+//
+//                    sp.set(ResPos::Stack(0));
+//                    Ok(p)
+//                },
+//                Syntax::Func => {
+//                    let last_def_varname = ce.borrow().recent_var.clone();
+//                    let mut fun_spos = spos.clone();
+//                    fun_spos.name = Some(Rc::new(last_def_varname));
+//
+//                    let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
+//                    let mut ce_sub = func_ce.clone();
+//
+//                    let label          = ast.at(1).unwrap();
+//                    let explicit_arity = ast.at(2).unwrap();
+//
+//                    let mut func_prog = vm_compile_stmts(ast, 3, &mut func_ce, sp)?;
+//                    func_prog.push_op(Op::End);
+//
+//                    let spos_inner = fun_spos.clone();
+//                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
+//                        let res = vm(&func_prog, env);
+//                        match res {
+//                            Ok(v)  => Ok(v),
+//                            Err(StackAction::Return((v_lbl, v))) => {
+//                                return
+//                                    if v_lbl.eqv(&label) { Ok(v) }
+//                                    else { Err(StackAction::Return((v_lbl, v))) }
+//                            },
+//                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
+//                        }
+//                    }));
+//
+//                    ce_sub.borrow_mut().explicit_arity.0 =
+//                        match explicit_arity.at(0).unwrap_or_else(|| VVal::Nul) {
+//                            VVal::Int(i) => ArityParam::Limit(i as usize),
+//                            VVal::Bol(true) => ArityParam::Limit(0),
+//                            _ => ArityParam::Undefined,
+//                        };
+//
+//                    ce_sub.borrow_mut().explicit_arity.1 =
+//                        match explicit_arity.at(1).unwrap_or_else(|| VVal::Nul) {
+//                            VVal::Int(i) => ArityParam::Limit(i as usize),
+//                            VVal::Bol(true) => ArityParam::Infinite,
+//                            _ => ArityParam::Undefined,
+//                        };
+//
+//                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
+//                        ce_sub.borrow().explicit_arity.0.clone()
+//                    } else {
+//                        ce_sub.borrow().implicit_arity.0.clone()
+//                    };
+//
+//                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
+//                        ce_sub.borrow().explicit_arity.1.clone()
+//                    } else {
+//                        ce_sub.borrow().implicit_arity.1.clone()
+//                    };
+//
+//                    let min_args : Option<usize> = match deciding_min_arity {
+//                        ArityParam::Infinite  => None,
+//                        ArityParam::Undefined => Some(0),
+//                        ArityParam::Limit(i)  => Some(i),
+//                    };
+//
+//                    let max_args : Option<usize> = match deciding_max_arity {
+//                        ArityParam::Infinite  => None,
+//                        ArityParam::Undefined => Some(0),
+//                        ArityParam::Limit(i)  => Some(i),
+//                    };
+//
+//                    let env_size = ce_sub.borrow().local_env_size();
+//                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
+//                    let upvalues = vec![];
+//                    let fun_template =
+//                        VValFun::new_val(
+//                            fun_ref.clone(),
+//                            upvalues, env_size, min_args, max_args, false,
+//                            Some(fun_spos.clone()),
+//                            Rc::new(upvs));
+//                    let mut prog = Prog::new().debug(spos);
+//                    let mut fsp = StorePos::new();
+//                    fsp.set_data(fun_template);
+//                    let fsp = fsp.to_load_pos(&mut prog);
+//                    prog.push_op(Op::NewClos(fsp, sp.to_store_pos()));
+//                    Ok(prog)
+//                },
+//                Syntax::Call => {
+//                    let is_for_n =
+//                        if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
+//                            let var = ast.at(1).unwrap().at(1).unwrap();
+//                            var.with_s_ref(|var_s: &str| var_s == "while")
+//                        } else {
+//                            false
+//                        };
+//
+//                    if is_for_n {
+//                        let mut sp_cond = StorePos::new();
+//                        let mut cond =
+//                            vm_compile_direct_block(
+//                                &ast.at(2).unwrap_or_else(|| VVal::Nul), ce, &mut sp_cond)?;
+//
+//                        let mut sp_body = StorePos::new();
+//                        sp_body.set(ResPos::Value(ResValue::Nul));
+//                        let mut body =
+//                            vm_compile_direct_block(
+//                                &ast.at(3).unwrap_or_else(|| VVal::Nul), ce, &mut sp_body)?;
+//
+//                        let sp_cond = sp_cond.to_load_pos(&mut cond);
+//                        let body_cnt = body.op_count();
+//                        cond.push_op(Op::JmpIfN(sp_cond, body_cnt as i32 + 1));
+//
+//                        let cond_cnt = cond.op_count();
+//                        cond.append(body);
+//                        cond.push_op(Op::Jmp(-(body_cnt as i32 + (cond_cnt + 1) as i32)));
+//
+//                        return Ok(cond);
+//                    }
+//
+//                    let mut args = vec![];
+//                    for (e, _) in ast.iter().skip(1) {
+//                        args.push(e);
+//                    }
+//                    args.reverse();
+//
+//                    let mut argc = 0;
+//                    let mut prog = Prog::new().debug(spos);
+//                    for e in args.iter() {
+//                        let mut sp = StorePos::new();
+//                        sp.set(ResPos::Stack(0));
+//                        let mut p = vm_compile(&e, ce, &mut sp)?;
+//                        sp.to_load_pos(&mut p);
+//                        prog.append(p);
+//                        argc += 1;
+//                    }
+//
+//                    prog.push_op(Op::Call(argc as u16 - 1, sp.to_store_pos()));
+//                    Ok(prog)
+//                },
+////                Syntax::Err => {
+////                    let err_val = vm_compile(&ast.at(1).unwrap(), ce)?;
+////                    Ok(err_val.debug(spos).op(Op::NewErr).consume(1).result())
+////                },
+//                Syntax::Key => {
+//                    let sym = ast.at(1).unwrap();
+//                    ce.borrow_mut().recent_sym = sym.s_raw();
+//                    sp.set_data(sym.clone());
+//                    Ok(Prog::new())
+//                },
+//                Syntax::Str => {
+//                    let sym = ast.at(1).unwrap();
+//                    ce.borrow_mut().recent_sym = sym.s_raw();
+//                    sp.set_data(sym.clone());
+//                    Ok(Prog::new())
+//                },
+//                Syntax::Accum => {
+//                    match ast.at(1) {
+//                        Some(s) => {
+//                            if s.s_raw() == "@" {
+//                                sp.set(ResPos::Value(ResValue::AccumVal));
+//                                Ok(Prog::new())
+//                            } else {
+//                                let accum_type =
+//                                    match &s.s_raw()[..] {
+//                                        "string" => AccumType::String,
+//                                        "bytes"  => AccumType::Bytes,
+//                                        "float"  => AccumType::Float,
+//                                        "int"    => AccumType::Int,
+//                                        "map"    => AccumType::Map,
+//                                        "vec"    => AccumType::Vec,
+//                                        _ => {
+//                                            panic!("COMPILER ERROR: BAD ACCUM SYM");
+//                                        }
+//                                    };
+//                                let mut devnull = StorePos::new_dev_null();
+//                                let mut prog =
+//                                    vm_compile(
+//                                        &ast.at(2).unwrap(),
+//                                        ce,
+//                                        &mut devnull)?;
+//                                prog.unshift_op(Op::Accumulator(accum_type));
+//                                prog.push_op(
+//                                    Op::Mov(
+//                                        ResPos::Value(ResValue::AccumVal),
+//                                        sp.to_store_pos()));
+//                                prog.push_op(Op::Unwind);
+//                                Ok(prog)
+//                            }
+//                        },
+//                        None => {
+//                            sp.set(ResPos::Value(ResValue::AccumFun));
+//                            Ok(Prog::new())
+//                        }
+//                    }
+//                },
+//                Syntax::GetIdx => {
+//                    let mut opos = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+//                    let opos = opos.to_load_pos(&mut prog);
+//                    let idx = ast.at(2).unwrap().i() as u32;
+//                    prog.push_op(Op::GetIdx(opos, idx, sp.to_store_pos()));
+//                    Ok(prog)
+//                },
+//                Syntax::GetIdx2 => {
+//                    let mut opos = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+//                    let opos = opos.to_load_pos(&mut prog);
+//                    let idx = ast.at(2).unwrap().i() as u32;
+//                    let idx2 = ast.at(3).unwrap().i() as u32;
+//                    prog.push_op(Op::GetIdx2(opos, Box::new((idx, idx2)), sp.to_store_pos()));
+//                    Ok(prog)
+//                },
+//                Syntax::GetIdx3 => {
+//                    let mut opos = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+//                    let opos = opos.to_load_pos(&mut prog);
+//                    let idx = ast.at(2).unwrap().i() as u32;
+//                    let idx2 = ast.at(3).unwrap().i() as u32;
+//                    let idx3 = ast.at(4).unwrap().i() as u32;
+//                    prog.push_op(Op::GetIdx3(opos, Box::new((idx, idx2, idx3)), sp.to_store_pos()));
+//                    Ok(prog)
+//                },
+//                Syntax::GetSym => {
+//                    let mut opos = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+//                    let opos = opos.to_load_pos(&mut prog);
+//                    let sym = ast.at(2).unwrap().s_raw();
+//                    prog.push_op(Op::GetSym(opos, Box::new(sym), sp.to_store_pos()));
+//                    Ok(prog)
+//                },
+//                Syntax::GetSym2 => {
+//                    let mut opos = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+//                    let opos = opos.to_load_pos(&mut prog);
+//                    let sym = ast.at(2).unwrap().s_raw();
+//                    let sym2 = ast.at(3).unwrap().s_raw();
+//                    prog.push_op(Op::GetSym2(opos, Box::new((sym, sym2)), sp.to_store_pos()));
+//                    Ok(prog)
+//                },
+//                Syntax::GetSym3 => {
+//                    let mut opos = StorePos::new();
+//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
+//                    let opos = opos.to_load_pos(&mut prog);
+//                    let sym = ast.at(2).unwrap().s_raw();
+//                    let sym2 = ast.at(3).unwrap().s_raw();
+//                    let sym3 = ast.at(4).unwrap().s_raw();
+//                    prog.push_op(Op::GetSym3(opos, Box::new((sym, sym2, sym3)), sp.to_store_pos()));
+//                    Ok(prog)
+//                },
+//                Syntax::GetKey => {
+//                    let mut mp = StorePos::new();
+//                    let mut ip = StorePos::new();
+//
+//                    let mut map_prog = vm_compile(&ast.at(1).unwrap(), ce, &mut mp)?;
+//                    let mut idx_prog = vm_compile(&ast.at(2).unwrap(), ce, &mut ip)?;
+//
+//                    let mut stack_offs = 0;
+//                    mp.volatile_to_stack(&mut map_prog, &mut stack_offs);
+//                    map_prog.append(idx_prog);
+//                    ip.volatile_to_stack(&mut map_prog, &mut stack_offs);
+//                    let mp = mp.to_load_pos(&mut map_prog);
+//                    let ip = ip.to_load_pos(&mut map_prog);
+//
+//                    map_prog.push_op(Op::GetKey(mp, ip, sp.to_store_pos()));
+//                    Ok(map_prog)
+//                },
+                _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
+            }
+        },
+        VVal::Pair(bx) => {
+            let a = vm_compile2(&bx.0, ce)?;
+            let b = vm_compile2(&bx.1, ce)?;
+
+            Ok(pw(Box::new(move |prog, store| {
+                let ar = (*a.node)(prog, None);
+                let br = (*b.node)(prog, None);
+
+                if let Some(store) = store {
+                    prog.push_op(Op::NewPair(br, ar, store));
+                    store
+                } else {
+                    prog.push_op(Op::NewPair(br, ar, ResPos::Stack(0)));
+                    ResPos::Stack(0)
+                }
+            })))
+        },
+//        VVal::Pair(bx) => {
+//            let mut ap = StorePos::new();
+//            let mut bp = StorePos::new();
+//
+//            let a = vm_compile(&bx.0, ce, &mut ap)?;
+//            let b = vm_compile(&bx.1, ce, &mut bp)?;
+//
+//            let mut p = Prog::new();
+//            let mut stack_offs : usize = 0;
+//            p.append(b);
+//            bp.volatile_to_stack(&mut p, &mut stack_offs);
+//            p.append(a);
+//            ap.volatile_to_stack(&mut p, &mut stack_offs);
+//
+//            let ap = ap.to_load_pos(&mut p);
+//            let bp = bp.to_load_pos(&mut p);
+//            p.op_new_pair(ap, bp, sp.to_store_pos());
+//            Ok(p)
+//        },
+        _ => {
+            let ast = ast.clone();
+            Ok(pw(Box::new(move |prog, store| {
+                if let Some(store) = store {
+                    let dp = prog.data_pos(ast.clone());
+                    prog.push_op(Op::Mov(dp, store));
+                    store
+                } else {
+                    prog.data_pos(ast.clone())
+                }
+            })))
+        },
+    }
+}
+
 pub fn gen(s: &str) -> String {
     let global = GlobalEnv::new_default();
     match parser::parse(s, "<compiler:s_eval>") {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
-            let mut dest = StorePos::new();
-            dest.set(ResPos::Value(ResValue::Ret));
-            match vm_compile(&ast, &mut ce, &mut dest) {
+
+            match vm_compile2(&ast, &mut ce) {
                 Ok(mut prog) => {
                     let local_space = ce.borrow().get_local_space();
-                    dest.to_load_pos(&mut prog);
-                    prog.op_end();
+
+                    let mut p = Prog::new();
+                    (*prog.node)(&mut p, Some(ResPos::Value(ResValue::Ret)));
+                    p.op_end();
 
                     let mut e = Env::new(global);
                     e.push(VVal::Int(10));
@@ -1876,7 +2385,7 @@ pub fn gen(s: &str) -> String {
                     e.set_bp(0);
                     e.push_sp(local_space);
 
-                    match vm(&prog, &mut e) {
+                    match vm(&p, &mut e) {
                         Ok(v) => v.s(),
                         Err(je) => {
                             format!("EXEC ERR: Caught {:?}", je)
