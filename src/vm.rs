@@ -44,6 +44,23 @@ pub struct ProgWriter {
 //    res:   ResPos,
 }
 
+impl ProgWriter {
+    fn eval_to(&self, prog: &mut Prog, rp: ResPos) {
+        (*self.node)(prog, Some(rp));
+    }
+
+    fn eval_nul(&self, prog: &mut Prog) {
+        let rp = (*self.node)(prog, None);
+        if let ResPos::Stack(_) = rp {
+            prog.push_op(Op::Mov(rp, ResPos::Value(ResValue::Nul)));
+        }
+    }
+
+    fn eval(&self, prog: &mut Prog) -> ResPos {
+        (*self.node)(prog, None)
+    }
+}
+
 pub fn pw(f: ProgWriteNode) -> ProgWriter {
     ProgWriter {
         node:   Box::new(f),
@@ -65,9 +82,26 @@ pub fn pw_respos(rp: ResPos, sp: SynPos) -> ProgWriter {
     }))
 }
 
+macro_rules! pw {
+    ($prog: ident, $store: ident, $b: block) => {
+        Ok(pw(Box::new(move |$prog, $store| {
+            $b
+        })))
+    }
+}
+
+macro_rules! pw_null {
+    ($prog: ident, $store: ident, $b: block) => {
+        Ok(pw(Box::new(move |$prog, $store| {
+            $b
+            ResPos::Value(ResValue::Nul)
+        })))
+    }
+}
+
 macro_rules! pw_respos_or_mov {
     ($prog: ident, $b: block) => {
-        Ok(pw(Box::new(move |$prog, store| {
+        pw!($prog, store, {
             let pos = $b;
             if let Some(store) = store {
                 $prog.push_op(Op::Mov(pos, store));
@@ -75,13 +109,13 @@ macro_rules! pw_respos_or_mov {
             } else {
                 pos
             }
-        })))
+        })
     }
 }
 
 macro_rules! pw_store_or_stack {
     ($prog: ident, $pos: ident, $b: block) => {
-        Ok(pw(Box::new(move |$prog, store| {
+        pw!($prog, store, {
             let $pos = if let Some(store) = store {
                 store
             } else {
@@ -89,15 +123,7 @@ macro_rules! pw_store_or_stack {
             };
             $b;
             $pos
-        })))
-    }
-}
-
-macro_rules! pw {
-    ($prog: ident, $store: ident, $b: block) => {
-        Ok(pw(Box::new(move |$prog, $store| {
-            $b
-        })))
+        })
     }
 }
 
@@ -1310,12 +1336,11 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
 
         if is_global {
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
-                Ok(pw(Box::new(move |prog, store| {
+                pw_null!(prog, store, {
                     prog.set_dbg(spos.clone());
                     let gp = prog.global_pos(r.clone());
-                    (*val_pw.node)(prog, Some(gp));
-                    ResPos::Value(ResValue::Nul)
-                })))
+                    val_pw.eval_to(prog, gp);
+                })
             } else {
                 panic!("Defining global did not return a global!");
             }
@@ -1323,11 +1348,10 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
             let next_local = ce.borrow_mut().next_local();
             ce.borrow_mut().def_local(&varname, next_local);
 
-            Ok(pw(Box::new(move |prog, store| {
+            pw_null!(prog, store, {
                 prog.set_dbg(spos.clone());
-                (*val_pw.node)(prog, Some(ResPos::Local(next_local as u16)));
-                ResPos::Value(ResValue::Nul)
-            })))
+                val_pw.eval_to(prog, ResPos::Local(next_local as u16));
+            })
         }
     }
 }
@@ -1558,8 +1582,8 @@ fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp
     })
 }
 
-pub fn pw_arg(arg_idx: usize, to_ref: bool) -> ProgWriter {
-    pw(Box::new(move |prog, store| {
+pub fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, CompileError> {
+    pw!(prog, store, {
         let rp = ResPos::Arg(arg_idx as u16);
         if let Some(store) = store {
             prog.push_op(Op::Mov(rp, store));
@@ -1574,7 +1598,7 @@ pub fn pw_arg(arg_idx: usize, to_ref: bool) -> ProgWriter {
                 rp
             }
         }
-    }))
+    })
 }
 
 fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Result<ProgWriter, CompileError> {
@@ -1584,27 +1608,23 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -
     let var = ast.at(1).unwrap();
     var.with_s_ref(|var_s: &str| -> Result<ProgWriter, CompileError> {
         match var_s {
-            "_"  => { set_impl_arity(1,  ce); Ok(pw_arg(0, to_ref)) },
-            "_1" => { set_impl_arity(2,  ce); Ok(pw_arg(1, to_ref)) },
-            "_2" => { set_impl_arity(3,  ce); Ok(pw_arg(2, to_ref)) },
-            "_3" => { set_impl_arity(4,  ce); Ok(pw_arg(3, to_ref)) },
-            "_4" => { set_impl_arity(5,  ce); Ok(pw_arg(4, to_ref)) },
-            "_5" => { set_impl_arity(6,  ce); Ok(pw_arg(5, to_ref)) },
-            "_6" => { set_impl_arity(7,  ce); Ok(pw_arg(6, to_ref)) },
-            "_7" => { set_impl_arity(8,  ce); Ok(pw_arg(7, to_ref)) },
-            "_8" => { set_impl_arity(9,  ce); Ok(pw_arg(8, to_ref)) },
-            "_9" => { set_impl_arity(10, ce); Ok(pw_arg(9, to_ref)) },
+            "_"  => { set_impl_arity(1,  ce); pw_arg(0, to_ref) },
+            "_1" => { set_impl_arity(2,  ce); pw_arg(1, to_ref) },
+            "_2" => { set_impl_arity(3,  ce); pw_arg(2, to_ref) },
+            "_3" => { set_impl_arity(4,  ce); pw_arg(3, to_ref) },
+            "_4" => { set_impl_arity(5,  ce); pw_arg(4, to_ref) },
+            "_5" => { set_impl_arity(6,  ce); pw_arg(5, to_ref) },
+            "_6" => { set_impl_arity(7,  ce); pw_arg(6, to_ref) },
+            "_7" => { set_impl_arity(8,  ce); pw_arg(7, to_ref) },
+            "_8" => { set_impl_arity(9,  ce); pw_arg(8, to_ref) },
+            "_9" => { set_impl_arity(10, ce); pw_arg(9, to_ref) },
             "@"  => {
                 ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                pw!(prog, store, {
-                    if let Some(store) = store {
-                        prog.set_dbg(spos.clone());
-                        prog.push_op(Op::Argv(store));
-                        if to_ref { prog.push_op(Op::ToRef(store, store, ToRefType::Ref)); }
-                        store
-                    } else {
-                        // FIXME: TODO!
-                        ResPos::Value(ResValue::Nul)
+                pw_store_or_stack!(prog, store, {
+                    prog.set_dbg(spos.clone());
+                    prog.push_op(Op::Argv(store));
+                    if to_ref {
+                        prog.push_op(Op::ToRef(store, store, ToRefType::Ref));
                     }
                 })
             },
