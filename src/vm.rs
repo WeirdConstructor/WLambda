@@ -14,6 +14,28 @@ pub struct Prog {
     nxt_debug: Option<SynPos>,
 }
 
+/// The idea what a ProgWriter does:
+/// - If a store position (second arg) is provided, the output must
+///   be stored there. It's either for a call to the stack or
+///   in an assignment to a variable/storage location.
+///   It means, the desired value is needed in a store context.
+/// - If no store position is provded, the routine should return
+///   the position it's value is to be read from. This is either
+///   the ResPos of the value (Data, Local, ...) or if the value is computed
+///   it is stored on the stack. In this case, the caller MUST consume
+///   the value so it is not left on the stack.
+// TODO: Define a eval_to(...) and eval(...) and eval_nul(...) routine
+//       for ProgWriter!
+// => FIXME: The Problem: a calling routine might just need a value (eg. something
+// that just consumes, like NewPair, BinOp* ... and does not care whether it
+// is from a direct value or stack or anywhere.
+// The problem is, the value might be generated and is just temporary in a way
+// that it might not be used at all.
+// => XXX: Does this mean, the caller must cleanup if he provided no value
+//         and doesn't even need the returned value (eg. it's just a single stmt)?
+//         XXX: I think it does!
+// BUT there are other routines, such as assignments/definitions or call args
+// that provide a place to store the stuff in that must be used.
 pub type ProgWriteNode = Box<dyn Fn(&mut Prog, Option<ResPos>) -> ResPos>;
 
 pub struct ProgWriter {
