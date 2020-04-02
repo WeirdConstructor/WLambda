@@ -30,8 +30,10 @@ pub fn pw(f: ProgWriteNode) -> ProgWriter {
     }
 }
 
-pub fn pw_respos(rp: ResPos) -> ProgWriter {
+pub fn pw_respos(rp: ResPos, sp: SynPos) -> ProgWriter {
     pw(Box::new(move |prog, store| {
+    println!("PW RESPOS: {:?}", store);
+        prog.set_dbg(sp.clone());
         if let Some(store) = store {
             prog.push_op(Op::Mov(rp, store));
             store
@@ -65,6 +67,14 @@ macro_rules! pw_store_or_stack {
             };
             $b;
             $pos
+        })))
+    }
+}
+
+macro_rules! pw {
+    ($prog: ident, $store: ident, $b: block) => {
+        Ok(pw(Box::new(move |$prog, $store| {
+            $b
         })))
     }
 }
@@ -1165,6 +1175,9 @@ fn vm_compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool,
 }
 
 fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) -> Result<ProgWriter, CompileError> {
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
     let vars    = ast.at(1).unwrap();
@@ -1276,6 +1289,7 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
         if is_global {
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
                 Ok(pw(Box::new(move |prog, store| {
+                    prog.set_dbg(spos.clone());
                     let gp = prog.global_pos(r.clone());
                     (*val_pw.node)(prog, Some(gp));
                     ResPos::Value(ResValue::Nul)
@@ -1288,6 +1302,7 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
             ce.borrow_mut().def_local(&varname, next_local);
 
             Ok(pw(Box::new(move |prog, store| {
+                prog.set_dbg(spos.clone());
                 (*val_pw.node)(prog, Some(ResPos::Local(next_local as u16)));
                 ResPos::Value(ResValue::Nul)
             })))
@@ -1447,7 +1462,6 @@ fn vm_compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool,
     }
 }
 
-
 fn vm_compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool, sp: &mut StorePos) -> Result<Prog, CompileError> {
     let var = ast.at(1).unwrap();
     var.with_s_ref(|var_s: &str| -> Result<Prog, CompileError> {
@@ -1542,6 +1556,9 @@ pub fn pw_arg(arg_idx: usize, to_ref: bool) -> ProgWriter {
 }
 
 fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Result<ProgWriter, CompileError> {
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
     let var = ast.at(1).unwrap();
     var.with_s_ref(|var_s: &str| -> Result<ProgWriter, CompileError> {
         match var_s {
@@ -1557,9 +1574,16 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -
             "_9" => { set_impl_arity(10, ce); Ok(pw_arg(9, to_ref)) },
             "@"  => {
                 ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                pw_store_or_stack!(prog, pos, {
-                    prog.push_op(Op::Argv(pos));
-                    if to_ref { prog.push_op(Op::ToRef(pos, pos, ToRefType::Ref)); }
+                pw!(prog, store, {
+                    if let Some(store) = store {
+                        prog.set_dbg(spos.clone());
+                        prog.push_op(Op::Argv(store));
+                        if to_ref { prog.push_op(Op::ToRef(store, store, ToRefType::Ref)); }
+                        store
+                    } else {
+                        // FIXME: TODO!
+                        ResPos::Value(ResValue::Nul)
+                    }
                 })
             },
             _ => {
@@ -1567,29 +1591,33 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -
                 match pos {
                     VarPos::UpValue(i) => {
                         if to_ref {
-                            Ok(pw_respos(ResPos::UpRef(i as u16)))
+                            Ok(pw_respos(ResPos::UpRef(i as u16), spos))
                         } else {
-                            Ok(pw_respos(ResPos::Up(i as u16)))
+                            Ok(pw_respos(ResPos::Up(i as u16), spos))
                         }
                     },
                     VarPos::Local(i) => {
                         if to_ref {
-                            Ok(pw_respos(ResPos::LocalRef(i as u16)))
+                            Ok(pw_respos(ResPos::LocalRef(i as u16), spos))
                         } else {
-                            Ok(pw_respos(ResPos::Local(i as u16)))
+                            Ok(pw_respos(ResPos::Local(i as u16), spos))
                         }
                     },
                     VarPos::Global(v) => {
                         pw_respos_or_mov!(prog, {
-                            if to_ref {
-                                prog.global_ref_pos(v.clone())
-                            } else {
-                                prog.global_pos(v.clone())
-                            }
+                            prog.set_dbg(spos.clone());
+                            let gp = prog.global_pos(v.clone());
+                            // TODO: FIXME!
+//                            if to_ref {
+//                                prog.push_op(Op::ToRef(gp, sp.to_store_pos(), ToRefType::Ref));
+//                            } else {
+                                gp
+//                            }
                         })
                     },
                     VarPos::Const(v) => {
                         pw_respos_or_mov!(prog, {
+                            prog.set_dbg(spos.clone());
                             let dp = prog.data_pos(v.clone());
                             if to_ref {
                                 prog.push_op(Op::ToRef(dp, ResPos::Stack(0), ToRefType::Ref));
@@ -1607,6 +1635,159 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -
     })
 }
 
+fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool)
+    -> Result<ProgWriter, CompileError>
+{
+    let prev_max_arity = ce.borrow().implicit_arity.clone();
+
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    let vars          = ast.at(1).unwrap();
+    let value         = ast.at(2).unwrap();
+    let destr         = ast.at(3).unwrap_or_else(|| VVal::Nul);
+
+    if destr.b() {
+//        check_for_at_arity(prev_max_arity, ast, ce, &vars);
+//
+//        let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
+//
+//        for (i, pos) in poses.iter().enumerate() {
+//            if let VarPos::NoPos = pos {
+//                return 
+//                    ast.to_compile_err(
+//                        format!("Can't assign to undefined local variable '{}'",
+//                                vars.at(i).unwrap_or_else(|| VVal::Nul).s_raw()));
+//            }
+//        }
+//
+//        if is_ref {
+//            Ok(Box::new(move |e: &mut Env| {
+//                let v = cv(e)?;
+//                match v {
+//                    VVal::Lst(l) => {
+//                        for (i, pos) in poses.iter().enumerate() {
+//                            let val = &mut l.borrow_mut()[i];
+//                            if let Some(err) = set_ref_at_varpos(e, pos, val.clone()) {
+//                                return Err(
+//                                    StackAction::panic_str(err, Some(spos.clone())));
+//                            }
+//                        }
+//                    },
+//                    VVal::Map(m) => {
+//                        for (i, pos) in poses.iter().enumerate() {
+//                            let vname = vars.at(i).unwrap().s_raw();
+//                            let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::Nul);
+//                            if let Some(err) = set_ref_at_varpos(e, pos, val) {
+//                                return Err(
+//                                    StackAction::panic_str(err, Some(spos.clone())));
+//                            }
+//                        }
+//                    },
+//                    _ => {
+//                        for pos in poses.iter() {
+//                            if let Some(err) = set_ref_at_varpos(e, pos, v.clone()) {
+//                                return Err(
+//                                    StackAction::panic_str(err, Some(spos.clone())));
+//                            }
+//                        }
+//                    }
+//                }
+//
+//                Ok(VVal::Nul)
+//            }))
+//        } else {
+//            Ok(Box::new(move |e: &mut Env| {
+//                let v = cv(e)?;
+//                match v {
+//                    VVal::Lst(l) => {
+//                        for (i, pos) in poses.iter().enumerate() {
+//                            let val = &mut l.borrow_mut()[i];
+//
+//                            if let Some(err) = set_env_at_varpos(e, pos, val) {
+//                                return Err(
+//                                    StackAction::panic_str(err, Some(spos.clone())));
+//                            }
+//                        }
+//                    },
+//                    VVal::Map(m) => {
+//                        for (i, pos) in poses.iter().enumerate() {
+//                            let vname = vars.at(i).unwrap().s_raw();
+//                            let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::Nul);
+//
+//                            if let Some(err) = set_env_at_varpos(e, pos, &val) {
+//                                return Err(
+//                                    StackAction::panic_str(err, Some(spos.clone())));
+//                            }
+//                        }
+//                    },
+//                    _ => {
+//                        for pos in poses.iter() {
+//                            if let Some(err) = set_env_at_varpos(e, pos, &v) {
+//                                return Err(
+//                                    StackAction::panic_str(err, Some(spos.clone())));
+//                            }
+//                        }
+//                    }
+//                }
+//
+//                Ok(VVal::Nul)
+//            }))
+//        }
+
+        Err(ast.compile_err("NOT IMPLEMENTED".to_string()))
+    } else {
+        let varname = &vars.at(0).unwrap().s_raw();
+        let pos     = ce.borrow_mut().get(varname);
+
+        let mut val_pw = vm_compile2(&value, ce)?;
+
+        match pos {
+            VarPos::Const(_) =>
+                return Err(ast.compile_err(
+                    format!("Can't assign to constant '{}'", varname))),
+            VarPos::NoPos =>
+                return Err(ast.compile_err(
+                    format!("Can't assign to undefined local variable '{}'", varname))),
+            _ => (),
+        }
+
+        Ok(pw(Box::new(move |prog, store| {
+            let rp =
+                match pos.clone() {
+                    VarPos::Local(vip) => {
+                        if is_ref {
+                            ResPos::LocalRef(vip as u16)
+                        } else {
+                            ResPos::Local(vip as u16)
+                        }
+                    },
+                    VarPos::Global(r) => {
+                        if is_ref {
+                            prog.global_ref_pos(r.clone())
+                        } else {
+                            prog.global_pos(r.clone())
+                        }
+                    },
+                    VarPos::UpValue(vip) => {
+                        if is_ref {
+                            ResPos::UpRef(vip as u16)
+                        } else {
+                            ResPos::Up(vip as u16)
+                        }
+                    },
+                    _ => ResPos::Value(ResValue::Nul)
+                };
+
+            (*val_pw.node)(prog, Some(rp));
+//            let rp_res = (*val_pw.node)(prog, Some(rp));
+//            if rp_res != rp {
+//                prog.push_op(Op::Mov(rp_res, rp));
+//            }
+            ResPos::Value(ResValue::Nul)
+        })))
+    }
+}
 
 fn vm_compile_stmts(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
     let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
@@ -1656,8 +1837,11 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
             if i == expr_count - 1 {
                 res = (*e.node)(prog, Some(res));
             } else {
-                (*e.node)(prog, Some(ResPos::Value(ResValue::Nul)));
+//                (*e.node)(prog, Some(ResPos::Value(ResValue::Nul)));
+                (*e.node)(prog, None);
             }
+
+            i += 1;
         }
 
         res
@@ -2187,8 +2371,8 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
             match syn {
                 Syntax::Block      => vm_compile_block2(ast, 1, ce),
-//                Syntax::Assign     => vm_compile_assign(ast, ce, false, sp).map(|p| p.debug(spos)),
-//                Syntax::AssignRef  => vm_compile_assign(ast, ce, true, sp) .map(|p| p.debug(spos)),
+                Syntax::Assign     => vm_compile_assign2(ast, ce, false),
+                Syntax::AssignRef  => vm_compile_assign2(ast, ce, true),
                 Syntax::Var        => vm_compile_var2(ast, ce, false),
                 Syntax::CaptureRef => vm_compile_var2(ast, ce, true),
                 Syntax::Def        => vm_compile_def2(ast, ce, false),
