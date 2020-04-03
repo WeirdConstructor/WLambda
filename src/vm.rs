@@ -1865,7 +1865,10 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
                 res = (*e.node)(prog, Some(res));
             } else {
 //                (*e.node)(prog, Some(ResPos::Value(ResValue::Nul)));
-                (*e.node)(prog, None);
+                let rp = (*e.node)(prog, None);
+                if let ResPos::Stack(_) = rp {
+                    prog.push_op(Op::Mov(rp, ResPos::Value(ResValue::Nul)));
+                }
             }
 
             i += 1;
@@ -2012,6 +2015,23 @@ fn vm_compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>, sp:
 
     p.push_op(op.to_op(ap, bp, sp.to_store_pos()));
     Ok(p)
+}
+
+fn vm_compile_binop2(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    let a_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+    let b_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
+
+    pw_store_or_stack!(prog, store, {
+        let ap = a_pw.eval(prog);
+        let bp = b_pw.eval(prog);
+        prog.set_dbg(spos.clone());
+        prog.push_op(op.to_op(ap, bp, store));
+    })
 }
 
 pub fn vm_compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos) -> Result<Prog, CompileError> {
@@ -2446,16 +2466,16 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::CaptureRef => vm_compile_var2(ast, ce, true),
                 Syntax::Def        => vm_compile_def2(ast, ce, false),
                 Syntax::DefGlobRef => vm_compile_def2(ast, ce, true),
-//                Syntax::BinOpAdd   => vm_compile_binop(ast, BinOp::Add, ce, sp),
-//                Syntax::BinOpSub   => vm_compile_binop(ast, BinOp::Sub, ce, sp),
-//                Syntax::BinOpDiv   => vm_compile_binop(ast, BinOp::Div, ce, sp),
-//                Syntax::BinOpMod   => vm_compile_binop(ast, BinOp::Mod, ce, sp),
-//                Syntax::BinOpMul   => vm_compile_binop(ast, BinOp::Mul, ce, sp),
-//                Syntax::BinOpGe    => vm_compile_binop(ast, BinOp::Ge,  ce, sp),
-//                Syntax::BinOpGt    => vm_compile_binop(ast, BinOp::Gt,  ce, sp),
-//                Syntax::BinOpLe    => vm_compile_binop(ast, BinOp::Le,  ce, sp),
-//                Syntax::BinOpLt    => vm_compile_binop(ast, BinOp::Lt,  ce, sp),
-//                Syntax::BinOpEq    => vm_compile_binop(ast, BinOp::Eq,  ce, sp),
+                Syntax::BinOpAdd   => vm_compile_binop2(ast, BinOp::Add, ce),
+                Syntax::BinOpSub   => vm_compile_binop2(ast, BinOp::Sub, ce),
+                Syntax::BinOpDiv   => vm_compile_binop2(ast, BinOp::Div, ce),
+                Syntax::BinOpMod   => vm_compile_binop2(ast, BinOp::Mod, ce),
+                Syntax::BinOpMul   => vm_compile_binop2(ast, BinOp::Mul, ce),
+                Syntax::BinOpGe    => vm_compile_binop2(ast, BinOp::Ge,  ce),
+                Syntax::BinOpGt    => vm_compile_binop2(ast, BinOp::Gt,  ce),
+                Syntax::BinOpLe    => vm_compile_binop2(ast, BinOp::Le,  ce),
+                Syntax::BinOpLt    => vm_compile_binop2(ast, BinOp::Lt,  ce),
+                Syntax::BinOpEq    => vm_compile_binop2(ast, BinOp::Eq,  ce),
 //                Syntax::Ref => {
 //                    let mut rp = StorePos::new();
 //                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
@@ -2558,88 +2578,91 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 //                    sp.set(ResPos::Stack(0));
 //                    Ok(p)
 //                },
-//                Syntax::Func => {
-//                    let last_def_varname = ce.borrow().recent_var.clone();
-//                    let mut fun_spos = spos.clone();
-//                    fun_spos.name = Some(Rc::new(last_def_varname));
-//
-//                    let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
-//                    let mut ce_sub = func_ce.clone();
-//
-//                    let label          = ast.at(1).unwrap();
-//                    let explicit_arity = ast.at(2).unwrap();
-//
-//                    let mut func_prog = vm_compile_stmts(ast, 3, &mut func_ce, sp)?;
-//                    func_prog.push_op(Op::End);
-//
-//                    let spos_inner = fun_spos.clone();
-//                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
-//                        let res = vm(&func_prog, env);
-//                        match res {
-//                            Ok(v)  => Ok(v),
-//                            Err(StackAction::Return((v_lbl, v))) => {
-//                                return
-//                                    if v_lbl.eqv(&label) { Ok(v) }
-//                                    else { Err(StackAction::Return((v_lbl, v))) }
-//                            },
-//                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
-//                        }
-//                    }));
-//
-//                    ce_sub.borrow_mut().explicit_arity.0 =
-//                        match explicit_arity.at(0).unwrap_or_else(|| VVal::Nul) {
-//                            VVal::Int(i) => ArityParam::Limit(i as usize),
-//                            VVal::Bol(true) => ArityParam::Limit(0),
-//                            _ => ArityParam::Undefined,
-//                        };
-//
-//                    ce_sub.borrow_mut().explicit_arity.1 =
-//                        match explicit_arity.at(1).unwrap_or_else(|| VVal::Nul) {
-//                            VVal::Int(i) => ArityParam::Limit(i as usize),
-//                            VVal::Bol(true) => ArityParam::Infinite,
-//                            _ => ArityParam::Undefined,
-//                        };
-//
-//                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
-//                        ce_sub.borrow().explicit_arity.0.clone()
-//                    } else {
-//                        ce_sub.borrow().implicit_arity.0.clone()
-//                    };
-//
-//                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
-//                        ce_sub.borrow().explicit_arity.1.clone()
-//                    } else {
-//                        ce_sub.borrow().implicit_arity.1.clone()
-//                    };
-//
-//                    let min_args : Option<usize> = match deciding_min_arity {
-//                        ArityParam::Infinite  => None,
-//                        ArityParam::Undefined => Some(0),
-//                        ArityParam::Limit(i)  => Some(i),
-//                    };
-//
-//                    let max_args : Option<usize> = match deciding_max_arity {
-//                        ArityParam::Infinite  => None,
-//                        ArityParam::Undefined => Some(0),
-//                        ArityParam::Limit(i)  => Some(i),
-//                    };
-//
-//                    let env_size = ce_sub.borrow().local_env_size();
-//                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
-//                    let upvalues = vec![];
-//                    let fun_template =
-//                        VValFun::new_val(
-//                            fun_ref.clone(),
-//                            upvalues, env_size, min_args, max_args, false,
-//                            Some(fun_spos.clone()),
-//                            Rc::new(upvs));
-//                    let mut prog = Prog::new().debug(spos);
-//                    let mut fsp = StorePos::new();
-//                    fsp.set_data(fun_template);
-//                    let fsp = fsp.to_load_pos(&mut prog);
-//                    prog.push_op(Op::NewClos(fsp, sp.to_store_pos()));
-//                    Ok(prog)
-//                },
+                Syntax::Func => {
+                    let last_def_varname = ce.borrow().recent_var.clone();
+                    let mut fun_spos = spos.clone();
+                    fun_spos.name = Some(Rc::new(last_def_varname));
+
+                    let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
+                    let mut ce_sub = func_ce.clone();
+
+                    let label          = ast.at(1).unwrap();
+                    let explicit_arity = ast.at(2).unwrap();
+
+                    let mut func_prog = Prog::new();
+
+                    let mut func_pw = vm_compile_stmts2(ast, 3, &mut func_ce)?;
+                    func_pw.eval_to(&mut func_prog, ResPos::Value(ResValue::Ret));
+                    func_prog.push_op(Op::End);
+
+                    let spos_inner = fun_spos.clone();
+                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
+                        let res = vm(&func_prog, env);
+                        match res {
+                            Ok(v)  => Ok(v),
+                            Err(StackAction::Return((v_lbl, v))) => {
+                                return
+                                    if v_lbl.eqv(&label) { Ok(v) }
+                                    else { Err(StackAction::Return((v_lbl, v))) }
+                            },
+                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
+                        }
+                    }));
+
+                    ce_sub.borrow_mut().explicit_arity.0 =
+                        match explicit_arity.at(0).unwrap_or_else(|| VVal::Nul) {
+                            VVal::Int(i) => ArityParam::Limit(i as usize),
+                            VVal::Bol(true) => ArityParam::Limit(0),
+                            _ => ArityParam::Undefined,
+                        };
+
+                    ce_sub.borrow_mut().explicit_arity.1 =
+                        match explicit_arity.at(1).unwrap_or_else(|| VVal::Nul) {
+                            VVal::Int(i) => ArityParam::Limit(i as usize),
+                            VVal::Bol(true) => ArityParam::Infinite,
+                            _ => ArityParam::Undefined,
+                        };
+
+                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
+                        ce_sub.borrow().explicit_arity.0.clone()
+                    } else {
+                        ce_sub.borrow().implicit_arity.0.clone()
+                    };
+
+                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
+                        ce_sub.borrow().explicit_arity.1.clone()
+                    } else {
+                        ce_sub.borrow().implicit_arity.1.clone()
+                    };
+
+                    let min_args : Option<usize> = match deciding_min_arity {
+                        ArityParam::Infinite  => None,
+                        ArityParam::Undefined => Some(0),
+                        ArityParam::Limit(i)  => Some(i),
+                    };
+
+                    let max_args : Option<usize> = match deciding_max_arity {
+                        ArityParam::Infinite  => None,
+                        ArityParam::Undefined => Some(0),
+                        ArityParam::Limit(i)  => Some(i),
+                    };
+
+                    let env_size = ce_sub.borrow().local_env_size();
+                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
+                    let upvalues = vec![];
+
+                    let fun_template =
+                        VValFun::new_val(
+                            fun_ref.clone(),
+                            upvalues, env_size, min_args, max_args, false,
+                            Some(fun_spos.clone()),
+                            Rc::new(upvs));
+
+                    pw_store_or_stack!(prog, store, {
+                        let fp = prog.data_pos(fun_template.clone());
+                        prog.push_op(Op::NewClos(fp, store))
+                    })
+                },
                 Syntax::Call => {
                     let is_while =
                         if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
