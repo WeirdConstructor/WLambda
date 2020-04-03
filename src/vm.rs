@@ -1630,48 +1630,33 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -
             },
             _ => {
                 let pos = ce.borrow_mut().get(var_s);
-                match pos {
-                    VarPos::UpValue(i) => {
-                        if to_ref {
-                            Ok(pw_respos(ResPos::UpRef(i as u16), spos))
-                        } else {
-                            Ok(pw_respos(ResPos::Up(i as u16), spos))
+                let mk_respos : Result<Box<dyn Fn(&mut Prog) -> ResPos>, CompileError> =
+                    match pos {
+                        VarPos::UpValue(i) =>
+                            Ok(Box::new(move |prog: &mut Prog| ResPos::Up(i as u16))),
+                        VarPos::Local(i) =>
+                            Ok(Box::new(move |prog: &mut Prog| ResPos::Local(i as u16))),
+                        VarPos::Global(v) =>
+                            Ok(Box::new(move |prog: &mut Prog| prog.global_pos(v.clone()))),
+                        VarPos::Const(v) =>
+                            Ok(Box::new(move |prog: &mut Prog| prog.data_pos(v.clone()))),
+                        VarPos::NoPos => {
+                            Err(ast.compile_err(
+                                format!("Variable '{}' undefined", var_s)))
                         }
-                    },
-                    VarPos::Local(i) => {
-                        if to_ref {
-                            Ok(pw_respos(ResPos::LocalRef(i as u16), spos))
-                        } else {
-                            Ok(pw_respos(ResPos::Local(i as u16), spos))
-                        }
-                    },
-                    VarPos::Global(v) => {
-                        pw_respos_or_mov!(prog, {
-                            prog.set_dbg(spos.clone());
-                            let gp = prog.global_pos(v.clone());
-                            // TODO: FIXME!
-//                            if to_ref {
-//                                prog.push_op(Op::ToRef(gp, sp.to_store_pos(), ToRefType::Ref));
-//                            } else {
-                                gp
-//                            }
-                        })
-                    },
-                    VarPos::Const(v) => {
-                        pw_respos_or_mov!(prog, {
-                            prog.set_dbg(spos.clone());
-                            let dp = prog.data_pos(v.clone());
-                            if to_ref {
-                                prog.push_op(Op::ToRef(dp, ResPos::Stack(0), ToRefType::Ref));
-                                ResPos::Stack(0)
-                            } else { dp }
-                        })
-                    },
-                    VarPos::NoPos => {
-                        Err(ast.compile_err(
-                            format!("Variable '{}' undefined", var_s)))
+                    };
+                let mk_respos = mk_respos?;
+                pw_respos_or_mov!(prog, {
+                    let var_respos = mk_respos(prog);
+                    prog.set_dbg(spos.clone());
+                    if to_ref {
+                        let rp = ResPos::Stack(0);
+                        prog.push_op(Op::ToRef(var_respos, rp, ToRefType::Ref));
+                        rp
+                    } else {
+                        var_respos
                     }
-                }
+                })
             }
         }
     })
@@ -1892,20 +1877,24 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
 
 
 fn vm_compile_block2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
 
     ce.borrow_mut().push_block_env();
     let mut stmts = vm_compile_stmts2(ast, skip_cnt, ce)?;
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
 
-    Ok(pw(Box::new(move |prog, store| {
+    pw!(prog, store, {
+        prog.set_dbg(spos.clone());
         let res = (*stmts.node)(prog, store);
         if from_local_idx != to_local_idx {
+            prog.set_dbg(spos.clone());
             prog.push_op(Op::ClearLocals(
                 from_local_idx as u16,
                 to_local_idx   as u16));
         }
         res
-    })))
+    })
 }
 
 
@@ -1960,6 +1949,44 @@ fn vm_compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mu
         _ => vm_compile(ast, ce, sp),
     }
 }
+
+fn vm_compile_direct_block2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    match ast {
+        VVal::Lst(l) => {
+            let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+            let spos = syn.get_syn_pos();
+            let syn  = syn.get_syn();
+
+            match syn {
+                Syntax::Func => {
+                    let label          = ast.at(1).unwrap();
+                    let explicit_arity = ast.at(2).unwrap();
+
+                    if !label.is_none() {
+                        return Err(
+                            ast.compile_err(
+                                format!("direct blocks don't support labels: {}",
+                                        ast.s())));
+                    }
+
+                    if !explicit_arity.is_none() {
+                        return Err(
+                            ast.compile_err(
+                                format!("direct blocks don't support arity: {}",
+                                        ast.s())));
+                    }
+
+                    vm_compile_block2(ast, 3, ce)
+                },
+                _ => vm_compile2(ast, ce),
+            }
+        },
+        _ => vm_compile2(ast, ce),
+    }
+}
+
 
 fn vm_compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>, sp: &mut StorePos)
     -> Result<Prog, CompileError>
@@ -2613,58 +2640,71 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 //                    prog.push_op(Op::NewClos(fsp, sp.to_store_pos()));
 //                    Ok(prog)
 //                },
-//                Syntax::Call => {
-//                    let is_for_n =
-//                        if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
-//                            let var = ast.at(1).unwrap().at(1).unwrap();
-//                            var.with_s_ref(|var_s: &str| var_s == "while")
-//                        } else {
-//                            false
-//                        };
-//
-//                    if is_for_n {
-//                        let mut sp_cond = StorePos::new();
-//                        let mut cond =
-//                            vm_compile_direct_block(
-//                                &ast.at(2).unwrap_or_else(|| VVal::Nul), ce, &mut sp_cond)?;
-//
-//                        let mut sp_body = StorePos::new();
-//                        sp_body.set(ResPos::Value(ResValue::Nul));
-//                        let mut body =
-//                            vm_compile_direct_block(
-//                                &ast.at(3).unwrap_or_else(|| VVal::Nul), ce, &mut sp_body)?;
-//
-//                        let sp_cond = sp_cond.to_load_pos(&mut cond);
-//                        let body_cnt = body.op_count();
-//                        cond.push_op(Op::JmpIfN(sp_cond, body_cnt as i32 + 1));
-//
-//                        let cond_cnt = cond.op_count();
-//                        cond.append(body);
-//                        cond.push_op(Op::Jmp(-(body_cnt as i32 + (cond_cnt + 1) as i32)));
-//
-//                        return Ok(cond);
-//                    }
-//
-//                    let mut args = vec![];
-//                    for (e, _) in ast.iter().skip(1) {
-//                        args.push(e);
-//                    }
-//                    args.reverse();
-//
-//                    let mut argc = 0;
-//                    let mut prog = Prog::new().debug(spos);
-//                    for e in args.iter() {
-//                        let mut sp = StorePos::new();
-//                        sp.set(ResPos::Stack(0));
-//                        let mut p = vm_compile(&e, ce, &mut sp)?;
-//                        sp.to_load_pos(&mut p);
-//                        prog.append(p);
-//                        argc += 1;
-//                    }
-//
-//                    prog.push_op(Op::Call(argc as u16 - 1, sp.to_store_pos()));
-//                    Ok(prog)
-//                },
+                Syntax::Call => {
+                    let is_while =
+                        if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
+                            let var = ast.at(1).unwrap().at(1).unwrap();
+                            var.with_s_ref(|var_s: &str| var_s == "while")
+                        } else {
+                            false
+                        };
+
+                    if is_while {
+                        let mut cond =
+                            vm_compile_direct_block2(
+                                &ast.at(2).unwrap_or_else(|| VVal::Nul), ce)?;
+
+                        let mut body =
+                            vm_compile_direct_block2(
+                                &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
+
+                        return pw_store_or_stack!(prog, store, {
+                            // Push Nul as the body value
+                            prog.push_op(
+                                Op::Mov(ResPos::Value(ResValue::Nul),
+                                ResPos::Stack(0)));
+
+                            let mut body_prog = Prog::new();
+                            body.eval_to(&mut body_prog, ResPos::Stack(0));
+                            let body_op_count = body_prog.op_count();
+
+                            let cond_op_count1 = prog.op_count();
+                            let cond_val = cond.eval(prog);
+                            let mut cond_offs =
+                                body_op_count + (prog.op_count() - cond_op_count1);
+
+                            // Pop the body value
+                            prog.push_op(
+                                Op::Mov(ResPos::Stack(0), ResPos::Value(ResValue::Nul)));
+                            body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
+
+                            prog.push_op(Op::JmpIfN(cond_val, body_op_count as i32 + 1));
+
+                            // Return the body value
+                            ResPos::Stack(0)
+                        });
+                    }
+
+                    let mut args = vec![];
+                    for (e, _) in ast.iter().skip(1) {
+                        args.push(e);
+                    }
+                    args.reverse();
+
+                    let mut compiled_args = vec![];
+                    let mut argc = 0;
+                    for e in args.iter() {
+                        compiled_args.push(vm_compile2(&e, ce)?);
+                        argc += 1;
+                    }
+
+                    pw_store_or_stack!(prog, store, {
+                        for ca in compiled_args.iter() {
+                            ca.eval_to(prog, ResPos::Stack(0));
+                        }
+                        prog.push_op(Op::Call(argc as u16 - 1, store));
+                    })
+                },
 ////                Syntax::Err => {
 ////                    let err_val = vm_compile(&ast.at(1).unwrap(), ce)?;
 ////                    Ok(err_val.debug(spos).op(Op::NewErr).consume(1).result())
@@ -2807,15 +2847,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
         },
         _ => {
             let ast = ast.clone();
-            Ok(pw(Box::new(move |prog, store| {
-                if let Some(store) = store {
-                    let dp = prog.data_pos(ast.clone());
-                    prog.push_op(Op::Mov(dp, store));
-                    store
-                } else {
-                    prog.data_pos(ast.clone())
-                }
-            })))
+            pw_respos_or_mov!(prog, { prog.data_pos(ast.clone()) })
         },
     }
 }
@@ -2831,7 +2863,7 @@ pub fn gen(s: &str) -> String {
                     let local_space = ce.borrow().get_local_space();
 
                     let mut p = Prog::new();
-                    (*prog.node)(&mut p, Some(ResPos::Value(ResValue::Ret)));
+                    prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));
                     p.op_end();
 
                     let mut e = Env::new(global);
