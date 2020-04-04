@@ -24,10 +24,10 @@ fn main() {
     println!("sizeof OP:{} bytes", std::mem::size_of::<Box<String>>());
 //    println!("sizeof OP:{} bytes", std::mem::size_of::<(ResPos, Box<String>, Box<String>, Box<String>, ResPos)>());
 
-
     let argv : Vec<String> = std::env::args().collect();
     let contents = std::fs::read_to_string(&argv[1]).unwrap();
-    crate::vm::gen(&contents);
+    let r = crate::vm::gen(&contents);
+    println!("R: {}", r);
     return;
 
 

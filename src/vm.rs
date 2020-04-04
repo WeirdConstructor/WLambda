@@ -91,11 +91,11 @@ macro_rules! pw {
 }
 
 macro_rules! pw_null {
-    ($prog: ident, $store: ident, $b: block) => {
-        Ok(pw(Box::new(move |$prog, $store| {
+    ($prog: ident, $b: block) => {
+        pw_respos_or_mov!($prog, {
             $b
             ResPos::Value(ResValue::Nul)
-        })))
+        })
     }
 }
 
@@ -476,6 +476,10 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
+                Op::NewErr(p1, p2) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
                 Op::NewClos(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
@@ -702,6 +706,7 @@ pub enum Op {
     Ge(ResPos, ResPos, ResPos),
     Gt(ResPos, ResPos, ResPos),
     Eq(ResPos, ResPos, ResPos),
+    NewErr(ResPos, ResPos),
     NewList(ResPos),
     ListPush(ResPos, ResPos, ResPos),
     ListSplice(ResPos, ResPos, ResPos),
@@ -722,7 +727,6 @@ pub enum Op {
     JmpIfN(ResPos, i32),
     Unwind,
     End,
-    //    NewErr,
 }
 
 macro_rules! in_reg {
@@ -1024,6 +1028,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     };
                 out_reg!(env, ret, prog, r, res);
             },
+            Op::NewErr(e, r) => op_a_r!(env, ret, prog, e, r, {
+                VVal::err(e, prog.debug[pc].clone().unwrap())
+            }),
             Op::NewClos(f, r) => op_a_r!(env, ret, prog, f, r, {
                 let fun = f.clone_and_rebind_upvalues(|upvs, upvalues| {
                     copy_upvs(upvs, env, upvalues);
@@ -1064,10 +1071,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 in_reg!(env, ret, prog, a);
                 if !a.b() { pc = (pc as i32 + *jmp_offs) as usize; }
             },
-                //            Op::NewErr => {
-                //                let val = env.pop();
-                //                env.push(VVal::err(val, prog.debug[pc].clone().unwrap()));
-                //            },
         }
         if DEBUG_VM {
             env.dump_stack();
@@ -1336,7 +1339,7 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
 
         if is_global {
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
-                pw_null!(prog, store, {
+                pw_null!(prog, {
                     prog.set_dbg(spos.clone());
                     let gp = prog.global_pos(r.clone());
                     val_pw.eval_to(prog, gp);
@@ -1348,7 +1351,7 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
             let next_local = ce.borrow_mut().next_local();
             ce.borrow_mut().def_local(&varname, next_local);
 
-            pw_null!(prog, store, {
+            pw_null!(prog, {
                 prog.set_dbg(spos.clone());
                 val_pw.eval_to(prog, ResPos::Local(next_local as u16));
             })
@@ -1779,7 +1782,7 @@ fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool
             _ => (),
         }
 
-        Ok(pw(Box::new(move |prog, store| {
+        pw_null!(prog, {
             let rp =
                 match pos.clone() {
                     VarPos::Local(vip) => {
@@ -1807,12 +1810,7 @@ fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool
                 };
 
             (*val_pw.node)(prog, Some(rp));
-//            let rp_res = (*val_pw.node)(prog, Some(rp));
-//            if rp_res != rp {
-//                prog.push_op(Op::Mov(rp_res, rp));
-//            }
-            ResPos::Value(ResValue::Nul)
-        })))
+        })
     }
 }
 
@@ -1853,16 +1851,21 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
     let exprs : Vec<ProgWriter> =
         ast.map_skip( |e| { vm_compile2(e, ce) }, skip_cnt)?;
 
-    Ok(pw(Box::new(move |prog, store| {
+    pw!(prog, store, {
         let expr_count = exprs.len();
         let mut i      = 0;
-        let mut res    = store.unwrap_or(ResPos::Stack(0));
+        let mut res    = ResPos::Value(ResValue::Nul);
 
         for e in exprs.iter() {
             prog.set_dbg(spos.clone());
 
             if i == expr_count - 1 {
-                res = (*e.node)(prog, Some(res));
+                if let Some(store) = store {
+                    e.eval_to(prog, store);
+                    res = store;
+                } else {
+                    res = e.eval(prog);
+                }
             } else {
 //                (*e.node)(prog, Some(ResPos::Value(ResValue::Nul)));
                 let rp = (*e.node)(prog, None);
@@ -1875,7 +1878,7 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
         }
 
         res
-    })))
+    })
 }
 
 
@@ -2502,35 +2505,35 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 //                Syntax::Lst => {
 //                    let mut stack_offs : usize = 0;
 //                    let mut p = Prog::new();
-//                    p.push_op(Op::NewList(ResPos::Stack(0)));
+//                    pw_respos_or_mov!(prog, {
+//                        prog.push_op(Op::NewList(ResPos::Stack(0)));
 //
-//                    for (a, _) in ast.iter().skip(1) {
-//                        let mut ap = StorePos::new();
-//
-//                        if a.is_vec() {
-//                            if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
-//                                a.at(0).unwrap_or_else(|| VVal::Nul)
-//                            {
-//                                let splice = vm_compile(&a.at(1).unwrap(), ce, &mut ap)?;
-//                                p.append(splice);
-//                                ap.volatile_to_stack(&mut p, &mut stack_offs);
-//                                let ap = ap.to_load_pos(&mut p);
-//                                p.push_op(Op::ListSplice(
-//                                    ap, ResPos::Stack(0), ResPos::Stack(0)));
-//                                continue;
+//                        for (a, _) in ast.iter().skip(1) {
+//                            if a.is_vec() {
+//                                if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
+//                                    a.at(0).unwrap_or_else(|| VVal::Nul)
+//                                {
+//                                    let splice_pw = vm_compile2(&a.at(1).unwrap(), ce)?;
+//                                    splice_pw.eval_to(prog, ResPos::Stack(0));
+//                                    prog.push_op(Op::ListSplice(
+//                                        ResPos::Stack(0),
+//                                        ResPos::Stack(0),
+//                                        ResPos::Stack(0)));
+//                                    continue;
+//                                }
 //                            }
+//
+//                            let val_pw = vm_compile2(&a, ce)?;
+//                            val_pw.eval_to(ResPos::Stack(0));
+//
+//                            prog.push_op(Op::ListPush(
+//                                ResPos::Stack(0),
+//                                ResPos::Stack(0),
+//                                ResPos::Stack(0)));
 //                        }
 //
-//                        let a = vm_compile(&a, ce, &mut ap)?;
-//                        p.append(a);
-//                        ap.volatile_to_stack(&mut p, &mut stack_offs);
-//                        let ap = ap.to_load_pos(&mut p);
-//                        p.push_op(Op::ListPush(
-//                            ap, ResPos::Stack(0), ResPos::Stack(0)));
-//                    }
-//
-//                    sp.set(ResPos::Stack(0));
-//                    Ok(p)
+//                        ResPos::Stack(0)
+//                    })
 //                },
 //                Syntax::Map => {
 //                    let mut stack_offs : usize = 0;
@@ -2681,31 +2684,22 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             vm_compile_direct_block2(
                                 &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
 
-                        return pw_store_or_stack!(prog, store, {
-                            // Push Nul as the body value
-                            prog.push_op(
-                                Op::Mov(ResPos::Value(ResValue::Nul),
-                                ResPos::Stack(0)));
-
+                        return pw_null!(prog, {
+                            // Create the OPs for the body:
                             let mut body_prog = Prog::new();
-                            body.eval_to(&mut body_prog, ResPos::Stack(0));
+                            body.eval_nul(&mut body_prog);
                             let body_op_count = body_prog.op_count();
 
                             let cond_op_count1 = prog.op_count();
                             let cond_val = cond.eval(prog);
+
+                            prog.push_op(
+                                Op::JmpIfN(cond_val, body_op_count as i32 + 1));
+
                             let mut cond_offs =
                                 body_op_count + (prog.op_count() - cond_op_count1);
-
-                            // Pop the body value
-                            prog.push_op(
-                                Op::Mov(ResPos::Stack(0), ResPos::Value(ResValue::Nul)));
                             body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
-
-                            prog.push_op(Op::JmpIfN(cond_val, body_op_count as i32 + 1));
                             prog.append(body_prog);
-
-                            // Return the body value
-                            ResPos::Stack(0)
                         });
                     }
 
@@ -2729,22 +2723,31 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.push_op(Op::Call(argc as u16 - 1, store));
                     })
                 },
-////                Syntax::Err => {
-////                    let err_val = vm_compile(&ast.at(1).unwrap(), ce)?;
-////                    Ok(err_val.debug(spos).op(Op::NewErr).consume(1).result())
-////                },
-//                Syntax::Key => {
-//                    let sym = ast.at(1).unwrap();
-//                    ce.borrow_mut().recent_sym = sym.s_raw();
-//                    sp.set_data(sym.clone());
-//                    Ok(Prog::new())
-//                },
-//                Syntax::Str => {
-//                    let sym = ast.at(1).unwrap();
-//                    ce.borrow_mut().recent_sym = sym.s_raw();
-//                    sp.set_data(sym.clone());
-//                    Ok(Prog::new())
-//                },
+                Syntax::Err => {
+                    let err_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+
+                    pw_store_or_stack!(prog, store, {
+                        prog.set_dbg(spos.clone());
+                        let err_val_pw = err_pw.eval(prog);
+                        prog.push_op(Op::NewErr(err_val_pw, store));
+                    })
+                },
+                Syntax::Key => {
+                    let sym = ast.at(1).unwrap();
+                    ce.borrow_mut().recent_sym = sym.s_raw();
+                    pw_respos_or_mov!(prog, {
+                        prog.set_dbg(spos.clone());
+                        prog.data_pos(sym.clone())
+                    })
+                },
+                Syntax::Str => {
+                    let string = ast.at(1).unwrap();
+                    ce.borrow_mut().recent_sym = string.s_raw();
+                    pw_respos_or_mov!(prog, {
+                        prog.set_dbg(spos.clone());
+                        prog.data_pos(string.clone())
+                    })
+                },
 //                Syntax::Accum => {
 //                    match ast.at(1) {
 //                        Some(s) => {
@@ -3026,12 +3029,38 @@ mod tests {
                 .x = x + 1;
             };
             x"), "1000");
+    }
+
+    #[test]
+    fn vm_while() {
         assert_eq!(gen(r"
             !:global x = 0;
             !inc = { .x = x + 1 };
             while { x < 1000 } inc[];
             x
         "), "1000");
+        assert_eq!(gen(r"
+            !x = 0;
+            while { x < 2 } {
+                .x = x + 1;
+                !k = 1;
+                .k = k + 1;
+            };
+            x
+        "), "2");
+        assert_eq!(gen(r"
+            !x = 0;
+            while { x < 2 } {
+                .x = x + 1;
+                !k = 1;
+            };
+            x
+        "), "2");
+        assert_eq!(gen(r"
+            !x = 0;
+            while { x < 2 } { .x = x + 1 };
+            x
+        "), "2");
     }
 
 #[test]
