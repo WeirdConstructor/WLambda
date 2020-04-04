@@ -2540,52 +2540,58 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         ResPos::Stack(0)
                     })
                 },
-//                Syntax::Map => {
-//                    let mut stack_offs : usize = 0;
-//                    let mut p = Prog::new();
-//                    p.push_op(Op::NewMap(ResPos::Stack(0)));
-//
-//                    for (e, _) in ast.iter().skip(1) {
-//                        let mut ap = StorePos::new();
-//
-//                        let k = e.at(0).unwrap();
-//                        let v = e.at(1).unwrap();
-//
-//                        if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
-//                            let sc = vm_compile(&v, ce, &mut ap)?;
-//                            p.append(sc);
-//                            ap.volatile_to_stack(&mut p, &mut stack_offs);
-//                            let ap = ap.to_load_pos(&mut p);
-//                            p.push_op(Op::MapSplice(
-//                                ap, ResPos::Stack(0), ResPos::Stack(0)));
-//                            continue;
-//                        }
-//
-//                        let kc = vm_compile(&k, ce, &mut ap)?;
-//                        if let VVal::Sym(y) = k {
-//                            ce.borrow_mut().recent_var = y.borrow().clone();
-//                        } else {
-//                            let recent_sym = ce.borrow().recent_sym.clone();
-//                            ce.borrow_mut().recent_var = recent_sym;
-//                        }
-//
-//                        let mut ap_v = StorePos::new();
-//                        let vc = vm_compile(&v, ce, &mut ap_v)?;
-//
-//                        p.append(kc);
-//                        ap.volatile_to_stack(&mut p, &mut stack_offs);
-//                        p.append(vc);
-//                        ap_v.volatile_to_stack(&mut p, &mut stack_offs);
-//
-//                        let ap = ap.to_load_pos(&mut p);
-//                        let ap_v = ap_v.to_load_pos(&mut p);
-//                        p.push_op(Op::MapSetKey(
-//                            ap_v, ap, ResPos::Stack(0), ResPos::Stack(0)));
-//                    }
-//
-//                    sp.set(ResPos::Stack(0));
-//                    Ok(p)
-//                },
+                Syntax::Map => {
+                    let mut pws : std::vec::Vec<(ProgWriter, Option<ProgWriter>)> =
+                        vec![];
+
+                    for (e, _) in ast.iter().skip(1) {
+                        let k = e.at(0).unwrap();
+                        let v = e.at(1).unwrap();
+
+                        if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
+                            let sc_pw = vm_compile2(&v, ce)?;
+                            pws.push((sc_pw, None));
+                            continue;
+                        }
+
+                        let kc_pw = vm_compile2(&k, ce)?;
+                        if let VVal::Sym(y) = k {
+                            ce.borrow_mut().recent_var = y.borrow().clone();
+                        } else {
+                            let recent_sym = ce.borrow().recent_sym.clone();
+                            ce.borrow_mut().recent_var = recent_sym;
+                        }
+
+                        let vc_pw = vm_compile2(&v, ce)?;
+                        pws.push((kc_pw, Some(vc_pw)));
+                    }
+
+                    pw_respos_or_mov!(prog, {
+                        prog.push_op(Op::NewMap(ResPos::Stack(0)));
+
+                        for (kc_pw, vc_pw) in pws.iter() {
+                            if let Some(vc_pw) = vc_pw {
+                                kc_pw.eval_to(prog, ResPos::Stack(0));
+                                vc_pw.eval_to(prog, ResPos::Stack(0));
+
+                                prog.push_op(Op::MapSetKey(
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0)));
+                            } else {
+                                kc_pw.eval_to(prog, ResPos::Stack(0));
+
+                                prog.push_op(Op::MapSplice(
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0)));
+                            }
+                        }
+
+                        ResPos::Stack(0)
+                    })
+                },
                 Syntax::Func => {
                     let last_def_varname = ce.borrow().recent_var.clone();
                     let mut fun_spos = spos.clone();
