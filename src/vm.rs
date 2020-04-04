@@ -2702,6 +2702,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
 
                             prog.push_op(Op::JmpIfN(cond_val, body_op_count as i32 + 1));
+                            prog.append(body_prog);
 
                             // Return the body value
                             ResPos::Stack(0)
