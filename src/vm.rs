@@ -2502,39 +2502,44 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 //                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Deref));
 //                    Ok(prog)
 //                },
-//                Syntax::Lst => {
-//                    let mut stack_offs : usize = 0;
-//                    let mut p = Prog::new();
-//                    pw_respos_or_mov!(prog, {
-//                        prog.push_op(Op::NewList(ResPos::Stack(0)));
-//
-//                        for (a, _) in ast.iter().skip(1) {
-//                            if a.is_vec() {
-//                                if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
-//                                    a.at(0).unwrap_or_else(|| VVal::Nul)
-//                                {
-//                                    let splice_pw = vm_compile2(&a.at(1).unwrap(), ce)?;
-//                                    splice_pw.eval_to(prog, ResPos::Stack(0));
-//                                    prog.push_op(Op::ListSplice(
-//                                        ResPos::Stack(0),
-//                                        ResPos::Stack(0),
-//                                        ResPos::Stack(0)));
-//                                    continue;
-//                                }
-//                            }
-//
-//                            let val_pw = vm_compile2(&a, ce)?;
-//                            val_pw.eval_to(ResPos::Stack(0));
-//
-//                            prog.push_op(Op::ListPush(
-//                                ResPos::Stack(0),
-//                                ResPos::Stack(0),
-//                                ResPos::Stack(0)));
-//                        }
-//
-//                        ResPos::Stack(0)
-//                    })
-//                },
+                Syntax::Lst => {
+                    let mut pws : std::vec::Vec<(bool, ProgWriter)> = vec![];
+                    for (a, _) in ast.iter().skip(1) {
+                        if a.is_vec() {
+                            if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
+                                a.at(0).unwrap_or_else(|| VVal::Nul)
+                            {
+                                let splice_pw = vm_compile2(&a.at(1).unwrap(), ce)?;
+                                pws.push((true, splice_pw));
+                                continue;
+                            }
+                        }
+
+                        let val_pw = vm_compile2(&a, ce)?;
+                        pws.push((false, val_pw));
+                    }
+
+                    pw_respos_or_mov!(prog, {
+                        prog.push_op(Op::NewList(ResPos::Stack(0)));
+
+                        for (is_splice, pw) in pws.iter() {
+                            pw.eval_to(prog, ResPos::Stack(0));
+                            if *is_splice {
+                                prog.push_op(Op::ListSplice(
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0)));
+                            } else {
+                                prog.push_op(Op::ListPush(
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0),
+                                    ResPos::Stack(0)));
+                            }
+                        }
+
+                        ResPos::Stack(0)
+                    })
+                },
 //                Syntax::Map => {
 //                    let mut stack_offs : usize = 0;
 //                    let mut p = Prog::new();
