@@ -355,7 +355,7 @@ impl BinOp {
     }
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,Copy)]
 #[repr(u8)]
 pub enum AccumType {
     String,
@@ -1563,46 +1563,47 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.data_pos(string.clone())
                     })
                 },
-//                Syntax::Accum => {
-//                    match ast.at(1) {
-//                        Some(s) => {
-//                            if s.s_raw() == "@" {
-//                                sp.set(ResPos::Value(ResValue::AccumVal));
-//                                Ok(Prog::new())
-//                            } else {
-//                                let accum_type =
-//                                    match &s.s_raw()[..] {
-//                                        "string" => AccumType::String,
-//                                        "bytes"  => AccumType::Bytes,
-//                                        "float"  => AccumType::Float,
-//                                        "int"    => AccumType::Int,
-//                                        "map"    => AccumType::Map,
-//                                        "vec"    => AccumType::Vec,
-//                                        _ => {
-//                                            panic!("COMPILER ERROR: BAD ACCUM SYM");
-//                                        }
-//                                    };
-//                                let mut devnull = StorePos::new_dev_null();
-//                                let mut prog =
-//                                    vm_compile(
-//                                        &ast.at(2).unwrap(),
-//                                        ce,
-//                                        &mut devnull)?;
-//                                prog.unshift_op(Op::Accumulator(accum_type));
-//                                prog.push_op(
-//                                    Op::Mov(
-//                                        ResPos::Value(ResValue::AccumVal),
-//                                        sp.to_store_pos()));
-//                                prog.push_op(Op::Unwind);
-//                                Ok(prog)
-//                            }
-//                        },
-//                        None => {
-//                            sp.set(ResPos::Value(ResValue::AccumFun));
-//                            Ok(Prog::new())
-//                        }
-//                    }
-//                },
+                Syntax::Accum => {
+                    match ast.at(1) {
+                        Some(s) => {
+                            if s.s_raw() == "@" {
+                                pw_respos_or_mov!(prog, {
+                                    ResPos::Value(ResValue::AccumVal)
+                                })
+                            } else {
+                                let accum_type =
+                                    match &s.s_raw()[..] {
+                                        "string" => AccumType::String,
+                                        "bytes"  => AccumType::Bytes,
+                                        "float"  => AccumType::Float,
+                                        "int"    => AccumType::Int,
+                                        "map"    => AccumType::Map,
+                                        "vec"    => AccumType::Vec,
+                                        _ => {
+                                            panic!("COMPILER ERROR: BAD ACCUM SYM");
+                                        }
+                                    };
+
+                                let mut acc_pw =
+                                    vm_compile2(&ast.at(2).unwrap(), ce)?;
+                                pw_store_or_stack!(prog, store, {
+                                    prog.push_op(Op::Accumulator(accum_type));
+                                    acc_pw.eval_nul(prog);
+                                    prog.push_op(
+                                        Op::Mov(
+                                            ResPos::Value(ResValue::AccumVal),
+                                            store));
+                                    prog.push_op(Op::Unwind);
+                                })
+                            }
+                        },
+                        None => {
+                            pw_respos_or_mov!(prog, {
+                                ResPos::Value(ResValue::AccumFun)
+                            })
+                        }
+                    }
+                },
                 Syntax::GetIdx => {
                     let mut o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let idx = ast.at(2).unwrap().i() as u32;
