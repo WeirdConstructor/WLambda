@@ -1634,50 +1634,57 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                 opos, Box::new((idx, idx2, idx3)), store));
                     })
                 },
-//                Syntax::GetSym => {
-//                    let mut opos = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
-//                    let opos = opos.to_load_pos(&mut prog);
-//                    let sym = ast.at(2).unwrap().s_raw();
-//                    prog.push_op(Op::GetSym(opos, Box::new(sym), sp.to_store_pos()));
-//                    Ok(prog)
-//                },
-//                Syntax::GetSym2 => {
-//                    let mut opos = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
-//                    let opos = opos.to_load_pos(&mut prog);
-//                    let sym = ast.at(2).unwrap().s_raw();
-//                    let sym2 = ast.at(3).unwrap().s_raw();
-//                    prog.push_op(Op::GetSym2(opos, Box::new((sym, sym2)), sp.to_store_pos()));
-//                    Ok(prog)
-//                },
-//                Syntax::GetSym3 => {
-//                    let mut opos = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
-//                    let opos = opos.to_load_pos(&mut prog);
-//                    let sym = ast.at(2).unwrap().s_raw();
-//                    let sym2 = ast.at(3).unwrap().s_raw();
-//                    let sym3 = ast.at(4).unwrap().s_raw();
-//                    prog.push_op(Op::GetSym3(opos, Box::new((sym, sym2, sym3)), sp.to_store_pos()));
-//                    Ok(prog)
-//                },
-//                Syntax::GetKey => {
-//                    let mut mp = StorePos::new();
-//                    let mut ip = StorePos::new();
-//
-//                    let mut map_prog = vm_compile(&ast.at(1).unwrap(), ce, &mut mp)?;
-//                    let mut idx_prog = vm_compile(&ast.at(2).unwrap(), ce, &mut ip)?;
-//
-//                    let mut stack_offs = 0;
-//                    mp.volatile_to_stack(&mut map_prog, &mut stack_offs);
-//                    map_prog.append(idx_prog);
-//                    ip.volatile_to_stack(&mut map_prog, &mut stack_offs);
-//                    let mp = mp.to_load_pos(&mut map_prog);
-//                    let ip = ip.to_load_pos(&mut map_prog);
-//
-//                    map_prog.push_op(Op::GetKey(mp, ip, sp.to_store_pos()));
-//                    Ok(map_prog)
-//                },
+                Syntax::GetSym => {
+                    let mut o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let sym = ast.at(2).unwrap().s_raw();
+                    pw_store_or_stack!(prog, store, {
+                        let opos = o_pw.eval(prog);
+                        prog.push_op(
+                            Op::GetSym(opos, Box::new(sym.clone()), store));
+                    })
+                },
+                Syntax::GetSym2 => {
+                    let mut o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let sym  = ast.at(2).unwrap().s_raw();
+                    let sym2 = ast.at(3).unwrap().s_raw();
+                    pw_store_or_stack!(prog, store, {
+                        let opos = o_pw.eval(prog);
+                        prog.push_op(
+                            Op::GetSym2(
+                                opos,
+                                Box::new((
+                                    sym.clone(),
+                                    sym2.clone())),
+                                store));
+                    })
+                },
+                Syntax::GetSym3 => {
+                    let mut o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let sym  = ast.at(2).unwrap().s_raw();
+                    let sym2 = ast.at(3).unwrap().s_raw();
+                    let sym3 = ast.at(4).unwrap().s_raw();
+                    pw_store_or_stack!(prog, store, {
+                        let opos = o_pw.eval(prog);
+                        prog.push_op(
+                            Op::GetSym3(
+                                opos,
+                                Box::new((
+                                    sym.clone(),
+                                    sym2.clone(),
+                                    sym3.clone())),
+                                store));
+                    })
+                },
+                Syntax::GetKey => {
+                    let mut map_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let mut idx_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
+
+                    pw_store_or_stack!(prog, store, {
+                        let mp = map_pw.eval(prog);
+                        let ip = idx_pw.eval(prog);
+                        prog.push_op(Op::GetKey(mp, ip, store));
+                    })
+                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },
