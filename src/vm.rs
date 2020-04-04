@@ -1603,33 +1603,37 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 //                        }
 //                    }
 //                },
-//                Syntax::GetIdx => {
-//                    let mut opos = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
-//                    let opos = opos.to_load_pos(&mut prog);
-//                    let idx = ast.at(2).unwrap().i() as u32;
-//                    prog.push_op(Op::GetIdx(opos, idx, sp.to_store_pos()));
-//                    Ok(prog)
-//                },
-//                Syntax::GetIdx2 => {
-//                    let mut opos = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
-//                    let opos = opos.to_load_pos(&mut prog);
-//                    let idx = ast.at(2).unwrap().i() as u32;
-//                    let idx2 = ast.at(3).unwrap().i() as u32;
-//                    prog.push_op(Op::GetIdx2(opos, Box::new((idx, idx2)), sp.to_store_pos()));
-//                    Ok(prog)
-//                },
-//                Syntax::GetIdx3 => {
-//                    let mut opos = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
-//                    let opos = opos.to_load_pos(&mut prog);
-//                    let idx = ast.at(2).unwrap().i() as u32;
-//                    let idx2 = ast.at(3).unwrap().i() as u32;
-//                    let idx3 = ast.at(4).unwrap().i() as u32;
-//                    prog.push_op(Op::GetIdx3(opos, Box::new((idx, idx2, idx3)), sp.to_store_pos()));
-//                    Ok(prog)
-//                },
+                Syntax::GetIdx => {
+                    let mut o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let idx = ast.at(2).unwrap().i() as u32;
+
+                    pw_store_or_stack!(prog, store, {
+                        let opos = o_pw.eval(prog);
+                        prog.push_op(Op::GetIdx(opos, idx, store));
+                    })
+                },
+                Syntax::GetIdx2 => {
+                    let mut o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let idx  = ast.at(2).unwrap().i() as u32;
+                    let idx2 = ast.at(3).unwrap().i() as u32;
+                    pw_store_or_stack!(prog, store, {
+                        let opos = o_pw.eval(prog);
+                        prog.push_op(
+                            Op::GetIdx2(opos, Box::new((idx, idx2)), store));
+                    })
+                },
+                Syntax::GetIdx3 => {
+                    let mut o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let idx  = ast.at(2).unwrap().i() as u32;
+                    let idx2 = ast.at(3).unwrap().i() as u32;
+                    let idx3 = ast.at(4).unwrap().i() as u32;
+                    pw_store_or_stack!(prog, store, {
+                        let opos = o_pw.eval(prog);
+                        prog.push_op(
+                            Op::GetIdx3(
+                                opos, Box::new((idx, idx2, idx3)), store));
+                    })
+                },
 //                Syntax::GetSym => {
 //                    let mut opos = StorePos::new();
 //                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut opos)?;
