@@ -77,13 +77,13 @@ pub fn ve(s: &str) -> String {
     match parser::parse(s, "<compiler:s_eval>") {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
-            let mut dest = StorePos::new();
-            dest.set(ResPos::Value(ResValue::Ret));
-            match vm_compile(&ast, &mut ce, &mut dest) {
+            match vm_compile2(&ast, &mut ce) {
                 Ok(mut prog) => {
                     let local_space = ce.borrow().get_local_space();
-                    dest.to_load_pos(&mut prog);
-                    prog.op_end();
+
+                    let mut p = Prog::new();
+                    prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));
+                    p.op_end();
 
                     let mut e = Env::new(global);
                     e.push(VVal::Int(10));
@@ -92,7 +92,7 @@ pub fn ve(s: &str) -> String {
                     e.set_bp(0);
                     e.push_sp(local_space);
 
-                    match vm(&prog, &mut e) {
+                    match vm(&p, &mut e) {
                         Ok(v) => v.s(),
                         Err(je) => {
                             format!("EXEC ERR: Caught {:?}", je)
@@ -1343,7 +1343,7 @@ fn check_bytes_impl() {
 
 #[test]
 fn check_ref() {
-    assert_eq!(ve("!:global x = 1; x"),              "3");
+    assert_eq!(ve("!:global x = 3; x"),                  "3");
 
     assert_eq!(ve("!x = $&&1; $*x"),                     "1");
     assert_eq!(ve("!x = $&&1; .*x = 2; $*x"),            "2");

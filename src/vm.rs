@@ -45,7 +45,7 @@ pub struct ProgWriter {
 }
 
 impl ProgWriter {
-    fn eval_to(&self, prog: &mut Prog, rp: ResPos) {
+    pub fn eval_to(&self, prog: &mut Prog, rp: ResPos) {
         (*self.node)(prog, Some(rp));
     }
 
@@ -555,7 +555,7 @@ impl Prog {
 
     fn op_count(&self) -> usize { self.ops.len() }
 
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             data:       vec![],
             ops:        vec![],
@@ -844,7 +844,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             let syn =
                 if let Some(sp) = &prog.debug[pc] { format!("{}", sp) }
                 else { "".to_string() };
-            println!("OP[{:>3}]: {:<15}      | sp: {:>3}, bp: {:>3} | {}", pc, format!("{:?}", op), env.sp, env.bp, syn);
+            println!("OP[{:>3}]: {:<15}      | sp: {:>3}, bp: {:>3} | {}",
+                     pc, format!("{:?}", op), env.sp, env.bp, syn);
         }
         match op {
             Op::Mov(a, r) => op_a_r!(env, ret, prog, a, r, { a }),
@@ -1076,6 +1077,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             env.dump_stack();
         }
         pc += 1;
+    }
+
+    if DEBUG_VM {
+        println!("-- END -------------------------------------");
+        prog.dump();
+        println!("# EXEC END PROG:###################################");
     }
 
     env.unwind_to_depth(uw_depth);
@@ -1342,6 +1349,8 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
                 pw_null!(prog, {
                     prog.set_dbg(spos.clone());
                     let gp = prog.global_pos(r.clone());
+                    println!("DEF GLOB: {:?}", gp);
+                    prog.dump();
                     val_pw.eval_to(prog, gp);
                 })
             } else {
@@ -2479,29 +2488,27 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::BinOpLe    => vm_compile_binop2(ast, BinOp::Le,  ce),
                 Syntax::BinOpLt    => vm_compile_binop2(ast, BinOp::Lt,  ce),
                 Syntax::BinOpEq    => vm_compile_binop2(ast, BinOp::Eq,  ce),
-//                Syntax::Ref => {
-//                    let mut rp = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
-//                    let rp = rp.to_load_pos(&mut prog);
-//                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Ref));
-//            println!("TOREFX");
-//            prog.dump();
-//                    Ok(prog)
-//                },
-//                Syntax::WRef => {
-//                    let mut rp = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
-//                    let rp = rp.to_load_pos(&mut prog);
-//                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Weakable));
-//                    Ok(prog)
-//                },
-//                Syntax::Deref => {
-//                    let mut rp = StorePos::new();
-//                    let mut prog = vm_compile(&ast.at(1).unwrap(), ce, &mut rp)?;
-//                    let rp = rp.to_load_pos(&mut prog);
-//                    prog.push_op(Op::ToRef(rp, sp.to_store_pos(), ToRefType::Deref));
-//                    Ok(prog)
-//                },
+                Syntax::Ref => {
+                    let mut ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    pw_store_or_stack!(prog, store, {
+                        let ref_rp = ref_pw.eval(prog);
+                        prog.push_op(Op::ToRef(ref_rp, store, ToRefType::Ref));
+                    })
+                },
+                Syntax::WRef => {
+                    let mut ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    pw_store_or_stack!(prog, store, {
+                        let ref_rp = ref_pw.eval(prog);
+                        prog.push_op(Op::ToRef(ref_rp, store, ToRefType::Weakable));
+                    })
+                },
+                Syntax::Deref => {
+                    let mut ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    pw_store_or_stack!(prog, store, {
+                        let ref_rp = ref_pw.eval(prog);
+                        prog.push_op(Op::ToRef(ref_rp, store, ToRefType::Deref));
+                    })
+                },
                 Syntax::Lst => {
                     let mut pws : std::vec::Vec<(bool, ProgWriter)> = vec![];
                     for (a, _) in ast.iter().skip(1) {
