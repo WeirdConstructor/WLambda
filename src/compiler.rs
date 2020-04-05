@@ -58,7 +58,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::cell::RefCell;
-use std::time::Instant;
 use std::fmt::{Display, Formatter};
 
 use fnv::FnvHashMap;
@@ -854,7 +853,7 @@ impl BlockEnv {
     fn pop_env(&mut self) -> (usize, usize) {
         let block_env_vars = self.local_map_stack.pop().unwrap();
 
-        let mut local_count = block_env_vars.0;
+        let local_count = block_env_vars.0;
         for _ in 0..local_count {
             self.locals.pop();
         }
@@ -870,30 +869,6 @@ impl BlockEnv {
         VarPos::UpValue(idx)
     }
 
-    // Temporaries are for registering stack space for calling
-    // other functions.
-    //
-    // call a b (call2 c d e) f g
-    //
-    // GT[x] - gets temporary for x
-    // - GT[a]     = 5
-    // - GT[b]     = 6
-    // - GT[call2] = local(call2)
-    // - GT[c]     = 7
-    // - GT[d]     = 8
-    // - GT[e]     = 9
-    // - => CALL call2
-    // - give back GT[c, d, e]
-    // - GT[f]     = 7
-    // - GT[g]     = 8
-    fn tmp_stk_slot(&mut self) -> ResPos {
-        let next_index = self.locals.len();
-        self.locals.push((String::from(""), CompileLocal { }));
-        let last_idx = self.local_map_stack.len() - 1;
-        self.local_map_stack[last_idx].0 += 1;
-        ResPos::Local(next_index as u16)
-    }
-
     fn next_local(&mut self) -> usize {
         let next_index = self.locals.len();
         self.locals.push((String::from(""), CompileLocal { }));
@@ -907,17 +882,6 @@ impl BlockEnv {
             .insert(String::from(var),
                     VarPos::Local(idx));
         self.local_map_stack[last_idx].0 += 1;
-    }
-
-    fn new_local(&mut self, var: &str) -> VarPos {
-        let next_index = self.locals.len();
-        self.locals.push((String::from(var), CompileLocal { }));
-        let last_idx = self.local_map_stack.len() - 1;
-        self.local_map_stack[last_idx].1
-            .insert(String::from(var),
-                    VarPos::Local(next_index));
-        self.local_map_stack[last_idx].0 += 1;
-        VarPos::Local(next_index)
     }
 
     fn get(&self, var: &str) -> VarPos {
@@ -1064,10 +1028,6 @@ impl CompileEnv {
 
     pub fn push_block_env(&mut self) {
         self.block_env.push_env();
-    }
-
-    pub fn tmp_stk_slot(&mut self) -> ResPos {
-        self.block_env.tmp_stk_slot()
     }
 
     pub fn pop_block_env(&mut self) -> (usize, usize) {
@@ -2796,9 +2756,4 @@ pub fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode,
 pub fn eval(s: &str) -> Result<VVal, EvalError>  {
     let mut ctx = EvalContext::new_default();
     ctx.eval(s)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }
