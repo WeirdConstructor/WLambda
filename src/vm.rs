@@ -1625,6 +1625,22 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.push_op(Op::GetKey(mp, ip, store));
                     })
                 },
+                Syntax::SetKey => {
+                    let map_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let sym_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
+
+                    let recent_sym = ce.borrow().recent_sym.clone();
+                    ce.borrow_mut().recent_var = recent_sym;
+
+                    let val_pw = vm_compile2(&ast.at(3).unwrap(), ce)?;
+
+                    pw_store_or_stack!(prog, store, {
+                        let map = map_pw.eval(prog);
+                        let sym = sym_pw.eval(prog);
+                        let val = val_pw.eval(prog);
+                        prog.push_op(Op::MapSetKey(val, sym, map, store));
+                    })
+                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },

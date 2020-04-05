@@ -1386,6 +1386,20 @@ fn check_ref() {
 }
 
 #[test]
+fn check_set_key() {
+    assert_eq!(ve(r#"
+        !self = ${};
+        self.x = 22;
+        self.x;
+    "#), "22");
+    assert_eq!(ve(r#"
+        !self = $&&${};
+        self.x = { 23 };
+        self.x[];
+    "#), "23");
+}
+
+#[test]
 fn check_append_prepend() {
     assert_eq!(ve("std:append 1 2"),                    "$[1,2]");
     assert_eq!(ve("std:append $[1, 2] 3"),              "$[1,2,3]");
