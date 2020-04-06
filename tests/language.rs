@@ -2253,6 +2253,16 @@ fn check_accumulator() {
 }
 
 #[test]
+fn check_accum_rec() {
+//    assert_eq!(ve(r"
+//        !:global g = {|| 11 };
+//        !:global f = { g (return 10) };
+//        f[];
+//    "), "${l=10}");
+    assert_eq!(ve("{|| std:num:log2 (return 10) }[4,5]"), "${l=10}");
+}
+
+#[test]
 fn check_accum() {
     assert_eq!(ve("std:accum $b\"a\" 1"),           "$b\"a\\x01\"");
     assert_eq!(ve("std:accum $b\"a\" 2.2"),         "$b\"a\\x02\"");

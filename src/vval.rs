@@ -186,6 +186,7 @@ const STACK_SIZE : usize = 10240;
 #[derive(Debug, Clone)]
 pub enum UnwindAction {
     RestoreAccum(VVal, VVal),
+    RestoreSP(usize),
 }
 
 /// The runtime environment of the evaluator.
@@ -679,8 +680,18 @@ impl Env {
     }
 
     #[inline]
+    pub fn push_unwind_sp(&mut self) {
+        self.unwind_stack.push(UnwindAction::RestoreSP(self.sp));
+    }
+
+    #[inline]
     pub fn unwind(&mut self, ua: UnwindAction) {
         match ua {
+            UnwindAction::RestoreSP(sp) => {
+                while self.sp > sp {
+                    self.pop();
+                }
+            },
             UnwindAction::RestoreAccum(fun, val) => {
                 std::mem::replace(&mut self.accum_fun, fun);
                 std::mem::replace(&mut self.accum_val, val);

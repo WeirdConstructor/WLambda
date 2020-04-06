@@ -586,14 +586,15 @@ macro_rules! op_a_b_c_r {
 }
 
 macro_rules! handle_err {
-    ($v: ident, $msg: expr) => {
+    ($v: ident, $msg: expr, $retv: ident) => {
         {
             match $v {
                 VVal::Err(ev) => {
-                    return
+                    $retv =
                         Err(StackAction::panic_str(
                             format!("Error value in {}: {}", $msg, ev.borrow().0.s()),
-                            Some(ev.borrow().1.clone())))
+                            Some(ev.borrow().1.clone())));
+                    break;
                 },
                 v => v,
             }
@@ -609,7 +610,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         prog.dump();
         println!("-- START -------------------------------------");
     }
+    let mut retv : Result<(), StackAction> = Ok(());
     let mut ret = VVal::Nul;
+    env.push_unwind_sp();
     let uw_depth = env.unwind_depth();
     loop {
         let op = &prog.ops[pc];
@@ -688,10 +691,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 } else if b.i() == 0 {
                     env.unwind_to_depth(uw_depth);
-                    return
+                    retv =
                         Err(StackAction::panic_str(
                             format!("Division by 0: {}/{}", a.i(), b.i()),
-                            prog.debug[pc].clone()))
+                            prog.debug[pc].clone()));
+                    break;
 
                 } else {
                     VVal::Int(a.i().wrapping_div(b.i()))
@@ -729,7 +733,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::NewList(r) => op_r!(env, ret, prog, r, { VVal::vec() }),
             Op::ListPush(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
-                b.push(handle_err!(a, "list element"));
+                b.push(handle_err!(a, "list element", retv));
                 b
             }),
             Op::ListSplice(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
@@ -740,37 +744,37 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::NewMap(r) => op_r!(env, ret, prog, r, { VVal::map() }),
             Op::MapSetKey(v, k, m, r) => op_a_b_c_r!(env, ret, prog, v, k, m, r, {
-                let v = handle_err!(v, "map value");
-                let k = handle_err!(k, "map key");
+                let v = handle_err!(v, "map value", retv);
+                let k = handle_err!(k, "map key", retv);
                 m.set_key(&k, v)?;
                 m
             }),
             Op::GetIdx(o, idx, r) => op_a_r!(env, ret, prog, o, r, {
-                handle_err!(o, "map/list")
+                handle_err!(o, "map/list", retv)
                 .at(*idx as usize).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetIdx2(o, idx, r) => op_a_r!(env, ret, prog, o, r, {
-                handle_err!(o, "map/list")
+                handle_err!(o, "map/list", retv)
                 .at(idx.0 as usize).unwrap_or_else(|| VVal::Nul)
                 .at(idx.1 as usize).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetIdx3(o, idx, r) => op_a_r!(env, ret, prog, o, r, {
-                handle_err!(o, "map/list")
+                handle_err!(o, "map/list", retv)
                 .at(idx.0 as usize).unwrap_or_else(|| VVal::Nul)
                 .at(idx.1 as usize).unwrap_or_else(|| VVal::Nul)
                 .at(idx.2 as usize).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetSym(o, sym, r) => op_a_r!(env, ret, prog, o, r, {
-                handle_err!(o, "map/list")
+                handle_err!(o, "map/list", retv)
                 .get_key(&sym).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetSym2(o, sym, r) => op_a_r!(env, ret, prog, o, r, {
-                handle_err!(o, "map/list")
+                handle_err!(o, "map/list", retv)
                 .get_key(&sym.0).unwrap_or_else(|| VVal::Nul)
                 .get_key(&sym.1).unwrap_or_else(|| VVal::Nul)
             }),
             Op::GetSym3(o, sym, r) => op_a_r!(env, ret, prog, o, r, {
-                handle_err!(o, "map/list")
+                handle_err!(o, "map/list", retv)
                 .get_key(&sym.0).unwrap_or_else(|| VVal::Nul)
                 .get_key(&sym.1).unwrap_or_else(|| VVal::Nul)
                 .get_key(&sym.2).unwrap_or_else(|| VVal::Nul)
@@ -779,8 +783,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 in_reg!(env, ret, prog, k);
                 in_reg!(env, ret, prog, o);
 
-                let o = handle_err!(o, "field idx/key");
-                let k = handle_err!(k, "map/list");
+                let o = handle_err!(o, "field idx/key", retv);
+                let k = handle_err!(k, "map/list", retv);
                 let res =
                     match k {
                         VVal::Int(i)  => o.at(i as usize).unwrap_or_else(|| VVal::Nul),
@@ -795,7 +799,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                                 Ok(v) => v,
                                 Err(sa) => {
                                     env.unwind_to_depth(uw_depth);
-                                    return Err(sa.wrap_panic(prog.debug[pc].clone()));
+                                    retv =
+                                        Err(sa.wrap_panic(prog.debug[pc].clone()));
+                                    break;
                                 },
                             }
                         }
@@ -819,12 +825,19 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 for (e, k) in s.iter() {
                     match m.set_key(&k.unwrap(), e) {
                         Ok(_) => (),
-                        Err(e) =>
-                            return Err(StackAction::panic_str(
-                                format!("map set key errro: {}", e),
-                                prog.debug[pc].clone())),
+                        Err(e) => {
+                            retv =
+                                Err(StackAction::panic_str(
+                                    format!("map set key errro: {}", e),
+                                    prog.debug[pc].clone()));
+                        }
                     }
                 }
+
+                if retv.is_err() {
+                    break;
+                }
+
                 m
             }),
             Op::Call(argc, r) => {
@@ -836,11 +849,13 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     Ok(v) => { out_reg!(env, ret, prog, r, v); },
                     Err(StackAction::Return((v_lbl, v))) => {
                         env.unwind_to_depth(uw_depth);
-                        return Err(StackAction::Return((v_lbl, v)));
+                        retv = Err(StackAction::Return((v_lbl, v)));
+                        break;
                     },
                     Err(sa) => {
                         env.unwind_to_depth(uw_depth);
-                        return Err(sa.wrap_panic(prog.debug[pc].clone()));
+                        retv = Err(sa.wrap_panic(prog.debug[pc].clone()));
+                        break;
                     },
                 }
             },
@@ -872,11 +887,13 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     Ok(v) => { out_reg!(env, ret, prog, r, v); },
                     Err(StackAction::Return((v_lbl, v))) => {
                         env.unwind_to_depth(uw_depth);
-                        return Err(StackAction::Return((v_lbl, v)));
+                        retv = Err(StackAction::Return((v_lbl, v)));
+                        break;
                     },
                     Err(sa) => {
                         env.unwind_to_depth(uw_depth);
-                        return Err(sa.wrap_panic(prog.debug[pc].clone()));
+                        retv = Err(sa.wrap_panic(prog.debug[pc].clone()));
+                        break;
                     },
                 }
             },
@@ -911,7 +928,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         panic!("leaked or consumed stack space unevenly!");
     }
 
-    Ok(ret)
+    match retv {
+        Ok(()) => Ok(ret),
+        Err(e) => Err(e),
+    }
 }
 
 fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) -> Result<ProgWriter, CompileError> {
