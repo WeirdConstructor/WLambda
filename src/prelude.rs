@@ -3121,7 +3121,7 @@ std:assert_eq (str ~ std:accum 10 1 2 3)    "16";
 #### <a name="742-stdzip-vector-map-fn"></a>7.4.2 - std:zip _vector_ _map-fn_
 
 Creates a generator that calls _map_fn_ with the consecutive elements of _vector_
-as the first argument of _map-fn_. All arguments passed to std:zip
+as the last argument of _map-fn_. All arguments passed to std:zip
 are appended to the argument list.
 
 This is useful for combining the iteration over two vectors or collections.
@@ -3171,8 +3171,8 @@ std:assert_eq (str v) (str $["d", "e", "f"]);
 #### <a name="744-stdenumerate-map-fn"></a>7.4.4 - std:enumerate _map-fn_
 
 Creates a generator that calls _map-fn_ with a counter that is incremented
-after each call, starting with 0. All received arguments are appended to
-the argument list after the counter.
+after each call, starting with 0. The counter is appended to the
+argument list after the regular arguments.
 
 ```wlambda
 !l = $@v $["lo", "mid", "hi"] ~ std:enumerate { $+ @ };
@@ -4212,10 +4212,10 @@ pub fn core_symbol_table() -> SymbolTable {
             match env.arg(1) {
                 VVal::Err(err_v) => {
                     env.with_restore_sp(|e: &mut Env| {
-                        e.push(VVal::new_str(err_v.borrow().1.file.s()));
-                        e.push(VVal::Int(err_v.borrow().1.col as i64));
-                        e.push(VVal::Int(err_v.borrow().1.line as i64));
                         e.push(err_v.borrow().0.clone());
+                        e.push(VVal::Int(err_v.borrow().1.line as i64));
+                        e.push(VVal::Int(err_v.borrow().1.col as i64));
+                        e.push(VVal::new_str(err_v.borrow().1.file.s()));
                         err_fn.call_internal(e, 4)
                     })
                 },
@@ -4382,10 +4382,10 @@ pub fn core_symbol_table() -> SymbolTable {
 
             let mut ret = VVal::Nul;
             for (v, k) in val.iter() {
+                env.push(v);
                 let n =
                     if let Some(k) = k { env.push(k); 2 }
                     else               { 1 };
-                env.push(v);
                 match f.call_internal(env, n) {
                     Ok(v)                      => { ret = v; },
                     Err(StackAction::Break(v)) => { env.popn(n); return Ok(v); },
@@ -4929,8 +4929,8 @@ pub fn std_symbol_table() -> SymbolTable {
             let lst     = env.arg(2);
 
             for (i, _) in lst.iter() {
-                env.push(acc.clone());
                 env.push(i);
+                env.push(acc.clone());
                 let rv = f.call_internal(env, 2);
                 env.popn(2);
 
@@ -5781,8 +5781,8 @@ pub fn std_symbol_table() -> SymbolTable {
                 let mut list = env.arg(1);
                 let mut ret = Ok(VVal::Nul);
                 list.sort(|a: &VVal, b: &VVal| {
-                    env.push(a.clone());
                     env.push(b.clone());
+                    env.push(a.clone());
                     let i =
                         match fun.call_internal(env, 2) {
                             Ok(v)  => { v.i() },

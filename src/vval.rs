@@ -433,17 +433,6 @@ impl Env {
     }
 
     #[inline]
-    pub fn with_pushed_sp<T>(&mut self, n: usize, f: T) -> Result<VVal, StackAction>
-        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
-
-        //d// println!("PUSHSP {}", n);
-        self.push_sp(n);
-        let ret = f(self);
-        self.popn(n);
-        ret
-    }
-
-    #[inline]
     pub fn push_sp(&mut self, n: usize) {
         self.sp += n;
         //d// println!("PUSH_SP {} => {}", n, self.sp);
@@ -564,20 +553,14 @@ impl Env {
     }
 
     #[inline]
-    pub fn set_arg(&mut self, i: usize, v: VVal) {
-        //d// println!("SET ARG [{}/{}]= {}", i, self.sp - (i + 1), v.s());
-        self.args[self.sp - (i + 1)] = v;
-    }
-
-    #[inline]
     pub fn arg_ref(&self, i: usize) -> Option<&VVal> {
         if i >= self.argc { return None; }
-        Some(&self.args[self.bp - (i + 1)])
+        Some(&self.args[(self.bp - self.argc) + i])
     }
 
     #[inline]
     pub fn arg_err_internal(&self, i: usize) -> Option<VVal> {
-        let v = &self.args[self.bp - (i + 1)];
+        let v = &self.args[(self.bp - self.argc) + i];
         match v {
             VVal::Err(_) => Some(v.clone()),
             _            => None,
@@ -588,7 +571,7 @@ impl Env {
     pub fn arg(&self, i: usize) -> VVal {
         //d// println!("GET ARGC [{}] = {}", i, self.argc);
         if i >= self.argc { return VVal::Nul; }
-        let v = &self.args[self.bp - (i + 1)];
+        let v = &self.args[(self.bp - self.argc) + i];
         //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
         v.clone()
     }
@@ -1415,7 +1398,6 @@ impl VVal {
     pub fn vec_from(vl: &[VVal]) -> VVal {
         let mut v = Vec::new();
         v.extend_from_slice(vl);
-        v.reverse();
         VVal::Lst(Rc::new(RefCell::new(v)))
     }
 
@@ -1425,12 +1407,12 @@ impl VVal {
 
     pub fn call(&self, env: &mut Env, args: &[VVal]) -> Result<VVal, StackAction> {
         let argc = args.len();
-        env.with_pushed_sp(argc, |e: &mut Env| {
-            for (i, v) in args.iter().enumerate() {
-                e.set_arg(i, v.clone());
-            }
-            self.call_internal(e, argc)
-        })
+        for v in args.iter() {
+            env.push(v.clone());
+        }
+        let ret = self.call_internal(env, argc);
+        env.popn(argc);
+        ret
     }
 
     pub fn compare_str(&self, b: &VVal) -> std::cmp::Ordering {
@@ -1708,8 +1690,8 @@ impl VVal {
 
                     let mut ret = VVal::Nul;
                     for (k, v) in m.borrow().iter() {
-                        e.push(VVal::new_str(k));
                         e.push(v.clone());
+                        e.push(VVal::new_str(k));
                         let el = f.call_internal(e, 2);
                         e.popn(2);
 

@@ -11,6 +11,11 @@ the error occurred easier.
 * Incompatible Change: Renamed `neg` to `neg_i64`, `uneg` to `neg_u32`.
 * Incompatible Change: Rewrote the complete threading implementation
 of WLambda.
+* Change: Function arguments are stored in right order (function, arg1, arg2, ...) on the
+stack now. This changes some of the argument handling and semantics of functions
+that did depend on the other order. (`zip`, `enumerate`, ...).
+* Incompatible Change: `zip` and `enumerate` push their arguments
+to the end of the argument list now.
 * Optimization: Removed many unnecessary String allocations.
 * Feature: Added `not_i64` and `not_u32`.
 * Feature: Added compile time constant values: `!:const X = ...`.

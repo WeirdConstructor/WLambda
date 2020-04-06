@@ -41,8 +41,8 @@ fn bench_eval_ast(v: VVal, g: GlobalEnvRef, runs: u32) -> VVal {
     match prog {
         Ok(r) => {
             let mut e = Env::new(g);
-            e.push(VVal::Flt(42.42)); // 2nd arg
             e.push(VVal::Int(13));    // 1st arg
+            e.push(VVal::Flt(42.42)); // 2nd arg
             e.argc = 2;
             e.set_bp(ce.borrow().local_env_size());
 
@@ -1416,14 +1416,14 @@ fn check_append_prepend() {
 
 #[test]
 fn check_apply() {
-    assert_eq!(s_eval("std:str:cat[[$[1,2,3]]]"), "\"123\"");
-    assert_eq!(s_eval("std:assert_eq std:str:cat[[$[1,2,3]]] \"123\""), "$true");
-    assert_eq!(s_eval("!a = $[4,5,6]; std:str:cat[[a]]"), "\"456\"");
+    assert_eq!(ve("std:str:cat[[$[1,2,3]]]"), "\"123\"");
+    assert_eq!(ve("std:assert_eq std:str:cat[[$[1,2,3]]] \"123\""), "$true");
+    assert_eq!(ve("!a = $[4,5,6]; std:str:cat[[a]]"), "\"456\"");
 }
 
 #[test]
 fn check_call_order() {
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve(r#"
         !v = $[];
         std:push v ~ ({
             std:push v 1;
@@ -1432,7 +1432,7 @@ fn check_call_order() {
         v
     "#),
     "$[1,2,$[3,3.5],4]");
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve(r#"
         !v = $[];
         !get_func = {
             std:push v 1;
@@ -1456,10 +1456,10 @@ fn check_call_order() {
 
 #[test]
 fn check_cyclic_str_write() {
-    assert_eq!(s_eval(r#"!x = $&&0; .*x = x; x"#), "$<1=>$&&$<1>");
-    assert_eq!(s_eval(r#"!x = $&1;  .x = $:x; x"#), "$<1=>$&&$<1>");
-    assert_eq!(s_eval(r#"!x = $&0;  .*x = $:x; !y = std:weaken x; y"#), "$<1=>$(&)$<1>");
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve(r#"!x = $&&0; .*x = x; x"#), "$<1=>$&&$<1>");
+    assert_eq!(ve(r#"!x = $&1;  .x = $:x; x"#), "$<1=>$&&$<1>");
+    assert_eq!(ve(r#"!x = $&0;  .*x = $:x; !y = std:weaken x; y"#), "$<1=>$(&)$<1>");
+    assert_eq!(ve(r#"
         !x = $[1,2];
         !y = ${};
         y.x = x;
@@ -1467,7 +1467,7 @@ fn check_cyclic_str_write() {
         x
     "#),
     "$<1=>$[1,2,${x=$<1>}]");
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve(r#"
         !x = $[1,2];
         !y = ${};
         !f = $[];
@@ -1481,15 +1481,15 @@ fn check_cyclic_str_write() {
     "#),
     "$<1=>$[1,2,${x=$<1>},$<1>,$<2=>$[$<2>,$<1>]]");
 
-    assert_eq!(s_eval(r#"!x = $[]; std:push x $&&x; $[x.0, x]"#), "$[$<1=>$&&$<2=>$[$<1>],$<2>]");
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve(r#"!x = $[]; std:push x $&&x; $[x.0, x]"#), "$[$<1=>$&&$<2=>$[$<1>],$<2>]");
+    assert_eq!(ve(r#"
         !x = ${};
         x.f = { x.b };
         $[x.f, $:x]
     "#),
     "$[$<1=>&F{@[3,15:<compiler:s_eval>(Func)@f],amin=0,amax=0,locals=0,upvalues=$[$<2=>$(&)${f=$<1>}]},$<2>]");
 
-    assert_eq!(s_eval(r#"
+    assert_eq!(ve(r#"
         !x = $[];
         std:push x ~ $&$e x;
         x
@@ -2241,15 +2241,15 @@ fn check_accumulator() {
         !f = {
             $@v $+ ($@s $[1,2,3] \$+ _)
         };
-        $@m $+ :k f[]
-    "), "${k=$[\"123\"]}");
+        $@m $+ :j f[]
+    "), "${j=$[\"123\"]}");
     assert_eq!(ve(r"
         !f = \:x{
             $@v $+ ($@s
                 (return :x 10))
         };
-        $@m $+ :k f[]
-    "), "${k=10}");
+        $@m $+ :l f[]
+    "), "${l=10}");
 }
 
 #[test]

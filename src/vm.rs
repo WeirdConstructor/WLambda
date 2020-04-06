@@ -236,6 +236,11 @@ impl Prog {
                 Op::Call(_, p1) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
+                Op::Apply(p1, p2, p3) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
+                },
                 Op::NewMap(p1) => { patch_respos_data(p1, self_data_next_idx); },
                 Op::NewList(p1) => { patch_respos_data(p1, self_data_next_idx); },
                 Op::Argv(p1) => { patch_respos_data(p1, self_data_next_idx); },
@@ -489,6 +494,7 @@ pub enum Op {
     GetKey(ResPos, ResPos, ResPos),
     Destr(ResPos, Box<DestructureInfo>),
     Call(u16, ResPos),
+    Apply(ResPos, ResPos, ResPos),
     Jmp(i32),
     JmpIf(ResPos, i32),
     JmpIfN(ResPos, i32),
@@ -528,10 +534,10 @@ macro_rules! out_reg {
             ResPos::UpRef(i)        => $env.assign_ref_up(*i as usize, $val),
             ResPos::Global(i)       => { $prog.data[*i as usize].set_ref($val); },
             ResPos::GlobalRef(i)    => { $prog.data[*i as usize].deref().set_ref($val); },
-            ResPos::Arg(o)          => $env.set_arg(*o as usize, $val),
             ResPos::Data(i)         => { $prog.data[*i as usize].set_ref($val); },
             ResPos::Stack(_)        => { $env.push($val); },
             ResPos::Value(ResValue::Ret) => { $ret = $val; },
+            ResPos::Arg(o)          => (),
             ResPos::Value(_) => (),
         };
     }
@@ -823,9 +829,45 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::Call(argc, r) => {
                 let argc = *argc as usize;
-                let f = env.pop();
+                let f = env.stk(argc + 1).clone();
                 let call_ret = f.call_internal(env, argc);
+                env.popn(argc + 1); // + 1 for the function
+                match call_ret {
+                    Ok(v) => { out_reg!(env, ret, prog, r, v); },
+                    Err(StackAction::Return((v_lbl, v))) => {
+                        env.unwind_to_depth(uw_depth);
+                        return Err(StackAction::Return((v_lbl, v)));
+                    },
+                    Err(sa) => {
+                        env.unwind_to_depth(uw_depth);
+                        return Err(sa.wrap_panic(prog.debug[pc].clone()));
+                    },
+                }
+            },
+            Op::Apply(argv, func, r) => {
+                in_reg!(env, ret, prog, argv);
+                in_reg!(env, ret, prog, func);
+
+                let mut argv = argv;
+
+                let argc =
+                    if let VVal::Lst(l) = &argv {
+                        l.borrow().len()
+                    } else {
+                        let a = VVal::vec();
+                        a.push(argv);
+                        argv = a;
+                        1
+                    };
+
+                for i in 0..argc {
+                    let v = argv.at(i).unwrap_or_else(|| VVal::Nul);
+                    env.push(v);
+                }
+
+                let call_ret = func.call_internal(env, argc);
                 env.popn(argc);
+
                 match call_ret {
                     Ok(v) => { out_reg!(env, ret, prog, r, v); },
                     Err(StackAction::Return((v_lbl, v))) => {
@@ -1150,7 +1192,6 @@ fn vm_compile_direct_block2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     match ast {
         VVal::Lst(_) => {
             let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
-            let spos = syn.get_syn_pos();
             let syn  = syn.get_syn();
 
             match syn {
@@ -1461,7 +1502,6 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     for (e, _) in ast.iter().skip(1) {
                         args.push(e);
                     }
-                    args.reverse();
 
                     let mut compiled_args = vec![];
                     let mut argc = 0;
@@ -1641,6 +1681,17 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.push_op(Op::MapSetKey(val, sym, map, store));
                     })
                 },
+                Syntax::Apply => {
+                    let call_argv_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
+                    let func_pw      = vm_compile2(&ast.at(1).unwrap(), ce)?;
+
+                    pw_store_or_stack!(prog, store, {
+                        let f_rp    = func_pw.eval(prog);
+                        let argv_rp = call_argv_pw.eval(prog);
+
+                        prog.push_op(Op::Apply(argv_rp, f_rp, store));
+                    })
+                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },
@@ -1676,8 +1727,8 @@ pub fn gen(s: &str) -> String {
                     p.op_end();
 
                     let mut e = Env::new(global);
-                    e.push(VVal::Int(10));
                     e.push(VVal::Flt(14.4));
+                    e.push(VVal::Int(10));
                     e.argc = 2;
                     e.set_bp(0);
                     e.push_sp(local_space);
