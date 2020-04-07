@@ -3128,7 +3128,7 @@ This is useful for combining the iteration over two vectors or collections.
 
 ```wlambda
 !l = $@v $[13, 42, 97] ~ std:zip $["Foo", "Bar", "Baz"] { $+ @ };
-std:assert_eq (str l) (str $[$["Foo", 13], $["Bar", 42], $["Baz", 97]]);
+std:assert_eq (str l) (str $[$[13, "Foo"], $[42, "Bar"], $[97, "Baz"]]);
 ```
 
 #### <a name="743-stdfold-accumulator-func-iteratable"></a>7.4.3 - std:fold _accumulator_ _func_ _iteratable_
@@ -3175,7 +3175,7 @@ after each call, starting with 0. The counter is appended to the
 argument list after the regular arguments.
 
 ```wlambda
-!l = $@v $["lo", "mid", "hi"] ~ std:enumerate { $+ @ };
+!l = $@v $["lo", "mid", "hi"] ~ std:enumerate { $+ $[_1, _] };
 std:assert_eq (str l) (str $[$[0, "lo"], $[1, "mid"], $[2, "hi"]]);
 ```
 

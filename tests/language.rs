@@ -2260,6 +2260,9 @@ fn check_return_sp() {
         f[];
     "), "10");
     assert_eq!(ve("{|| std:num:log2 (return 12) }[4,5]"), "12");
+    assert_eq!(ve(r"
+        {|| std:num:log2 (+ 5 6) (return 13) (+ 1 2) (+ 3 4)}[4,5]
+    "), "13");
 }
 
 #[test]

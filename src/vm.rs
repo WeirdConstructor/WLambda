@@ -1556,6 +1556,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     pw_store_or_stack!(prog, store, {
                         prog.set_dbg(spos.clone());
                         let err_val_pw = err_pw.eval(prog);
+                        prog.set_dbg(spos.clone());
                         prog.push_op(Op::NewErr(err_val_pw, store));
                     })
                 },
