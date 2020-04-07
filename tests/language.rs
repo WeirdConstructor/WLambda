@@ -2012,50 +2012,50 @@ fn check_method_calls() {
 
 #[test]
 fn capture_ref_semantics() {
-    assert_eq!(s_eval(r" !x = $& 10;   x "),            "10");
-    assert_eq!(s_eval(r" !x = $& 10; $*x "),            "10");
-    assert_eq!(s_eval(r" !x = $& 10; $:x "),            "$&&10");
-    assert_eq!(s_eval(r" !x = 10;     !y = { x }[]; $[x,  y] "),         "$[10,10]");
-    assert_eq!(s_eval(r" !x = 10;     !y = { x }[]; $[$*x, y] "),        "$[10,10]");
-    assert_eq!(s_eval(r" !x = 10;     !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
-    assert_eq!(s_eval(r" !x = $& 10;  !y = { x }[]; $[x,  y] "),         "$[10,10]");
-    assert_eq!(s_eval(r" !x = $& 10;  !y = { x }[]; $[$*x, y] "),        "$[10,10]");
-    assert_eq!(s_eval(r" !x = $& 10;  !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
-    assert_eq!(s_eval(r" !x = $&& 10; !y = { x }[]; $[x, y] "),          "$[$&&10,10]");
-    assert_eq!(s_eval(r" !x = $&& 10; !y = { x }[]; $[$*x, y] "),        "$[10,10]");
-    assert_eq!(s_eval(r" !x = $&& 10; !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
+    assert_eq!(ve(r" !x = $& 10;   x "),            "10");
+    assert_eq!(ve(r" !x = $& 10; $*x "),            "10");
+    assert_eq!(ve(r" !x = $& 10; $:x "),            "$&&10");
+    assert_eq!(ve(r" !x = 10;     !y = { x }[]; $[x,  y] "),         "$[10,10]");
+    assert_eq!(ve(r" !x = 10;     !y = { x }[]; $[$*x, y] "),        "$[10,10]");
+    assert_eq!(ve(r" !x = 10;     !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
+    assert_eq!(ve(r" !x = $& 10;  !y = { x }[]; $[x,  y] "),         "$[10,10]");
+    assert_eq!(ve(r" !x = $& 10;  !y = { x }[]; $[$*x, y] "),        "$[10,10]");
+    assert_eq!(ve(r" !x = $& 10;  !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
+    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[x, y] "),          "$[$&&10,10]");
+    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[$*x, y] "),        "$[10,10]");
+    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
 
-    assert_eq!(s_eval(r" !x = $& 10;  !y = std:weaken $:x;   y "),       "$n");
-    assert_eq!(s_eval(r" !x = $& 10;  !y = std:weaken $:x; $*y "),       "10");
-    assert_eq!(s_eval(r" !x = $& 10;  !y = std:weaken $:x; $:y "),       "$&&10");
-    assert_eq!(s_eval(r" !x = $&& 10; !y = std:weaken $:x;   y "),       "$n");
-    assert_eq!(s_eval(r" !x = $&& 10; !y = std:weaken $:x; $*y "),       "10");
-    assert_eq!(s_eval(r" !x = $&& 10; !y = std:weaken $:x; $:y "),       "$&&10");
+    assert_eq!(ve(r" !x = $& 10;  !y = std:weaken $:x;   y "),       "$n");
+    assert_eq!(ve(r" !x = $& 10;  !y = std:weaken $:x; $*y "),       "10");
+    assert_eq!(ve(r" !x = $& 10;  !y = std:weaken $:x; $:y "),       "$&&10");
+    assert_eq!(ve(r" !x = $&& 10; !y = std:weaken $:x;   y "),       "$n");
+    assert_eq!(ve(r" !x = $&& 10; !y = std:weaken $:x; $*y "),       "10");
+    assert_eq!(ve(r" !x = $&& 10; !y = std:weaken $:x; $:y "),       "$&&10");
 
-    assert_eq!(s_eval("!x = 10; !y = { $:x }[]; .x = 20; y"), "$&&20");
-    assert_eq!(s_eval("!x = 10; !y = { $:x }[]; .x = 20; .y = 11; $[x, y]"),        "$[20,11]");
-    assert_eq!(s_eval("!x = 10; !y = { $:x }[]; .x = 20; .*y = 11; $[x, $*y, y]"),  "$[11,11,$&&11]");
+    assert_eq!(ve("!x = 10; !y = { $:x }[]; .x = 20; y"), "$&&20");
+    assert_eq!(ve("!x = 10; !y = { $:x }[]; .x = 20; .y = 11; $[x, y]"),        "$[20,11]");
+    assert_eq!(ve("!x = 10; !y = { $:x }[]; .x = 20; .*y = 11; $[x, $*y, y]"),  "$[11,11,$&&11]");
 
-    assert_eq!(s_eval("!x =     10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&10]");
-    assert_eq!(s_eval("!x = $&  10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&& 10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&10]");
-    assert_eq!(s_eval("!x =     10; !y = $:x; .*x = 11; $[x,y]"), "$[11,$&&10]");
-    assert_eq!(s_eval("!x = $&  10; !y = $:x; .*x = 11; $[x,y]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&& 10; !y = $:x; .*x = 11; $[x,y]"), "$[$<1=>$&&11,$<1>]");
+    assert_eq!(ve("!x =     10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&10]");
+    assert_eq!(ve("!x = $&  10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&& 10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&10]");
+    assert_eq!(ve("!x =     10; !y = $:x; .*x = 11; $[x,y]"), "$[11,$&&10]");
+    assert_eq!(ve("!x = $&  10; !y = $:x; .*x = 11; $[x,y]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&& 10; !y = $:x; .*x = 11; $[x,y]"), "$[$<1=>$&&11,$<1>]");
 
-    assert_eq!(s_eval("!x =     10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&  10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&& 10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x =     10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&  10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]"); // yes, upvalue refs are implicit
+    assert_eq!(ve("!x =     10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&  10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&& 10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x =     10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&  10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]"); // yes, upvalue refs are implicit
 
-    assert_eq!(s_eval("!x =     10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&  10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&& 10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x =     10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&  10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
-    assert_eq!(s_eval("!x = $&& 10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]"); // yes, upvalue refs are implicit
+    assert_eq!(ve("!x =     10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&  10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&& 10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x =     10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&  10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+    assert_eq!(ve("!x = $&& 10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]"); // yes, upvalue refs are implicit
 }
 
 #[test]
@@ -2191,10 +2191,10 @@ fn ref_semantics() {
 
 #[test]
 fn check_trim() {
-    assert_eq!(s_eval("$qX foo X | std:str:trim_start"), "\"foo \"");
-    assert_eq!(s_eval("$qX foo X | std:str:trim_end"),   "\" foo\"");
-    assert_eq!(s_eval("$qX foo X | std:str:trim"),       "\"foo\"");
-    assert_eq!(s_eval("$qX foo \n X | std:str:trim"),    "\"foo\"");
+    assert_eq!(ve("$qX foo X | std:str:trim_start"), "\"foo \"");
+    assert_eq!(ve("$qX foo X | std:str:trim_end"),   "\" foo\"");
+    assert_eq!(ve("$qX foo X | std:str:trim"),       "\"foo\"");
+    assert_eq!(ve("$qX foo \n X | std:str:trim"),    "\"foo\"");
 }
 
 #[test]
@@ -2306,21 +2306,21 @@ fn check_error_reporting_func() {
 
 #[test]
 fn check_const() {
-    assert_eq!(s_eval("!:const X = 32; X"),                     "32");
-    assert_eq!(s_eval("!:const X = 32.4; X"),                   "32.4");
-    assert_eq!(s_eval("!:const X = :XX; X"),                    ":\"XX\"");
-    assert_eq!(s_eval("!:const X = $[1,2]; X.1"),               "2");
-    assert_eq!(s_eval("!:const X = ${A=32}; X.A"),              "32");
-    assert_eq!(s_eval("!:const X = \"fo\"; X"),                 "\"fo\"");
-    assert_eq!(s_eval("!:const (A,B,X) = $[1,3,4]; $[X,B,A]"),  "$[4,3,1]");
-    assert_eq!(s_eval("!:const (A,B,X) = ${A=1,B=3,X=4}; $[X,B,A]"),  "$[4,3,1]");
+    assert_eq!(ve("!:const X = 32; X"),                     "32");
+    assert_eq!(ve("!:const X = 32.4; X"),                   "32.4");
+    assert_eq!(ve("!:const X = :XX; X"),                    ":\"XX\"");
+    assert_eq!(ve("!:const X = $[1,2]; X.1"),               "2");
+    assert_eq!(ve("!:const X = ${A=32}; X.A"),              "32");
+    assert_eq!(ve("!:const X = \"fo\"; X"),                 "\"fo\"");
+    assert_eq!(ve("!:const (A,B,X) = $[1,3,4]; $[X,B,A]"),  "$[4,3,1]");
+    assert_eq!(ve("!:const (A,B,X) = ${A=1,B=3,X=4}; $[X,B,A]"),  "$[4,3,1]");
 
-    assert_eq!(s_eval(r"
+    assert_eq!(ve(r"
         !@import c tests:test_mod_const;
         c:XX
     "), "32");
 
-    assert_eq!(s_eval(r"
+    assert_eq!(ve(r"
         !@import c tests:test_mod_const;
         c:X2
     "), "$[1,2]");
@@ -2368,31 +2368,31 @@ fn check_nvec() {
 
 #[test]
 fn check_pairs() {
-    assert_eq!(s_eval("$p(1 + 2, 3 + 4)"),  "$p(3,7)");
-    assert_eq!(s_eval("$p(:a, :f).0"),      ":\"a\"");
-    assert_eq!(s_eval("$p(:a, :f).1"),      ":\"f\"");
-    assert_eq!(s_eval("$p(:a, :f).car"),    ":\"a\"");
-    assert_eq!(s_eval("$p(:a, :f).cdr"),    ":\"f\"");
-    assert_eq!(s_eval("$p(:a, :f).first"),  ":\"a\"");
-    assert_eq!(s_eval("$p(:a, :f).second"), ":\"f\"");
-    assert_eq!(s_eval("$p(:a, :f).head"),   ":\"a\"");
-    assert_eq!(s_eval("$p(:a, :f).tail"),   ":\"f\"");
-    assert_eq!(s_eval("$true $p(:a, :f)"),  ":\"f\"");
-    assert_eq!(s_eval("$false $p(:a, :f)"), ":\"a\"");
-    assert_eq!(s_eval("cons :a :f"),        "$p(:\"a\",:\"f\")");
-    assert_eq!(s_eval("cons :a :f |> 0"),   ":\"a\"");
-    assert_eq!(s_eval("cons :a :f |> 1"),   ":\"f\"");
+    assert_eq!(ve("$p(1 + 2, 3 + 4)"),  "$p(3,7)");
+    assert_eq!(ve("$p(:a, :f).0"),      ":\"a\"");
+    assert_eq!(ve("$p(:a, :f).1"),      ":\"f\"");
+    assert_eq!(ve("$p(:a, :f).car"),    ":\"a\"");
+    assert_eq!(ve("$p(:a, :f).cdr"),    ":\"f\"");
+    assert_eq!(ve("$p(:a, :f).first"),  ":\"a\"");
+    assert_eq!(ve("$p(:a, :f).second"), ":\"f\"");
+    assert_eq!(ve("$p(:a, :f).head"),   ":\"a\"");
+    assert_eq!(ve("$p(:a, :f).tail"),   ":\"f\"");
+    assert_eq!(ve("$true $p(:a, :f)"),  ":\"f\"");
+    assert_eq!(ve("$false $p(:a, :f)"), ":\"a\"");
+    assert_eq!(ve("cons :a :f"),        "$p(:\"a\",:\"f\")");
+    assert_eq!(ve("cons :a :f |> 0"),   ":\"a\"");
+    assert_eq!(ve("cons :a :f |> 1"),   ":\"f\"");
 
-    assert_eq!(s_eval("(cons :a :f) == $p(:a,:f)"),   "$true");
-    assert_eq!(s_eval("(cons :b :f) == $p(:a,:f)"),   "$false");
+    assert_eq!(ve("(cons :a :f) == $p(:a,:f)"),   "$true");
+    assert_eq!(ve("(cons :b :f) == $p(:a,:f)"),   "$false");
 
-    assert_eq!(s_eval("bool $p($t,$t)"),   "$true");
-    assert_eq!(s_eval("bool $p($f,$t)"),   "$true");
-    assert_eq!(s_eval("bool $p($t,$f)"),   "$true");
-    assert_eq!(s_eval("bool $p($f,$f)"),   "$false");
+    assert_eq!(ve("bool $p($t,$t)"),   "$true");
+    assert_eq!(ve("bool $p($f,$t)"),   "$true");
+    assert_eq!(ve("bool $p($t,$f)"),   "$true");
+    assert_eq!(ve("bool $p($f,$f)"),   "$false");
 
-    assert_eq!(s_eval("int $p(3.3,4.4)"),   "3");
-    assert_eq!(s_eval("float $p(3.3,4.4)"), "3.3");
+    assert_eq!(ve("int $p(3.3,4.4)"),   "3");
+    assert_eq!(ve("float $p(3.3,4.4)"), "3.3");
 }
 
 #[test]

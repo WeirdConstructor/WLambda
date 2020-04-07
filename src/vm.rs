@@ -1273,6 +1273,69 @@ fn vm_compile_binop2(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
     })
 }
 
+fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
+    match val {
+        VVal::Lst(l) => {
+            let l = l.borrow();
+            match l[0].get_syn() {
+                Syntax::Key => Ok(l[1].clone()),
+                Syntax::Str => Ok(l[1].clone()),
+                Syntax::Lst => {
+                    let v = VVal::vec();
+                    for i in l.iter().skip(1) {
+                        v.push(vm_compile_const_value(i)?);
+                    }
+                    Ok(v)
+                },
+                Syntax::Map => {
+                    let m = VVal::map();
+                    for i in l.iter().skip(1) {
+                        let key = vm_compile_const_value(&i.at(0).unwrap_or(VVal::Nul))?;
+                        let val = vm_compile_const_value(&i.at(1).unwrap_or(VVal::Nul))?;
+                        m.set_key_mv(key.s_raw(), val);
+                    }
+                    Ok(m)
+                },
+                _ => Err(val.to_compile_err(
+                    format!(
+                        "Invalid literal in constant definition: {}",
+                        val.s())).err().unwrap()),
+            }
+        },
+        _ => Ok(val.clone()),
+    }
+}
+
+fn vm_compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let vars    = ast.at(1).unwrap();
+    let value   = ast.at(2).unwrap();
+    let destr   = ast.at(3).unwrap_or(VVal::Nul);
+
+    if destr.b() {
+        for (i, (v, _)) in vars.iter().enumerate() {
+            let varname = v.s_raw();
+            let val = vm_compile_const_value(&value)?;
+            let val =
+                match val {
+                    VVal::Lst(_) => val.at(i).unwrap_or(VVal::Nul),
+                    VVal::Map(_) => val.get_key(&varname).unwrap_or(VVal::Nul),
+                    _ => val,
+                };
+
+            ce.borrow_mut().def_const(&varname, val);
+        }
+    } else {
+        let varname = vars.at(0).unwrap().s_raw();
+        let const_val = vm_compile_const_value(&value)?;
+        ce.borrow_mut().def_const(&varname, const_val);
+    }
+
+    pw_null!(prog, { })
+}
+
+
 pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
     match ast {
         VVal::Lst(_) => {
@@ -1288,6 +1351,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::CaptureRef => vm_compile_var2(ast, ce, true),
                 Syntax::Def        => vm_compile_def2(ast, ce, false),
                 Syntax::DefGlobRef => vm_compile_def2(ast, ce, true),
+                Syntax::DefConst   => vm_compile_const(ast, ce),
                 Syntax::BinOpAdd   => vm_compile_binop2(ast, BinOp::Add, ce),
                 Syntax::BinOpSub   => vm_compile_binop2(ast, BinOp::Sub, ce),
                 Syntax::BinOpDiv   => vm_compile_binop2(ast, BinOp::Div, ce),

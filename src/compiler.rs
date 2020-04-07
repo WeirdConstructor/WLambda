@@ -970,7 +970,7 @@ impl CompileEnv {
         self.block_env.set_upvalue(s, next_index)
     }
 
-    fn def_const(&mut self, s: &str, val: VVal) {
+    pub fn def_const(&mut self, s: &str, val: VVal) {
         self.global.borrow_mut().env.insert(String::from(s), val);
     }
 
