@@ -229,6 +229,8 @@ pub struct Env {
     /// A pointer to the global environment, holding stuff like
     /// the module loader and thread creator.
     pub global: GlobalEnvRef,
+    /// A counter that counts the nesting depth in vm() calls
+    pub vm_nest: usize,
 }
 
 //impl Default for Env {
@@ -250,6 +252,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       vec![],
+            vm_nest:            0,
             global
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
@@ -269,6 +272,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       vec![],
+            vm_nest:            0,
             user,
             global,
         };
@@ -688,6 +692,7 @@ impl Env {
     pub fn unwind(&mut self, ua: UnwindAction) {
         match ua {
             UnwindAction::RestoreSP(sp) => {
+                println!("UNWINDDDDD {},{}", sp, self.sp);
                 while self.sp > sp {
                     self.pop();
                 }

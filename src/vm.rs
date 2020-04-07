@@ -537,8 +537,8 @@ macro_rules! out_reg {
             ResPos::Data(i)         => { $prog.data[*i as usize].set_ref($val); },
             ResPos::Stack(_)        => { $env.push($val); },
             ResPos::Value(ResValue::Ret) => { $ret = $val; },
-            ResPos::Arg(o)          => (),
-            ResPos::Value(_) => (),
+            ResPos::Arg(_)          => (),
+            ResPos::Value(_)        => (),
         };
     }
 }
@@ -592,7 +592,8 @@ macro_rules! handle_err {
                 VVal::Err(ev) => {
                     $retv =
                         Err(StackAction::panic_str(
-                            format!("Error value in {}: {}", $msg, ev.borrow().0.s()),
+                            format!("Error value in {}: {}",
+                                    $msg, ev.borrow().0.s()),
                             Some(ev.borrow().1.clone())));
                     break;
                 },
@@ -603,26 +604,33 @@ macro_rules! handle_err {
 }
 
 pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
+    env.vm_nest += 1;
+
     let old_sp = env.sp;
     let mut pc : usize = 0;
+
     if DEBUG_VM {
         println!("# EXEC PROG:###################################");
         prog.dump();
-        println!("-- START -------------------------------------");
+        println!("-- START {:>3} -------------------------------",
+                 env.vm_nest);
     }
+
     let mut retv : Result<(), StackAction> = Ok(());
     let mut ret = VVal::Nul;
-    env.push_unwind_sp();
+
     let uw_depth = env.unwind_depth();
+
     loop {
         let op = &prog.ops[pc];
         if DEBUG_VM {
             let syn =
                 if let Some(sp) = &prog.debug[pc] { format!("{}", sp) }
                 else { "".to_string() };
-            println!("OP[{:>3}]: {:<15}      | sp: {:>3}, bp: {:>3} | {}",
-                     pc, format!("{:?}", op), env.sp, env.bp, syn);
+            println!("OP[{:<2} {:>3}]: {:<15}      | sp: {:>3}, bp: {:>3} | {}",
+                     env.vm_nest, pc, format!("{:?}", op), env.sp, env.bp, syn);
         }
+
         match op {
             Op::Mov(a, r) => op_a_r!(env, ret, prog, a, r, { a }),
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
@@ -915,18 +923,23 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         pc += 1;
     }
 
+    if env.sp > old_sp {
+        if DEBUG_VM {
+            println!("-- Excess stuff on stack: {}", env.sp - old_sp);
+        }
+        env.popn(env.sp - old_sp);
+    }
+
     if DEBUG_VM {
-        println!("-- END -------------------------------------");
-        prog.dump();
-        println!("# EXEC END PROG:###################################");
+        println!("-- END {:>3} -------------------------------",
+                 env.vm_nest);
+//        prog.dump();
+//        println!("# EXEC END PROG:###################################");
     }
 
     env.unwind_to_depth(uw_depth);
 
-    if env.sp != old_sp {
-        env.dump_stack();
-        panic!("leaked or consumed stack space unevenly!");
-    }
+    env.vm_nest -= 1;
 
     match retv {
         Ok(()) => Ok(ret),
