@@ -1790,6 +1790,59 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.push_op(Op::Apply(argv_rp, f_rp, store));
                     })
                 },
+                Syntax::Import => {
+                    let prefix = ast.at(1).unwrap();
+                    let name   = ast.at(2).unwrap();
+                    let s_prefix = if prefix.is_none() { String::from("") }
+                                   else { prefix.s_raw() + ":" };
+
+                    let glob_ref = ce.borrow_mut().global.clone();
+                    if glob_ref.borrow_mut().import_module_as(
+                         &name.s_raw(), &prefix.s_raw())
+                    {
+                        return pw_null!(prog, { });
+                    }
+
+                    let resolver : Option<Rc<RefCell<dyn ModuleResolver>>> =
+                        glob_ref.borrow_mut().resolver.clone();
+
+                    let path : Vec<String> =
+                        (&name.s_raw())
+                            .split(':')
+                            .map(String::from)
+                            .collect();
+
+                    let import_file_path = if spos.file.s() == "?" { None } else { Some(spos.file.s()) };
+
+                    if let Some(resolver) = resolver {
+
+                        let r = resolver.borrow();
+                        let exports = r.resolve(glob_ref.clone(), &path, import_file_path);
+                        match exports {
+                            Err(ModuleLoadError::NoSuchModule(p)) => {
+                                Err(ast.compile_err(
+                                    format!("Couldn't find module '{}' in paths: {}", name.s_raw(), p)))
+                            },
+                            Err(ModuleLoadError::ModuleEvalError(e)) => {
+                                Err(ast.compile_err(
+                                    format!("Error on evaluating module '{}': {}", name.s_raw(), e)))
+                            },
+                            Err(ModuleLoadError::Other(s)) => {
+                                Err(ast.compile_err(
+                                    format!("Error on resolving module '{}': {}", name.s_raw(), s)))
+                            },
+                            Ok(symtbl) => {
+                                glob_ref.borrow_mut().import_from_symtbl(
+                                    &s_prefix, symtbl);
+
+                                pw_null!(prog, { })
+                            },
+                        }
+                    } else {
+                        Err(ast.compile_err(
+                            format!("Couldn't resolve module '{}'", name.s_raw())))
+                    }
+                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },

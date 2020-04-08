@@ -266,7 +266,7 @@ pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
     mem_modules:
         std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, SymbolTable>>>,
-    resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
+    pub resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
     thread_creator: Option<Arc<Mutex<dyn ThreadCreator>>>,
 }
 
@@ -343,7 +343,8 @@ impl GlobalEnv {
     /// Imports all symbols from the designated module with the specified
     /// prefix applied. This does not call out to the resolver and
     /// only works on previously `set_module` modules.
-    pub fn import_module_as(&mut self, mod_name: &str, prefix: &str) {
+    /// Returns true if the module was found.
+    pub fn import_module_as(&mut self, mod_name: &str, prefix: &str) -> bool {
         let prefix =
             if !prefix.is_empty() { prefix.to_string() + ":" }
             else { String::from("") };
@@ -351,6 +352,9 @@ impl GlobalEnv {
             for (k, v) in &st.symbols {
                 self.env.insert(prefix.clone() + &k, v.clone());
             }
+            true
+        } else {
+            false
         }
     }
 
@@ -423,6 +427,14 @@ impl GlobalEnv {
         }
         for (mod_name, symtbl) in parent_global_env.mem_modules.borrow().iter() {
             self.set_module(mod_name, symtbl.clone());
+        }
+    }
+
+    /// Imports all functions from the given SymbolTable with the
+    /// given prefix to the GlobalEnv.
+    pub fn import_from_symtbl(&mut self, prefix: &str, symtbl: SymbolTable) {
+        for (k, v) in symtbl.symbols {
+            self.env.insert(prefix.to_string() + &k, v.clone());
         }
     }
 
@@ -904,7 +916,7 @@ impl BlockEnv {
 #[derive(Debug, Clone)]
 pub struct CompileEnv {
     /// Reference to the global environment
-    global:    GlobalEnvRef,
+    pub global:    GlobalEnvRef,
     /// Reference to the environment of the _parent_ function.
     parent:    Option<Rc<RefCell<CompileEnv>>>,
     /// Holds all function local variables and manages nesting of blocks.
