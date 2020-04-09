@@ -241,10 +241,14 @@ impl Prog {
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                 },
+                Op::Builtin(Builtin::Export(_, p1)) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
                 Op::NewMap(p1) => { patch_respos_data(p1, self_data_next_idx); },
                 Op::NewList(p1) => { patch_respos_data(p1, self_data_next_idx); },
                 Op::Argv(p1) => { patch_respos_data(p1, self_data_next_idx); },
                 Op::End
+                | Op::Builtin(Builtin::DumpStack(_))
                 | Op::Unwind
                 | Op::Accumulator(_)
                 | Op::Jmp(_)
@@ -453,9 +457,17 @@ pub enum AccumType {
 #[derive(Debug,Clone)]
 #[repr(u8)]
 pub enum ToRefType {
-    Ref,
+    CaptureRef,
+    ToRef,
     Deref,
     Weakable,
+}
+
+#[derive(Debug,Clone)]
+#[repr(u8)]
+pub enum Builtin {
+    Export(Box<String>, ResPos),
+    DumpStack(SynPos),
 }
 
 #[derive(Debug,Clone)]
@@ -498,6 +510,7 @@ pub enum Op {
     Jmp(i32),
     JmpIf(ResPos, i32),
     JmpIfN(ResPos, i32),
+    Builtin(Builtin),
     Unwind,
     End,
 }
@@ -638,7 +651,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::ToRef(a, r, trtype) => {
                 match trtype {
-                    ToRefType::Ref =>
+                    ToRefType::CaptureRef =>
                         match a {
                             ResPos::Local(i) => out_reg!(env, ret, prog, r, {
                                 env.get_local_captured_ref(*i as usize)
@@ -651,6 +664,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             }),
                             _ => op_a_r!(env, ret, prog, a, r, { a.to_ref() }),
                         },
+                    ToRefType::ToRef =>
+                        op_a_r!(env, ret, prog, a, r, { a.to_ref() }),
                     ToRefType::Weakable =>
                         op_a_r!(env, ret, prog, a, r, {
                             a.to_weakened_upvalue_ref()
@@ -677,7 +692,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     };
                 env.setup_accumulator(v);
             },
-            Op::Add(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Add(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Int(a) = a {
                     VVal::Int(a.wrapping_add(b.i()))
                 } else {
@@ -689,11 +704,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     }
                 }
             }),
-            Op::Sub(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Sub(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Flt(f - b.f()) }
                 else { VVal::Int(a.i().wrapping_sub(b.i())) }
             }),
-            Op::Div(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Div(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a {
                     VVal::Flt(f / b.f())
 
@@ -709,34 +724,34 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     VVal::Int(a.i().wrapping_div(b.i()))
                 }
             }),
-            Op::Mul(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Mul(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Flt(f * b.f()) }
                 else { VVal::Int(a.i().wrapping_mul(b.i())) }
             }),
-            Op::Mod(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Mod(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a {
                     VVal::Flt(f % b.f())
                 } else {
                     VVal::Int(a.i().wrapping_rem(b.i()))
                 }
             }),
-            Op::Le(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Le(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
                 else { VVal::Bol(a.i() <= b.i()) }
             }),
-            Op::Lt(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Lt(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f < b.f()) }
                 else { VVal::Bol(a.i() < b.i()) }
             }),
-            Op::Ge(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Ge(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
                 else { VVal::Bol(a.i() >= b.i()) }
             }),
-            Op::Gt(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Gt(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
                 else { VVal::Bol(a.i() > b.i()) }
             }),
-            Op::Eq(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
+            Op::Eq(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 VVal::Bol(a.eqv(&b))
             }),
             Op::NewList(r) => op_r!(env, ret, prog, r, { VVal::vec() }),
@@ -854,7 +869,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 let call_ret = f.call_internal(env, argc);
                 env.popn(argc + 1); // + 1 for the function
                 match call_ret {
-                    Ok(v) => { out_reg!(env, ret, prog, r, v); },
+                    Ok(v) => {
+                        out_reg!(env, ret, prog, r, v);
+                    },
                     Err(StackAction::Return((v_lbl, v))) => {
                         env.unwind_to_depth(uw_depth);
                         retv = Err(StackAction::Return((v_lbl, v)));
@@ -915,6 +932,18 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::JmpIfN(a, jmp_offs) => {
                 in_reg!(env, ret, prog, a);
                 if !a.b() { pc = (pc as i32 + *jmp_offs) as usize; }
+            },
+            Op::Builtin(b) => {
+                match b {
+                    Builtin::DumpStack(spos) => {
+                        println!("DUMPSTACK@{}", spos);
+                        env.dump_stack();
+                    },
+                    Builtin::Export(name, a) => {
+                        in_reg!(env, ret, prog, a);
+                        env.export_name(name, &a);
+                    },
+                }
             },
         }
         if DEBUG_VM {
@@ -989,7 +1018,6 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
                 pw_null!(prog, {
                     prog.set_dbg(spos.clone());
                     let gp = prog.global_pos(r.clone());
-                    println!("DEF GLOB: {:?}", gp);
                     prog.dump();
                     val_pw.eval_to(prog, gp);
                 })
@@ -1013,12 +1041,12 @@ pub fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, CompileError> 
         let rp = ResPos::Arg(arg_idx as u16);
         if let Some(store) = store {
             prog.push_op(Op::Mov(rp, store));
-            if to_ref { prog.push_op(Op::ToRef(store, store, ToRefType::Ref)); }
+            if to_ref { prog.push_op(Op::ToRef(store, store, ToRefType::CaptureRef)); }
             store
         } else {
             if to_ref {
                 let store = ResPos::Stack(0);
-                prog.push_op(Op::ToRef(rp, store, ToRefType::Ref));
+                prog.push_op(Op::ToRef(rp, store, ToRefType::CaptureRef));
                 store
             } else {
                 rp
@@ -1027,30 +1055,30 @@ pub fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, CompileError> 
     })
 }
 
-fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -> Result<ProgWriter, CompileError> {
+fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool) -> Result<ProgWriter, CompileError> {
     let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
     let spos = syn.get_syn_pos();
 
     let var = ast.at(1).unwrap();
     var.with_s_ref(|var_s: &str| -> Result<ProgWriter, CompileError> {
         match var_s {
-            "_"  => { set_impl_arity(1,  ce); pw_arg(0, to_ref) },
-            "_1" => { set_impl_arity(2,  ce); pw_arg(1, to_ref) },
-            "_2" => { set_impl_arity(3,  ce); pw_arg(2, to_ref) },
-            "_3" => { set_impl_arity(4,  ce); pw_arg(3, to_ref) },
-            "_4" => { set_impl_arity(5,  ce); pw_arg(4, to_ref) },
-            "_5" => { set_impl_arity(6,  ce); pw_arg(5, to_ref) },
-            "_6" => { set_impl_arity(7,  ce); pw_arg(6, to_ref) },
-            "_7" => { set_impl_arity(8,  ce); pw_arg(7, to_ref) },
-            "_8" => { set_impl_arity(9,  ce); pw_arg(8, to_ref) },
-            "_9" => { set_impl_arity(10, ce); pw_arg(9, to_ref) },
+            "_"  => { set_impl_arity(1,  ce); pw_arg(0, capt_ref) },
+            "_1" => { set_impl_arity(2,  ce); pw_arg(1, capt_ref) },
+            "_2" => { set_impl_arity(3,  ce); pw_arg(2, capt_ref) },
+            "_3" => { set_impl_arity(4,  ce); pw_arg(3, capt_ref) },
+            "_4" => { set_impl_arity(5,  ce); pw_arg(4, capt_ref) },
+            "_5" => { set_impl_arity(6,  ce); pw_arg(5, capt_ref) },
+            "_6" => { set_impl_arity(7,  ce); pw_arg(6, capt_ref) },
+            "_7" => { set_impl_arity(8,  ce); pw_arg(7, capt_ref) },
+            "_8" => { set_impl_arity(9,  ce); pw_arg(8, capt_ref) },
+            "_9" => { set_impl_arity(10, ce); pw_arg(9, capt_ref) },
             "@"  => {
                 ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
                 pw_store_or_stack!(prog, store, {
                     prog.set_dbg(spos.clone());
                     prog.push_op(Op::Argv(store));
-                    if to_ref {
-                        prog.push_op(Op::ToRef(store, store, ToRefType::Ref));
+                    if capt_ref {
+                        prog.push_op(Op::ToRef(store, store, ToRefType::CaptureRef));
                     }
                 })
             },
@@ -1075,9 +1103,9 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, to_ref: bool) -
                 pw_respos_or_mov!(prog, {
                     let var_respos = mk_respos(prog);
                     prog.set_dbg(spos.clone());
-                    if to_ref {
+                    if capt_ref {
                         let rp = ResPos::Stack(0);
-                        prog.push_op(Op::ToRef(var_respos, rp, ToRefType::Ref));
+                        prog.push_op(Op::ToRef(var_respos, rp, ToRefType::CaptureRef));
                         rp
                     } else {
                         var_respos
@@ -1269,7 +1297,7 @@ fn vm_compile_binop2(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
         let ap = a_pw.eval(prog);
         let bp = b_pw.eval(prog);
         prog.set_dbg(spos.clone());
-        prog.push_op(op.to_op(ap, bp, store));
+        prog.push_op(op.to_op(bp, ap, store));
     })
 }
 
@@ -1366,7 +1394,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     pw_store_or_stack!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
-                        prog.push_op(Op::ToRef(ref_rp, store, ToRefType::Ref));
+                        prog.push_op(Op::ToRef(ref_rp, store, ToRefType::ToRef));
                     })
                 },
                 Syntax::WRef => {
@@ -1640,6 +1668,14 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.data_pos(string.clone())
                     })
                 },
+                Syntax::SelfObj => {
+                    pw_respos_or_mov!(prog,
+                        { ResPos::Value(ResValue::SelfObj) })
+                },
+                Syntax::SelfData => {
+                    pw_respos_or_mov!(prog,
+                        { ResPos::Value(ResValue::SelfData) })
+                },
                 Syntax::Accum => {
                     match ast.at(1) {
                         Some(s) => {
@@ -1790,6 +1826,25 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.push_op(Op::Apply(argv_rp, f_rp, store));
                     })
                 },
+                Syntax::DumpStack => {
+                    pw_null!(prog, {
+                        prog.set_dbg(spos.clone());
+                        prog.push_op(Op::Builtin(Builtin::DumpStack(spos.clone())));
+                    })
+                },
+                Syntax::Export => {
+                    let name = ast.at(1).unwrap();
+                    let val_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
+
+                    pw_null!(prog, {
+                        let vp = val_pw.eval(prog);
+                        prog.set_dbg(spos.clone());
+                        prog.push_op(
+                            Op::Builtin(
+                                Builtin::Export(
+                                    Box::new(name.s_raw()), vp)));
+                    })
+                },
                 Syntax::Import => {
                     let prefix = ast.at(1).unwrap();
                     let name   = ast.at(2).unwrap();
@@ -1861,6 +1916,24 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
             pw_respos_or_mov!(prog, { prog.data_pos(ast.clone()) })
         },
     }
+}
+
+pub fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<EvalNode, CompileError>
+{
+    let mut ce = CompileEnv::create_env(Some(ce.clone()));
+    let ce_sub = ce.clone();
+    let prog = vm_compile2(&ast, &mut ce)?;
+    let local_space = ce_sub.borrow().get_local_space();
+
+    let mut p = Prog::new();
+    prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));
+    p.op_end();
+
+    Ok(Box::new(move |e: &mut Env| {
+        e.push_sp(local_space);
+        vm(&p, e)
+    }))
 }
 
 pub fn gen(s: &str) -> String {

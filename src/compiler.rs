@@ -662,7 +662,7 @@ impl EvalContext {
     /// println!("Res: {}", r.s());
     /// ```
     pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
-        let prog = compile(ast, &mut self.local_compile);
+        let prog = crate::vm::compile_vm_fun(ast, &mut self.local_compile);
         let local_env_size = self.local_compile.borrow().local_env_size();
 
         let env = self.local.borrow_mut();

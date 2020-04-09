@@ -611,10 +611,13 @@ impl Env {
 
     #[inline]
     pub fn get_local(&self, i: usize) -> VVal {
+        let ll =
         match &self.args[self.bp + i] {
             VVal::CRef(r)  => r.borrow().clone(),
             v              => v.clone(),
-        }
+        };
+        println!("GET LOCAL: {}", ll.s());
+        ll
     }
 
     pub fn assign_ref_up(&mut self, i: usize, value: VVal) {
@@ -1913,6 +1916,7 @@ impl VVal {
     }
 
     pub fn to_ref(&self) -> VVal {
+        println!("TOOOO REF: {}", self.s());
         match self {
             VVal::CRef(r)    => VVal::Ref(r.clone()),
             VVal::Ref(r)     => VVal::Ref(r.clone()),
