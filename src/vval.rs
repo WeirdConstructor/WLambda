@@ -1486,14 +1486,14 @@ impl VVal {
     pub fn fisher_yates_shuffle<I>(&mut self, mut rand: I)
         where I: FnMut() -> i64
     {
-        if let VVal::Lst(v) = self {
-            let mut list = v.borrow_mut();
-            if list.len() <= 1 { return; }
+        if let VVal::Lst(list) = self {
+            let len = list.borrow().len();
+            if len <= 1 { return; }
 
-            for k in 1..list.len() {
-                let i = list.len() - k;
+            for k in 1..len {
+                let i = len - k;
                 let j = rand().abs() as usize % (i + 1);
-                list.swap(j, i);
+                list.borrow_mut().swap(j, i);
             }
         }
     }

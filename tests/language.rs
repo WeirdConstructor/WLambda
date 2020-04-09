@@ -517,6 +517,16 @@ fn check_global_vars() {
 }
 
 #[test]
+fn check_and_or() {
+//    assert_eq!(ve("$t &and $t"),    "$true");
+//    assert_eq!(ve("$f &and $t"),    "$false");
+    assert_eq!(ve("$t &or  $t"),    "$true");
+    assert_eq!(ve("$f &or  $t"),    "$true");
+    assert_eq!(ve("$f &or  $f"),    "$false");
+    assert_eq!(ve("$f &or  $f &or 0 &or 10"),    "$false");
+}
+
+#[test]
 fn check_ops() {
     assert_eq!(ve("10 < 20"),     "$true");
     assert_eq!(ve("11 < 10"),     "$false");
@@ -537,12 +547,6 @@ fn check_ops() {
     assert_eq!(ve("22 == 23"),    "$false");
     assert_eq!(ve("22 != 22"),    "$false");
     assert_eq!(ve("21 != 22"),    "$true");
-
-    assert_eq!(ve("$t &and $t"),    "$true");
-    assert_eq!(ve("$f &and $t"),    "$false");
-    assert_eq!(ve("$t &or  $t"),    "$true");
-    assert_eq!(ve("$f &or  $t"),    "$true");
-    assert_eq!(ve("$f &or  $f"),    "$false");
 
     assert_eq!(ve("2 ^ 2"),       "4");
     assert_eq!(ve("2 ^ 3"),       "8");
@@ -1198,7 +1202,7 @@ fn check_prelude_regex() {
         assert_eq!(ve("
             std:re:replace_all $q/ar/ { \"mak\" } $q/foobarbarfoobararar/
         "),
-        "$e \"EXEC ERR: Caught [2,39:<compiler:s_eval_no_panic>(Func)]=>[2,32:<compiler:s_eval_no_panic>(Call)] SA::Panic(\\\"function expects at most 0 arguments, got 1\\\")\"");
+        "EXEC ERR: Caught [2,39:<compiler:s_eval>(Func)]=>[?] SA::Panic(\"function expects at most 0 arguments, got 1\")");
         assert_eq!(ve("
             std:re:replace_all $q/a+r/ { std:str:cat \"mak\" ~ std:str:len _.0 } $q/foobarbaaaarfoobaararar/
         "),

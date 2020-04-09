@@ -7,6 +7,7 @@ use std::cell::RefCell;
 
 const DEBUG_VM: bool = true;
 
+#[derive(Clone)]
 pub struct Prog {
     debug:   std::vec::Vec<Option<SynPos>>,
     data:    std::vec::Vec<VVal>,
@@ -207,6 +208,14 @@ impl Prog {
                 },
                 Op::JmpIfN(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::OrJmp(p1, _, p2) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
+                Op::AndJmp(p1, _, p2) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
                 },
                 Op::GetIdx(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
@@ -510,6 +519,8 @@ pub enum Op {
     Jmp(i32),
     JmpIf(ResPos, i32),
     JmpIfN(ResPos, i32),
+    OrJmp(ResPos, i32, ResPos),
+    AndJmp(ResPos, i32, ResPos),
     Builtin(Builtin),
     Unwind,
     End,
@@ -932,6 +943,24 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::JmpIfN(a, jmp_offs) => {
                 in_reg!(env, ret, prog, a);
                 if !a.b() { pc = (pc as i32 + *jmp_offs) as usize; }
+            },
+            Op::OrJmp(a, jmp_offs, r) => {
+                in_reg!(env, ret, prog, a);
+                if a.b() {
+                    pc = (pc as i32 + *jmp_offs) as usize;
+                    out_reg!(env, ret, prog, r, a);
+                } else if *jmp_offs == 0 {
+                    out_reg!(env, ret, prog, r, a);
+                }
+            },
+            Op::AndJmp(a, jmp_offs, r) => {
+                in_reg!(env, ret, prog, a);
+                if !a.b() {
+                    pc = (pc as i32 + *jmp_offs) as usize;
+                    out_reg!(env, ret, prog, r, a);
+                } else if *jmp_offs == 0 {
+                    out_reg!(env, ret, prog, r, a);
+                }
             },
             Op::Builtin(b) => {
                 match b {
@@ -1815,6 +1844,60 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.push_op(Op::MapSetKey(val, sym, map, store));
                     })
                 },
+                Syntax::Or => {
+                    let mut exprs : Vec<ProgWriter> =
+                        ast.map_skip(|e| vm_compile2(e, ce), 1)?;
+
+                    let mut exs : Vec<(Prog, ResPos, usize)> = vec![];
+                    for e in exprs.iter() {
+                        let mut p = Prog::new();
+                        let rp = e.eval(&mut p);
+                        println!("PUSH");
+                        p.dump();
+                        exs.push((p, rp, 0));
+                    }
+
+                    let mut jmp_offs = 0;
+                    for e in exs.iter_mut().rev() {
+                        jmp_offs += e.0.op_count() + 1;
+                        e.2 += jmp_offs - 1;
+                    }
+                    pw_store_or_stack!(prog, store, {
+                        for e in exs.iter() {
+                            let mut p = e.0.clone();
+                            p.push_op(Op::OrJmp(e.1, e.2 as i32, store));
+                            prog.append(p);
+                        }
+                    })
+
+//                    pw_store_or_stack!(prog, store, {
+//                        VVal::Nul
+//                    })
+//                    Ok(Box::new(move |e: &mut Env| {
+//                        for x in exprs.iter() {
+//                            let ret = x(e)?;
+//                            if ret.b() {
+//                                return Ok(ret);
+//                            }
+//                        }
+//                        Ok(VVal::Bol(false))
+//                    }))
+                },
+//                Syntax::And => {
+//                    let exprs : Vec<EvalNode> =
+//                        ast.map_skip(|e| compile(e, ce), 1)?;
+//
+//                    Ok(Box::new(move |e: &mut Env| {
+//                        let mut ret = VVal::Nul;
+//                        for x in exprs.iter() {
+//                            ret = x(e)?;
+//                            if !ret.b() {
+//                                return Ok(VVal::Bol(false));
+//                            }
+//                        }
+//                        Ok(ret)
+//                    }))
+//                },
                 Syntax::Apply => {
                     let call_argv_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
                     let func_pw      = vm_compile2(&ast.at(1).unwrap(), ce)?;
