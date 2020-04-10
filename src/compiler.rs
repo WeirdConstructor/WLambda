@@ -1764,7 +1764,7 @@ fn generate_call(func: EvalNode,
     }
 }
 
-fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
+pub fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
     let syn = ast.v_(0).get_syn();
     match syn {
         Syntax::GetKey => {

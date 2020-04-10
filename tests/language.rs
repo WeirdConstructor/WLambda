@@ -1867,6 +1867,8 @@ fn check_field_access() {
 
 #[test]
 fn check_method_calls() {
+    assert_eq!(ve("!v = $&${ _proto = ${ a = { 10 } } }; v.a[]"), "102");
+
     // Simple vector call table access still works as usual:
     assert_eq!(ve("!v = $[{ _ }]; v.0 20"),                       "20");
     assert_eq!(ve("!v = $[1,2,$[10,{ _ }]]; v.2.1 20"),           "20");
@@ -2471,6 +2473,10 @@ fn check_nvec() {
     assert_eq!(ve("$i(255, 128).rgba"),          "$i(255,128,0,0)");
     assert_eq!(ve("$i(255, 128, 64).rgba"),      "$i(255,128,64,0)");
     assert_eq!(ve("$i(255, 128, 64, 255).rgba"), "$i(255,128,64,255)");
+    assert_eq!(ve("$i(255, 128, 64).hhs"),       "$i(255,255,128)");
+    assert_eq!(ve("$i(255, 128).hsva"),          "$i(255,128,0,0)");
+    assert_eq!(ve("$i(255, 128, 64).hsva"),      "$i(255,128,64,0)");
+    assert_eq!(ve("$i(255, 128, 64, 255).hsva"), "$i(255,128,64,255)");
 }
 
 #[test]

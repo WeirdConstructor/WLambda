@@ -706,7 +706,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         match op {
             Op::Mov(a, r) => op_a_r!(env, ret, prog, a, r, { a }),
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
-                VVal::Pair(Box::new((b, a)))
+                VVal::Pair(Box::new((
+                    handle_err!(b, "first pair element", retv),
+                    handle_err!(a, "second pair element", retv))))
             }),
             Op::NewNVec(vp, r) => {
                 use crate::nvec::NVec;
@@ -715,6 +717,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     NVecPos::IVec2(a, b) => {
                         in_reg!(env, ret, prog, a);
                         in_reg!(env, ret, prog, b);
+                        let a = handle_err!(a, "x nvector component", retv);
+                        let b = handle_err!(b, "y nvector component", retv);
                         out_reg!(env, ret, prog, r,
                             VVal::IVec(NVec::Vec2(a.i(), b.i())));
                     },
@@ -722,6 +726,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         in_reg!(env, ret, prog, a);
                         in_reg!(env, ret, prog, b);
                         in_reg!(env, ret, prog, c);
+                        let a = handle_err!(a, "x nvector component", retv);
+                        let b = handle_err!(b, "y nvector component", retv);
+                        let c = handle_err!(c, "z nvector component", retv);
                         out_reg!(env, ret, prog, r,
                             VVal::IVec(NVec::Vec3(a.i(), b.i(), c.i())));
                     },
@@ -730,12 +737,18 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         in_reg!(env, ret, prog, b);
                         in_reg!(env, ret, prog, c);
                         in_reg!(env, ret, prog, d);
+                        let a = handle_err!(a, "x nvector component", retv);
+                        let b = handle_err!(b, "y nvector component", retv);
+                        let c = handle_err!(c, "z nvector component", retv);
+                        let d = handle_err!(d, "w nvector component", retv);
                         out_reg!(env, ret, prog, r,
                             VVal::IVec(NVec::Vec4(a.i(), b.i(), c.i(), d.i())));
                     },
                     NVecPos::FVec2(a, b) => {
                         in_reg!(env, ret, prog, a);
                         in_reg!(env, ret, prog, b);
+                        let a = handle_err!(a, "x nvector component", retv);
+                        let b = handle_err!(b, "y nvector component", retv);
                         out_reg!(env, ret, prog, r,
                             VVal::FVec(NVec::Vec2(a.f(), b.f())));
                     },
@@ -743,6 +756,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         in_reg!(env, ret, prog, a);
                         in_reg!(env, ret, prog, b);
                         in_reg!(env, ret, prog, c);
+                        let a = handle_err!(a, "x nvector component", retv);
+                        let b = handle_err!(b, "y nvector component", retv);
+                        let c = handle_err!(c, "z nvector component", retv);
                         out_reg!(env, ret, prog, r,
                             VVal::FVec(NVec::Vec3(a.f(), b.f(), c.f())));
                     },
@@ -751,6 +767,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         in_reg!(env, ret, prog, b);
                         in_reg!(env, ret, prog, c);
                         in_reg!(env, ret, prog, d);
+                        let a = handle_err!(a, "x nvector component", retv);
+                        let b = handle_err!(b, "y nvector component", retv);
+                        let c = handle_err!(c, "z nvector component", retv);
+                        let d = handle_err!(d, "w nvector component", retv);
                         out_reg!(env, ret, prog, r,
                             VVal::FVec(NVec::Vec4(a.f(), b.f(), c.f(), d.f())));
                     },
@@ -1744,60 +1764,108 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     })
                 },
                 Syntax::Call => {
-                    let is_while =
-                        if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
-                            let var = ast.at(1).unwrap().at(1).unwrap();
-                            var.with_s_ref(|var_s: &str| var_s == "while")
-                        } else {
-                            false
-                        };
+                    if let Some((syntax, object, key)) =
+                        fetch_object_key_access(&ast.at(1).unwrap()) {
 
-                    if is_while {
-                        let cond =
-                            vm_compile_direct_block2(
-                                &ast.at(2).unwrap_or_else(|| VVal::Nul), ce)?;
+//                        let obj = vm_compile2(&object, ce)?;
+//
+//                        let mut args = vec![];
+//                        for (e, _) in ast.iter().skip(2) {
+//                            args.push(e);
+//                        }
+//
+//                        match syntax {
+//                            Syntax::GetKey => {
+//                                let key = compile(&key, ce)?;
+//                                let func = generate_get_key(
+//                                    Box::new(move |e: &mut Env| Ok(e.self_object())),
+//                                    key,
+//                                    spos.clone(),
+//                                    true);
+//                                let fun_call =
+//                                    generate_call(func, call_args, spos);
+//                                Ok(Box::new(move |e: &mut Env| {
+//                                    let o = obj(e)?;
+//                                    e.with_object(
+//                                        o, |e: &mut Env| fun_call(e))
+//                                }))
+//                            },
+//                            Syntax::GetSym => {
+//                                let key = key.s_raw();
+//                                let func = Box::new(move |e: &mut Env| {
+//                                    let o = e.self_object();
+//                                    Ok(o.proto_lookup(&key).unwrap_or(VVal::Nul))
+//                                });
+//                                let fun_call =
+//                                    generate_call(func, call_args, spos);
+//                                Ok(Box::new(move |e: &mut Env| {
+//                                    let o = obj(e)?;
+//                                    e.with_object(
+//                                        o, |e: &mut Env| fun_call(e))
+//                                }))
+//                            },
+//                            _ => {
+                                Err(ast.compile_err(
+                                    format!("fetch_object_key_access failed: {}",
+                                            ast.s())))
+//                            },
+//                        }
+                    } else {
+                        let is_while =
+                            if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
+                                let var = ast.at(1).unwrap().at(1).unwrap();
+                                var.with_s_ref(|var_s: &str| var_s == "while")
+                            } else {
+                                false
+                            };
 
-                        let body =
-                            vm_compile_direct_block2(
-                                &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
+                        if is_while {
+                            let cond =
+                                vm_compile_direct_block2(
+                                    &ast.at(2).unwrap_or_else(|| VVal::Nul), ce)?;
 
-                        return pw_null!(prog, {
-                            // Create the OPs for the body:
-                            let mut body_prog = Prog::new();
-                            body.eval_nul(&mut body_prog);
-                            let body_op_count = body_prog.op_count();
+                            let body =
+                                vm_compile_direct_block2(
+                                    &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
 
-                            let cond_op_count1 = prog.op_count();
-                            let cond_val = cond.eval(prog);
+                            return pw_null!(prog, {
+                                // Create the OPs for the body:
+                                let mut body_prog = Prog::new();
+                                body.eval_nul(&mut body_prog);
+                                let body_op_count = body_prog.op_count();
 
-                            prog.push_op(
-                                Op::JmpIfN(cond_val, body_op_count as i32 + 1));
+                                let cond_op_count1 = prog.op_count();
+                                let cond_val = cond.eval(prog);
 
-                            let cond_offs =
-                                body_op_count + (prog.op_count() - cond_op_count1);
-                            body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
-                            prog.append(body_prog);
-                        });
-                    }
+                                prog.push_op(
+                                    Op::JmpIfN(cond_val, body_op_count as i32 + 1));
 
-                    let mut args = vec![];
-                    for (e, _) in ast.iter().skip(1) {
-                        args.push(e);
-                    }
-
-                    let mut compiled_args = vec![];
-                    let mut argc = 0;
-                    for e in args.iter() {
-                        compiled_args.push(vm_compile2(&e, ce)?);
-                        argc += 1;
-                    }
-
-                    pw_store_or_stack!(prog, store, {
-                        for ca in compiled_args.iter() {
-                            ca.eval_to(prog, ResPos::Stack(0));
+                                let cond_offs =
+                                    body_op_count + (prog.op_count() - cond_op_count1);
+                                body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
+                                prog.append(body_prog);
+                            });
                         }
-                        prog.push_op(Op::Call(argc as u16 - 1, store));
-                    })
+
+                        let mut args = vec![];
+                        for (e, _) in ast.iter().skip(1) {
+                            args.push(e);
+                        }
+
+                        let mut compiled_args = vec![];
+                        let mut argc = 0;
+                        for e in args.iter() {
+                            compiled_args.push(vm_compile2(&e, ce)?);
+                            argc += 1;
+                        }
+
+                        pw_store_or_stack!(prog, store, {
+                            for ca in compiled_args.iter() {
+                                ca.eval_to(prog, ResPos::Stack(0));
+                            }
+                            prog.push_op(Op::Call(argc as u16 - 1, store));
+                        })
+                    }
                 },
                 Syntax::Err => {
                     let err_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
