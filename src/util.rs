@@ -163,3 +163,171 @@ pub fn now_timestamp() -> u64 {
     .unwrap()
     .as_secs() as u64
 }
+
+pub fn rgba2hsvaf(rgba: (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
+    let (h, s, v) = rgb2hsv(rgba.0, rgba.1, rgba.2);
+    (h, s, v, rgba.3)
+}
+
+pub fn rgb2hsv(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
+    let c_max = r.max(g.max(b));
+    let c_min = r.min(g.min(b));
+    let delta = c_max - c_min;
+    let mut h =
+        if delta < 0.000001 { 0.0 } else {
+            if r == c_max {
+                60.0 * (((g - b) / delta) % 6.0)
+            } else if g == c_max {
+                60.0 * (((b - r) / delta) + 2.0)
+            } else {
+                60.0 * (((r - g) / delta) + 4.0)
+            }
+        };
+    if h < 0.0 { h += 360.0 }
+    if h > 360.0 { h -= 360.0 }
+    let s = if c_max < 0.000001 { 0.0 } else { delta / c_max };
+    let v = c_max;
+    (h, s, v)
+}
+
+pub fn hsva2rgba(hsva: (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
+    let (r, g, b) = hsv2rgb(hsva.0, hsva.1, hsva.2);
+    (r, g, b, hsva.3)
+}
+
+pub fn hsv2rgb(h: f64, s: f64, v: f64) -> (f64, f64, f64) {
+    let c = v * s;
+    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+    let m = v - c;
+    let (r_, g_, b_) =
+        if        h >= 0.0   && h < 60.0 {
+            (c, x, 0.0)
+        } else if h >= 60.0  && h < 120.0 {
+            (x, c, 0.0)
+        } else if h >= 120.0 && h < 180.0 {
+            (0.0, c, x)
+        } else if h >= 180.0 && h < 240.0 {
+            (0.0, x, c)
+        } else if h >= 240.0 && h < 300.0 {
+            (x, 0.0, c)
+        } else { // if h >= 300.0 && h < 360.0 {
+            (c, 0.0, x)
+        };
+    println!("in: h={}, s={}, v={}, r:{}, g:{}, b: {}", h, s, v,
+        (r_ + m) * 255.0,
+        (g_ + m) * 255.0,
+        (b_ + m) * 255.0);
+    (r_ + m, g_ + m, b_ + m)
+}
+
+pub fn rgba2hexf(rgba: (f64, f64, f64, f64)) -> String {
+    format!("{:02x}{:02x}{:02x}{:02x}",
+        (rgba.0 * 255.0).round() as u8,
+        (rgba.1 * 255.0).round() as u8,
+        (rgba.2 * 255.0).round() as u8,
+        (rgba.3 * 255.0).round() as u8)
+}
+
+pub fn rgba2hex(rgba: (u8, u8, u8, u8)) -> String {
+    format!("{:02x}{:02x}{:02x}{:02x}",
+        rgba.0, rgba.1, rgba.2, rgba.3)
+}
+
+pub fn hex2hsvaf(s: &str) -> (f64, f64, f64, f64) {
+    let (h, s, v, a) = hex2rgbaf(s);
+    (h * 360.0, s * 100.0, v * 100.0, a * 100.0)
+}
+
+pub fn hsva2hexf(hsva: (f64, f64, f64, f64)) -> String {
+    format!("{:02x}{:02x}{:02x}{:02x}",
+        ((hsva.0 / 360.0) * 255.0).round() as u8,
+        (hsva.1 * 255.0).round() as u8,
+        (hsva.2 * 255.0).round() as u8,
+        (hsva.3 * 255.0).round() as u8)
+}
+
+pub fn hex2rgbaf(s: &str) -> (f64, f64, f64, f64) {
+    let (r, g, b, a) = hex2rgba(s);
+    (r as f64 / 255.0,
+     g as f64 / 255.0,
+     b as f64 / 255.0,
+     a as f64 / 255.0)
+}
+
+fn shiftaddup4(u: u8) -> u8 { (u << 4) | u }
+
+pub fn hex2rgba(s: &str) -> (u8, u8, u8, u8) {
+    match s.len() {
+        8 => (
+            u8::from_str_radix(&s[0..2], 16).unwrap_or(0),
+            u8::from_str_radix(&s[2..4], 16).unwrap_or(0),
+            u8::from_str_radix(&s[4..6], 16).unwrap_or(0),
+            u8::from_str_radix(&s[6..8], 16).unwrap_or(255)
+        ),
+        6 => (
+            u8::from_str_radix(&s[0..2], 16).unwrap_or(0),
+            u8::from_str_radix(&s[2..4], 16).unwrap_or(0),
+            u8::from_str_radix(&s[4..6], 16).unwrap_or(0),
+            255
+        ),
+        4 => (
+            shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
+            shiftaddup4(u8::from_str_radix(&s[1..2], 16).unwrap_or(0)),
+            shiftaddup4(u8::from_str_radix(&s[2..3], 16).unwrap_or(0)),
+            shiftaddup4(u8::from_str_radix(&s[3..4], 16).unwrap_or(0xF)),
+        ),
+        3 => (
+            shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
+            shiftaddup4(u8::from_str_radix(&s[1..2], 16).unwrap_or(0)),
+            shiftaddup4(u8::from_str_radix(&s[2..3], 16).unwrap_or(0)),
+            255
+        ),
+        2 => (
+            shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
+            shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
+            shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
+            255
+        ),
+        _ => (255, 0, 255, 255),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn util_rgb2hsv() {
+        assert_eq!(
+            hsva2hexf(rgba2hsvaf(hex2rgbaf("FF0000FF"))),
+            "00ffffff");
+        assert_eq!(
+            hsva2hexf(rgba2hsvaf(hex2rgbaf("00FF00FF"))),
+            "55ffffff");
+        assert_eq!(
+            hsva2hexf(rgba2hsvaf(hex2rgbaf("0000FFFF"))),
+            "aaffffff");
+        assert_eq!(
+            rgba2hsvaf(hex2rgbaf("FF00FFFF")),
+            (300.0, 1.0, 1.0, 1.0));
+        assert_eq!(
+            rgba2hsvaf(hex2rgbaf("00FFFFFF")),
+            (180.0, 1.0, 1.0, 1.0));
+        assert_eq!(
+            rgba2hsvaf(hex2rgbaf("FFFF00FF")),
+            (60.0, 1.0, 1.0, 1.0));
+
+        assert_eq!(
+            rgba2hexf(hsva2rgba((300.0, 1.0, 1.0, 1.0))),
+            "ff00ffff");
+        assert_eq!(
+            rgba2hexf(hsva2rgba((180.0, 1.0, 1.0, 1.0))),
+            "00ffffff");
+        assert_eq!(
+            rgba2hexf(hsva2rgba((60.0, 1.0, 1.0, 1.0))),
+            "ffff00ff");
+        assert_eq!(
+            rgba2hexf(hsva2rgba((100.0, 0.5, 0.25, 1.0))),
+            "2b4020ff");
+    }
+}

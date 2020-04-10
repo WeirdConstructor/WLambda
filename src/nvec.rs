@@ -284,7 +284,7 @@ impl<N: NVecNum> NVec<N> {
             _ => return None
         })
     }
-    
+
     #[inline]
     pub fn from_vval_tpl<W: AsRef<VVal>>((x, y, z, w): (W, W, Option<W>, Option<W>)) -> Option<Self> {
         Some(match (x.as_ref(), y.as_ref(), z, w) {
