@@ -1872,19 +1872,6 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                     "Can only create an IVector with 2, 3 or 4 elements, but got {}.", ecount)))
                         }
                     }
-
-//                    use crate::nvec::NVec;
-//                    Ok(Box::new(move |e: &mut Env| {
-//                        let mut c = lc.iter().map(|f| f(e).map(|v| v.i()));
-//                        let _ = c.next();
-//                        Ok(VVal::IVec(match (c.next(), c.next(), c.next(), c.next()) {
-//                            (Some(x), Some(y), None   , None)    => NVec::Vec2(x?, y?),
-//                            (Some(x), Some(y), Some(z), None)    => NVec::Vec3(x?, y?, z?),
-//                            (Some(x), Some(y), Some(z), Some(w)) => NVec::Vec4(x?, y?, z?, w?),
-//                            _ => return Err(
-//                            )
-//                        }))
-//                    }))
                 },
                 Syntax::FVec => {
                     let lc : Vec<ProgWriter> =
@@ -1933,29 +1920,6 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                     "Can only create an FVector with 2, 3 or 4 elements, but got {}.", ecount)))
                         }
                     }
-//                    use crate::nvec::NVec;
-//                    let lc = l
-//                        .borrow()
-//                        .iter()
-//                        .map(|v| compile(v, ce))
-//                        .collect::<Result<Vec<_>, CompileError>>()?;
-//
-//                    Ok(Box::new(move |e: &mut Env| {
-//                        let mut c = lc.iter().map(|f| f(e).map(|v| v.f()));
-//                        let _ = c.next();
-//                        Ok(VVal::FVec(match (c.next(), c.next(), c.next(), c.next()) {
-//                            (Some(x), Some(y), None   , None)    => NVec::Vec2(x?, y?),
-//                            (Some(x), Some(y), Some(z), None)    => NVec::Vec3(x?, y?, z?),
-//                            (Some(x), Some(y), Some(z), Some(w)) => NVec::Vec4(x?, y?, z?, w?),
-//                            _ => return Err(
-//                                StackAction::panic_str(
-//                                    "Cannot create an IVector without between 2 and 4 (inclusive) integers."
-//                                        .to_string(),
-//                                    Some(spos.clone()),
-//                                ),
-//                            )
-//                        }))
-//                    }))
                 },
                 Syntax::SelfObj => {
                     pw_respos_or_mov!(prog,

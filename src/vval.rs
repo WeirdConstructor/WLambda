@@ -1368,6 +1368,68 @@ impl CycleCheck {
 pub type VValIter =
     std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>>;
 
+macro_rules! swizzle_char2value {
+    ($c: expr, $i: expr, $x: ident, $y: ident, $z: ident, $w: ident) => (
+        match $c.chars().nth($i).unwrap_or(' ') {
+            'r' => $x,
+            'g' => $y,
+            'b' => $z,
+            'a' => $w,
+            '0' => $x,
+            '1' => $y,
+            '2' => $z,
+            '3' => $w,
+            'x' => $x,
+            'y' => $y,
+            'z' => $z,
+            'w' => $w,
+            _ => return VVal::Nul,
+        }
+    )
+}
+
+fn swizzleI(s: &str, x: i64, y: i64, z: i64, w: i64) -> VVal {
+    match s.len() {
+        2 =>
+            VVal::IVec(NVec::Vec2(
+                swizzle_char2value!(s, 0, x, y, z, w),
+                swizzle_char2value!(s, 1, x, y, z, w))),
+        3 =>
+            VVal::IVec(NVec::Vec3(
+                swizzle_char2value!(s, 0, x, y, z, w),
+                swizzle_char2value!(s, 1, x, y, z, w),
+                swizzle_char2value!(s, 2, x, y, z, w))),
+        4 =>
+            VVal::IVec(NVec::Vec4(
+                swizzle_char2value!(s, 0, x, y, z, w),
+                swizzle_char2value!(s, 1, x, y, z, w),
+                swizzle_char2value!(s, 2, x, y, z, w),
+                swizzle_char2value!(s, 3, x, y, z, w))),
+        _ => VVal::Nul,
+    }
+}
+
+fn swizzleF(s: &str, x: f64, y: f64, z: f64, w: f64) -> VVal {
+    match s.len() {
+        2 =>
+            VVal::FVec(NVec::Vec2(
+                swizzle_char2value!(s, 0, x, y, z, w),
+                swizzle_char2value!(s, 1, x, y, z, w))),
+        3 =>
+            VVal::FVec(NVec::Vec3(
+                swizzle_char2value!(s, 0, x, y, z, w),
+                swizzle_char2value!(s, 1, x, y, z, w),
+                swizzle_char2value!(s, 2, x, y, z, w))),
+        4 =>
+            VVal::FVec(NVec::Vec4(
+                swizzle_char2value!(s, 0, x, y, z, w),
+                swizzle_char2value!(s, 1, x, y, z, w),
+                swizzle_char2value!(s, 2, x, y, z, w),
+                swizzle_char2value!(s, 3, x, y, z, w))),
+        _ => VVal::Nul,
+    }
+}
+
 #[allow(dead_code)]
 impl VVal {
     pub fn new_str(s: &str) -> VVal {
@@ -2295,20 +2357,32 @@ impl VVal {
             VVal::Map(m) => m.borrow().get(key).cloned(),
             VVal::IVec(b) => {
                 Some(match key {
-                    "0" | "first"  | "x" => b.x(),
-                    "1" | "second" | "y" => b.y(),
-                    "2" | "third"  | "z" => b.z().unwrap_or(VVal::Nul),
-                    "3" | "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
-                    _ => VVal::Nul
+                    "0" | "first"  | "x" | "r" => b.x(),
+                    "1" | "second" | "y" | "g" => b.y(),
+                    "2" | "third"  | "z" | "b" => b.z().unwrap_or(VVal::Nul),
+                    "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::Nul),
+                    _ =>
+                        swizzleI(
+                            key,
+                            b.x_raw(),
+                            b.y_raw(),
+                            b.z_raw().unwrap_or(0),
+                            b.w_raw().unwrap_or(0)),
                 })
             },
             VVal::FVec(b) => {
                 Some(match key {
-                    "0" | "first"  | "x" => b.x(),
-                    "1" | "second" | "y" => b.y(),
-                    "2" | "third"  | "z" => b.z().unwrap_or(VVal::Nul),
-                    "3" | "fourth" | "w" => b.w().unwrap_or(VVal::Nul),
-                    _ => VVal::Nul
+                    "0" | "first"  | "x" | "r" => b.x(),
+                    "1" | "second" | "y" | "g" => b.y(),
+                    "2" | "third"  | "z" | "b" => b.z().unwrap_or(VVal::Nul),
+                    "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::Nul),
+                    _ =>
+                        swizzleF(
+                            key,
+                            b.x_raw(),
+                            b.y_raw(),
+                            b.z_raw().unwrap_or(0.0),
+                            b.w_raw().unwrap_or(0.0)),
                 })
             },
             VVal::Pair(_) => {

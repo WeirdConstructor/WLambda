@@ -2393,20 +2393,21 @@ fn check_threads() {
 
 #[test]
 fn check_nvec() {
-    assert_eq!(ve("$i(1, 2)"), "$i(1,2)");
-    assert_eq!(ve("$i(1, 2) * 2"), "$i(2,4)");
-    assert_eq!(ve("$f(1, 2) / 2"), "$f(0.5,1)");
-    assert_eq!(ve("$f(2, 0) - $f(2, 0)"), "$f(0,0)");
-    assert_eq!(ve("$i(2, 0) - $f(2, 0)"), "$i(0,0)");
-    assert_eq!(ve("$f(2, 0) + $f(0, 2)"), "$f(2,2)");
-    assert_eq!(ve("$f(2, 0) + $i(1, 2)"), "$f(3,2)");
-    assert_eq!(ve("$i(2, 0) + $f(1, 2)"), "$i(3,2)");
-    assert_eq!(ve("$f(2, 0) + $f(2, 2)"), "$f(4,2)");
+    assert_eq!(ve("$i(1, 2)"),                  "$i(1,2)");
+    assert_eq!(ve("$i(1, 2) * 2"),              "$i(2,4)");
+    assert_eq!(ve("$f(1, 2) / 2"),              "$f(0.5,1)");
+    assert_eq!(ve("$f(2, 0) - $f(2, 0)"),       "$f(0,0)");
+    assert_eq!(ve("$i(2, 0) - $f(2, 0)"),       "$i(0,0)");
+    assert_eq!(ve("$f(2, 0) + $f(0, 2)"),       "$f(2,2)");
+    assert_eq!(ve("$f(2, 0) + $i(1, 2)"),       "$f(3,2)");
+    assert_eq!(ve("$i(2, 0) + $f(1, 2)"),       "$i(3,2)");
+    assert_eq!(ve("$f(2, 0) + $f(2, 2)"),       "$f(4,2)");
     assert_eq!(ve("$i(2, 0) + ${y=2,x=1,z=0}"), "$i(3,2,0)");
-    assert_eq!(ve("$f(2, 0) == ${x=2,y=0}"), "$false");
-    assert_eq!(ve("$i(0, 0) == ${}"), "$false");
-    assert_eq!(ve("$i(0, 0) == ${}"), "$false");
-    assert_eq!(ve("$i(0, 0) == $f(0, 0)"), "$false");
+    assert_eq!(ve("$i(2, 0) + $[2,1,3]"),       "$i(4,1,3)");
+    assert_eq!(ve("$f(2, 0) == ${x=2,y=0}"),    "$false");
+    assert_eq!(ve("$i(0, 0) == ${}"),           "$false");
+    assert_eq!(ve("$i(0, 0) == ${}"),           "$false");
+    assert_eq!(ve("$i(0, 0) == $f(0, 0)"),      "$false");
 
     assert_eq!(ve("$i(2, 3).x"),        "2");
     assert_eq!(ve("$i(2, 3).y"),        "3");
@@ -2448,13 +2449,28 @@ fn check_nvec() {
     assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).2"),  "4.2");
     assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).3"),  "5.3");
 
-    assert_eq!(ve("$i(1, 2).xx"),       "");
-    assert_eq!(ve("$i(1, 2).xxx"),      "");
-    assert_eq!(ve("$i(1, 2).xyxy"),     "");
-    assert_eq!(ve("$i(1, 2, 3).zx"),    "");
-    assert_eq!(ve("$i(1, 2, 3).zxy"),   "");
-    assert_eq!(ve("$i(1, 2, 3).zx"),    "");
-    assert_eq!(ve("$i(1, 2, 3).zx"),    "");
+    assert_eq!(ve("$i(2, 3).r"),        "2");
+    assert_eq!(ve("$i(2, 3).g"),        "3");
+    assert_eq!(ve("$i(2, 3, 4).r"),     "2");
+    assert_eq!(ve("$i(2, 3, 4).g"),     "3");
+    assert_eq!(ve("$i(2, 3, 4).b"),     "4");
+    assert_eq!(ve("$i(2, 3, 4, 5).r"),  "2");
+    assert_eq!(ve("$i(2, 3, 4, 5).g"),  "3");
+    assert_eq!(ve("$i(2, 3, 4, 5).b"),  "4");
+    assert_eq!(ve("$i(2, 3, 4, 5).a"),  "5");
+
+    assert_eq!(ve("$i(1, 2).xx"),       "$i(1,1)");
+    assert_eq!(ve("$i(1, 2).xxx"),      "$i(1,1,1)");
+    assert_eq!(ve("$i(1, 2).xyxy"),     "$i(1,2,1,2)");
+    assert_eq!(ve("$i(1, 2, 3).zx"),    "$i(3,1)");
+    assert_eq!(ve("$i(1, 2, 3).zxy"),   "$i(3,1,2)");
+    assert_eq!(ve("$i(1, 2, 3).zx"),    "$i(3,1)");
+    assert_eq!(ve("$i(1, 2, 3).zx"),    "$i(3,1)");
+
+    assert_eq!(ve("$i(255, 128, 64).rrg"),       "$i(255,255,128)");
+    assert_eq!(ve("$i(255, 128).rgba"),          "$i(255,128,0,0)");
+    assert_eq!(ve("$i(255, 128, 64).rgba"),      "$i(255,128,64,0)");
+    assert_eq!(ve("$i(255, 128, 64, 255).rgba"), "$i(255,128,64,255)");
 }
 
 #[test]
