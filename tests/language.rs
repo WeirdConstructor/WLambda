@@ -2461,6 +2461,16 @@ fn check_nvec() {
     assert_eq!(ve("$i(2, 3, 4, 5).b"),  "4");
     assert_eq!(ve("$i(2, 3, 4, 5).a"),  "5");
 
+    assert_eq!(ve("$i(2, 3).h"),        "2");
+    assert_eq!(ve("$i(2, 3).s"),        "3");
+    assert_eq!(ve("$i(2, 3, 4).h"),     "2");
+    assert_eq!(ve("$i(2, 3, 4).s"),     "3");
+    assert_eq!(ve("$i(2, 3, 4).v"),     "4");
+    assert_eq!(ve("$i(2, 3, 4, 5).h"),  "2");
+    assert_eq!(ve("$i(2, 3, 4, 5).s"),  "3");
+    assert_eq!(ve("$i(2, 3, 4, 5).v"),  "4");
+    assert_eq!(ve("$i(2, 3, 4, 5).a"),  "5");
+
     assert_eq!(ve("$i(1, 2).xx"),       "$i(1,1)");
     assert_eq!(ve("$i(1, 2).xxx"),      "$i(1,1,1)");
     assert_eq!(ve("$i(1, 2).xyxy"),     "$i(1,2,1,2)");
