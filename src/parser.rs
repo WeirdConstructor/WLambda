@@ -957,84 +957,45 @@ fn make_sym(ps: &State, identifier: &str) -> VVal {
     id
 }
 
-fn make_binop(ps: &State, op: &str, left: VVal, right: VVal) -> VVal {
+fn make_binop(ps: &State, op: &str) -> VVal {
     if op == "&and" {
-        let and = ps.syn(Syntax::And);
-        and.push(left);
-        and.push(right);
-        and
+        ps.syn(Syntax::And)
 
     } else if op == "&or" {
-        let or = ps.syn(Syntax::Or);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::Or)
 
     } else if op == "+" {
-        let or = ps.syn(Syntax::BinOpAdd);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpAdd)
 
     } else if op == "-" {
-        let or = ps.syn(Syntax::BinOpSub);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpSub)
 
     } else if op == "*" {
-        let or = ps.syn(Syntax::BinOpMul);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpMul)
 
     } else if op == "/" {
-        let or = ps.syn(Syntax::BinOpDiv);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpDiv)
 
     } else if op == "%" {
-        let or = ps.syn(Syntax::BinOpMod);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpMod)
 
     } else if op == ">" {
-        let or = ps.syn(Syntax::BinOpGt);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpGt)
 
     } else if op == "<" {
-        let or = ps.syn(Syntax::BinOpLt);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpLt)
 
     } else if op == "<=" {
-        let or = ps.syn(Syntax::BinOpLe);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpLe)
 
     } else if op == ">=" {
-        let or = ps.syn(Syntax::BinOpGe);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpGe)
 
     } else if op == "==" {
-        let or = ps.syn(Syntax::BinOpEq);
-        or.push(left);
-        or.push(right);
-        or
+        ps.syn(Syntax::BinOpEq)
 
     } else {
-        let call = make_to_call(ps, make_var(ps, op));
-        call.push(left);
-        call.push(right);
-        call
+        make_to_call(ps, make_var(ps, op))
     }
 }
 
@@ -1351,23 +1312,29 @@ fn get_op_prec(op: &str) -> i32 {
     }
 }
 
-fn parse_binop(mut left: VVal, ps: &mut State, op: &str) -> Result<VVal, ParseError> {
+fn parse_binop(mut left: VVal, ps: &mut State, op: &str, binop: VVal) -> Result<VVal, ParseError> {
     let prec = get_op_prec(op);
     let mut right = parse_call(ps, true)?;
 
     while let Some(next_op) = ps.peek_op() {
+        let next_prec = get_op_prec(&next_op);
+        let next_binop = make_binop(ps, &next_op);
+
         ps.consume_wsc_n(next_op.len());
 
-        let next_prec = get_op_prec(&next_op);
         if prec < next_prec {
-            right = parse_binop(right, ps, &next_op)?;
+            right = parse_binop(right, ps, &next_op, next_binop)?;
         } else {
-            left = make_binop(ps, &op, left, right);
-            return parse_binop(left, ps, &next_op);
+            binop.push(left);
+            binop.push(right);
+            left = binop;
+            return parse_binop(left, ps, &next_op, next_binop);
         }
     }
 
-    Ok(make_binop(ps, op, left, right))
+    binop.push(left);
+    binop.push(right);
+    Ok(binop)
 }
 
 fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
@@ -1426,8 +1393,9 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
             _ if op.is_some() => {
                 if binop_mode { break; }
                 let op = op.unwrap();
+                let binop = make_binop(ps, &op);
                 ps.consume_wsc_n(op.len());
-                value = parse_binop(value, ps, &op)?;
+                value = parse_binop(value, ps, &op, binop)?;
             },
             '=' => { break; }, // '=' from parsing map keys
             _ => {

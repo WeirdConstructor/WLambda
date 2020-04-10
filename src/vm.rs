@@ -166,6 +166,42 @@ impl Prog {
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                 },
+                Op::NewNVec(vec, p1) => {
+                    use std::borrow::BorrowMut;
+                    match vec.borrow_mut() {
+                        NVecPos::IVec2(a, b) => {
+                            patch_respos_data(a, self_data_next_idx);
+                            patch_respos_data(b, self_data_next_idx);
+                        },
+                        NVecPos::IVec3(a, b, c) => {
+                            patch_respos_data(a, self_data_next_idx);
+                            patch_respos_data(b, self_data_next_idx);
+                            patch_respos_data(c, self_data_next_idx);
+                        },
+                        NVecPos::IVec4(a, b, c, d) => {
+                            patch_respos_data(a, self_data_next_idx);
+                            patch_respos_data(b, self_data_next_idx);
+                            patch_respos_data(c, self_data_next_idx);
+                            patch_respos_data(d, self_data_next_idx);
+                        },
+                        NVecPos::FVec2(a, b) => {
+                            patch_respos_data(a, self_data_next_idx);
+                            patch_respos_data(b, self_data_next_idx);
+                        },
+                        NVecPos::FVec3(a, b, c) => {
+                            patch_respos_data(a, self_data_next_idx);
+                            patch_respos_data(b, self_data_next_idx);
+                            patch_respos_data(c, self_data_next_idx);
+                        },
+                        NVecPos::FVec4(a, b, c, d) => {
+                            patch_respos_data(a, self_data_next_idx);
+                            patch_respos_data(b, self_data_next_idx);
+                            patch_respos_data(c, self_data_next_idx);
+                            patch_respos_data(d, self_data_next_idx);
+                        },
+                    }
+                    patch_respos_data(p1, self_data_next_idx);
+                },
                 Op::Mov(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
@@ -481,9 +517,21 @@ pub enum Builtin {
 
 #[derive(Debug,Clone)]
 #[repr(u8)]
+pub enum NVecPos {
+    IVec2(ResPos, ResPos),
+    IVec3(ResPos, ResPos, ResPos),
+    IVec4(ResPos, ResPos, ResPos, ResPos),
+    FVec2(ResPos, ResPos),
+    FVec3(ResPos, ResPos, ResPos),
+    FVec4(ResPos, ResPos, ResPos, ResPos),
+}
+
+#[derive(Debug,Clone)]
+#[repr(u8)]
 pub enum Op {
     Mov(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
+    NewNVec(Box<NVecPos>, ResPos),
     Argv(ResPos),
     ToRef(ResPos, ResPos, ToRefType),
     ClearLocals(u16, u16),
@@ -660,6 +708,54 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, prog, a, b, r, {
                 VVal::Pair(Box::new((b, a)))
             }),
+            Op::NewNVec(vp, r) => {
+                use crate::nvec::NVec;
+
+                match vp.as_ref() {
+                    NVecPos::IVec2(a, b) => {
+                        in_reg!(env, ret, prog, a);
+                        in_reg!(env, ret, prog, b);
+                        out_reg!(env, ret, prog, r,
+                            VVal::IVec(NVec::Vec2(a.i(), b.i())));
+                    },
+                    NVecPos::IVec3(a, b, c) => {
+                        in_reg!(env, ret, prog, a);
+                        in_reg!(env, ret, prog, b);
+                        in_reg!(env, ret, prog, c);
+                        out_reg!(env, ret, prog, r,
+                            VVal::IVec(NVec::Vec3(a.i(), b.i(), c.i())));
+                    },
+                    NVecPos::IVec4(a, b, c, d) => {
+                        in_reg!(env, ret, prog, a);
+                        in_reg!(env, ret, prog, b);
+                        in_reg!(env, ret, prog, c);
+                        in_reg!(env, ret, prog, d);
+                        out_reg!(env, ret, prog, r,
+                            VVal::IVec(NVec::Vec4(a.i(), b.i(), c.i(), d.i())));
+                    },
+                    NVecPos::FVec2(a, b) => {
+                        in_reg!(env, ret, prog, a);
+                        in_reg!(env, ret, prog, b);
+                        out_reg!(env, ret, prog, r,
+                            VVal::FVec(NVec::Vec2(a.f(), b.f())));
+                    },
+                    NVecPos::FVec3(a, b, c) => {
+                        in_reg!(env, ret, prog, a);
+                        in_reg!(env, ret, prog, b);
+                        in_reg!(env, ret, prog, c);
+                        out_reg!(env, ret, prog, r,
+                            VVal::FVec(NVec::Vec3(a.f(), b.f(), c.f())));
+                    },
+                    NVecPos::FVec4(a, b, c, d) => {
+                        in_reg!(env, ret, prog, a);
+                        in_reg!(env, ret, prog, b);
+                        in_reg!(env, ret, prog, c);
+                        in_reg!(env, ret, prog, d);
+                        out_reg!(env, ret, prog, r,
+                            VVal::FVec(NVec::Vec4(a.f(), b.f(), c.f(), d.f())));
+                    },
+                }
+            },
             Op::ToRef(a, r, trtype) => {
                 match trtype {
                     ToRefType::CaptureRef =>
@@ -949,16 +1045,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 if a.b() {
                     pc = (pc as i32 + *jmp_offs) as usize;
                     out_reg!(env, ret, prog, r, a);
-                } else if *jmp_offs == 0 {
-                    out_reg!(env, ret, prog, r, a);
                 }
             },
             Op::AndJmp(a, jmp_offs, r) => {
                 in_reg!(env, ret, prog, a);
                 if !a.b() {
                     pc = (pc as i32 + *jmp_offs) as usize;
-                    out_reg!(env, ret, prog, r, a);
-                } else if *jmp_offs == 0 {
                     out_reg!(env, ret, prog, r, a);
                 }
             },
@@ -1697,6 +1789,138 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         prog.data_pos(string.clone())
                     })
                 },
+                Syntax::IVec => {
+                    let lc : Vec<ProgWriter> =
+                        ast.map_skip(|e| { vm_compile2(e, ce) }, 1)?;
+
+                    match lc.len() {
+                        2 => {
+                            pw_store_or_stack!(prog, store, {
+                                let lc0p = lc[0].eval(prog);
+                                let lc1p = lc[1].eval(prog);
+                                prog.push_op(
+                                    Op::NewNVec(
+                                        Box::new(
+                                            NVecPos::IVec2(lc0p, lc1p)),
+                                        store));
+                            })
+                        },
+                        3 => {
+                            pw_store_or_stack!(prog, store, {
+                                let lc0p = lc[0].eval(prog);
+                                let lc1p = lc[1].eval(prog);
+                                let lc2p = lc[2].eval(prog);
+                                prog.push_op(
+                                    Op::NewNVec(
+                                        Box::new(
+                                            NVecPos::IVec3(lc0p, lc1p, lc2p)),
+                                        store));
+                            })
+                        },
+                        4 => {
+                            pw_store_or_stack!(prog, store, {
+                                let lc0p = lc[0].eval(prog);
+                                let lc1p = lc[1].eval(prog);
+                                let lc2p = lc[2].eval(prog);
+                                let lc3p = lc[3].eval(prog);
+                                prog.push_op(
+                                    Op::NewNVec(
+                                        Box::new(
+                                            NVecPos::IVec4(lc0p, lc1p, lc2p, lc3p)),
+                                        store));
+                            })
+                        },
+                        ecount => {
+                            Err(ast.compile_err(
+                                format!(
+                                    "Can only create an IVector with 2, 3 or 4 elements, but got {}.", ecount)))
+                        }
+                    }
+
+//                    use crate::nvec::NVec;
+//                    Ok(Box::new(move |e: &mut Env| {
+//                        let mut c = lc.iter().map(|f| f(e).map(|v| v.i()));
+//                        let _ = c.next();
+//                        Ok(VVal::IVec(match (c.next(), c.next(), c.next(), c.next()) {
+//                            (Some(x), Some(y), None   , None)    => NVec::Vec2(x?, y?),
+//                            (Some(x), Some(y), Some(z), None)    => NVec::Vec3(x?, y?, z?),
+//                            (Some(x), Some(y), Some(z), Some(w)) => NVec::Vec4(x?, y?, z?, w?),
+//                            _ => return Err(
+//                            )
+//                        }))
+//                    }))
+                },
+                Syntax::FVec => {
+                    let lc : Vec<ProgWriter> =
+                        ast.map_skip(|e| { vm_compile2(e, ce) }, 1)?;
+
+                    match lc.len() {
+                        2 => {
+                            pw_store_or_stack!(prog, store, {
+                                let lc0p = lc[0].eval(prog);
+                                let lc1p = lc[1].eval(prog);
+                                prog.push_op(
+                                    Op::NewNVec(
+                                        Box::new(
+                                            NVecPos::FVec2(lc0p, lc1p)),
+                                        store));
+                            })
+                        },
+                        3 => {
+                            pw_store_or_stack!(prog, store, {
+                                let lc0p = lc[0].eval(prog);
+                                let lc1p = lc[1].eval(prog);
+                                let lc2p = lc[2].eval(prog);
+                                prog.push_op(
+                                    Op::NewNVec(
+                                        Box::new(
+                                            NVecPos::FVec3(lc0p, lc1p, lc2p)),
+                                        store));
+                            })
+                        },
+                        4 => {
+                            pw_store_or_stack!(prog, store, {
+                                let lc0p = lc[0].eval(prog);
+                                let lc1p = lc[1].eval(prog);
+                                let lc2p = lc[2].eval(prog);
+                                let lc3p = lc[3].eval(prog);
+                                prog.push_op(
+                                    Op::NewNVec(
+                                        Box::new(
+                                            NVecPos::FVec4(lc0p, lc1p, lc2p, lc3p)),
+                                        store));
+                            })
+                        },
+                        ecount => {
+                            Err(ast.compile_err(
+                                format!(
+                                    "Can only create an FVector with 2, 3 or 4 elements, but got {}.", ecount)))
+                        }
+                    }
+//                    use crate::nvec::NVec;
+//                    let lc = l
+//                        .borrow()
+//                        .iter()
+//                        .map(|v| compile(v, ce))
+//                        .collect::<Result<Vec<_>, CompileError>>()?;
+//
+//                    Ok(Box::new(move |e: &mut Env| {
+//                        let mut c = lc.iter().map(|f| f(e).map(|v| v.f()));
+//                        let _ = c.next();
+//                        Ok(VVal::FVec(match (c.next(), c.next(), c.next(), c.next()) {
+//                            (Some(x), Some(y), None   , None)    => NVec::Vec2(x?, y?),
+//                            (Some(x), Some(y), Some(z), None)    => NVec::Vec3(x?, y?, z?),
+//                            (Some(x), Some(y), Some(z), Some(w)) => NVec::Vec4(x?, y?, z?, w?),
+//                            _ => return Err(
+//                                StackAction::panic_str(
+//                                    "Cannot create an IVector without between 2 and 4 (inclusive) integers."
+//                                        .to_string(),
+//                                    Some(spos.clone()),
+//                                ),
+//                            )
+//                        }))
+//                    }))
+                },
                 Syntax::SelfObj => {
                     pw_respos_or_mov!(prog,
                         { ResPos::Value(ResValue::SelfObj) })
@@ -1845,43 +2069,46 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     })
                 },
                 Syntax::Or => {
-                    let mut exprs : Vec<ProgWriter> =
-                        ast.map_skip(|e| vm_compile2(e, ce), 1)?;
+                    let a = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let b = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-                    let mut exs : Vec<(Prog, ResPos, usize)> = vec![];
-                    for e in exprs.iter() {
-                        let mut p = Prog::new();
-                        let rp = e.eval(&mut p);
-                        println!("PUSH");
-                        p.dump();
-                        exs.push((p, rp, 0));
-                    }
+                    let mut aprog = Prog::new();
+                    let ap = a.eval(&mut aprog);
 
-                    let mut jmp_offs = 0;
-                    for e in exs.iter_mut().rev() {
-                        jmp_offs += e.0.op_count() + 1;
-                        e.2 += jmp_offs - 1;
-                    }
+                    let mut bprog = Prog::new();
+                    let bp = b.eval(&mut bprog);
+
                     pw_store_or_stack!(prog, store, {
-                        for e in exs.iter() {
-                            let mut p = e.0.clone();
-                            p.push_op(Op::OrJmp(e.1, e.2 as i32, store));
-                            prog.append(p);
-                        }
+                        let mut aprog = aprog.clone();
+                        let mut bprog = bprog.clone();
+                        bprog.set_dbg(spos.clone());
+                        bprog.push_op(Op::Mov(bp, store));
+                        aprog.set_dbg(spos.clone());
+                        aprog.push_op(Op::OrJmp(ap, bprog.op_count() as i32, store));
+                        prog.append(aprog);
+                        prog.append(bprog);
                     })
+                },
+                Syntax::And => {
+                    let a = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    let b = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-//                    pw_store_or_stack!(prog, store, {
-//                        VVal::Nul
-//                    })
-//                    Ok(Box::new(move |e: &mut Env| {
-//                        for x in exprs.iter() {
-//                            let ret = x(e)?;
-//                            if ret.b() {
-//                                return Ok(ret);
-//                            }
-//                        }
-//                        Ok(VVal::Bol(false))
-//                    }))
+                    let mut aprog = Prog::new();
+                    let ap = a.eval(&mut aprog);
+
+                    let mut bprog = Prog::new();
+                    let bp = b.eval(&mut bprog);
+
+                    pw_store_or_stack!(prog, store, {
+                        let mut aprog = aprog.clone();
+                        let mut bprog = bprog.clone();
+                        bprog.set_dbg(spos.clone());
+                        bprog.push_op(Op::Mov(bp, store));
+                        aprog.set_dbg(spos.clone());
+                        aprog.push_op(Op::AndJmp(ap, bprog.op_count() as i32, store));
+                        prog.append(aprog);
+                        prog.append(bprog);
+                    })
                 },
 //                Syntax::And => {
 //                    let exprs : Vec<EvalNode> =

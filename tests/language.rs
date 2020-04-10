@@ -518,12 +518,36 @@ fn check_global_vars() {
 
 #[test]
 fn check_and_or() {
-//    assert_eq!(ve("$t &and $t"),    "$true");
-//    assert_eq!(ve("$f &and $t"),    "$false");
+    assert_eq!(ve("$t &and $t"),                "$true");
+    assert_eq!(ve("$f &and $t"),                "$false");
+    assert_eq!(ve("$t &and 10 &and (1 + 3)"),   "4");
+    assert_eq!(ve("$t &and 0 &and (1 + 3)"),    "0");
+    assert_eq!(ve("\"\" &and (4+3) &and (1 + 3)"), "\"\"");
+    assert_eq!(ve(r"
+        !x = 0;
+        !inc = { .x = x + 1; x };
+        !a = inc[] &and inc[] &and inc[] &and inc[];
+        !b = x;
+        $p(a,b)
+    "), "$p(4,4)");
+
     assert_eq!(ve("$t &or  $t"),    "$true");
     assert_eq!(ve("$f &or  $t"),    "$true");
     assert_eq!(ve("$f &or  $f"),    "$false");
-    assert_eq!(ve("$f &or  $f &or 0 &or 10"),    "$false");
+    assert_eq!(ve("$f\n&or\n$f\n&or\n0\n&or\n10"), "10");
+    assert_eq!(ve("11\n&or\n$f\n&or\n0\n&or\n10"), "11");
+    assert_eq!(ve("$f\n&or\n12\n&or\n0\n&or\n10"), "12");
+    assert_eq!(ve("$f\n&or\n\"\"\n&or\n13\n&or\n10"), "13");
+    assert_eq!(ve("$f\n&or\n(1 + 2 * 4)\n&or\n13\n&or\n10"), "9");
+    assert_eq!(ve("(8 - 2 * 4)\n&or\n(1 + 2 * 4)\n&or\n13\n&or\n10"), "9");
+
+    assert_eq!(ve(r"
+        !x = 0;
+        !inc = { .x = x + 1; x };
+        !a = inc[] &or inc[] &or inc[] &or inc[];
+        !b = x;
+        $p(a,b)
+    "), "$p(1,1)");
 }
 
 #[test]
