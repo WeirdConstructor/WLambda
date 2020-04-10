@@ -802,38 +802,74 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Add(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Int(a) = a {
                     VVal::Int(a.wrapping_add(b.i()))
+                } else if let VVal::Flt(f) = a {
+                    VVal::Flt(f + b.f())
                 } else {
                     match (a, b) {
                         (VVal::IVec(ln), re) => VVal::IVec(ln + re.nvec()),
                         (VVal::FVec(ln), re) => VVal::FVec(ln + re.nvec()),
-                        (VVal::Flt(f), re)   => VVal::Flt(f + re.f()),
                         (le, re)             => VVal::Int(le.i().wrapping_add(re.i()))
                     }
                 }
             }),
             Op::Sub(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
-                if let VVal::Flt(f) = a { VVal::Flt(f - b.f()) }
-                else { VVal::Int(a.i().wrapping_sub(b.i())) }
+                if let VVal::Int(a) = a {
+                    VVal::Int(a.wrapping_sub(b.i()))
+                } else if let VVal::Flt(f) = a {
+                    VVal::Flt(f - b.f())
+                } else {
+                    match (a, b) {
+                        (VVal::IVec(ln), re) => VVal::IVec(ln - re.nvec()),
+                        (VVal::FVec(ln), re) => VVal::FVec(ln - re.nvec()),
+                        (le, re)             => VVal::Int(le.i().wrapping_sub(re.i()))
+                    }
+                }
             }),
             Op::Div(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
-                if let VVal::Flt(f) = a {
+                if let VVal::Int(a) = a {
+                    if b.i() == 0 {
+                        env.unwind_to_depth(uw_depth);
+                        retv =
+                            Err(StackAction::panic_str(
+                                format!("Division by 0: {}/{}", a, b.i()),
+                                prog.debug[pc].clone()));
+                        break;
+                    }
+
+                    VVal::Int(a.wrapping_div(b.i()))
+                } else if let VVal::Flt(f) = a {
                     VVal::Flt(f / b.f())
-
-                } else if b.i() == 0 {
-                    env.unwind_to_depth(uw_depth);
-                    retv =
-                        Err(StackAction::panic_str(
-                            format!("Division by 0: {}/{}", a.i(), b.i()),
-                            prog.debug[pc].clone()));
-                    break;
-
                 } else {
-                    VVal::Int(a.i().wrapping_div(b.i()))
+                    match (a, b) {
+                        (VVal::IVec(ln), re) => VVal::IVec(ln / re.i()),
+                        (VVal::FVec(ln), re) => VVal::FVec(ln / re.f()),
+                        (le, re)             => {
+                            let re = re.i();
+                            if re == 0 {
+                                env.unwind_to_depth(uw_depth);
+                                retv =
+                                    Err(StackAction::panic_str(
+                                        format!("Division by 0: {}/{}", le.i(), re),
+                                        prog.debug[pc].clone()));
+                                break;
+                            }
+                            VVal::Int(le.i().wrapping_div(re))
+                        },
+                    }
                 }
             }),
             Op::Mul(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
-                if let VVal::Flt(f) = a { VVal::Flt(f * b.f()) }
-                else { VVal::Int(a.i().wrapping_mul(b.i())) }
+                if let VVal::Int(a) = a {
+                    VVal::Int(a.wrapping_mul(b.i()))
+                } else if let VVal::Flt(f) = a {
+                    VVal::Flt(f * b.f())
+                } else {
+                    match (a, b) {
+                        (VVal::IVec(ln), re) => VVal::IVec(ln * re.i()),
+                        (VVal::FVec(ln), re) => VVal::FVec(ln * re.f()),
+                        (le, re)             => VVal::Int(le.i().wrapping_mul(re.i()))
+                    }
+                }
             }),
             Op::Mod(b, a, r) => op_a_b_r!(env, ret, prog, b, a, r, {
                 if let VVal::Flt(f) = a {

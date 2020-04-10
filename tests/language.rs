@@ -2397,13 +2397,64 @@ fn check_nvec() {
     assert_eq!(ve("$i(1, 2) * 2"), "$i(2,4)");
     assert_eq!(ve("$f(1, 2) / 2"), "$f(0.5,1)");
     assert_eq!(ve("$f(2, 0) - $f(2, 0)"), "$f(0,0)");
+    assert_eq!(ve("$i(2, 0) - $f(2, 0)"), "$i(0,0)");
     assert_eq!(ve("$f(2, 0) + $f(0, 2)"), "$f(2,2)");
+    assert_eq!(ve("$f(2, 0) + $i(1, 2)"), "$f(3,2)");
+    assert_eq!(ve("$i(2, 0) + $f(1, 2)"), "$i(3,2)");
     assert_eq!(ve("$f(2, 0) + $f(2, 2)"), "$f(4,2)");
     assert_eq!(ve("$i(2, 0) + ${y=2,x=1,z=0}"), "$i(3,2,0)");
     assert_eq!(ve("$f(2, 0) == ${x=2,y=0}"), "$false");
     assert_eq!(ve("$i(0, 0) == ${}"), "$false");
     assert_eq!(ve("$i(0, 0) == ${}"), "$false");
     assert_eq!(ve("$i(0, 0) == $f(0, 0)"), "$false");
+
+    assert_eq!(ve("$i(2, 3).x"),        "2");
+    assert_eq!(ve("$i(2, 3).y"),        "3");
+    assert_eq!(ve("$i(2, 3, 4).x"),     "2");
+    assert_eq!(ve("$i(2, 3, 4).y"),     "3");
+    assert_eq!(ve("$i(2, 3, 4).z"),     "4");
+    assert_eq!(ve("$i(2, 3, 4, 5).x"),  "2");
+    assert_eq!(ve("$i(2, 3, 4, 5).y"),  "3");
+    assert_eq!(ve("$i(2, 3, 4, 5).z"),  "4");
+    assert_eq!(ve("$i(2, 3, 4, 5).w"),  "5");
+
+    assert_eq!(ve("$f(2.1, 3.1).x"),            "2.1");
+    assert_eq!(ve("$f(2.1, 3.1).y"),            "3.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2).x"),       "2.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2).y"),       "3.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2).z"),       "4.2");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).x"),  "2.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).y"),  "3.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).z"),  "4.2");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).w"),  "5.3");
+
+    assert_eq!(ve("$i(2, 3).0"),        "2");
+    assert_eq!(ve("$i(2, 3).1"),        "3");
+    assert_eq!(ve("$i(2, 3, 4).0"),     "2");
+    assert_eq!(ve("$i(2, 3, 4).1"),     "3");
+    assert_eq!(ve("$i(2, 3, 4).2"),     "4");
+    assert_eq!(ve("$i(2, 3, 4, 5).0"),  "2");
+    assert_eq!(ve("$i(2, 3, 4, 5).1"),  "3");
+    assert_eq!(ve("$i(2, 3, 4, 5).2"),  "4");
+    assert_eq!(ve("$i(2, 3, 4, 5).3"),  "5");
+
+    assert_eq!(ve("$f(2.1, 3.1).0"),            "2.1");
+    assert_eq!(ve("$f(2.1, 3.1).1"),            "3.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2).0"),       "2.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2).1"),       "3.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2).2"),       "4.2");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).0"),  "2.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).1"),  "3.1");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).2"),  "4.2");
+    assert_eq!(ve("$f(2.1, 3.1, 4.2, 5.3).3"),  "5.3");
+
+    assert_eq!(ve("$i(1, 2).xx"),       "");
+    assert_eq!(ve("$i(1, 2).xxx"),      "");
+    assert_eq!(ve("$i(1, 2).xyxy"),     "");
+    assert_eq!(ve("$i(1, 2, 3).zx"),    "");
+    assert_eq!(ve("$i(1, 2, 3).zxy"),   "");
+    assert_eq!(ve("$i(1, 2, 3).zx"),    "");
+    assert_eq!(ve("$i(1, 2, 3).zx"),    "");
 }
 
 #[test]
