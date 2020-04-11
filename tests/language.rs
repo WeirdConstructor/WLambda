@@ -317,22 +317,44 @@ fn check_while() {
 
     assert_eq!(ve(r#"
         !x = $&0;
+        while { x < 2 } {
+            .x = x + 1;
+            next[];
+            .x = x + 100;
+        };
+        $*x
+    "#),
+    "2");
+
+    assert_eq!(ve(r#"
+        !x = $&0;
+        while { x < 2 } {
+            !k = std:to_drop 10 {|| .x = 99; };
+            .x = x + 1;
+            next[];
+        };
+        $*x
+    "#),
+    "99");
+
+    assert_eq!(ve(r#"
+        !x = $&0;
+        while { x < 2 } {
+            !k = std:to_drop 10 {|| .x = 89; };
+            .x = x + 1;
+        };
+        $*x
+    "#),
+    "89");
+
+    assert_eq!(ve(r#"
+        !x = $&0;
         while { x == 0 } {
             break 10;
             .x = x + 1;
         }
     "#),
     "10");
-
-    assert_eq!(ve(r#"
-        !x = $&0;
-        while { x == 0 } {
-            next;
-            .x = x + 1;
-        };
-        $*x
-    "#),
-    "1");
 
     assert_eq!(ve(r#"
         !x = 0;

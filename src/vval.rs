@@ -183,10 +183,10 @@ const STACK_SIZE : usize = 10240;
 
 #[derive(Debug, Clone, Copy)]
 pub struct LoopInfo {
-    pc:       usize,
-    uw_depth: usize,
-    sp:       usize,
-    break_pc: usize,
+    pub pc:       usize,
+    pub uw_depth: usize,
+    pub sp:       usize,
+    pub break_pc: usize,
 }
 
 /// Describes an action that needs to be done when returning from a function
@@ -718,7 +718,7 @@ impl Env {
 
     #[inline]
     pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize) {
-        let uw_depth = self.unwind_depth();
+        let uw_depth = self.unwind_depth() + 1;
         let loop_sp  = self.sp;
         self.unwind_stack.push(
             UnwindAction::RestoreLoopInfo(

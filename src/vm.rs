@@ -298,11 +298,15 @@ impl Prog {
                 Op::Builtin(Builtin::Export(_, p1)) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
+                Op::CtrlFlow(CtrlFlow::Break(p1)) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
                 Op::NewMap(p1) => { patch_respos_data(p1, self_data_next_idx); },
                 Op::NewList(p1) => { patch_respos_data(p1, self_data_next_idx); },
                 Op::Argv(p1) => { patch_respos_data(p1, self_data_next_idx); },
                 Op::End
                 | Op::Builtin(Builtin::DumpStack(_))
+                | Op::CtrlFlow(CtrlFlow::Next)
                 | Op::Unwind
                 | Op::Accumulator(_)
                 | Op::PushLoopInfo(_)
@@ -527,6 +531,13 @@ pub enum Builtin {
 
 #[derive(Debug,Clone)]
 #[repr(u8)]
+pub enum CtrlFlow {
+    Next,
+    Break(ResPos),
+}
+
+#[derive(Debug,Clone)]
+#[repr(u8)]
 pub enum NVecPos {
     IVec2(ResPos, ResPos),
     IVec3(ResPos, ResPos, ResPos),
@@ -582,6 +593,7 @@ pub enum Op {
     JmpIfN(ResPos, i32),
     OrJmp(ResPos, i32, ResPos),
     AndJmp(ResPos, i32, ResPos),
+    CtrlFlow(CtrlFlow),
     Builtin(Builtin),
     Unwind,
     End,
@@ -868,6 +880,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Unwind              => { env.unwind_one(); },
             Op::PushLoopInfo(body_ops) => {
                 env.push_loop_info(pc, pc + *body_ops as usize);
+                println!("*LOOPINO: {:?}", env.loop_info);
             },
             Op::ClearLocals(from, to) => {
                 env.push_clear_locals(*from as usize, *to as usize);
@@ -1165,6 +1178,30 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 if !a.b() {
                     pc = (pc as i32 + *jmp_offs) as usize;
                     out_reg!(env, ret, prog, r, a);
+                }
+            },
+            Op::CtrlFlow(flw) => {
+                match flw {
+                    CtrlFlow::Next => {
+                        if env.loop_info.break_pc == 0 {
+                            env.unwind_to_depth(uw_depth);
+                            retv = Err(StackAction::Next);
+                            break;
+                        } else {
+                            env.unwind_to_depth(env.loop_info.uw_depth);
+                            println!("LOOPINO: {:?}", env.loop_info);
+                            pc = env.loop_info.pc;
+                        }
+                    },
+                    CtrlFlow::Break(a) => {
+                        in_reg!(env, ret, prog, a);
+
+                        if env.loop_info.break_pc == 0 {
+                            env.unwind_to_depth(uw_depth);
+                            retv = Err(StackAction::Break(a));
+                            break;
+                        }
+                    },
                 }
             },
             Op::Builtin(b) => {
@@ -1601,6 +1638,71 @@ fn vm_compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     pw_null!(prog, { })
 }
 
+pub fn vm_compile_next2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    if ast.len() > 2 {
+        return Err(ast.compile_err(
+            format!("next takes only 0 or 1 arguments: {}", ast.s())))
+    }
+
+    if let Some(expr) = ast.at(1) {
+        let expr = vm_compile2(&expr, ce)?;
+        pw_null!(prog, {
+            let ep = expr.eval(prog);
+            prog.set_dbg(spos.clone());
+            prog.push_op(Op::CtrlFlow(CtrlFlow::Next));
+        })
+    } else {
+        pw_null!(prog, {
+            prog.set_dbg(spos.clone());
+            prog.push_op(Op::CtrlFlow(
+                CtrlFlow::Next));
+        })
+    }
+}
+
+pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    let cond =
+        vm_compile_direct_block2(
+            &ast.at(2).unwrap_or_else(|| VVal::Nul), ce)?;
+
+    let body =
+        vm_compile_direct_block2(
+            &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
+
+    return pw_null!(prog, {
+        // Create the OPs for the body:
+        let mut body_prog = Prog::new();
+        body.eval_nul(&mut body_prog);
+        let body_op_count = body_prog.op_count();
+
+        prog.set_dbg(spos.clone());
+        prog.push_op(Op::PushLoopInfo(body_op_count as u16));
+        let cond_op_count1 = prog.op_count();
+        let cond_val = cond.eval(prog);
+
+        prog.set_dbg(spos.clone());
+        prog.push_op(
+            Op::JmpIfN(cond_val, body_op_count as i32 + 1));
+
+        let cond_offs =
+            body_op_count + (prog.op_count() - cond_op_count1);
+        body_prog.set_dbg(spos.clone());
+        body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
+        prog.append(body_prog);
+        prog.set_dbg(spos.clone());
+        prog.push_op(Op::Unwind);
+    });
+}
 
 pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
     match ast {
@@ -1881,42 +1983,20 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             },
                         }
                     } else {
-                        let is_while =
+                        let symbol =
                             if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
                                 let var = ast.at(1).unwrap().at(1).unwrap();
-                                var.with_s_ref(|var_s: &str| var_s == "while")
+                                Some(var.s_raw())
                             } else {
-                                false
+                                None
                             };
 
-                        if is_while {
-                            let cond =
-                                vm_compile_direct_block2(
-                                    &ast.at(2).unwrap_or_else(|| VVal::Nul), ce)?;
-
-                            let body =
-                                vm_compile_direct_block2(
-                                    &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
-
-                            return pw_null!(prog, {
-                                // Create the OPs for the body:
-                                let mut body_prog = Prog::new();
-                                body.eval_nul(&mut body_prog);
-                                let body_op_count = body_prog.op_count();
-
-                                prog.push_op(Op::PushLoopInfo(body_op_count as u16));
-                                let cond_op_count1 = prog.op_count();
-                                let cond_val = cond.eval(prog);
-
-                                prog.push_op(
-                                    Op::JmpIfN(cond_val, body_op_count as i32 + 1));
-
-                                let cond_offs =
-                                    body_op_count + (prog.op_count() - cond_op_count1);
-                                body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
-                                prog.append(body_prog);
-                                prog.push_op(Op::Unwind);
-                            });
+                        if let Some(sym) = symbol {
+                            match &sym[..] {
+                                "while" => return vm_compile_while2(ast, ce),
+                                "next"  => return vm_compile_next2(ast, ce),
+                                _ => (),
+                            }
                         }
 
                         let mut args = vec![];
