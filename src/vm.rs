@@ -2447,19 +2447,13 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 pub fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<EvalNode, CompileError>
 {
-    let mut ce = CompileEnv::create_env(Some(ce.clone()));
-    let ce_sub = ce.clone();
-    let prog = vm_compile2(&ast, &mut ce)?;
-    let local_space = ce_sub.borrow().get_local_space();
+    let prog = vm_compile_stmts2(&ast, 1, ce)?;
 
     let mut p = Prog::new();
     prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));
     p.op_end();
 
-    Ok(Box::new(move |e: &mut Env| {
-        e.push_sp(local_space);
-        vm(&p, e)
-    }))
+    Ok(Box::new(move |e: &mut Env| { vm(&p, e) }))
 }
 
 pub fn gen(s: &str) -> String {

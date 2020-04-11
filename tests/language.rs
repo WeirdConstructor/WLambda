@@ -1308,6 +1308,19 @@ fn check_eval() {
 }
 
 #[test]
+fn check_eval_ctx() {
+    let mut ctx = wlambda::EvalContext::new_default();
+    ctx.eval("!toplevel_var = 20").unwrap();
+    let ret = ctx.eval("toplevel_var").unwrap().i();
+    assert_eq!(ret, 20);
+
+    let mut ctx = wlambda::EvalContext::new_default();
+    ctx.eval("!toplevel_var = { _ + 20 }").unwrap();
+    let ret = ctx.eval("toplevel_var 11").unwrap().i();
+    assert_eq!(ret, 31);
+}
+
+#[test]
 fn check_userdata() {
     use std::rc::Rc;
     use std::cell::RefCell;
