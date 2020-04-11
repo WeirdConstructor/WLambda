@@ -700,17 +700,55 @@ macro_rules! handle_err {
     }
 }
 
+macro_rules! handle_next {
+    ($env: ident, $pc: ident, $uw_depth: ident, $retv: ident) => {
+        if $env.loop_info.break_pc == 0 {
+            $env.unwind_to_depth($uw_depth);
+            $retv = Err(StackAction::Next);
+            break;
+        } else {
+            $env.unwind_to_depth($env.loop_info.uw_depth);
+            while $env.sp > $env.loop_info.sp {
+                $env.pop();
+            }
+            $pc = $env.loop_info.pc;
+        }
+    }
+}
+
+macro_rules! handle_break {
+    ($env: ident, $pc: ident, $val: expr, $uw_depth: ident, $retv: ident) => {
+        if $env.loop_info.break_pc == 0 {
+            $env.unwind_to_depth($uw_depth);
+            $retv = Err(StackAction::Break($val));
+            break;
+        } else {
+            $env.unwind_to_depth($env.loop_info.uw_depth);
+            while $env.sp > $env.loop_info.sp {
+                $env.pop();
+            }
+            $pc = $env.loop_info.break_pc;
+        }
+    }
+}
+
 macro_rules! call_func {
-    ($f: ident, $argc: ident, $popc: expr, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident) => {
+    ($f: ident, $argc: ident, $popc: expr, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident, $call_ret: ident, $cont: block) => {
         {
             let call_ret = $f.call_internal($env, $argc);
             $env.popn($popc); // + 1 for the function
             match call_ret {
-                Ok(v) => v,
+                Ok($call_ret) => $cont,
                 Err(StackAction::Return((v_lbl, v))) => {
                     $env.unwind_to_depth($uw_depth);
                     $retv = Err(StackAction::Return((v_lbl, v)));
                     break;
+                },
+                Err(StackAction::Next) => {
+                    handle_next!($env, $pc, $uw_depth, $retv);
+                },
+                Err(StackAction::Break(v)) => {
+                    handle_break!($env, $pc, v, $uw_depth, $retv);
                 },
                 Err(sa) => {
                     $env.unwind_to_depth($uw_depth);
@@ -1095,9 +1133,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 let argc = *argc as usize;
                 env.push_unwind_self(o);
-                let call_ret = call_func!(f, argc, argc, env, retv, uw_depth, prog, pc);
-                env.unwind_one();
-                out_reg!(env, ret, prog, r, call_ret);
+                let call_ret = call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                    env.unwind_one();
+                    out_reg!(env, ret, prog, r, v);
+                });
             },
             Op::CallMethodSym(o, k, argc, r) => {
                 in_reg!(env, ret, prog, o);
@@ -1107,16 +1146,18 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 let argc = *argc as usize;
                 env.push_unwind_self(o);
-                let call_ret = call_func!(f, argc, argc, env, retv, uw_depth, prog, pc);
-                env.unwind_one();
-                out_reg!(env, ret, prog, r, call_ret);
+                let call_ret = call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                    env.unwind_one();
+                    out_reg!(env, ret, prog, r, v);
+                });
             },
             Op::Call(argc, r) => {
                 let argc = *argc as usize;
                 let f = env.stk(argc + 1).clone();
 
-                let call_ret = call_func!(f, argc, argc + 1, env, retv, uw_depth, prog, pc);
-                out_reg!(env, ret, prog, r, call_ret);
+                let call_ret = call_func!(f, argc, argc + 1, env, retv, uw_depth, prog, pc, v, {
+                    out_reg!(env, ret, prog, r, v);
+                });
             },
             Op::Apply(argv, func, r) => {
                 in_reg!(env, ret, prog, argv);
@@ -1184,32 +1225,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::CtrlFlow(flw) => {
                 match flw {
                     CtrlFlow::Next => {
-                        if env.loop_info.break_pc == 0 {
-                            env.unwind_to_depth(uw_depth);
-                            retv = Err(StackAction::Next);
-                            break;
-                        } else {
-                            env.unwind_to_depth(env.loop_info.uw_depth);
-                            while env.sp > env.loop_info.sp {
-                                env.pop();
-                            }
-                            pc = env.loop_info.pc;
-                        }
+                        handle_next!(env, pc, uw_depth, retv);
                     },
                     CtrlFlow::Break(a) => {
                         in_reg!(env, ret, prog, a);
-
-                        if env.loop_info.break_pc == 0 {
-                            env.unwind_to_depth(uw_depth);
-                            retv = Err(StackAction::Break(a));
-                            break;
-                        } else {
-                            env.unwind_to_depth(env.loop_info.uw_depth);
-                            while env.sp > env.loop_info.sp {
-                                env.pop();
-                            }
-                            pc = env.loop_info.break_pc;
-                        }
+                        handle_break!(env, pc, a, uw_depth, retv);
                     },
                 }
             },
@@ -1293,9 +1313,9 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
         let varname = vars.at(0).unwrap().s_raw();
         ce.borrow_mut().recent_var = varname.clone();
 
-        let val_pw = vm_compile2(&value, ce)?;
-
         if is_global {
+            let val_pw = vm_compile2(&value, ce)?;
+
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
                 pw_null!(prog, {
                     prog.set_dbg(spos.clone());
@@ -1308,6 +1328,7 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
             }
         } else {
             let next_local = ce.borrow_mut().next_local();
+            let val_pw = vm_compile2(&value, ce)?;
             ce.borrow_mut().def_local(&varname, next_local);
 
             pw_null!(prog, {
@@ -1670,7 +1691,8 @@ pub fn vm_compile_break2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     } else {
         pw_null!(prog, {
             prog.set_dbg(spos.clone());
-            prog.push_op(Op::CtrlFlow(CtrlFlow::Break(ResPos::Value(ResValue::Nul))));
+            prog.push_op(Op::CtrlFlow(
+                CtrlFlow::Break(ResPos::Value(ResValue::Nul))));
         })
     }
 }
@@ -1690,6 +1712,47 @@ pub fn vm_compile_next2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         prog.set_dbg(spos.clone());
         prog.push_op(Op::CtrlFlow(CtrlFlow::Next));
     })
+}
+
+pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    let cond =
+        vm_compile_direct_block2(
+            &ast.at(2).unwrap_or_else(|| VVal::Nul), ce)?;
+
+    let then_body =
+        vm_compile_direct_block2(
+            &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
+
+    if let Some(else_body) = ast.at(4) {
+        let else_body = vm_compile_direct_block2(&else_body, ce)?;
+
+        pw_store_or_stack!(prog, store, {
+            let mut then_body_prog = Prog::new();
+            let mut else_body_prog = Prog::new();
+            let tbp = then_body.eval_to(&mut then_body_prog, store);
+            let ebp = else_body.eval_to(&mut else_body_prog, store);
+            then_body_prog.push_op(Op::Jmp(else_body_prog.op_count() as i32));
+
+            let condval = cond.eval(prog);
+            prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
+            prog.append(then_body_prog);
+            prog.append(else_body_prog);
+        })
+    } else {
+        pw_store_or_stack!(prog, store, {
+            let mut then_body_prog = Prog::new();
+            let tbp = then_body.eval_to(&mut then_body_prog, store);
+
+            let condval = cond.eval(prog);
+            prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
+            prog.append(then_body_prog);
+        })
+    }
 }
 
 pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
@@ -1720,11 +1783,10 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             (cond_prog.op_count() + body_op_count + 2) as u16));
 
         let cond_op_count1 = prog.op_count();
-        prog.append(cond_prog);
-
-        prog.set_dbg(spos.clone());
-        prog.push_op(
+        cond_prog.set_dbg(spos.clone());
+        cond_prog.push_op(
             Op::JmpIfN(cond_val, body_op_count as i32 + 1));
+        prog.append(cond_prog);
 
         let cond_offs =
             body_op_count + (prog.op_count() - cond_op_count1);
@@ -2025,6 +2087,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                         if let Some(sym) = symbol {
                             match &sym[..] {
+                                "?"     => return vm_compile_if2(ast, ce),
                                 "while" => return vm_compile_while2(ast, ce),
                                 "next"  => return vm_compile_next2(ast, ce),
                                 "break" => return vm_compile_break2(ast, ce),

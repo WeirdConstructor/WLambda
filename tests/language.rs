@@ -396,7 +396,17 @@ fn check_while() {
     "#),
     "20");
 
-//    assert_eq!(ve(r#"
+    assert_eq!(ve(r#"
+        !i = 0;
+
+        while $true {
+            (i >= 4) break;
+            .i = i + 1;
+        };
+
+        i
+    "#),
+    "4");
 //        !x = 0;
 //        !a = while { x == 0 } {
 //            break[];
@@ -2613,17 +2623,19 @@ fn check_if() {
     assert_eq!(ve("? 2 > 3 { 1 } { 2 }"), "2");
     assert_eq!(ve("? 2 < 3 { 1 } { 2 }"), "1");
     assert_eq!(ve(r"
+        !y = ? 2 < 3 { !x = 11; 1 } { 2 };
+        y
+    "), "1");
+    assert_eq!(ve(r"
         !x = 10;
         !k = $n;
         !y = ? 2 < 3 {
             !x = $&& 20;
             .k = { x };
-            !@dump_stack;
             1
         } {
             2
         };
-        !@dump_stack;
         $[x, y, k[]]
     "), "$[10,1,20]");
     assert_eq!(ve(r"

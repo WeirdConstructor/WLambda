@@ -2826,7 +2826,6 @@ std:assert_eq (str out) "$[0,1,2,3,4,5,6,7,8,9]";
 If you need an endless loop you can pass `$true` as predicate:
 
 ```wlambda
-
 !i = 0;
 
 while $true {
