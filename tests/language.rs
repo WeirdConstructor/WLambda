@@ -1867,7 +1867,22 @@ fn check_field_access() {
 
 #[test]
 fn check_method_calls() {
-    assert_eq!(ve("!v = $&${ _proto = ${ a = { 10 } } }; v.a[]"), "102");
+    // Idiomatic class making:
+    assert_eq!(ve(r"
+        !class = ${
+            new = {!(x) = @;
+                ${
+                    _proto = $self,
+                    x = x,
+                }
+            },
+            meth_a = { $self.x * _ },
+        };
+        !instance = class.new 20;
+        instance.meth_a 22;
+    "), "440");
+    assert_eq!(ve("!v = $&${ _proto = ${ a = { 11 } } }; v.(\"\" \"a\")[]"), "11");
+    assert_eq!(ve("!v = $&${ _proto = ${ a = { 10 } } }; v.a[]"), "10");
 
     // Simple vector call table access still works as usual:
     assert_eq!(ve("!v = $[{ _ }]; v.0 20"),                       "20");

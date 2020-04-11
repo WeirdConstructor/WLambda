@@ -187,6 +187,7 @@ const STACK_SIZE : usize = 10240;
 pub enum UnwindAction {
     RestoreAccum(VVal, VVal),
     RestoreSP(usize),
+    RestoreSelf(VVal),
 }
 
 /// The runtime environment of the evaluator.
@@ -611,13 +612,10 @@ impl Env {
 
     #[inline]
     pub fn get_local(&self, i: usize) -> VVal {
-        let ll =
         match &self.args[self.bp + i] {
             VVal::CRef(r)  => r.borrow().clone(),
             v              => v.clone(),
-        };
-        println!("GET LOCAL: {}", ll.s());
-        ll
+        }
     }
 
     pub fn assign_ref_up(&mut self, i: usize, value: VVal) {
@@ -692,10 +690,16 @@ impl Env {
     }
 
     #[inline]
+    pub fn push_unwind_self(&mut self, new_self: VVal) {
+        self.unwind_stack.push(
+            UnwindAction::RestoreSelf(
+                std::mem::replace(&mut self.current_self, new_self)));
+    }
+
+    #[inline]
     pub fn unwind(&mut self, ua: UnwindAction) {
         match ua {
             UnwindAction::RestoreSP(sp) => {
-                println!("UNWINDDDDD {},{}", sp, self.sp);
                 while self.sp > sp {
                     self.pop();
                 }
@@ -704,6 +708,9 @@ impl Env {
                 std::mem::replace(&mut self.accum_fun, fun);
                 std::mem::replace(&mut self.accum_val, val);
             },
+            UnwindAction::RestoreSelf(slf) => {
+                std::mem::replace(&mut self.current_self, slf);
+            }
         }
     }
 

@@ -281,6 +281,15 @@ impl Prog {
                 Op::Call(_, p1) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
+                Op::CallMethodKey(p1, p2, _, p3) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
+                },
+                Op::CallMethodSym(p1, _, _, p2) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
                 Op::Apply(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
@@ -563,6 +572,8 @@ pub enum Op {
     GetKey(ResPos, ResPos, ResPos),
     Destr(ResPos, Box<DestructureInfo>),
     Call(u16, ResPos),
+    CallMethodKey(ResPos, ResPos, u16, ResPos),
+    CallMethodSym(ResPos, Box<String>, u16, ResPos),
     Apply(ResPos, ResPos, ResPos),
     Jmp(i32),
     JmpIf(ResPos, i32),
@@ -670,6 +681,53 @@ macro_rules! handle_err {
                     break;
                 },
                 v => v,
+            }
+        }
+    }
+}
+
+macro_rules! call_func {
+    ($f: ident, $argc: ident, $popc: expr, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident) => {
+        {
+            let call_ret = $f.call_internal($env, $argc);
+            $env.popn($popc); // + 1 for the function
+            match call_ret {
+                Ok(v) => v,
+                Err(StackAction::Return((v_lbl, v))) => {
+                    $env.unwind_to_depth($uw_depth);
+                    $retv = Err(StackAction::Return((v_lbl, v)));
+                    break;
+                },
+                Err(sa) => {
+                    $env.unwind_to_depth($uw_depth);
+                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                    break;
+                },
+            }
+        }
+    }
+}
+
+macro_rules! get_key {
+    ($o: ident, $k: ident, $method: ident, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident) => {
+        match $k {
+            VVal::Int(i)  => $o.at(i as usize).unwrap_or_else(|| VVal::Nul),
+            VVal::Bol(b)  => $o.at(b as usize).unwrap_or_else(|| VVal::Nul),
+            VVal::Sym(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::Nul),
+            VVal::Str(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::Nul),
+            _ => {
+                $env.push($o.clone());
+                let call_ret = $k.call_internal($env, 1);
+                $env.pop();
+                match call_ret {
+                    Ok(v) => v,
+                    Err(sa) => {
+                        $env.unwind_to_depth($uw_depth);
+                        $retv =
+                            Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                        break;
+                    },
+                }
             }
         }
     }
@@ -971,27 +1029,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 let o = handle_err!(o, "field idx/key", retv);
                 let k = handle_err!(k, "map/list", retv);
-                let res =
-                    match k {
-                        VVal::Int(i)  => o.at(i as usize).unwrap_or_else(|| VVal::Nul),
-                        VVal::Bol(b)  => o.at(b as usize).unwrap_or_else(|| VVal::Nul),
-                        VVal::Sym(sy) => o.get_key(&sy.borrow()).unwrap_or_else(|| VVal::Nul),
-                        VVal::Str(sy) => o.get_key(&sy.borrow()).unwrap_or_else(|| VVal::Nul),
-                        _ => {
-                            env.push(o.clone());
-                            let call_ret = k.call_internal(env, 1);
-                            env.pop();
-                            match call_ret {
-                                Ok(v) => v,
-                                Err(sa) => {
-                                    env.unwind_to_depth(uw_depth);
-                                    retv =
-                                        Err(sa.wrap_panic(prog.debug[pc].clone()));
-                                    break;
-                                },
-                            }
-                        }
-                    };
+                let res = get_key!(o, k, get_key, env, retv, uw_depth, prog, pc);
                 out_reg!(env, ret, prog, r, res);
             },
             Op::Destr(a, info) => {
@@ -1026,26 +1064,38 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 m
             }),
+            Op::CallMethodKey(o, k, argc, r) => {
+                in_reg!(env, ret, prog, k);
+                in_reg!(env, ret, prog, o);
+                let o = handle_err!(o, "field idx/key", retv);
+                let k = handle_err!(k, "map/list", retv);
+
+                let f = get_key!(o, k, proto_lookup, env, retv, uw_depth, prog, pc);
+
+                let argc = *argc as usize;
+                env.push_unwind_self(o);
+                let call_ret = call_func!(f, argc, argc, env, retv, uw_depth, prog, pc);
+                env.unwind_one();
+                out_reg!(env, ret, prog, r, call_ret);
+            },
+            Op::CallMethodSym(o, k, argc, r) => {
+                in_reg!(env, ret, prog, o);
+                let o = handle_err!(o, "field idx/key", retv);
+
+                let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::Nul);
+
+                let argc = *argc as usize;
+                env.push_unwind_self(o);
+                let call_ret = call_func!(f, argc, argc, env, retv, uw_depth, prog, pc);
+                env.unwind_one();
+                out_reg!(env, ret, prog, r, call_ret);
+            },
             Op::Call(argc, r) => {
                 let argc = *argc as usize;
                 let f = env.stk(argc + 1).clone();
-                let call_ret = f.call_internal(env, argc);
-                env.popn(argc + 1); // + 1 for the function
-                match call_ret {
-                    Ok(v) => {
-                        out_reg!(env, ret, prog, r, v);
-                    },
-                    Err(StackAction::Return((v_lbl, v))) => {
-                        env.unwind_to_depth(uw_depth);
-                        retv = Err(StackAction::Return((v_lbl, v)));
-                        break;
-                    },
-                    Err(sa) => {
-                        env.unwind_to_depth(uw_depth);
-                        retv = Err(sa.wrap_panic(prog.debug[pc].clone()));
-                        break;
-                    },
-                }
+
+                let call_ret = call_func!(f, argc, argc + 1, env, retv, uw_depth, prog, pc);
+                out_reg!(env, ret, prog, r, call_ret);
             },
             Op::Apply(argv, func, r) => {
                 in_reg!(env, ret, prog, argv);
@@ -1767,49 +1817,58 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     if let Some((syntax, object, key)) =
                         fetch_object_key_access(&ast.at(1).unwrap()) {
 
-//                        let obj = vm_compile2(&object, ce)?;
-//
-//                        let mut args = vec![];
-//                        for (e, _) in ast.iter().skip(2) {
-//                            args.push(e);
-//                        }
-//
-//                        match syntax {
-//                            Syntax::GetKey => {
-//                                let key = compile(&key, ce)?;
-//                                let func = generate_get_key(
-//                                    Box::new(move |e: &mut Env| Ok(e.self_object())),
-//                                    key,
-//                                    spos.clone(),
-//                                    true);
-//                                let fun_call =
-//                                    generate_call(func, call_args, spos);
-//                                Ok(Box::new(move |e: &mut Env| {
-//                                    let o = obj(e)?;
-//                                    e.with_object(
-//                                        o, |e: &mut Env| fun_call(e))
-//                                }))
-//                            },
-//                            Syntax::GetSym => {
-//                                let key = key.s_raw();
-//                                let func = Box::new(move |e: &mut Env| {
-//                                    let o = e.self_object();
-//                                    Ok(o.proto_lookup(&key).unwrap_or(VVal::Nul))
-//                                });
-//                                let fun_call =
-//                                    generate_call(func, call_args, spos);
-//                                Ok(Box::new(move |e: &mut Env| {
-//                                    let o = obj(e)?;
-//                                    e.with_object(
-//                                        o, |e: &mut Env| fun_call(e))
-//                                }))
-//                            },
-//                            _ => {
+                        let obj = vm_compile2(&object, ce)?;
+
+                        let mut args = vec![];
+                        for (e, _) in ast.iter().skip(2) {
+                            args.push(e);
+                        }
+
+                        let mut compiled_args = vec![];
+                        let mut argc = 0;
+                        for e in args.iter() {
+                            compiled_args.push(vm_compile2(&e, ce)?);
+                            argc += 1;
+                        }
+
+                        match syntax {
+                            Syntax::GetKey => {
+                                let key = vm_compile2(&key, ce)?;
+                                pw_store_or_stack!(prog, store, {
+                                    for ca in compiled_args.iter() {
+                                        ca.eval_to(prog, ResPos::Stack(0));
+                                    }
+                                    let obj_p = obj.eval(prog);
+                                    let key_p = key.eval(prog);
+                                    prog.push_op(
+                                        Op::CallMethodKey(
+                                            obj_p,
+                                            key_p,
+                                            argc as u16,
+                                            store));
+                                })
+                            },
+                            Syntax::GetSym => {
+                                let key = key.s_raw();
+                                pw_store_or_stack!(prog, store, {
+                                    for ca in compiled_args.iter() {
+                                        ca.eval_to(prog, ResPos::Stack(0));
+                                    }
+                                    let obj_p = obj.eval(prog);
+                                    prog.push_op(
+                                        Op::CallMethodSym(
+                                            obj_p,
+                                            Box::new(key.clone()),
+                                            argc as u16,
+                                            store));
+                                })
+                            },
+                            _ => {
                                 Err(ast.compile_err(
                                     format!("fetch_object_key_access failed: {}",
                                             ast.s())))
-//                            },
-//                        }
+                            },
+                        }
                     } else {
                         let is_while =
                             if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
