@@ -1038,6 +1038,42 @@ std:assert_eq -0b1011      -11;
 std:assert_eq 4r31          13;
 ```
 
+#### - Named Field Access and Swizzling
+
+You can access the fields of numeric vectors with different keys:
+
+```wlambda
+std:assert_eq $i(2,3,4,5).x     2;
+std:assert_eq $i(2,3,4,5).y     3;
+std:assert_eq $i(2,3,4,5).z     4;
+std:assert_eq $i(2,3,4,5).w     5;
+
+std:assert_eq $i(5,6,7,8).r     5;
+std:assert_eq $i(5,6,7,8).g     6;
+std:assert_eq $i(5,6,7,8).b     7;
+std:assert_eq $i(5,6,7,8).a     8;
+
+std:assert_eq $i(5,6,7,8).h     5;
+std:assert_eq $i(5,6,7,8).s     6;
+std:assert_eq $i(5,6,7,8).v     7;
+std:assert_eq $i(5,6,7,8).a     8;
+
+std:assert_eq $i(5,6,7,8).0     5;
+std:assert_eq $i(5,6,7,8).1     6;
+std:assert_eq $i(5,6,7,8).2     7;
+std:assert_eq $i(5,6,7,8).3     8;
+```
+
+You can also use **swizzling** to quickly make a new vector:
+
+```wlambda
+std:assert_eq $i(2,3,4).xx      $i(2,2);
+std:assert_eq $i(2,3,4).xyxz    $i(2,3,2,4);
+std:assert_eq $i(2,3,4).bgr     $i(4,3,2);
+std:assert_eq $i(2,3).xyrg      $i(2,3,2,3);
+std:assert_eq $i(2,3,4,5).zw    $i(4,5);
+```
+
 #### <a name="441-int-value"></a>4.4.1 - int _value_
 
 Returns the integer casted version of _value_.
