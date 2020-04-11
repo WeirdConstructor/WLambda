@@ -105,19 +105,20 @@ Smalltalk, LISP and Perl.
   - [4.8](#48-numerical-mathematical-vectors) - Numerical Mathematical Vectors
     - [4.8.1](#481-vector-conversions) - Vector Conversions
     - [4.8.2](#482-vector-component-access) - Vector Component Access
-    - [4.8.3](#483-euler-additionsubtraction) - Euler Addition/Subtraction
-    - [4.8.4](#484-scalar-multiplicationdivision) - Scalar Multiplication/Division
-    - [4.8.5](#485-unary-vector-operations) - Unary Vector Operations
-    - [4.8.6](#486-stdvdims-vec) - std:v:dims _vec_
-    - [4.8.7](#487-stdvmag2-vec) - std:v:mag2 _vec_
-    - [4.8.8](#488-stdvmag-vec) - std:v:mag _vec_
-    - [4.8.9](#489-stdvnorm-vec) - std:v:norm _vec_
-    - [4.8.10](#4810-stdvdot-vec1-vec2) - std:v:dot _vec1_ _vec2_
-    - [4.8.11](#4811-stdvcross-vec1-vec2) - std:v:cross _vec1_ _vec2_
-    - [4.8.12](#4812-stdvlerp-vec1-vec2-t) - std:v:lerp _vec1_ _vec2_ _t_
-    - [4.8.13](#4813-stdvslerp-vec1-vec2-t) - std:v:slerp _vec1_ _vec2_ _t_
-    - [4.8.14](#4814-stdvvec2rad-vec) - std:v:vec2rad _vec_
-    - [4.8.15](#4815-stdvrad2vec-radians) - std:v:rad2vec _radians_
+    - [4.8.3](#483-named-field-access-and-swizzling) - Named Field Access and Swizzling
+    - [4.8.4](#484-euler-additionsubtraction) - Euler Addition/Subtraction
+    - [4.8.5](#485-scalar-multiplicationdivision) - Scalar Multiplication/Division
+    - [4.8.6](#486-unary-vector-operations) - Unary Vector Operations
+    - [4.8.7](#487-stdvdims-vec) - std:v:dims _vec_
+    - [4.8.8](#488-stdvmag2-vec) - std:v:mag2 _vec_
+    - [4.8.9](#489-stdvmag-vec) - std:v:mag _vec_
+    - [4.8.10](#4810-stdvnorm-vec) - std:v:norm _vec_
+    - [4.8.11](#4811-stdvdot-vec1-vec2) - std:v:dot _vec1_ _vec2_
+    - [4.8.12](#4812-stdvcross-vec1-vec2) - std:v:cross _vec1_ _vec2_
+    - [4.8.13](#4813-stdvlerp-vec1-vec2-t) - std:v:lerp _vec1_ _vec2_ _t_
+    - [4.8.14](#4814-stdvslerp-vec1-vec2-t) - std:v:slerp _vec1_ _vec2_ _t_
+    - [4.8.15](#4815-stdvvec2rad-vec) - std:v:vec2rad _vec_
+    - [4.8.16](#4816-stdvrad2vec-radians) - std:v:rad2vec _radians_
   - [4.9](#49-strings) - Strings
     - [4.9.1](#491-str-value) - str _value_
     - [4.9.2](#492-isstr-value) - is_str _value_
@@ -1038,42 +1039,6 @@ std:assert_eq -0b1011      -11;
 std:assert_eq 4r31          13;
 ```
 
-#### - Named Field Access and Swizzling
-
-You can access the fields of numeric vectors with different keys:
-
-```wlambda
-std:assert_eq $i(2,3,4,5).x     2;
-std:assert_eq $i(2,3,4,5).y     3;
-std:assert_eq $i(2,3,4,5).z     4;
-std:assert_eq $i(2,3,4,5).w     5;
-
-std:assert_eq $i(5,6,7,8).r     5;
-std:assert_eq $i(5,6,7,8).g     6;
-std:assert_eq $i(5,6,7,8).b     7;
-std:assert_eq $i(5,6,7,8).a     8;
-
-std:assert_eq $i(5,6,7,8).h     5;
-std:assert_eq $i(5,6,7,8).s     6;
-std:assert_eq $i(5,6,7,8).v     7;
-std:assert_eq $i(5,6,7,8).a     8;
-
-std:assert_eq $i(5,6,7,8).0     5;
-std:assert_eq $i(5,6,7,8).1     6;
-std:assert_eq $i(5,6,7,8).2     7;
-std:assert_eq $i(5,6,7,8).3     8;
-```
-
-You can also use **swizzling** to quickly make a new vector:
-
-```wlambda
-std:assert_eq $i(2,3,4).xx      $i(2,2);
-std:assert_eq $i(2,3,4).xyxz    $i(2,3,2,4);
-std:assert_eq $i(2,3,4).bgr     $i(4,3,2);
-std:assert_eq $i(2,3).xyrg      $i(2,3,2,3);
-std:assert_eq $i(2,3,4,5).zw    $i(4,5);
-```
-
 #### <a name="441-int-value"></a>4.4.1 - int _value_
 
 Returns the integer casted version of _value_.
@@ -1388,27 +1353,64 @@ just like when converting floats into integers implicitly elsewhere in WLambda.
 There are 12 functions for accessing the components of vectors,
 but only four have unique behavior (the rest are aliases).
 
-- `x`/`0`/`first`,
-- `y`/`1`/`second`,
-- `z`/`2`/`third`,
+- `x`/`r`/`h`/`0`/`first`,
+- `y`/`g`/`s`/`1`/`second`,
+- `z`/`b`/`v`/`2`/`third`,
 - `w`/`3`/`fourth`
 
 ```wlambda
 !my_vec = $f(39.3, 404.504, 333.8);
-std:assert_eq my_vec.x my_vec.0; 
-std:assert_eq my_vec.x my_vec.first; 
+std:assert_eq my_vec.x my_vec.0;
+std:assert_eq my_vec.x my_vec.first;
 
-std:assert_eq my_vec.y my_vec.1; 
-std:assert_eq my_vec.y my_vec.second; 
+std:assert_eq my_vec.y my_vec.1;
+std:assert_eq my_vec.y my_vec.second;
 
-std:assert_eq my_vec.z my_vec.2; 
-std:assert_eq my_vec.z my_vec.third; 
+std:assert_eq my_vec.z my_vec.2;
+std:assert_eq my_vec.z my_vec.third;
 
-std:assert_eq my_vec.w my_vec.3; 
-std:assert_eq my_vec.w my_vec.fourth; 
+std:assert_eq my_vec.w my_vec.3;
+std:assert_eq my_vec.w my_vec.fourth;
 ```
 
-#### <a name="483-euler-additionsubtraction"></a>4.8.3 - Euler Addition/Subtraction
+#### <a name="483-named-field-access-and-swizzling"></a>4.8.3 - Named Field Access and Swizzling
+
+You can access the fields of numeric vectors with different keys:
+
+```wlambda
+std:assert_eq $i(2,3,4,5).x     2;
+std:assert_eq $i(2,3,4,5).y     3;
+std:assert_eq $i(2,3,4,5).z     4;
+std:assert_eq $i(2,3,4,5).w     5;
+
+std:assert_eq $i(5,6,7,8).r     5;
+std:assert_eq $i(5,6,7,8).g     6;
+std:assert_eq $i(5,6,7,8).b     7;
+std:assert_eq $i(5,6,7,8).a     8;
+
+std:assert_eq $i(5,6,7,8).h     5;
+std:assert_eq $i(5,6,7,8).s     6;
+std:assert_eq $i(5,6,7,8).v     7;
+std:assert_eq $i(5,6,7,8).a     8;
+
+std:assert_eq $i(5,6,7,8).0     5;
+std:assert_eq $i(5,6,7,8).1     6;
+std:assert_eq $i(5,6,7,8).2     7;
+std:assert_eq $i(5,6,7,8).3     8;
+```
+
+You can also use **swizzling** to quickly make a new vector:
+
+```wlambda
+std:assert_eq $i(2,3,4).xx      $i(2,2);
+std:assert_eq $i(2,3,4).xyxz    $i(2,3,2,4);
+std:assert_eq $i(2,3,4).bgr     $i(4,3,2);
+std:assert_eq $i(2,3).xyrg      $i(2,3,2,3);
+std:assert_eq $i(2,3,4,5).zw    $i(4,5);
+```
+
+
+#### <a name="484-euler-additionsubtraction"></a>4.8.4 - Euler Addition/Subtraction
 
 You can add vectors to each other and subtract them from each other.
 
@@ -1428,7 +1430,7 @@ std:assert_eq[ $f(0.1, 0.9) + ${ w=7 } , $f(0.1, 0.9, 0, 7) ];
 std:assert_eq[ std:v:mag2 $i(-1, 5) + $i(1, -5) , 0.0 ];
 ```
 
-#### <a name="484-scalar-multiplicationdivision"></a>4.8.4 - Scalar Multiplication/Division
+#### <a name="485-scalar-multiplicationdivision"></a>4.8.5 - Scalar Multiplication/Division
 
 You can multiply and divide integer and float vectors by single numbers.
 This copies the vector, multiplies or divides each component of the vector by the single number,
@@ -1443,7 +1445,7 @@ std:assert ~ $f(0.5, 0) * 1.3 == $f(0.65,0);
 std:assert ~ (std:v:mag (std:v:norm $[40.19, 0.399]) * 10) == 10.0;
 ```
 
-#### <a name="485-unary-vector-operations"></a>4.8.5 - Unary Vector Operations
+#### <a name="486-unary-vector-operations"></a>4.8.6 - Unary Vector Operations
 
 Calling `-` on a vector returns a new vector with all of its fields negated.
 This is equivalent to multiplying the vector by `-1`.
@@ -1459,7 +1461,7 @@ std:assert_eq (+my_vec) my_vec;
 std:assert_eq[ my_vec + (-my_vec), my_vec * 0 ];
 ```
 
-#### <a name="486-stdvdims-vec"></a>4.8.6 - std:v:dims _vec_
+#### <a name="487-stdvdims-vec"></a>4.8.7 - std:v:dims _vec_
 
 You can use this function to retrieve the number of dimensions in _vec_.
 
@@ -1477,7 +1479,7 @@ std:assert_eq (std:v:dims ${w=0}) 4;
 std:assert_eq (std:v:dims $f(1,2)) (std:v:dims $i(1,2));
 ```
 
-#### <a name="487-stdvmag2-vec"></a>4.8.7 - std:v:mag2 _vec_
+#### <a name="488-stdvmag2-vec"></a>4.8.8 - std:v:mag2 _vec_
 
 Returns the magnitude of _vec_, squared.
 
@@ -1490,7 +1492,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag2 ${w=4}) 16.0;
 ```
 
-#### <a name="488-stdvmag-vec"></a>4.8.8 - std:v:mag _vec_
+#### <a name="489-stdvmag-vec"></a>4.8.9 - std:v:mag _vec_
 
 Returns the magnitude (also known as the length) of _vec_.
 
@@ -1500,7 +1502,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag ${w=4}) 4.0;
 ```
 
-#### <a name="489-stdvnorm-vec"></a>4.8.9 - std:v:norm _vec_
+#### <a name="4810-stdvnorm-vec"></a>4.8.10 - std:v:norm _vec_
 
 Returns a new vector which has a magnitude of `1`, but points in the same direction as _vec_.
 Vectors with a length of one are also known as unit vectors.
@@ -1527,7 +1529,7 @@ These are the only `ivec2`s that have a length of `1`.
 std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
 ```
 
-#### <a name="4810-stdvdot-vec1-vec2"></a>4.8.10 - std:v:dot _vec1_ _vec2_
+#### <a name="4811-stdvdot-vec1-vec2"></a>4.8.11 - std:v:dot _vec1_ _vec2_
 
 Returns the sum of all components after multiplying each component
 in _vec1_ with the corresponding component of _vec2_.
@@ -1558,7 +1560,7 @@ If _vec1_ isn't an `fvec`, then it's coerced into an `ivec`, just like the other
 std:assert_eq[ (dir < 0) "left" "right", "left" ];
 ```
 
-#### <a name="4811-stdvcross-vec1-vec2"></a>4.8.11 - std:v:cross _vec1_ _vec2_
+#### <a name="4812-stdvcross-vec1-vec2"></a>4.8.12 - std:v:cross _vec1_ _vec2_
 
 Returns a vector perpendicular to _vec1_ and _vec2_.
 
@@ -1583,7 +1585,7 @@ std:assert_eq[(std:v:dot x y), (std:v:dot y z)];
 std:assert_eq[(std:v:dot y z), (std:v:dot z x)];
 ```
 
-#### <a name="4812-stdvlerp-vec1-vec2-t"></a>4.8.12 - std:v:lerp _vec1_ _vec2_ _t_
+#### <a name="4813-stdvlerp-vec1-vec2-t"></a>4.8.13 - std:v:lerp _vec1_ _vec2_ _t_
 
 `lerp` stands for linear interpolation.
 This function is useful when animating positions, whereas slerp is useful for animating rotations.
@@ -1606,7 +1608,7 @@ std:assert_eq[ (std:v:mag a) * 2 , std:v:mag (std:v:lerp $f(0,0) a 2.0) ];
 std:assert_eq[ std:v:lerp b a 1.5 , std:v:lerp a b -0.5 ];
 ```
 
-#### <a name="4813-stdvslerp-vec1-vec2-t"></a>4.8.13 - std:v:slerp _vec1_ _vec2_ _t_
+#### <a name="4814-stdvslerp-vec1-vec2-t"></a>4.8.14 - std:v:slerp _vec1_ _vec2_ _t_
 
 `slerp` stands for spherical linear interpolation.
 This function is useful when animating rotations, whereas lerp is useful for animating positions.
@@ -1639,7 +1641,7 @@ std:assert_rel_eq half.x four.x 0.000001;
 std:assert_rel_eq half.y four.y 0.000001;
 ```
 
-#### <a name="4814-stdvvec2rad-vec"></a>4.8.14 - std:v:vec2rad _vec_
+#### <a name="4815-stdvvec2rad-vec"></a>4.8.15 - std:v:vec2rad _vec_
 
 Creates a rotation in radians from the x and y components of _vec_.
 
@@ -1657,7 +1659,7 @@ std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad h) , 45.0 ];
 ```
 
-#### <a name="4815-stdvrad2vec-radians"></a>4.8.15 - std:v:rad2vec _radians_
+#### <a name="4816-stdvrad2vec-radians"></a>4.8.16 - std:v:rad2vec _radians_
 
 Creates a unit vector from _radians_.
 

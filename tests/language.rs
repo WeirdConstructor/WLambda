@@ -305,6 +305,36 @@ fn check_range_next() {
 }
 
 #[test]
+fn check_loop_info_unwind() {
+    assert_eq!(ve(r"
+        !y = 0;
+        range 0 10 1 {
+            .y = y + _;
+            next[];
+            .y = y + 100;
+        };
+        y
+    "), "55");
+
+    assert_eq!(ve(r"
+        !x = 0;
+        !y = 0;
+        while { x < 10 } {
+            .y = 0;
+            range 0 10 1 {
+                .y = y + _;
+                next[];
+                .y = y + 100;
+            };
+            .x = x + 1;
+            next[];
+            .x = x + 100;
+        };
+        $p(x, y)
+    "), "$p(10,55)");
+}
+
+#[test]
 fn check_while() {
     assert_eq!(ve(r#"
         !x = $& 0;

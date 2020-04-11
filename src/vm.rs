@@ -5,7 +5,7 @@ use crate::vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = true;
+const DEBUG_VM: bool = false;
 
 #[derive(Clone)]
 pub struct Prog {
@@ -764,6 +764,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     let mut ret = VVal::Nul;
 
     let uw_depth = env.unwind_depth();
+    env.push_loop_info(0, 0);
 
     loop {
         let op = &prog.ops[pc];
@@ -880,7 +881,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Unwind              => { env.unwind_one(); },
             Op::PushLoopInfo(body_ops) => {
                 env.push_loop_info(pc, pc + *body_ops as usize);
-                println!("*LOOPINO: {:?}", env.loop_info);
             },
             Op::ClearLocals(from, to) => {
                 env.push_clear_locals(*from as usize, *to as usize);
@@ -1189,7 +1189,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             break;
                         } else {
                             env.unwind_to_depth(env.loop_info.uw_depth);
-                            println!("LOOPINO: {:?}", env.loop_info);
                             pc = env.loop_info.pc;
                         }
                     },
