@@ -186,7 +186,6 @@ pub struct LoopInfo {
     pc:       usize,
     uw_depth: usize,
     sp:       usize,
-    next_pc:  usize,
     break_pc: usize,
 }
 
@@ -196,6 +195,7 @@ pub struct LoopInfo {
 pub enum UnwindAction {
     RestoreAccum(VVal, VVal),
     RestoreSP(usize),
+    ClearLocals(usize, usize),
     RestoreSelf(VVal),
     RestoreLoopInfo(LoopInfo),
 }
@@ -266,7 +266,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       vec![],
-            loop_info:          LoopInfo { pc: 0, uw_depth: 0, sp: 0, next_pc: 0, break_pc: 0 },
+            loop_info:          LoopInfo { pc: 0, uw_depth: 0, sp: 0, break_pc: 0 },
             vm_nest:            0,
             global
         };
@@ -287,7 +287,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       vec![],
-            loop_info:          LoopInfo { pc: 0, uw_depth: 0, sp: 0, next_pc: 0, break_pc: 0 },
+            loop_info:          LoopInfo { pc: 0, uw_depth: 0, sp: 0, break_pc: 0 },
             vm_nest:            0,
             user,
             global,
@@ -705,6 +705,11 @@ impl Env {
     }
 
     #[inline]
+    pub fn push_clear_locals(&mut self, from: usize, to: usize) {
+        self.unwind_stack.push(UnwindAction::ClearLocals(from, to));
+    }
+
+    #[inline]
     pub fn push_unwind_self(&mut self, new_self: VVal) {
         self.unwind_stack.push(
             UnwindAction::RestoreSelf(
@@ -712,7 +717,7 @@ impl Env {
     }
 
     #[inline]
-    pub fn push_loop_info(&mut self, current_pc: usize, next_pc: u16, break_pc: u16) {
+    pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize) {
         let uw_depth = self.unwind_depth();
         let loop_sp  = self.sp;
         self.unwind_stack.push(
@@ -721,8 +726,7 @@ impl Env {
                     uw_depth,
                     pc:         current_pc,
                     sp:         self.sp,
-                    next_pc:    next_pc  as usize,
-                    break_pc:   break_pc as usize,
+                    break_pc:   break_pc,
                 })));
     }
 
@@ -733,6 +737,9 @@ impl Env {
                 while self.sp > sp {
                     self.pop();
                 }
+            },
+            UnwindAction::ClearLocals(from, to) => {
+                self.null_locals(from, to);
             },
             UnwindAction::RestoreLoopInfo(li) => {
                 std::mem::replace(&mut self.loop_info, li);

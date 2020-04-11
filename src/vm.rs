@@ -305,6 +305,7 @@ impl Prog {
                 | Op::Builtin(Builtin::DumpStack(_))
                 | Op::Unwind
                 | Op::Accumulator(_)
+                | Op::PushLoopInfo(_)
                 | Op::Jmp(_)
                 | Op::ClearLocals(_, _)
                     => (),
@@ -545,6 +546,7 @@ pub enum Op {
     ToRef(ResPos, ResPos, ToRefType),
     ClearLocals(u16, u16),
     Accumulator(AccumType),
+    PushLoopInfo(u16),
     Add(ResPos, ResPos, ResPos),
     Sub(ResPos, ResPos, ResPos),
     Mul(ResPos, ResPos, ResPos),
@@ -864,7 +866,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Argv(r)             => op_r!(env, ret, prog, r, { env.argv() }),
             Op::End                 => { break; },
             Op::Unwind              => { env.unwind_one(); },
-            Op::ClearLocals(from, to) => env.null_locals(*from as usize, *to as usize),
+            Op::PushLoopInfo(body_ops) => {
+                env.push_loop_info(pc, pc + *body_ops as usize);
+            },
+            Op::ClearLocals(from, to) => {
+                env.push_clear_locals(*from as usize, *to as usize);
+            },
             Op::Accumulator(typ) => {
                 let v =
                     match typ {
@@ -1463,14 +1470,18 @@ fn vm_compile_block2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
 
     pw!(prog, store, {
         prog.set_dbg(spos.clone());
-        let res = (*stmts.node)(prog, store);
         if from_local_idx != to_local_idx {
             prog.set_dbg(spos.clone());
             prog.push_op(Op::ClearLocals(
                 from_local_idx as u16,
                 to_local_idx   as u16));
+            let res = (*stmts.node)(prog, store);
+            prog.set_dbg(spos.clone());
+            prog.push_op(Op::Unwind);
+            res
+        } else {
+            (*stmts.node)(prog, store)
         }
-        res
     })
 }
 
@@ -1893,6 +1904,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                 body.eval_nul(&mut body_prog);
                                 let body_op_count = body_prog.op_count();
 
+                                prog.push_op(Op::PushLoopInfo(body_op_count as u16));
                                 let cond_op_count1 = prog.op_count();
                                 let cond_val = cond.eval(prog);
 
@@ -1903,6 +1915,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                     body_op_count + (prog.op_count() - cond_op_count1);
                                 body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
                                 prog.append(body_prog);
+                                prog.push_op(Op::Unwind);
                             });
                         }
 
@@ -2199,15 +2212,13 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let a = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let b = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-                    let mut aprog = Prog::new();
-                    let ap = a.eval(&mut aprog);
-
-                    let mut bprog = Prog::new();
-                    let bp = b.eval(&mut bprog);
-
                     pw_store_or_stack!(prog, store, {
-                        let mut aprog = aprog.clone();
-                        let mut bprog = bprog.clone();
+                        let mut aprog = Prog::new();
+                        let ap = a.eval(&mut aprog);
+
+                        let mut bprog = Prog::new();
+                        let bp = b.eval(&mut bprog);
+
                         bprog.set_dbg(spos.clone());
                         bprog.push_op(Op::Mov(bp, store));
                         aprog.set_dbg(spos.clone());
@@ -2220,15 +2231,13 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let a = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let b = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-                    let mut aprog = Prog::new();
-                    let ap = a.eval(&mut aprog);
-
-                    let mut bprog = Prog::new();
-                    let bp = b.eval(&mut bprog);
-
                     pw_store_or_stack!(prog, store, {
-                        let mut aprog = aprog.clone();
-                        let mut bprog = bprog.clone();
+                        let mut aprog = Prog::new();
+                        let ap = a.eval(&mut aprog);
+
+                        let mut bprog = Prog::new();
+                        let bp = b.eval(&mut bprog);
+
                         bprog.set_dbg(spos.clone());
                         bprog.push_op(Op::Mov(bp, store));
                         aprog.set_dbg(spos.clone());
