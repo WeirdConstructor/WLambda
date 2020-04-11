@@ -1203,6 +1203,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             env.unwind_to_depth(uw_depth);
                             retv = Err(StackAction::Break(a));
                             break;
+                        } else {
+                            env.unwind_to_depth(env.loop_info.uw_depth);
+                            while env.sp > env.loop_info.sp {
+                                env.pop();
+                            }
+                            pc = env.loop_info.break_pc;
                         }
                     },
                 }
@@ -1643,6 +1649,32 @@ fn vm_compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     pw_null!(prog, { })
 }
 
+pub fn vm_compile_break2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    if ast.len() > 3 {
+        return Err(ast.compile_err(
+            format!("break takes 0 or 1 arguments: {}", ast.s())))
+    }
+
+    if let Some(expr) = ast.at(2) {
+        let expr = vm_compile2(&expr, ce)?;
+        pw_null!(prog, {
+            let ep = expr.eval(prog);
+            prog.set_dbg(spos.clone());
+            prog.push_op(Op::CtrlFlow(CtrlFlow::Break(ep)));
+        })
+    } else {
+        pw_null!(prog, {
+            prog.set_dbg(spos.clone());
+            prog.push_op(Op::CtrlFlow(CtrlFlow::Break(ResPos::Value(ResValue::Nul))));
+        })
+    }
+}
+
 pub fn vm_compile_next2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
@@ -1651,23 +1683,13 @@ pub fn vm_compile_next2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     if ast.len() > 2 {
         return Err(ast.compile_err(
-            format!("next takes only 0 or 1 arguments: {}", ast.s())))
+            format!("next takes no arguments: {}", ast.s())))
     }
 
-    if let Some(expr) = ast.at(1) {
-        let expr = vm_compile2(&expr, ce)?;
-        pw_null!(prog, {
-            let ep = expr.eval(prog);
-            prog.set_dbg(spos.clone());
-            prog.push_op(Op::CtrlFlow(CtrlFlow::Next));
-        })
-    } else {
-        pw_null!(prog, {
-            prog.set_dbg(spos.clone());
-            prog.push_op(Op::CtrlFlow(
-                CtrlFlow::Next));
-        })
-    }
+    pw_null!(prog, {
+        prog.set_dbg(spos.clone());
+        prog.push_op(Op::CtrlFlow(CtrlFlow::Next));
+    })
 }
 
 pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
@@ -1690,10 +1712,15 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         body.eval_nul(&mut body_prog);
         let body_op_count = body_prog.op_count();
 
+        let mut cond_prog = Prog::new();
+        let cond_val = cond.eval(&mut cond_prog);
+
         prog.set_dbg(spos.clone());
-        prog.push_op(Op::PushLoopInfo(body_op_count as u16));
+        prog.push_op(Op::PushLoopInfo(
+            (cond_prog.op_count() + body_op_count + 2) as u16));
+
         let cond_op_count1 = prog.op_count();
-        let cond_val = cond.eval(prog);
+        prog.append(cond_prog);
 
         prog.set_dbg(spos.clone());
         prog.push_op(
@@ -2000,6 +2027,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             match &sym[..] {
                                 "while" => return vm_compile_while2(ast, ce),
                                 "next"  => return vm_compile_next2(ast, ce),
+                                "break" => return vm_compile_break2(ast, ce),
                                 _ => (),
                             }
                         }

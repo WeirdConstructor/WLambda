@@ -388,20 +388,22 @@ fn check_while() {
     assert_eq!(ve(r#"
         !x = $&0;
         while { x == 0 } {
-            break 10;
+            .x = 20;
+            break[];
             .x = x + 1;
-        }
-    "#),
-    "10");
-
-    assert_eq!(ve(r#"
-        !x = 0;
-        !a = while { x == 0 } {
-            break 20;
         };
-        a
+        x
     "#),
     "20");
+
+//    assert_eq!(ve(r#"
+//        !x = 0;
+//        !a = while { x == 0 } {
+//            break[];
+//        };
+//        a
+//    "#),
+//    "20");
 }
 
 #[test]
