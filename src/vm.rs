@@ -5,7 +5,7 @@ use crate::vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = true;
+const DEBUG_VM: bool = false;
 
 #[derive(Clone)]
 pub struct Prog {
