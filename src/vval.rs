@@ -181,6 +181,15 @@ impl std::fmt::Debug for Stdio {
 /// Currently hardcoded, but later the API user will be able to specify it.
 const STACK_SIZE : usize = 10240;
 
+#[derive(Debug, Clone, Copy)]
+pub struct LoopInfo {
+    pc:       usize,
+    uw_depth: usize,
+    sp:       usize,
+    next_pc:  usize,
+    break_pc: usize,
+}
+
 /// Describes an action that needs to be done when returning from a function
 /// or somehow jumps unpredictably around the VM prog.
 #[derive(Debug, Clone)]
@@ -188,6 +197,7 @@ pub enum UnwindAction {
     RestoreAccum(VVal, VVal),
     RestoreSP(usize),
     RestoreSelf(VVal),
+    RestoreLoopInfo(LoopInfo),
 }
 
 /// The runtime environment of the evaluator.
@@ -232,6 +242,9 @@ pub struct Env {
     pub global: GlobalEnvRef,
     /// A counter that counts the nesting depth in vm() calls
     pub vm_nest: usize,
+    /// Holds information to process 'next' and 'break' for loop
+    /// constructs:
+    pub loop_info: LoopInfo,
 }
 
 //impl Default for Env {
@@ -253,6 +266,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       vec![],
+            loop_info:          LoopInfo { pc: 0, uw_depth: 0, sp: 0, next_pc: 0, break_pc: 0 },
             vm_nest:            0,
             global
         };
@@ -273,6 +287,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       vec![],
+            loop_info:          LoopInfo { pc: 0, uw_depth: 0, sp: 0, next_pc: 0, break_pc: 0 },
             vm_nest:            0,
             user,
             global,
@@ -697,12 +712,30 @@ impl Env {
     }
 
     #[inline]
+    pub fn push_loop_info(&mut self, current_pc: usize, next_pc: u16, break_pc: u16) {
+        let uw_depth = self.unwind_depth();
+        let loop_sp  = self.sp;
+        self.unwind_stack.push(
+            UnwindAction::RestoreLoopInfo(
+                std::mem::replace(&mut self.loop_info, LoopInfo {
+                    uw_depth,
+                    pc:         current_pc,
+                    sp:         self.sp,
+                    next_pc:    next_pc  as usize,
+                    break_pc:   break_pc as usize,
+                })));
+    }
+
+    #[inline]
     pub fn unwind(&mut self, ua: UnwindAction) {
         match ua {
             UnwindAction::RestoreSP(sp) => {
                 while self.sp > sp {
                     self.pop();
                 }
+            },
+            UnwindAction::RestoreLoopInfo(li) => {
+                std::mem::replace(&mut self.loop_info, li);
             },
             UnwindAction::RestoreAccum(fun, val) => {
                 std::mem::replace(&mut self.accum_fun, fun);
