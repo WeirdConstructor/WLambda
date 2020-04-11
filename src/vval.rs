@@ -189,6 +189,13 @@ pub struct LoopInfo {
     pub break_pc: usize,
 }
 
+impl LoopInfo {
+    #[inline]
+    pub fn new() -> Self {
+        Self { pc: 0, uw_depth: 0, sp: 0, break_pc: 0 }
+    }
+}
+
 /// Describes an action that needs to be done when returning from a function
 /// or somehow jumps unpredictably around the VM prog.
 #[derive(Debug, Clone)]
@@ -266,7 +273,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       vec![],
-            loop_info:          LoopInfo { pc: 0, uw_depth: 0, sp: 0, break_pc: 0 },
+            loop_info:          LoopInfo::new(),
             vm_nest:            0,
             global
         };
@@ -286,8 +293,8 @@ impl Env {
             accum_fun:          VVal::Nul,
             accum_val:          VVal::Nul,
             call_stack:         vec![],
-            unwind_stack:       vec![],
-            loop_info:          LoopInfo { pc: 0, uw_depth: 0, sp: 0, break_pc: 0 },
+            unwind_stack:       std::vec::Vec::with_capacity(1000),
+            loop_info:          LoopInfo::new(),
             vm_nest:            0,
             user,
             global,

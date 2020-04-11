@@ -318,6 +318,14 @@ fn check_loop_info_unwind() {
 
     assert_eq!(ve(r"
         !x = 0;
+        is_none ~ while { x < 10 } {
+            .x = x + 1;
+            1 2 3 4 next[];
+        };
+    "), "$true");
+
+    assert_eq!(ve(r"
+        !x = 0;
         !y = 0;
         while { x < 10 } {
             .y = 0;
