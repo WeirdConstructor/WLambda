@@ -5,7 +5,7 @@ use crate::vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = false;
+const DEBUG_VM: bool = true;
 
 #[derive(Clone)]
 pub struct Prog {
@@ -301,9 +301,15 @@ impl Prog {
                 Op::CtrlFlow(CtrlFlow::Break(p1)) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::NewMap(p1) => { patch_respos_data(p1, self_data_next_idx); },
+                Op::IterInit(p1, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::IterNext(p1) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::NewMap(p1)  => { patch_respos_data(p1, self_data_next_idx); },
                 Op::NewList(p1) => { patch_respos_data(p1, self_data_next_idx); },
-                Op::Argv(p1) => { patch_respos_data(p1, self_data_next_idx); },
+                Op::Argv(p1)    => { patch_respos_data(p1, self_data_next_idx); },
                 Op::End
                 | Op::Builtin(Builtin::DumpStack(_))
                 | Op::CtrlFlow(CtrlFlow::Next)
@@ -595,6 +601,8 @@ pub enum Op {
     AndJmp(ResPos, i32, ResPos),
     CtrlFlow(CtrlFlow),
     Builtin(Builtin),
+    IterInit(ResPos, i32),
+    IterNext(ResPos),
     Unwind,
     End,
 }
@@ -700,6 +708,15 @@ macro_rules! handle_err {
     }
 }
 
+macro_rules! unwind_loop_info {
+    ($env: ident) => {
+        $env.unwind_to_depth($env.loop_info.uw_depth);
+        while $env.sp > $env.loop_info.sp {
+            $env.pop();
+        }
+    }
+}
+
 macro_rules! handle_next {
     ($env: ident, $pc: ident, $uw_depth: ident, $retv: ident) => {
         if $env.loop_info.break_pc == 0 {
@@ -707,10 +724,7 @@ macro_rules! handle_next {
             $retv = Err(StackAction::Next);
             break;
         } else {
-            $env.unwind_to_depth($env.loop_info.uw_depth);
-            while $env.sp > $env.loop_info.sp {
-                $env.pop();
-            }
+            unwind_loop_info!($env);
             $pc = $env.loop_info.pc;
         }
     }
@@ -723,10 +737,7 @@ macro_rules! handle_break {
             $retv = Err(StackAction::Break($val));
             break;
         } else {
-            $env.unwind_to_depth($env.loop_info.uw_depth);
-            while $env.sp > $env.loop_info.sp {
-                $env.pop();
-            }
+            unwind_loop_info!($env);
             $pc = $env.loop_info.break_pc;
         }
     }
@@ -811,8 +822,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             let syn =
                 if let Some(sp) = &prog.debug[pc] { format!("{}", sp) }
                 else { "".to_string() };
-            println!("OP[{:<2} {:>3}]: {:<15}      | sp: {:>3}, bp: {:>3} | {}",
-                     env.vm_nest, pc, format!("{:?}", op), env.sp, env.bp, syn);
+            println!("OP[{:<2} {:>3}]: {:<15}      | sp: {:>3}, bp: {:>3}, uws: {:>3} | {}",
+                     env.vm_nest, pc, format!("{:?}", op), env.sp, env.bp, env.unwind_depth(), syn);
         }
 
         match op {
@@ -918,6 +929,26 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Argv(r)             => op_r!(env, ret, prog, r, { env.argv() }),
             Op::End                 => { break; },
             Op::Unwind              => { env.unwind_one(); },
+            Op::IterInit(iterable, body_ops) => {
+                in_reg!(env, ret, prog, iterable);
+                env.push_loop_info(pc, pc + *body_ops as usize);
+                env.push_iter(iterable.iter());
+            },
+            Op::IterNext(ivar) => {
+                if let Some(i) = &mut env.iter {
+                    if let Some(v) = i.next() {
+                        out_reg!(env, ret, prog, ivar, v.0);
+                    } else {
+                        unwind_loop_info!(env);
+                        pc = env.loop_info.break_pc;
+                        env.unwind_one();
+                    }
+                } else {
+                    unwind_loop_info!(env);
+                    pc = env.loop_info.break_pc;
+                    env.unwind_one();
+                }
+            },
             Op::PushLoopInfo(body_ops) => {
                 env.push_loop_info(pc, pc + *body_ops as usize);
             },
@@ -1528,6 +1559,23 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
     })
 }
 
+macro_rules! var_env_clear_locals {
+    ($prog: ident, $from: ident, $to: ident, $spos: ident, $block: block) => {
+        if $from != $to {
+            $prog.set_dbg($spos.clone());
+            $prog.push_op(Op::ClearLocals($from as u16, $to as u16));
+
+            let res = $block;
+
+            $prog.set_dbg($spos.clone());
+            $prog.push_op(Op::Unwind);
+
+            res
+        } else {
+            $block
+        }
+    }
+}
 
 fn vm_compile_block2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
     let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
@@ -1538,19 +1586,9 @@ fn vm_compile_block2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
 
     pw!(prog, store, {
-        prog.set_dbg(spos.clone());
-        if from_local_idx != to_local_idx {
-            prog.set_dbg(spos.clone());
-            prog.push_op(Op::ClearLocals(
-                from_local_idx as u16,
-                to_local_idx   as u16));
-            let res = (*stmts.node)(prog, store);
-            prog.set_dbg(spos.clone());
-            prog.push_op(Op::Unwind);
-            res
-        } else {
+        var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
             (*stmts.node)(prog, store)
-        }
+        })
     })
 }
 
@@ -1739,9 +1777,11 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             let mut else_body_prog = Prog::new();
             let tbp = then_body.eval_to(&mut then_body_prog, store);
             let ebp = else_body.eval_to(&mut else_body_prog, store);
+            then_body_prog.set_dbg(spos.clone());
             then_body_prog.push_op(Op::Jmp(else_body_prog.op_count() as i32));
 
             let condval = cond.eval(prog);
+            prog.set_dbg(spos.clone());
             prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
             prog.append(then_body_prog);
             prog.append(else_body_prog);
@@ -1752,6 +1792,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             let tbp = then_body.eval_to(&mut then_body_prog, store);
 
             let condval = cond.eval(prog);
+            prog.set_dbg(spos.clone());
             prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
             prog.append(then_body_prog);
         })
@@ -1766,7 +1807,8 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     if ast.len() != 4 {
         return Err(ast.compile_err(
-            format!("while takes exactly 2 arguments (condition and expression)")))
+            format!("while takes exactly 2 arguments \
+                     (condition and expression)")));
     }
 
     let cond =
@@ -1804,6 +1846,70 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         prog.set_dbg(spos.clone());
         prog.push_op(Op::Unwind);
     });
+}
+
+pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let spos = syn.get_syn_pos();
+
+    if ast.len() != 5 {
+        return Err(ast.compile_err(
+            format!("while takes exactly 3 arguments \
+                    (variable identifier, iterable expression and \
+                    iteration expression)")));
+    }
+
+    if ast.at(2).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() != Syntax::Var {
+        return Err(ast.compile_err(
+            format!("iter takes an identifier as first argument")));
+    }
+
+    let varname =
+        ast.at(2).unwrap_or_else(|| VVal::Nul)
+           .at(1).unwrap_or(VVal::Nul).s_raw();
+
+    ce.borrow_mut().push_block_env();
+    let iter_var = ce.borrow_mut().next_local();
+
+    let iterable =
+        vm_compile_direct_block2(
+            &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
+
+    ce.borrow_mut().def_local(&varname, iter_var);
+
+    let expr =
+        vm_compile_direct_block2(
+            &ast.at(4).unwrap_or_else(|| VVal::Nul), ce)?;
+
+    let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
+
+    pw_null!(prog, {
+        let iter_var = ResPos::Local(iter_var as u16);
+
+        let mut body = Prog::new();
+        expr.eval_nul(&mut body);
+        body.set_dbg(spos.clone());
+        body.push_op(Op::Jmp(-(body.op_count() as i32 + 2)));
+
+        let ip = iterable.eval(prog);
+        body.set_dbg(spos.clone());
+        prog.push_op(Op::IterInit(ip, (body.op_count() + 3) as i32));
+        var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
+            body.set_dbg(spos.clone());
+            prog.push_op(Op::IterNext(iter_var));
+            prog.append(body);
+        });
+
+        // vp = <iterable>
+        // IterInit(vp, bodyoffs_to_B)
+        // ClearLocals
+        // A: IterNext(var)
+        // <body>
+        // Jmp(A)
+        // B:
+    })
 }
 
 pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
@@ -2097,6 +2203,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             match &sym[..] {
                                 "?"     => return vm_compile_if2(ast, ce),
                                 "while" => return vm_compile_while2(ast, ce),
+                                "iter"  => return vm_compile_iter2(ast, ce),
                                 "next"  => return vm_compile_next2(ast, ce),
                                 "break" => return vm_compile_break2(ast, ce),
                                 _ => (),

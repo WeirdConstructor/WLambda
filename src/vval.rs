@@ -198,17 +198,18 @@ impl LoopInfo {
 
 /// Describes an action that needs to be done when returning from a function
 /// or somehow jumps unpredictably around the VM prog.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum UnwindAction {
     RestoreAccum(VVal, VVal),
     RestoreSP(usize),
     ClearLocals(usize, usize),
     RestoreSelf(VVal),
     RestoreLoopInfo(LoopInfo),
+    RestoreIter(Option<VValIter>),
 }
 
 /// The runtime environment of the evaluator.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Env {
     /// The argument stack, limited to `STACK_SIZE`.
     pub args: std::vec::Vec<VVal>,
@@ -252,6 +253,8 @@ pub struct Env {
     /// Holds information to process 'next' and 'break' for loop
     /// constructs:
     pub loop_info: LoopInfo,
+    /// Holds the current iterator for the 'iter' construct.
+    pub iter: Option<VValIter>,
 }
 
 //impl Default for Env {
@@ -274,6 +277,7 @@ impl Env {
             call_stack:         vec![],
             unwind_stack:       vec![],
             loop_info:          LoopInfo::new(),
+            iter:               None,
             vm_nest:            0,
             global
         };
@@ -295,6 +299,7 @@ impl Env {
             call_stack:         vec![],
             unwind_stack:       std::vec::Vec::with_capacity(1000),
             loop_info:          LoopInfo::new(),
+            iter:               None,
             vm_nest:            0,
             user,
             global,
@@ -738,6 +743,13 @@ impl Env {
     }
 
     #[inline]
+    pub fn push_iter(&mut self, iter: VValIter) {
+        self.unwind_stack.push(
+            UnwindAction::RestoreIter(
+                std::mem::replace(&mut self.iter, Some(iter))));
+    }
+
+    #[inline]
     pub fn unwind(&mut self, ua: UnwindAction) {
         match ua {
             UnwindAction::RestoreSP(sp) => {
@@ -757,7 +769,10 @@ impl Env {
             },
             UnwindAction::RestoreSelf(slf) => {
                 std::mem::replace(&mut self.current_self, slf);
-            }
+            },
+            UnwindAction::RestoreIter(i) => {
+                std::mem::replace(&mut self.iter, i);
+            },
         }
     }
 
@@ -1693,6 +1708,9 @@ impl VVal {
                 if let Some(r) = v.upgrade() {
                     r.borrow().iter()
                 } else { std::iter::from_fn(Box::new(|| { None })) },
+            VVal::Nul => {
+                std::iter::from_fn(Box::new(move || { None }))
+            },
             _ => {
                 let x = self.clone();
                 let mut used = false;

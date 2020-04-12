@@ -2617,7 +2617,30 @@ fn check_if() {
         "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ? takes 1 or 2 arguments (condition and expression)");
 }
 
+#[test]
 fn check_backslash_function() {
     assert_eq!(ve("!x = $[\\1,\\2,\\3 + _,5]; $[x.1[],x.2 4,x.3[]]"), "$[2,7,5]");
     assert_eq!(ve("!x = ${a = \\1, b = \\2 * _, c = 9}; $[x.a[],x.b 4,x.c[]]"), "$[1,8,9]");
+}
+
+#[test]
+fn check_iter() {
+//    assert_eq!(ve("!x = 0; for $n {|| .x = 20 }; x"), "0");
+//    assert_eq!(ve(r"
+//        !x = $[1,2,3,4,5,6,7];
+//        !r = 0;
+//        iter i x {
+//            .r = r + i;
+//        };
+//        r
+//    "), "28");
+    assert_eq!(ve(r"
+        !x = $[1,2,3,4,5,6,7];
+        !r = 0;
+        iter i x {
+            .r = r + i;
+            ? r >= 6 break[];
+        };
+        r
+    "), "6");
 }
