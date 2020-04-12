@@ -1675,19 +1675,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     func_pw.eval_to(&mut func_prog, ResPos::Value(ResValue::Ret));
                     func_prog.push_op(Op::End);
 
-                    let spos_inner = fun_spos.clone();
-                    let fun_ref = Rc::new(RefCell::new(move |env: &mut Env, _argc: usize| {
-                        let res = vm(&func_prog, env);
-                        match res {
-                            Ok(v)  => Ok(v),
-                            Err(StackAction::Return((v_lbl, v))) => {
-                                return
-                                    if v_lbl.eqv(&label) { Ok(v) }
-                                    else { Err(StackAction::Return((v_lbl, v))) }
-                            },
-                            Err(e) => { return Err(e.wrap_panic(Some(spos_inner.clone()))) }
-                        }
-                    }));
+                    let func_prog = Rc::new(func_prog);
 
                     ce_sub.borrow_mut().explicit_arity.0 =
                         match explicit_arity.at(0).unwrap_or_else(|| VVal::Nul) {
@@ -1732,11 +1720,12 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let upvalues = vec![];
 
                     let fun_template =
-                        VValFun::new_val(
-                            fun_ref.clone(),
+                        VValFun::new_prog(
+                            func_prog,
                             upvalues, env_size, min_args, max_args, false,
                             Some(fun_spos.clone()),
-                            Rc::new(upvs));
+                            Rc::new(upvs),
+                            label);
 
                     pw_needs_storage!(prog, store, {
                         let fp = prog.data_pos(fun_template.clone());

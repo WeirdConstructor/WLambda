@@ -995,6 +995,8 @@ pub struct VValFun {
     pub err_arg_ok: bool,
     /// The location of the definition of this function.
     pub syn_pos:    Option<SynPos>,
+    /// The return label of the function:
+    pub label:      VVal,
 }
 
 impl VValFun {
@@ -1048,6 +1050,26 @@ impl VValFun {
             max_args,
             err_arg_ok,
             syn_pos,
+            label: VVal::Nul,
+        }))
+    }
+
+    /// Internal utility function. Use at your own risk, API might change.
+    pub fn new_prog(prog: Rc<Prog>, upvalues: std::vec::Vec<VVal>,
+                   env_size: usize, min_args: Option<usize>,
+                   max_args: Option<usize>, err_arg_ok: bool, syn_pos: Option<SynPos>,
+                   upvalue_pos: Rc<std::vec::Vec<VarPos>>,
+                   label: VVal) -> VVal {
+        VVal::Fun(Rc::new(VValFun {
+            upvalue_pos,
+            upvalues,
+            fun: FunType::VMProg(prog),
+            local_size: env_size,
+            min_args,
+            max_args,
+            err_arg_ok,
+            syn_pos,
+            label
         }))
     }
 
@@ -1062,6 +1084,7 @@ impl VValFun {
             max_args:    None,
             err_arg_ok:  false,
             syn_pos:     None,
+            label:       VVal::Nul,
         })
     }
 
@@ -1812,12 +1835,23 @@ impl VVal {
                         }
                     }
 
-                    if let FunType::ClosureNode(cn) = &(*fu).fun {
-                        (cn.borrow())(e, argc)
-                    } else {
-                        return Err(StackAction::panic_str(
-                            format!("FunType::VMProg not yet supported!"),
-                            fu.syn_pos.clone()));
+                    match &(*fu).fun {
+                        FunType::ClosureNode(cn) => (cn.borrow())(e, argc),
+                        FunType::VMProg(prog)    => {
+                            match crate::vm::vm(&*prog, e) {
+                                Ok(v) => Ok(v),
+                                Err(StackAction::Return((v_lbl, v))) => {
+                                    if v_lbl.eqv(&fu.label) {
+                                        Ok(v)
+                                    } else {
+                                        Err(StackAction::Return((v_lbl, v)))
+                                    }
+                                },
+                                Err(e) => {
+                                    Err(e.wrap_panic(fu.syn_pos.clone()))
+                                },
+                            }
+                        },
                     }
                 })
             },
