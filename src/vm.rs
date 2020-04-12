@@ -54,14 +54,14 @@ macro_rules! pw {
 
 macro_rules! pw_null {
     ($prog: ident, $b: block) => {
-        pw_respos_or_mov!($prog, {
+        pw_provides_result_pos!($prog, {
             $b
             ResPos::Value(ResValue::Nul)
         })
     }
 }
 
-macro_rules! pw_respos_or_mov {
+macro_rules! pw_provides_result_pos {
     ($prog: ident, $b: block) => {
         pw!($prog, store, {
             let pos = $b;
@@ -75,7 +75,7 @@ macro_rules! pw_respos_or_mov {
     }
 }
 
-macro_rules! pw_store_or_stack {
+macro_rules! pw_needs_storage {
     ($prog: ident, $pos: ident, $b: block) => {
         pw!($prog, store, {
             let $pos = if let Some(store) = store {
@@ -1408,7 +1408,7 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool)
             "_9" => { set_impl_arity(10, ce); pw_arg(9, capt_ref) },
             "@"  => {
                 ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                pw_store_or_stack!(prog, store, {
+                pw_needs_storage!(prog, store, {
                     prog.set_dbg(spos.clone());
                     prog.push_op(Op::Argv(store));
                     if capt_ref {
@@ -1434,7 +1434,7 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool)
                         }
                     };
                 let mk_respos = mk_respos?;
-                pw_respos_or_mov!(prog, {
+                pw_provides_result_pos!(prog, {
                     let var_respos = mk_respos(prog);
                     prog.set_dbg(spos.clone());
                     if capt_ref {
@@ -1521,7 +1521,7 @@ fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool
                     _ => ResPos::Value(ResValue::Nul)
                 };
 
-            (*val_pw.node)(prog, Some(rp));
+            val_pw.eval_to(prog, rp)
         })
     }
 }
@@ -1638,7 +1638,7 @@ fn vm_compile_binop2(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
     let a_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
     let b_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-    pw_store_or_stack!(prog, store, {
+    pw_needs_storage!(prog, store, {
         let ap = a_pw.eval(prog);
         let bp = b_pw.eval(prog);
         prog.set_dbg(spos.clone());
@@ -1772,7 +1772,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     if let Some(else_body) = ast.at(4) {
         let else_body = vm_compile_direct_block2(&else_body, ce)?;
 
-        pw_store_or_stack!(prog, store, {
+        pw_needs_storage!(prog, store, {
             let mut then_body_prog = Prog::new();
             let mut else_body_prog = Prog::new();
             let tbp = then_body.eval_to(&mut then_body_prog, store);
@@ -1787,7 +1787,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             prog.append(else_body_prog);
         })
     } else {
-        pw_store_or_stack!(prog, store, {
+        pw_needs_storage!(prog, store, {
             let mut then_body_prog = Prog::new();
             let tbp = then_body.eval_to(&mut then_body_prog, store);
             then_body_prog.push_op(Op::Jmp(1));
@@ -1942,21 +1942,21 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::BinOpEq    => vm_compile_binop2(ast, BinOp::Eq,  ce),
                 Syntax::Ref => {
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
                         prog.push_op(Op::ToRef(ref_rp, store, ToRefType::ToRef));
                     })
                 },
                 Syntax::WRef => {
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
                         prog.push_op(Op::ToRef(ref_rp, store, ToRefType::Weakable));
                     })
                 },
                 Syntax::Deref => {
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
                         prog.push_op(Op::ToRef(ref_rp, store, ToRefType::Deref));
                     })
@@ -1978,7 +1978,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         pws.push((false, val_pw));
                     }
 
-                    pw_respos_or_mov!(prog, {
+                    pw_provides_result_pos!(prog, {
                         prog.push_op(Op::NewList(ResPos::Stack(0)));
 
                         for (is_splice, pw) in pws.iter() {
@@ -2026,7 +2026,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         pws.push((kc_pw, Some(vc_pw)));
                     }
 
-                    pw_respos_or_mov!(prog, {
+                    pw_provides_result_pos!(prog, {
                         prog.push_op(Op::NewMap(ResPos::Stack(0)));
 
                         for (kc_pw, vc_pw) in pws.iter() {
@@ -2134,7 +2134,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             Some(fun_spos.clone()),
                             Rc::new(upvs));
 
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let fp = prog.data_pos(fun_template.clone());
                         prog.push_op(Op::NewClos(fp, store))
                     })
@@ -2160,7 +2160,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         match syntax {
                             Syntax::GetKey => {
                                 let key = vm_compile2(&key, ce)?;
-                                pw_store_or_stack!(prog, store, {
+                                pw_needs_storage!(prog, store, {
                                     for ca in compiled_args.iter() {
                                         ca.eval_to(prog, ResPos::Stack(0));
                                     }
@@ -2176,7 +2176,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             },
                             Syntax::GetSym => {
                                 let key = key.s_raw();
-                                pw_store_or_stack!(prog, store, {
+                                pw_needs_storage!(prog, store, {
                                     for ca in compiled_args.iter() {
                                         ca.eval_to(prog, ResPos::Stack(0));
                                     }
@@ -2227,7 +2227,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             argc += 1;
                         }
 
-                        pw_store_or_stack!(prog, store, {
+                        pw_needs_storage!(prog, store, {
                             for ca in compiled_args.iter() {
                                 ca.eval_to(prog, ResPos::Stack(0));
                             }
@@ -2238,7 +2238,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::Err => {
                     let err_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
 
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         prog.set_dbg(spos.clone());
                         let err_val_pw = err_pw.eval(prog);
                         prog.set_dbg(spos.clone());
@@ -2248,7 +2248,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::Key => {
                     let sym = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = sym.s_raw();
-                    pw_respos_or_mov!(prog, {
+                    pw_provides_result_pos!(prog, {
                         prog.set_dbg(spos.clone());
                         prog.data_pos(sym.clone())
                     })
@@ -2256,7 +2256,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::Str => {
                     let string = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = string.s_raw();
-                    pw_respos_or_mov!(prog, {
+                    pw_provides_result_pos!(prog, {
                         prog.set_dbg(spos.clone());
                         prog.data_pos(string.clone())
                     })
@@ -2267,7 +2267,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                     match lc.len() {
                         2 => {
-                            pw_store_or_stack!(prog, store, {
+                            pw_needs_storage!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 prog.push_op(
@@ -2278,7 +2278,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             })
                         },
                         3 => {
-                            pw_store_or_stack!(prog, store, {
+                            pw_needs_storage!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
@@ -2290,7 +2290,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             })
                         },
                         4 => {
-                            pw_store_or_stack!(prog, store, {
+                            pw_needs_storage!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
@@ -2315,7 +2315,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                     match lc.len() {
                         2 => {
-                            pw_store_or_stack!(prog, store, {
+                            pw_needs_storage!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 prog.push_op(
@@ -2326,7 +2326,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             })
                         },
                         3 => {
-                            pw_store_or_stack!(prog, store, {
+                            pw_needs_storage!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
@@ -2338,7 +2338,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             })
                         },
                         4 => {
-                            pw_store_or_stack!(prog, store, {
+                            pw_needs_storage!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
@@ -2358,18 +2358,18 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     }
                 },
                 Syntax::SelfObj => {
-                    pw_respos_or_mov!(prog,
+                    pw_provides_result_pos!(prog,
                         { ResPos::Value(ResValue::SelfObj) })
                 },
                 Syntax::SelfData => {
-                    pw_respos_or_mov!(prog,
+                    pw_provides_result_pos!(prog,
                         { ResPos::Value(ResValue::SelfData) })
                 },
                 Syntax::Accum => {
                     match ast.at(1) {
                         Some(s) => {
                             if s.s_raw() == "@" {
-                                pw_respos_or_mov!(prog, {
+                                pw_provides_result_pos!(prog, {
                                     ResPos::Value(ResValue::AccumVal)
                                 })
                             } else {
@@ -2388,7 +2388,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                                 let acc_pw =
                                     vm_compile2(&ast.at(2).unwrap(), ce)?;
-                                pw_store_or_stack!(prog, store, {
+                                pw_needs_storage!(prog, store, {
                                     prog.push_op(Op::Accumulator(accum_type));
                                     acc_pw.eval_nul(prog);
                                     prog.push_op(
@@ -2400,7 +2400,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             }
                         },
                         None => {
-                            pw_respos_or_mov!(prog, {
+                            pw_provides_result_pos!(prog, {
                                 ResPos::Value(ResValue::AccumFun)
                             })
                         }
@@ -2410,7 +2410,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let idx = ast.at(2).unwrap().i() as u32;
 
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(Op::GetIdx(opos, idx, store));
                     })
@@ -2419,7 +2419,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let idx  = ast.at(2).unwrap().i() as u32;
                     let idx2 = ast.at(3).unwrap().i() as u32;
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetIdx2(opos, Box::new((idx, idx2)), store));
@@ -2430,7 +2430,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let idx  = ast.at(2).unwrap().i() as u32;
                     let idx2 = ast.at(3).unwrap().i() as u32;
                     let idx3 = ast.at(4).unwrap().i() as u32;
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetIdx3(
@@ -2440,7 +2440,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::GetSym => {
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let sym = ast.at(2).unwrap().s_raw();
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetSym(opos, Box::new(sym.clone()), store));
@@ -2450,7 +2450,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let sym  = ast.at(2).unwrap().s_raw();
                     let sym2 = ast.at(3).unwrap().s_raw();
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetSym2(
@@ -2466,7 +2466,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let sym  = ast.at(2).unwrap().s_raw();
                     let sym2 = ast.at(3).unwrap().s_raw();
                     let sym3 = ast.at(4).unwrap().s_raw();
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetSym3(
@@ -2482,7 +2482,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let map_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let idx_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let mp = map_pw.eval(prog);
                         let ip = idx_pw.eval(prog);
                         prog.push_op(Op::GetKey(mp, ip, store));
@@ -2497,7 +2497,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                     let val_pw = vm_compile2(&ast.at(3).unwrap(), ce)?;
 
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let map = map_pw.eval(prog);
                         let sym = sym_pw.eval(prog);
                         let val = val_pw.eval(prog);
@@ -2508,7 +2508,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let a = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let b = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let mut aprog = Prog::new();
                         let ap = a.eval(&mut aprog);
 
@@ -2527,7 +2527,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let a = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let b = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let mut aprog = Prog::new();
                         let ap = a.eval(&mut aprog);
 
@@ -2561,7 +2561,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let call_argv_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
                     let func_pw      = vm_compile2(&ast.at(1).unwrap(), ce)?;
 
-                    pw_store_or_stack!(prog, store, {
+                    pw_needs_storage!(prog, store, {
                         let f_rp    = func_pw.eval(prog);
                         let argv_rp = call_argv_pw.eval(prog);
 
@@ -2647,15 +2647,15 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
             let a = vm_compile2(&bx.0, ce)?;
             let b = vm_compile2(&bx.1, ce)?;
 
-            pw_store_or_stack!(prog, pos, {
-                let ar = (*a.node)(prog, None);
-                let br = (*b.node)(prog, None);
+            pw_needs_storage!(prog, pos, {
+                let ar = a.eval(prog);
+                let br = b.eval(prog);
                 prog.push_op(Op::NewPair(br, ar, pos));
             })
         },
         _ => {
             let ast = ast.clone();
-            pw_respos_or_mov!(prog, { prog.data_pos(ast.clone()) })
+            pw_provides_result_pos!(prog, { prog.data_pos(ast.clone()) })
         },
     }
 }
