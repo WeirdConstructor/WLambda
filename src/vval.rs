@@ -16,6 +16,7 @@ use std::fmt::{Display, Debug, Formatter};
 
 use crate::compiler::{GlobalEnv, GlobalEnvRef};
 use crate::nvec::NVec;
+use crate::ops::Prog;
 
 use fnv::FnvHashMap;
 
@@ -966,10 +967,16 @@ pub type EvalNode = Box<dyn Fn(&mut Env) -> Result<VVal,StackAction>>;
 pub type ClosNodeRef = Rc<RefCell<dyn Fn(&mut Env, usize) -> Result<VVal,StackAction>>>;
 
 #[derive(Clone)]
+pub enum FunType {
+    ClosureNode(ClosNodeRef),
+    VMProg(Rc<Prog>),
+}
+
+#[derive(Clone)]
 /// This structure is the runtime representation of a WLambda function value.
 pub struct VValFun {
-    /// The closure that runs the function.
-    pub fun:        ClosNodeRef,
+    /// The closure or vm program that runs the function.
+    pub fun:        FunType,
     /// The positions of the upvalues that are being captured by this function.
     pub upvalue_pos: Rc<std::vec::Vec<VarPos>>,
     /// Contains any caught upvalues.
@@ -1035,7 +1042,7 @@ impl VValFun {
         VVal::Fun(Rc::new(VValFun {
             upvalue_pos,
             upvalues,
-            fun,
+            fun: FunType::ClosureNode(fun),
             local_size: env_size,
             min_args,
             max_args,
@@ -1047,7 +1054,7 @@ impl VValFun {
     /// Returns a dummy function that does nothing.
     pub fn new_dummy() -> Rc<VValFun> {
         Rc::new(VValFun {
-            fun:         Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) })),
+            fun:         FunType::ClosureNode(Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) }))),
             upvalue_pos: Rc::new(vec![]),
             upvalues:    Vec::new(),
             local_size:  0,
@@ -1805,7 +1812,13 @@ impl VVal {
                         }
                     }
 
-                    ((*fu).fun.borrow())(e, argc)
+                    if let FunType::ClosureNode(cn) = &(*fu).fun {
+                        (cn.borrow())(e, argc)
+                    } else {
+                        return Err(StackAction::panic_str(
+                            format!("FunType::VMProg not yet supported!"),
+                            fu.syn_pos.clone()));
+                    }
                 })
             },
             VVal::Bol(b) => {

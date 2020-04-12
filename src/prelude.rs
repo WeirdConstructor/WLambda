@@ -4389,29 +4389,6 @@ pub fn core_symbol_table() -> SymbolTable {
             Ok(VVal::Pair(Box::new((env.arg(0), env.arg(1)))))
         }, Some(2), Some(2), true);
 
-    func!(st, "while",
-        |env: &mut Env, _argc: usize| {
-            let test = env.arg(0);
-            let f    = env.arg(1);
-
-            let mut ret = VVal::Nul;
-            loop {
-                match test.call_no_args(env) {
-                    Ok(v)                      => { if !v.b() { return Ok(ret); } },
-                    Err(StackAction::Break(v)) => { return Ok(v); },
-                    Err(StackAction::Next)     => { continue; },
-                    Err(e)                     => { return Err(e); }
-                }
-
-                match f.call_no_args(env) {
-                    Ok(v)                      => { ret = v; },
-                    Err(StackAction::Break(v)) => { return Ok(v); },
-                    Err(StackAction::Next)     => { },
-                    Err(e)                     => { return Err(e); }
-                }
-            }
-        }, Some(2), Some(2), false);
-
     func!(st, "for",
         |env: &mut Env, _argc: usize| {
             let val = env.arg(0);

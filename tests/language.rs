@@ -1,6 +1,7 @@
 use wlambda::*;
 use wlambda::compiler::{CompileEnv, GlobalEnvRef, ResPos, ResValue};
 use wlambda::vm::*;
+use wlambda::ops::Prog;
 use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -2625,15 +2626,15 @@ fn check_backslash_function() {
 
 #[test]
 fn check_iter() {
-//    assert_eq!(ve("!x = 0; for $n {|| .x = 20 }; x"), "0");
-//    assert_eq!(ve(r"
-//        !x = $[1,2,3,4,5,6,7];
-//        !r = 0;
-//        iter i x {
-//            .r = r + i;
-//        };
-//        r
-//    "), "28");
+    assert_eq!(ve("!x = 0; for $n {|| .x = 20 }; x"), "0");
+    assert_eq!(ve(r"
+        !x = $[1,2,3,4,5,6,7];
+        !r = 0;
+        iter i x {
+            .r = r + i;
+        };
+        r
+    "), "28");
     assert_eq!(ve(r"
         !x = $[1,2,3,4];
         !r = 0;

@@ -4,6 +4,7 @@
 mod vval;
 mod parser;
 mod compiler;
+mod ops;
 mod vm;
 mod prelude;
 mod util;

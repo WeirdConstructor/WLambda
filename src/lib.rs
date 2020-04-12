@@ -28,6 +28,7 @@ of Rust's Result type.
 - Easy maintenance and hackability of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 - Threading support with shared atoms and message queues.
+- Register based VM evaluator and code generator.
 - Has a testable wasm32 version: [WASM WLambda Evaluator](http://wlambda.m8geil.de/#!/main).
 
 The embedding API and all internal operations rely on a data structure
@@ -527,11 +528,8 @@ complete for real world use. So my current goals are:
 - Improve reference documentation.
 - DONE: Add proper module support (via !@import and !@export).
 - DONE: Add prototyped inheritance for OOP paradigm.
-- There are no plans to change the internal evaluator to a VM and/or JIT speedup.
-It's one of WLambda's goals to have a simple and easily hackable implementation.
-The compiler transforms the AST directly into Rust closures. This
-allows a seamless integration of new functions via WLambda's embedding
-API.
+- DONE: Replace compiler and closure based evaluator with a VM
+and more or less clever code generator.
 
 # License
 
@@ -621,6 +619,7 @@ without any additional terms or conditions.
 pub mod vval;
 pub mod parser;
 pub mod compiler;
+pub mod ops;
 pub mod vm;
 pub mod prelude;
 pub mod threads;
