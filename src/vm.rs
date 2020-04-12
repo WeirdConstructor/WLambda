@@ -820,9 +820,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         let op = &prog.ops[pc];
         if DEBUG_VM {
             let syn =
-                if let Some(sp) = &prog.debug[pc] { format!("{}", sp) }
+                if let Some(sp) = &prog.debug[pc] { sp.s_short() }
                 else { "".to_string() };
-            println!("OP[{:<2} {:>3}]: {:<15}      | sp: {:>3}, bp: {:>3}, uws: {:>3} | {}",
+            println!("OP[{:<2} {:>3}]: {:<40}      | sp: {:>3}, bp: {:>3}, uws: {:>3} | {}",
                      env.vm_nest, pc, format!("{:?}", op), env.sp, env.bp, env.unwind_depth(), syn);
         }
 
@@ -1790,11 +1790,13 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         pw_store_or_stack!(prog, store, {
             let mut then_body_prog = Prog::new();
             let tbp = then_body.eval_to(&mut then_body_prog, store);
+            then_body_prog.push_op(Op::Jmp(1));
 
             let condval = cond.eval(prog);
             prog.set_dbg(spos.clone());
             prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
             prog.append(then_body_prog);
+            prog.push_op(Op::Mov(ResPos::Value(ResValue::Nul), store));
         })
     }
 }
@@ -1981,6 +1983,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                         for (is_splice, pw) in pws.iter() {
                             pw.eval_to(prog, ResPos::Stack(0));
+                            prog.set_dbg(spos.clone());
                             if *is_splice {
                                 prog.push_op(Op::ListSplice(
                                     ResPos::Stack(0),
@@ -2031,6 +2034,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                 kc_pw.eval_to(prog, ResPos::Stack(0));
                                 vc_pw.eval_to(prog, ResPos::Stack(0));
 
+                                prog.set_dbg(spos.clone());
                                 prog.push_op(Op::MapSetKey(
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),
@@ -2039,6 +2043,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             } else {
                                 kc_pw.eval_to(prog, ResPos::Stack(0));
 
+                                prog.set_dbg(spos.clone());
                                 prog.push_op(Op::MapSplice(
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),

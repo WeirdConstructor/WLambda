@@ -48,6 +48,12 @@ pub struct SynPos {
     pub name:       Option<std::rc::Rc<String>>,
 }
 
+impl SynPos {
+    pub fn s_short(&self) -> String {
+        format!("[{},{}({:?})]", self.line, self.col, self.syn)
+    }
+}
+
 impl Display for SynPos {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         if self.line > 0 {
