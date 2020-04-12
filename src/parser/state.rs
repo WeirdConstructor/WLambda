@@ -22,12 +22,32 @@ use std::fmt;
 /// ```
 #[allow(dead_code)]
 pub struct State {
-        chars:      Vec<char>,
-        peek_char:  char,
-        line_no:    u32,
-        col_no:     u16,
-        file:       FileRef,
-    pub at_eof:     bool,
+        chars:          Vec<char>,
+        peek_char:      char,
+        line_no:        u32,
+        col_no:         u16,
+        indent:         Option<u32>,
+        line_indent:    u32,
+        last_tok_char:  char,
+        file:           FileRef,
+    pub at_eof:         bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct IndentPos {
+    line_no:        u32,
+    indent:         Option<u32>,
+    line_indent:    u32,
+}
+
+impl IndentPos {
+    pub fn belongs_to(&self, call_ip: &IndentPos) -> bool {
+        self.line_no == call_ip.line_no
+        || (if let Some(i) = self.indent {
+                if let Some(i2) = call_ip.indent { i > i2 }
+                else { i > call_ip.line_indent } }
+            else { true })
+    }
 }
 
 /// The possible errors the parser can detect while reading code.
@@ -35,6 +55,7 @@ pub struct State {
 pub enum ParseErrorKind {
     UnexpectedToken(char, &'static str),
     BadEscape(&'static str),
+    BadIndent(&'static str),
     BadValue(ParseValueError),
     BadKeyword(String, &'static str),
     BadNumber(ParseNumberError),
@@ -47,6 +68,7 @@ impl fmt::Display for ParseErrorKind {
         match self {
             UnexpectedToken(c, s) => write!(f, "Unexpected token '{}'. {}", c, s),
             BadEscape(s)          => write!(f, "{}", s),
+            BadIndent(s)          => write!(f, "{}", s),
             BadValue(s)           => write!(f, "{}", s),
             BadKeyword(kw, s)     => write!(f, "Got '{}', expected {}", kw, s),
             BadNumber(s)          => write!(f, "{}", s),
@@ -317,6 +339,18 @@ impl State {
         ret
     }
 
+    pub fn indent_pos(&self) -> IndentPos {
+        IndentPos {
+            line_no:     self.line_no,
+            indent:      self.indent,
+            line_indent: self.line_indent,
+        }
+    }
+
+    pub fn last_token_char(&self) -> char {
+        self.last_tok_char
+    }
+
     pub fn consume_lookahead(&mut self, s: &str) -> bool {
         if self.lookahead(s) {
             for _ in s.chars() { self.chars.remove(0); }
@@ -375,7 +409,17 @@ impl State {
         self.col_no = self.col_no.wrapping_add(1);
         if c == '\n' {
             self.line_no += 1;
-            self.col_no = 1;
+            self.indent      = Some(0);
+            self.line_indent = 0;
+            self.col_no      = 1;
+        } else if c.is_whitespace() {
+            if let Some(i) = self.indent {
+                self.line_indent += 1;
+                self.indent = Some(i + 1);
+            }
+        } else {
+            self.indent = None;
+            self.last_tok_char = c;
         }
 
         if !self.chars.is_empty() {
@@ -429,12 +473,15 @@ impl State {
     /// ```
     pub fn new(code: &str, filename: &str) -> State {
         let mut ps = State {
-            chars:     code.chars().collect(),
-            peek_char: ' ',
-            at_eof:    false,
-            line_no:   1,
-            col_no:    1,
-            file:      FileRef::new(filename),
+            chars:          code.chars().collect(),
+            peek_char:      ' ',
+            at_eof:         false,
+            line_no:        1,
+            col_no:         1,
+            indent:         Some(0),
+            line_indent:    0,
+            last_tok_char:  ' ',
+            file:           FileRef::new(filename),
         };
         ps.init();
         ps.skip_ws_and_comments();

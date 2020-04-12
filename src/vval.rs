@@ -2035,7 +2035,6 @@ impl VVal {
     }
 
     pub fn to_ref(&self) -> VVal {
-        println!("TOOOO REF: {}", self.s());
         match self {
             VVal::CRef(r)    => VVal::Ref(r.clone()),
             VVal::Ref(r)     => VVal::Ref(r.clone()),

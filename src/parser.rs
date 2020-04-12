@@ -1339,6 +1339,8 @@ fn parse_binop(mut left: VVal, ps: &mut State, op: &str, binop: VVal) -> Result<
 
 fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
     //println!("parse_expr [{}] np={}", ps.rest(), no_pipe);
+    let call_indent = ps.indent_pos();
+    //d// println!("CALL INDENT: {:?} @'{}'", call_indent, ps.rest());
     let mut value = parse_value(ps)?;
 
     // look ahead, if we see an expression delimiter.
@@ -1348,24 +1350,11 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
         return Ok(value);
     }
 
-    //println!("parse_call [{}]", ps.rest());
     let mut res_call = VVal::Nul;
 
     while let Some(c) = ps.peek() {
-        //println!("PC c={}", c);
         let op = ps.peek_op();
 
-//        if let Some(s) = self.peek2() {
-//            match s.chars().nth(0).unwrap_or(' ') {
-//                '+' | '-' => true,
-//                _         => false,
-//            } && (if s.chars().nth(1).unwrap_or(' ').is_digit(10) {
-//                      true
-//                  } else {
-//                      false
-//                  })
-//        } else {
-//
         match c {
             '[' => {
                 let mut call = make_to_call(ps, value);
@@ -1403,7 +1392,27 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
 
                 if let VVal::Nul = res_call { res_call = make_to_call(ps, value); }
                 else { res_call.push(value); }
+
+                //d// println!("INDENT: {:?} VS {:?} '{}'", ps.indent_pos(), call_indent, ps.rest());
+                if !ps.indent_pos().belongs_to(&call_indent) {
+                    return Err(ps.err(ParseErrorKind::BadIndent(
+                        "Call argument does not belong to call, it needs a higher indentation.")));
+                }
+
                 value = parse_value(ps)?;
+//                if !ps.indent_pos().belongs_to(&call_indent) {
+//                    let is_new_stmt =
+//                        if let Some(c) = ps.peek() { c == ';' } else { false };
+//                    let was_closing_paren =
+//                        match ps.last_token_char() {
+//                            '}' | ')' | ']' => true,
+//                            _               => false,
+//                        };
+//                    if !ps.at_eof() && !is_new_stmt && !was_closing_paren {
+//                        return Err(ps.err(ParseErrorKind::BadIndent(
+//                            "Call argument does not belong to call, it needs a higher indentation.")));
+//                    }
+//                }
             },
         }
     }
@@ -2042,6 +2051,28 @@ mod tests {
         assert_eq!(parse("!:const X = $[120];"),            "$[&Block,$[&DefConst,$[:\"X\"],$[&Lst,120]]]");
         assert_eq!(parse("!:const X = ${a=10};"),           "$[&Block,$[&DefConst,$[:\"X\"],$[&Map,$[:\"a\",10]]]]");
         assert_eq!(parse("!:const (A,B,X) = $[1,3,4];"),    "$[&Block,$[&DefConst,$[:\"A\",:\"B\",:\"X\"],$[&Lst,1,3,4],$true]]");
+    }
+
+    #[test]
+    fn check_indent_error() {
+        assert_eq!(parse_error(" 10 11\n12"),
+            "Parse error: error[2,1:<parser_test>] Call argument does not belong to call, it needs a higher indentation. at code \'12\'");
+        assert_eq!(parse_error("10 11\n12"),
+            "Parse error: error[2,1:<parser_test>] Call argument does not belong to call, it needs a higher indentation. at code \'12\'");
+        assert_eq!(parse_error("!x = 10 11\n12"),
+            "Parse error: error[2,1:<parser_test>] Call argument does not belong to call, it needs a higher indentation. at code \'12\'");
+        assert_eq!(parse("10 11\n 12"),
+            "$[&Block,$[&Call,10,11,12]]");
+        assert_eq!(parse("10 11\n;12"),
+            "$[&Block,$[&Call,10,11],12]");
+        assert_eq!(parse("10 11\n;\n12"),
+            "$[&Block,$[&Call,10,11],12]");
+        assert_eq!(parse("10 11\n 12 13"),
+            "$[&Block,$[&Call,10,11,12,13]]");
+        assert_eq!(parse("!x = 10 11\n 12"),
+            "$[&Block,$[&Def,$[:\"x\"],$[&Call,10,11,12]]]");
+        assert_eq!(parse("!x = 10 11\n 12 13"),
+            "$[&Block,$[&Def,$[:\"x\"],$[&Call,10,11,12,13]]]");
     }
 
     #[test]

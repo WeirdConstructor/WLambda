@@ -1677,8 +1677,7 @@ pub fn vm_compile_break2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     let spos = syn.get_syn_pos();
 
     if ast.len() > 3 {
-        return Err(ast.compile_err(
-            format!("break takes 0 or 1 arguments: {}", ast.s())))
+        return Err(ast.compile_err(format!("break takes 0 or 1 arguments")))
     }
 
     if let Some(expr) = ast.at(2) {
@@ -1704,8 +1703,7 @@ pub fn vm_compile_next2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     let spos = syn.get_syn_pos();
 
     if ast.len() > 2 {
-        return Err(ast.compile_err(
-            format!("next takes no arguments: {}", ast.s())))
+        return Err(ast.compile_err(format!("next takes no arguments")))
     }
 
     pw_null!(prog, {
@@ -1719,6 +1717,11 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 {
     let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
     let spos = syn.get_syn_pos();
+
+    if ast.len() != 4 && ast.len() != 5 {
+        return Err(ast.compile_err(
+            format!("? takes 1 or 2 arguments (condition and expression)")))
+    }
 
     let cond =
         vm_compile_direct_block2(
@@ -1760,6 +1763,11 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 {
     let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
     let spos = syn.get_syn_pos();
+
+    if ast.len() != 4 {
+        return Err(ast.compile_err(
+            format!("while takes exactly 2 arguments (condition and expression)")))
+    }
 
     let cond =
         vm_compile_direct_block2(
