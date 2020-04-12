@@ -5,7 +5,7 @@ use crate::vval::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = true;
+const DEBUG_VM: bool = false;
 
 #[derive(Clone)]
 pub struct Prog {
@@ -15,7 +15,47 @@ pub struct Prog {
     nxt_debug: Option<SynPos>,
 }
 
-pub type ProgWriteNode = Box<dyn Fn(&mut Prog, Option<ResPos>) -> ResPos>;
+#[derive(Debug, Clone)]
+pub enum ResultSink {
+    WriteTo(ResPos),
+    WantResult,
+    Null,
+}
+
+impl ResultSink {
+    fn if_null<T>(&self, f: T) -> bool
+        where T: FnOnce(ResPos)
+    {
+        match self {
+            ResultSink::WriteTo(_) => true,
+            ResultSink::WantResult => true,
+            ResultSink::Null => {
+                let rp = ResPos::Value(ResValue::Nul);
+                f(rp);
+                false
+            },
+        }
+    }
+
+    fn if_must_store<T>(&self, f: T) -> ResPos
+        where T: FnOnce(ResPos)
+    {
+        match self {
+            ResultSink::WriteTo(rp) => {
+                f(*rp);
+                *rp
+            },
+            ResultSink::WantResult => {
+                let rp = ResPos::Stack(0);
+                f(rp);
+                rp
+            },
+            ResultSink::Null => ResPos::Value(ResValue::Nul),
+        }
+    }
+}
+
+pub type ProgWriteNode = Box<dyn Fn(&mut Prog, ResultSink) -> ResPos>;
 
 pub struct ProgWriter {
     node:  ProgWriteNode,
@@ -23,18 +63,22 @@ pub struct ProgWriter {
 
 impl ProgWriter {
     pub fn eval_to(&self, prog: &mut Prog, rp: ResPos) {
-        (*self.node)(prog, Some(rp));
+        (*self.node)(prog, ResultSink::WriteTo(rp));
+    }
+
+    fn eval_proxy(&self, prog: &mut Prog, rs: ResultSink) -> ResPos {
+        (*self.node)(prog, rs)
     }
 
     fn eval_nul(&self, prog: &mut Prog) {
-        let rp = (*self.node)(prog, None);
+        let rp = (*self.node)(prog, ResultSink::Null);
         if let ResPos::Stack(_) = rp {
             prog.push_op(Op::Mov(rp, ResPos::Value(ResValue::Nul)));
         }
     }
 
     fn eval(&self, prog: &mut Prog) -> ResPos {
-        (*self.node)(prog, None)
+        (*self.node)(prog, ResultSink::WantResult)
     }
 }
 
@@ -65,26 +109,63 @@ macro_rules! pw_provides_result_pos {
     ($prog: ident, $b: block) => {
         pw!($prog, store, {
             let pos = $b;
-            if let Some(store) = store {
-                $prog.push_op(Op::Mov(pos, store));
-                store
-            } else {
-                pos
+            match store {
+                ResultSink::WriteTo(store_pos) => {
+                    $prog.push_op(Op::Mov(pos, store_pos));
+                    store_pos
+                },
+                ResultSink::WantResult => {
+                    pos
+                },
+                ResultSink::Null => {
+                    if let ResPos::Stack(_) = pos {
+                        $prog.push_op(Op::Mov(pos, ResPos::Value(ResValue::Nul)));
+                    }
+                    ResPos::Value(ResValue::Nul)
+                },
             }
         })
     }
 }
 
+macro_rules! pw_store_if_needed {
+    ($prog: ident, $pos: ident, $b: block) => {
+        pw!($prog, store, {
+            let $pos =
+                match store {
+                    ResultSink::WriteTo(store_pos) => store_pos,
+                    ResultSink::WantResult => ResPos::Stack(0),
+                    ResultSink::Null => ResPos::Value(ResValue::Nul),
+                };
+
+            $b;
+            $pos
+        })
+    }
+}
+
+
 macro_rules! pw_needs_storage {
     ($prog: ident, $pos: ident, $b: block) => {
         pw!($prog, store, {
-            let $pos = if let Some(store) = store {
-                store
-            } else {
-                ResPos::Stack(0)
-            };
-            $b;
-            $pos
+            match store {
+                ResultSink::WriteTo(store_pos) => {
+                    let $pos = store_pos;
+                    $b;
+                    $pos
+                },
+                ResultSink::WantResult => {
+                    let $pos = ResPos::Stack(0);
+                    $b;
+                    $pos
+                },
+                ResultSink::Null => {
+                    let $pos = ResPos::Stack(0);
+                    $b;
+                    $prog.push_op(Op::Mov($pos, ResPos::Value(ResValue::Nul)));
+                    ResPos::Value(ResValue::Nul)
+                },
+            }
         })
     }
 }
@@ -312,6 +393,7 @@ impl Prog {
                 Op::Argv(p1)    => { patch_respos_data(p1, self_data_next_idx); },
                 Op::End
                 | Op::Builtin(Builtin::DumpStack(_))
+                | Op::Builtin(Builtin::DumpVM(_))
                 | Op::CtrlFlow(CtrlFlow::Next)
                 | Op::Unwind
                 | Op::Accumulator(_)
@@ -533,6 +615,7 @@ pub enum ToRefType {
 pub enum Builtin {
     Export(Box<String>, ResPos),
     DumpStack(SynPos),
+    DumpVM(SynPos),
 }
 
 #[derive(Debug,Clone)]
@@ -1270,6 +1353,22 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         println!("DUMPSTACK@{}", spos);
                         env.dump_stack();
                     },
+                    Builtin::DumpVM(spos) => {
+                        println!("DUMPPROG@{}", spos);
+                        for (i, op) in prog.ops.iter().enumerate() {
+                            let syn =
+                                if let Some(sp) = &prog.debug[i] { sp.s_short() }
+                                else { "".to_string() };
+                            println!("{}OP[{:<2} {:>3}]: {:<40}      | sp: {:>3}, bp: {:>3}, uws: {:>3} | {}",
+                                     (if i == pc { ">" } else { " " }),
+                                     env.vm_nest,
+                                     pc, format!("{:?}", op),
+                                     env.sp, env.bp, env.unwind_depth(), syn);
+                            if i == pc {
+                                env.dump_stack();
+                            }
+                        }
+                    },
                     Builtin::Export(name, a) => {
                         in_reg!(env, ret, prog, a);
                         env.export_name(name, &a);
@@ -1371,22 +1470,20 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
 }
 
 pub fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, CompileError> {
-    pw!(prog, store, {
-        let rp = ResPos::Arg(arg_idx as u16);
-        if let Some(store) = store {
-            prog.push_op(Op::Mov(rp, store));
-            if to_ref { prog.push_op(Op::ToRef(store, store, ToRefType::CaptureRef)); }
-            store
-        } else {
-            if to_ref {
-                let store = ResPos::Stack(0);
-                prog.push_op(Op::ToRef(rp, store, ToRefType::CaptureRef));
-                store
-            } else {
-                rp
-            }
-        }
-    })
+    let arg_pos = ResPos::Arg(arg_idx as u16);
+
+    if to_ref {
+        pw!(prog, store, {
+            store.if_must_store(|store_pos| {
+                prog.push_op(Op::Mov(arg_pos, store_pos));
+                prog.push_op(Op::ToRef(store_pos, store_pos, ToRefType::CaptureRef));
+            })
+        })
+    } else {
+        pw_provides_result_pos!(prog, {
+            arg_pos
+        })
+    }
 }
 
 fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool) -> Result<ProgWriter, CompileError> {
@@ -1408,12 +1505,14 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool)
             "_9" => { set_impl_arity(10, ce); pw_arg(9, capt_ref) },
             "@"  => {
                 ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
-                pw_needs_storage!(prog, store, {
-                    prog.set_dbg(spos.clone());
-                    prog.push_op(Op::Argv(store));
-                    if capt_ref {
-                        prog.push_op(Op::ToRef(store, store, ToRefType::CaptureRef));
-                    }
+                pw!(prog, store, {
+                    store.if_must_store(|store_pos| {
+                        prog.set_dbg(spos.clone());
+                        prog.push_op(Op::Argv(store_pos));
+                        if capt_ref {
+                            prog.push_op(Op::ToRef(store_pos, store_pos, ToRefType::CaptureRef));
+                        }
+                    })
                 })
             },
             _ => {
@@ -1542,12 +1641,7 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
             prog.set_dbg(spos.clone());
 
             if i == expr_count - 1 {
-                if let Some(store) = store {
-                    e.eval_to(prog, store);
-                    res = store;
-                } else {
-                    res = e.eval(prog);
-                }
+                res = e.eval_proxy(prog, store.clone());
             } else {
                 e.eval_nul(prog);
             }
@@ -1587,7 +1681,7 @@ fn vm_compile_block2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
 
     pw!(prog, store, {
         var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
-            (*stmts.node)(prog, store)
+            stmts.eval_proxy(prog, store)
         })
     })
 }
@@ -1772,31 +1866,76 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     if let Some(else_body) = ast.at(4) {
         let else_body = vm_compile_direct_block2(&else_body, ce)?;
 
-        pw_needs_storage!(prog, store, {
-            let mut then_body_prog = Prog::new();
-            let mut else_body_prog = Prog::new();
-            let tbp = then_body.eval_to(&mut then_body_prog, store);
-            let ebp = else_body.eval_to(&mut else_body_prog, store);
-            then_body_prog.set_dbg(spos.clone());
-            then_body_prog.push_op(Op::Jmp(else_body_prog.op_count() as i32));
+        pw!(prog, store, {
 
-            let condval = cond.eval(prog);
-            prog.set_dbg(spos.clone());
-            prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
-            prog.append(then_body_prog);
-            prog.append(else_body_prog);
+            let needs_store = store.if_null(|_| {
+                let mut then_body_prog = Prog::new();
+                let mut else_body_prog = Prog::new();
+                let tbp = then_body.eval_nul(&mut then_body_prog);
+                let ebp = else_body.eval_nul(&mut else_body_prog);
+
+                then_body_prog.set_dbg(spos.clone());
+                then_body_prog.push_op(Op::Jmp(else_body_prog.op_count() as i32));
+
+                let condval = cond.eval(prog);
+                prog.set_dbg(spos.clone());
+                prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
+                prog.append(then_body_prog);
+                prog.append(else_body_prog);
+            });
+
+            if needs_store {
+                store.if_must_store(|store_pos| {
+                    let mut then_body_prog = Prog::new();
+                    let mut else_body_prog = Prog::new();
+                    let tbp = then_body.eval(&mut then_body_prog);
+                    let ebp = else_body.eval(&mut else_body_prog);
+                    else_body_prog.set_dbg(spos.clone());
+                    else_body_prog.push_op(Op::Mov(ebp, store_pos));
+
+                    then_body_prog.set_dbg(spos.clone());
+                    then_body_prog.push_op(Op::Mov(tbp, store_pos));
+                    then_body_prog.set_dbg(spos.clone());
+                    then_body_prog.push_op(Op::Jmp(else_body_prog.op_count() as i32));
+
+                    let condval = cond.eval(prog);
+                    prog.set_dbg(spos.clone());
+                    prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
+                    prog.append(then_body_prog);
+                    prog.append(else_body_prog);
+                })
+            } else {
+                ResPos::Value(ResValue::Nul)
+            }
         })
     } else {
-        pw_needs_storage!(prog, store, {
-            let mut then_body_prog = Prog::new();
-            let tbp = then_body.eval_to(&mut then_body_prog, store);
-            then_body_prog.push_op(Op::Jmp(1));
+        pw!(prog, store, {
+            let needs_store = store.if_null(|_| {
+                let mut then_body_prog = Prog::new();
+                then_body.eval_nul(&mut then_body_prog);
 
-            let condval = cond.eval(prog);
-            prog.set_dbg(spos.clone());
-            prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
-            prog.append(then_body_prog);
-            prog.push_op(Op::Mov(ResPos::Value(ResValue::Nul), store));
+                let condval = cond.eval(prog);
+                prog.set_dbg(spos.clone());
+                prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
+                prog.append(then_body_prog);
+            });
+
+            if needs_store {
+                store.if_must_store(|store_pos| {
+                    let mut then_body_prog = Prog::new();
+                    let tbp = then_body.eval_to(&mut then_body_prog, store_pos);
+                    then_body_prog.set_dbg(spos.clone());
+                    then_body_prog.push_op(Op::Jmp(1));
+
+                    let condval = cond.eval(prog);
+                    prog.set_dbg(spos.clone());
+                    prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
+                    prog.append(then_body_prog);
+                    prog.push_op(Op::Mov(ResPos::Value(ResValue::Nul), store_pos));
+                })
+            } else {
+                ResPos::Value(ResValue::Nul)
+            }
         })
     }
 }
@@ -2160,7 +2299,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         match syntax {
                             Syntax::GetKey => {
                                 let key = vm_compile2(&key, ce)?;
-                                pw_needs_storage!(prog, store, {
+                                pw_store_if_needed!(prog, store, {
                                     for ca in compiled_args.iter() {
                                         ca.eval_to(prog, ResPos::Stack(0));
                                     }
@@ -2176,7 +2315,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             },
                             Syntax::GetSym => {
                                 let key = key.s_raw();
-                                pw_needs_storage!(prog, store, {
+                                pw_store_if_needed!(prog, store, {
                                     for ca in compiled_args.iter() {
                                         ca.eval_to(prog, ResPos::Stack(0));
                                     }
@@ -2227,7 +2366,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             argc += 1;
                         }
 
-                        pw_needs_storage!(prog, store, {
+                        pw_store_if_needed!(prog, store, {
                             for ca in compiled_args.iter() {
                                 ca.eval_to(prog, ResPos::Stack(0));
                             }
@@ -2267,7 +2406,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                     match lc.len() {
                         2 => {
-                            pw_needs_storage!(prog, store, {
+                            pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 prog.push_op(
@@ -2278,7 +2417,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             })
                         },
                         3 => {
-                            pw_needs_storage!(prog, store, {
+                            pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
@@ -2290,7 +2429,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             })
                         },
                         4 => {
-                            pw_needs_storage!(prog, store, {
+                            pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
@@ -2315,7 +2454,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                     match lc.len() {
                         2 => {
-                            pw_needs_storage!(prog, store, {
+                            pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 prog.push_op(
@@ -2326,7 +2465,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             })
                         },
                         3 => {
-                            pw_needs_storage!(prog, store, {
+                            pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
@@ -2338,7 +2477,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             })
                         },
                         4 => {
-                            pw_needs_storage!(prog, store, {
+                            pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
@@ -2388,7 +2527,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                                 let acc_pw =
                                     vm_compile2(&ast.at(2).unwrap(), ce)?;
-                                pw_needs_storage!(prog, store, {
+                                pw_store_if_needed!(prog, store, {
                                     prog.push_op(Op::Accumulator(accum_type));
                                     acc_pw.eval_nul(prog);
                                     prog.push_op(
@@ -2410,7 +2549,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let idx = ast.at(2).unwrap().i() as u32;
 
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(Op::GetIdx(opos, idx, store));
                     })
@@ -2419,7 +2558,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let idx  = ast.at(2).unwrap().i() as u32;
                     let idx2 = ast.at(3).unwrap().i() as u32;
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetIdx2(opos, Box::new((idx, idx2)), store));
@@ -2430,7 +2569,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let idx  = ast.at(2).unwrap().i() as u32;
                     let idx2 = ast.at(3).unwrap().i() as u32;
                     let idx3 = ast.at(4).unwrap().i() as u32;
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetIdx3(
@@ -2440,7 +2579,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 Syntax::GetSym => {
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let sym = ast.at(2).unwrap().s_raw();
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetSym(opos, Box::new(sym.clone()), store));
@@ -2450,7 +2589,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let sym  = ast.at(2).unwrap().s_raw();
                     let sym2 = ast.at(3).unwrap().s_raw();
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetSym2(
@@ -2466,7 +2605,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let sym  = ast.at(2).unwrap().s_raw();
                     let sym2 = ast.at(3).unwrap().s_raw();
                     let sym3 = ast.at(4).unwrap().s_raw();
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.push_op(
                             Op::GetSym3(
@@ -2482,7 +2621,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let map_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     let idx_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
 
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let mp = map_pw.eval(prog);
                         let ip = idx_pw.eval(prog);
                         prog.push_op(Op::GetKey(mp, ip, store));
@@ -2497,7 +2636,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                     let val_pw = vm_compile2(&ast.at(3).unwrap(), ce)?;
 
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let map = map_pw.eval(prog);
                         let sym = sym_pw.eval(prog);
                         let val = val_pw.eval(prog);
@@ -2561,11 +2700,17 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let call_argv_pw = vm_compile2(&ast.at(2).unwrap(), ce)?;
                     let func_pw      = vm_compile2(&ast.at(1).unwrap(), ce)?;
 
-                    pw_needs_storage!(prog, store, {
+                    pw_store_if_needed!(prog, store, {
                         let f_rp    = func_pw.eval(prog);
                         let argv_rp = call_argv_pw.eval(prog);
 
                         prog.push_op(Op::Apply(argv_rp, f_rp, store));
+                    })
+                },
+                Syntax::DumpVM => {
+                    pw_null!(prog, {
+                        prog.set_dbg(spos.clone());
+                        prog.push_op(Op::Builtin(Builtin::DumpVM(spos.clone())));
                     })
                 },
                 Syntax::DumpStack => {
@@ -2647,10 +2792,10 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
             let a = vm_compile2(&bx.0, ce)?;
             let b = vm_compile2(&bx.1, ce)?;
 
-            pw_needs_storage!(prog, pos, {
+            pw_store_if_needed!(prog, store, {
                 let ar = a.eval(prog);
                 let br = b.eval(prog);
-                prog.push_op(Op::NewPair(br, ar, pos));
+                prog.push_op(Op::NewPair(br, ar, store));
             })
         },
         _ => {

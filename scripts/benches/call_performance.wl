@@ -58,14 +58,61 @@
 #$[1624,10000000]
 #$[1666,10000000]
 
+# weictr@lockwork:~/devel/rust/wlambda$ ./wlambda_vm_20200413 scripts/benches/call_performance.wl 
+# 832040
+# fib1 time: $[3516,832040]
+# 832040
+# fib1 time: $[3510,832040]
+# 832040
+# fib1 time: $[3536,832040]
+# 832040
+# fib1 time: $[3543,832040]
+# 832040
+# fib1 time: $[3537,832040]
+# 832040
+# fib2 time: $[1262,832040]
+# 832040
+# fib2 time: $[1265,832040]
+# 832040
+# fib2 time: $[1279,832040]
+# 832040
+# fib2 time: $[1285,832040]
+# 832040
+# fib2 time: $[1281,832040]
+# $[1121,10000000]
+# $[1126,10000000]
+# $[1130,10000000]
+# $[1185,10000000]
+# $[1214,10000000]
+# $[2122,10000000]
+# $[2043,10000000]
+# $[2226,10000000]
+# $[2133,10000000]
+# $[2134,10000000]
+
+
 range 1 5 1 {||
-    std:displayln "time:" ~ std:measure_time :ms {
+    std:displayln "fib1 time:" ~ std:measure_time :ms {
         !fib = $n;
         .fib = \:fib {!n = _;
+#            !@dump_vm;
             match n
                 0 {|| return :fib 0 }
                 1 {|| return :fib 1 }
                 {|| return :fib (fib n - 1) + (fib n - 2); };
+        };
+        std:displayln ~ fib 30;
+    };
+};
+
+range 1 5 1 {||
+    std:displayln "fib2 time:" ~ std:measure_time :ms {
+        !fib = $n;
+        .fib = \:fib {!n = _;
+#            !@dump_vm;
+            ? n == 0 (return :fib 0)
+               ~ ? n == 1 (return :fib 1)
+                 (return :fib (fib n - 1) + (fib n - 2));
         };
         std:displayln ~ fib 30;
     };

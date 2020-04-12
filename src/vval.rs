@@ -146,6 +146,7 @@ pub enum Syntax {
     Import,
     Export,
     DumpStack,
+    DumpVM,
     MapSplice,
     VecSplice,
     Accum,
