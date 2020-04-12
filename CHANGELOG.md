@@ -1,6 +1,8 @@
 0.4.5 (unreleased)
 ==================
 
+* Potentially Incompatible Change: The compiler and evaluator was completely replaced
+by a VM and code generator for it.
 * Incompatible Change: Renamed `padl` and `padr` to `pad_start` and `pad_end`
 to make it more consistent naming to `trim_start` and `trim_end`.
 * Change: Added proper error location to errors generated from
@@ -19,6 +21,9 @@ to the end of the argument list now.
 * Optimization: Removed many unnecessary String allocations.
 * Feature: Added `not_i64` and `not_u32`.
 * Feature: Added compile time constant values: `!:const X = ...`.
+* Feature: Added if statement `? <cond> <then> <else>`.
+* Feature: Added `iter <var> <list-expr> <block>` statement.
+* Incompatible Change: Replaced while statement in prelude with `while <cond> <block>`.
 * Documentation: More!
 
 0.4.4 (2020-03-06)
