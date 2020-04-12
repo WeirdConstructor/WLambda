@@ -214,6 +214,7 @@ pub enum UnwindAction {
     RestoreSelf(VVal),
     RestoreLoopInfo(LoopInfo),
     RestoreIter(Option<VValIter>),
+    FunctionCall(usize, usize, usize),
 }
 
 /// The runtime environment of the evaluator.
@@ -443,26 +444,28 @@ impl Env {
         ret
     }
 
-    #[inline]
-    pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
-        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
-        let local_size = fu.local_size;
-        let old_argc = std::mem::replace(&mut self.argc, argc);
-//        let old_fun  = std::mem::replace(&mut self.fun, fu.clone());
-        self.call_stack.push(fu);
-        let old_bp   = self.set_bp(local_size);
-        //d// println!("OLD FUN: {:?}", old_fun.upvalues);
-
-        let ret = f(self);
-
-        self.reset_bp(local_size, old_bp);
-//        self.fun  = old_fun;
-        self.call_stack.pop();
-        self.argc = old_argc;
-
-        ret
-    }
-
+//    #[inline]
+//    pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
+//        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+//        self.push_fun_call(fu);
+////        let local_size = fu.local_size;
+////        let old_argc = std::mem::replace(&mut self.argc, argc);
+//////        let old_fun  = std::mem::replace(&mut self.fun, fu.clone());
+////        self.call_stack.push(fu);
+////        let old_bp   = self.set_bp(local_size);
+////        //d// println!("OLD FUN: {:?}", old_fun.upvalues);
+//
+//        let ret = f(self);
+//
+//        self.unwind_one();
+////        self.reset_bp(local_size, old_bp);
+//////        self.fun  = old_fun;
+////        self.call_stack.pop();
+////        self.argc = old_argc;
+//
+//        ret
+//    }
+//
     #[inline]
     pub fn with_restore_sp<T>(&mut self, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
@@ -720,6 +723,18 @@ impl Env {
     }
 
     #[inline]
+    pub fn push_fun_call(&mut self, fu: Rc<VValFun>, argc: usize) {
+        let local_size = fu.local_size;
+        let old_bp = self.set_bp(local_size);
+        self.unwind_stack.push(
+            UnwindAction::FunctionCall(
+                std::mem::replace(&mut self.argc, argc),
+                old_bp,
+                local_size));
+        self.call_stack.push(fu);
+    }
+
+    #[inline]
     pub fn push_unwind_sp(&mut self) {
         self.unwind_stack.push(UnwindAction::RestoreSP(self.sp));
     }
@@ -781,6 +796,11 @@ impl Env {
             UnwindAction::RestoreIter(i) => {
                 std::mem::replace(&mut self.iter, i);
             },
+            UnwindAction::FunctionCall(argc, old_bp, local_size) => {
+                self.reset_bp(local_size, old_bp);
+                self.call_stack.pop();
+                self.argc = argc;
+            }
         }
     }
 
@@ -1822,10 +1842,11 @@ impl VVal {
                     }
                 }
 
-                env.with_fun_info(fu.clone(), argc, |e: &mut Env| {
+//                env.with_fun_info(fu.clone(), argc, |e: &mut Env| {
+                    env.push_fun_call(fu.clone(), argc);
                     if !(*fu).err_arg_ok {
                         for i in 0..argc {
-                            if let Some(VVal::Err(ev)) = e.arg_err_internal(i) {
+                            if let Some(VVal::Err(ev)) = env.arg_err_internal(i) {
                                 return
                                     Err(StackAction::panic_str(
                                         format!("Error value in parameter list: {}",
@@ -1835,25 +1856,28 @@ impl VVal {
                         }
                     }
 
-                    match &(*fu).fun {
-                        FunType::ClosureNode(cn) => (cn.borrow())(e, argc),
-                        FunType::VMProg(prog)    => {
-                            match crate::vm::vm(&*prog, e) {
-                                Ok(v) => Ok(v),
-                                Err(StackAction::Return((v_lbl, v))) => {
-                                    if v_lbl.eqv(&fu.label) {
-                                        Ok(v)
-                                    } else {
-                                        Err(StackAction::Return((v_lbl, v)))
-                                    }
-                                },
-                                Err(e) => {
-                                    Err(e.wrap_panic(fu.syn_pos.clone()))
-                                },
-                            }
-                        },
-                    }
-                })
+                    let ret =
+                        match &(*fu).fun {
+                            FunType::ClosureNode(cn) => (cn.borrow())(env, argc),
+                            FunType::VMProg(prog)    => {
+                                match crate::vm::vm(&*prog, env) {
+                                    Ok(v) => Ok(v),
+                                    Err(StackAction::Return((v_lbl, v))) => {
+                                        if v_lbl.eqv(&fu.label) {
+                                            Ok(v)
+                                        } else {
+                                            Err(StackAction::Return((v_lbl, v)))
+                                        }
+                                    },
+                                    Err(e) => {
+                                        Err(e.wrap_panic(fu.syn_pos.clone()))
+                                    },
+                                }
+                            },
+                        };
+                    env.unwind_one();
+                    ret
+//                })
             },
             VVal::Bol(b) => {
                 env.with_local_call_info(argc, |e: &mut Env| {

@@ -302,27 +302,77 @@ macro_rules! handle_break {
 macro_rules! call_func {
     ($f: ident, $argc: ident, $popc: expr, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident, $call_ret: ident, $cont: block) => {
         {
-            let call_ret = $f.call_internal($env, $argc);
-            $env.popn($popc); // + 1 for the function
-            match call_ret {
-                Ok($call_ret) => $cont,
-                Err(StackAction::Return((v_lbl, v))) => {
-                    $env.unwind_to_depth($uw_depth);
-                    $retv = Err(StackAction::Return((v_lbl, v)));
-                    break;
-                },
-                Err(StackAction::Next) => {
-                    handle_next!($env, $pc, $uw_depth, $retv);
-                },
-                Err(StackAction::Break(v)) => {
-                    handle_break!($env, $pc, v, $uw_depth, $retv);
-                },
-                Err(sa) => {
-                    $env.unwind_to_depth($uw_depth);
-                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
-                    break;
-                },
-            }
+//            if let VVal::Fun(r) = $f {
+//                if let FunType::VMProg(p) = r {
+//                    $env.with_fun_info($f.clone(), $argc, |e: &mut Env| {
+//                        let call_ret = vm(&*p, e);
+//                        $env.popn($popc); // + 1 for the function
+//                        match call_ret {
+//                            Ok($call_ret) => $cont,
+//                            Err(StackAction::Return((v_lbl, v))) => {
+//                                $env.unwind_to_depth($uw_depth);
+//                                $retv = Err(StackAction::Return((v_lbl, v)));
+//                                break;
+//                            },
+//                            Err(StackAction::Next) => {
+//                                handle_next!($env, $pc, $uw_depth, $retv);
+//                            },
+//                            Err(StackAction::Break(v)) => {
+//                                handle_break!($env, $pc, v, $uw_depth, $retv);
+//                            },
+//                            Err(sa) => {
+//                                $env.unwind_to_depth($uw_depth);
+//                                $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+//                                break;
+//                            },
+//                        }
+//                    })
+//                } else {
+//                    let call_ret = $f.call_internal($env, $argc);
+//                    $env.popn($popc); // + 1 for the function
+//                    match call_ret {
+//                        Ok($call_ret) => $cont,
+//                        Err(StackAction::Return((v_lbl, v))) => {
+//                            $env.unwind_to_depth($uw_depth);
+//                            $retv = Err(StackAction::Return((v_lbl, v)));
+//                            break;
+//                        },
+//                        Err(StackAction::Next) => {
+//                            handle_next!($env, $pc, $uw_depth, $retv);
+//                        },
+//                        Err(StackAction::Break(v)) => {
+//                            handle_break!($env, $pc, v, $uw_depth, $retv);
+//                        },
+//                        Err(sa) => {
+//                            $env.unwind_to_depth($uw_depth);
+//                            $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+//                            break;
+//                        },
+//                    }
+//                }
+//            } else {
+                let call_ret = $f.call_internal($env, $argc);
+                $env.popn($popc); // + 1 for the function
+                match call_ret {
+                    Ok($call_ret) => $cont,
+                    Err(StackAction::Return((v_lbl, v))) => {
+                        $env.unwind_to_depth($uw_depth);
+                        $retv = Err(StackAction::Return((v_lbl, v)));
+                        break;
+                    },
+                    Err(StackAction::Next) => {
+                        handle_next!($env, $pc, $uw_depth, $retv);
+                    },
+                    Err(StackAction::Break(v)) => {
+                        handle_break!($env, $pc, v, $uw_depth, $retv);
+                    },
+                    Err(sa) => {
+                        $env.unwind_to_depth($uw_depth);
+                        $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                        break;
+                    },
+                }
+//            }
         }
     }
 }
