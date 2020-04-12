@@ -907,24 +907,24 @@ impl Env {
 /// closure call tree to handle jumping up the stack.
 #[derive(Clone)]
 pub enum StackAction {
-    Panic(VVal, Vec<Option<SynPos>>),
-    Return((VVal, VVal)),
-    Break(VVal),
+    Panic(Box<(VVal, Vec<Option<SynPos>>)>),
+    Return(Box<(VVal, VVal)>),
+    Break(Box<VVal>),
     Next,
 }
 
 impl Display for StackAction {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            StackAction::Panic(v, spstk) => {
+            StackAction::Panic(panic) => {
                 let stk : Vec<String> =
-                    spstk.iter().map(|s|
+                    panic.1.iter().map(|s|
                         if let Some(p) = s { format!("{}", p) }
                         else { String::from("[?]") })
                     .collect();
-                write!(f, "{} SA::Panic({})", stk.join("=>"), v.s())
+                write!(f, "{} SA::Panic({})", stk.join("=>"), panic.0.s())
             },
-            StackAction::Return((l, v)) => write!(f, "SA::Return(lbl={},{})", l.s(), v.s()),
+            StackAction::Return(ret) => write!(f, "SA::Return(lbl={},{})", ret.0.s(), ret.1.s()),
             StackAction::Break(v) => write!(f, "SA::Break({})", v.s()),
             StackAction::Next     => write!(f, "SA::Next"),
         }
@@ -944,23 +944,23 @@ impl StackAction {
 
     pub fn panic_msg(err: String) -> Self {
         let v = Vec::new();
-        StackAction::Panic(VVal::new_str_mv(err), v)
+        StackAction::Panic(Box::new((VVal::new_str_mv(err), v)))
     }
     pub fn panic_str(err: String, sp: Option<SynPos>) -> Self {
         let mut v = Vec::new();
         v.push(sp);
-        StackAction::Panic(VVal::new_str_mv(err), v)
+        StackAction::Panic(Box::new((VVal::new_str_mv(err), v)))
     }
     pub fn panic(err: VVal, sp: Option<SynPos>) -> Self {
         let mut v = Vec::new();
         v.push(sp);
-        StackAction::Panic(err, v)
+        StackAction::Panic(Box::new((err, v)))
     }
     pub fn wrap_panic(self, sp: Option<SynPos>) -> Self {
         match self {
-            StackAction::Panic(v, mut stk) => {
-                stk.push(sp);
-                StackAction::Panic(v, stk)
+            StackAction::Panic(mut panic) => {
+                panic.as_mut().1.push(sp);
+                StackAction::Panic(panic)
             },
             _ => self,
         }
@@ -1862,11 +1862,11 @@ impl VVal {
                             FunType::VMProg(prog)    => {
                                 match crate::vm::vm(&*prog, env) {
                                     Ok(v) => Ok(v),
-                                    Err(StackAction::Return((v_lbl, v))) => {
-                                        if v_lbl.eqv(&fu.label) {
-                                            Ok(v)
+                                    Err(StackAction::Return(ret)) => {
+                                        if ret.0.eqv(&fu.label) {
+                                            Ok(ret.1)
                                         } else {
-                                            Err(StackAction::Return((v_lbl, v)))
+                                            Err(StackAction::Return(ret))
                                         }
                                     },
                                     Err(e) => {
@@ -1931,7 +1931,7 @@ impl VVal {
 
                         match el {
                             Ok(v)                      => { ret = v; },
-                            Err(StackAction::Break(v)) => { ret = v; break; },
+                            Err(StackAction::Break(v)) => { ret = *v; break; },
                             Err(StackAction::Next)     => { },
                             Err(e)                     => { return Err(e); },
                         }
@@ -1954,7 +1954,7 @@ impl VVal {
 
                         match el {
                             Ok(v)                      => { ret = v; },
-                            Err(StackAction::Break(v)) => { ret = v; break; },
+                            Err(StackAction::Break(v)) => { ret = *v; break; },
                             Err(StackAction::Next)     => { },
                             Err(e)                     => { return Err(e); },
                         }
@@ -2014,7 +2014,7 @@ impl VVal {
                                     e.popn(1);
                                     match el {
                                         Ok(v)                      => { ret = v; },
-                                        Err(StackAction::Break(v)) => { ret = v; break; },
+                                        Err(StackAction::Break(v)) => { ret = *v; break; },
                                         Err(StackAction::Next)     => { },
                                         Err(e)                     => { return Err(e); },
                                     }
@@ -2070,7 +2070,7 @@ impl VVal {
                                     e.popn(1);
                                     match el {
                                         Ok(v)                      => { ret = v; },
-                                        Err(StackAction::Break(v)) => { ret = v; break; },
+                                        Err(StackAction::Break(v)) => { ret = *v; break; },
                                         Err(StackAction::Next)     => { },
                                         Err(e)                     => { return Err(e); },
                                     }

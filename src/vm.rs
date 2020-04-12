@@ -355,9 +355,9 @@ macro_rules! call_func {
                 $env.popn($popc); // + 1 for the function
                 match call_ret {
                     Ok($call_ret) => $cont,
-                    Err(StackAction::Return((v_lbl, v))) => {
+                    Err(StackAction::Return(ret)) => {
                         $env.unwind_to_depth($uw_depth);
-                        $retv = Err(StackAction::Return((v_lbl, v)));
+                        $retv = Err(StackAction::Return(ret));
                         break;
                     },
                     Err(StackAction::Next) => {
@@ -822,9 +822,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 match call_ret {
                     Ok(v) => { out_reg!(env, ret, prog, r, v); },
-                    Err(StackAction::Return((v_lbl, v))) => {
+                    Err(StackAction::Return(ret)) => {
                         env.unwind_to_depth(uw_depth);
-                        retv = Err(StackAction::Return((v_lbl, v)));
+                        retv = Err(StackAction::Return(ret));
                         break;
                     },
                     Err(sa) => {
@@ -866,6 +866,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     },
                     CtrlFlow::Break(a) => {
                         in_reg!(env, ret, prog, a);
+                        let a = Box::new(a);
                         handle_break!(env, pc, a, uw_depth, retv);
                     },
                 }

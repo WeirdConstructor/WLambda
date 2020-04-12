@@ -4183,9 +4183,9 @@ pub fn core_symbol_table() -> SymbolTable {
             let fn_arg_idx = if argc <= 1 { 0 } else { label = env.arg(0); 1 };
             match env.arg(fn_arg_idx).call_no_args(env) {
                 Ok(v)   => Ok(v),
-                Err(StackAction::Return((v_lbl, v))) => {
-                    if v_lbl.eqv(&label) { Ok(v) }
-                    else { Err(StackAction::Return((v_lbl, v))) }
+                Err(StackAction::Return(ret)) => {
+                    if ret.0.eqv(&label) { Ok(ret.1) }
+                    else { Err(StackAction::Return(ret)) }
                 },
                 Err(e)  => Err(e),
             }
@@ -4200,7 +4200,7 @@ pub fn core_symbol_table() -> SymbolTable {
             } else { env.arg(0) };
 
             match err_val {
-                VVal::Err(e) => Err(StackAction::Return((lbl, VVal::Err(e)))),
+                VVal::Err(e) => Err(StackAction::Return(Box::new((lbl, VVal::Err(e))))),
                 v            => Ok(v),
             }
         }, Some(1), Some(2), true);
@@ -4262,15 +4262,15 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "return",
         |env: &mut Env, argc: usize| {
-            if argc < 1 { return Err(StackAction::Return((VVal::Nul, VVal::Nul))); }
-            if argc < 2 { return Err(StackAction::Return((VVal::Nul, env.arg(0)))); }
-            Err(StackAction::Return((env.arg(0), env.arg(1))))
+            if argc < 1 { return Err(StackAction::Return(Box::new((VVal::Nul, VVal::Nul)))); }
+            if argc < 2 { return Err(StackAction::Return(Box::new((VVal::Nul, env.arg(0))))); }
+            Err(StackAction::Return(Box::new((env.arg(0), env.arg(1)))))
         }, Some(1), Some(2), true);
 
     func!(st, "break",
         |env: &mut Env, argc: usize| {
-            if argc < 1 { return Err(StackAction::Break(VVal::Nul)); }
-            Err(StackAction::Break(env.arg(0)))
+            if argc < 1 { return Err(StackAction::Break(Box::new(VVal::Nul))); }
+            Err(StackAction::Break(Box::new(env.arg(0))))
         }, Some(0), Some(1), true);
 
     func!(st, "next",
@@ -4402,7 +4402,7 @@ pub fn core_symbol_table() -> SymbolTable {
                     else               { 1 };
                 match f.call_internal(env, n) {
                     Ok(v)                      => { ret = v; },
-                    Err(StackAction::Break(v)) => { env.popn(n); return Ok(v); },
+                    Err(StackAction::Break(v)) => { env.popn(n); return Ok(*v); },
                     Err(StackAction::Next)     => { },
                     Err(e)                     => { env.popn(n); return Err(e); }
                 }
@@ -4432,7 +4432,7 @@ pub fn core_symbol_table() -> SymbolTable {
                     env.push(VVal::Flt(from));
                     match f.call_internal(env, 1) {
                         Ok(v)                      => { ret = v; },
-                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
+                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(*v); },
                         Err(StackAction::Next)     => { },
                         Err(e)                     => { env.popn(1); return Err(e); }
                     }
@@ -4452,7 +4452,7 @@ pub fn core_symbol_table() -> SymbolTable {
                     env.push(VVal::Int(from));
                     match f.call_internal(env, 1) {
                         Ok(v)                      => { ret = v; },
-                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
+                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(*v); },
                         Err(StackAction::Next)     => { },
                         Err(e)                     => { env.popn(1); return Err(e); }
                     }
@@ -4950,7 +4950,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
                 match rv {
                     Ok(v)                      => { acc = v;  },
-                    Err(StackAction::Break(v)) => { acc = v; break; },
+                    Err(StackAction::Break(v)) => { acc = *v; break; },
                     Err(StackAction::Next)     => { },
                     Err(e)                     => { return Err(e); },
                 }
@@ -5054,7 +5054,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 env.push(VVal::new_str_mv(line));
                 match f.call_internal(env, 1) {
                     Ok(v)                      => { ret = v; },
-                    Err(StackAction::Break(v)) => { env.popn(1); return Ok(v); },
+                    Err(StackAction::Break(v)) => { env.popn(1); return Ok(*v); },
                     Err(StackAction::Next)     => { },
                     Err(e)                     => { env.popn(1); return Err(e); }
                 }
@@ -5587,7 +5587,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
                     match rv {
                         Ok(v)                      => { ret = v; },
-                        Err(StackAction::Break(v)) => { ret = v; break; },
+                        Err(StackAction::Break(v)) => { ret = *v; break; },
                         Err(StackAction::Next)     => { },
                         Err(e)                     => { return Err(e); },
                     }
