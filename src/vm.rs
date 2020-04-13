@@ -541,14 +541,18 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 env.push_iter(iterable.iter());
             },
             Op::IterNext(ivar) => {
-                if let Some(i) = &mut env.iter {
-                    if let Some(v) = i.next() {
-                        out_reg!(env, ret, prog, ivar, v.0);
+                let value =
+                    if let Some(i) = &env.iter {
+                        if let Some(v) = i.borrow_mut().next() {
+                            Some(v.0)
+                        } else {
+                            None
+                        }
                     } else {
-                        unwind_loop_info!(env);
-                        pc = env.loop_info.break_pc;
-                        env.unwind_one();
-                    }
+                        None
+                    };
+                if let Some(v) = value {
+                    out_reg!(env, ret, prog, ivar, v);
                 } else {
                     unwind_loop_info!(env);
                     pc = env.loop_info.break_pc;

@@ -206,14 +206,15 @@ impl LoopInfo {
 
 /// Describes an action that needs to be done when returning from a function
 /// or somehow jumps unpredictably around the VM prog.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnwindAction {
+    Null,
     RestoreAccum(VVal, VVal),
     RestoreSP(usize),
     ClearLocals(usize, usize),
     RestoreSelf(VVal),
     RestoreLoopInfo(LoopInfo),
-    RestoreIter(Option<VValIter>),
+    RestoreIter(Option<Rc<RefCell<VValIter>>>),
     FunctionCall(usize, usize, usize),
 }
 
@@ -229,6 +230,8 @@ pub struct Env {
     pub call_stack: std::vec::Vec<Rc<VValFun>>,
     /// A stack that holds cleanup routines that need to be handled:
     pub unwind_stack: std::vec::Vec<UnwindAction>,
+    /// A stack pointer for unwind_stack,
+    pub unwind_sp: usize,
     /// Holds the object of the currently called method:
     pub current_self: VVal,
     /// The basepointer to reference arguments and
@@ -263,7 +266,7 @@ pub struct Env {
     /// constructs:
     pub loop_info: LoopInfo,
     /// Holds the current iterator for the 'iter' construct.
-    pub iter: Option<VValIter>,
+    pub iter: Option<Rc<RefCell<VValIter>>>,
 }
 
 //impl Default for Env {
@@ -285,12 +288,14 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       vec![],
+            unwind_sp:          0,
             loop_info:          LoopInfo::new(),
             iter:               None,
             vm_nest:            0,
             global
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
+        e.unwind_stack.resize(STACK_SIZE, UnwindAction::Null);
         e
     }
 
@@ -307,6 +312,7 @@ impl Env {
             accum_val:          VVal::Nul,
             call_stack:         vec![],
             unwind_stack:       std::vec::Vec::with_capacity(1000),
+            unwind_sp:          0,
             loop_info:          LoopInfo::new(),
             iter:               None,
             vm_nest:            0,
@@ -314,6 +320,7 @@ impl Env {
             global,
         };
         e.args.resize(STACK_SIZE, VVal::Nul);
+        e.unwind_stack.resize(STACK_SIZE, UnwindAction::Null);
         e
     }
 
@@ -712,12 +719,18 @@ impl Env {
 
     #[inline]
     pub fn unwind_depth(&self) -> usize {
-        self.unwind_stack.len()
+        self.unwind_sp
+    }
+
+    #[inline]
+    pub fn push_unwind(&mut self, uwa: UnwindAction) {
+        self.unwind_stack[self.unwind_sp] = uwa;
+        self.unwind_sp += 1;
     }
 
     #[inline]
     pub fn unwind_to_depth(&mut self, depth: usize) {
-        while self.unwind_stack.len() > depth {
+        while self.unwind_sp > depth {
             self.unwind_one();
         }
     }
@@ -726,50 +739,55 @@ impl Env {
     pub fn push_fun_call(&mut self, fu: Rc<VValFun>, argc: usize) {
         let local_size = fu.local_size;
         let old_bp = self.set_bp(local_size);
-        self.unwind_stack.push(
+        let uwa =
             UnwindAction::FunctionCall(
                 std::mem::replace(&mut self.argc, argc),
                 old_bp,
-                local_size));
+                local_size);
+        self.push_unwind(uwa);
         self.call_stack.push(fu);
     }
 
     #[inline]
     pub fn push_unwind_sp(&mut self) {
-        self.unwind_stack.push(UnwindAction::RestoreSP(self.sp));
+        self.push_unwind(UnwindAction::RestoreSP(self.sp));
     }
 
     #[inline]
     pub fn push_clear_locals(&mut self, from: usize, to: usize) {
-        self.unwind_stack.push(UnwindAction::ClearLocals(from, to));
+        self.push_unwind(UnwindAction::ClearLocals(from, to));
     }
 
     #[inline]
     pub fn push_unwind_self(&mut self, new_self: VVal) {
-        self.unwind_stack.push(
+        let uwa =
             UnwindAction::RestoreSelf(
-                std::mem::replace(&mut self.current_self, new_self)));
+                std::mem::replace(&mut self.current_self, new_self));
+        self.push_unwind(uwa);
     }
 
     #[inline]
     pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize) {
         let uw_depth = self.unwind_depth() + 1;
         let loop_sp  = self.sp;
-        self.unwind_stack.push(
+        let uwa =
             UnwindAction::RestoreLoopInfo(
                 std::mem::replace(&mut self.loop_info, LoopInfo {
                     uw_depth,
                     pc:         current_pc,
                     sp:         self.sp,
                     break_pc:   break_pc,
-                })));
+                }));
+        self.push_unwind(uwa);
     }
 
     #[inline]
     pub fn push_iter(&mut self, iter: VValIter) {
-        self.unwind_stack.push(
+        let uwa =
             UnwindAction::RestoreIter(
-                std::mem::replace(&mut self.iter, Some(iter))));
+                std::mem::replace(
+                    &mut self.iter, Some(Rc::new(RefCell::new(iter)))));
+        self.push_unwind(uwa);
     }
 
     #[inline]
@@ -800,13 +818,18 @@ impl Env {
                 self.reset_bp(local_size, old_bp);
                 self.call_stack.pop();
                 self.argc = argc;
-            }
+            },
+            UnwindAction::Null => (),
         }
     }
 
     #[inline]
     pub fn unwind_one(&mut self) {
-        let ua = self.unwind_stack.pop().unwrap();
+        self.unwind_sp -= 1;
+        let ua =
+            std::mem::replace(
+                &mut self.unwind_stack[self.unwind_sp],
+                UnwindAction::Null);
         self.unwind(ua);
     }
 
@@ -832,10 +855,11 @@ impl Env {
                 }
             };
 
-        self.unwind_stack.push(
+        let uwa =
             UnwindAction::RestoreAccum(
                 std::mem::replace(&mut self.accum_fun, f),
-                std::mem::replace(&mut self.accum_val, v)));
+                std::mem::replace(&mut self.accum_val, v));
+        self.push_unwind(uwa);
     }
 
     pub fn with_accum<T>(&mut self, v: VVal, acfun: T) -> Result<VVal, StackAction>
