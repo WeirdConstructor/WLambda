@@ -2596,6 +2596,14 @@ fn check_pairs() {
 
 #[test]
 fn check_if() {
+//assert_eq!(ve(r"
+//!res =
+//    ? { !x = 2; x > 1 } 39;
+//
+//std:assert_eq res 39;
+//"), "");
+    assert_eq!(ve("? { !x = 10; x > 1 } 99 49"), "99");
+    assert_eq!(ve("? { !x = 10; x > 1 } 99"),    "99");
     assert_eq!(ve("? 2 > 3 { 1 } { 2 }"), "2");
     assert_eq!(ve("? 2 < 3 { 1 } { 2 }"), "1");
     assert_eq!(ve(r"

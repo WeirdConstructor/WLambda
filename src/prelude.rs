@@ -2710,12 +2710,43 @@ std:assert dropped;
 
 ## <a name="6-conditional-execution---if--then--else"></a>6 - Conditional Execution - if / then / else
 
-WLambda has no `if`. Conditional execution is provided by the bool
-data type. As in WLambda everything can be called like a function, you
-can just pass other functions as arguments to `$true` and `$false`.
-If you pass a function as first argument to `$true`, it will
-be executed. If you pass a function as second argument to `$false` then that
-will be executed.
+### - ? _condition_ _then-expr_ [_else-expr_]
+
+The keyword for conditional execution is just the question mark `?`:
+It takes 3 arguments: The first is an expression that will be evaluated
+and cast to a boolean. If the boolean is `$true`, the second argument is
+evaluated. If the boolean is `$false` the thrid argument is evaluated.
+The third argument is optional.
+
+```wlambda
+!x = 10;
+
+!msg = "x is ";
+? x > 4 {
+    .msg = std:str:cat msg "bigger than 4";
+} {
+    .msg = std:str:cat msg "smaller than or equal to 4";
+};
+
+std:assert_eq msg "x is bigger than 4";
+```
+
+The _condition_ can also be a function block, which will be evaluated:
+
+```wlambda
+!res =
+    ? { !x = 2; x > 1 } "x > 1";
+
+std:assert_eq res "x > 1";
+```
+
+### - Using Booleans for Conditional Execution
+
+Conditional execution is also provided by the bool data type. As in WLambda
+everything can be called like a function, you can just pass other functions as
+arguments to `$true` and `$false`.  If you pass a function as first argument to
+`$true`, it will be executed. If you pass a function as second argument to
+`$false` then that will be executed.
 
 ```wlambda
 (10 == 10) { std:displayln "10 is 10" };         #=> prints "10 is 10"
@@ -2789,7 +2820,8 @@ whereas with indexing approach, the opposite is true.
 WLambda has many ways to loop and iterate:
 
 - Counting loop with `range`
-- While some condition is `$true` with `while`
+- While some condition is `$true` with the `while` special form.
+- Over the items in a vector or map with the `iter` special form.
 - Over the items in a vector with either `for` or by calling the vector
 with a function as first argument.
 - Over the items in a map with either `for` or by calling the map
@@ -2806,16 +2838,17 @@ iteration function. If you don't need that list you should use `for`.
 
 ### <a name="71-control-flow"></a>7.1 - Control Flow
 
-#### <a name="711-while-predicate-fun"></a>7.1.1 - while _predicate_ _fun_
+#### <a name="711-while-predicate-fun"></a>7.1.1 - while _predicate_ _body_
 
-`while` will call _fun_ until the _predicate_ function returns `$false`.
+`while` will evaluate _body_ until the evaluation of _predicate_ function returns `$false`.
+Or `break` is used to end the loop. The loop can be restarted using `next`.
 This is the most basic loop for iteration:
 
 ```wlambda
 !i   = 0;
 !out = $[];
 
-while { i < 10 } {
+while i < 10 {
     std:push out i;
     .i = i + 1;
 };
@@ -2835,6 +2868,8 @@ while $true {
 
 std:assert_eq i 4;
 ```
+
+The first 
 
 #### <a name="712-range-start-end-step-fun"></a>7.1.2 - range _start_ _end_ _step_ _fun_
 

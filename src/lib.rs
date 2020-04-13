@@ -72,7 +72,7 @@ std:assert_eq x 6;
 ## If
 
 ```wlambda
-$true {
+? $true {
     std:displayln "It's true!";
 } {
     std:displayln "It's false!";
@@ -82,7 +82,7 @@ $true {
 ```wlambda
 !x = 10 / 2;
 
-(x == 5) {
+? x == 5 {
     std:displayln "x == 5";
 };
 ```
@@ -92,7 +92,7 @@ $true {
 ```wlambda
 !x = 10;
 
-while { x > 0 } {
+while x > 0 {
     std:displayln x;
 
     (x == 5) {
@@ -105,10 +105,10 @@ while { x > 0 } {
 ```wlambda
 !x = 10;
 
-while { x > 0 } {
+while x > 0 {
     std:displayln x;
 
-    (x == 5) {
+    ? x == 5 {
         # break is a function, first arg
         # is the return value for `while`:
         break[];
@@ -143,7 +143,7 @@ range 1 10 1 {!(i) = @;     # or just `!i = _`
 while $true {
     std:displayln x;
     .x = x - 1;
-    (x == 0) break;
+    ? x == 0 break[];
 };
 ```
 
@@ -181,7 +181,7 @@ std:displayln ~ add 2 3;    # `~` means: evaluate rest as one expression
 
     # an `if` is actually a call to another function, so we need to
     # dynamically jump upwards the call stack to the given label:
-    (x > 10) {
+    ? x > 10 {
         return :ret_label_a x * 2;
     };
 };
@@ -189,7 +189,7 @@ std:displayln ~ add 2 3;    # `~` means: evaluate rest as one expression
 std:assert_eq (test 11) 22;
 ```
 
-## Arrays
+## Vectors
 
 ```wlambda
 !v = $[1, 2, 3];
@@ -200,6 +200,15 @@ std:assert_eq v.1 5;
 std:assert_eq (std:pop v) 3;
 std:assert_eq (std:pop v) 5;
 std:assert_eq (std:pop v) 1;
+```
+
+## Iterating over an Vector
+
+```wlambda
+!sum = 0;
+iter i $[1, 2, 3, 4] { .sum = sum + i; };
+
+std:assert_eq i 10;
 ```
 
 ## Hash tables/maps
@@ -295,161 +304,12 @@ u:print_ten[]
 
 # Example WLambda Code
 
-Just a quick glance at the WLambda syntax and semantics.
+That was just a quick glance at the WLambda syntax and semantics.
 
 More details for the syntax and the provided global functions
 can be found in the [WLambda Language Reference](prelude/index.html#wlambda-reference).
 
-```wlambda
-# This is a comment
-
-# Definition:
-!a = 10;
-
-# Assignment:
-.a = 20;
-
-# List variable definition:
-!a_list = $[1, 2, 3, 4];
-
-# Map assignment:
-!a_map = ${a = 10, b = 20};
-
-# Function definition/assignment:
-!a_func = {
-    _ + _1  # Arguments are not named, they are put into _, _1, _2
-};
-
-a_func[2, 3];   # Function call
-a_func 2 3;     # Equivalent function call
-
-# Shortened one statement function definition:
-!do_something_to = \_ * 2;
-
-# There is no `if` statement. Booleans can be called
-# with two arguments. The first one is called when the boolean
-# is true, the second one is called when the boolean is false.
-(a == 10) {
-    # called if a == 10
-} {
-    # called if a != 10
-};
-
-# Counting loop:
-!sum = $&0; # Defining a reference that can be assignment
-            # from inside a function.
-
-# `range` calls the given function for each iteration
-# and passes the counter as first argument in `_`
-range 0 10 1 { # This is a regular function.
-    .*sum = $*sum + _; # $* is a dereferencing operator
-                       # and .* starts a reference assignment
-};
-
-# `range` loop with `break`
-!break_value = range 0 10 1 {
-    (_ == 5) { break 22 };
-};
-
-# Returning early from functions:
-!some_fun = \:some_fun_lbl { # \:xxx defines a function label for returning
-    !x = 10;
-    .x = do_something_to x;
-    (x > 20) {
-        return :some_fun_lbl 20; # explicit argument for return returns from
-                                 # the specified block.
-    }
-    .x = 20;
-    x
-};
-
-# `return` implicitly jumps to the topmost $nul label
-# you may specify a small unused label like `_` to jump out some unnamed func:
-!some_fun = {
-    !(x) = @;
-    (x == 20) \:_{ return 30 } # returns from some_fun, not from the if-branch
-};
-
-# Error reporting:
-    # There are special error values, that will make the program panic
-    # if they are not handled correctly at statement block level:
-    !some_erroring_func = {
-        return $error "An error happened!"
-    };
-    !value = some_erroring_func[];
-    # on_error calls the first argument if the second argument
-    # is an error value.
-    on_error {
-        # handle error here, eg. report, or make a new error value
-        !(err_value, line, col, file) = @;
-        std:displayln err_value;
-    } value;
-
-    !handle_err = { std:displayln _ };
-
-    # with the ~ operator, you can chain it nicely:
-    on_error {|| handle_err[_] } ~ some_erroring_func[];
-    # or without ~:
-    on_error {|| handle_err[_] } (some_erroring_func[]);
-    # or with |
-    some_erroring_func[] | on_error {|| handle_err[_] };
-
-    # _? transforms an error value, and returns it from the current
-    #    function. optionally jumping outwards.
-
-    std:assert_eq (str ~ std:to_ref ~ {
-        _? ~ $e "ok"; # is with an error value the same as: `return $e "ok"`
-    }[]) "$&&$e[98,17:<wlambda::eval>(Err)] \"ok\"";
-
-    _? 10; # passes the value through
-
-!report_my_error = { std:displayln _ };
-
-!some_erroring_func = {
-    on_error {
-        report_my_error _;
-    } block :outer {
-        # do something...
-        (_ != 10) {
-            return :outer $error "Something really failed";
-            # same as, with the difference, that _? only returns
-            # from :outer if it is an error value.
-            _? :outer $error "Something really failed";
-        }
-        # do more ...
-    }
-    # cleanup ...
-};
-
-# Basic closure OOP:
-# $& to make any closure capture of some_obj a weak reference, so
-# we don't get any cyclic references:
-!some_obj = $&${};
-some_obj.do_something = {
-    # do something here with some_obj captured (weakly)
-    # from the upper lexical scope.
-};
-some_obj.do_something[]; # Method call
-
-# Basic prototyped OOP:
-!some_class = ${
-    new = {
-        ${
-            _proto = $self,
-            a = 10,
-        }
-    },
-    bang = {
-        std:str:cat "bang!" _ ":" $self.a
-    },
-};
-
-!o = some_class.new[];
-!r = o.bang 22;
-std:assert_eq r "bang!22:10";
-```
-
-Currently there are many more examples in the test cases in `compiler.rs`.
+Currently there are many more examples in the test cases in `tests/language.rs`.
 
 # API Usage Examples
 
