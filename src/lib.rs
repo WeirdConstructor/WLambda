@@ -105,18 +105,18 @@ while { x > 0 } {
 ```wlambda
 !x = 10;
 
-!r = while { x > 0 } {
+while { x > 0 } {
     std:displayln x;
 
     (x == 5) {
         # break is a function, first arg
         # is the return value for `while`:
-        break 5;
+        break[];
     };
     .x = x - 1;
 };
 
-std:assert_eq r 5;
+std:assert_eq x 5;
 ```
 
 ## Counting Loop
@@ -411,10 +411,10 @@ range 0 10 1 { # This is a regular function.
     } block :outer {
         # do something...
         (_ != 10) {
-            return :outer $error "Something really failed"
+            return :outer $error "Something really failed";
             # same as, with the difference, that _? only returns
             # from :outer if it is an error value.
-            _? :outer $error "Something really failed"
+            _? :outer $error "Something really failed";
         }
         # do more ...
     }

@@ -1823,6 +1823,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                     }
                                     let obj_p = obj.eval(prog);
                                     let key_p = key.eval(prog);
+                                    prog.set_dbg(spos.clone());
                                     prog.push_op(
                                         Op::CallMethodKey(
                                             obj_p,
@@ -1838,6 +1839,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                         ca.eval_to(prog, ResPos::Stack(0));
                                     }
                                     let obj_p = obj.eval(prog);
+                                    prog.set_dbg(spos.clone());
                                     prog.push_op(
                                         Op::CallMethodSym(
                                             obj_p,
@@ -1888,6 +1890,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             for ca in compiled_args.iter() {
                                 ca.eval_to(prog, ResPos::Stack(0));
                             }
+                            prog.set_dbg(spos.clone());
                             prog.push_op(Op::Call(argc as u16 - 1, store));
                         })
                     }
