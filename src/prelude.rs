@@ -1293,6 +1293,27 @@ Converts degrees to radians.
 
 Returns the integer part of a number.
 
+#### - std:num:lerp _a_ _b_ _x_
+
+Linear interpolation between _a_ and _b_ by _x_. Where _x_ is
+in the range of `[0.0, 1.0]`.
+
+```wlambda
+!res = int ~ std:num:lerp 0.0 100.0 0.5;
+
+std:assert_eq res 50;
+```
+
+#### - std:num:smoothstep _a_ _b_ _x_
+
+Interpolates smoothly from 0.0 to 1.0 where _x_ is in the range of `[a, b]`.
+
+```wlambda
+!res = int ~ 1000.0 * (std:num:smoothstep 0.0 100.0 10.0);
+
+std:assert_eq res 28;
+```
+
 ### <a name="47-numeric-functions"></a>4.7 - Numeric Functions
 
 These functions work for all types of numbers.
@@ -3613,7 +3634,7 @@ std:assert_eq (str m) (str ${b = 20});
 ```wlambda
 !b = $b"abc";
 
-std:assert_eq (std:delete b 1) 12;
+std:assert_eq (std:delete b 1) (int $b"b");
 std:assert_eq b $b"ac";
 ```
 
@@ -4617,8 +4638,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let v   = env.arg(0);
             let key = env.arg(1);
-            v.delete_key(&key)?;
-            Ok(VVal::None)
+            v.delete_key(&key)
         }, Some(2), Some(2), false);
 
     func!(st, "prepend",
@@ -5108,6 +5128,24 @@ pub fn std_symbol_table() -> SymbolTable {
                 _ => VVal::Int(env.arg(0).i().abs())
             })
         }, Some(1), Some(1), false);
+
+    func!(st, "num:lerp",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0).f();
+            let b = env.arg(1).f();
+            let x = env.arg(2).f();
+            Ok(VVal::Flt(a * (1.0 - x) + b * x))
+        }, Some(3), Some(3), false);
+
+    func!(st, "num:smoothstep",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0).f();
+            let b = env.arg(1).f();
+            let x = env.arg(2).f();
+            let x = (x - a) / (b - a);
+            let x = x.max(0.0).min(1.0);
+            Ok(VVal::Flt(x * x * (3.0 - (2.0 * x))))
+        }, Some(3), Some(3), false);
 
     func!(st, "io:lines",
         |env: &mut Env, _argc: usize| {

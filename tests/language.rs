@@ -2697,7 +2697,18 @@ fn check_iter() {
 
 #[test]
 fn check_delete() {
-    assert_eq!(ve("!v = $[1,2,3]; delete v 1; v"),          "$[1,3]");
-    assert_eq!(ve("!v = ${a=10,b=20}; delete v :a; v"),     "${b=20}");
-    assert_eq!(ve("!b = $b\"abc\"; delete b 1; b"),         "$b\"ac\"");
+    assert_eq!(ve("!v = $[1,2,3];     std:delete v 1; v"),          "$[1,3]");
+    assert_eq!(ve("!v = ${a=10,b=20}; std:delete v :a; v"),     "${b=20}");
+    assert_eq!(ve("!b = $b\"abc\";    std:delete b 1; b"),         "$b\"ac\"");
+}
+
+#[test]
+fn check_lerp_smoothstep() {
+    assert_eq!(ve("std:num:lerp       0.0 1000.0 0.1 | int"), "100");
+    assert_eq!(ve("std:num:lerp       0.0 1000.0 0.9 | int"), "900");
+    assert_eq!(ve("std:num:lerp       0.0 1000.0 0.5 | int"), "500");
+
+    assert_eq!(ve("10000.0 * (std:num:smoothstep 0.0 1000.0 50.0 )  | int"), "72");
+    assert_eq!(ve("10000.0 * (std:num:smoothstep 0.0 1000.0 900.0)  | int"), "9720");
+    assert_eq!(ve("10000.0 * (std:num:smoothstep 0.0 1000.0 500.0 ) | int"), "5000");
 }
