@@ -172,11 +172,13 @@ Smalltalk, LISP and Perl.
     - [5.2.2](#522-block-label-function) - block [label] _function_
     - [5.2.3](#523-stdtodrop-value-function-or-raii-destructors-or-drop-functions) - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
 - [6](#6-conditional-execution---if--then--else) - Conditional Execution - if / then / else
-    - [6.0.1](#601-pick-bool-a--b-) - pick _bool_ _a_ -b-
-    - [6.0.2](#602-indexing-by-booleans) - Indexing by Booleans
+  - [6.1](#61--condition-then-expr-else-expr) - ? _condition_ _then-expr_ [_else-expr_]
+  - [6.2](#62-using-booleans-for-conditional-execution) - Using Booleans for Conditional Execution
+    - [6.2.1](#621-pick-bool-a--b-) - pick _bool_ _a_ -b-
+    - [6.2.2](#622-indexing-by-booleans) - Indexing by Booleans
 - [7](#7-loops-and-iteration) - Loops And Iteration
   - [7.1](#71-control-flow) - Control Flow
-    - [7.1.1](#711-while-predicate-fun) - while _predicate_ _fun_
+    - [7.1.1](#711-while-predicate-body) - while _predicate_ _body_
     - [7.1.2](#712-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
     - [7.1.3](#713-break-value) - break _value_
     - [7.1.4](#714-next) - next
@@ -225,15 +227,16 @@ Smalltalk, LISP and Perl.
     - [10.0.3](#1003-panic-message) - panic _message_
 - [11](#11-standard-library) - Standard Library
     - [11.0.1](#1101-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
-    - [11.0.2](#1102-stdcopy-vecormap) - std:copy _vec_or_map_
-    - [11.0.3](#1103-stdsort-comparefun-vec) - std:sort [_compare_fun_] _vec_
-    - [11.0.4](#1104-stdcmpnumasc-a-b) - std:cmp:num:asc _a_ _b_
-    - [11.0.5](#1105-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
-    - [11.0.6](#1106-stddisplayln-arg1-) - std:displayln _arg1_ ...
-    - [11.0.7](#1107-stdwriteln-arg1-) - std:writeln _arg1_ ...
-    - [11.0.8](#1108-stdeval-code-string) - std:eval _code-string_
-    - [11.0.9](#1109-stdassert-bool-message) - std:assert _bool_ \[_message_]
-    - [11.0.10](#11010-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
+    - [11.0.2](#1102-stddelete-vector-or-map-index-or-key) - std:delete _vector-or-map_ _index-or-key_
+    - [11.0.3](#1103-stdcopy-vecormap) - std:copy _vec_or_map_
+    - [11.0.4](#1104-stdsort-comparefun-vec) - std:sort [_compare_fun_] _vec_
+    - [11.0.5](#1105-stdcmpnumasc-a-b) - std:cmp:num:asc _a_ _b_
+    - [11.0.6](#1106-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
+    - [11.0.7](#1107-stddisplayln-arg1-) - std:displayln _arg1_ ...
+    - [11.0.8](#1108-stdwriteln-arg1-) - std:writeln _arg1_ ...
+    - [11.0.9](#1109-stdeval-code-string) - std:eval _code-string_
+    - [11.0.10](#11010-stdassert-bool-message) - std:assert _bool_ \[_message_]
+    - [11.0.11](#11011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
   - [11.1](#111-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
     - [11.1.1](#1111-stdwlambdaversion) - std:wlambda:version
   - [11.2](#112-io) - I/O
@@ -2710,7 +2713,7 @@ std:assert dropped;
 
 ## <a name="6-conditional-execution---if--then--else"></a>6 - Conditional Execution - if / then / else
 
-### - ? _condition_ _then-expr_ [_else-expr_]
+### <a name="61--condition-then-expr-else-expr"></a>6.1 - ? _condition_ _then-expr_ [_else-expr_]
 
 The keyword for conditional execution is just the question mark `?`:
 It takes 3 arguments: The first is an expression that will be evaluated
@@ -2740,7 +2743,7 @@ The _condition_ can also be a function block, which will be evaluated:
 std:assert_eq res "x > 1";
 ```
 
-### - Using Booleans for Conditional Execution
+### <a name="62-using-booleans-for-conditional-execution"></a>6.2 - Using Booleans for Conditional Execution
 
 Conditional execution is also provided by the bool data type. As in WLambda
 everything can be called like a function, you can just pass other functions as
@@ -2772,7 +2775,7 @@ syntax, but still works:
 (x == 20)[{ std:displayln "x is 20" }, { std:displayln "x isn't 20" }]; #=> print "x isn't 20"
 ```
 
-#### <a name="601-pick-bool-a--b-"></a>6.0.1 - pick _bool_ _a_ -b-
+#### <a name="621-pick-bool-a--b-"></a>6.2.1 - pick _bool_ _a_ -b-
 
 Often, you may want to choose one variable (_a_) or another (_b_) based on some predicate (_bool_).
 For these situations, the `pick` function is available.
@@ -2783,7 +2786,7 @@ or a single list parameter.
 !sum = \|| std:fold 0 { _ + _1 } ~ pick (is_vec _) _ @;
 ```
 
-#### <a name="602-indexing-by-booleans"></a>6.0.2 - Indexing by Booleans
+#### <a name="622-indexing-by-booleans"></a>6.2.2 - Indexing by Booleans
 
 Booleans can also be used to index into lists.
 When this is done, `$t` represents `1` and `$f` represents `0`.
@@ -2838,7 +2841,7 @@ iteration function. If you don't need that list you should use `for`.
 
 ### <a name="71-control-flow"></a>7.1 - Control Flow
 
-#### <a name="711-while-predicate-fun"></a>7.1.1 - while _predicate_ _body_
+#### <a name="711-while-predicate-body"></a>7.1.1 - while _predicate_ _body_
 
 `while` will evaluate _body_ until the evaluation of _predicate_ function returns `$false`.
 Or `break` is used to end the loop. The loop can be restarted using `next`.
@@ -3587,7 +3590,7 @@ std:shuffle { std:rand:split_mix64_next sm } vec;
 std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
 ```
 
-#### - std:delete _vector-or-map_ _index-or-key_
+#### <a name="1102-stddelete-vector-or-map-index-or-key"></a>11.0.2 - std:delete _vector-or-map_ _index-or-key_
 
 This removes the designated element from the collection (either vector or map).
 This works for:
@@ -3616,7 +3619,7 @@ std:assert_eq b $b"ac";
 
 Please note that this operation is potentially O(n) on vectors.
 
-#### <a name="1102-stdcopy-vecormap"></a>11.0.2 - std:copy _vec_or_map_
+#### <a name="1103-stdcopy-vecormap"></a>11.0.3 - std:copy _vec_or_map_
 
 Makes a shallow copy of the given vector or map.
 
@@ -3629,7 +3632,7 @@ std:assert_eq a.0 1;
 std:assert_eq b.0 10;
 ```
 
-#### <a name="1103-stdsort-comparefun-vec"></a>11.0.3 - std:sort [_compare_fun_] _vec_
+#### <a name="1104-stdsort-comparefun-vec"></a>11.0.4 - std:sort [_compare_fun_] _vec_
 
 Sorts the given _vec_ in place. The comparison function _compare_fun_ gets the
 two values a and b and needs to return -1 if a < b, 0 if a = b and 1 if a > b.
@@ -3654,7 +3657,7 @@ std:assert_eq v.1.0 1;
 std:assert_eq v.2.0 -1;
 ```
 
-#### <a name="1104-stdcmpnumasc-a-b"></a>11.0.4 - std:cmp:num:asc _a_ _b_
+#### <a name="1105-stdcmpnumasc-a-b"></a>11.0.5 - std:cmp:num:asc _a_ _b_
 
 Compares _a_ and _b_ numerically and returns:
 
@@ -3670,7 +3673,7 @@ std:assert_eq (std:cmp:num:asc "20" "20")    0;
 std:assert_eq (std:cmp:num:asc 20 21)        1;
 ```
 
-#### <a name="1105-stdcmpnumdesc-a-b"></a>11.0.5 - std:cmp:num:desc _a_ _b_
+#### <a name="1106-stdcmpnumdesc-a-b"></a>11.0.6 - std:cmp:num:desc _a_ _b_
 
 Compares _a_ and _b_ numerically descending and returns:
 
@@ -3686,7 +3689,7 @@ std:assert_eq (std:cmp:num:desc "20" "20")    0;
 std:assert_eq (std:cmp:num:desc 20 21)       -1;
 ```
 
-#### <a name="1106-stddisplayln-arg1-"></a>11.0.6 - std:displayln _arg1_ ...
+#### <a name="1107-stddisplayln-arg1-"></a>11.0.7 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -3700,7 +3703,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
-#### <a name="1107-stdwriteln-arg1-"></a>11.0.7 - std:writeln _arg1_ ...
+#### <a name="1108-stdwriteln-arg1-"></a>11.0.8 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
@@ -3715,7 +3718,7 @@ See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="1108-stdeval-code-string"></a>11.0.8 - std:eval _code-string_
+#### <a name="1109-stdeval-code-string"></a>11.0.9 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -3727,7 +3730,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="1109-stdassert-bool-message"></a>11.0.9 - std:assert _bool_ \[_message_]
+#### <a name="11010-stdassert-bool-message"></a>11.0.10 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -3738,7 +3741,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="11010-stdasserteq-actual-expected-message"></a>11.0.10 - std:assert_eq _actual_ _expected_ \[_message_]
+#### <a name="11011-stdasserteq-actual-expected-message"></a>11.0.11 - std:assert_eq _actual_ _expected_ \[_message_]
 
 This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
