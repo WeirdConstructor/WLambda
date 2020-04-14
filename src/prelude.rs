@@ -719,21 +719,113 @@ std:assert ~ is_none[$n];
 
 #### <a name="411-isnone-value"></a>4.1.1 - is_none _value_
 
-Returns `$true` if _value_ is `$none`.
+Returns `$true` if _value_ is `$none` or `$o()`.
 
 ```wlambda
 std:assert ~ is_none $none;
+std:assert ~ is_none $o();
 std:assert ~ not ~ is_none $false;
+std:assert ~ not ~ is_none $o(10);
 ```
 
 #### <a name="412-issome-value"></a>4.1.2 - is_some _value_
 
-Returns `$true` if _value_ is anything except `$none`.
+Returns `$true` if _value_ is anything except `$none` or `$o()`.
 
 ```wlambda
 std:assert ~ not ~ is_some $none;
+std:assert ~ not ~ is_some $o();
 std:assert ~ is_some $false;
 std:assert ~ is_some 30;
+std:assert ~ is_some $o(30);
+```
+
+### - Optional values `$o()` and `$o(...)`
+
+An optional value can either contain another value, or contain no value at all.
+An empty optional value is not much different from `$none`, but it is sometimes
+desirabel to make a difference between an optional value and a `$none` value
+if the `$none` value is used as sentinel value.
+
+Optional values were introduced for functions that lookup stuff and either
+return _something_ that might be `$none` (eg. if some element in a vector is
+searched for), or return that nothing was found.
+
+The functions `is_none` and `is_some` like stated above work for these
+optional values too:
+
+```wlambda
+std:assert ~ is_none $o();
+std:assert ~ is_some $o(10);
+std:assert ~ is_some $o($none);
+std:assert ~ is_some $o($o());
+```
+
+Calling an optional value will return it's contents or `$none`:
+
+```wlambda
+std:assert_eq $o()[]     $none;
+std:assert_eq $o(10)[]   10;
+
+!do_something = {
+    ? _ == 0 {
+        $o()
+    } {
+        $o(_ + 10)
+    }
+};
+
+!result = do_something 11;
+std:assert_eq result[] 21;
+
+!result = do_something 0;
+std:assert_eq result[] $none;
+```
+
+In a boolean context an optional becomes `$true` if it contains
+something and `$false` if it has nothing.
+
+```wlambda
+std:assert ~ not ~ bool $o();
+std:assert ~ bool $o(10);
+
+!x = $o();
+!res1 = ? x "something" "nothing";
+std:assert_eq res1 "nothing";
+
+.x = $o(30);
+!res2 = ? x "something" "nothing";
+std:assert_eq res2 "something";
+```
+
+Many other operations are just forwarded to the contents of the
+optional value:
+
+```wlambda
+std:assert_eq $o(33) + 44    77;
+
+!x = $o($[1,2,3]);
+std:push x 4;
+std:assert_eq (str x) (str $[1,2,3,4]);
+
+std:assert_eq (float $o(4.4))   4.4;
+std:assert_eq (int $o(4.4))     4;
+```
+
+#### - is_optional _value_
+
+Returns `$true` if _value_ is an optional value. That means either `$o()` or
+`$o(...)`.
+
+```wlambda
+std:assert ~ is_optional $o();
+std:assert ~ is_optional $o($none);
+std:assert ~ is_optional $o(10);
+
+std:assert ~ not ~ is_optional $true;
+std:assert ~ not ~ is_optional $none;
+std:assert ~ not ~ is_optional $false;
+std:assert ~ not ~ is_optional 303;
 ```
 
 ### <a name="42-error-values-e-expr-or-error-expr"></a>4.2 - Error values: `$e expr` or `$error expr`
@@ -793,6 +885,7 @@ a few functions that accept error values in their arguments:
 - is_bytes
 - is_sym
 - is_float
+- is_optional
 - is_int
 - ==
 - !=
@@ -1718,6 +1811,7 @@ std:assert_eq "\u{2211}" "∑";
 #### <a name="491-str-value"></a>4.9.1 - str _value_
 
 Casts _value_ to a string and returns it.
+Also dereferences a value.
 
 ```wlambda
 std:assert_eq (str "\xFF")     "ÿ";
@@ -1726,13 +1820,15 @@ std:assert_eq (str 1)          "1";
 std:assert_eq (str $n)         "";
 std:assert_eq (str $t)         "$true";
 std:assert_eq (str $f)         "$false";
-std:assert_eq (str $&10)       "$&10";
-std:assert_eq (str $&&10)      "$&&10";
+std:assert_eq (str $&10)       "10";
+std:assert_eq (str $&&10)      "10";
 std:assert_eq (str ${a=10})    "${a=10}";
 std:assert_eq (str $[1,2,3])   "$[1,2,3]";
+std:assert_eq (str $o(42))     "42";
+std:assert_eq (str $o())       "";
 
 !x = $&&10;
-std:assert_eq (str ~ std:weaken x)   "$(&)10";
+std:assert_eq (str ~ std:weaken x)   "10";
 ```
 
 #### <a name="492-isstr-value"></a>4.9.2 - is_str _value_
@@ -4411,7 +4507,7 @@ pub fn core_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| { Ok(VVal::new_sym_mv(env.arg(0).s_raw())) },
         Some(1), Some(1), false);
     func!(st, "is_some",
-        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(!env.arg(0).is_none())) },
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_some())) },
         Some(1), Some(1), true);
     func!(st, "is_none",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_none())) },
@@ -4451,6 +4547,9 @@ pub fn core_symbol_table() -> SymbolTable {
         Some(1), Some(1), true);
     func!(st, "is_pair",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_pair())) },
+        Some(1), Some(1), true);
+    func!(st, "is_optional",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_optional())) },
         Some(1), Some(1), true);
     func!(st, "is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) },

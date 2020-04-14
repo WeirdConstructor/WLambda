@@ -258,141 +258,6 @@ pub mod state;
 pub use state::State;
 pub use state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
 
-/*
-
-special variables:
-    arguments are in '@', first one is in '_' and _1
-    others: _1 up to _9
-
-special functions:
-    range   - returning a range iterator
-    iter    - called on list/map it returns a collection iterator
-    apply fn arg-list - calls fn with arguments from arg-list
-                        makes stuff like `apply bla @` possible
-
-pipe:
-
-    fn a b | fn_b c | fn_c
-    =>
-    fn_c(fn_b (fn a b) c)
-
-    allows:
-        iter x | map { * _ 2 } | filter { even? _ }
-
-    => filter({ even? _ }, map({ * _ 2 }, iter(x)))
-
-tilde:
-
-    fn a b ~ fn_b c ~ fn_c
-
-    { * _ 2 } ~ { - _ 2 } ~ { pow _ 10 } ~ 20
-    =>
-    { * _ 2 }({ - _ 2 }({ pow _ 10 } 20))
-
-dotcall:
-
-    a.b c d
-    =>
-    [b a] c d
-
-what calling means for primitive types:
-
-    number  => access index in first arg
-    key     => access field in first arg
-    list    => call first arg for every element
-    map     => call first arg for every kv pair
-    #true   => call first arg
-    #false  => call second arg
-    string  => call first arg for every character
-
-=>
-
-    let x = 0
-
-    while { < x 10 } {
-        x = + x 1;
-        [== 0 $ % x 2] { break }
-    }
-
-    [range 0 10 1] {
-        print "foo {}" _;
-    }
-
-    let doit = {
-       let (a, b) = @;
-       assert = _ a;
-    }
-
-
-Thoughts about cyclic referencing
-
-    let new = {
-        ! self = ${ // self on stack
-            x = 10
-        };
-        ! y = $[1,2,3]; // y on stack
-        ! :ref yhard = $[1,2,3]; // yhard puts upvalue on stack, any closure captures the upvalue by value so it references it strongly
-
-        self.foo = {
-            # think of this as:
-            # let self  = shallow copy of outer_self;
-            # let y     = shallow copy of outer_y;
-            # yhard references yhard up value;
-
-            # or: set! self :x ~ + 1 ~ :x self
-            # or: mut! self :x { + _ 1 }; // self captures by value
-            self->x = + self->x 1;
-            y     = + y 1;      // y captured by value locally no change to outer y
-            yhard = + yhard 1;  // y referenced strong now!
-        };
-
-        self.bar = {
-            + [0 y] [0 yhard]
-            # or:
-            +(y->0, yhard->0)
-            # or:
-            + ~ y->0 ~ yhard->0
-        }
-
-        self
-    }
-
-    let obj = new(); // self is on stack here
-    obj.foo;
-
-Callable objects:
-
-    !my_cond = {
-        let :ref self = ${ inner_val = #t };
-        { apply self->inner_val @ }
-    }()
-
-    my_cond { # if
-        println "INNER VALUE IS TRUE!"
-    } { # else
-        println "INNER VALUE IS FALSE!"
-    }
-
-Prototyped inheritance:
-
-    !proto = ${ print = { println _ }, };
-    !o = to_obj { _proto_ = proto };
-    o.print(123);
-
-    # MetaMap(Rc<RefCell<std::collections::HashMap<String, VVal>>>),
-    # => invokes _proto_ lookup on field access (not write)
-
-Tagged values:
-    !tag = 123;
-    !v = tag 10 tag;
-    !fun = { println("not tagged!") };
-    .fun = add_tag fun tag { println("tagged with 123"); }
-    fun(v); # prints "tagged with 123"
-    fun(10); # prints "not tagged!"
-
-    # TagFun(Rc<RefCell<std::collections::HashMap<String, Rc<VValFun>>>>),
-*/
-
 /// Helper function for recording characters into a byte buffer.
 fn add_c_to_vec(v: &mut Vec<u8>, c: char) {
     if c.is_ascii() {
@@ -824,10 +689,30 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             r.push(parse_value(ps)?);
             Ok(r)
         },
+        'o' => {
+            ps.consume_wsc();
+            if !ps.consume_if_eq_wsc('(') {
+                return Err(ps.err(ParseErrorKind::UnexpectedToken('(', "At the start of $o(...)")))
+            }
+
+            if ps.consume_if_eq_wsc(')') {
+                Ok(ps.syn(Syntax::Opt))
+            } else {
+                let a = parse_expr(ps)?;
+                let opt_v = ps.syn(Syntax::Opt);
+                opt_v.push(a);
+
+                if ps.consume_if_eq_wsc(')') {
+                    Ok(opt_v)
+                } else {
+                    Err(ps.err(ParseErrorKind::UnexpectedToken(')', "At the end of a $o(...)")))
+                }
+            }
+        },
         'p' => {
             ps.consume_wsc();
             if !ps.consume_if_eq_wsc('(') {
-                return Err(ps.err(ParseErrorKind::UnexpectedToken(')', "At the end of a pair")))
+                return Err(ps.err(ParseErrorKind::UnexpectedToken('(', "At the start of a pair")))
             }
             let a = parse_expr(ps)?;
             let ret =

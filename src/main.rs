@@ -20,13 +20,14 @@ use crate::compiler::{GlobalEnv, EvalContext};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
-    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
-    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
-    println!("sizeof {} NVec<f64> bytes", std::mem::size_of::<crate::nvec::NVec<f64>>());
-    println!("sizeof {} Op bytes", std::mem::size_of::<crate::ops::Op>());
-    println!("sizeof {} ResPos bytes", std::mem::size_of::<crate::compiler::ResPos>());
-    println!("sizeof {} VVal bytes", std::mem::size_of::<VVal>());
-    println!("sizeof {} Box<String> bytes", std::mem::size_of::<Box<String>>());
+//    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
+//    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
+//    println!("sizeof {} NVec<f64> bytes", std::mem::size_of::<crate::nvec::NVec<f64>>());
+//    println!("sizeof {} Op bytes", std::mem::size_of::<crate::ops::Op>());
+//    println!("sizeof {} ResPos bytes", std::mem::size_of::<crate::compiler::ResPos>());
+//    println!("sizeof {} VVal bytes", std::mem::size_of::<VVal>());
+//    println!("sizeof {} Box<String> bytes", std::mem::size_of::<Box<String>>());
+
 ////    println!("sizeof OP:{} bytes", std::mem::size_of::<(ResPos, Box<String>, Box<String>, Box<String>, ResPos)>());
 //
 //    let argv : Vec<String> = std::env::args().collect();

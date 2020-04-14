@@ -124,6 +124,7 @@ pub enum Syntax {
     Lst,
     IVec,
     FVec,
+    Opt,
     Map,
     Expr,
     Func,
@@ -1351,6 +1352,13 @@ pub enum VVal {
     Syn(SynPos),
     /// A pair
     Pair(Box<(VVal, VVal)>),
+    /// An optional value. While VVal::None basically has the same meaning
+    /// as "no value", an optional value provides functions a way to say
+    /// that they don't even return none value but nothing. Yes, it sounds
+    /// weird, and it is weird. But in case of iterator functions that
+    /// iterate over an array you can find out whether the iterator is at
+    /// the end or will provide more values.
+    Opt(Option<Rc<VVal>>),
     /// A list (or vector) of VVals.
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
     /// A mapping of strings to VVals.
@@ -1444,6 +1452,11 @@ impl CycleCheck {
             VVal::Pair(b) => {
                 self.touch_walk(&b.0);
                 self.touch_walk(&b.1);
+            },
+            VVal::Opt(b) => {
+                if let Some(x) = b {
+                    self.touch_walk(x);
+                }
             },
             VVal::Lst(l) => {
                 for v in l.borrow().iter() { self.touch_walk(v); }
@@ -1672,14 +1685,10 @@ impl VVal {
             VVal::Str(s) => {
                 VVal::new_str_mv(s.borrow_mut().clone())
             },
-            VVal::DropFun(v) => v.v.shallow_clone(),
-            VVal::Ref(v)     => v.borrow_mut().shallow_clone(),
-            VVal::CRef(v)    => v.borrow_mut().shallow_clone(),
-            VVal::WWRef(v)   =>
-                if let Some(r) = v.upgrade() {
-                    r.borrow().shallow_clone()
-                } else { VVal::None },
-            _ => self.clone()
+            v => v.with_deref(
+                |v| v.shallow_clone(),
+                |v| if let Some(v) = v { v.clone() }
+                    else { VVal::None }),
         }
     }
 
@@ -1792,6 +1801,18 @@ impl VVal {
                     r.borrow().iter()
                 } else { std::iter::from_fn(Box::new(|| { None })) },
             VVal::None => {
+                std::iter::from_fn(Box::new(move || { None }))
+            },
+            VVal::Opt(Some(v)) => {
+                let x = v.as_ref().clone();
+                let mut used = false;
+                std::iter::from_fn(Box::new(move || {
+                    if used { return None; }
+                    used = true;
+                    Some((x.clone(), None))
+                }))
+            },
+            VVal::Opt(None) => {
                 std::iter::from_fn(Box::new(move || { None }))
             },
             _ => {
@@ -2138,6 +2159,13 @@ impl VVal {
                     Ok(self.at(e.arg(0).i() as usize).unwrap_or(VVal::None))
                 })
             },
+            VVal::Opt(v) => {
+                if let Some(v) = v {
+                    Ok(v.as_ref().clone())
+                } else {
+                    Ok(VVal::None)
+                }
+            },
             VVal::Usr(ud) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let mut args = vec![];
@@ -2189,21 +2217,6 @@ impl VVal {
         }
     }
 
-    pub fn deref(&self) -> VVal {
-        match self {
-            VVal::DropFun(r) => r.v.clone(),
-            VVal::Ref(l)     => (*l).borrow().clone(),
-            VVal::CRef(l)    => (*l).borrow().clone(),
-            VVal::WWRef(l)   => {
-                match l.upgrade() {
-                    Some(v) => v.borrow().clone(),
-                    None => VVal::None,
-                }
-            },
-            _ => self.clone()
-        }
-    }
-
     pub fn upgrade(self) -> VVal {
         match self {
             VVal::CRef(f) => VVal::Ref(f),
@@ -2242,6 +2255,7 @@ impl VVal {
             VVal::Byt(s)     => { &*s.borrow() as *const Vec<u8> as i64 },
             VVal::Lst(v)     => { &*v.borrow() as *const Vec<VVal> as i64 },
             VVal::Map(v)     => { &*v.borrow() as *const FnvHashMap<String, VVal> as i64 },
+            VVal::Opt(p)     => { if let Some(p) = p { &*p.as_ref() as *const VVal as i64 } else { 0 } },
             VVal::Fun(f)     => { &**f as *const VValFun as i64 },
             VVal::DropFun(f) => { &**f as *const DropVVal as i64 },
             VVal::Ref(v)     => { &*v.borrow() as *const VVal as i64 },
@@ -2271,6 +2285,21 @@ impl VVal {
             VVal::Pair(b)  => {
                 if let VVal::Pair(b2) = v { b.0.eqv(&b2.0) && b.1.eqv(&b2.1) }
                 else { false }
+            },
+            VVal::Opt(a)  => {
+                if let VVal::Opt(b) = v {
+                    if let Some(a) = a {
+                        if let Some(b) = b {
+                            a.eqv(b)
+                        } else {
+                            false
+                        }
+                    } else {
+                        b.is_none()
+                    }
+                } else {
+                    false
+                }
             },
             VVal::Lst(l)  => {
                 if let VVal::Lst(l2) = v { Rc::ptr_eq(l, l2) } else { false }
@@ -2403,13 +2432,18 @@ impl VVal {
     pub fn unshift(&self, val: VVal) -> &VVal {
         if let VVal::Lst(b) = &self {
             b.borrow_mut().insert(0, val);
+            self
+        } else {
+            self.with_deref(move |v| { v.unshift(val); }, |_| ());
+            self
         }
-        self
     }
 
     pub fn insert_at(&self, index: usize, val: VVal) {
         if let VVal::Lst(b) = &self {
             b.borrow_mut().insert(index, val);
+        } else {
+            self.with_deref(|v| v.insert_at(index, val), |_| ())
         }
     }
 
@@ -2430,10 +2464,6 @@ impl VVal {
 
     pub fn at(&self, index: usize) -> Option<VVal> {
         match self {
-            VVal::Ref(_)   => self.deref().at(index),
-            VVal::CRef(_)  => self.deref().at(index),
-            VVal::WWRef(_) => self.deref().at(index),
-            VVal::DropFun(f) => f.v.at(index),
             VVal::Byt(vval_bytes) => {
                 let bytes = vval_bytes.borrow();
                 if index as usize >= bytes.len() {
@@ -2454,6 +2484,13 @@ impl VVal {
             },
             VVal::Pair(b) => {
                 Some(if index % 2 == 0 { b.0.clone() } else { b.1.clone() })
+            },
+            VVal::Opt(ref b) => {
+                if let Some(b) = b {
+                    b.as_ref().at(index)
+                } else {
+                    None
+                }
             },
             VVal::IVec(b) => {
                 Some(match index {
@@ -2480,15 +2517,15 @@ impl VVal {
                     None
                 }
             },
-            _ => self.get_key(&format!("{}", index)),
+            v => v.with_deref(
+                |v| v.at(index),
+                |v| if let Some(v) = v { v.get_key(&format!("{}", index)) }
+                    else { None }),
         }
     }
 
     pub fn proto_data(&self) -> VVal {
         match self {
-            VVal::Ref(_)   => self.deref().proto_data(),
-            VVal::CRef(_)  => self.deref().proto_data(),
-            VVal::WWRef(_) => self.deref().proto_data(),
             VVal::Map(m) => m.borrow().get("_data").cloned().unwrap_or(VVal::None),
             VVal::Lst(l) => {
                 if l.borrow().len() > 1 {
@@ -2497,15 +2534,14 @@ impl VVal {
                     VVal::None
                 }
             },
-            _ => VVal::None,
+            v => v.with_deref(
+                |v| v.proto_data(),
+                |_| VVal::None),
         }
     }
 
     pub fn proto_lookup(&self, key: &str) -> Option<VVal> {
         match self {
-            VVal::Ref(_)   => self.deref().proto_lookup(key),
-            VVal::CRef(_)  => self.deref().proto_lookup(key),
-            VVal::WWRef(_) => self.deref().proto_lookup(key),
             VVal::Map(m) => {
                 if let Some(func) = m.borrow().get(key) {
                     Some(func.clone())
@@ -2523,15 +2559,12 @@ impl VVal {
                     l[0].proto_lookup(key)
                 }
             },
-            _ => None
+            v => v.with_deref(|v| v.proto_lookup(key), |_| None),
         }
     }
 
     pub fn get_key(&self, key: &str) -> Option<VVal> {
         match self {
-            VVal::Ref(_)   => self.deref().get_key(key),
-            VVal::CRef(_)  => self.deref().get_key(key),
-            VVal::WWRef(_) => self.deref().get_key(key),
             VVal::Map(m) => m.borrow().get(key).cloned(),
             VVal::IVec(b) => {
                 Some(match key {
@@ -2579,7 +2612,7 @@ impl VVal {
                 }
             },
             VVal::Usr(u) => u.get_key(key),
-            _ => None
+            v => v.with_deref(|v| v.get_key(key), |_| None),
         }
     }
 
@@ -2588,25 +2621,29 @@ impl VVal {
         self.set_key_mv(key, VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
     }
 
-    pub fn set_key_mv(&self, key: String, val: VVal) {
+    pub fn deref(&self) -> VVal {
+        self.with_deref(
+            |v| v.clone(),
+            |v| v.map_or(VVal::None, |v| v.clone()))
+    }
+
+    #[inline]
+    pub fn with_deref<O, D, R>(&self, op: O, default: D) -> R
+        where O: FnOnce(&VVal) -> R, D: FnOnce(Option<&VVal>) -> R
+    {
         match self {
-            VVal::Ref(_)   => self.deref().set_key_mv(key, val),
-            VVal::CRef(_)  => self.deref().set_key_mv(key, val),
-            VVal::WWRef(_) => self.deref().set_key_mv(key, val),
-            VVal::DropFun(f) => f.v.set_key_mv(key, val),
-            VVal::Map(m) => {
-                m.borrow_mut().insert(key, val);
-            },
-            VVal::Lst(l) => {
-                let idx = key.parse::<usize>().unwrap_or(0);
-                let mut v = l.borrow_mut();
-                if v.len() <= idx {
-                    v.resize(idx + 1, VVal::None);
+            VVal::DropFun(r)    => op(&r.v),
+            VVal::Opt(Some(v))  => op(v.as_ref()),
+            VVal::Opt(None)     => op(&VVal::None),
+            VVal::Ref(l)        => op(&(*l).borrow()),
+            VVal::CRef(l)       => op(&(*l).borrow()),
+            VVal::WWRef(l)      => {
+                match l.upgrade() {
+                    Some(v) => op(&v.borrow()),
+                    None    => default(None),
                 }
-                v[idx] = val;
             },
-            VVal::Usr(u) => { u.set_key(&VVal::new_str_mv(key), val).unwrap(); },
-            _ => {}
+            _ => default(Some(self)),
         }
     }
 
@@ -2614,30 +2651,22 @@ impl VVal {
         where O: FnMut(&mut std::cell::RefMut<std::vec::Vec<VVal>>) -> R
     {
         match self {
-            VVal::Ref(_)   => self.deref().list_operation(op),
-            VVal::CRef(_)  => self.deref().list_operation(op),
-            VVal::WWRef(_) => self.deref().list_operation(op),
-            VVal::DropFun(f) => f.v.list_operation(op),
             VVal::Lst(l) => {
                 match l.try_borrow_mut() {
                     Ok(mut v) => { Ok(op(&mut v)) },
                     Err(_) => Err(StackAction::panic_borrow(self)),
                 }
             },
-            _ => {
-                Err(StackAction::panic_msg(format!(
+            v => v.with_deref(|v| {
+                v.list_operation(op)
+            }, |v| Err(StackAction::panic_msg(format!(
                     "Can't do list operation with non list value: {}",
-                    self.s())))
-            }
+                    v.map_or("".to_string(), |v| v.s())))))
         }
     }
 
     pub fn delete_key(&self, key: &VVal) -> Result<VVal, StackAction> {
         match self {
-            VVal::Ref(_)   => self.deref().delete_key(key),
-            VVal::CRef(_)  => self.deref().delete_key(key),
-            VVal::WWRef(_) => self.deref().delete_key(key),
-            VVal::DropFun(f) => f.v.delete_key(key),
             VVal::Map(m) => {
                 let ks = key.s_raw();
                 match m.try_borrow_mut() {
@@ -2672,17 +2701,34 @@ impl VVal {
                 }
             },
             VVal::Usr(u) => u.delete_key(key),
-            _ => Ok(VVal::None)
+            v => v.with_deref(
+                |v| v.delete_key(key),
+                |_| Ok(VVal::None)),
         }
     }
 
+    pub fn set_key_mv(&self, key: String, val: VVal) {
+        match self {
+            VVal::Map(m) => {
+                m.borrow_mut().insert(key, val);
+            },
+            VVal::Lst(l) => {
+                let idx = key.parse::<usize>().unwrap_or(0);
+                let mut v = l.borrow_mut();
+                if v.len() <= idx {
+                    v.resize(idx + 1, VVal::None);
+                }
+                v[idx] = val;
+            },
+            VVal::Usr(u) => { u.set_key(&VVal::new_str_mv(key), val).unwrap(); },
+            v => v.with_deref(
+                |v| v.set_key_mv(key, val),
+                |_| ()),
+        }
+    }
 
     pub fn set_key(&self, key: &VVal, val: VVal) -> Result<(), StackAction> {
         match self {
-            VVal::Ref(_)   => self.deref().set_key(key, val),
-            VVal::CRef(_)  => self.deref().set_key(key, val),
-            VVal::WWRef(_) => self.deref().set_key(key, val),
-            VVal::DropFun(f) => f.v.set_key(key, val),
             VVal::Map(m) => {
                 let ks = key.s_raw();
                 match m.try_borrow_mut() {
@@ -2704,7 +2750,9 @@ impl VVal {
                 }
             },
             VVal::Usr(u) => u.set_key(key, val),
-            _ => Ok(())
+            v => v.with_deref(
+                |v| v.set_key(key, val),
+                |_| Ok(())),
         }
     }
 
@@ -2712,7 +2760,7 @@ impl VVal {
         if let VVal::Lst(b) = &self {
             b.borrow_mut().pop().unwrap_or(VVal::None)
         } else {
-            VVal::None
+            self.with_deref(|v| v.pop(), |_| VVal::None)
         }
     }
 
@@ -2756,6 +2804,8 @@ impl VVal {
         if let VVal::Lst(b) = &self {
             //d// println!("FN ! PUSH {} v {}", self.s(), val.s());
             b.borrow_mut().push(val);
+        } else {
+            self.with_deref(|v| { v.push(val); }, |_| ())
         }
         self
     }
@@ -2769,7 +2819,7 @@ impl VVal {
             VVal::Byt(l) => l.borrow().len(),
             VVal::Str(l) => l.borrow().len(),
             VVal::Sym(l) => l.borrow().len(),
-            _ => 0,
+            v => v.with_deref(|v| v.len(), |_| 0),
         }
     }
 
@@ -2810,7 +2860,15 @@ impl VVal {
             VVal::Usr(s)  => s.s_raw(),
             VVal::Byt(s)  => s.borrow().iter().map(|b| *b as char).collect(),
             VVal::None    => String::from(""),
-            _             => self.s(),
+            v => v.with_deref(|v| {
+                if v.is_none() { "".to_string() }
+                else { v.s_raw() }
+            }, |v| {
+                v.map_or_else(
+                    || "".to_string(),
+                    |v| if v.is_none() { "".to_string() }
+                        else { v.s() })
+            }),
         }
     }
 
@@ -2909,6 +2967,10 @@ impl VVal {
         match self { VVal::Pair(_) => true, _ => false }
     }
 
+    pub fn is_optional(&self) -> bool {
+        if let VVal::Opt(_) = self { true } else { false }
+    }
+
     pub fn is_ref(&self) -> bool {
         match self { VVal::Ref(_) => true, VVal::CRef(_) => true, VVal::WWRef(_) => true, _ => false }
     }
@@ -2941,8 +3003,20 @@ impl VVal {
         match self { VVal::Map(_) => true, _ => false }
     }
 
+    pub fn is_some(&self) -> bool {
+        match self {
+            VVal::None      => false,
+            VVal::Opt(None) => false,
+            _ => true
+        }
+    }
+
     pub fn is_none(&self) -> bool {
-        match self { VVal::None => true, _ => false }
+        match self {
+            VVal::None      => true,
+            VVal::Opt(None) => true,
+            _ => false,
+        }
     }
 
     pub fn is_err(&self) -> bool {
@@ -2961,6 +3035,7 @@ impl VVal {
             VVal::Int(_)     => String::from("integer"),
             VVal::Flt(_)     => String::from("float"),
             VVal::Pair(_)    => String::from("pair"),
+            VVal::Opt(_)     => String::from("optional"),
             VVal::Lst(_)     => String::from("vector"),
             VVal::Map(_)     => String::from("map"),
             VVal::Usr(_)     => String::from("userdata"),
@@ -3137,15 +3212,7 @@ impl VVal {
             VVal::Fun(_)     => 1.0,
             VVal::IVec(iv)   => iv.x_raw() as f64,
             VVal::FVec(fv)   => fv.x_raw(),
-            VVal::DropFun(f) => f.v.f(),
-            VVal::Ref(l)     => (*l).borrow().f(),
-            VVal::CRef(l)    => (*l).borrow().f(),
-            VVal::WWRef(l)   => {
-                match l.upgrade() {
-                    Some(v) => v.borrow().f(),
-                    None => 0.0,
-                }
-            },
+            v => v.with_deref(|v| v.f(), |_| 0.0),
         }
     }
 
@@ -3168,15 +3235,7 @@ impl VVal {
             VVal::Fun(_)     => 1,
             VVal::IVec(iv)   => iv.x_raw(),
             VVal::FVec(fv)   => fv.x_raw() as i64,
-            VVal::DropFun(f) => f.v.i(),
-            VVal::Ref(l)     => (*l).borrow().i(),
-            VVal::CRef(l)    => (*l).borrow().i(),
-            VVal::WWRef(l)   => {
-                match l.upgrade() {
-                    Some(v) => v.borrow().i(),
-                    None => 0,
-                }
-            },
+            v => v.with_deref(|v| v.i(), |_| 0),
         }
     }
 
@@ -3199,15 +3258,7 @@ impl VVal {
             VVal::Fun(_)     => true,
             VVal::IVec(iv)   => iv.x().b(),
             VVal::FVec(fv)   => fv.x().b(),
-            VVal::DropFun(f) => f.v.b(),
-            VVal::Ref(l)     => (*l).borrow().i() != 0,
-            VVal::CRef(l)    => (*l).borrow().i() != 0,
-            VVal::WWRef(l)   => {
-                match l.upgrade() {
-                    Some(v) => v.borrow().i() != 0,
-                    None => false,
-                }
-            },
+            v => v.with_deref(|v| v.b(), |_| false),
         }
     }
 
@@ -3264,6 +3315,9 @@ impl VVal {
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
             VVal::Pair(b)    => format!("$p({},{})", b.0.s_cy(c), b.1.s_cy(c)),
+            VVal::Opt(b)     =>
+                if let Some(b) = b { format!("$o({})", b.s_cy(c)) }
+                else { "$o()".to_string() },
             VVal::Lst(l)     => VVal::dump_vec_as_str(l, c),
             VVal::Map(l)     => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
             VVal::Usr(u)     => u.s(),
@@ -3303,17 +3357,12 @@ impl VVal {
 
     pub fn as_bytes(&self) -> std::vec::Vec<u8> {
         match self {
-            VVal::Byt(b)     => b.borrow().clone(),
-            VVal::DropFun(f) => f.v.as_bytes(),
-            VVal::Ref(l)     => (*l).borrow().as_bytes(),
-            VVal::CRef(l)    => (*l).borrow().as_bytes(),
-            VVal::WWRef(l)   => {
-                match l.upgrade() {
-                    Some(v) => v.borrow().as_bytes(),
-                    None    => std::vec::Vec::new(),
-                }
-            },
-            _ => self.with_s_ref(|s: &str| s.as_bytes().to_vec()),
+            VVal::Byt(b) => b.borrow().clone(),
+            v => v.with_deref(
+                |v| v.as_bytes(),
+                |v| v.map_or_else(
+                    || vec![],
+                    |v| v.with_s_ref(|s: &str| s.as_bytes().to_vec()))),
         }
     }
 
@@ -3404,6 +3453,16 @@ impl serde::ser::Serialize for VVal {
                 seq.serialize_element(&b.0)?;
                 seq.serialize_element(&b.1)?;
                 seq.end()
+            },
+            VVal::Opt(b)    => {
+                if let Some(b) = b {
+                    let mut seq = serializer.serialize_seq(Some(1))?;
+                    seq.serialize_element(b.as_ref())?;
+                    seq.end()
+                } else {
+                    let seq = serializer.serialize_seq(Some(0))?;
+                    seq.end()
+                }
             },
             VVal::Lst(l)     => {
                 let mut seq = serializer.serialize_seq(Some(l.borrow().len()))?;

@@ -23,7 +23,7 @@ impl ResultSink {
             ResultSink::WriteTo(_) => true,
             ResultSink::WantResult => true,
             ResultSink::Null => {
-                let rp = ResPos::Value(ResValue::Nul);
+                let rp = ResPos::Value(ResValue::None);
                 f(rp);
                 false
             },
@@ -43,7 +43,7 @@ impl ResultSink {
                 f(rp);
                 rp
             },
-            ResultSink::Null => ResPos::Value(ResValue::Nul),
+            ResultSink::Null => ResPos::Value(ResValue::None),
         }
     }
 }
@@ -66,7 +66,7 @@ impl ProgWriter {
     fn eval_nul(&self, prog: &mut Prog) {
         let rp = (*self.node)(prog, ResultSink::Null);
         if let ResPos::Stack(_) = rp {
-            prog.push_op(Op::Mov(rp, ResPos::Value(ResValue::Nul)));
+            prog.push_op(Op::Mov(rp, ResPos::Value(ResValue::None)));
         }
     }
 
@@ -93,7 +93,7 @@ macro_rules! pw_null {
     ($prog: ident, $b: block) => {
         pw_provides_result_pos!($prog, {
             $b
-            ResPos::Value(ResValue::Nul)
+            ResPos::Value(ResValue::None)
         })
     }
 }
@@ -112,9 +112,9 @@ macro_rules! pw_provides_result_pos {
                 },
                 ResultSink::Null => {
                     if let ResPos::Stack(_) = pos {
-                        $prog.push_op(Op::Mov(pos, ResPos::Value(ResValue::Nul)));
+                        $prog.push_op(Op::Mov(pos, ResPos::Value(ResValue::None)));
                     }
-                    ResPos::Value(ResValue::Nul)
+                    ResPos::Value(ResValue::None)
                 },
             }
         })
@@ -128,7 +128,7 @@ macro_rules! pw_store_if_needed {
                 match store {
                     ResultSink::WriteTo(store_pos) => store_pos,
                     ResultSink::WantResult => ResPos::Stack(0),
-                    ResultSink::Null => ResPos::Value(ResValue::Nul),
+                    ResultSink::Null => ResPos::Value(ResValue::None),
                 };
 
             $b;
@@ -155,8 +155,8 @@ macro_rules! pw_needs_storage {
                 ResultSink::Null => {
                     let $pos = ResPos::Stack(0);
                     $b;
-                    $prog.push_op(Op::Mov($pos, ResPos::Value(ResValue::Nul)));
-                    ResPos::Value(ResValue::Nul)
+                    $prog.push_op(Op::Mov($pos, ResPos::Value(ResValue::None)));
+                    ResPos::Value(ResValue::None)
                 },
             }
         })
@@ -176,9 +176,10 @@ macro_rules! in_reg {
                 ResPos::Arg(o)      => $env.arg(*o as usize),
                 ResPos::Data(i)     => $prog.data[*i as usize].clone(),
                 ResPos::Stack(_o)   => $env.pop(),
-                ResPos::Value(ResValue::Ret) => std::mem::replace(&mut $ret, VVal::None),
-                ResPos::Value(ResValue::Nul) => VVal::None,
-                ResPos::Value(ResValue::SelfObj) => $env.self_object(),
+                ResPos::Value(ResValue::Ret)      => std::mem::replace(&mut $ret, VVal::None),
+                ResPos::Value(ResValue::None)     => VVal::None,
+                ResPos::Value(ResValue::OptNone)  => VVal::Opt(None),
+                ResPos::Value(ResValue::SelfObj)  => $env.self_object(),
                 ResPos::Value(ResValue::SelfData) => $env.self_object().proto_data(),
                 ResPos::Value(ResValue::AccumVal) => $env.get_accum_value(),
                 ResPos::Value(ResValue::AccumFun) => $env.get_accum_function(),
@@ -199,7 +200,7 @@ macro_rules! out_reg {
             ResPos::Stack(_)        => { $env.push($val); },
             ResPos::Value(ResValue::Ret) => { $ret = $val; },
             ResPos::Arg(_)          => (),
-            ResPos::Value(ResValue::Nul) => {
+            ResPos::Value(ResValue::None) => {
                 if let VVal::Err(ev) = $val {
                     $retv =
                         Err(StackAction::panic_str(
@@ -447,6 +448,14 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 VVal::Pair(Box::new((
                     handle_err!(b, "first pair element", retv),
                     handle_err!(a, "second pair element", retv))))
+            }),
+            Op::NewOpt(a, r) => op_r!(env, ret, retv, prog, r, {
+                if let ResPos::Value(ResValue::OptNone) = a {
+                    VVal::Opt(None)
+                } else {
+                    in_reg!(env, ret, prog, a);
+                    VVal::Opt(Some(Rc::new(a)))
+                }
             }),
             Op::NewNVec(vp, r) => {
                 use crate::nvec::NVec;
@@ -1158,7 +1167,7 @@ fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool
                             ResPos::Up(vip as u16)
                         }
                     },
-                    _ => ResPos::Value(ResValue::Nul)
+                    _ => ResPos::Value(ResValue::None)
                 };
 
             val_pw.eval_to(prog, rp)
@@ -1176,7 +1185,7 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
     pw!(prog, store, {
         let expr_count = exprs.len();
         let mut i      = 0;
-        let mut res    = ResPos::Value(ResValue::Nul);
+        let mut res    = ResPos::Value(ResValue::None);
 
         for e in exprs.iter() {
             prog.set_dbg(spos.clone());
@@ -1364,7 +1373,7 @@ pub fn vm_compile_break2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         pw_null!(prog, {
             prog.set_dbg(spos.clone());
             prog.push_op(Op::CtrlFlow(
-                CtrlFlow::Break(ResPos::Value(ResValue::Nul))));
+                CtrlFlow::Break(ResPos::Value(ResValue::None))));
         })
     }
 }
@@ -1446,7 +1455,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     prog.append(else_body_prog);
                 })
             } else {
-                ResPos::Value(ResValue::Nul)
+                ResPos::Value(ResValue::None)
             }
         })
     } else {
@@ -1472,10 +1481,10 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     prog.set_dbg(spos.clone());
                     prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
                     prog.append(then_body_prog);
-                    prog.push_op(Op::Mov(ResPos::Value(ResValue::Nul), store_pos));
+                    prog.push_op(Op::Mov(ResPos::Value(ResValue::None), store_pos));
                 })
             } else {
-                ResPos::Value(ResValue::Nul)
+                ResPos::Value(ResValue::None)
             }
         })
     }
@@ -1672,6 +1681,23 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                         ResPos::Stack(0)
                     })
+                },
+                Syntax::Opt => {
+                    if let Some(v) = ast.at(1) {
+                        let val_pw = vm_compile2(&v, ce)?;
+
+                        pw_store_if_needed!(prog, store, {
+                            let vp = val_pw.eval(prog);
+                            prog.push_op(Op::NewOpt(vp, store));
+                        })
+                    } else {
+                        pw_store_if_needed!(prog, store, {
+                            prog.push_op(
+                                Op::NewOpt(
+                                    ResPos::Value(ResValue::OptNone),
+                                    store));
+                        })
+                    }
                 },
                 Syntax::Map => {
                     let mut pws : std::vec::Vec<(ProgWriter, Option<ProgWriter>)> =

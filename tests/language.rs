@@ -2712,3 +2712,44 @@ fn check_lerp_smoothstep() {
     assert_eq!(ve("10000.0 * (std:num:smoothstep 0.0 1000.0 900.0)  | int"), "9720");
     assert_eq!(ve("10000.0 * (std:num:smoothstep 0.0 1000.0 500.0 ) | int"), "5000");
 }
+
+#[test]
+fn check_optionals() {
+    assert_eq!(ve("$o(10)"),      "$o(10)");
+    assert_eq!(ve("$o()"),        "$o()");
+
+    assert_eq!(ve("is_optional $o(10)"),      "$true");
+    assert_eq!(ve("is_optional $o()"),        "$true");
+    assert_eq!(ve("is_optional $none"),       "$false");
+
+    assert_eq!(ve("is_some $o(10)"),      "$true");
+    assert_eq!(ve("is_some $o()"),        "$false");
+
+    assert_eq!(ve("is_none $o(10)"),      "$false");
+    assert_eq!(ve("is_none $o()"),        "$true");
+
+    assert_eq!(ve("$o(10) == $o(10)"),  "$true");
+    assert_eq!(ve("$o(11) == $o(10)"),  "$false");
+    assert_eq!(ve("$o() == $o()"),      "$true");
+    assert_eq!(ve("$o() == $o(10)"),    "$false");
+    assert_eq!(ve("$o(10) == $o()"),    "$false");
+
+    assert_eq!(ve("$o(10)[]"),    "10");
+    assert_eq!(ve("$o()[]"),      "$n");
+
+    assert_eq!(ve(r"
+        !x = $o(10);
+        !y = $o(11);
+        !x1 = std:ref_id x;
+        !y1 = std:ref_id y;
+        !x2 = std:ref_id x;
+        !y2 = std:ref_id y;
+        $[std:ref_id[x] != std:ref_id[y],
+          std:ref_id[x] == x1,
+          std:ref_id[x] == x2,
+          std:ref_id[y] == y1,
+          std:ref_id[y] == y2]
+        "),
+        "$[$true,$true,$true,$true,$true]");
+
+}

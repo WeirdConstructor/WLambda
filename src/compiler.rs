@@ -807,7 +807,8 @@ struct BlockEnv {
 #[derive(Debug,Clone,Copy,PartialEq)]
 #[repr(u8)]
 pub enum ResValue {
-    Nul,
+    None,
+    OptNone,
     Ret,
     AccumVal,
     AccumFun,

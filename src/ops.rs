@@ -87,6 +87,10 @@ impl Prog {
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                 },
+                Op::NewOpt(p1, p2) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
                 Op::NewNVec(vec, p1) => {
                     use std::borrow::BorrowMut;
                     match vec.borrow_mut() {
@@ -483,6 +487,7 @@ pub enum NVecPos {
 #[repr(u8)]
 pub enum Op {
     Mov(ResPos, ResPos),
+    NewOpt(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
     NewNVec(Box<NVecPos>, ResPos),
     Argv(ResPos),
