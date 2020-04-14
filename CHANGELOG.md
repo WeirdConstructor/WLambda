@@ -28,6 +28,7 @@ the error occurred easier.
 * Feature: Added compile time constant values: `!:const X = ...`.
 * Feature: Added if statement `? <cond> <then> <else>`.
 * Feature: Added `iter <var> <list-expr> <block>` statement.
+* Feature: Added `std:delete` added for removing elements from maps or vectors.
 * Documentation: More!
 
 0.4.4 (2020-03-06)

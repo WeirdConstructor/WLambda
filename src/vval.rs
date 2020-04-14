@@ -1267,6 +1267,9 @@ pub trait VValUserData {
     /// for implementing your own registries or data structures.
     /// Implement this method for setting a key to a value.
     fn set_key(&self, _key: &VVal, _val: VVal) -> Result<(), StackAction> { Ok(()) }
+    /// This method is called when the user wants to remove a key.
+    /// Typically called when `std:delete` from the prelude is called.
+    fn delete_key(&self, _key: &VVal) -> Result<VVal, StackAction> { Ok(VVal::None) }
     /// This method returns some value that your user data
     /// associates with the given key.
     fn get_key(&self, _key: &str) -> Option<VVal> { None }
@@ -2628,6 +2631,51 @@ impl VVal {
             }
         }
     }
+
+    pub fn delete_key(&self, key: &VVal) -> Result<VVal, StackAction> {
+        match self {
+            VVal::Ref(_)   => self.deref().delete_key(key),
+            VVal::CRef(_)  => self.deref().delete_key(key),
+            VVal::WWRef(_) => self.deref().delete_key(key),
+            VVal::DropFun(f) => f.v.delete_key(key),
+            VVal::Map(m) => {
+                let ks = key.s_raw();
+                match m.try_borrow_mut() {
+                    Ok(mut r)  => { Ok(r.remove(&ks).unwrap_or_else(|| VVal::None)) },
+                    Err(_)     => Err(StackAction::panic_borrow(self)),
+                }
+            },
+            VVal::Lst(l) => {
+                let idx = key.i() as usize;
+                match l.try_borrow_mut() {
+                    Ok(mut v) => {
+                        if idx < v.len() {
+                            Ok(v.remove(idx))
+                        } else {
+                            Ok(VVal::None)
+                        }
+                    },
+                    Err(_) => Err(StackAction::panic_borrow(self)),
+                }
+            },
+            VVal::Byt(b) => {
+                let idx = key.i() as usize;
+                match b.try_borrow_mut() {
+                    Ok(mut b) => {
+                        if idx < b.len() {
+                            Ok(VVal::Int(b.remove(idx) as i64))
+                        } else {
+                            Ok(VVal::None)
+                        }
+                    },
+                    Err(_) => Err(StackAction::panic_borrow(self)),
+                }
+            },
+            VVal::Usr(u) => u.delete_key(key),
+            _ => Ok(VVal::None)
+        }
+    }
+
 
     pub fn set_key(&self, key: &VVal, val: VVal) -> Result<(), StackAction> {
         match self {

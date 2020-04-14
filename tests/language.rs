@@ -2694,3 +2694,10 @@ fn check_iter() {
         sum
     "), "10");
 }
+
+#[test]
+fn check_delete() {
+    assert_eq!(ve("!v = $[1,2,3]; delete v 1; v"),          "$[1,3]");
+    assert_eq!(ve("!v = ${a=10,b=20}; delete v :a; v"),     "${b=20}");
+    assert_eq!(ve("!b = $b\"abc\"; delete b 1; b"),         "$b\"ac\"");
+}

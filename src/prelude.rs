@@ -3587,6 +3587,35 @@ std:shuffle { std:rand:split_mix64_next sm } vec;
 std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
 ```
 
+#### - std:delete _vector-or-map_ _index-or-key_
+
+This removes the designated element from the collection (either vector or map).
+This works for:
+
+- Vectors:
+```wlambda
+!v = $[1,2,3];
+
+std:assert_eq (std:delete v 1) 2;
+std:assert_eq (str v) (str $[1,3]);
+```
+- Maps:
+```wlambda
+!m = ${a = 10, b = 20};
+
+std:assert_eq (std:delete m :a) 10;
+std:assert_eq (str m) (str ${b = 20});
+```
+- Byte Vectors:
+```wlambda
+!b = $b"abc";
+
+std:assert_eq (std:delete b 1) 12;
+std:assert_eq b $b"ac";
+```
+
+Please note that this operation is potentially O(n) on vectors.
+
 #### <a name="1102-stdcopy-vecormap"></a>11.0.2 - std:copy _vec_or_map_
 
 Makes a shallow copy of the given vector or map.
@@ -4580,6 +4609,14 @@ pub fn std_symbol_table() -> SymbolTable {
             }
             Ok(v)
         }, Some(2), None, false);
+
+    func!(st, "delete",
+        |env: &mut Env, _argc: usize| {
+            let v   = env.arg(0);
+            let key = env.arg(1);
+            v.delete_key(&key)?;
+            Ok(VVal::None)
+        }, Some(2), Some(2), false);
 
     func!(st, "prepend",
         |env: &mut Env, argc: usize| {
