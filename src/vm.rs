@@ -6,7 +6,7 @@ use crate::ops::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = true;
+const DEBUG_VM: bool = false;
 
 #[derive(Debug, Clone)]
 pub enum ResultSink {

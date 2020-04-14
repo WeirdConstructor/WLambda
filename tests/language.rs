@@ -2689,4 +2689,9 @@ fn check_iter() {
         };
         r
     "), "6");
+    assert_eq!(v(r"
+        !sum = 0;
+        iter i $[1, 2, 3, 4] { .sum = sum + i; };
+        sum
+    "), "10");
 }

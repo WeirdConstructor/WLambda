@@ -208,7 +208,7 @@ std:assert_eq (std:pop v) 1;
 !sum = 0;
 iter i $[1, 2, 3, 4] { .sum = sum + i; };
 
-std:assert_eq i 10;
+std:assert_eq sum 10;
 ```
 
 ## Hash tables/maps

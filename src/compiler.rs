@@ -663,7 +663,7 @@ impl EvalContext {
     /// ```
     pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
         let prog = crate::vm::compile_vm_fun(ast, &mut self.local_compile);
-        let local_env_size = self.local_compile.borrow().local_env_size();
+        let locals_size = self.local_compile.borrow().get_local_space();
 
         let env = self.local.borrow_mut();
         let mut res = Ok(VVal::Nul);
@@ -672,7 +672,7 @@ impl EvalContext {
             res = match prog {
                 Ok(prog_closures) => {
                     l_env.sp = 0;
-                    l_env.set_bp(local_env_size);
+                    l_env.set_bp(locals_size);
                     match l_env.with_restore_sp(|e: &mut Env| { prog_closures(e) }) {
                         Ok(v)   => Ok(v),
                         Err(je) => Err(EvalError::ExecError(je)),
