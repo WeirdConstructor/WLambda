@@ -1,29 +1,31 @@
 0.4.5 (unreleased)
 ==================
 
-* Potentially Incompatible Change: The compiler and evaluator was completely replaced
-by a VM and code generator for it.
 * Incompatible Change: Renamed `padl` and `padr` to `pad_start` and `pad_end`
 to make it more consistent naming to `trim_start` and `trim_end`.
+* Incompatible Change: Renamed `neg` to `neg_i64`, `uneg` to `neg_u32`.
+* Incompatible Change: Rewrote the complete threading implementation
+of WLambda.
+* Incompatible Change: Replaced while statement in prelude with `while <cond> <block>`.
+* Incompatible Change: `zip` and `enumerate` push their arguments
+to the end of the argument list now.
+* Incompatible Change: `VVal::set_map_key()` has been removed and replaced by
+`VVal::set_key_mv()`.
+* Potentially Incompatible Change: The compiler and evaluator was completely replaced
+by a VM and code generator for it.
+* Change: Function arguments are stored in right order (function, arg1, arg2, ...) on the
+stack now. This changes some of the argument handling and semantics of functions
+that did depend on the other order. (`zip`, `enumerate`, ...).
 * Change: Added proper error location to errors generated from
 prelude or other pure Rust functions.
 * Change: Added recently defined variable name or key to syntax positions
 for functions. This might help finding the actual function where
 the error occurred easier.
-* Incompatible Change: Renamed `neg` to `neg_i64`, `uneg` to `neg_u32`.
-* Incompatible Change: Rewrote the complete threading implementation
-of WLambda.
-* Change: Function arguments are stored in right order (function, arg1, arg2, ...) on the
-stack now. This changes some of the argument handling and semantics of functions
-that did depend on the other order. (`zip`, `enumerate`, ...).
-* Incompatible Change: `zip` and `enumerate` push their arguments
-to the end of the argument list now.
 * Optimization: Removed many unnecessary String allocations.
 * Feature: Added `not_i64` and `not_u32`.
 * Feature: Added compile time constant values: `!:const X = ...`.
 * Feature: Added if statement `? <cond> <then> <else>`.
 * Feature: Added `iter <var> <list-expr> <block>` statement.
-* Incompatible Change: Replaced while statement in prelude with `while <cond> <block>`.
 * Documentation: More!
 
 0.4.4 (2020-03-06)

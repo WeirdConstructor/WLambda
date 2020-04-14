@@ -120,7 +120,7 @@ impl AVal {
             AVal::Map(m) => {
                 let mv = VVal::map();
                 for (k, v) in m.iter() {
-                    mv.set_map_key(k.clone(), v.to_vval());
+                    mv.set_key_mv(k.clone(), v.to_vval());
                 }
                 mv
             },

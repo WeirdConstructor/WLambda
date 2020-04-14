@@ -1663,7 +1663,7 @@ impl VVal {
             VVal::Map(m) => {
                 let out = VVal::map();
                 for (k, v) in m.borrow_mut().iter() {
-                    out.set_map_key(k.to_string(), v.clone())
+                    out.set_key_mv(k.to_string(), v.clone())
                 }
                 out
             },
@@ -2583,17 +2583,7 @@ impl VVal {
 
     pub fn set_map_key_fun<T>(&self, key: String, fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool)
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
-        self.set_map_key(key, VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
-    }
-
-    pub fn set_map_key(&self, key: String, val: VVal) {
-        match self {
-            VVal::Ref(_)   => self.deref().set_map_key(key, val),
-            VVal::CRef(_)  => self.deref().set_map_key(key, val),
-            VVal::WWRef(_) => self.deref().set_map_key(key, val),
-            VVal::Map(m)   => { m.borrow_mut().insert(key, val); },
-            _ => (),
-        }
+        self.set_key_mv(key, VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
     }
 
     pub fn set_key_mv(&self, key: String, val: VVal) {
@@ -2959,9 +2949,9 @@ impl VVal {
     ///```
     /// use wlambda::VVal;
     /// let v = VVal::map();
-    /// v.set_map_key(String::from("aaa"), VVal::Int(12));
-    /// v.set_map_key(String::from("abc"), VVal::Int(13));
-    /// v.set_map_key(String::from("zyy"), VVal::Int(14));
+    /// v.set_key_mv(String::from("aaa"), VVal::Int(12));
+    /// v.set_key_mv(String::from("abc"), VVal::Int(13));
+    /// v.set_key_mv(String::from("zyy"), VVal::Int(14));
     ///
     /// assert_eq!(v.v_k("abc").i(), 13);
     /// assert_eq!(v.v_ik("aaa"),    12);
@@ -2982,7 +2972,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_map_key(String::from("aaa"), wlambda::VVal::new_str("10"));
+    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::new_str("10"));
     /// assert_eq!(v.v_ik("aaa"), 10);
     ///```
     pub fn v_ik(&self, key: &str)     -> i64 { self.v_k(key).i() }
@@ -3013,7 +3003,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_map_key(String::from("aaa"), wlambda::VVal::new_str("XYX"));
+    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::new_str("XYX"));
     /// assert_eq!(v.v_s_rawk("aaa"), "XYX");
     ///```
     pub fn v_s_rawk(&self, key: &str) -> String { self.v_k(key).s_raw() }
@@ -3022,7 +3012,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_map_key(String::from("aaa"), wlambda::VVal::new_str("XYX"));
+    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::new_str("XYX"));
     /// assert!(v.v_with_s_refk("aaa", |s: &str| s == "XYX"));
     ///```
     pub fn v_with_s_refk<T, R>(&self, key: &str, f: T) -> R
@@ -3044,7 +3034,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_map_key(String::from("aaa"), wlambda::VVal::Flt(12.2));
+    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::Flt(12.2));
     /// assert_eq!(v.v_sk("aaa"), "12.2");
     ///```
     pub fn v_sk(&self, key: &str)     -> String { self.v_k(key).s() }
@@ -3062,7 +3052,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_map_key(String::from("aaa"), wlambda::VVal::Flt(12.2));
+    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::Flt(12.2));
     /// assert_eq!(v.v_fk("aaa"), 12.2);
     ///```
     pub fn v_fk(&self, key: &str)     -> f64 { self.v_k(key).f() }
@@ -3466,7 +3456,7 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
 
         while let Some((ke, ve)) = map.next_entry()? {
             let k : VVal = ke;
-            v.set_map_key(k.s_raw(), ve);
+            v.set_key_mv(k.s_raw(), ve);
         }
 
         Ok(v)
