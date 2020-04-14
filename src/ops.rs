@@ -228,9 +228,13 @@ impl Prog {
                 Op::IterNext(p1) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::NewMap(p1)  => { patch_respos_data(p1, self_data_next_idx); },
-                Op::NewList(p1) => { patch_respos_data(p1, self_data_next_idx); },
-                Op::Argv(p1)    => { patch_respos_data(p1, self_data_next_idx); },
+//                Op::UnwindMov(p1, p2) => {
+//                    patch_respos_data(p1, self_data_next_idx);
+//                    patch_respos_data(p2, self_data_next_idx);
+//                },
+                Op::NewMap(p1)    => { patch_respos_data(p1, self_data_next_idx); },
+                Op::NewList(p1)   => { patch_respos_data(p1, self_data_next_idx); },
+                Op::Argv(p1)      => { patch_respos_data(p1, self_data_next_idx); },
                 Op::End
                 | Op::Builtin(Builtin::DumpStack(_))
                 | Op::Builtin(Builtin::DumpVM(_))
@@ -525,6 +529,7 @@ pub enum Op {
     Builtin(Builtin),
     IterInit(ResPos, i32),
     IterNext(ResPos),
+//    UnwindMov(ResPos, ResPos),
     Unwind,
     End,
 }

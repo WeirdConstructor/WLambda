@@ -544,6 +544,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Argv(r)             => op_r!(env, ret, retv, prog, r, { env.argv() }),
             Op::End                 => { break; },
             Op::Unwind              => { env.unwind_one(); },
+//            Op::UnwindMov(a, r) => op_a_r!(env, ret, retv, prog, a, r, {
+//                env.unwind_one();
+//                a
+//            }),
             Op::IterInit(iterable, body_ops) => {
                 in_reg!(env, ret, prog, iterable);
                 env.push_loop_info(pc, pc + *body_ops as usize);
@@ -1574,6 +1578,7 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         let ip = iterable.eval(prog);
         body.set_dbg(spos.clone());
         prog.push_op(Op::IterInit(ip, (body.op_count() + 3) as i32));
+
         var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
             body.set_dbg(spos.clone());
             prog.push_op(Op::IterNext(iter_var));

@@ -6,6 +6,14 @@ use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
 
+pub fn v(s: &str) -> String {
+    let mut ctx = EvalContext::new_default();
+    match ctx.eval(s) {
+        Ok(v) => v.s(),
+        Err(e) => format!("{}", e),
+    }
+}
+
 pub fn ve(s: &str) -> String {
     let global = GlobalEnv::new_default();
     match parser::parse(s, "<compiler:s_eval>") {
@@ -2602,8 +2610,10 @@ fn check_if() {
 //
 //std:assert_eq res 39;
 //"), "");
-    assert_eq!(ve("? { !x = 10; x > 1 } 99 49"), "99");
-    assert_eq!(ve("? { !x = 10; x > 1 } 99"),    "99");
+    assert_eq!(v("? { !x = 10; x > 1 } 99 49"), "99");
+    assert_eq!(v("? { !x = 10; x > 1 } 99"),    "99");
+    assert_eq!(v("!res = ? { !x = 10; x > 1 } 99 49; res"), "99");
+    assert_eq!(v("!res = ? { !x = 10; x > 1 } 99; res"),    "99");
     assert_eq!(ve("? 2 > 3 { 1 } { 2 }"), "2");
     assert_eq!(ve("? 2 < 3 { 1 } { 2 }"), "1");
     assert_eq!(ve(r"
