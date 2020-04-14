@@ -816,6 +816,13 @@ std:assert_eq (float $o(4.4))   4.4;
 std:assert_eq (int $o(4.4))     4;
 ```
 
+An optional value can also be dereferenced:
+
+```wlambda
+std:assert_eq $*$o()    $none;
+std:assert_eq $*$o(10)  10;
+```
+
 #### <a name="421-isoptional-value"></a>4.2.1 - is_optional _value_
 
 Returns `$true` if _value_ is an optional value. That means either `$o()` or
