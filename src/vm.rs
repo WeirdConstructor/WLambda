@@ -176,8 +176,8 @@ macro_rules! in_reg {
                 ResPos::Arg(o)      => $env.arg(*o as usize),
                 ResPos::Data(i)     => $prog.data[*i as usize].clone(),
                 ResPos::Stack(_o)   => $env.pop(),
-                ResPos::Value(ResValue::Ret) => std::mem::replace(&mut $ret, VVal::Nul),
-                ResPos::Value(ResValue::Nul) => VVal::Nul,
+                ResPos::Value(ResValue::Ret) => std::mem::replace(&mut $ret, VVal::None),
+                ResPos::Value(ResValue::Nul) => VVal::None,
                 ResPos::Value(ResValue::SelfObj) => $env.self_object(),
                 ResPos::Value(ResValue::SelfData) => $env.self_object().proto_data(),
                 ResPos::Value(ResValue::AccumVal) => $env.get_accum_value(),
@@ -389,10 +389,10 @@ macro_rules! call_func {
 macro_rules! get_key {
     ($o: ident, $k: ident, $method: ident, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident) => {
         match $k {
-            VVal::Int(i)  => $o.at(i as usize).unwrap_or_else(|| VVal::Nul),
-            VVal::Bol(b)  => $o.at(b as usize).unwrap_or_else(|| VVal::Nul),
-            VVal::Sym(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::Nul),
-            VVal::Str(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::Nul),
+            VVal::Int(i)  => $o.at(i as usize).unwrap_or_else(|| VVal::None),
+            VVal::Bol(b)  => $o.at(b as usize).unwrap_or_else(|| VVal::None),
+            VVal::Sym(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::None),
+            VVal::Str(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::None),
             _ => {
                 $env.push($o.clone());
                 let call_ret = $k.call_internal($env, 1);
@@ -425,7 +425,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     }
 
     let mut retv : Result<(), StackAction> = Ok(());
-    let mut ret = VVal::Nul;
+    let mut ret = VVal::None;
 
     let uw_depth = env.unwind_depth();
     let old_loop_info =
@@ -708,33 +708,33 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::GetIdx(o, idx, r) => op_a_r!(env, ret, retv, prog, o, r, {
                 handle_err!(o, "map/list", retv)
-                .at(*idx as usize).unwrap_or_else(|| VVal::Nul)
+                .at(*idx as usize).unwrap_or_else(|| VVal::None)
             }),
             Op::GetIdx2(o, idx, r) => op_a_r!(env, ret, retv, prog, o, r, {
                 handle_err!(o, "map/list", retv)
-                .at(idx.0 as usize).unwrap_or_else(|| VVal::Nul)
-                .at(idx.1 as usize).unwrap_or_else(|| VVal::Nul)
+                .at(idx.0 as usize).unwrap_or_else(|| VVal::None)
+                .at(idx.1 as usize).unwrap_or_else(|| VVal::None)
             }),
             Op::GetIdx3(o, idx, r) => op_a_r!(env, ret, retv, prog, o, r, {
                 handle_err!(o, "map/list", retv)
-                .at(idx.0 as usize).unwrap_or_else(|| VVal::Nul)
-                .at(idx.1 as usize).unwrap_or_else(|| VVal::Nul)
-                .at(idx.2 as usize).unwrap_or_else(|| VVal::Nul)
+                .at(idx.0 as usize).unwrap_or_else(|| VVal::None)
+                .at(idx.1 as usize).unwrap_or_else(|| VVal::None)
+                .at(idx.2 as usize).unwrap_or_else(|| VVal::None)
             }),
             Op::GetSym(o, sym, r) => op_a_r!(env, ret, retv, prog, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key(&sym).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym).unwrap_or_else(|| VVal::None)
             }),
             Op::GetSym2(o, sym, r) => op_a_r!(env, ret, retv, prog, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key(&sym.0).unwrap_or_else(|| VVal::Nul)
-                .get_key(&sym.1).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym.0).unwrap_or_else(|| VVal::None)
+                .get_key(&sym.1).unwrap_or_else(|| VVal::None)
             }),
             Op::GetSym3(o, sym, r) => op_a_r!(env, ret, retv, prog, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key(&sym.0).unwrap_or_else(|| VVal::Nul)
-                .get_key(&sym.1).unwrap_or_else(|| VVal::Nul)
-                .get_key(&sym.2).unwrap_or_else(|| VVal::Nul)
+                .get_key(&sym.0).unwrap_or_else(|| VVal::None)
+                .get_key(&sym.1).unwrap_or_else(|| VVal::None)
+                .get_key(&sym.2).unwrap_or_else(|| VVal::None)
             }),
             Op::GetKey(o, k, r) => {
                 in_reg!(env, ret, prog, k);
@@ -787,7 +787,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 let argc = *argc as usize;
                 env.push_unwind_self(o);
-                let call_ret = call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
                     env.unwind_one();
                     out_reg!(env, ret, retv, prog, r, v);
                 });
@@ -796,11 +796,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 in_reg!(env, ret, prog, o);
                 let o = handle_err!(o, "field idx/key", retv);
 
-                let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::Nul);
+                let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::None);
 
                 let argc = *argc as usize;
                 env.push_unwind_self(o);
-                let call_ret = call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
                     env.unwind_one();
                     out_reg!(env, ret, retv, prog, r, v);
                 });
@@ -809,7 +809,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 let argc = *argc as usize;
                 let f = env.stk(argc + 1).clone();
 
-                let call_ret = call_func!(f, argc, argc + 1, env, retv, uw_depth, prog, pc, v, {
+                call_func!(f, argc, argc + 1, env, retv, uw_depth, prog, pc, v, {
                     out_reg!(env, ret, retv, prog, r, v);
                 });
             },
@@ -830,7 +830,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     };
 
                 for i in 0..argc {
-                    let v = argv.at(i).unwrap_or_else(|| VVal::Nul);
+                    let v = argv.at(i).unwrap_or_else(|| VVal::None);
                     env.push(v);
                 }
 
@@ -950,14 +950,14 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 }
 
 fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
-    let destr   = ast.at(3).unwrap_or_else(|| VVal::Nul);
+    let destr   = ast.at(3).unwrap_or_else(|| VVal::None);
 
     //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
@@ -1028,7 +1028,7 @@ pub fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, CompileError> 
 }
 
 fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     let var = ast.at(1).unwrap();
@@ -1095,12 +1095,12 @@ fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool
 {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     let vars          = ast.at(1).unwrap();
     let value         = ast.at(2).unwrap();
-    let destr         = ast.at(3).unwrap_or_else(|| VVal::Nul);
+    let destr         = ast.at(3).unwrap_or_else(|| VVal::None);
 
     if destr.b() {
         let val_pw = vm_compile2(&value, ce)?;
@@ -1167,7 +1167,7 @@ fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool
 }
 
 fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     let exprs : Vec<ProgWriter> =
@@ -1213,7 +1213,7 @@ macro_rules! var_env_clear_locals {
 }
 
 fn vm_compile_block2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     ce.borrow_mut().push_block_env();
@@ -1232,7 +1232,7 @@ fn vm_compile_direct_block2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 {
     match ast {
         VVal::Lst(_) => {
-            let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+            let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
             let syn  = syn.get_syn();
 
             match syn {
@@ -1267,7 +1267,7 @@ fn vm_compile_direct_block2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 fn vm_compile_binop2(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     let a_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
@@ -1298,8 +1298,8 @@ fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                 Syntax::Map => {
                     let m = VVal::map();
                     for i in l.iter().skip(1) {
-                        let key = vm_compile_const_value(&i.at(0).unwrap_or(VVal::Nul))?;
-                        let val = vm_compile_const_value(&i.at(1).unwrap_or(VVal::Nul))?;
+                        let key = vm_compile_const_value(&i.at(0).unwrap_or(VVal::None))?;
+                        let val = vm_compile_const_value(&i.at(1).unwrap_or(VVal::None))?;
                         m.set_key_mv(key.s_raw(), val);
                     }
                     Ok(m)
@@ -1319,7 +1319,7 @@ fn vm_compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 {
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
-    let destr   = ast.at(3).unwrap_or(VVal::Nul);
+    let destr   = ast.at(3).unwrap_or(VVal::None);
 
     if destr.b() {
         for (i, (v, _)) in vars.iter().enumerate() {
@@ -1327,8 +1327,8 @@ fn vm_compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             let val = vm_compile_const_value(&value)?;
             let val =
                 match val {
-                    VVal::Lst(_) => val.at(i).unwrap_or(VVal::Nul),
-                    VVal::Map(_) => val.get_key(&varname).unwrap_or(VVal::Nul),
+                    VVal::Lst(_) => val.at(i).unwrap_or(VVal::None),
+                    VVal::Map(_) => val.get_key(&varname).unwrap_or(VVal::None),
                     _ => val,
                 };
 
@@ -1346,7 +1346,7 @@ fn vm_compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub fn vm_compile_break2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() > 3 {
@@ -1369,10 +1369,10 @@ pub fn vm_compile_break2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     }
 }
 
-pub fn vm_compile_next2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+pub fn vm_compile_next2(ast: &VVal, _ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() > 2 {
@@ -1388,7 +1388,7 @@ pub fn vm_compile_next2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 4 && ast.len() != 5 {
@@ -1398,11 +1398,11 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     let cond =
         vm_compile_direct_block2(
-            &ast.at(2).unwrap_or_else(|| VVal::Nul), ce)?;
+            &ast.at(2).unwrap_or_else(|| VVal::None), ce)?;
 
     let then_body =
         vm_compile_direct_block2(
-            &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
+            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
 
     if let Some(else_body) = ast.at(4) {
         let else_body = vm_compile_direct_block2(&else_body, ce)?;
@@ -1412,8 +1412,8 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             let needs_store = store.if_null(|_| {
                 let mut then_body_prog = Prog::new();
                 let mut else_body_prog = Prog::new();
-                let tbp = then_body.eval_nul(&mut then_body_prog);
-                let ebp = else_body.eval_nul(&mut else_body_prog);
+                then_body.eval_nul(&mut then_body_prog);
+                else_body.eval_nul(&mut else_body_prog);
 
                 then_body_prog.set_dbg(spos.clone());
                 then_body_prog.push_op(Op::Jmp(else_body_prog.op_count() as i32));
@@ -1464,7 +1464,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             if needs_store {
                 store.if_must_store(|store_pos| {
                     let mut then_body_prog = Prog::new();
-                    let tbp = then_body.eval_to(&mut then_body_prog, store_pos);
+                    then_body.eval_to(&mut then_body_prog, store_pos);
                     then_body_prog.set_dbg(spos.clone());
                     then_body_prog.push_op(Op::Jmp(1));
 
@@ -1484,7 +1484,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 4 {
@@ -1495,11 +1495,11 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     let cond =
         vm_compile_direct_block2(
-            &ast.at(2).unwrap_or_else(|| VVal::Nul), ce)?;
+            &ast.at(2).unwrap_or_else(|| VVal::None), ce)?;
 
     let body =
         vm_compile_direct_block2(
-            &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
+            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
 
     return pw_null!(prog, {
         // Create the OPs for the body:
@@ -1533,7 +1533,7 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 5 {
@@ -1543,27 +1543,27 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     iteration expression)")));
     }
 
-    if ast.at(2).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() != Syntax::Var {
+    if ast.at(2).unwrap_or_else(|| VVal::None).at(0).unwrap_or_else(|| VVal::None).get_syn() != Syntax::Var {
         return Err(ast.compile_err(
             format!("iter takes an identifier as first argument")));
     }
 
     let varname =
-        ast.at(2).unwrap_or_else(|| VVal::Nul)
-           .at(1).unwrap_or(VVal::Nul).s_raw();
+        ast.at(2).unwrap_or_else(|| VVal::None)
+           .at(1).unwrap_or(VVal::None).s_raw();
 
     ce.borrow_mut().push_block_env();
     let iter_var = ce.borrow_mut().next_local();
 
     let iterable =
         vm_compile_direct_block2(
-            &ast.at(3).unwrap_or_else(|| VVal::Nul), ce)?;
+            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
 
     ce.borrow_mut().def_local(&varname, iter_var);
 
     let expr =
         vm_compile_direct_block2(
-            &ast.at(4).unwrap_or_else(|| VVal::Nul), ce)?;
+            &ast.at(4).unwrap_or_else(|| VVal::None), ce)?;
 
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
 
@@ -1590,7 +1590,7 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
     match ast {
         VVal::Lst(_) => {
-            let syn  = ast.at(0).unwrap_or_else(|| VVal::Nul);
+            let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
             let spos = syn.get_syn_pos();
             let syn  = syn.get_syn();
 
@@ -1639,7 +1639,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     for (a, _) in ast.iter().skip(1) {
                         if a.is_vec() {
                             if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
-                                a.at(0).unwrap_or_else(|| VVal::Nul)
+                                a.at(0).unwrap_or_else(|| VVal::None)
                             {
                                 let splice_pw = vm_compile2(&a.at(1).unwrap(), ce)?;
                                 pws.push((true, splice_pw));
@@ -1747,14 +1747,14 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let func_prog = Rc::new(func_prog);
 
                     ce_sub.borrow_mut().explicit_arity.0 =
-                        match explicit_arity.at(0).unwrap_or_else(|| VVal::Nul) {
+                        match explicit_arity.at(0).unwrap_or_else(|| VVal::None) {
                             VVal::Int(i) => ArityParam::Limit(i as usize),
                             VVal::Bol(true) => ArityParam::Limit(0),
                             _ => ArityParam::Undefined,
                         };
 
                     ce_sub.borrow_mut().explicit_arity.1 =
-                        match explicit_arity.at(1).unwrap_or_else(|| VVal::Nul) {
+                        match explicit_arity.at(1).unwrap_or_else(|| VVal::None) {
                             VVal::Int(i) => ArityParam::Limit(i as usize),
                             VVal::Bol(true) => ArityParam::Infinite,
                             _ => ArityParam::Undefined,
@@ -1861,7 +1861,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         }
                     } else {
                         let symbol =
-                            if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::Nul).at(0).unwrap_or_else(|| VVal::Nul).get_syn() {
+                            if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::None).at(0).unwrap_or_else(|| VVal::None).get_syn() {
                                 let var = ast.at(1).unwrap().at(1).unwrap();
                                 Some(var.s_raw())
                             } else {
@@ -2212,7 +2212,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 //                        ast.map_skip(|e| compile(e, ce), 1)?;
 //
 //                    Ok(Box::new(move |e: &mut Env| {
-//                        let mut ret = VVal::Nul;
+//                        let mut ret = VVal::None;
 //                        for x in exprs.iter() {
 //                            ret = x(e)?;
 //                            if !ret.b() {

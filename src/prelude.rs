@@ -3943,7 +3943,7 @@ macro_rules! add_func {
 macro_rules! add_multi_op {
     ($g: ident, $op: tt) => {
         add_func!($g, $op, env, argc, {
-            if argc <= 0 { return Ok(VVal::Nul); }
+            if argc <= 0 { return Ok(VVal::None); }
             if let VVal::Flt(f) = env.arg(0) {
                 let mut accum = f;
                 for i in 1..argc { accum = accum $op env.arg(i).f() }
@@ -3960,7 +3960,7 @@ macro_rules! add_multi_op {
 macro_rules! add_bool_bin_op {
     ($g: ident, $op: tt) => {
         add_func!($g, $op, env, argc, {
-            if argc < 2 { return Ok(VVal::Nul); }
+            if argc < 2 { return Ok(VVal::None); }
             let a = env.arg(0);
             if let VVal::Flt(af) = a { Ok(VVal::Bol(af $op env.arg(1).f())) }
             else { Ok(VVal::Bol(a.i() $op env.arg(1).i())) }
@@ -3971,7 +3971,7 @@ macro_rules! add_bool_bin_op {
 macro_rules! add_fi_bin_op {
     ($g: ident, $op: tt, $a: ident, $b: ident, $ef: expr, $ei: expr) => {
         add_func!($g, $op, env, argc, {
-            if argc < 2 { return Ok(VVal::Nul); }
+            if argc < 2 { return Ok(VVal::None); }
             let $a = env.arg(0);
             let $b = env.arg(1);
             if let VVal::Flt(_) = $a { $ef }
@@ -3983,7 +3983,7 @@ macro_rules! add_fi_bin_op {
 macro_rules! add_bin_op_err_ok {
     ($g: ident, $op: tt, $a: ident, $b: ident, $e: expr) => {
         add_func!($g, $op, env, argc, {
-            if argc < 2 { return Ok(VVal::Nul); }
+            if argc < 2 { return Ok(VVal::None); }
             let $a = env.arg(0);
             let $b = env.arg(1);
             $e
@@ -3995,7 +3995,7 @@ macro_rules! add_sbin_op {
     ($g: ident, $op: literal, $a: ident, $b: ident, $e: expr) => {
         func!($g,
                 $op, |env: &mut Env, argc: usize| {
-                if argc < 2 { return Ok(VVal::Nul); }
+                if argc < 2 { return Ok(VVal::None); }
                 let $a = env.arg(0);
                 let $b = env.arg(1);
                 $e
@@ -4091,7 +4091,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
                             None
                         },
                         "?p" => {
-                            if fun_idx + 1 >= argc { return Some(Ok(VVal::Nul)); }
+                            if fun_idx + 1 >= argc { return Some(Ok(VVal::None)); }
                             let fun_idx = fun_idx + 1;
 
                             let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
@@ -4125,7 +4125,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
         arg_idx += 1;
     }
 
-    Ok(VVal::Nul)
+    Ok(VVal::None)
 }
 
 /// Returns a SymbolTable with all WLambda core language symbols.
@@ -4138,7 +4138,7 @@ pub fn core_symbol_table() -> SymbolTable {
     // unary +/-.
     add_func!(st, +, env, argc, {
         Ok(match (argc, env.arg(0)) {
-            (0, _) => VVal::Nul,
+            (0, _) => VVal::None,
             (1, VVal::Flt(f)) => VVal::Flt(f),
             (1, VVal::Int(i)) => VVal::Int(i),
             (1, VVal::FVec(fv)) => VVal::FVec(fv),
@@ -4157,7 +4157,7 @@ pub fn core_symbol_table() -> SymbolTable {
     }, Some(1), None, false);
     add_func!(st, -, env, argc, {
         Ok(match (argc, env.arg(0)) {
-            (0, _) => VVal::Nul,
+            (0, _) => VVal::None,
             (1, VVal::Int(i))   => VVal::Int(-i),
             (1, VVal::Flt(f))   => VVal::Flt(-f),
             (1, VVal::FVec(fv)) => VVal::FVec(-fv),
@@ -4214,7 +4214,7 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "block",
         |env: &mut Env, argc: usize| {
-            let mut label = VVal::Nul;
+            let mut label = VVal::None;
             let fn_arg_idx = if argc <= 1 { 0 } else { label = env.arg(0); 1 };
             match env.arg(fn_arg_idx).call_no_args(env) {
                 Ok(v)   => Ok(v),
@@ -4228,7 +4228,7 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "_?",
         |env: &mut Env, argc: usize| {
-            let mut lbl = VVal::Nul;
+            let mut lbl = VVal::None;
             let err_val = if argc > 1 {
                 lbl = env.arg(0);
                 env.arg(1)
@@ -4297,14 +4297,14 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "return",
         |env: &mut Env, argc: usize| {
-            if argc < 1 { return Err(StackAction::Return(Box::new((VVal::Nul, VVal::Nul)))); }
-            if argc < 2 { return Err(StackAction::Return(Box::new((VVal::Nul, env.arg(0))))); }
+            if argc < 1 { return Err(StackAction::Return(Box::new((VVal::None, VVal::None)))); }
+            if argc < 2 { return Err(StackAction::Return(Box::new((VVal::None, env.arg(0))))); }
             Err(StackAction::Return(Box::new((env.arg(0), env.arg(1)))))
         }, Some(1), Some(2), true);
 
     func!(st, "break",
         |env: &mut Env, argc: usize| {
-            if argc < 1 { return Err(StackAction::Break(Box::new(VVal::Nul))); }
+            if argc < 1 { return Err(StackAction::Break(Box::new(VVal::None))); }
             Err(StackAction::Break(Box::new(env.arg(0))))
         }, Some(0), Some(1), true);
 
@@ -4414,8 +4414,8 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "match",
         |env: &mut Env, argc: usize| {
-            if argc < 1 { return Ok(VVal::Nul); }
-            if argc == 1 { return Ok(VVal::Nul) }
+            if argc < 1 { return Ok(VVal::None); }
+            if argc == 1 { return Ok(VVal::None) }
             match_next(env, &env.arg(0), 1, argc)
         }, Some(1), None, true);
 
@@ -4429,7 +4429,7 @@ pub fn core_symbol_table() -> SymbolTable {
             let val = env.arg(0);
             let f   = env.arg(1);
 
-            let mut ret = VVal::Nul;
+            let mut ret = VVal::None;
             for (v, k) in val.iter() {
                 env.push(v);
                 let n =
@@ -4460,10 +4460,10 @@ pub fn core_symbol_table() -> SymbolTable {
                 let to       = to.f();
                 let step     = step.f();
 
-                let mut ret = VVal::Nul;
+                let mut ret = VVal::None;
                 #[allow(unused_must_use)]
                 while from <= to {
-                    ret = VVal::Nul;
+                    ret = VVal::None;
                     env.push(VVal::Flt(from));
                     match f.call_internal(env, 1) {
                         Ok(v)                      => { ret = v; },
@@ -4480,10 +4480,10 @@ pub fn core_symbol_table() -> SymbolTable {
                 let to       = to.i();
                 let step     = step.i();
 
-                let mut ret = VVal::Nul;
+                let mut ret = VVal::None;
                 #[allow(unused_must_use)]
                 while from <= to {
-                    ret = VVal::Nul;
+                    ret = VVal::None;
                     env.push(VVal::Int(from));
                     match f.call_internal(env, 1) {
                         Ok(v)                      => { ret = v; },
@@ -4533,7 +4533,7 @@ fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackActio
     if argc > 0 {
         Ok(env.arg(argc - 1))
     } else {
-        Ok(VVal::Nul)
+        Ok(VVal::None)
     }
 }
 
@@ -4827,7 +4827,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 if let VVal::Byt(u) = b {
                     VVal::new_str_mv(String::from_utf8_lossy(&u.borrow()).to_string())
                 } else {
-                    VVal::Nul
+                    VVal::None
                 })
         }, Some(1), Some(1), false);
     func!(st, "str:from_utf8",
@@ -4842,7 +4842,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     }
                 }
             } else {
-                Ok(VVal::Nul)
+                Ok(VVal::None)
             }
         }, Some(1), Some(1), false);
 
@@ -4875,7 +4875,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::new_byt(u.borrow().iter().map(|v| v.i() as u8).collect()))
 
             } else {
-                Ok(VVal::Nul)
+                Ok(VVal::None)
             }
         }, Some(1), Some(1), false);
 
@@ -4953,7 +4953,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::new_str_mv(out))
 
             } else {
-                Ok(VVal::Nul)
+                Ok(VVal::None)
             }
         }, Some(1), Some(3), false);
 
@@ -5017,7 +5017,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
             Ok(VValFun::new_fun(
                 move |env: &mut Env, argc: usize| {
-                    env.push(o.at(*i.borrow()).unwrap_or(VVal::Nul));
+                    env.push(o.at(*i.borrow()).unwrap_or(VVal::None));
                     let r = f.call_internal(env, 1 + argc);
                     *i.borrow_mut() += 1;
                     env.popn(1);
@@ -5072,7 +5072,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "io:lines",
         |env: &mut Env, _argc: usize| {
             let f = env.arg(0);
-            let mut ret = VVal::Nul;
+            let mut ret = VVal::None;
             loop {
                 let mut line = String::new();
                 {
@@ -5328,7 +5328,7 @@ pub fn std_symbol_table() -> SymbolTable {
             if let VVal::Fun(f) = env.arg(0) {
                 return Ok(f.dump_upvals());
             }
-            Ok(VVal::Nul)
+            Ok(VVal::None)
         }, Some(1), Some(1), false);
 
     func!(st, "wlambda:version",
@@ -5414,10 +5414,10 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "ref_id",
         |env: &mut Env, _argc: usize| {
-            if let Some(id) = env.arg_ref(0).unwrap_or(&VVal::Nul).ref_id() {
+            if let Some(id) = env.arg_ref(0).unwrap_or(&VVal::None).ref_id() {
                 Ok(VVal::Int(id))
             } else {
-                Ok(VVal::Nul)
+                Ok(VVal::None)
             }
         }, Some(1), Some(1), true);
 
@@ -5513,21 +5513,21 @@ pub fn std_symbol_table() -> SymbolTable {
             let rx = rx.unwrap();
 
             let mut finished = false;
-            let mut ret = Ok(VVal::Nul);
+            let mut ret = Ok(VVal::None);
             let ret_str = text.with_s_ref(|text: &str| {
                 VVal::new_str_mv(String::from(
                     rx.replace_all(&text, |capts: &regex::Captures| {
                         let captures = VVal::vec();
                         for cap in capts.iter() {
                             match cap {
-                                None    => { captures.push(VVal::Nul); },
+                                None    => { captures.push(VVal::None); },
                                 Some(c) => {
                                     captures.push(VVal::new_str(c.as_str()));
                                 }
                             }
                         }
 
-                        let repl = captures.at(0).unwrap_or(VVal::Nul).s_raw();
+                        let repl = captures.at(0).unwrap_or(VVal::None).s_raw();
                         if finished { return repl; }
 
                         if f.is_fun() {
@@ -5571,7 +5571,7 @@ pub fn std_symbol_table() -> SymbolTable {
                         let captures = VVal::vec();
                         for cap in c.iter() {
                             match cap {
-                                None    => { captures.push(VVal::Nul); },
+                                None    => { captures.push(VVal::None); },
                                 Some(c) => {
                                     captures.push(VVal::new_str(c.as_str()));
                                 }
@@ -5583,7 +5583,7 @@ pub fn std_symbol_table() -> SymbolTable {
                         rv
                     },
                     None => {
-                        Ok(VVal::Nul)
+                        Ok(VVal::None)
                     }
                 }
             })
@@ -5604,13 +5604,13 @@ pub fn std_symbol_table() -> SymbolTable {
             }
             let rx = rx.unwrap();
 
-            let mut ret = VVal::Nul;
+            let mut ret = VVal::None;
             text.with_s_ref(|text: &str| {
                 for capts in rx.captures_iter(text) {
                     let captures = VVal::vec();
                     for cap in capts.iter() {
                         match cap {
-                            None    => { captures.push(VVal::Nul); },
+                            None    => { captures.push(VVal::None); },
                             Some(c) => {
                                 captures.push(VVal::new_str(c.as_str()));
                             }
@@ -5828,7 +5828,7 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 let fun = env.arg(0);
                 let mut list = env.arg(1);
-                let mut ret = Ok(VVal::Nul);
+                let mut ret = Ok(VVal::None);
                 list.sort(|a: &VVal, b: &VVal| {
                     env.push(b.clone());
                     env.push(a.clone());
@@ -5854,7 +5854,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let fun = env.arg(0);
             let mut list = env.arg(1);
             list.fisher_yates_shuffle(|| {
-                fun.call_no_args(env).unwrap_or(VVal::Nul).i()
+                fun.call_no_args(env).unwrap_or(VVal::None).i()
             });
             Ok(list)
         }, Some(2), Some(2), false);

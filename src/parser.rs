@@ -765,7 +765,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             } else {
                 ps.consume_wsc();
             }
-            Ok(VVal::Nul)
+            Ok(VVal::None)
         },
         'i' => {
             ps.consume();
@@ -835,7 +835,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                     let b = parse_expr(ps)?;
                     VVal::Pair(Box::new((a, b)))
                 } else {
-                    VVal::Pair(Box::new((a, VVal::Nul)))
+                    VVal::Pair(Box::new((a, VVal::None)))
                 };
 
             if ps.consume_if_eq_wsc(')') {
@@ -1066,7 +1066,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 let syn = ps.syn_raw(Syntax::Func);
                 let block = parse_block(ps, true)?;
                 block.set_at(0, syn);
-                block.insert_at(1, VVal::Nul);
+                block.insert_at(1, VVal::None);
                 Ok(block)
             },
             '\\' => {
@@ -1087,10 +1087,10 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
 
                     let arity =
                         if ps.lookahead("|") { parse_arity(ps)? }
-                        else { VVal::Nul };
+                        else { VVal::None };
 
                     let next_stmt = parse_stmt(ps)?;
-                    block.push(VVal::Nul);
+                    block.push(VVal::None);
                     block.push(arity);
                     block.push(next_stmt);
                     Ok(block)
@@ -1260,7 +1260,7 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
     let is_apply = ps.consume_if_eq_wsc('[');
 
     if is_apply {
-        if let VVal::Syn(mut sp) = call.at(0).unwrap_or(VVal::Nul) {
+        if let VVal::Syn(mut sp) = call.at(0).unwrap_or(VVal::None) {
             sp.syn = Syntax::Apply;
             call.set_at(0, VVal::Syn(sp));
         }
@@ -1350,7 +1350,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
         return Ok(value);
     }
 
-    let mut res_call = VVal::Nul;
+    let mut res_call = VVal::None;
 
     while let Some(c) = ps.peek() {
         let op = ps.peek_op();
@@ -1368,7 +1368,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
             },
             '~' => {
                 ps.consume_wsc();
-                if let VVal::Nul = res_call { res_call = make_to_call(ps, value); }
+                if let VVal::None = res_call { res_call = make_to_call(ps, value); }
                 else { res_call.push(value); }
                 res_call.push(parse_expr(ps)?);
                 // We don't set value here, because it will not be
@@ -1390,7 +1390,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
             _ => {
                 if binop_mode { break; }
 
-                if let VVal::Nul = res_call { res_call = make_to_call(ps, value); }
+                if let VVal::None = res_call { res_call = make_to_call(ps, value); }
                 else { res_call.push(value); }
 
                 //d// println!("INDENT: {:?} VS {:?} '{}'", ps.indent_pos(), call_indent, ps.rest());
@@ -1417,7 +1417,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
         }
     }
 
-    if let VVal::Nul = res_call {
+    if let VVal::None = res_call {
         res_call = value;
     } else {
         res_call.push(value);
@@ -1555,7 +1555,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                         match &id[..] {
                             "wlambda" => {
                                 let imp = ps.syn(Syntax::Import);
-                                imp.push(VVal::Nul);
+                                imp.push(VVal::None);
                                 imp.push(VVal::new_sym("wlambda"));
                                 Ok(imp)
                             },
@@ -1566,7 +1566,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                 let name =
                                     if ps.peek().unwrap_or(';') == ';' {
                                         let p = prefix;
-                                        prefix = VVal::Nul;
+                                        prefix = VVal::None;
                                         p
                                     } else {
                                         ps.consume_if_eq_wsc('=');
@@ -1681,7 +1681,7 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
     if is_func && ps.lookahead("|") {
         block.push(parse_arity(ps)?);
     } else if is_func {
-        block.push(VVal::Nul);
+        block.push(VVal::None);
     }
 
     while let Some(c) = ps.peek() {

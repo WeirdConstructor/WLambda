@@ -45,11 +45,9 @@ assert_eq!(res.s(), "$[10,50]");
 use crate::parser::{self};
 use crate::prelude::*;
 use crate::vval::VVal;
-use crate::vval::SynPos;
 use crate::vval::Syntax;
 use crate::vval::Env;
 use crate::vval::VValFun;
-use crate::vval::EvalNode;
 use crate::vval::StackAction;
 use crate::vval::CompileError;
 use crate::vval::VarPos;
@@ -184,7 +182,7 @@ impl SymbolTable {
     /// use wlambda::VVal;
     /// let mut st = wlambda::compiler::SymbolTable::new();
     /// st.fun("nothing",
-    ///        |e: &mut wlambda::vval::Env, _argc: usize| Ok(VVal::Nul),
+    ///        |e: &mut wlambda::vval::Env, _argc: usize| Ok(VVal::None),
     ///        None, None, false);
     ///```
     pub fn fun<T>(
@@ -292,7 +290,7 @@ impl GlobalEnv {
     /// g.borrow_mut().add_func(
     ///     "push",
     ///     |env: &mut Env, argc: usize| {
-    ///         if argc < 2 { return Ok(VVal::Nul); }
+    ///         if argc < 2 { return Ok(VVal::None); }
     ///         let v = env.arg(0);
     ///         v.push(env.arg(1).clone());
     ///         Ok(v.clone())
@@ -666,7 +664,7 @@ impl EvalContext {
         let locals_size = self.local_compile.borrow().get_local_space();
 
         let env = self.local.borrow_mut();
-        let mut res = Ok(VVal::Nul);
+        let mut res = Ok(VVal::None);
 
         std::cell::RefMut::map(env, |l_env| {
             res = match prog {
@@ -1002,7 +1000,7 @@ impl CompileEnv {
 
     pub fn def(&mut self, s: &str, is_global: bool) -> VarPos {
         if is_global {
-            let v = VVal::Nul;
+            let v = VVal::None;
             let r = v.to_ref();
             self.global.borrow_mut().env.insert(String::from(s), r.clone());
             VarPos::Global(r)
@@ -1106,7 +1104,7 @@ pub fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
 pub fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, vars: &VVal) {
     // If we have an destructuring assignment directly from "@", then we conclude
     // the implicit max arity to be minimum of number of vars:
-    if ast.at(2).unwrap_or(VVal::Nul).at(0).unwrap_or(VVal::Nul).get_syn() == Syntax::Var {
+    if ast.at(2).unwrap_or(VVal::None).at(0).unwrap_or(VVal::None).get_syn() == Syntax::Var {
         if let VVal::Lst(l) = vars {
             let llen = l.borrow().len();
 
@@ -1161,7 +1159,7 @@ pub fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal
         match u {
             VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
             VarPos::Local(i)   => upvalues.push(e.get_local_up_promotion(*i)),
-            VarPos::NoPos      => upvalues.push(VVal::Nul.to_ref()),
+            VarPos::NoPos      => upvalues.push(VVal::None.to_ref()),
             VarPos::Global(_)  => (),
             VarPos::Const(_)   => (),
         }

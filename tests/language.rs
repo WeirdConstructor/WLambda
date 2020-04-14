@@ -1,8 +1,7 @@
 use wlambda::*;
-use wlambda::compiler::{CompileEnv, GlobalEnvRef, ResPos, ResValue};
+use wlambda::compiler::{CompileEnv, ResPos, ResValue};
 use wlambda::vm::*;
 use wlambda::ops::Prog;
-use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -20,7 +19,7 @@ pub fn ve(s: &str) -> String {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
             match vm_compile2(&ast, &mut ce) {
-                Ok(mut prog) => {
+                Ok(prog) => {
                     let local_space = ce.borrow().get_local_space();
 
                     let mut p = Prog::new();
@@ -905,7 +904,7 @@ fn check_callbacks() {
     global.borrow_mut().add_func("reg", |env: &mut Env, _argc: usize| {
         let fun = env.arg(0);
         env.with_user_do(|v: &mut Vec<VVal>| v.push(fun.clone()));
-        Ok(VVal::Nul)
+        Ok(VVal::None)
     }, Some(1), Some(1));
 
     let reg : Rc<RefCell<Vec<VVal>>> = Rc::new(RefCell::new(Vec::new()));
@@ -929,7 +928,7 @@ fn check_returned_functions() {
 fn check_global_var_api() {
     let mut ctx = EvalContext::new_default();
     ctx.set_global_var("XXX", &VVal::Int(210));
-    ctx.set_global_var("YYY", &VVal::Nul);
+    ctx.set_global_var("YYY", &VVal::None);
     let n = ctx.eval("{ .YYY = _ + 11; XXX + _ } 20").unwrap();
     assert_eq!(ctx.get_global_var("YYY").unwrap().i(), 31);
     assert_eq!(n.i(), 230);
@@ -1383,9 +1382,9 @@ fn check_userdata() {
                     ud.x.borrow_mut().1 *= 2;
                     VVal::Int(ud.x.borrow().0 + ud.x.borrow().1)
                 } else {
-                    VVal::Nul
+                    VVal::None
                 }
-            } else { VVal::Nul })
+            } else { VVal::None })
         }, Some(1), Some(1));
 
     let mut ctx = crate::compiler::EvalContext::new(global_env);

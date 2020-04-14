@@ -1,6 +1,8 @@
 0.4.5 (unreleased)
 ==================
 
+* Incompatible Change: VVal::Nul was renamed to VVal::None because it
+was called `$none` in WLambda anyways.
 * Incompatible Change: Renamed `padl` and `padr` to `pad_start` and `pad_end`
 to make it more consistent naming to `trim_start` and `trim_end`.
 * Incompatible Change: Renamed `neg` to `neg_i64`, `uneg` to `neg_u32`.

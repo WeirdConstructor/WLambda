@@ -346,9 +346,9 @@ fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, rv: &VVal) {
 
 impl DestructureInfo {
     pub fn destructure(&self, env: &mut Env, val: VVal) {
-        let nul = VVal::Nul;
         match val {
             VVal::Lst(l) => {
+                let nul = VVal::None;
                 for (i, pos) in self.poses.iter().enumerate() {
                     if self.is_ref {
                         set_ref_at_varpos(env, pos, l.borrow().get(i).unwrap_or(&nul));
@@ -360,7 +360,7 @@ impl DestructureInfo {
             VVal::Map(m) => {
                 for (i, pos) in self.poses.iter().enumerate() {
                     let vname = self.vars.at(i).unwrap().s_raw();
-                    let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::Nul);
+                    let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::None);
 
                     if self.is_ref {
                         set_ref_at_varpos(env, pos, &val);

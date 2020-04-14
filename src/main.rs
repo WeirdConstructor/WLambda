@@ -40,7 +40,7 @@ fn main() {
         "dump_stack",
         move |env: &mut Env, _argc: usize| {
             env.dump_stack();
-            Ok(VVal::Nul)
+            Ok(VVal::None)
         }, Some(0), Some(0));
 
     let mut ctx = EvalContext::new(global);

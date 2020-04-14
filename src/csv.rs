@@ -23,12 +23,12 @@ struct CSVParser {
 impl CSVParser {
     pub fn new(delim: char, row_sep: &str) -> Self {
         Self {
-            data: vec![],
-            row_sep: row_sep.to_string(),
+            data:      vec![],
+            row_sep:   row_sep.to_string(),
+            pos:       0,
+            cur_table: VVal::None,
+            cur_row:   VVal::None,
             delim,
-            pos: 0,
-            cur_table: VVal::Nul,
-            cur_row: VVal::Nul,
         }
     }
 
@@ -186,7 +186,7 @@ impl CSVParser {
             }
         }
 
-        Ok(std::mem::replace(&mut self.cur_table, VVal::Nul))
+        Ok(std::mem::replace(&mut self.cur_table, VVal::None))
     }
 }
 

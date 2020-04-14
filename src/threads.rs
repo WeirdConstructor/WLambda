@@ -48,7 +48,7 @@ use fnv::FnvHashMap;
 /// And get back the VVal like this:
 #[derive(Clone, Debug)]
 pub enum AVal {
-    Nul,
+    None,
     Err(Box<AVal>, String),
     Bol(bool),
     Sym(String),
@@ -67,7 +67,7 @@ impl AVal {
     /// This is used by `std:sync:atom:write_at`.
     #[allow(dead_code)]
     pub fn set_at_path(&mut self, path_idx: usize, pth: &VVal, av: AVal) {
-        match pth.at(path_idx).unwrap_or(VVal::Nul) {
+        match pth.at(path_idx).unwrap_or(VVal::None) {
             VVal::Int(i) => {
                 if let AVal::Lst(ref mut v) = self {
                     if (i as usize) < v.len() {
@@ -94,7 +94,7 @@ impl AVal {
     /// ```
     pub fn to_vval(&self) -> VVal {
         match self {
-            AVal::Nul    => VVal::Nul,
+            AVal::None => VVal::None,
             AVal::Err(av, pos) => {
                 let v = VVal::vec();
                 v.push(av.to_vval());
@@ -141,7 +141,7 @@ impl AVal {
     /// ```
     pub fn from_vval(v: &VVal) -> Self {
         match v {
-            VVal::Nul => AVal::Nul,
+            VVal::None => AVal::None,
             VVal::Err(e) => {
                 let eb = e.borrow();
                 AVal::Err(
@@ -175,10 +175,10 @@ impl AVal {
                     AVal::Atom(ud.clone())
 
                 } else {
-                    AVal::Nul
+                    AVal::None
                 }
             },
-            _ => AVal::Nul,
+            _ => AVal::None,
         }
     }
 }
@@ -242,7 +242,7 @@ impl AValReceiver {
             Ok(guard) => {
                 match guard.try_recv() {
                     Ok(av) => av.to_vval(),
-                    Err(TryRecvError::Empty) => VVal::Nul,
+                    Err(TryRecvError::Empty) => VVal::None,
                     Err(e) => {
                         VVal::err_msg(&format!("try_recv error: {}", e))
                     }
@@ -270,9 +270,9 @@ impl AValReceiver {
 //}
 
 impl AtomicAVal {
-    /// Creates a new empty instance, containing AVal::Nul.
+    /// Creates a new empty instance, containing AVal::None.
     pub fn new() -> Self {
-        Self(Arc::new(RwLock::new(AVal::Nul)))
+        Self(Arc::new(RwLock::new(AVal::None)))
     }
 
     /// Locks and stores the VVal.
@@ -317,7 +317,7 @@ impl AtomicAVal {
 
     /// Locks and reads the AVal at the given key path.
     pub fn read_at(&self, _keypath: &VVal) -> VVal {
-        VVal::Nul
+        VVal::None
     }
 }
 
@@ -369,7 +369,7 @@ impl VValUserData for AtomicAVal {
 ///                     }
 ///                 }
 ///             });
-///         VVal::Nul
+///         VVal::None
 ///     }
 /// }
 /// ```

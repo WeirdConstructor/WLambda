@@ -277,15 +277,15 @@ impl Env {
     pub fn new(global: GlobalEnvRef) -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
-            current_self:       VVal::Nul,
+            current_self:       VVal::None,
             bp:                 0,
             sp:                 0,
             argc:               0,
             user:               Rc::new(RefCell::new(VVal::vec())),
             exports:            FnvHashMap::with_capacity_and_hasher(5, Default::default()),
             stdio:              Stdio::new_rust_std(),
-            accum_fun:          VVal::Nul,
-            accum_val:          VVal::Nul,
+            accum_fun:          VVal::None,
+            accum_val:          VVal::None,
             call_stack:         vec![],
             unwind_stack:       vec![],
             unwind_sp:          0,
@@ -294,7 +294,7 @@ impl Env {
             vm_nest:            0,
             global
         };
-        e.args.resize(STACK_SIZE, VVal::Nul);
+        e.args.resize(STACK_SIZE, VVal::None);
         e.unwind_stack.resize(STACK_SIZE, UnwindAction::Null);
         e
     }
@@ -302,14 +302,14 @@ impl Env {
     pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> Env {
         let mut e = Env {
             args:               Vec::with_capacity(STACK_SIZE),
-            current_self:       VVal::Nul,
+            current_self:       VVal::None,
             bp:                 0,
             sp:                 0,
             argc:               0,
             exports:            FnvHashMap::with_capacity_and_hasher(2, Default::default()),
             stdio:              Stdio::new_rust_std(),
-            accum_fun:          VVal::Nul,
-            accum_val:          VVal::Nul,
+            accum_fun:          VVal::None,
+            accum_val:          VVal::None,
             call_stack:         vec![],
             unwind_stack:       std::vec::Vec::with_capacity(1000),
             unwind_sp:          0,
@@ -319,7 +319,7 @@ impl Env {
             user,
             global,
         };
-        e.args.resize(STACK_SIZE, VVal::Nul);
+        e.args.resize(STACK_SIZE, VVal::None);
         e.unwind_stack.resize(STACK_SIZE, UnwindAction::Null);
         e
     }
@@ -381,7 +381,7 @@ impl Env {
     /// global.borrow_mut().add_func("reg", |env: &mut Env, _argc: usize| {
     ///     let fun = env.arg(0);
     ///     env.with_user_do(|v: &mut Vec<VVal>| v.push(fun.clone()));
-    ///     Ok(VVal::Nul)
+    ///     Ok(VVal::None)
     /// }, Some(1), Some(1));
     ///
     /// let reg : Rc<RefCell<Vec<VVal>>> =
@@ -416,7 +416,7 @@ impl Env {
     #[inline]
     pub fn reset_bp(&mut self, env_size: usize, oldbp: usize) {
         for i in self.bp..self.sp {
-            self.args[i] = VVal::Nul;
+            self.args[i] = VVal::None;
         }
 //        self.sp -= env_size;
         self.popn(env_size);
@@ -528,13 +528,13 @@ impl Env {
             panic!(format!("Stack pointer underflow {} {}", self.sp, 1));
         }
         self.sp -= 1;
-        std::mem::replace(&mut self.args[self.sp], VVal::Nul)
+        std::mem::replace(&mut self.args[self.sp], VVal::None)
     }
 
     #[inline]
     pub fn null_locals(&mut self, from: usize, to: usize) {
         for i in from..to {
-            self.args[self.bp + i] = VVal::Nul;
+            self.args[self.bp + i] = VVal::None;
         }
     }
 
@@ -547,7 +547,7 @@ impl Env {
             //d// println!("SP={}, N={}", self.sp, n);
             for i in (self.sp - n)..self.sp {
                 //d// println!("POP[{}] {} [of {}]", i, self.args[i].s(), n);
-                self.args[i] = VVal::Nul;
+                self.args[i] = VVal::None;
             }
         }
         self.sp -= n;
@@ -596,7 +596,7 @@ impl Env {
 //            VVal::WWRef(l) => { 
 //                match l.upgrade() {
 //                    Some(v) => v.borrow().clone(),
-//                    None => VVal::Nul,
+//                    None => VVal::None,
 //                }
 //            },
 //            v => v,
@@ -621,7 +621,7 @@ impl Env {
     #[inline]
     pub fn arg(&self, i: usize) -> VVal {
         //d// println!("GET ARGC [{}] = {}", i, self.argc);
-        if i >= self.argc { return VVal::Nul; }
+        if i >= self.argc { return VVal::None; }
         let v = &self.args[(self.bp - self.argc) + i];
         //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
         v.clone()
@@ -769,7 +769,6 @@ impl Env {
     #[inline]
     pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize) {
         let uw_depth = self.unwind_depth() + 1;
-        let loop_sp  = self.sp;
         let uwa =
             UnwindAction::RestoreLoopInfo(
                 std::mem::replace(&mut self.loop_info, LoopInfo {
@@ -1094,7 +1093,7 @@ impl VValFun {
             max_args,
             err_arg_ok,
             syn_pos,
-            label: VVal::Nul,
+            label: VVal::None,
         }))
     }
 
@@ -1120,7 +1119,7 @@ impl VValFun {
     /// Returns a dummy function that does nothing.
     pub fn new_dummy() -> Rc<VValFun> {
         Rc::new(VValFun {
-            fun:         FunType::ClosureNode(Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::Nul) }))),
+            fun:         FunType::ClosureNode(Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::None) }))),
             upvalue_pos: Rc::new(vec![]),
             upvalues:    Vec::new(),
             local_size:  0,
@@ -1128,7 +1127,7 @@ impl VValFun {
             max_args:    None,
             err_arg_ok:  false,
             syn_pos:     None,
-            label:       VVal::Nul,
+            label:       VVal::None,
         })
     }
 
@@ -1192,9 +1191,9 @@ impl VValFun {
 ///                 ud.x.borrow_mut().1 *= 2;
 ///                 VVal::Int(ud.x.borrow().0 + ud.x.borrow().1)
 ///             } else {
-///                 VVal::Nul
+///                 VVal::None
 ///             }
-///         } else { VVal::Nul })
+///         } else { VVal::None })
 ///     }, Some(1), Some(1));
 ///
 /// let mut ctx = wlambda::compiler::EvalContext::new(global_env);
@@ -1272,7 +1271,7 @@ pub trait VValUserData {
     /// associates with the given key.
     fn get_key(&self, _key: &str) -> Option<VVal> { None }
     /// This method is called when the user data is called.
-    fn call(&self, _args: &[VVal]) -> Result<VVal, StackAction> { Ok(VVal::Nul) }
+    fn call(&self, _args: &[VVal]) -> Result<VVal, StackAction> { Ok(VVal::None) }
     /// This should be implemented simply by returning
     /// a mutable reference to the concrete type self.
     /// It allows you to access your data structure from inside
@@ -1325,7 +1324,7 @@ impl Drop for DropVVal {
 #[allow(dead_code)]
 pub enum VVal {
     /// The none value, the default value of all non initialized data.
-    Nul,
+    None,
     /// The err value is a special sentinel value for representing any kind of
     /// application error condition. It's created using the special $e <expr> or $error <expr>
     /// syntax.
@@ -1367,7 +1366,7 @@ pub enum VVal {
     /// A (still strong) reference to a VVal, which becomes a weak reference if
     /// captured by a closure.
     CRef(Rc<RefCell<VVal>>),
-    /// A (weak) reference to a VVal. Might turn VVal::Nul anytime.
+    /// A (weak) reference to a VVal. Might turn VVal::None anytime.
     WWRef(Weak<RefCell<VVal>>),
     /// A vval that can box some user data which can later be accessed
     /// from inside user supplied Rust functions via std::any::Any.
@@ -1464,7 +1463,7 @@ impl CycleCheck {
             },
               VVal::Str(_)
             | VVal::Byt(_)
-            | VVal::Nul
+            | VVal::None
             | VVal::Bol(_)
             | VVal::Sym(_)
             | VVal::Syn(_)
@@ -1536,7 +1535,7 @@ macro_rules! swizzle_char2value {
             'y' => $y,
             'z' => $z,
             'w' => $w,
-            _ => return VVal::Nul,
+            _ => return VVal::None,
         }
     )
 }
@@ -1558,7 +1557,7 @@ fn swizzle_i(s: &str, x: i64, y: i64, z: i64, w: i64) -> VVal {
                 swizzle_char2value!(s, 1, x, y, z, w),
                 swizzle_char2value!(s, 2, x, y, z, w),
                 swizzle_char2value!(s, 3, x, y, z, w))),
-        _ => VVal::Nul,
+        _ => VVal::None,
     }
 }
 
@@ -1579,7 +1578,7 @@ fn swizzle_f(s: &str, x: f64, y: f64, z: f64, w: f64) -> VVal {
                 swizzle_char2value!(s, 1, x, y, z, w),
                 swizzle_char2value!(s, 2, x, y, z, w),
                 swizzle_char2value!(s, 3, x, y, z, w))),
-        _ => VVal::Nul,
+        _ => VVal::None,
     }
 }
 
@@ -1676,7 +1675,7 @@ impl VVal {
             VVal::WWRef(v)   =>
                 if let Some(r) = v.upgrade() {
                     r.borrow().shallow_clone()
-                } else { VVal::Nul },
+                } else { VVal::None },
             _ => self.clone()
         }
     }
@@ -1789,7 +1788,7 @@ impl VVal {
                 if let Some(r) = v.upgrade() {
                     r.borrow().iter()
                 } else { std::iter::from_fn(Box::new(|| { None })) },
-            VVal::Nul => {
+            VVal::None => {
                 std::iter::from_fn(Box::new(move || { None }))
             },
             _ => {
@@ -1842,7 +1841,7 @@ impl VVal {
     pub fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
 //        env.dump_stack();
         match self {
-            VVal::Nul => {
+            VVal::None => {
                 Err(StackAction::panic_msg("Calling $none is invalid".to_string()))
             },
             VVal::Fun(fu) => {
@@ -1909,10 +1908,10 @@ impl VVal {
                     match first {
                         // Calling a boolean on a list converts the boolean into an integer
                         // and fetches the value at that index.
-                        VVal::Lst(_) => Ok(first.at(*b as usize).unwrap_or(VVal::Nul)),
+                        VVal::Lst(_) => Ok(first.at(*b as usize).unwrap_or(VVal::None)),
                         // Calling a boolean on a pair converts the boolean into an integer
                         // and fetches the value at that index.
-                        VVal::Pair(_) => Ok(first.at(*b as usize).unwrap_or(VVal::Nul)),
+                        VVal::Pair(_) => Ok(first.at(*b as usize).unwrap_or(VVal::None)),
                         // Calling a boolean with anything else becomes an implicit `if`,
                         // calling the first parameter if the boolean is true
                         // and the second if the boolean is false.
@@ -1923,7 +1922,7 @@ impl VVal {
                                 if !v.is_none() {
                                     v.call_internal(e, 0)
                                 } else {
-                                    Ok(VVal::Nul)
+                                    Ok(VVal::None)
                                 }
                             } else { Ok(self.clone()) }
                         }
@@ -1938,7 +1937,7 @@ impl VVal {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     if argc > 0 {
                         let v = e.arg(0);
-                        Ok(v.get_key(&*sym.borrow()).unwrap_or(VVal::Nul))
+                        Ok(v.get_key(&*sym.borrow()).unwrap_or(VVal::None))
                     } else { Ok(self.clone()) }
                 })
             },
@@ -1946,7 +1945,7 @@ impl VVal {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let f = e.arg(0);
 
-                    let mut ret = VVal::Nul;
+                    let mut ret = VVal::None;
                     for (k, v) in m.borrow().iter() {
                         e.push(v.clone());
                         e.push(VVal::new_str(k));
@@ -1970,7 +1969,7 @@ impl VVal {
                     // in the map is passed in as the parameter.
                     let f = e.arg(0);
 
-                    let mut ret = VVal::Nul;
+                    let mut ret = VVal::None;
                     for i in l.borrow().iter() {
                         e.push(i.clone());
                         let el = f.call_internal(e, 1);
@@ -2024,14 +2023,14 @@ impl VVal {
                                 } else {
                                     let r = vval_bytes.borrow();
                                     if arg_int as usize >= r.len() {
-                                        Ok(VVal::Nul)
+                                        Ok(VVal::None)
                                     } else {
                                         Ok(VVal::new_byt(vec![r[arg_int as usize]]))
                                     }
                                 }
                             },
                             VVal::Fun(_) => {
-                                let mut ret = VVal::Nul;
+                                let mut ret = VVal::None;
                                 for c in vval_bytes.borrow().iter() {
                                     e.push(VVal::new_byt(vec![*c]));
                                     let el = first_arg.call_internal(e, 1);
@@ -2058,8 +2057,8 @@ impl VVal {
                                               .take(cnt).copied().collect();
                                 Ok(VVal::new_byt(r))
                             },
-                            VVal::Map(_) => Ok(self.with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::Nul))),
-                            _ => Ok(VVal::Nul)
+                            VVal::Map(_) => Ok(self.with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::None))),
+                            _ => Ok(VVal::None)
                         }
                     } else { Ok(self.clone()) }
                 })
@@ -2087,7 +2086,7 @@ impl VVal {
                                 }
                             },
                             VVal::Fun(_) => {
-                                let mut ret = VVal::Nul;
+                                let mut ret = VVal::None;
                                 for c in vval_str.borrow().chars() {
                                     e.push(VVal::new_str_mv(c.to_string()));
                                     let el = first_arg.call_internal(e, 1);
@@ -2118,8 +2117,8 @@ impl VVal {
                                     Ok(VVal::new_str_mv(vval_str.borrow().clone() + &s2.borrow()))
                                 }
                             },
-                            VVal::Map(_) => Ok(first_arg.get_key(&vval_str.borrow()).unwrap_or(VVal::Nul)),
-                            _ => Ok(VVal::Nul)
+                            VVal::Map(_) => Ok(first_arg.get_key(&vval_str.borrow()).unwrap_or(VVal::None)),
+                            _ => Ok(VVal::None)
                         }
                     } else { Ok(self.clone()) }
                 })
@@ -2127,13 +2126,13 @@ impl VVal {
             VVal::Int(i) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let v = e.arg(0);
-                    if argc > 0 { Ok(v.at(*i as usize).unwrap_or(VVal::Nul)) }
+                    if argc > 0 { Ok(v.at(*i as usize).unwrap_or(VVal::None)) }
                     else { Ok(self.clone()) }
                 })
             },
             VVal::Pair(_) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    Ok(self.at(e.arg(0).i() as usize).unwrap_or(VVal::Nul))
+                    Ok(self.at(e.arg(0).i() as usize).unwrap_or(VVal::None))
                 })
             },
             VVal::Usr(ud) => {
@@ -2149,7 +2148,7 @@ impl VVal {
             VVal::WWRef(v)   =>
                 if let Some(r) = v.upgrade() {
                     r.borrow().call_internal(env, argc)
-                } else { Ok(VVal::Nul) },
+                } else { Ok(VVal::None) },
             _ => { Ok(self.clone()) },
         }
     }
@@ -2162,7 +2161,7 @@ impl VVal {
                 if let Some(r) = v.upgrade() {
                     VVal::Ref(r)
                 } else {
-                    VVal::Ref(Rc::new(RefCell::new(VVal::Nul)))
+                    VVal::Ref(Rc::new(RefCell::new(VVal::None)))
                 },
             _ => VVal::Ref(Rc::new(RefCell::new(self.clone()))),
         }
@@ -2180,10 +2179,10 @@ impl VVal {
                 if let Some(r) = l.upgrade() {
                     r.replace(v)
                 } else {
-                    VVal::Nul
+                    VVal::None
                 }
             },
-            _ => VVal::Nul
+            _ => VVal::None
         }
     }
 
@@ -2195,7 +2194,7 @@ impl VVal {
             VVal::WWRef(l)   => {
                 match l.upgrade() {
                     Some(v) => v.borrow().clone(),
-                    None => VVal::Nul,
+                    None => VVal::None,
                 }
             },
             _ => self.clone()
@@ -2209,7 +2208,7 @@ impl VVal {
                 if let Some(r) = f.upgrade() {
                     VVal::Ref(r)
                 } else {
-                    VVal::Nul
+                    VVal::None
                 }
             },
             _ => self,
@@ -2258,7 +2257,7 @@ impl VVal {
 
     pub fn eqv(&self, v: &VVal) -> bool {
         match self {
-            VVal::Nul     => { if let VVal::Nul = v { true } else { false } },
+            VVal::None    => { if let VVal::None = v { true } else { false } },
             VVal::Bol(ia) => { if let VVal::Bol(ib) = v { ia == ib } else { false } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { ia == ib } else { false } },
             VVal::Flt(ia) => { if let VVal::Flt(ib) = v { (ia - ib).abs() < std::f64::EPSILON } else { false } },
@@ -2414,7 +2413,7 @@ impl VVal {
     pub fn set(&self, index: usize, val: VVal) {
         if let VVal::Lst(b) = &self {
             if index >= b.borrow().len() {
-                b.borrow_mut().resize(index + 1, VVal::Nul);
+                b.borrow_mut().resize(index + 1, VVal::None);
             }
             b.borrow_mut()[index] = val;
         }
@@ -2457,18 +2456,18 @@ impl VVal {
                 Some(match index {
                     0 => b.x(),
                     1 => b.y(),
-                    2 => b.z().unwrap_or(VVal::Nul),
-                    3 => b.w().unwrap_or(VVal::Nul),
-                    _ => VVal::Nul
+                    2 => b.z().unwrap_or(VVal::None),
+                    3 => b.w().unwrap_or(VVal::None),
+                    _ => VVal::None
                 })
             },
             VVal::FVec(b) => {
                 Some(match index {
                     0 => b.x(),
                     1 => b.y(),
-                    2 => b.z().unwrap_or(VVal::Nul),
-                    3 => b.w().unwrap_or(VVal::Nul),
-                    _ => VVal::Nul
+                    2 => b.z().unwrap_or(VVal::None),
+                    3 => b.w().unwrap_or(VVal::None),
+                    _ => VVal::None
                 })
             },
             VVal::Lst(b) => {
@@ -2487,15 +2486,15 @@ impl VVal {
             VVal::Ref(_)   => self.deref().proto_data(),
             VVal::CRef(_)  => self.deref().proto_data(),
             VVal::WWRef(_) => self.deref().proto_data(),
-            VVal::Map(m) => m.borrow().get("_data").cloned().unwrap_or(VVal::Nul),
+            VVal::Map(m) => m.borrow().get("_data").cloned().unwrap_or(VVal::None),
             VVal::Lst(l) => {
                 if l.borrow().len() > 1 {
                     l.borrow()[1].clone()
                 } else {
-                    VVal::Nul
+                    VVal::None
                 }
             },
-            _ => VVal::Nul,
+            _ => VVal::None,
         }
     }
 
@@ -2535,8 +2534,8 @@ impl VVal {
                 Some(match key {
                     "0" | "first"  | "x" | "r" | "h" => b.x(),
                     "1" | "second" | "y" | "g" | "s" => b.y(),
-                    "2" | "third"  | "z" | "b" | "v" => b.z().unwrap_or(VVal::Nul),
-                    "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::Nul),
+                    "2" | "third"  | "z" | "b" | "v" => b.z().unwrap_or(VVal::None),
+                    "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::None),
                     _ =>
                         swizzle_i(
                             key,
@@ -2550,8 +2549,8 @@ impl VVal {
                 Some(match key {
                     "0" | "first"  | "x" | "r" | "h" => b.x(),
                     "1" | "second" | "y" | "g" | "s" => b.y(),
-                    "2" | "third"  | "z" | "b" | "v" => b.z().unwrap_or(VVal::Nul),
-                    "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::Nul),
+                    "2" | "third"  | "z" | "b" | "v" => b.z().unwrap_or(VVal::None),
+                    "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::None),
                     _ =>
                         swizzle_f(
                             key,
@@ -2573,7 +2572,7 @@ impl VVal {
                 if idx < l.borrow().len() {
                     Some(l.borrow()[idx].clone())
                 } else {
-                    Some(VVal::Nul)
+                    Some(VVal::None)
                 }
             },
             VVal::Usr(u) => u.get_key(key),
@@ -2599,7 +2598,7 @@ impl VVal {
                 let idx = key.parse::<usize>().unwrap_or(0);
                 let mut v = l.borrow_mut();
                 if v.len() <= idx {
-                    v.resize(idx + 1, VVal::Nul);
+                    v.resize(idx + 1, VVal::None);
                 }
                 v[idx] = val;
             },
@@ -2648,7 +2647,7 @@ impl VVal {
                 match l.try_borrow_mut() {
                     Ok(mut v) => {
                         if v.len() <= idx {
-                            v.resize(idx + 1, VVal::Nul);
+                            v.resize(idx + 1, VVal::None);
                         }
                         v[idx] = val;
                         Ok(())
@@ -2663,9 +2662,9 @@ impl VVal {
 
     pub fn pop(&self) -> VVal {
         if let VVal::Lst(b) = &self {
-            b.borrow_mut().pop().unwrap_or(VVal::Nul)
+            b.borrow_mut().pop().unwrap_or(VVal::None)
         } else {
-            VVal::Nul
+            VVal::None
         }
     }
 
@@ -2732,7 +2731,7 @@ impl VVal {
             VVal::Sym(s)  => s.borrow().chars().count(),
             VVal::Usr(s)  => s.s_raw().chars().count(),
             VVal::Byt(b)  => b.borrow().len(),
-            VVal::Nul     => 0,
+            VVal::None    => 0,
             _             => self.s().chars().count(),
         }
     }
@@ -2744,7 +2743,7 @@ impl VVal {
     /// Use this if you need the raw unescaped contents of VVal::Str, VVal::Sym,
     /// VVal::Byt and other VVals.
     ///
-    /// As this is used usually for generating output a VVal::Nul is
+    /// As this is used usually for generating output a VVal::None is
     /// turned into an empty string
     ///
     /// **There is also `with_s_ref()` which allows you to work with a
@@ -2753,7 +2752,7 @@ impl VVal {
     /// ```
     /// use wlambda::VVal;
     ///
-    /// assert_eq!(VVal::Nul.s_raw(), "");
+    /// assert_eq!(VVal::None.s_raw(), "");
     /// assert_eq!(VVal::new_str("Test").s_raw(), "Test");
     /// ```
     pub fn s_raw(&self) -> String {
@@ -2762,7 +2761,7 @@ impl VVal {
             VVal::Sym(s)  => s.borrow().clone(),
             VVal::Usr(s)  => s.s_raw(),
             VVal::Byt(s)  => s.borrow().iter().map(|b| *b as char).collect(),
-            VVal::Nul     => String::from(""),
+            VVal::None    => String::from(""),
             _             => self.s(),
         }
     }
@@ -2772,13 +2771,13 @@ impl VVal {
     /// Use this if you need the raw unescaped contents of VVal::Str, VVal::Sym,
     /// VVal::Byt and other VVals.
     ///
-    /// As this is used usually for generating output a VVal::Nul is
+    /// As this is used usually for generating output a VVal::None is
     /// turned into an empty string
     ///
     /// ```
     /// use wlambda::VVal;
     ///
-    /// VVal::Nul.with_s_ref(
+    /// VVal::None.with_s_ref(
     ///     |s: &str| assert_eq!(s, ""));
     ///
     /// VVal::new_str("Test").with_s_ref(
@@ -2793,7 +2792,7 @@ impl VVal {
             VVal::Sym(s)  => f(&s.borrow()),
             VVal::Usr(s)  => f(&s.s_raw()),
             VVal::Byt(_)  => f(&self.s_raw()),
-            VVal::Nul     => f(""),
+            VVal::None    => f(""),
             _             => f(&self.s_raw()),
         }
     }
@@ -2850,7 +2849,7 @@ impl VVal {
     pub fn compile_err(&self, msg: String) -> CompileError {
         CompileError {
             msg,
-            pos: self.at(0).unwrap_or(VVal::Nul).get_syn_pos(),
+            pos: self.at(0).unwrap_or(VVal::None).get_syn_pos(),
         }
     }
 
@@ -2895,7 +2894,7 @@ impl VVal {
     }
 
     pub fn is_none(&self) -> bool {
-        match self { VVal::Nul => true, _ => false }
+        match self { VVal::None => true, _ => false }
     }
 
     pub fn is_err(&self) -> bool {
@@ -2906,7 +2905,7 @@ impl VVal {
         match self {
             VVal::Str(_)     => String::from("string"),
             VVal::Byt(_)     => String::from("bytes"),
-            VVal::Nul        => String::from("none"),
+            VVal::None       => String::from("none"),
             VVal::Err(_)     => String::from("error"),
             VVal::Bol(_)     => String::from("bool"),
             VVal::Sym(_)     => String::from("symbol"),
@@ -2928,7 +2927,7 @@ impl VVal {
     }
 
     /// Quick access method for retrieving the VVal at index `idx`.
-    /// Returns VVal::Nul if the VVal is not a VVal::Lst or no such index exists.
+    /// Returns VVal::None if the VVal is not a VVal::Lst or no such index exists.
     /// See also the shorthands `v_i`, `v_f`, `v_s` and `v_s_raw`.
     ///
     ///```
@@ -2940,10 +2939,10 @@ impl VVal {
     /// assert_eq!(v.v_(1).i(), 11);
     /// assert_eq!(v.v_i(1),    11);
     ///```
-    pub fn v_(&self, idx: usize) -> VVal { self.at(idx).unwrap_or(VVal::Nul) }
+    pub fn v_(&self, idx: usize) -> VVal { self.at(idx).unwrap_or(VVal::None) }
 
     /// Quick access method for retrieving the VVal at key `idx`.
-    /// Returns VVal::Nul if the VVal is not a VVal::Map or no such index exists.
+    /// Returns VVal::None if the VVal is not a VVal::Map or no such index exists.
     /// See also the shorthands `v_ik`, `v_fk`, `v_sk` and `v_s_rawk`.
     ///
     ///```
@@ -2957,7 +2956,7 @@ impl VVal {
     /// assert_eq!(v.v_ik("aaa"),    12);
     /// assert_eq!(v.v_ik("zyy"),    14);
     ///```
-    pub fn v_k(&self, key: &str) -> VVal { self.get_key(key).unwrap_or(VVal::Nul) }
+    pub fn v_k(&self, key: &str) -> VVal { self.get_key(key).unwrap_or(VVal::None) }
     /// Quick access of an integer at the given `idx`.
     /// See also `v_`.
     ///
@@ -3077,7 +3076,7 @@ impl VVal {
             VVal::Str(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
             VVal::Sym(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
             VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as f64 } else { 0.0 },
-            VVal::Nul        => 0.0,
+            VVal::None       => 0.0,
             VVal::Err(_)     => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
             VVal::Syn(s)     => (s.syn.clone() as i64) as f64,
@@ -3108,7 +3107,7 @@ impl VVal {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
             VVal::Sym(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
             VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 },
-            VVal::Nul        => 0,
+            VVal::None       => 0,
             VVal::Err(_)     => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
             VVal::Syn(s)     => s.syn.clone() as i64,
@@ -3139,7 +3138,7 @@ impl VVal {
             VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0) != 0,
             VVal::Sym(s)     => (*s).borrow().parse::<i64>().unwrap_or(0) != 0,
             VVal::Byt(s)     => (if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 }) != 0,
-            VVal::Nul        => false,
+            VVal::None       => false,
             VVal::Err(_)     => false,
             VVal::Bol(b)     => *b,
             VVal::Syn(s)     => (s.syn.clone() as i64) != 0,
@@ -3210,7 +3209,7 @@ impl VVal {
             VVal::Str(s)     => format_vval_str(&s.borrow(), false),
             VVal::Sym(s)     => format!(":\"{}\"", &s.borrow()),
             VVal::Byt(s)     => format!("$b{}", format_vval_byt(&s.borrow())),
-            VVal::Nul        => "$n".to_string(),
+            VVal::None       => "$n".to_string(),
             VVal::Err(e)     => format!("$e{} {}", (*e).borrow().1, (*e).borrow().0.s_cy(c)),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
             VVal::Syn(s)     => format!("&{:?}", s.syn),
@@ -3273,7 +3272,7 @@ impl VVal {
     /// Returns a string representation of the VVal data structure.
     /// It handles cyclic data structures fine.
     /// The purpose is to return an unambigous represenation of the data
-    /// structure. That means strings are quoted and VVal::Nul becomes `$n`
+    /// structure. That means strings are quoted and VVal::None becomes `$n`
     /// for instance.
     ///
     /// If you need strings in pure form, use the `s_raw()` method.
@@ -3281,7 +3280,7 @@ impl VVal {
     /// ```
     /// use wlambda::VVal;
     ///
-    /// let v = VVal::Nul;
+    /// let v = VVal::None;
     /// assert_eq!(v.s(), "$n");
     ///
     /// assert_eq!(VVal::new_str("Foo").s(), "\"Foo\"");
@@ -3346,7 +3345,7 @@ impl serde::ser::Serialize for VVal {
             VVal::Str(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Sym(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Byt(b)     => serializer.serialize_bytes(&b.borrow()[..]),
-            VVal::Nul        => serializer.serialize_none(),
+            VVal::None       => serializer.serialize_none(),
             VVal::Err(_)     => serializer.serialize_str(&self.s()),
             VVal::Bol(b)     => serializer.serialize_bool(*b),
             VVal::Syn(_)     => serializer.serialize_str(&self.s()),
@@ -3433,9 +3432,9 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
         where E: serde::de::Error { Ok(VVal::new_byt(value.to_vec())) }
 
     fn visit_none<E>(self) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Nul) }
+        where E: serde::de::Error { Ok(VVal::None) }
     fn visit_unit<E>(self) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Nul) }
+        where E: serde::de::Error { Ok(VVal::None) }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
         where A: serde::de::SeqAccess<'de> {
