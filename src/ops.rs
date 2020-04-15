@@ -417,6 +417,11 @@ impl Prog {
         self.push_op(Op::NewOpt(a, r));
     }
 
+    pub fn op_new_none_opt(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewNoneOpt(r));
+    }
+
     pub fn op_new_clos(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
         self.set_dbg(sp.clone());
         self.push_op(Op::NewClos(a, r));
@@ -692,86 +697,86 @@ pub enum ToRefType {
     Weakable,
 }
 
-#[derive(Debug,Clone)]
-#[repr(u8)]
-pub enum Builtin {
-    Export(Box<String>, ResPos),
-    DumpStack(SynPos),
-    DumpVM(SynPos),
-}
+//#[derive(Debug,Clone)]
+//#[repr(u8)]
+//pub enum Builtin {
+//    Export(Box<String>, ResPos),
+//    DumpStack(SynPos),
+//    DumpVM(SynPos),
+//}
+//
+//#[derive(Debug,Clone)]
+//#[repr(u8)]
+//pub enum CtrlFlow {
+//    Next,
+//    Break(ResPos),
+//}
+//
+//#[derive(Debug,Clone)]
+//#[repr(u8)]
+//pub enum NVecPos {
+//    IVec2(ResPos, ResPos),
+//    IVec3(ResPos, ResPos, ResPos),
+//    IVec4(ResPos, ResPos, ResPos, ResPos),
+//    FVec2(ResPos, ResPos),
+//    FVec3(ResPos, ResPos, ResPos),
+//    FVec4(ResPos, ResPos, ResPos, ResPos),
+//}
 
-#[derive(Debug,Clone)]
-#[repr(u8)]
-pub enum CtrlFlow {
-    Next,
-    Break(ResPos),
-}
-
-#[derive(Debug,Clone)]
-#[repr(u8)]
-pub enum NVecPos {
-    IVec2(ResPos, ResPos),
-    IVec3(ResPos, ResPos, ResPos),
-    IVec4(ResPos, ResPos, ResPos, ResPos),
-    FVec2(ResPos, ResPos),
-    FVec3(ResPos, ResPos, ResPos),
-    FVec4(ResPos, ResPos, ResPos, ResPos),
-}
-
-#[derive(Debug,Clone)]
-#[repr(u8)]
-pub enum Op {
-    Mov(ResPos, ResPos),
-    NewOpt(ResPos, ResPos),
-    NewPair(ResPos, ResPos, ResPos),
-    NewNVec(Box<NVecPos>, ResPos),
-    Argv(ResPos),
-    ToRef(ResPos, ResPos, ToRefType),
-    ClearLocals(u16, u16),
-    Accumulator(AccumType),
-    PushLoopInfo(u16),
-    Add(ResPos, ResPos, ResPos),
-    Sub(ResPos, ResPos, ResPos),
-    Mul(ResPos, ResPos, ResPos),
-    Div(ResPos, ResPos, ResPos),
-    Mod(ResPos, ResPos, ResPos),
-    Le(ResPos, ResPos, ResPos),
-    Lt(ResPos, ResPos, ResPos),
-    Ge(ResPos, ResPos, ResPos),
-    Gt(ResPos, ResPos, ResPos),
-    Eq(ResPos, ResPos, ResPos),
-    NewErr(ResPos, ResPos),
-    NewList(ResPos),
-    ListPush(ResPos, ResPos, ResPos),
-    ListSplice(ResPos, ResPos, ResPos),
-    NewMap(ResPos),
-    MapSetKey(ResPos, ResPos, ResPos, ResPos),
-    MapSplice(ResPos, ResPos, ResPos),
-    NewClos(ResPos, ResPos),
-    GetIdx(ResPos, u32, ResPos),
-    GetIdx2(ResPos, Box<(u32, u32)>, ResPos),
-    GetIdx3(ResPos, Box<(u32, u32, u32)>, ResPos),
-    GetSym(ResPos, Box<String>, ResPos),
-    GetSym2(ResPos, Box<(String, String)>, ResPos),
-    GetSym3(ResPos, Box<(String, String, String)>, ResPos),
-    GetKey(ResPos, ResPos, ResPos),
-    Destr(ResPos, Box<DestructureInfo>),
-    Call(u16, ResPos),
-    CallMethodKey(ResPos, ResPos, u16, ResPos),
-    CallMethodSym(ResPos, Box<String>, u16, ResPos),
-    Apply(ResPos, ResPos, ResPos),
-    Jmp(i32),
-    JmpIfN(ResPos, i32),
-    OrJmp(ResPos, i32, ResPos),
-    AndJmp(ResPos, i32, ResPos),
-    CtrlFlow(CtrlFlow),
-    Builtin(Builtin),
-    IterInit(ResPos, i32),
-    IterNext(ResPos),
-//    UnwindMov(ResPos, ResPos),
-    Unwind,
-    End,
-}
+//#[derive(Debug,Clone)]
+//#[repr(u8)]
+//pub enum Op {
+//    Mov(ResPos, ResPos),
+//    NewOpt(ResPos, ResPos),
+//    NewPair(ResPos, ResPos, ResPos),
+//    NewNVec(Box<NVecPos>, ResPos),
+//    Argv(ResPos),
+//    ToRef(ResPos, ResPos, ToRefType),
+//    ClearLocals(u16, u16),
+//    Accumulator(AccumType),
+//    PushLoopInfo(u16),
+//    Add(ResPos, ResPos, ResPos),
+//    Sub(ResPos, ResPos, ResPos),
+//    Mul(ResPos, ResPos, ResPos),
+//    Div(ResPos, ResPos, ResPos),
+//    Mod(ResPos, ResPos, ResPos),
+//    Le(ResPos, ResPos, ResPos),
+//    Lt(ResPos, ResPos, ResPos),
+//    Ge(ResPos, ResPos, ResPos),
+//    Gt(ResPos, ResPos, ResPos),
+//    Eq(ResPos, ResPos, ResPos),
+//    NewErr(ResPos, ResPos),
+//    NewList(ResPos),
+//    ListPush(ResPos, ResPos, ResPos),
+//    ListSplice(ResPos, ResPos, ResPos),
+//    NewMap(ResPos),
+//    MapSetKey(ResPos, ResPos, ResPos, ResPos),
+//    MapSplice(ResPos, ResPos, ResPos),
+//    NewClos(ResPos, ResPos),
+//    GetIdx(ResPos, u32, ResPos),
+//    GetIdx2(ResPos, Box<(u32, u32)>, ResPos),
+//    GetIdx3(ResPos, Box<(u32, u32, u32)>, ResPos),
+//    GetSym(ResPos, Box<String>, ResPos),
+//    GetSym2(ResPos, Box<(String, String)>, ResPos),
+//    GetSym3(ResPos, Box<(String, String, String)>, ResPos),
+//    GetKey(ResPos, ResPos, ResPos),
+//    Destr(ResPos, Box<DestructureInfo>),
+//    Call(u16, ResPos),
+//    CallMethodKey(ResPos, ResPos, u16, ResPos),
+//    CallMethodSym(ResPos, Box<String>, u16, ResPos),
+//    Apply(ResPos, ResPos, ResPos),
+//    Jmp(i32),
+//    JmpIfN(ResPos, i32),
+//    OrJmp(ResPos, i32, ResPos),
+//    AndJmp(ResPos, i32, ResPos),
+//    CtrlFlow(CtrlFlow),
+//    Builtin(Builtin),
+//    IterInit(ResPos, i32),
+//    IterNext(ResPos),
+////    UnwindMov(ResPos, ResPos),
+//    Unwind,
+//    End,
+//}
 
 #[derive(Debug,Clone,Copy)]
 pub enum OpR {
@@ -779,7 +784,9 @@ pub enum OpR {
     Call(u16),
     NewList,
     NewMap,
+    NewNoneOpt,
     IterNext,
+    ToRef(ResPos, ToRefType),
 }
 
 #[derive(Debug,Clone)]
@@ -789,13 +796,14 @@ pub enum OpA {
     Break,
     Export(Box<String>),
     IterInit(i32),
+    OrJmp(i32),
+    AndJmp(i32),
 }
 
 #[derive(Debug,Clone)]
 pub enum OpAR {
     Mov,
     NewOpt,
-    ToRef(ToRefType),
     NewErr,
     NewClos,
     GetIdx(u32),
@@ -805,8 +813,6 @@ pub enum OpAR {
     GetSym2(Box<(String, String)>),
     GetSym3(Box<(String, String, String)>),
     CallMethodSym(Box<String>, u16),
-    OrJmp(i32),
-    AndJmp(i32),
 }
 
 #[derive(Debug,Clone,Copy)]
@@ -828,16 +834,21 @@ pub enum OpABR {
     GetKey,
     CallMethodKey(u16),
     Apply,
+    NewIVec,
+    NewFVec,
 }
 
 #[derive(Debug,Clone,Copy)]
 pub enum OpABCR {
     MapSetKey,
+    NewIVec,
+    NewFVec,
 }
 
 #[derive(Debug,Clone,Copy)]
 pub enum OpABCDR {
-    NewNVec,
+    NewIVec,
+    NewFVec,
 }
 
 #[derive(Debug,Clone)]
@@ -854,8 +865,9 @@ pub enum OpS {
 }
 
 #[derive(Debug,Clone)]
-pub enum OpArgs {
+pub enum Op {
     S(OpS),
+    R(OpR),
     A(OpA, ResPos),
     AR(OpAR, ResPos, ResPos),
     ABR(OpABR, ResPos, ResPos, ResPos),
