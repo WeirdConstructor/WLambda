@@ -1624,14 +1624,14 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                         pw_store_if_needed!(prog, store, {
                             let vp = val_pw.eval(prog);
-                            prog.push_op(Op::NewOpt(vp, store));
+                            prog.op_new_opt(&spos, vp, store);
                         })
                     } else {
                         pw_store_if_needed!(prog, store, {
-                            prog.push_op(
-                                Op::NewOpt(
-                                    ResPos::Value(ResValue::OptNone),
-                                    store));
+                            prog.op_new_opt(
+                                &spos,
+                                ResPos::Value(ResValue::OptNone),
+                                store);
                         })
                     }
                 },
@@ -1704,7 +1704,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                     let func_pw = vm_compile_stmts2(ast, 3, &mut func_ce)?;
                     func_pw.eval_to(&mut func_prog, ResPos::Value(ResValue::Ret));
-                    func_prog.push_op(Op::End);
+                    func_prog.op_end();
 
                     let func_prog = Rc::new(func_prog);
 
@@ -1760,7 +1760,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                     pw_needs_storage!(prog, store, {
                         let fp = prog.data_pos(fun_template.clone());
-                        prog.push_op(Op::NewClos(fp, store))
+                        prog.op_new_clos(&spos, fp, store)
                     })
                 },
                 Syntax::Call => {
@@ -1790,13 +1790,12 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                     }
                                     let obj_p = obj.eval(prog);
                                     let key_p = key.eval(prog);
-                                    prog.set_dbg(spos.clone());
-                                    prog.push_op(
-                                        Op::CallMethodKey(
-                                            obj_p,
-                                            key_p,
-                                            argc as u16,
-                                            store));
+                                    prog.op_call_method_key(
+                                        &spos,
+                                        obj_p,
+                                        key_p,
+                                        argc as u16,
+                                        store);
                                 })
                             },
                             Syntax::GetSym => {
@@ -1806,13 +1805,12 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                         ca.eval_to(prog, ResPos::Stack(0));
                                     }
                                     let obj_p = obj.eval(prog);
-                                    prog.set_dbg(spos.clone());
-                                    prog.push_op(
-                                        Op::CallMethodSym(
-                                            obj_p,
-                                            Box::new(key.clone()),
-                                            argc as u16,
-                                            store));
+                                    prog.op_call_method_sym(
+                                        &spos,
+                                        obj_p,
+                                        key.clone(),
+                                        argc as u16,
+                                        store);
                                 })
                             },
                             _ => {
@@ -1857,8 +1855,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             for ca in compiled_args.iter() {
                                 ca.eval_to(prog, ResPos::Stack(0));
                             }
-                            prog.set_dbg(spos.clone());
-                            prog.push_op(Op::Call(argc as u16 - 1, store));
+                            prog.op_call(&spos, argc as u16 - 1, store);
                         })
                     }
                 },
@@ -1897,11 +1894,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                             pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
-                                prog.push_op(
-                                    Op::NewNVec(
-                                        Box::new(
-                                            NVecPos::IVec2(lc0p, lc1p)),
-                                        store));
+                                prog.op_new_ivec2(&spos, lc0p, lc1p, store);
                             })
                         },
                         3 => {

@@ -355,6 +355,36 @@ impl Prog {
         self.push_op(op.to_op(a, b, r));
     }
 
+    pub fn op_new_opt(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewOpt(a, r));
+    }
+
+    pub fn op_new_clos(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewClos(a, r));
+    }
+
+    pub fn op_call_method_key(&mut self, sp: &SynPos, a: ResPos, b: ResPos, argc: u16, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::CallMethodKey(a, b, argc, r));
+    }
+
+    pub fn op_call_method_sym(&mut self, sp: &SynPos, a: ResPos, sym: String, argc: u16, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::CallMethodSym(a, Box::new(sym), argc, r));
+    }
+
+    pub fn op_call(&mut self, sp: &SynPos, argc: u16, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Call(argc, r));
+    }
+
+    pub fn op_new_ivec2(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewNVec(Box::new(NVecPos::IVec2(a, b)), r));
+    }
+
     pub fn dump(&self) {
         println!("PROG:");
         for (i, o) in self.ops.iter().enumerate() {
