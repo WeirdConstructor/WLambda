@@ -20,6 +20,12 @@ use crate::compiler::{GlobalEnv, EvalContext};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
+    println!("sizeof {} OpArgs bytes", std::mem::size_of::<crate::ops::OpArgs>());
+    println!("sizeof {} OpS bytes",    std::mem::size_of::<crate::ops::OpArgs>());
+    println!("sizeof {} OpR bytes",    std::mem::size_of::<crate::ops::OpR>());
+    println!("sizeof {} OpA bytes",    std::mem::size_of::<crate::ops::OpA>());
+    println!("sizeof {} OpAR bytes",   std::mem::size_of::<crate::ops::OpAR>());
+    println!("sizeof {} OpABR bytes",  std::mem::size_of::<crate::ops::OpABR>());
 //    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
 //    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
 //    println!("sizeof {} NVec<f64> bytes", std::mem::size_of::<crate::nvec::NVec<f64>>());

@@ -538,3 +538,94 @@ pub enum Op {
     Unwind,
     End,
 }
+
+#[derive(Debug,Clone,Copy)]
+pub enum OpR {
+    Argv,
+    Call(u16),
+    NewList,
+    NewMap,
+    IterNext,
+}
+
+#[derive(Debug,Clone)]
+pub enum OpA {
+    Destr(Box<DestructureInfo>),
+    JmpIf(i32),
+    JmpIfN(i32),
+    Break,
+    Export(Box<String>),
+    IterInit(i32),
+}
+
+#[derive(Debug,Clone)]
+pub enum OpAR {
+    Mov,
+    NewOpt,
+    ToRef(ToRefType),
+    NewErr,
+    NewClos,
+    GetIdx(u32),
+    GetIdx2(Box<(u32, u32)>),
+    GetIdx3(Box<(u32, u32, u32)>),
+    GetSym(Box<String>),
+    GetSym2(Box<(String, String)>),
+    GetSym3(Box<(String, String, String)>),
+    CallMethodSym(Box<String>, u16),
+    OrJmp(i32),
+    AndJmp(i32),
+}
+
+#[derive(Debug,Clone,Copy)]
+pub enum OpABR {
+    NewPair,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Le,
+    Lt,
+    Ge,
+    Gt,
+    Eq,
+    ListPush,
+    ListSplice,
+    MapSplice,
+    GetKey,
+    CallMethodKey(u16),
+    Apply,
+}
+
+#[derive(Debug,Clone,Copy)]
+pub enum OpABCR {
+    MapSetKey,
+}
+
+#[derive(Debug,Clone,Copy)]
+pub enum OpABCDR {
+    NewNVec,
+}
+
+#[derive(Debug,Clone)]
+pub enum OpS {
+    ClearLocals(u16, u16),
+    Accumulator(AccumType),
+    PushLoopInfo(u16),
+    Jmp(i32),
+    CtrlFlowNext,
+    DumpStack(Box<SynPos>),
+    DumpVM(Box<SynPos>),
+    Unwind,
+    End,
+}
+
+#[derive(Debug,Clone)]
+pub enum OpArgs {
+    S(OpS),
+    A(OpA, ResPos),
+    AR(OpAR, ResPos, ResPos),
+    ABR(OpABR, ResPos, ResPos, ResPos),
+    ABCR(OpABCR, Box<(ResPos, ResPos, ResPos)>, ResPos),
+    ABCDR(OpABCDR, Box<(ResPos, ResPos, ResPos, ResPos)>),
+}
