@@ -268,8 +268,6 @@ impl Prog {
         }
     }
 
-    pub fn op_end(&mut self) -> &mut Self { self.push_op(Op::End); self }
-
     pub fn global_ref_pos(&mut self, data: VVal) -> ResPos {
         self.data.push(data);
         ResPos::GlobalRef((self.data.len() - 1) as u16)
@@ -300,6 +298,61 @@ impl Prog {
     pub fn set_dbg(&mut self, sp: SynPos) -> &mut Self {
         self.nxt_debug = Some(sp);
         self
+    }
+
+    pub fn op_end(&mut self) -> &mut Self {
+        self.push_op(Op::End);
+        self
+    }
+
+    pub fn op_mov(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Mov(a, r));
+    }
+
+    pub fn op_and_jmp(&mut self, sp: &SynPos, a: ResPos, jmp: i32, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::AndJmp(a, jmp, r));
+    }
+
+    pub fn op_destr(&mut self, sp: &SynPos, a: ResPos, destr_info: DestructureInfo) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Destr(a, Box::new(destr_info)));
+    }
+
+    pub fn op_to_ref(&mut self, sp: &SynPos, a: ResPos, r: ResPos, typ: ToRefType) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::ToRef(a, r, typ));
+    }
+
+    pub fn op_new_list(&mut self, sp: &SynPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewList(r));
+    }
+
+    pub fn op_list_splice(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::ListSplice(a, b, r));
+    }
+
+    pub fn op_list_push(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::ListPush(a, b, r));
+    }
+
+    pub fn op_argv(&mut self, sp: &SynPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Argv(r));
+    }
+
+    pub fn op_unwind(&mut self, sp: &SynPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Unwind);
+    }
+
+    pub fn op_binop(&mut self, sp: &SynPos, op: BinOp, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(op.to_op(a, b, r));
     }
 
     pub fn dump(&self) {
@@ -405,7 +458,7 @@ impl DestructureInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum BinOp {
     Add,

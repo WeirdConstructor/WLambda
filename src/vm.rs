@@ -66,7 +66,7 @@ impl ProgWriter {
     fn eval_nul(&self, prog: &mut Prog) {
         let rp = (*self.node)(prog, ResultSink::Null);
         if let ResPos::Stack(_) = rp {
-            prog.push_op(Op::Mov(rp, ResPos::Value(ResValue::None)));
+            prog.op_mov(&SynPos::empty(), rp, ResPos::Value(ResValue::None));
         }
     }
 
@@ -104,7 +104,7 @@ macro_rules! pw_provides_result_pos {
             let pos = $b;
             match store {
                 ResultSink::WriteTo(store_pos) => {
-                    $prog.push_op(Op::Mov(pos, store_pos));
+                    $prog.op_mov(&SynPos::empty(), pos, store_pos);
                     store_pos
                 },
                 ResultSink::WantResult => {
@@ -112,7 +112,7 @@ macro_rules! pw_provides_result_pos {
                 },
                 ResultSink::Null => {
                     if let ResPos::Stack(_) = pos {
-                        $prog.push_op(Op::Mov(pos, ResPos::Value(ResValue::None)));
+                        $prog.op_mov(&SynPos::empty(), pos, ResPos::Value(ResValue::None));
                     }
                     ResPos::Value(ResValue::None)
                 },
@@ -155,7 +155,7 @@ macro_rules! pw_needs_storage {
                 ResultSink::Null => {
                     let $pos = ResPos::Stack(0);
                     $b;
-                    $prog.push_op(Op::Mov($pos, ResPos::Value(ResValue::None)));
+                    $prog.op_mov(&SynPos::empty(), $pos, ResPos::Value(ResValue::None));
                     ResPos::Value(ResValue::None)
                 },
             }
@@ -312,77 +312,27 @@ macro_rules! handle_break {
 macro_rules! call_func {
     ($f: ident, $argc: ident, $popc: expr, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident, $call_ret: ident, $cont: block) => {
         {
-//            if let VVal::Fun(r) = $f {
-//                if let FunType::VMProg(p) = r {
-//                    $env.with_fun_info($f.clone(), $argc, |e: &mut Env| {
-//                        let call_ret = vm(&*p, e);
-//                        $env.popn($popc); // + 1 for the function
-//                        match call_ret {
-//                            Ok($call_ret) => $cont,
-//                            Err(StackAction::Return((v_lbl, v))) => {
-//                                $env.unwind_to_depth($uw_depth);
-//                                $retv = Err(StackAction::Return((v_lbl, v)));
-//                                break;
-//                            },
-//                            Err(StackAction::Next) => {
-//                                handle_next!($env, $pc, $uw_depth, $retv);
-//                            },
-//                            Err(StackAction::Break(v)) => {
-//                                handle_break!($env, $pc, v, $uw_depth, $retv);
-//                            },
-//                            Err(sa) => {
-//                                $env.unwind_to_depth($uw_depth);
-//                                $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
-//                                break;
-//                            },
-//                        }
-//                    })
-//                } else {
-//                    let call_ret = $f.call_internal($env, $argc);
-//                    $env.popn($popc); // + 1 for the function
-//                    match call_ret {
-//                        Ok($call_ret) => $cont,
-//                        Err(StackAction::Return((v_lbl, v))) => {
-//                            $env.unwind_to_depth($uw_depth);
-//                            $retv = Err(StackAction::Return((v_lbl, v)));
-//                            break;
-//                        },
-//                        Err(StackAction::Next) => {
-//                            handle_next!($env, $pc, $uw_depth, $retv);
-//                        },
-//                        Err(StackAction::Break(v)) => {
-//                            handle_break!($env, $pc, v, $uw_depth, $retv);
-//                        },
-//                        Err(sa) => {
-//                            $env.unwind_to_depth($uw_depth);
-//                            $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
-//                            break;
-//                        },
-//                    }
-//                }
-//            } else {
-                let call_ret = $f.call_internal($env, $argc);
-                $env.popn($popc); // + 1 for the function
-                match call_ret {
-                    Ok($call_ret) => $cont,
-                    Err(StackAction::Return(ret)) => {
-                        $env.unwind_to_depth($uw_depth);
-                        $retv = Err(StackAction::Return(ret));
-                        break;
-                    },
-                    Err(StackAction::Next) => {
-                        handle_next!($env, $pc, $uw_depth, $retv);
-                    },
-                    Err(StackAction::Break(v)) => {
-                        handle_break!($env, $pc, v, $uw_depth, $retv);
-                    },
-                    Err(sa) => {
-                        $env.unwind_to_depth($uw_depth);
-                        $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
-                        break;
-                    },
-                }
-//            }
+            let call_ret = $f.call_internal($env, $argc);
+            $env.popn($popc); // + 1 for the function
+            match call_ret {
+                Ok($call_ret) => $cont,
+                Err(StackAction::Return(ret)) => {
+                    $env.unwind_to_depth($uw_depth);
+                    $retv = Err(StackAction::Return(ret));
+                    break;
+                },
+                Err(StackAction::Next) => {
+                    handle_next!($env, $pc, $uw_depth, $retv);
+                },
+                Err(StackAction::Break(v)) => {
+                    handle_break!($env, $pc, v, $uw_depth, $retv);
+                },
+                Err(sa) => {
+                    $env.unwind_to_depth($uw_depth);
+                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                    break;
+                },
+            }
         }
     }
 }
@@ -553,10 +503,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Argv(r)             => op_r!(env, ret, retv, prog, r, { env.argv() }),
             Op::End                 => { break; },
             Op::Unwind              => { env.unwind_one(); },
-//            Op::UnwindMov(a, r) => op_a_r!(env, ret, retv, prog, a, r, {
-//                env.unwind_one();
-//                a
-//            }),
             Op::IterInit(iterable, body_ops) => {
                 in_reg!(env, ret, prog, iterable);
                 env.push_loop_info(pc, pc + *body_ops as usize);
@@ -982,12 +928,11 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
 
         pw_null!(prog, {
             let vp = val_pw.eval(prog);
-            prog.set_dbg(spos.clone());
-            prog.push_op(Op::Destr(vp, Box::new(DestructureInfo {
+            prog.op_destr(&spos, vp, DestructureInfo {
                 vars:   vars.clone(),
                 poses:  poses.clone(),
                 is_ref: false,
-            })));
+            });
         })
     } else {
         let varname = vars.at(0).unwrap().s_raw();
@@ -1025,8 +970,8 @@ pub fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, CompileError> 
     if to_ref {
         pw!(prog, store, {
             store.if_must_store(|store_pos| {
-                prog.push_op(Op::Mov(arg_pos, store_pos));
-                prog.push_op(Op::ToRef(store_pos, store_pos, ToRefType::CaptureRef));
+                prog.op_mov(&SynPos::empty(), arg_pos, store_pos);
+                prog.op_to_ref(&SynPos::empty(), store_pos, store_pos, ToRefType::CaptureRef);
             })
         })
     } else {
@@ -1057,10 +1002,9 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool)
                 ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
                 pw!(prog, store, {
                     store.if_must_store(|store_pos| {
-                        prog.set_dbg(spos.clone());
-                        prog.push_op(Op::Argv(store_pos));
+                        prog.op_argv(&spos, store_pos);
                         if capt_ref {
-                            prog.push_op(Op::ToRef(store_pos, store_pos, ToRefType::CaptureRef));
+                            prog.op_to_ref(&spos, store_pos, store_pos, ToRefType::CaptureRef);
                         }
                     })
                 })
@@ -1085,10 +1029,9 @@ fn vm_compile_var2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool)
                 let mk_respos = mk_respos?;
                 pw_provides_result_pos!(prog, {
                     let var_respos = mk_respos(prog);
-                    prog.set_dbg(spos.clone());
                     if capt_ref {
                         let rp = ResPos::Stack(0);
-                        prog.push_op(Op::ToRef(var_respos, rp, ToRefType::CaptureRef));
+                        prog.op_to_ref(&spos, var_respos, rp, ToRefType::CaptureRef);
                         rp
                     } else {
                         var_respos
@@ -1120,12 +1063,11 @@ fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool
 
         pw_null!(prog, {
             let vp = val_pw.eval(prog);
-            prog.set_dbg(spos.clone());
-            prog.push_op(Op::Destr(vp, Box::new(DestructureInfo {
+            prog.op_destr(&spos, vp, DestructureInfo {
                 vars:   vars.clone(),
                 poses:  poses.clone(),
                 is_ref: is_ref,
-            })));
+            });
         })
     } else {
         let varname = &vars.at(0).unwrap().s_raw();
@@ -1211,9 +1153,7 @@ macro_rules! var_env_clear_locals {
 
             let res = $block;
 
-            $prog.set_dbg($spos.clone());
-            $prog.push_op(Op::Unwind);
-
+            $prog.op_unwind(&$spos);
             res
         } else {
             $block
@@ -1285,8 +1225,7 @@ fn vm_compile_binop2(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
     pw_needs_storage!(prog, store, {
         let ap = a_pw.eval(prog);
         let bp = b_pw.eval(prog);
-        prog.set_dbg(spos.clone());
-        prog.push_op(op.to_op(bp, ap, store));
+        prog.op_binop(&spos, op, bp, ap, store);
     })
 }
 
@@ -1440,11 +1379,8 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let mut else_body_prog = Prog::new();
                     let tbp = then_body.eval(&mut then_body_prog);
                     let ebp = else_body.eval(&mut else_body_prog);
-                    else_body_prog.set_dbg(spos.clone());
-                    else_body_prog.push_op(Op::Mov(ebp, store_pos));
-
-                    then_body_prog.set_dbg(spos.clone());
-                    then_body_prog.push_op(Op::Mov(tbp, store_pos));
+                    else_body_prog.op_mov(&spos, ebp, store_pos);
+                    then_body_prog.op_mov(&spos, tbp, store_pos);
                     then_body_prog.set_dbg(spos.clone());
                     then_body_prog.push_op(Op::Jmp(else_body_prog.op_count() as i32));
 
@@ -1481,7 +1417,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     prog.set_dbg(spos.clone());
                     prog.push_op(Op::JmpIfN(condval, then_body_prog.op_count() as i32));
                     prog.append(then_body_prog);
-                    prog.push_op(Op::Mov(ResPos::Value(ResValue::None), store_pos));
+                    prog.op_mov(&spos, ResPos::Value(ResValue::None), store_pos);
                 })
             } else {
                 ResPos::Value(ResValue::None)
@@ -1534,8 +1470,7 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         body_prog.set_dbg(spos.clone());
         body_prog.push_op(Op::Jmp(-(cond_offs as i32 + 1)));
         prog.append(body_prog);
-        prog.set_dbg(spos.clone());
-        prog.push_op(Op::Unwind);
+        prog.op_unwind(&spos);
     });
 }
 
@@ -1626,21 +1561,21 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
-                        prog.push_op(Op::ToRef(ref_rp, store, ToRefType::ToRef));
+                        prog.op_to_ref(&spos, ref_rp, store, ToRefType::ToRef);
                     })
                 },
                 Syntax::WRef => {
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
-                        prog.push_op(Op::ToRef(ref_rp, store, ToRefType::Weakable));
+                        prog.op_to_ref(&spos, ref_rp, store, ToRefType::Weakable);
                     })
                 },
                 Syntax::Deref => {
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
-                        prog.push_op(Op::ToRef(ref_rp, store, ToRefType::Deref));
+                        prog.op_to_ref(&spos, ref_rp, store, ToRefType::Deref);
                     })
                 },
                 Syntax::Lst => {
@@ -1661,21 +1596,22 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     }
 
                     pw_provides_result_pos!(prog, {
-                        prog.push_op(Op::NewList(ResPos::Stack(0)));
+                        prog.op_new_list(&spos, ResPos::Stack(0));
 
                         for (is_splice, pw) in pws.iter() {
                             pw.eval_to(prog, ResPos::Stack(0));
-                            prog.set_dbg(spos.clone());
                             if *is_splice {
-                                prog.push_op(Op::ListSplice(
+                                prog.op_list_splice(
+                                    &spos,
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),
-                                    ResPos::Stack(0)));
+                                    ResPos::Stack(0));
                             } else {
-                                prog.push_op(Op::ListPush(
+                                prog.op_list_push(
+                                    &spos,
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),
-                                    ResPos::Stack(0)));
+                                    ResPos::Stack(0));
                             }
                         }
 
@@ -2082,11 +2018,10 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                 pw_store_if_needed!(prog, store, {
                                     prog.push_op(Op::Accumulator(accum_type));
                                     acc_pw.eval_nul(prog);
-                                    prog.push_op(
-                                        Op::Mov(
-                                            ResPos::Value(ResValue::AccumVal),
-                                            store));
-                                    prog.push_op(Op::Unwind);
+                                    prog.op_mov(&spos,
+                                        ResPos::Value(ResValue::AccumVal),
+                                        store);
+                                    prog.op_unwind(&spos);
                                 })
                             }
                         },
@@ -2206,8 +2141,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         let mut bprog = Prog::new();
                         let bp = b.eval(&mut bprog);
 
-                        bprog.set_dbg(spos.clone());
-                        bprog.push_op(Op::Mov(bp, store));
+                        bprog.op_mov(&spos, bp, store);
                         aprog.set_dbg(spos.clone());
                         aprog.push_op(Op::OrJmp(ap, bprog.op_count() as i32, store));
                         prog.append(aprog);
@@ -2225,10 +2159,8 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         let mut bprog = Prog::new();
                         let bp = b.eval(&mut bprog);
 
-                        bprog.set_dbg(spos.clone());
-                        bprog.push_op(Op::Mov(bp, store));
-                        aprog.set_dbg(spos.clone());
-                        aprog.push_op(Op::AndJmp(ap, bprog.op_count() as i32, store));
+                        bprog.op_mov(&spos, bp, store);
+                        aprog.op_and_jmp(&spos, ap, bprog.op_count() as i32, store);
                         prog.append(aprog);
                         prog.append(bprog);
                     })
