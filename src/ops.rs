@@ -374,7 +374,7 @@ impl DestructureInfo {
                 }
             },
             VVal::Pair(p) => {
-                let (lv, rv) = *p;
+                let (lv, rv) = &*p;
 
                 if let Some(pos) = self.poses.get(0) {
                     if self.is_ref {

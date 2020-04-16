@@ -125,6 +125,7 @@ pub enum Syntax {
     IVec,
     FVec,
     Opt,
+    Iter,
     Map,
     Expr,
     Func,
@@ -1351,7 +1352,7 @@ pub enum VVal {
     /// A syntax node in the AST, records the position too.
     Syn(SynPos),
     /// A pair
-    Pair(Box<(VVal, VVal)>),
+    Pair(Rc<(VVal, VVal)>),
     /// An optional value. While VVal::None basically has the same meaning
     /// as "no value", an optional value provides functions a way to say
     /// that they don't even return none value but nothing. Yes, it sounds
@@ -1359,6 +1360,8 @@ pub enum VVal {
     /// iterate over an array you can find out whether the iterator is at
     /// the end or will provide more values.
     Opt(Option<Rc<VVal>>),
+    /// A special internal iterator type for built in VVal data structures.
+    Iter(Rc<RefCell<VValIter>>),
     /// A list (or vector) of VVals.
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
     /// A mapping of strings to VVals.
@@ -1483,6 +1486,7 @@ impl CycleCheck {
             | VVal::Bol(_)
             | VVal::Sym(_)
             | VVal::Syn(_)
+            | VVal::Iter(_)
             | VVal::FVec(_)
             | VVal::IVec(_)
             | VVal::Int(_)
@@ -1598,28 +1602,55 @@ fn swizzle_f(s: &str, x: f64, y: f64, z: f64, w: f64) -> VVal {
     }
 }
 
+macro_rules! iter_next {
+    ($i: expr) => {
+        if let Some((v, k)) = $i.next() {
+            if let Some(k) = k {
+                VVal::opt(VVal::pair(v, k))
+            } else {
+                VVal::opt(v)
+            }
+        } else {
+            VVal::opt_none()
+        }
+    }
+}
+
+macro_rules! iter_next_value {
+    ($i: expr, $v: ident, $conv: block, $def: expr) => {
+        if let Some(($v, _)) = $i.next() { $conv } else { $def }
+    }
+}
+
+
 #[allow(dead_code)]
 impl VVal {
+    #[inline]
     pub fn new_str(s: &str) -> VVal {
         VVal::Str(Rc::new(RefCell::new(String::from(s))))
     }
 
+    #[inline]
     pub fn new_str_mv(s: String) -> VVal {
         VVal::Str(Rc::new(RefCell::new(s)))
     }
 
+    #[inline]
     pub fn new_sym(s: &str) -> VVal {
         VVal::Sym(Rc::new(RefCell::new(String::from(s))))
     }
 
+    #[inline]
     pub fn new_sym_mv(s: String) -> VVal {
         VVal::Sym(Rc::new(RefCell::new(s)))
     }
 
+    #[inline]
     pub fn new_byt(v: Vec<u8>) -> VVal {
         VVal::Byt(Rc::new(RefCell::new(v)))
     }
 
+    #[inline]
     pub fn err(v: VVal, pos: SynPos) -> VVal {
         VVal::Err(Rc::new(RefCell::new((v, pos))))
     }
@@ -1631,8 +1662,22 @@ impl VVal {
                       col: 0, file: FileRef::new("?"), name: None }))))
     }
 
+    #[inline]
     pub fn vec() -> VVal {
         VVal::Lst(Rc::new(RefCell::new(Vec::new())))
+    }
+
+    #[inline]
+    pub fn opt(v: VVal) -> VVal {
+        VVal::Opt(Some(Rc::new(v)))
+    }
+
+    #[inline]
+    pub fn opt_none() -> VVal { VVal::Opt(None) }
+
+    #[inline]
+    pub fn pair(a: VVal, b: VVal) -> VVal {
+        VVal::Pair(Rc::new((a, b)))
     }
 
     pub fn to_vec(&self) -> Vec<VVal> {
@@ -2159,6 +2204,9 @@ impl VVal {
                     Ok(self.at(e.arg(0).i() as usize).unwrap_or(VVal::None))
                 })
             },
+            VVal::Iter(i) => {
+                Ok(iter_next!(i.borrow_mut()))
+            },
             VVal::Opt(v) => {
                 if let Some(v) = v {
                     Ok(v.as_ref().clone())
@@ -2255,9 +2303,11 @@ impl VVal {
             VVal::Byt(s)     => { &*s.borrow() as *const Vec<u8> as i64 },
             VVal::Lst(v)     => { &*v.borrow() as *const Vec<VVal> as i64 },
             VVal::Map(v)     => { &*v.borrow() as *const FnvHashMap<String, VVal> as i64 },
+            VVal::Iter(v)    => { &*v.borrow() as *const VValIter as i64 },
             VVal::Opt(p)     => { if let Some(p) = p { &*p.as_ref() as *const VVal as i64 } else { 0 } },
             VVal::Fun(f)     => { &**f as *const VValFun as i64 },
             VVal::DropFun(f) => { &**f as *const DropVVal as i64 },
+            VVal::Pair(v)    => { &**v as *const (VVal, VVal) as i64 },
             VVal::Ref(v)     => { &*v.borrow() as *const VVal as i64 },
             VVal::CRef(v)    => { &*v.borrow() as *const VVal as i64 },
             VVal::Usr(b)     => { &**b as *const dyn VValUserData as *const usize as i64 },
@@ -2317,6 +2367,13 @@ impl VVal {
             },
             VVal::Err(l)  => {
                 if let VVal::Err(l2) = v { Rc::ptr_eq(l, l2) } else { false }
+            },
+            VVal::Iter(i) => {
+                if let VVal::Iter(i2) = v {
+                    Rc::ptr_eq(i, i2)
+                } else {
+                    false
+                }
             },
             VVal::Ref(l)  => {
                 match v {
@@ -2485,6 +2542,11 @@ impl VVal {
             VVal::Pair(b) => {
                 Some(if index % 2 == 0 { b.0.clone() } else { b.1.clone() })
             },
+            VVal::Iter(i) => {
+                let mut i = i.borrow_mut();
+                for _ in 0..index { i.next(); }
+                iter_next_value!(i, v, { Some(v) }, None)
+            },
             VVal::Opt(ref b) => {
                 if let Some(b) = b {
                     b.as_ref().at(index)
@@ -2602,6 +2664,12 @@ impl VVal {
                     "1" | "cdr" | "tail" | "second" => 1,
                     _ => usize::from_str_radix(key, 10).unwrap_or(0),
                 })
+            },
+            VVal::Iter(i) => {
+                let index = usize::from_str_radix(key, 10).unwrap_or(0);
+                let mut i = i.borrow_mut();
+                for _ in 0..index { i.next(); }
+                iter_next_value!(i, v, { Some(v) }, None)
             },
             VVal::Lst(l) => {
                 let idx = usize::from_str_radix(key, 10).unwrap_or(0);
@@ -2967,6 +3035,10 @@ impl VVal {
         match self { VVal::Pair(_) => true, _ => false }
     }
 
+    pub fn is_iter(&self) -> bool {
+        if let VVal::Iter(_) = self { true } else { false }
+    }
+
     pub fn is_optional(&self) -> bool {
         if let VVal::Opt(_) = self { true } else { false }
     }
@@ -3035,6 +3107,7 @@ impl VVal {
             VVal::Int(_)     => String::from("integer"),
             VVal::Flt(_)     => String::from("float"),
             VVal::Pair(_)    => String::from("pair"),
+            VVal::Iter(_)    => String::from("iter"),
             VVal::Opt(_)     => String::from("optional"),
             VVal::Lst(_)     => String::from("vector"),
             VVal::Map(_)     => String::from("map"),
@@ -3212,6 +3285,7 @@ impl VVal {
             VVal::Fun(_)     => 1.0,
             VVal::IVec(iv)   => iv.x_raw() as f64,
             VVal::FVec(fv)   => fv.x_raw(),
+            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.f() }, 0.0),
             v => v.with_deref(|v| v.f(), |_| 0.0),
         }
     }
@@ -3235,6 +3309,7 @@ impl VVal {
             VVal::Fun(_)     => 1,
             VVal::IVec(iv)   => iv.x_raw(),
             VVal::FVec(fv)   => fv.x_raw() as i64,
+            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.i() }, 0),
             v => v.with_deref(|v| v.i(), |_| 0),
         }
     }
@@ -3258,6 +3333,7 @@ impl VVal {
             VVal::Fun(_)     => true,
             VVal::IVec(iv)   => iv.x().b(),
             VVal::FVec(fv)   => fv.x().b(),
+            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.b() }, false),
             v => v.with_deref(|v| v.b(), |_| false),
         }
     }
@@ -3293,6 +3369,15 @@ impl VVal {
                 // because lists can't have holes.
                 NVec::from_vval_tpl((x.unwrap_or(&o), y.unwrap_or(&o), z, w)).unwrap()
             },
+            VVal::Pair(p) => {
+                NVec::from_vval_tpl((p.0.clone(), p.1.clone(), None, None)).unwrap()
+            },
+            VVal::Iter(i) => {
+                iter_next_value!(
+                    i.borrow_mut(), v, { v.nvec::<N>() },
+                    NVec::from_vval_tpl(
+                        (VVal::Int(0), VVal::Int(0), None, None)).unwrap())
+            },
             _ => Vec2(N::from_vval(self), N::zero()),
         }
     }
@@ -3315,6 +3400,7 @@ impl VVal {
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
             VVal::Pair(b)    => format!("$p({},{})", b.0.s_cy(c), b.1.s_cy(c)),
+            VVal::Iter(_)    => format!("$iter(&)"),
             VVal::Opt(b)     =>
                 if let Some(b) = b { format!("$o({})", b.s_cy(c)) }
                 else { "$o()".to_string() },
@@ -3443,6 +3529,7 @@ impl serde::ser::Serialize for VVal {
             VVal::Sym(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Byt(b)     => serializer.serialize_bytes(&b.borrow()[..]),
             VVal::None       => serializer.serialize_none(),
+            VVal::Iter(_)    => serializer.serialize_none(),
             VVal::Err(_)     => serializer.serialize_str(&self.s()),
             VVal::Bol(b)     => serializer.serialize_bool(*b),
             VVal::Syn(_)     => serializer.serialize_str(&self.s()),

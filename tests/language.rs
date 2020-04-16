@@ -2599,6 +2599,13 @@ fn check_pairs() {
 
     assert_eq!(ve("int $p(3.3,4.4)"),   "3");
     assert_eq!(ve("float $p(3.3,4.4)"), "3.3");
+
+    assert_eq!(ve(r"
+        !p1 = $p(1, 2);
+        !p2 = $p(1, 2);
+        $[std:ref_id[p1] == std:ref_id[p2],
+          std:ref_id[p1] == std:ref_id[p2]]
+    "), "$[$false,$false]");
 }
 
 #[test]
@@ -2751,5 +2758,6 @@ fn check_optionals() {
           std:ref_id[y] == y2]
         "),
         "$[$true,$true,$true,$true,$true]");
-
 }
+
+

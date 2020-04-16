@@ -633,8 +633,24 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             Ok(VVal::None)
         },
         'i' => {
-            ps.consume();
-            parse_nvec_body(ps, NVecKind::Int)
+            if ps.consume_lookahead("iter") {
+                if !ps.consume_if_eq_wsc('(') {
+                    return Err(ps.err(ParseErrorKind::UnexpectedToken('(', "At the start of $iter(...)")))
+                }
+
+                let a = parse_expr(ps)?;
+                let it_v = ps.syn(Syntax::Iter);
+                it_v.push(a);
+
+                if ps.consume_if_eq_wsc(')') {
+                    Ok(it_v)
+                } else {
+                    Err(ps.err(ParseErrorKind::UnexpectedToken(')', "At the end of a $iter(...)")))
+                }
+            } else {
+                ps.consume();
+                parse_nvec_body(ps, NVecKind::Int)
+            }
         },
         'd' => {
             if ps.consume_lookahead("data") {
@@ -718,9 +734,9 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             let ret =
                 if ps.consume_if_eq_wsc(',') {
                     let b = parse_expr(ps)?;
-                    VVal::Pair(Box::new((a, b)))
+                    VVal::Pair(std::rc::Rc::new((a, b)))
                 } else {
-                    VVal::Pair(Box::new((a, VVal::None)))
+                    VVal::Pair(std::rc::Rc::new((a, VVal::None)))
                 };
 
             if ps.consume_if_eq_wsc(')') {

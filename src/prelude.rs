@@ -4562,6 +4562,9 @@ pub fn core_symbol_table() -> SymbolTable {
     func!(st, "is_optional",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_optional())) },
         Some(1), Some(1), true);
+    func!(st, "is_iter",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_iter())) },
+        Some(1), Some(1), true);
     func!(st, "is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) },
         Some(1), Some(1), true);
@@ -4584,7 +4587,7 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "cons",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::Pair(Box::new((env.arg(0), env.arg(1)))))
+            Ok(VVal::pair(env.arg(0), env.arg(1)))
         }, Some(2), Some(2), true);
 
     func!(st, "for",
