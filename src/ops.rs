@@ -785,7 +785,6 @@ pub enum OpR {
     NewList,
     NewMap,
     NewNoneOpt,
-    IterNext,
     ToRef(ResPos, ToRefType),
 }
 
@@ -860,6 +859,7 @@ pub enum OpS {
     CtrlFlowNext,
     DumpStack(Box<SynPos>),
     DumpVM(Box<SynPos>),
+    IterNext,
     Unwind,
     End,
 }

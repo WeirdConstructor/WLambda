@@ -265,6 +265,19 @@ macro_rules! op_a_b_c_r {
     }
 }
 
+macro_rules! op_a_b_c_d_r {
+    ($env: ident, $ret: ident, $retv: ident, $prog: ident, $a: ident, $b: ident, $c: ident, $d: ident, $r: ident, $block: block) => {
+        {
+            in_reg!($env, $ret, $prog, $a);
+            in_reg!($env, $ret, $prog, $b);
+            in_reg!($env, $ret, $prog, $c);
+            in_reg!($env, $ret, $prog, $d);
+            let res = $block;
+            out_reg!($env, $ret, $retv, $prog, $r, res);
+        }
+    }
+}
+
 macro_rules! handle_err {
     ($v: ident, $msg: expr, $retv: ident) => {
         {
@@ -448,6 +461,25 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             }
                         }
                     },
+                    OpS::IterNext => {
+                        let value =
+                            if let Some(i) = &env.iter {
+                                if let Some(v) = i.borrow_mut().next() {
+                                    Some(v.0)
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            };
+                        if let Some(v) = value {
+                            out_reg!(env, ret, retv, prog, r, v);
+                        } else {
+                            unwind_loop_info!(env);
+                            pc = env.loop_info.break_pc;
+                            env.unwind_one();
+                        }
+                    },
                     OpS::Unwind => { env.unwind_one(); },
                     OpS::End    => { break; },
                 }
@@ -487,8 +519,21 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::R(op, r) => op_r!(env, ret, retv, prog, r, {
                 match op {
+                    OpR::Argv => { env.argv() },
+                    OpR::Call(u16) => {
+                        let argc = *argc as usize;
+                        let f = env.stk(argc + 1).clone();
+
+                        let rv = VVal::Nul;
+                        call_func!(f, argc, argc + 1, env, retv, uw_depth, prog, pc, v, {
+                            rv = v
+                        });
+                        rv
+                    },
+                    OpR::NewList => { VVal::vec() },
+                    OpR::NewMap => { VVal::map() },
                     OpR::NewNoneOpt => { VVal::Opt(None) },
-                    OpS::ToRef(a, typ) => {
+                    OpR::ToRef(a, typ) => {
                         match typ {
                             ToRefType::CaptureRef =>
                                 match a {
@@ -577,312 +622,261 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     },
                 }
             }),
-            Op::ABR(op, a, b, r) => {
-            },
+            Op::ABR(op, a, b, r) => op_a_b_r!(env, ret, retv, prog, a, b, r, {
+                match op {
+                    OpABR::NewPair => {
+                        VVal::Pair(Box::new((
+                            handle_err!(b, "first pair element", retv),
+                            handle_err!(a, "second pair element", retv))))
+                    },
+                    OpABR::Add => {
+                        if let VVal::Int(a) = a {
+                            VVal::Int(a.wrapping_add(b.i()))
+                        } else if let VVal::Flt(f) = a {
+                            VVal::Flt(f + b.f())
+                        } else {
+                            match (a, b) {
+                                (VVal::IVec(ln), re) => VVal::IVec(ln + re.nvec()),
+                                (VVal::FVec(ln), re) => VVal::FVec(ln + re.nvec()),
+                                (le, re)             => VVal::Int(le.i().wrapping_add(re.i()))
+                            }
+                        }
+                    },
+                    OpABR::Sub => {
+                        if let VVal::Int(a) = a {
+                            VVal::Int(a.wrapping_sub(b.i()))
+                        } else if let VVal::Flt(f) = a {
+                            VVal::Flt(f - b.f())
+                        } else {
+                            match (a, b) {
+                                (VVal::IVec(ln), re) => VVal::IVec(ln - re.nvec()),
+                                (VVal::FVec(ln), re) => VVal::FVec(ln - re.nvec()),
+                                (le, re)             => VVal::Int(le.i().wrapping_sub(re.i()))
+                            }
+                        }
+                    },
+                    OpABR::Mul => {
+                        if let VVal::Int(a) = a {
+                            VVal::Int(a.wrapping_mul(b.i()))
+                        } else if let VVal::Flt(f) = a {
+                            VVal::Flt(f * b.f())
+                        } else {
+                            match (a, b) {
+                                (VVal::IVec(ln), re) => VVal::IVec(ln * re.i()),
+                                (VVal::FVec(ln), re) => VVal::FVec(ln * re.f()),
+                                (le, re)             => VVal::Int(le.i().wrapping_mul(re.i()))
+                            }
+                        }
+                    },
+                    OpABR::Div => {
+                        if let VVal::Int(a) = a {
+                            if b.i() == 0 {
+                                env.unwind_to_depth(uw_depth);
+                                retv =
+                                    Err(StackAction::panic_str(
+                                        format!("Division by 0: {}/{}", a, b.i()),
+                                        prog.debug[pc].clone()));
+                                break;
+                            }
+
+                            VVal::Int(a.wrapping_div(b.i()))
+                        } else if let VVal::Flt(f) = a {
+                            VVal::Flt(f / b.f())
+                        } else {
+                            match (a, b) {
+                                (VVal::IVec(ln), re) => VVal::IVec(ln / re.i()),
+                                (VVal::FVec(ln), re) => VVal::FVec(ln / re.f()),
+                                (le, re)             => {
+                                    let re = re.i();
+                                    if re == 0 {
+                                        env.unwind_to_depth(uw_depth);
+                                        retv =
+                                            Err(StackAction::panic_str(
+                                                format!("Division by 0: {}/{}", le.i(), re),
+                                                prog.debug[pc].clone()));
+                                        break;
+                                    }
+                                    VVal::Int(le.i().wrapping_div(re))
+                                },
+                            }
+                        }
+                    },
+                    OpABR::Mod => {
+                        if let VVal::Flt(f) = a {
+                            VVal::Flt(f % b.f())
+                        } else {
+                            VVal::Int(a.i().wrapping_rem(b.i()))
+                        }
+                    },
+                    OpABR::Le => {
+                        if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
+                        else { VVal::Bol(a.i() <= b.i()) }
+                    },
+                    OpABR::Lt => {
+                        if let VVal::Flt(f) = a { VVal::Bol(f < b.f()) }
+                        else { VVal::Bol(a.i() < b.i()) }
+                    },
+                    OpABR::Ge => {
+                        if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
+                        else { VVal::Bol(a.i() >= b.i()) }
+                    },
+                    OpABR::Gt => {
+                        if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
+                        else { VVal::Bol(a.i() > b.i()) }
+                    },
+                    OpABR::Eq => {
+                        VVal::Bol(a.eqv(&b))
+                    },
+                    OpABR::ListPush => {
+                        b.push(handle_err!(a, "list element", retv));
+                        b
+                    },
+                    OpABR::ListSplice => {
+                        for (e, _) in a.iter() {
+                            b.push(e);
+                        }
+                        b
+                    },
+                    OpABR::MapSplice => {
+                        for (e, k) in a.iter() {
+                            match b.set_key(&k.unwrap(), e) {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    retv =
+                                        Err(StackAction::panic_str(
+                                            format!("map set key errro: {}", e),
+                                            prog.debug[pc].clone()));
+                                }
+                            }
+                        }
+
+                        if retv.is_err() {
+                            break;
+                        }
+
+                        b
+                    },
+                    OpABR::GetKey => {
+                        let a = handle_err!(a, "field idx/key", retv);
+                        let b = handle_err!(b, "map/list", retv);
+                        get_key!(a, b, get_key, env, retv, uw_depth, prog, pc)
+                    },
+                    OpABR::CallMethodKey(u16) => {
+                        let a = handle_err!(a, "field idx/key", retv);
+                        let b = handle_err!(b, "map/list", retv);
+
+                        let f = get_key!(a, b, proto_lookup, env, retv, uw_depth, prog, pc);
+
+                        let argc = *argc as usize;
+                        env.push_unwind_self(b);
+                        let rv = VVal::Nul;
+                        call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                            env.unwind_one();
+                            rv = v;
+                        });
+                        rv
+                    },
+                    OpABR::Apply => {
+                        let mut argv = a;
+                        let func     = b;
+
+                        let argc =
+                            if let VVal::Lst(l) = &argv {
+                                l.borrow().len()
+                            } else {
+                                let a = VVal::vec();
+                                a.push(argv);
+                                argv = a;
+                                1
+                            };
+
+                        for i in 0..argc {
+                            let v = argv.at(i).unwrap_or_else(|| VVal::None);
+                            env.push(v);
+                        }
+
+                        let call_ret = func.call_internal(env, argc);
+                        env.popn(argc);
+
+                        match call_ret {
+                            Ok(v) => { v },
+                            Err(StackAction::Return(ret)) => {
+                                env.unwind_to_depth(uw_depth);
+                                retv = Err(StackAction::Return(ret));
+                                break;
+                            },
+                            Err(sa) => {
+                                env.unwind_to_depth(uw_depth);
+                                retv = Err(sa.wrap_panic(prog.debug[pc].clone()));
+                                break;
+                            },
+                        }
+                    },
+                    OpABR::NewIVec => {
+                        let a = handle_err!(a, "x nvector component", retv);
+                        let b = handle_err!(b, "y nvector component", retv);
+                        VVal::IVec(NVec::Vec2(a.i(), b.i()))
+                    },
+                    OpABR::NewFVec => {
+                        let a = handle_err!(a, "x nvector component", retv);
+                        let b = handle_err!(b, "y nvector component", retv);
+                        VVal::FVec(NVec::Vec2(a.f(), b.f()))
+                    },
+                }
+            }),
             Op::ABCR(op, bx, r) => {
+                let a = bx.0;
+                let b = bx.1;
+                let c = bx.2;
+                op_a_b_c_r!(env, ret, retv, prog, a, b, c, r, {
+                    match op {
+                        OpABCR::MapSetKey => {
+                            let a = handle_err!(a, "map value", retv);
+                            let b = handle_err!(b, "map key", retv);
+                            c.set_key(&b, a)?;
+                            c
+                        },
+                        OpABCR::NewIVec => {
+                            let a = handle_err!(a, "x nvector component", retv);
+                            let b = handle_err!(b, "y nvector component", retv);
+                            let c = handle_err!(c, "z nvector component", retv);
+                            VVal::IVec(NVec::Vec3(a.i(), b.i(), c.i()))
+                        },
+                        OpABCR::NewFVec => {
+                            let a = handle_err!(a, "x nvector component", retv);
+                            let b = handle_err!(b, "y nvector component", retv);
+                            let c = handle_err!(c, "z nvector component", retv);
+                            VVal::FVec(NVec::Vec3(a.f(), b.f(), c.f()))
+                        },
+                    }
+                })
             },
             Op::ABCDR(op, bx, r) => {
+                let a = bx.0;
+                let b = bx.1;
+                let c = bx.2;
+                let d = bx.3;
+                op_a_b_c_d_r!(env, ret, retv, prog, a, b, c, d, r, {
+                    match op {
+                        NewIVec => {
+                            let a = handle_err!(a, "x nvector component", retv);
+                            let b = handle_err!(b, "y nvector component", retv);
+                            let c = handle_err!(c, "z nvector component", retv);
+                            let d = handle_err!(d, "w nvector component", retv);
+                            VVal::IVec(NVec::Vec4(a.i(), b.i(), c.i(), d.i()))
+                        },
+                        NewFVec => {
+                            let a = handle_err!(a, "x nvector component", retv);
+                            let b = handle_err!(b, "y nvector component", retv);
+                            let c = handle_err!(c, "z nvector component", retv);
+                            let d = handle_err!(d, "w nvector component", retv);
+                            VVal::FVec(NVec::Vec4(a.f(), b.f(), c.f(), d.f()))
+                        },
+                    }
+                })
             },
         }
 
-//        match op {
-//            Op::NewPair(a, b, r) => op_a_b_r!(env, ret, retv, prog, a, b, r, {
-//                VVal::Pair(Box::new((
-//                    handle_err!(b, "first pair element", retv),
-//                    handle_err!(a, "second pair element", retv))))
-//            }),
-//            Op::NewNVec(vp, r) => {
-//                use crate::nvec::NVec;
-//
-//                match vp.as_ref() {
-//                    NVecPos::IVec2(a, b) => {
-//                        in_reg!(env, ret, prog, a);
-//                        in_reg!(env, ret, prog, b);
-//                        let a = handle_err!(a, "x nvector component", retv);
-//                        let b = handle_err!(b, "y nvector component", retv);
-//                        out_reg!(env, ret, retv, prog, r,
-//                            VVal::IVec(NVec::Vec2(a.i(), b.i())));
-//                    },
-//                    NVecPos::IVec3(a, b, c) => {
-//                        in_reg!(env, ret, prog, a);
-//                        in_reg!(env, ret, prog, b);
-//                        in_reg!(env, ret, prog, c);
-//                        let a = handle_err!(a, "x nvector component", retv);
-//                        let b = handle_err!(b, "y nvector component", retv);
-//                        let c = handle_err!(c, "z nvector component", retv);
-//                        out_reg!(env, ret, retv, prog, r,
-//                            VVal::IVec(NVec::Vec3(a.i(), b.i(), c.i())));
-//                    },
-//                    NVecPos::IVec4(a, b, c, d) => {
-//                        in_reg!(env, ret, prog, a);
-//                        in_reg!(env, ret, prog, b);
-//                        in_reg!(env, ret, prog, c);
-//                        in_reg!(env, ret, prog, d);
-//                        let a = handle_err!(a, "x nvector component", retv);
-//                        let b = handle_err!(b, "y nvector component", retv);
-//                        let c = handle_err!(c, "z nvector component", retv);
-//                        let d = handle_err!(d, "w nvector component", retv);
-//                        out_reg!(env, ret, retv, prog, r,
-//                            VVal::IVec(NVec::Vec4(a.i(), b.i(), c.i(), d.i())));
-//                    },
-//                    NVecPos::FVec2(a, b) => {
-//                        in_reg!(env, ret, prog, a);
-//                        in_reg!(env, ret, prog, b);
-//                        let a = handle_err!(a, "x nvector component", retv);
-//                        let b = handle_err!(b, "y nvector component", retv);
-//                        out_reg!(env, ret, retv, prog, r,
-//                            VVal::FVec(NVec::Vec2(a.f(), b.f())));
-//                    },
-//                    NVecPos::FVec3(a, b, c) => {
-//                        in_reg!(env, ret, prog, a);
-//                        in_reg!(env, ret, prog, b);
-//                        in_reg!(env, ret, prog, c);
-//                        let a = handle_err!(a, "x nvector component", retv);
-//                        let b = handle_err!(b, "y nvector component", retv);
-//                        let c = handle_err!(c, "z nvector component", retv);
-//                        out_reg!(env, ret, retv, prog, r,
-//                            VVal::FVec(NVec::Vec3(a.f(), b.f(), c.f())));
-//                    },
-//                    NVecPos::FVec4(a, b, c, d) => {
-//                        in_reg!(env, ret, prog, a);
-//                        in_reg!(env, ret, prog, b);
-//                        in_reg!(env, ret, prog, c);
-//                        in_reg!(env, ret, prog, d);
-//                        let a = handle_err!(a, "x nvector component", retv);
-//                        let b = handle_err!(b, "y nvector component", retv);
-//                        let c = handle_err!(c, "z nvector component", retv);
-//                        let d = handle_err!(d, "w nvector component", retv);
-//                        out_reg!(env, ret, retv, prog, r,
-//                            VVal::FVec(NVec::Vec4(a.f(), b.f(), c.f(), d.f())));
-//                    },
-//                }
-//            },
-//            Op::Argv(r)             => op_r!(env, ret, retv, prog, r, { env.argv() }),
-//            Op::IterNext(ivar) => {
-//                let value =
-//                    if let Some(i) = &env.iter {
-//                        if let Some(v) = i.borrow_mut().next() {
-//                            Some(v.0)
-//                        } else {
-//                            None
-//                        }
-//                    } else {
-//                        None
-//                    };
-//                if let Some(v) = value {
-//                    out_reg!(env, ret, retv, prog, ivar, v);
-//                } else {
-//                    unwind_loop_info!(env);
-//                    pc = env.loop_info.break_pc;
-//                    env.unwind_one();
-//                }
-//            },
-//            Op::Add(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Int(a) = a {
-//                    VVal::Int(a.wrapping_add(b.i()))
-//                } else if let VVal::Flt(f) = a {
-//                    VVal::Flt(f + b.f())
-//                } else {
-//                    match (a, b) {
-//                        (VVal::IVec(ln), re) => VVal::IVec(ln + re.nvec()),
-//                        (VVal::FVec(ln), re) => VVal::FVec(ln + re.nvec()),
-//                        (le, re)             => VVal::Int(le.i().wrapping_add(re.i()))
-//                    }
-//                }
-//            }),
-//            Op::Sub(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Int(a) = a {
-//                    VVal::Int(a.wrapping_sub(b.i()))
-//                } else if let VVal::Flt(f) = a {
-//                    VVal::Flt(f - b.f())
-//                } else {
-//                    match (a, b) {
-//                        (VVal::IVec(ln), re) => VVal::IVec(ln - re.nvec()),
-//                        (VVal::FVec(ln), re) => VVal::FVec(ln - re.nvec()),
-//                        (le, re)             => VVal::Int(le.i().wrapping_sub(re.i()))
-//                    }
-//                }
-//            }),
-//            Op::Div(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Int(a) = a {
-//                    if b.i() == 0 {
-//                        env.unwind_to_depth(uw_depth);
-//                        retv =
-//                            Err(StackAction::panic_str(
-//                                format!("Division by 0: {}/{}", a, b.i()),
-//                                prog.debug[pc].clone()));
-//                        break;
-//                    }
-//
-//                    VVal::Int(a.wrapping_div(b.i()))
-//                } else if let VVal::Flt(f) = a {
-//                    VVal::Flt(f / b.f())
-//                } else {
-//                    match (a, b) {
-//                        (VVal::IVec(ln), re) => VVal::IVec(ln / re.i()),
-//                        (VVal::FVec(ln), re) => VVal::FVec(ln / re.f()),
-//                        (le, re)             => {
-//                            let re = re.i();
-//                            if re == 0 {
-//                                env.unwind_to_depth(uw_depth);
-//                                retv =
-//                                    Err(StackAction::panic_str(
-//                                        format!("Division by 0: {}/{}", le.i(), re),
-//                                        prog.debug[pc].clone()));
-//                                break;
-//                            }
-//                            VVal::Int(le.i().wrapping_div(re))
-//                        },
-//                    }
-//                }
-//            }),
-//            Op::Mul(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Int(a) = a {
-//                    VVal::Int(a.wrapping_mul(b.i()))
-//                } else if let VVal::Flt(f) = a {
-//                    VVal::Flt(f * b.f())
-//                } else {
-//                    match (a, b) {
-//                        (VVal::IVec(ln), re) => VVal::IVec(ln * re.i()),
-//                        (VVal::FVec(ln), re) => VVal::FVec(ln * re.f()),
-//                        (le, re)             => VVal::Int(le.i().wrapping_mul(re.i()))
-//                    }
-//                }
-//            }),
-//            Op::Mod(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Flt(f) = a {
-//                    VVal::Flt(f % b.f())
-//                } else {
-//                    VVal::Int(a.i().wrapping_rem(b.i()))
-//                }
-//            }),
-//            Op::Le(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
-//                else { VVal::Bol(a.i() <= b.i()) }
-//            }),
-//            Op::Lt(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Flt(f) = a { VVal::Bol(f < b.f()) }
-//                else { VVal::Bol(a.i() < b.i()) }
-//            }),
-//            Op::Ge(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
-//                else { VVal::Bol(a.i() >= b.i()) }
-//            }),
-//            Op::Gt(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
-//                else { VVal::Bol(a.i() > b.i()) }
-//            }),
-//            Op::Eq(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
-//                VVal::Bol(a.eqv(&b))
-//            }),
-//            Op::NewList(r) => op_r!(env, ret, retv, prog, r, { VVal::vec() }),
-//            Op::ListPush(a, b, r) => op_a_b_r!(env, ret, retv, prog, a, b, r, {
-//                b.push(handle_err!(a, "list element", retv));
-//                b
-//            }),
-//            Op::ListSplice(a, b, r) => op_a_b_r!(env, ret, retv, prog, a, b, r, {
-//                for (e, _) in a.iter() {
-//                    b.push(e);
-//                }
-//                b
-//            }),
-//            Op::NewMap(r) => op_r!(env, ret, retv, prog, r, { VVal::map() }),
-//            Op::MapSetKey(v, k, m, r) => op_a_b_c_r!(env, ret, retv, prog, v, k, m, r, {
-//                let v = handle_err!(v, "map value", retv);
-//                let k = handle_err!(k, "map key", retv);
-//                m.set_key(&k, v)?;
-//                m
-//            }),
-//            Op::GetKey(o, k, r) => {
-//                in_reg!(env, ret, prog, k);
-//                in_reg!(env, ret, prog, o);
-//
-//                let o = handle_err!(o, "field idx/key", retv);
-//                let k = handle_err!(k, "map/list", retv);
-//                let res = get_key!(o, k, get_key, env, retv, uw_depth, prog, pc);
-//                out_reg!(env, ret, retv, prog, r, res);
-//            },
-//            Op::MapSplice(s, m, r) => op_a_b_r!(env, ret, retv, prog, s, m, r, {
-//                for (e, k) in s.iter() {
-//                    match m.set_key(&k.unwrap(), e) {
-//                        Ok(_) => (),
-//                        Err(e) => {
-//                            retv =
-//                                Err(StackAction::panic_str(
-//                                    format!("map set key errro: {}", e),
-//                                    prog.debug[pc].clone()));
-//                        }
-//                    }
-//                }
-//
-//                if retv.is_err() {
-//                    break;
-//                }
-//
-//                m
-//            }),
-//            Op::CallMethodKey(o, k, argc, r) => {
-//                in_reg!(env, ret, prog, k);
-//                in_reg!(env, ret, prog, o);
-//                let o = handle_err!(o, "field idx/key", retv);
-//                let k = handle_err!(k, "map/list", retv);
-//
-//                let f = get_key!(o, k, proto_lookup, env, retv, uw_depth, prog, pc);
-//
-//                let argc = *argc as usize;
-//                env.push_unwind_self(o);
-//                call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
-//                    env.unwind_one();
-//                    out_reg!(env, ret, retv, prog, r, v);
-//                });
-//            },
-//            Op::Call(argc, r) => {
-//                let argc = *argc as usize;
-//                let f = env.stk(argc + 1).clone();
-//
-//                call_func!(f, argc, argc + 1, env, retv, uw_depth, prog, pc, v, {
-//                    out_reg!(env, ret, retv, prog, r, v);
-//                });
-//            },
-//            Op::Apply(argv, func, r) => {
-//                in_reg!(env, ret, prog, argv);
-//                in_reg!(env, ret, prog, func);
-//
-//                let mut argv = argv;
-//
-//                let argc =
-//                    if let VVal::Lst(l) = &argv {
-//                        l.borrow().len()
-//                    } else {
-//                        let a = VVal::vec();
-//                        a.push(argv);
-//                        argv = a;
-//                        1
-//                    };
-//
-//                for i in 0..argc {
-//                    let v = argv.at(i).unwrap_or_else(|| VVal::None);
-//                    env.push(v);
-//                }
-//
-//                let call_ret = func.call_internal(env, argc);
-//                env.popn(argc);
-//
-//                match call_ret {
-//                    Ok(v) => { out_reg!(env, ret, retv, prog, r, v); },
-//                    Err(StackAction::Return(ret)) => {
-//                        env.unwind_to_depth(uw_depth);
-//                        retv = Err(StackAction::Return(ret));
-//                        break;
-//                    },
-//                    Err(sa) => {
-//                        env.unwind_to_depth(uw_depth);
-//                        retv = Err(sa.wrap_panic(prog.debug[pc].clone()));
-//                        break;
-//                    },
-//                }
-//            },
-//        }
         if DEBUG_VM {
             env.dump_stack();
         }
@@ -1780,8 +1774,8 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                     let key_p = key.eval(prog);
                                     prog.op_call_method_key(
                                         &spos,
-                                        obj_p,
                                         key_p,
+                                        obj_p,
                                         argc as u16,
                                         store);
                                 })
@@ -2060,7 +2054,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     pw_store_if_needed!(prog, store, {
                         let mp = map_pw.eval(prog);
                         let ip = idx_pw.eval(prog);
-                        prog.op_get_key(&spos, mp, ip, store);
+                        prog.op_get_key(&spos, ip, mp, store);
                     })
                 },
                 Syntax::SetKey => {
