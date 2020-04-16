@@ -50,16 +50,6 @@ pub struct SynPos {
 }
 
 impl SynPos {
-    pub fn empty() -> Self {
-        Self {
-            syn:     Syntax::Block,
-            line:    0,
-            col:     0,
-            file:    FileRef::new(""),
-            name:    None,
-        }
-    }
-
     pub fn s_short(&self) -> String {
         format!("[{},{}({:?})]", self.line, self.col, self.syn)
     }
