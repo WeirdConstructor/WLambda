@@ -6,7 +6,7 @@ use crate::ops::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = false;
+const DEBUG_VM: bool = true;
 
 #[derive(Debug, Clone)]
 pub enum ResultSink {
@@ -508,7 +508,13 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::Unwind              => { env.unwind_one(); },
             Op::IterInit(iterable, body_ops) => {
                 in_reg!(env, ret, prog, iterable);
-                env.push_loop_info(pc, pc + *body_ops as usize);
+
+                // the pc + 1 because ClearLocals() is executed at the start
+                // of the iteration next right after Op::InitIter().
+                // The extra 1 at the end because the ClearLocals is not part
+                // of the inner loop unwind stack.
+                env.push_loop_info(pc + 1, pc + *body_ops as usize, 1);
+
                 if let VVal::Iter(i) = iterable {
                     env.push_iter(i);
                 } else {
@@ -539,7 +545,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
             },
             Op::PushLoopInfo(body_ops) => {
-                env.push_loop_info(pc, pc + *body_ops as usize);
+                env.push_loop_info(pc, pc + *body_ops as usize, 0);
             },
             Op::ClearLocals(from, to) => {
                 env.push_clear_locals(*from as usize, *to as usize);
@@ -1541,7 +1547,7 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         body.op_jmp(&spos, -(body.op_count() as i32 + 2));
 
         let ip = iterable.eval(prog);
-        prog.op_iter_init(&spos, ip, (body.op_count() + 3) as i32);
+        prog.op_iter_init(&spos, ip, (body.op_count() + 2) as i32);
 
         var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
             prog.op_iter_next(&spos, iter_var);
@@ -1773,7 +1779,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         ArityParam::Limit(i)  => Some(i),
                     };
 
-                    let env_size = ce_sub.borrow().local_env_size();
+                    let env_size = ce_sub.borrow().get_local_space();
                     let upvs     = ce_sub.borrow_mut().get_upval_pos();
                     let upvalues = vec![];
 

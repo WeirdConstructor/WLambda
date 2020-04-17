@@ -779,8 +779,8 @@ impl Env {
     }
 
     #[inline]
-    pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize) {
-        let uw_depth = self.unwind_depth() + 1;
+    pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize, uw_depth_offs: usize) {
+        let uw_depth = self.unwind_depth() + 1 + uw_depth_offs;
         let uwa =
             UnwindAction::RestoreLoopInfo(
                 std::mem::replace(&mut self.loop_info, LoopInfo {
@@ -2128,40 +2128,40 @@ impl VVal {
                 }
 
 //                env.with_fun_info(fu.clone(), argc, |e: &mut Env| {
-                    env.push_fun_call(fu.clone(), argc);
-                    if !(*fu).err_arg_ok {
-                        for i in 0..argc {
-                            if let Some(VVal::Err(ev)) = env.arg_err_internal(i) {
-                                return
-                                    Err(StackAction::panic_str(
-                                        format!("Error value in parameter list: {}",
-                                                ev.borrow().0.s()),
-                                        Some(ev.borrow().1.clone())));
-                            }
+                env.push_fun_call(fu.clone(), argc);
+                if !(*fu).err_arg_ok {
+                    for i in 0..argc {
+                        if let Some(VVal::Err(ev)) = env.arg_err_internal(i) {
+                            return
+                                Err(StackAction::panic_str(
+                                    format!("Error value in parameter list: {}",
+                                            ev.borrow().0.s()),
+                                    Some(ev.borrow().1.clone())));
                         }
                     }
+                }
 
-                    let ret =
-                        match &(*fu).fun {
-                            FunType::ClosureNode(cn) => (cn.borrow())(env, argc),
-                            FunType::VMProg(prog)    => {
-                                match crate::vm::vm(&*prog, env) {
-                                    Ok(v) => Ok(v),
-                                    Err(StackAction::Return(ret)) => {
-                                        if ret.0.eqv(&fu.label) {
-                                            Ok(ret.1)
-                                        } else {
-                                            Err(StackAction::Return(ret))
-                                        }
-                                    },
-                                    Err(e) => {
-                                        Err(e.wrap_panic(fu.syn_pos.clone()))
-                                    },
-                                }
-                            },
-                        };
-                    env.unwind_one();
-                    ret
+                let ret =
+                    match &(*fu).fun {
+                        FunType::ClosureNode(cn) => (cn.borrow())(env, argc),
+                        FunType::VMProg(prog)    => {
+                            match crate::vm::vm(&*prog, env) {
+                                Ok(v) => Ok(v),
+                                Err(StackAction::Return(ret)) => {
+                                    if ret.0.eqv(&fu.label) {
+                                        Ok(ret.1)
+                                    } else {
+                                        Err(StackAction::Return(ret))
+                                    }
+                                },
+                                Err(e) => {
+                                    Err(e.wrap_panic(fu.syn_pos.clone()))
+                                },
+                            }
+                        },
+                    };
+                env.unwind_one();
+                ret
 //                })
             },
             VVal::Bol(b) => {
