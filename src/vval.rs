@@ -1779,6 +1779,113 @@ impl VVal {
         }
     }
 
+    pub fn keys(&self) -> VVal {
+        match self {
+            VVal::Map(m) => {
+                let out = VVal::vec();
+                for (k, _) in m.borrow_mut().iter() {
+                    out.push(VVal::new_str_mv(k.to_string()));
+                }
+                out
+            },
+            VVal::Iter(i) => {
+                let out = VVal::vec();
+                let mut i = i.borrow_mut();
+                loop {
+                    if let Some((_, k)) = i.next() {
+                        if let Some(k) = k {
+                            out.push(k);
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                out
+            },
+            VVal::Lst(l) => {
+                let out = VVal::vec();
+                for (i, _) in l.borrow_mut().iter().enumerate() {
+                    out.push(VVal::Int(i as i64));
+                }
+                out
+            },
+            v => v.with_deref(
+                |v| v.keys(),
+                |_| VVal::None),
+        }
+    }
+
+    pub fn values(&self) -> VVal {
+        match self {
+            VVal::Map(m) => {
+                let out = VVal::vec();
+                for (_, v) in m.borrow_mut().iter() {
+                    out.push(v.clone());
+                }
+                out
+            },
+            VVal::Lst(l) => {
+                let out = VVal::vec();
+                for v in l.borrow_mut().iter() {
+                    out.push(v.clone());
+                }
+                out
+            },
+            VVal::Iter(i) => {
+                let out = VVal::vec();
+                let mut i = i.borrow_mut();
+                loop {
+                    if let Some((v, _)) = i.next() {
+                        out.push(v);
+                    } else {
+                        break;
+                    }
+                }
+                out
+            },
+            v => v.with_deref(
+                |v| v.values(),
+                |_| VVal::None),
+        }
+    }
+
+    pub fn enumerate(&self) -> VVal {
+        match self {
+            VVal::Map(m) => {
+                let out = VVal::vec();
+                for (i, _) in m.borrow_mut().iter().enumerate() {
+                    out.push(VVal::Int(i as i64));
+                }
+                out
+            },
+            VVal::Lst(l) => {
+                let out = VVal::vec();
+                for (i, _) in l.borrow_mut().iter().enumerate() {
+                    out.push(VVal::Int(i as i64));
+                }
+                out
+            },
+            VVal::Iter(i) => {
+                let out = VVal::vec();
+                let mut i = i.borrow_mut();
+                let mut c = 0;
+                loop {
+                    if let Some(_) = i.next() {
+                        out.push(VVal::Int(c));
+                        c += 1;
+                    } else {
+                        break;
+                    }
+                }
+                out
+            },
+            v => v.with_deref(
+                |v| v.enumerate(),
+                |_| VVal::None),
+        }
+    }
+
+
     /// This function returns you an iterator over the VVal.
     /// It will iterate over data such as VVal::Str, VVal::Sym, VVal::Lst,
     /// VVal::Map and VVal::Byt.
@@ -1857,6 +1964,31 @@ impl VVal {
                 } else { std::iter::from_fn(Box::new(|| { None })) },
             VVal::None => {
                 std::iter::from_fn(Box::new(move || { None }))
+            },
+            VVal::Pair(p) => {
+                p.0.with_s_ref(|key: &str| -> VValIter {
+                    let l =
+                        match &key[..] {
+                            "keys"      => p.1.keys(),
+                            "values"    => p.1.values(),
+                            "enumerate" => p.1.enumerate(),
+                            _ => {
+                                return std::iter::from_fn(Box::new(move || { None }))
+                            }
+                        };
+                    if let VVal::Lst(l) = l {
+                        let l = l.clone();
+                        let mut idx = 0;
+                        std::iter::from_fn(Box::new(move || {
+                            if idx >= l.borrow().len() { return None; }
+                            let r = Some((l.borrow()[idx].clone(), None));
+                            idx += 1;
+                            r
+                        }))
+                    } else {
+                        std::iter::from_fn(Box::new(move || { None }))
+                    }
+                })
             },
             VVal::IVec(NVec::Vec2(a, b)) => {
                 let mut i = *a;

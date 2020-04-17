@@ -4738,6 +4738,18 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(v)
         }, Some(2), Some(2), false);
 
+    func!(st, "keys",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            Ok(v.keys())
+        }, Some(1), Some(1), false);
+
+    func!(st, "values",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            Ok(v.values())
+        }, Some(1), Some(1), false);
+
     func!(st, "accum",
         |env: &mut Env, argc: usize| {
             let mut v = env.arg(0);

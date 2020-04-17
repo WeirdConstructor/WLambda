@@ -1824,6 +1824,8 @@ fn check_for() {
 #[test]
 fn check_splices() {
     assert_eq!(ve("${ a = 10, *${ b = 2 }}.b"), "2");
+    assert_eq!(ve("${*10}"), "${=10}");
+    assert_eq!(ve("!it = $iter ${a=33}; ${*it}"), "${a=33}");
     assert_eq!(ve("!a = ${a=10}; !b = ${b = 3}; ${*a, *b}.b"), "3");
     assert_eq!(ve("$[1,2,*$[3,4]].2"), "3");
     assert_eq!(ve("!a = $[1,2]; !b = $[3,4]; $[*a, *b].2"), "3");
@@ -2738,6 +2740,67 @@ fn check_iter_data() {
         !it = $iter $[1,2,3,4];
         $[int it, it[], ${a=float[it] + 0.2}, ${b=it[]}]
     "), "$[1,$o(2),${a=3.2},${b=$o(4)}]");
+
+    assert_eq!(ve(r"
+        !it = $iter $q abc ;
+        it[];
+        it[][];
+    "), "\"b\"");
+
+    assert_eq!(ve(r"
+        !it = $iter $Q abc ;
+        it[];
+        it[][];
+    "), "$b\"b\"");
+
+    assert_eq!(ve(r"
+        !it = $iter $i(0, 10);
+        it[];
+        $[
+            it[][],
+            it[][],
+            it[][],
+        ]
+    "), "$[1,2,3]");
+
+    assert_eq!(ve(r"
+        !it = $iter $i(0, 10, 2);
+        it[];
+        $[
+            it[][],
+            it[][],
+            it[][],
+        ]
+    "), "$[2,4,6]");
+
+    assert_eq!(ve(r"
+        !it = $iter $true;
+        $[
+            it[][],
+            it[][],
+        ]
+    "), "$[$true,$n]");
+
+    // splicing!
+    assert_eq!(ve(r"
+        !it = $iter $i(5,8);
+        $[:a, *it, :b]
+    "), "$[:\"a\",5,6,7,:\"b\"]");
+}
+
+#[test]
+fn check_kve_funcs() {
+    assert_eq!(ve("std:sort ~ std:keys      ${a=10,b=20,c=30}"),       "$[\"a\",\"b\",\"c\"]");
+    assert_eq!(ve("std:sort ~ std:values    ${a=10,b=20,c=30}"),       "$[10,20,30]");
+    assert_eq!(ve("!it = $iter ${a=10,b=20,c=30}; std:sort $[*it]"),   "$[10,20,30]");
+    assert_eq!(ve("std:keys      $[4,5,6,7,8]"),                       "$[0,1,2,3,4]");
+    assert_eq!(ve("std:values    $[4,5,6,7,8]"),                       "$[4,5,6,7,8]");
+    assert_eq!(ve("!it = $iter $p(:enumerate, $[4,5,6,7,8]); $[*it]"), "$[0,1,2,3,4]");
+    assert_eq!(ve("!it = $iter $i(9,30,4); std:keys      it"),         "$[]");
+    assert_eq!(ve("!it = $iter ${a=10};    std:keys      it"),         "$[\"a\"]");
+    assert_eq!(ve("!it = $iter $i(9,30,4); std:values    it"),         "$[9,13,17,21,25,29]");
+    assert_eq!(ve("!it = $iter $i(9,30,4); $[*$iter $p(:enumerate, it)]"), "$[0,1,2,3,4,5]");
+
 }
 
 #[test]

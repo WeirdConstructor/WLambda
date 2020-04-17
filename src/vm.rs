@@ -660,8 +660,19 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 b
             }),
             Op::ListSplice(a, b, r) => op_a_b_r!(env, ret, retv, prog, a, b, r, {
-                for (e, _) in a.iter() {
-                    b.push(e);
+                if let VVal::Iter(i) = a {
+                    let mut i = i.borrow_mut();
+                    loop {
+                        if let Some((v, _)) = i.next() {
+                            b.push(v);
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    for (e, _) in a.iter() {
+                        b.push(e);
+                    }
                 }
                 b
             }),
@@ -725,14 +736,35 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 fun
             }),
             Op::MapSplice(s, m, r) => op_a_b_r!(env, ret, retv, prog, s, m, r, {
-                for (e, k) in s.iter() {
-                    match m.set_key(&k.unwrap(), e) {
-                        Ok(_) => (),
-                        Err(e) => {
-                            retv =
-                                Err(StackAction::panic_str(
-                                    format!("map set key errro: {}", e),
-                                    prog.debug[pc].clone()));
+                if let VVal::Iter(i) = s {
+                    let mut i = i.borrow_mut();
+                    loop {
+                        if let Some((e, k)) = i.next() {
+                            if let Some(k) = k {
+                                match m.set_key(&k, e) {
+                                    Ok(_) => (),
+                                    Err(e) => {
+                                        retv =
+                                            Err(StackAction::panic_str(
+                                                format!("map set key errro: {}", e),
+                                                prog.debug[pc].clone()));
+                                    }
+                                }
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    for (e, k) in s.iter() {
+                        match m.set_key(&k.unwrap_or_else(|| VVal::None), e) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                retv =
+                                    Err(StackAction::panic_str(
+                                        format!("map set key errro: {}", e),
+                                        prog.debug[pc].clone()));
+                            }
                         }
                     }
                 }
