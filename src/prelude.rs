@@ -336,6 +336,10 @@ it will enumerate entries in a map or values in a vector.
 
 ```wlambda
 !v = $[];
+
+# $iter is only explicit here for demonstration
+# purposes! `iter` will make an iter from the pair
+# if you don't pass one!
 iter i ($iter $p(:enumerate, $[:a, :b, :c]))
     ~ std:push v i;
 
@@ -346,14 +350,35 @@ For maps:
 
 ```wlambda
 !v = $[];
-iter i ($iter $p(:enumerate, ${a = 10, b = 20}))
+iter i $p(:enumerate, ${a = 10, b = 20})
     ~ std:push v i;
 
 std:assert_eq (str v) (str $[0, 1]);
 ```
 
 ##### - Iter - Values
+
+This is useful for iterating over the values in a map in an undefined order:
+
+```wlambda
+!m = ${ a = 10, b = 20, c = 33 };
+
+!sum = $@i iter v $p(:values, m) ~ $+ v;
+
+std:assert_eq sum 63;
+```
+
 ##### - Iter - Keys
+
+You can also iterate over map keys in an undefined order:
+
+```wlambda
+!m = ${ :10 = :c, :20 = :b, :30 = :a };
+
+!sum = $@i iter v $p(:keys, m) ~ $+ v;
+
+std:assert_eq sum 60;
+```
 
 #### - is_pair _value_
 
@@ -4624,6 +4649,18 @@ pub fn core_symbol_table() -> SymbolTable {
         Some(1), Some(1), false);
     func!(st, "fvec4",
         |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec4())),
+        Some(1), Some(1), false);
+    func!(st, "is_nvec",
+        |env: &mut Env, _argc: usize| Ok(VVal::Bol(env.arg(0).is_nvec())),
+        Some(1), Some(1), false);
+    func!(st, "is_ivec",
+        |env: &mut Env, _argc: usize| Ok(VVal::Bol(env.arg(0).is_ivec())),
+        Some(1), Some(1), false);
+    func!(st, "is_fvec",
+        |env: &mut Env, _argc: usize| Ok(VVal::Bol(env.arg(0).is_fvec())),
+        Some(1), Some(1), false);
+    func!(st, "nvec_len",
+        |env: &mut Env, _argc: usize| Ok(VVal::Int(env.arg(0).nvec_len() as i64)),
         Some(1), Some(1), false);
 
     func!(st, "bool",

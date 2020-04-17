@@ -1504,7 +1504,7 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     if ast.len() != 5 {
         return Err(ast.compile_err(
-            format!("while takes exactly 3 arguments \
+            format!("iter takes exactly 3 arguments \
                     (variable identifier, iterable expression and \
                     iteration expression)")));
     }

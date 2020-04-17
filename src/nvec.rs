@@ -19,6 +19,16 @@ pub enum NVecDim {
     Four = 4,
 }
 
+impl NVecDim {
+    pub fn len(&self) -> usize {
+        match self {
+            NVecDim::Two   => 2,
+            NVecDim::Three => 3,
+            NVecDim::Four  => 4,
+        }
+    }
+}
+
 /*
 impl<N: NVecNum> PartialEq for NVec<N> {
     fn eq(&self, o: &Self) -> bool {

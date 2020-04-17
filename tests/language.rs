@@ -2496,6 +2496,8 @@ fn check_nvec() {
     assert_eq!(ve("$i(0, 0) == ${}"),           "$false");
     assert_eq!(ve("$i(0, 0) == $f(0, 0)"),      "$false");
 
+    assert_eq!(ve("$i(2, 0) + $p(1, 2)"),       "$i(3,2)");
+
     assert_eq!(ve("$i(2, 3).x"),        "2");
     assert_eq!(ve("$i(2, 3).y"),        "3");
     assert_eq!(ve("$i(2, 3, 4).x"),     "2");
@@ -2572,6 +2574,36 @@ fn check_nvec() {
     assert_eq!(ve("$i(255, 128).hsva"),          "$i(255,128,0,0)");
     assert_eq!(ve("$i(255, 128, 64).hsva"),      "$i(255,128,64,0)");
     assert_eq!(ve("$i(255, 128, 64, 255).hsva"), "$i(255,128,64,255)");
+
+    assert_eq!(ve("ivec $p(4.3, 5.4)"),  "$i(4,5)");
+    assert_eq!(ve("ivec2 $p(4.3, 5.4)"), "$i(4,5)");
+    assert_eq!(ve("ivec3 $p(4.3, 5.4)"), "$i(4,5,0)");
+    assert_eq!(ve("ivec4 $p(4.3, 5.4)"), "$i(4,5,0,0)");
+
+    assert_eq!(ve("fvec $p(4.3, 5.4)"),  "$f(4.3,5.4)");
+    assert_eq!(ve("fvec2 $p(4.3, 5.4)"), "$f(4.3,5.4)");
+    assert_eq!(ve("fvec3 $p(4.3, 5.4)"), "$f(4.3,5.4,0)");
+    assert_eq!(ve("fvec4 $p(4.3, 5.4)"), "$f(4.3,5.4,0,0)");
+
+    assert_eq!(ve("is_nvec $p(0, 0)"), "$false");
+    assert_eq!(ve("is_ivec $p(0, 0)"), "$false");
+    assert_eq!(ve("is_fvec $p(0, 0)"), "$false");
+
+    assert_eq!(ve("is_nvec $i(0, 0)"), "$true");
+    assert_eq!(ve("is_ivec $i(0, 0)"), "$true");
+    assert_eq!(ve("is_fvec $i(0, 0)"), "$false");
+
+    assert_eq!(ve("is_nvec $f(0, 0)"), "$true");
+    assert_eq!(ve("is_ivec $f(0, 0)"), "$false");
+    assert_eq!(ve("is_fvec $f(0, 0)"), "$true");
+
+    assert_eq!(ve("nvec_len $i(0,0)"),     "2");
+    assert_eq!(ve("nvec_len $i(0,0,0)"),   "3");
+    assert_eq!(ve("nvec_len $i(0,0,0,0)"), "4");
+    assert_eq!(ve("nvec_len $f(0,0)"),     "2");
+    assert_eq!(ve("nvec_len $f(0,0,0)"),   "3");
+    assert_eq!(ve("nvec_len $f(0,0,0,0)"), "4");
+    assert_eq!(ve("nvec_len $p(0,0)"),     "0");
 }
 
 #[test]
@@ -2732,6 +2764,45 @@ fn check_iter() {
         iter i $f(0.0, 10.0) { std:push r int[i * 10]; };
         r
     "), "$[0,10,20,30,40,50,60,70,80,90]");
+
+    assert_eq!(v(r"
+        !a = $[1,2,3,4];
+        !b = $[90,80,70];
+        !v = $[];
+
+        $@v
+            iter ai a
+            ~ iter bi b {
+                $+ $p(ai, bi);
+            };
+    "), "$[$p(1,90),$p(1,80),$p(1,70),$p(2,90),$p(2,80),$p(2,70),$p(3,90),$p(3,80),$p(3,70),$p(4,90),$p(4,80),$p(4,70)]");
+
+    assert_eq!(v(r"
+        !a = $[1,2,3,4];
+        !b = $[90,80,70];
+        !v = $[];
+
+        $@v
+            iter ai a {
+                ? (ai % 2) == 0 {
+                    iter bi b {
+                        $+ $p(ai, bi);
+                    };
+                };
+            }
+    "), "$[$p(2,90),$p(2,80),$p(2,70),$p(4,90),$p(4,80),$p(4,70)]");
+
+    assert_eq!(v(r"
+        !a = $[1,2,3,4];
+        !b = $[90,80,70];
+        !v = $[];
+
+        $@v
+            iter ai a {
+                ? (ai % 2) == 0 next[];
+                $+ $p(ai, ai);
+            }
+    "), "$[$p(2,90),$p(2,80),$p(2,70),$p(4,90),$p(4,80),$p(4,70)]");
 }
 
 #[test]

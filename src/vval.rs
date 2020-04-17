@@ -3264,6 +3264,26 @@ impl VVal {
         match self { VVal::Lst(_) => true, _ => false }
     }
 
+    pub fn is_nvec(&self) -> bool {
+        match self { VVal::FVec(_) => true, VVal::IVec(_) => true, _ => false }
+    }
+
+    pub fn is_ivec(&self) -> bool {
+        match self { VVal::IVec(_) => true, _ => false }
+    }
+
+    pub fn is_fvec(&self) -> bool {
+        match self { VVal::FVec(_) => true, _ => false }
+    }
+
+    pub fn nvec_len(&self) -> usize {
+        match self {
+            VVal::IVec(nv) => nv.dims().len(),
+            VVal::FVec(nv) => nv.dims().len(),
+            _ => 0,
+        }
+    }
+
     pub fn is_map(&self) -> bool {
         match self { VVal::Map(_) => true, _ => false }
     }
