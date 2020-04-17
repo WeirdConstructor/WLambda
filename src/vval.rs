@@ -1633,6 +1633,37 @@ macro_rules! iter_next_value {
 }
 
 
+macro_rules! pair_key_to_iter {
+    ($p: ident) => {
+        $p.0.with_s_ref(|key: &str| -> VValIter {
+            let l =
+                match &key[..] {
+                    "keys"      => $p.1.keys(),
+                    "values"    => $p.1.values(),
+                    "enumerate" => $p.1.enumerate(),
+                    _ => {
+                        return std::iter::from_fn(
+                            Box::new(move || { None }))
+                    }
+                };
+            if let VVal::Lst(l) = l {
+                let l = l.clone();
+                let mut idx = 0;
+                std::iter::from_fn(Box::new(move || {
+                    if idx >= l.borrow().len() {
+                        return None;
+                    }
+                    let r = Some((l.borrow()[idx].clone(), None));
+                    idx += 1;
+                    r
+                }))
+            } else {
+                std::iter::from_fn(Box::new(move || { None }))
+            }
+        })
+    }
+}
+
 #[allow(dead_code)]
 impl VVal {
     #[inline]
@@ -1966,29 +1997,7 @@ impl VVal {
                 std::iter::from_fn(Box::new(move || { None }))
             },
             VVal::Pair(p) => {
-                p.0.with_s_ref(|key: &str| -> VValIter {
-                    let l =
-                        match &key[..] {
-                            "keys"      => p.1.keys(),
-                            "values"    => p.1.values(),
-                            "enumerate" => p.1.enumerate(),
-                            _ => {
-                                return std::iter::from_fn(Box::new(move || { None }))
-                            }
-                        };
-                    if let VVal::Lst(l) = l {
-                        let l = l.clone();
-                        let mut idx = 0;
-                        std::iter::from_fn(Box::new(move || {
-                            if idx >= l.borrow().len() { return None; }
-                            let r = Some((l.borrow()[idx].clone(), None));
-                            idx += 1;
-                            r
-                        }))
-                    } else {
-                        std::iter::from_fn(Box::new(move || { None }))
-                    }
-                })
+                pair_key_to_iter!(p)
             },
             VVal::IVec(NVec::Vec2(a, b)) => {
                 let mut i = *a;

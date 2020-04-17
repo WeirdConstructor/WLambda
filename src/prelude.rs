@@ -311,6 +311,60 @@ std:assert_eq b 20;
 std:assert_eq c 30;
 ```
 
+And also with pairs:
+
+```wlambda
+!p = $p(10, 20);
+!(a, b) = p;
+.(a, b) = p;
+
+std:assert_eq a 10;
+std:assert_eq b 20;
+```
+
+#### - Pair to Iterator
+
+Pairs play a special role if you make an iterator from it.
+It can be used to create a specialized iterator that only
+iterates over keys or values of a map. Or that enumerates
+a vector or map.
+
+##### - Iter - Enumerate
+
+If the first value of the pair is `:enumerate`
+it will enumerate entries in a map or values in a vector.
+
+```wlambda
+!v = $[];
+iter i ($iter $p(:enumerate, $[:a, :b, :c]))
+    ~ std:push v i;
+
+std:assert_eq (str v) (str $[0, 1, 2]);
+```
+
+For maps:
+
+```wlambda
+!v = $[];
+iter i ($iter $p(:enumerate, ${a = 10, b = 20}))
+    ~ std:push v i;
+
+std:assert_eq (str v) (str $[0, 1]);
+```
+
+##### - Iter - Values
+##### - Iter - Keys
+
+#### - is_pair _value_
+
+Checks if _value_ is a pair.
+
+```wlambda
+std:assert ~ is_pair $p(1, 2);
+std:assert not ~ is_pair $[1, 2];
+std:assert not ~ is_pair $i(1, 2);
+```
+
 ### <a name="21-global-variables"></a>2.1 - Global Variables
 
 You can define global variables that are not bound to
@@ -2238,6 +2292,71 @@ match y
 std:assert_eq state "is off";
 ```
 
+### - Pairs `$p(a, b)`
+
+A pair is an immutable tuple of 2 values. You can use it for returning two
+values from a function as it is a slight bit slimmer than a vector with two
+values. Unlike a vector pairs are compared by `==` according to their contents
+and not by referencial equality.
+
+You can access the pair values by the following keys:
+
+```wlambda
+!v = $p(11, 12);
+
+std:assert_eq v.0     11;
+std:assert_eq v.1     12;
+std:assert_eq (0 v)   11;
+std:assert_eq (1 v)   12;
+
+std:assert_eq v.car   11;
+std:assert_eq v.cdr   12;
+
+std:assert_eq v.head  11;
+std:assert_eq v.tail  12;
+
+std:assert_eq v.first    11;
+std:assert_eq v.second   12;
+```
+
+Comparison does happen by their contents:
+
+```wlambda
+std:assert $p(1, 2) == $p(1, 2);
+std:assert $p(2, 2) != $p(1, 2);
+
+# In contrast to vectors:
+std:assert not ~ $[1, 2] == $[1, 2];
+```
+
+The index is wrapping around, that means `$p(a, b).2` is the first element again:
+
+```wlambda
+!v = $p(33, 44);
+!l = $[];
+
+iter i $i(0, 4)
+    ~ std:push l v.(i);
+
+std:assert_eq (str l) (str $[33, 44, 33, 44]);
+```
+
+A pair is a referencial data type, that means you can use `std:ref_id` on it:
+
+```wlambda
+!a = $p(1,2);
+!b = $p(2,3);
+!id_a = std:ref_id a;
+!id_b = std:ref_id b;
+
+std:assert (id_a != id_b);
+std:assert std:ref_id[a] == id_a;
+
+!v = $[a];
+std:assert std:ref_id[v.0] == id_a;
+```
+
+
 ### <a name="413-vectors-or-lists"></a>4.13 - Vectors (or Lists)
 
 The literal syntax for vectors (or sometimes also called lists in WLambda)
@@ -3479,11 +3598,16 @@ Other types like vectors, maps, functions, errors or references are compared
 by referential equality.
 
 ```wlambda
-std:assert        $none == $none;
-std:assert            1 == 2 - 1;
-std:assert         "aa" == ("a" "a");
-std:assert         :xxy == :xxy;
-std:assert not ~ $[1,2] == $[1,2];
+std:assert              $none == $none;
+std:assert                  1 == 2 - 1;
+std:assert               "aa" == ("a" "a");
+std:assert               :xxy == :xxy;
+std:assert       not ~ $[1,2] == $[1,2];
+std:assert            $p(1,2) == $p(1,2);
+std:assert            $i(1,2) == $i(1,2);
+std:assert          $i(1,2,3) == $i(1,2,3);
+std:assert    not ~ $i(1,2,3) == $f(1.0,2.0,3.0);
+std:assert    $f(1.0,2.0,3.0) == $f(1.0,2.0,3.0);
 
 std:assert ~ `==` 1 (2 - 1); # prefix form
 ```
