@@ -50,6 +50,16 @@ pub struct SynPos {
 }
 
 impl SynPos {
+    pub fn empty() -> Self {
+        Self {
+            syn:     Syntax::Block,
+            line:    0,
+            col:     0,
+            file:    FileRef::new(""),
+            name:    None,
+        }
+    }
+
     pub fn s_short(&self) -> String {
         format!("[{},{}({:?})]", self.line, self.col, self.syn)
     }
@@ -783,11 +793,11 @@ impl Env {
     }
 
     #[inline]
-    pub fn push_iter(&mut self, iter: VValIter) {
+    pub fn push_iter(&mut self, iter: Rc<RefCell<VValIter>>) {
         let uwa =
             UnwindAction::RestoreIter(
                 std::mem::replace(
-                    &mut self.iter, Some(Rc::new(RefCell::new(iter)))));
+                    &mut self.iter, Some(iter)));
         self.push_unwind(uwa);
     }
 
@@ -1847,6 +1857,48 @@ impl VVal {
                 } else { std::iter::from_fn(Box::new(|| { None })) },
             VVal::None => {
                 std::iter::from_fn(Box::new(move || { None }))
+            },
+            VVal::IVec(NVec::Vec2(a, b)) => {
+                let mut i = *a;
+                let b = *b;
+                std::iter::from_fn(Box::new(move || {
+                    if i >= b { return None; }
+                    let r = Some((VVal::Int(i), None));
+                    i += 1;
+                    r
+                }))
+            },
+            VVal::IVec(NVec::Vec3(a, b, s)) => {
+                let mut i = *a;
+                let b = *b;
+                let s = *s;
+                std::iter::from_fn(Box::new(move || {
+                    if i >= b { return None; }
+                    let r = Some((VVal::Int(i), None));
+                    i += s;
+                    r
+                }))
+            },
+            VVal::FVec(NVec::Vec2(a, b)) => {
+                let mut i = *a;
+                let b = *b;
+                std::iter::from_fn(Box::new(move || {
+                    if i >= b { return None; }
+                    let r = Some((VVal::Flt(i), None));
+                    i += 1.0;
+                    r
+                }))
+            },
+            VVal::FVec(NVec::Vec3(a, b, s)) => {
+                let mut i = *a;
+                let b = *b;
+                let s = *s;
+                std::iter::from_fn(Box::new(move || {
+                    if i >= b { return None; }
+                    let r = Some((VVal::Flt(i), None));
+                    i += s;
+                    r
+                }))
             },
             VVal::Opt(Some(v)) => {
                 let x = v.as_ref().clone();

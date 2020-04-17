@@ -2700,6 +2700,44 @@ fn check_iter() {
         iter i $[1, 2, 3, 4] { .sum = sum + i; };
         sum
     "), "10");
+
+    assert_eq!(v(r"
+        !r = $[];
+        iter i ${a=10} { !(v, k) = i; std:push r i; std:push r v; std:push r k; };
+        r
+    "), "$[$p(10,$<1=>\"a\"),10,$<1>]");
+
+    assert_eq!(v(r"
+        !r = $[];
+        iter i $i(1, 10) { std:push r i; };
+        r
+    "), "$[1,2,3,4,5,6,7,8,9]");
+
+    assert_eq!(v(r"
+        !r = $[];
+        iter i $i(1, 10, 2) { std:push r i; };
+        r
+    "), "$[1,3,5,7,9]");
+
+    assert_eq!(v(r"
+        !r = $[];
+        iter i $f(0.0, 10.0, 3.2) { std:push r int[i * 10]; };
+        r
+    "), "$[0,32,64,96]");
+
+    assert_eq!(v(r"
+        !r = $[];
+        iter i $f(0.0, 10.0) { std:push r int[i * 10]; };
+        r
+    "), "$[0,10,20,30,40,50,60,70,80,90]");
+}
+
+#[test]
+fn check_iter_data() {
+    assert_eq!(ve(r"
+        !it = $iter $[1,2,3,4];
+        $[int it, it[], ${a=float[it] + 0.2}, ${b=it[]}]
+    "), "$[1,$o(2),${a=3.2},${b=$o(4)}]");
 }
 
 #[test]
@@ -2759,5 +2797,4 @@ fn check_optionals() {
         "),
         "$[$true,$true,$true,$true,$true]");
 }
-
 

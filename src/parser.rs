@@ -634,19 +634,11 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         },
         'i' => {
             if ps.consume_lookahead("iter") {
-                if !ps.consume_if_eq_wsc('(') {
-                    return Err(ps.err(ParseErrorKind::UnexpectedToken('(', "At the start of $iter(...)")))
-                }
+                ps.skip_ws_and_comments();
 
-                let a = parse_expr(ps)?;
-                let it_v = ps.syn(Syntax::Iter);
-                it_v.push(a);
-
-                if ps.consume_if_eq_wsc(')') {
-                    Ok(it_v)
-                } else {
-                    Err(ps.err(ParseErrorKind::UnexpectedToken(')', "At the end of a $iter(...)")))
-                }
+                let err = ps.syn(Syntax::Iter);
+                err.push(parse_expr(ps)?);
+                Ok(err)
             } else {
                 ps.consume();
                 parse_nvec_body(ps, NVecKind::Int)

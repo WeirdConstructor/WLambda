@@ -91,6 +91,10 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
+                Op::NewIter(p1, p2) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                },
                 Op::NewNVec(vec, p1) => {
                     use std::borrow::BorrowMut;
                     match vec.borrow_mut() {
@@ -163,9 +167,6 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
-                Op::JmpIf(p1, _) => {
-                    patch_respos_data(p1, self_data_next_idx);
                 },
                 Op::JmpIfN(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
@@ -268,8 +269,6 @@ impl Prog {
         }
     }
 
-    pub fn op_end(&mut self) -> &mut Self { self.push_op(Op::End); self }
-
     pub fn global_ref_pos(&mut self, data: VVal) -> ResPos {
         self.data.push(data);
         ResPos::GlobalRef((self.data.len() - 1) as u16)
@@ -300,6 +299,251 @@ impl Prog {
     pub fn set_dbg(&mut self, sp: SynPos) -> &mut Self {
         self.nxt_debug = Some(sp);
         self
+    }
+
+    pub fn op_end(&mut self) -> &mut Self {
+        self.push_op(Op::End);
+        self
+    }
+
+    pub fn op_mov(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Mov(a, r));
+    }
+
+    pub fn op_and_jmp(&mut self, sp: &SynPos, a: ResPos, jmp: i32, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::AndJmp(a, jmp, r));
+    }
+
+    pub fn op_or_jmp(&mut self, sp: &SynPos, a: ResPos, jmp: i32, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::OrJmp(a, jmp, r));
+    }
+
+    pub fn op_destr(&mut self, sp: &SynPos, a: ResPos, destr_info: DestructureInfo) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Destr(a, Box::new(destr_info)));
+    }
+
+    pub fn op_to_ref(&mut self, sp: &SynPos, a: ResPos, r: ResPos, typ: ToRefType) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::ToRef(a, r, typ));
+    }
+
+    pub fn op_new_list(&mut self, sp: &SynPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewList(r));
+    }
+
+    pub fn op_list_splice(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::ListSplice(a, b, r));
+    }
+
+    pub fn op_list_push(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::ListPush(a, b, r));
+    }
+
+    pub fn op_new_map(&mut self, sp: &SynPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewMap(r));
+    }
+
+    pub fn op_map_set_key(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::MapSetKey(a, b, c, r));
+    }
+
+    pub fn op_map_splice(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::MapSplice(a, b, r));
+    }
+
+    pub fn op_get_key(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::GetKey(a, b, r));
+    }
+
+    pub fn op_get_idx(&mut self, sp: &SynPos, a: ResPos, i: u32, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::GetIdx(a, i, r));
+    }
+
+    pub fn op_get_idx2(&mut self, sp: &SynPos, a: ResPos, i: u32, i2: u32, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::GetIdx2(a, Box::new((i, i2)), r));
+    }
+
+    pub fn op_get_idx3(&mut self, sp: &SynPos, a: ResPos, i: u32, i2: u32, i3: u32, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::GetIdx3(a, Box::new((i, i2, i3)), r));
+    }
+
+    pub fn op_get_sym(&mut self, sp: &SynPos, a: ResPos, s: String, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::GetSym(a, Box::new(s), r));
+    }
+
+    pub fn op_get_sym2(&mut self, sp: &SynPos, a: ResPos, s: String, s2: String, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::GetSym2(a, Box::new((s, s2)), r));
+    }
+
+    pub fn op_get_sym3(&mut self, sp: &SynPos, a: ResPos, s: String, s2: String, s3: String, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::GetSym3(a, Box::new((s, s2, s3)), r));
+    }
+
+    pub fn op_new_err(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewErr(a, r));
+    }
+
+    pub fn op_argv(&mut self, sp: &SynPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Argv(r));
+    }
+
+    pub fn op_unwind(&mut self, sp: &SynPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Unwind);
+    }
+
+    pub fn op_binop(&mut self, sp: &SynPos, op: BinOp, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(op.to_op(a, b, r));
+    }
+
+    pub fn op_new_opt(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewOpt(a, r));
+    }
+
+    pub fn op_new_iter(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewIter(a, r));
+    }
+
+    pub fn op_new_clos(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewClos(a, r));
+    }
+
+    pub fn op_call_method_key(&mut self, sp: &SynPos, a: ResPos, b: ResPos, argc: u16, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::CallMethodKey(a, b, argc, r));
+    }
+
+    pub fn op_call_method_sym(&mut self, sp: &SynPos, a: ResPos, sym: String, argc: u16, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::CallMethodSym(a, Box::new(sym), argc, r));
+    }
+
+    pub fn op_call(&mut self, sp: &SynPos, argc: u16, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Call(argc, r));
+    }
+
+    pub fn op_new_ivec2(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewNVec(Box::new(NVecPos::IVec2(a, b)), r));
+    }
+
+    pub fn op_new_ivec3(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewNVec(Box::new(NVecPos::IVec3(a, b, c)), r));
+    }
+
+    pub fn op_new_ivec4(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, d: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewNVec(Box::new(NVecPos::IVec4(a, b, c, d)), r));
+    }
+
+    pub fn op_new_fvec2(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewNVec(Box::new(NVecPos::FVec2(a, b)), r));
+    }
+
+    pub fn op_new_fvec3(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewNVec(Box::new(NVecPos::FVec3(a, b, c)), r));
+    }
+
+    pub fn op_new_fvec4(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, d: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewNVec(Box::new(NVecPos::FVec4(a, b, c, d)), r));
+    }
+
+    pub fn op_clear_locals(&mut self, sp: &SynPos, from: u16, to: u16) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::ClearLocals(from, to));
+    }
+
+    pub fn op_ctrl_flow_break(&mut self, sp: &SynPos, a: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::CtrlFlow(CtrlFlow::Break(a)));
+    }
+
+    pub fn op_ctrl_flow_next(&mut self, sp: &SynPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::CtrlFlow(CtrlFlow::Next));
+    }
+
+    pub fn op_jmp(&mut self, sp: &SynPos, offs: i32) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Jmp(offs));
+    }
+
+    pub fn op_jmp_ifn(&mut self, sp: &SynPos, a: ResPos, offs: i32) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::JmpIfN(a, offs));
+    }
+
+    pub fn op_push_loop_info(&mut self, sp: &SynPos, break_offs: u16) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::PushLoopInfo(break_offs));
+    }
+
+    pub fn op_iter_init(&mut self, sp: &SynPos, a: ResPos, end_offs: i32) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::IterInit(a, end_offs));
+    }
+
+    pub fn op_iter_next(&mut self, sp: &SynPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::IterNext(r));
+    }
+
+    pub fn op_apply(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Apply(a, b, r));
+    }
+
+    pub fn op_dump_vm(&mut self, sp: &SynPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Builtin(Builtin::DumpVM(sp.clone())));
+    }
+
+    pub fn op_dump_stack(&mut self, sp: &SynPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Builtin(Builtin::DumpStack(sp.clone())));
+    }
+
+    pub fn op_export(&mut self, sp: &SynPos, a: ResPos, name: String) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Builtin(Builtin::Export(Box::new(name), a)));
+    }
+
+    pub fn op_new_pair(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::NewPair(a, b, r));
+    }
+
+    pub fn op_accumulator(&mut self, sp: &SynPos, at: AccumType) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::Accumulator(at));
     }
 
     pub fn dump(&self) {
@@ -405,7 +649,7 @@ impl DestructureInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum BinOp {
     Add,
@@ -488,6 +732,7 @@ pub enum NVecPos {
 pub enum Op {
     Mov(ResPos, ResPos),
     NewOpt(ResPos, ResPos),
+    NewIter(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
     NewNVec(Box<NVecPos>, ResPos),
     Argv(ResPos),
@@ -526,7 +771,6 @@ pub enum Op {
     CallMethodSym(ResPos, Box<String>, u16, ResPos),
     Apply(ResPos, ResPos, ResPos),
     Jmp(i32),
-    JmpIf(ResPos, i32),
     JmpIfN(ResPos, i32),
     OrJmp(ResPos, i32, ResPos),
     AndJmp(ResPos, i32, ResPos),
