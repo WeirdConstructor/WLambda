@@ -33,6 +33,8 @@ the error occurred easier.
 * Feature: Implemented optional values `$o(...)` and `$o()` for representing
 function return values that need a better distinction
 between `$none` and really no value.
+* Feature: Implemented iterator values `$iter ...` that can either be called
+directly of passed to `iter`.
 * Documentation: More!
 
 0.4.4 (2020-03-06)
