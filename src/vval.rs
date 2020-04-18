@@ -801,6 +801,36 @@ impl Env {
         self.push_unwind(uwa);
     }
 
+    pub fn dump_unwind_stack(&self) -> String {
+        let mut s = String::new();
+        for i in 0..self.unwind_sp {
+            let add =
+                match &self.unwind_stack[self.unwind_sp - (i + 1)] {
+                    UnwindAction::RestoreSP(sp) =>
+                        format!("rsp({})", *sp),
+                    UnwindAction::ClearLocals(from, to) =>
+                        format!("cl({},{})", *from, *to),
+                    UnwindAction::RestoreLoopInfo(_li) =>
+                        format!("loinf"),
+                    UnwindAction::RestoreAccum(_fun, _val) =>
+                        format!("raccm"),
+                    UnwindAction::RestoreSelf(_slf) =>
+                        format!("rslf"),
+                    UnwindAction::RestoreIter(_i) =>
+                        format!("ritr"),
+                    UnwindAction::FunctionCall(argc, old_bp, local_size) =>
+                        format!("fcal({},{},{})", argc, old_bp, local_size),
+                    UnwindAction::Null =>
+                        format!("nul"),
+                };
+            if s.len() > 0 {
+                s += ";";
+            }
+            s += &add[..];
+        }
+        s
+    }
+
     #[inline]
     pub fn unwind(&mut self, ua: UnwindAction) {
         match ua {

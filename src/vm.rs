@@ -513,7 +513,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 // of the iteration next right after Op::InitIter().
                 // The extra 1 at the end because the ClearLocals is not part
                 // of the inner loop unwind stack.
-                env.push_loop_info(pc + 1, pc + *body_ops as usize, 1);
+                env.push_loop_info(pc, pc + *body_ops as usize, 0);
 
                 if let VVal::Iter(i) = iterable {
                     env.push_iter(i);
@@ -918,7 +918,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             },
         }
         if DEBUG_VM {
+            let uws_dump = env.dump_unwind_stack();
+            println!("    => uws: {}", uws_dump);
             env.dump_stack();
+            println!("");
         }
         pc += 1;
     }
@@ -1546,10 +1549,10 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         expr.eval_nul(&mut body);
         body.op_jmp(&spos, -(body.op_count() as i32 + 2));
 
-        let ip = iterable.eval(prog);
-        prog.op_iter_init(&spos, ip, (body.op_count() + 2) as i32);
-
         var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
+            let ip = iterable.eval(prog);
+            prog.op_iter_init(&spos, ip, (body.op_count() + 2) as i32);
+
             prog.op_iter_next(&spos, iter_var);
             prog.append(body);
         });
