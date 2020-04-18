@@ -276,10 +276,10 @@ macro_rules! handle_err {
 
 macro_rules! unwind_loop_info {
     ($env: ident) => {
-        $env.unwind_to_depth($env.loop_info.uw_depth);
         while $env.sp > $env.loop_info.sp {
             $env.pop();
         }
+        $env.unwind_to_depth($env.loop_info.uw_depth);
     }
 }
 
@@ -290,8 +290,11 @@ macro_rules! handle_next {
             $retv = Err(StackAction::Next);
             break;
         } else {
-            unwind_loop_info!($env);
+            // - Jump to IterNext or the while condition
+            // - Unwind SP
+            // - Unwind unwind stack to initial level
             $pc = $env.loop_info.pc;
+            unwind_loop_info!($env);
         }
     }
 }
@@ -303,8 +306,12 @@ macro_rules! handle_break {
             $retv = Err(StackAction::Break($val));
             break;
         } else {
-            unwind_loop_info!($env);
+            // TODO: - Jump after the end of the body
+            // TODO: - Unwind SP
+            // TODO: - Unwind unwind stack to initial level
+            // TODO: The loop needs to cleanup with Unwind-Instructions itself!
             $pc = $env.loop_info.break_pc;
+            unwind_loop_info!($env);
         }
     }
 }
@@ -511,8 +518,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 // the pc + 1 because ClearLocals() is executed at the start
                 // of the iteration next right after Op::InitIter().
-                // The extra 1 at the end because the ClearLocals is not part
-                // of the inner loop unwind stack.
                 env.push_loop_info(pc, pc + *body_ops as usize, 0);
 
                 if let VVal::Iter(i) = iterable {
@@ -539,13 +544,15 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 if let Some(v) = value {
                     out_reg!(env, ret, retv, prog, ivar, v);
                 } else {
-                    unwind_loop_info!(env);
+                    // TODO: Jump to the end of the loop.
+                    // TODO: The unwind instructions should be in the program code
                     pc = env.loop_info.break_pc;
-                    env.unwind_one();
+                    unwind_loop_info!(env);
                 }
             },
             Op::PushLoopInfo(body_ops) => {
-                env.push_loop_info(pc, pc + *body_ops as usize, 0);
+                // 1 offset because of ???? XXX FIXME TODO
+                env.push_loop_info(pc, pc + *body_ops as usize, 1);
             },
             Op::ClearLocals(from, to) => {
                 env.push_clear_locals(*from as usize, *to as usize);
@@ -920,6 +927,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         if DEBUG_VM {
             let uws_dump = env.dump_unwind_stack();
             println!("    => uws: {}", uws_dump);
+            println!("  loopinfo: uw={},sp={},pc={},bpc={}",
+                     env.loop_info.uw_depth,
+                     env.loop_info.sp,
+                     env.loop_info.pc,
+                     env.loop_info.break_pc);
             env.dump_stack();
             println!("");
         }
@@ -1551,7 +1563,8 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
         var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
             let ip = iterable.eval(prog);
-            prog.op_iter_init(&spos, ip, (body.op_count() + 2) as i32);
+            // + 1 for the op_iter_next:
+            prog.op_iter_init(&spos, ip, (body.op_count() + 1) as i32);
 
             prog.op_iter_next(&spos, iter_var);
             prog.append(body);
