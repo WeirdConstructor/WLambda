@@ -6,7 +6,7 @@ use crate::ops::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-const DEBUG_VM: bool = true;
+const DEBUG_VM: bool = false;
 
 #[derive(Debug, Clone)]
 pub enum ResultSink {
@@ -276,6 +276,11 @@ macro_rules! handle_err {
 
 macro_rules! unwind_loop_info {
     ($env: ident) => {
+        // Takes care of:
+        // - Unwind SP to the state of the initial first start of
+        //   the loop body.
+        // - Unwind unwind stack to the state of the first start of
+        //   the loop body.
         while $env.sp > $env.loop_info.sp {
             $env.pop();
         }
@@ -290,9 +295,6 @@ macro_rules! handle_next {
             $retv = Err(StackAction::Next);
             break;
         } else {
-            // - Jump to IterNext or the while condition
-            // - Unwind SP
-            // - Unwind unwind stack to initial level
             $pc = $env.loop_info.pc;
             unwind_loop_info!($env);
         }
@@ -306,10 +308,6 @@ macro_rules! handle_break {
             $retv = Err(StackAction::Break($val));
             break;
         } else {
-            // TODO: - Jump after the end of the body
-            // TODO: - Unwind SP
-            // TODO: - Unwind unwind stack to initial level
-            // TODO: The loop needs to cleanup with Unwind-Instructions itself!
             $pc = $env.loop_info.break_pc;
             unwind_loop_info!($env);
         }
@@ -516,9 +514,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::IterInit(iterable, body_ops) => {
                 in_reg!(env, ret, prog, iterable);
 
-                // the pc + 1 because ClearLocals() is executed at the start
-                // of the iteration next right after Op::InitIter().
-                env.push_loop_info(pc, pc + *body_ops as usize, 0);
+                // 1 unwind offset for push_iter, which needs to be preserved
+                // on break/next, as it is explicitly cleaned up.
+                env.push_loop_info(pc, pc + *body_ops as usize, 1);
 
                 if let VVal::Iter(i) = iterable {
                     env.push_iter(i);
@@ -544,15 +542,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 if let Some(v) = value {
                     out_reg!(env, ret, retv, prog, ivar, v);
                 } else {
-                    // TODO: Jump to the end of the loop.
-                    // TODO: The unwind instructions should be in the program code
                     pc = env.loop_info.break_pc;
-                    unwind_loop_info!(env);
                 }
             },
             Op::PushLoopInfo(body_ops) => {
-                // 1 offset because of ???? XXX FIXME TODO
-                env.push_loop_info(pc, pc + *body_ops as usize, 1);
+                env.push_loop_info(pc, pc + *body_ops as usize, 0);
             },
             Op::ClearLocals(from, to) => {
                 env.push_clear_locals(*from as usize, *to as usize);
@@ -1563,11 +1557,15 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
         var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
             let ip = iterable.eval(prog);
+
             // + 1 for the op_iter_next:
             prog.op_iter_init(&spos, ip, (body.op_count() + 1) as i32);
-
             prog.op_iter_next(&spos, iter_var);
+
             prog.append(body);
+
+            prog.op_unwind(&spos);
+            prog.op_unwind(&spos);
         });
     })
 }

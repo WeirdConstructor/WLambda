@@ -780,7 +780,7 @@ impl Env {
 
     #[inline]
     pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize, uw_depth_offs: usize) {
-        let uw_depth = self.unwind_depth() + uw_depth_offs;
+        let uw_depth = self.unwind_depth() + 1 + uw_depth_offs;
         let uwa =
             UnwindAction::RestoreLoopInfo(
                 std::mem::replace(&mut self.loop_info, LoopInfo {
