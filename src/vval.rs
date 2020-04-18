@@ -2436,7 +2436,39 @@ impl VVal {
                 })
             },
             VVal::Iter(i) => {
-                Ok(iter_next!(i.borrow_mut()))
+                if argc == 1 {
+                    env.with_local_call_info(argc, |e: &mut Env| {
+                        let f = e.arg(0);
+
+                        let mut ret = VVal::None;
+                        loop {
+                            let v =
+                                if let Some((v, k)) = i.borrow_mut().next() {
+                                    if let Some(k) = k {
+                                        VVal::pair(v, k)
+                                    } else {
+                                        v
+                                    }
+                                } else {
+                                    break;
+                                };
+
+                            e.push(v);
+                            let el = f.call_internal(e, 1);
+                            e.popn(1);
+
+                            match el {
+                                Ok(v)                      => { ret = v; },
+                                Err(StackAction::Break(v)) => { ret = *v; break; },
+                                Err(StackAction::Next)     => { },
+                                Err(e)                     => { return Err(e); },
+                            }
+                        }
+                        Ok(ret)
+                    })
+                } else {
+                    Ok(iter_next!(i.borrow_mut()))
+                }
             },
             VVal::Opt(v) => {
                 if let Some(v) = v {

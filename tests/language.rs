@@ -2934,6 +2934,28 @@ fn check_iter() {
                 $+ x;
             }
     "), "$[399,0,399,0]");
+
+    assert_eq!(v(r"
+        !it = $iter $i(0,10);
+
+        $@v it \$+ _;
+    "), "$[0,1,2,3,4,5,6,7,8,9]");
+
+    assert_eq!(v(r"
+        !it = $iter $i(0,3);
+
+        $@v it $+;
+    "), "$[0,1,2]");
+
+    assert_eq!(v(r"
+        !it = $iter $i(0,4);
+        $@v it \$+ $p(_, unwrap it[]);
+    "), "$[$p(0,1),$p(2,3)]");
+
+    assert_eq!(v(r"
+        !it = $iter $i(0,5);
+        $@v it \$+ $p(_, unwrap it[]);
+    "), "Execution error: Jumped out of execution: [?]=>[3,31:<wlambda::eval>(Call)]=>[3,15:<wlambda::eval>(Func)@it]=>[3,14:<wlambda::eval>(Call)] SA::Panic(\"unwrap empty option!\")");
 }
 
 #[test]

@@ -918,6 +918,15 @@ std:assert ~ not ~ is_optional $false;
 std:assert ~ not ~ is_optional 303;
 ```
 
+#### - Unwrapping optionals
+
+You can unwrap an optional with `unwrap`. It will panic if there is no value provided.
+Otherwise it will return the contents.
+
+```wlambda
+std:assert unwrap[$o(10)] 10;
+```
+
 ### <a name="43-error-values-e-expr-or-error-expr"></a>4.3 - Error values: `$e expr` or `$error expr`
 
 There are no exceptions in WLambda, except the panic, that
@@ -4583,6 +4592,11 @@ pub fn core_symbol_table() -> SymbolTable {
                         format!("unwrap error: {}", err_v.borrow().0.s()),
                         Some(err_v.borrow().1.clone())))
                 },
+                VVal::Opt(None) => {
+                    Err(StackAction::panic_str(
+                        format!("unwrap empty option!"), None))
+                },
+                VVal::Opt(Some(v)) => Ok((*v).clone()),
                 v => Ok(v)
             }
         }, Some(1), Some(1), true);
