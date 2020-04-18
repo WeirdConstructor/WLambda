@@ -122,17 +122,13 @@ std:assert_eq x 5;
 ## Counting Loop
 
 ```wlambda
-range 1 10 1 {
-    std:displayln "> " _;
-};
-```
+!sum = 0;
 
-With named counting variable:
-
-```wlambda
-range 1 10 1 {!(i) = @;     # or just `!i = _`
-    std:displayln "> " i;
+iter i $i(0, 10, 1) {
+    .sum = sum + i;
 };
+
+std:assert_eq sum 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9;
 ```
 
 ## Endless loop
@@ -206,9 +202,33 @@ std:assert_eq (std:pop v) 1;
 
 ```wlambda
 !sum = 0;
+
 iter i $[1, 2, 3, 4] { .sum = sum + i; };
 
 std:assert_eq sum 10;
+```
+
+## Accumulate values in a vector
+
+```wlambda
+
+!new_vec =
+    $@vec iter i $i(0, 4) {
+        $+ i;
+    };
+
+std:assert_eq (str new_vec) (str $[0,1,2,3]);
+```
+
+## Accumulate a sum
+
+```wlambda
+!sum =
+    $@int iter i $i(0, 4) {
+        $+ i;
+    };
+
+std:assert_eq sum 1 + 2 + 3;
 ```
 
 ## Hash tables/maps
