@@ -51,6 +51,7 @@ Smalltalk, LISP and Perl.
     - [4.1.2](#412-issome-value) - is_some _value_
   - [4.2](#42-optional-values-o-and-o) - Optional values `$o()` and `$o(...)`
     - [4.2.1](#421-isoptional-value) - is_optional _value_
+    - [4.2.2](#422-unwrapping-optionals) - Unwrapping optionals
   - [4.3](#43-error-values-e-expr-or-error-expr) - Error values: `$e expr` or `$error expr`
     - [4.3.1](#431--label-value) - _? [_label_] _value_
     - [4.3.2](#432-onerror-handler-maybe-error-value) - on_error _handler_ _maybe-error-value_
@@ -148,25 +149,31 @@ Smalltalk, LISP and Perl.
     - [4.11.2](#4112-byte-conversion-functions) - Byte Conversion Functions
     - [4.11.3](#4113-isbytes-value) - is_bytes _value_
   - [4.12](#412-symbols) - Symbols
-  - [4.13](#413-vectors-or-lists) - Vectors (or Lists)
-    - [4.13.1](#4131-stdpush-vector-item) - std:push _vector_ _item_
-    - [4.13.2](#4132-stdpop-vector) - std:pop _vector_
-    - [4.13.3](#4133-stdunshift-vector-item) - std:unshift _vector_ _item_
-    - [4.13.4](#4134-vector-splicing) - Vector Splicing
-    - [4.13.5](#4135-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
-    - [4.13.6](#4136-stdprepend-vec-a-value-or-vec-) - std:prepend _vec-a_ _value-or-vec_ ...
-    - [4.13.7](#4137-stdtake-count-vector) - std:take _count_ _vector_
-    - [4.13.8](#4138-stddrop-count-vector) - std:drop _count_ _vector_
-  - [4.14](#414-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
-    - [4.14.1](#4141-map-splicing) - Map Splicing
-  - [4.15](#415-references) - References
-    - [4.15.1](#4151-stdtoref-value) - std:to_ref _value_
-    - [4.15.2](#4152-stdweaken-ref) - std:weaken _ref_
-    - [4.15.3](#4153-isref-value) - is_ref _value_
-    - [4.15.4](#4154-iswref-value) - is_wref _value_
-    - [4.15.5](#4155-stdstrengthen-ref) - std:strengthen _ref_
-    - [4.15.6](#4156-stdsetref-ref-value) - std:set_ref _ref_ _value_
-  - [4.16](#416-calling-semantics-of-data-types) - Calling Semantics of Data Types
+  - [4.13](#413-pairs-pa-b) - Pairs `$p(a, b)`
+    - [4.13.1](#4131-pair-to-iterator) - Pair to Iterator
+      - [4.13.1.1](#41311-iter---enumerate) - Iter - Enumerate
+      - [4.13.1.2](#41312-iter---values) - Iter - Values
+      - [4.13.1.3](#41313-iter---keys) - Iter - Keys
+    - [4.13.2](#4132-ispair-value) - is_pair _value_
+  - [4.14](#414-vectors-or-lists) - Vectors (or Lists)
+    - [4.14.1](#4141-stdpush-vector-item) - std:push _vector_ _item_
+    - [4.14.2](#4142-stdpop-vector) - std:pop _vector_
+    - [4.14.3](#4143-stdunshift-vector-item) - std:unshift _vector_ _item_
+    - [4.14.4](#4144-vector-splicing) - Vector Splicing
+    - [4.14.5](#4145-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
+    - [4.14.6](#4146-stdprepend-vec-a-value-or-vec-) - std:prepend _vec-a_ _value-or-vec_ ...
+    - [4.14.7](#4147-stdtake-count-vector) - std:take _count_ _vector_
+    - [4.14.8](#4148-stddrop-count-vector) - std:drop _count_ _vector_
+  - [4.15](#415-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
+    - [4.15.1](#4151-map-splicing) - Map Splicing
+  - [4.16](#416-references) - References
+    - [4.16.1](#4161-stdtoref-value) - std:to_ref _value_
+    - [4.16.2](#4162-stdweaken-ref) - std:weaken _ref_
+    - [4.16.3](#4163-isref-value) - is_ref _value_
+    - [4.16.4](#4164-iswref-value) - is_wref _value_
+    - [4.16.5](#4165-stdstrengthen-ref) - std:strengthen _ref_
+    - [4.16.6](#4166-stdsetref-ref-value) - std:set_ref _ref_ _value_
+  - [4.17](#417-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
   - [5.1](#51-function-call-composition) - Function call composition
     - [5.1.1](#511--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
@@ -320,74 +327,6 @@ And also with pairs:
 
 std:assert_eq a 10;
 std:assert_eq b 20;
-```
-
-#### - Pair to Iterator
-
-Pairs play a special role if you make an iterator from it.
-It can be used to create a specialized iterator that only
-iterates over keys or values of a map. Or that enumerates
-a vector or map.
-
-##### - Iter - Enumerate
-
-If the first value of the pair is `:enumerate`
-it will enumerate entries in a map or values in a vector.
-
-```wlambda
-!v = $[];
-
-# $iter is only explicit here for demonstration
-# purposes! `iter` will make an iter from the pair
-# if you don't pass one!
-iter i ($iter $p(:enumerate, $[:a, :b, :c]))
-    ~ std:push v i;
-
-std:assert_eq (str v) (str $[0, 1, 2]);
-```
-
-For maps:
-
-```wlambda
-!v = $[];
-iter i $p(:enumerate, ${a = 10, b = 20})
-    ~ std:push v i;
-
-std:assert_eq (str v) (str $[0, 1]);
-```
-
-##### - Iter - Values
-
-This is useful for iterating over the values in a map in an undefined order:
-
-```wlambda
-!m = ${ a = 10, b = 20, c = 33 };
-
-!sum = $@i iter v $p(:values, m) ~ $+ v;
-
-std:assert_eq sum 63;
-```
-
-##### - Iter - Keys
-
-You can also iterate over map keys in an undefined order:
-
-```wlambda
-!m = ${ :10 = :c, :20 = :b, :30 = :a };
-
-!sum = $@i iter v $p(:keys, m) ~ $+ v;
-
-std:assert_eq sum 60;
-```
-
-#### - is_pair _value_
-
-Checks if _value_ is a pair.
-
-```wlambda
-std:assert ~ is_pair $p(1, 2);
-std:assert not ~ is_pair $[1, 2];
-std:assert not ~ is_pair $i(1, 2);
 ```
 
 ### <a name="21-global-variables"></a>2.1 - Global Variables
@@ -918,7 +857,7 @@ std:assert ~ not ~ is_optional $false;
 std:assert ~ not ~ is_optional 303;
 ```
 
-#### - Unwrapping optionals
+#### <a name="422-unwrapping-optionals"></a>4.2.2 - Unwrapping optionals
 
 You can unwrap an optional with `unwrap`. It will panic if there is no value provided.
 Otherwise it will return the contents.
@@ -2326,7 +2265,7 @@ match y
 std:assert_eq state "is off";
 ```
 
-### - Pairs `$p(a, b)`
+### <a name="413-pairs-pa-b"></a>4.13 - Pairs `$p(a, b)`
 
 A pair is an immutable tuple of 2 values. You can use it for returning two
 values from a function as it is a slight bit slimmer than a vector with two
@@ -2390,8 +2329,75 @@ std:assert std:ref_id[a] == id_a;
 std:assert std:ref_id[v.0] == id_a;
 ```
 
+#### <a name="4131-pair-to-iterator"></a>4.13.1 - Pair to Iterator
 
-### <a name="413-vectors-or-lists"></a>4.13 - Vectors (or Lists)
+Pairs play a special role if you make an iterator from it.
+It can be used to create a specialized iterator that only
+iterates over keys or values of a map. Or that enumerates
+a vector or map.
+
+##### <a name="41311-iter---enumerate"></a>4.13.1.1 - Iter - Enumerate
+
+If the first value of the pair is `:enumerate`
+it will enumerate entries in a map or values in a vector.
+
+```wlambda
+!v = $[];
+
+# $iter is only explicit here for demonstration
+# purposes! `iter` will make an iter from the pair
+# if you don't pass one!
+iter i ($iter $p(:enumerate, $[:a, :b, :c]))
+    ~ std:push v i;
+
+std:assert_eq (str v) (str $[0, 1, 2]);
+```
+
+For maps:
+
+```wlambda
+!v = $[];
+iter i $p(:enumerate, ${a = 10, b = 20})
+    ~ std:push v i;
+
+std:assert_eq (str v) (str $[0, 1]);
+```
+
+##### <a name="41312-iter---values"></a>4.13.1.2 - Iter - Values
+
+This is useful for iterating over the values in a map in an undefined order:
+
+```wlambda
+!m = ${ a = 10, b = 20, c = 33 };
+
+!sum = $@i iter v $p(:values, m) ~ $+ v;
+
+std:assert_eq sum 63;
+```
+
+##### <a name="41313-iter---keys"></a>4.13.1.3 - Iter - Keys
+
+You can also iterate over map keys in an undefined order:
+
+```wlambda
+!m = ${ :10 = :c, :20 = :b, :30 = :a };
+
+!sum = $@i iter v $p(:keys, m) ~ $+ v;
+
+std:assert_eq sum 60;
+```
+
+#### <a name="4132-ispair-value"></a>4.13.2 - is_pair _value_
+
+Checks if _value_ is a pair.
+
+```wlambda
+std:assert ~ is_pair $p(1, 2);
+std:assert not ~ is_pair $[1, 2];
+std:assert not ~ is_pair $i(1, 2);
+```
+
+### <a name="414-vectors-or-lists"></a>4.14 - Vectors (or Lists)
 
 The literal syntax for vectors (or sometimes also called lists in WLambda)
 is `$[...]`. You may write any kind of expression in it and you will get
@@ -2419,7 +2425,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="4131-stdpush-vector-item"></a>4.13.1 - std:push _vector_ _item_
+#### <a name="4141-stdpush-vector-item"></a>4.14.1 - std:push _vector_ _item_
 
 Pushes _item_ to the end of _vector_. Returns _item_.
 
@@ -2431,7 +2437,7 @@ std:push v 3;
 std:assert_eq (str v) (str $[1,2,3]);
 ```
 
-#### <a name="4132-stdpop-vector"></a>4.13.2 - std:pop _vector_
+#### <a name="4142-stdpop-vector"></a>4.14.2 - std:pop _vector_
 
 Pops off the last element of _vector_. Returns `$none` if the vector is empty
 or if _vector_ is not a vector.
@@ -2443,7 +2449,7 @@ std:assert_eq (std:pop v) 3;
 std:assert_eq (str v) (str $[1,2]);
 ```
 
-#### <a name="4133-stdunshift-vector-item"></a>4.13.3 - std:unshift _vector_ _item_
+#### <a name="4143-stdunshift-vector-item"></a>4.14.3 - std:unshift _vector_ _item_
 
 Inserts _item_ at the front of _vector_. Returns _item_ and mutates _vector_
 inplace. Be aware that this operation is of O(n) complexity.
@@ -2456,7 +2462,7 @@ std:unshift v 3;
 std:assert_eq (str v) (str $[3,1,2]);
 ```
 
-#### <a name="4134-vector-splicing"></a>4.13.4 - Vector Splicing
+#### <a name="4144-vector-splicing"></a>4.14.4 - Vector Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -2476,7 +2482,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-#### <a name="4135-stdappend-vec-a-value-or-vec-"></a>4.13.5 - std:append _vec-a_ _value-or-vec_ ...
+#### <a name="4145-stdappend-vec-a-value-or-vec-"></a>4.14.5 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
 If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
@@ -2495,7 +2501,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
 ```
 
-#### <a name="4136-stdprepend-vec-a-value-or-vec-"></a>4.13.6 - std:prepend _vec-a_ _value-or-vec_ ...
+#### <a name="4146-stdprepend-vec-a-value-or-vec-"></a>4.14.6 - std:prepend _vec-a_ _value-or-vec_ ...
 
 Prepends _value-or-vec_ and all following items to the front of _vec-a_.
 If _value-or-vec_ is a vector, all its items will be prepended to _vec-a_.
@@ -2514,7 +2520,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) (str $[:d, :c, :b, :a, 1]);
 ```
 
-#### <a name="4137-stdtake-count-vector"></a>4.13.7 - std:take _count_ _vector_
+#### <a name="4147-stdtake-count-vector"></a>4.14.7 - std:take _count_ _vector_
 
 Takes and returns the first _count_ elements of _vector_. Does not
 mutate _vector_.
@@ -2528,7 +2534,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[1,2,3,4]";
 ```
 
-#### <a name="4138-stddrop-count-vector"></a>4.13.8 - std:drop _count_ _vector_
+#### <a name="4148-stddrop-count-vector"></a>4.14.8 - std:drop _count_ _vector_
 
 Drops _count_ elements from _vector_ and returns them as new vector.
 Does not mutate _vector_.
@@ -2542,7 +2548,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[5,6]";
 ```
 
-### <a name="414-associative-maps-or-string-to-value-mappings"></a>4.14 - Associative Maps (or String to Value mappings)
+### <a name="415-associative-maps-or-string-to-value-mappings"></a>4.15 - Associative Maps (or String to Value mappings)
 
 Aside from vectors there are associative maps in WLambda. Their syntax is
 `${ key = expr, ... }`. The keys of these maps have to be strings,
@@ -2586,7 +2592,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4141-map-splicing"></a>4.14.1 - Map Splicing
+#### <a name="4151-map-splicing"></a>4.15.1 - Map Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -2605,7 +2611,7 @@ std:assert_eq (str ${*${a=10}}) "${a=10}";
 std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 ```
 
-### <a name="415-references"></a>4.15 - References
+### <a name="416-references"></a>4.16 - References
 
 Some data structures already have reference characteristics, such as strings,
 vectors and maps. There are 3 types of references in WLambda that handle
@@ -2661,7 +2667,7 @@ std:assert_eq $*x 20;
 
 Strong references can also be created using the `std:to_ref` function.
 
-#### <a name="4151-stdtoref-value"></a>4.15.1 - std:to_ref _value_
+#### <a name="4161-stdtoref-value"></a>4.16.1 - std:to_ref _value_
 
 Creates a new strong reference that refers to a cell that stores _value_.
 
@@ -2673,7 +2679,7 @@ std:assert_eq (std:ser:wlambda x) "$&&10";
 std:assert_eq $*x 10;
 ```
 
-#### <a name="4152-stdweaken-ref"></a>4.15.2 - std:weaken _ref_
+#### <a name="4162-stdweaken-ref"></a>4.16.2 - std:weaken _ref_
 
 You can weaken any of those two types of references manually using the
 `std:weaken` function.
@@ -2701,7 +2707,7 @@ std:assert_eq $*y $n;
 std:assert drop_check;
 ```
 
-#### <a name="4153-isref-value"></a>4.15.3 - is_ref _value_
+#### <a name="4163-isref-value"></a>4.16.3 - is_ref _value_
 
 Returns `$true` if _value_ is a reference (strong, weakable or weak).
 
@@ -2717,7 +2723,7 @@ std:assert ~ not ~ is_ref $true;
 std:assert ~ not ~ is_ref $none;
 ```
 
-#### <a name="4154-iswref-value"></a>4.15.4 - is_wref _value_
+#### <a name="4164-iswref-value"></a>4.16.4 - is_wref _value_
 
 Returns `$true` if _value_ is a weak reference.
 
@@ -2728,14 +2734,14 @@ std:assert ~ is_wref y;
 std:assert ~ not ~ is_wref x;
 ```
 
-#### <a name="4155-stdstrengthen-ref"></a>4.15.5 - std:strengthen _ref_
+#### <a name="4165-stdstrengthen-ref"></a>4.16.5 - std:strengthen _ref_
 
 You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
 
-#### <a name="4156-stdsetref-ref-value"></a>4.15.6 - std:set_ref _ref_ _value_
+#### <a name="4166-stdsetref-ref-value"></a>4.16.6 - std:set_ref _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -2760,7 +2766,7 @@ std:set_ref w3 14;      # Set reference via the weak reference in w3 to r3.
 std:assert_eq $*r3 14;
 ```
 
-### <a name="416-calling-semantics-of-data-types"></a>4.16 - Calling Semantics of Data Types
+### <a name="417-calling-semantics-of-data-types"></a>4.17 - Calling Semantics of Data Types
 
 You can call almost all basic data types of WLambda.
 Here is an overview of the data type calling semantics:
