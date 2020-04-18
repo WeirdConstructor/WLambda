@@ -348,18 +348,26 @@ fn check_while() {
         i
     "#),
     "4");
-//        !x = 0;
-//        !a = while { x == 0 } {
-//            break[];
-//        };
-//        a
-//    "#),
-//    "20");
 
-    assert_eq!(ve("while 1"),
-        "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: while takes exactly 2 arguments (condition and expression)");
-    assert_eq!(ve("while 1 2 3"),
-        "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: while takes exactly 2 arguments (condition and expression)");
+    assert_eq!(ve(r#"
+        !x = 0;
+        $@v
+            while x < 4 {
+                !y = 4;
+                while y > 0 {
+                    .y = y - 1;
+                    ? x % 2 == 0 { !kk = 3; next[]; };
+                    ? y < 2 { !kk = 3; break[]; };
+                    $+ $p(x, y);
+                };
+                .x = x + 1;
+            };
+    "#), "$[$p(1,3),$p(1,2),$p(3,3),$p(3,2)]");
+
+//    assert_eq!(ve("while 1"),
+//        "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: while takes exactly 2 arguments (condition and expression)");
+//    assert_eq!(ve("while 1 2 3"),
+//        "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: while takes exactly 2 arguments (condition and expression)");
 }
 
 #[test]

@@ -164,17 +164,17 @@ macro_rules! pw_needs_storage {
 }
 
 macro_rules! in_reg {
-    ($env: ident, $ret: ident, $prog: ident, $respos_var: ident) => {
+    ($env: ident, $ret: ident, $data: ident, $respos_var: ident) => {
         let $respos_var =
             match $respos_var {
                 ResPos::Local(o)    => $env.get_local(*o as usize),
                 ResPos::LocalRef(o) => $env.get_local(*o as usize).deref(),
                 ResPos::Up(i)       => $env.get_up(*i as usize),
                 ResPos::UpRef(i)    => $env.get_up(*i as usize).deref(),
-                ResPos::Global(i)   => $prog.data[*i as usize].deref(),
-                ResPos::GlobalRef(i)=> $prog.data[*i as usize].deref().deref(),
+                ResPos::Global(i)   => $data[*i as usize].deref(),
+                ResPos::GlobalRef(i)=> $data[*i as usize].deref().deref(),
                 ResPos::Arg(o)      => $env.arg(*o as usize),
-                ResPos::Data(i)     => $prog.data[*i as usize].clone(),
+                ResPos::Data(i)     => $data[*i as usize].clone(),
                 ResPos::Stack(_o)   => $env.pop(),
                 ResPos::Value(ResValue::Ret)      => std::mem::replace(&mut $ret, VVal::None),
                 ResPos::Value(ResValue::None)     => VVal::None,
@@ -188,15 +188,15 @@ macro_rules! in_reg {
 }
 
 macro_rules! out_reg {
-    ($env: ident, $ret: ident, $retv: ident, $prog: ident, $respos_var: ident, $val: expr) => {
+    ($env: ident, $ret: ident, $retv: ident, $data: ident, $respos_var: ident, $val: expr) => {
         match $respos_var {
             ResPos::Local(o)        => $env.set_consume(*o as usize, $val),
             ResPos::LocalRef(o)     => $env.assign_ref_local(*o as usize, $val),
             ResPos::Up(i)           => $env.set_up(*i as usize, $val),
             ResPos::UpRef(i)        => $env.assign_ref_up(*i as usize, $val),
-            ResPos::Global(i)       => { $prog.data[*i as usize].set_ref($val); },
-            ResPos::GlobalRef(i)    => { $prog.data[*i as usize].deref().set_ref($val); },
-            ResPos::Data(i)         => { $prog.data[*i as usize].set_ref($val); },
+            ResPos::Global(i)       => { $data[*i as usize].set_ref($val); },
+            ResPos::GlobalRef(i)    => { $data[*i as usize].deref().set_ref($val); },
+            ResPos::Data(i)         => { $data[*i as usize].set_ref($val); },
             ResPos::Stack(_)        => { $env.push($val); },
             ResPos::Value(ResValue::Ret) => { $ret = $val; },
             ResPos::Arg(_)          => (),
@@ -215,43 +215,43 @@ macro_rules! out_reg {
 }
 
 macro_rules! op_r {
-    ($env: ident, $ret: ident, $retv: ident, $prog: ident, $r: ident, $block: block) => {
+    ($env: ident, $ret: ident, $retv: ident, $data: ident, $r: ident, $block: block) => {
         {
             let res = $block;
-            out_reg!($env, $ret, $retv, $prog, $r, res);
+            out_reg!($env, $ret, $retv, $data, $r, res);
         }
     }
 }
 
 macro_rules! op_a_r {
-    ($env: ident, $ret: ident, $retv: ident, $prog: ident, $a: ident, $r: ident, $block: block) => {
+    ($env: ident, $ret: ident, $retv: ident, $data: ident, $a: ident, $r: ident, $block: block) => {
         {
-            in_reg!($env, $ret, $prog, $a);
+            in_reg!($env, $ret, $data, $a);
             let res = $block;
-            out_reg!($env, $ret, $retv, $prog, $r, res);
+            out_reg!($env, $ret, $retv, $data, $r, res);
         }
     }
 }
 
 macro_rules! op_a_b_r {
-    ($env: ident, $ret: ident, $retv: ident, $prog: ident, $a: ident, $b: ident, $r: ident, $block: block) => {
+    ($env: ident, $ret: ident, $retv: ident, $data: ident, $a: ident, $b: ident, $r: ident, $block: block) => {
         {
-            in_reg!($env, $ret, $prog, $a);
-            in_reg!($env, $ret, $prog, $b);
+            in_reg!($env, $ret, $data, $a);
+            in_reg!($env, $ret, $data, $b);
             let res = $block;
-            out_reg!($env, $ret, $retv, $prog, $r, res);
+            out_reg!($env, $ret, $retv, $data, $r, res);
         }
     }
 }
 
 macro_rules! op_a_b_c_r {
-    ($env: ident, $ret: ident, $retv: ident, $prog: ident, $a: ident, $b: ident, $c: ident, $r: ident, $block: block) => {
+    ($env: ident, $ret: ident, $retv: ident, $data: ident, $a: ident, $b: ident, $c: ident, $r: ident, $block: block) => {
         {
-            in_reg!($env, $ret, $prog, $a);
-            in_reg!($env, $ret, $prog, $b);
-            in_reg!($env, $ret, $prog, $c);
+            in_reg!($env, $ret, $data, $a);
+            in_reg!($env, $ret, $data, $b);
+            in_reg!($env, $ret, $data, $c);
             let res = $block;
-            out_reg!($env, $ret, $retv, $prog, $r, res);
+            out_reg!($env, $ret, $retv, $data, $r, res);
         }
     }
 }
@@ -274,20 +274,6 @@ macro_rules! handle_err {
     }
 }
 
-macro_rules! unwind_loop_info {
-    ($env: ident) => {
-        // Takes care of:
-        // - Unwind SP to the state of the initial first start of
-        //   the loop body.
-        // - Unwind unwind stack to the state of the first start of
-        //   the loop body.
-        while $env.sp > $env.loop_info.sp {
-            $env.pop();
-        }
-        $env.unwind_to_depth($env.loop_info.uw_depth);
-    }
-}
-
 macro_rules! handle_next {
     ($env: ident, $pc: ident, $uw_depth: ident, $retv: ident) => {
         if $env.loop_info.break_pc == 0 {
@@ -296,7 +282,7 @@ macro_rules! handle_next {
             break;
         } else {
             $pc = $env.loop_info.pc;
-            unwind_loop_info!($env);
+            $env.cleanup_loop();
         }
     }
 }
@@ -309,7 +295,7 @@ macro_rules! handle_break {
             break;
         } else {
             $pc = $env.loop_info.break_pc;
-            unwind_loop_info!($env);
+            $env.cleanup_loop();
         }
     }
 }
@@ -387,6 +373,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     let old_loop_info =
         std::mem::replace(&mut env.loop_info, LoopInfo::new());
 
+    let data = &prog.data;
+
     loop {
         let op = &prog.ops[pc];
         if DEBUG_VM {
@@ -398,21 +386,21 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         }
 
         match op {
-            Op::Mov(a, r) => op_a_r!(env, ret, retv, prog, a, r, { a }),
-            Op::NewPair(a, b, r) => op_a_b_r!(env, ret, retv, prog, a, b, r, {
+            Op::Mov(a, r) => op_a_r!(env, ret, retv, data, a, r, { a }),
+            Op::NewPair(a, b, r) => op_a_b_r!(env, ret, retv, data, a, b, r, {
                 VVal::Pair(Rc::new((
                     handle_err!(b, "first pair element", retv),
                     handle_err!(a, "second pair element", retv))))
             }),
-            Op::NewOpt(a, r) => op_r!(env, ret, retv, prog, r, {
+            Op::NewOpt(a, r) => op_r!(env, ret, retv, data, r, {
                 if let ResPos::Value(ResValue::OptNone) = a {
                     VVal::Opt(None)
                 } else {
-                    in_reg!(env, ret, prog, a);
+                    in_reg!(env, ret, data, a);
                     VVal::Opt(Some(Rc::new(a)))
                 }
             }),
-            Op::NewIter(a, r) => op_a_r!(env, ret, retv, prog, a, r, {
+            Op::NewIter(a, r) => op_a_r!(env, ret, retv, data, a, r, {
                 VVal::Iter(Rc::new(RefCell::new(a.iter())))
             }),
             Op::NewNVec(vp, r) => {
@@ -420,63 +408,63 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 match vp.as_ref() {
                     NVecPos::IVec2(a, b) => {
-                        in_reg!(env, ret, prog, a);
-                        in_reg!(env, ret, prog, b);
+                        in_reg!(env, ret, data, a);
+                        in_reg!(env, ret, data, b);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
-                        out_reg!(env, ret, retv, prog, r,
+                        out_reg!(env, ret, retv, data, r,
                             VVal::IVec(NVec::Vec2(a.i(), b.i())));
                     },
                     NVecPos::IVec3(a, b, c) => {
-                        in_reg!(env, ret, prog, a);
-                        in_reg!(env, ret, prog, b);
-                        in_reg!(env, ret, prog, c);
+                        in_reg!(env, ret, data, a);
+                        in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, c);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
-                        out_reg!(env, ret, retv, prog, r,
+                        out_reg!(env, ret, retv, data, r,
                             VVal::IVec(NVec::Vec3(a.i(), b.i(), c.i())));
                     },
                     NVecPos::IVec4(a, b, c, d) => {
-                        in_reg!(env, ret, prog, a);
-                        in_reg!(env, ret, prog, b);
-                        in_reg!(env, ret, prog, c);
-                        in_reg!(env, ret, prog, d);
+                        in_reg!(env, ret, data, a);
+                        in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, c);
+                        in_reg!(env, ret, data, d);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
                         let d = handle_err!(d, "w nvector component", retv);
-                        out_reg!(env, ret, retv, prog, r,
+                        out_reg!(env, ret, retv, data, r,
                             VVal::IVec(NVec::Vec4(a.i(), b.i(), c.i(), d.i())));
                     },
                     NVecPos::FVec2(a, b) => {
-                        in_reg!(env, ret, prog, a);
-                        in_reg!(env, ret, prog, b);
+                        in_reg!(env, ret, data, a);
+                        in_reg!(env, ret, data, b);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
-                        out_reg!(env, ret, retv, prog, r,
+                        out_reg!(env, ret, retv, data, r,
                             VVal::FVec(NVec::Vec2(a.f(), b.f())));
                     },
                     NVecPos::FVec3(a, b, c) => {
-                        in_reg!(env, ret, prog, a);
-                        in_reg!(env, ret, prog, b);
-                        in_reg!(env, ret, prog, c);
+                        in_reg!(env, ret, data, a);
+                        in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, c);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
-                        out_reg!(env, ret, retv, prog, r,
+                        out_reg!(env, ret, retv, data, r,
                             VVal::FVec(NVec::Vec3(a.f(), b.f(), c.f())));
                     },
                     NVecPos::FVec4(a, b, c, d) => {
-                        in_reg!(env, ret, prog, a);
-                        in_reg!(env, ret, prog, b);
-                        in_reg!(env, ret, prog, c);
-                        in_reg!(env, ret, prog, d);
+                        in_reg!(env, ret, data, a);
+                        in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, c);
+                        in_reg!(env, ret, data, d);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
                         let d = handle_err!(d, "w nvector component", retv);
-                        out_reg!(env, ret, retv, prog, r,
+                        out_reg!(env, ret, retv, data, r,
                             VVal::FVec(NVec::Vec4(a.f(), b.f(), c.f(), d.f())));
                     },
                 }
@@ -485,34 +473,34 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 match trtype {
                     ToRefType::CaptureRef =>
                         match a {
-                            ResPos::Local(i) => out_reg!(env, ret, retv, prog, r, {
+                            ResPos::Local(i) => out_reg!(env, ret, retv, data, r, {
                                 env.get_local_captured_ref(*i as usize)
                             }),
-                            ResPos::Global(i) => out_reg!(env, ret, retv, prog, r, {
+                            ResPos::Global(i) => out_reg!(env, ret, retv, data, r, {
                                 prog.data[*i as usize].clone()
                             }),
-                            ResPos::Up(i) => out_reg!(env, ret, retv, prog, r, {
+                            ResPos::Up(i) => out_reg!(env, ret, retv, data, r, {
                                 env.get_up_captured_ref(*i as usize)
                             }),
-                            _ => op_a_r!(env, ret, retv, prog, a, r, { a.to_ref() }),
+                            _ => op_a_r!(env, ret, retv, data, a, r, { a.to_ref() }),
                         },
                     ToRefType::ToRef =>
-                        op_a_r!(env, ret, retv, prog, a, r, { a.to_ref() }),
+                        op_a_r!(env, ret, retv, data, a, r, { a.to_ref() }),
                     ToRefType::Weakable =>
-                        op_a_r!(env, ret, retv, prog, a, r, {
+                        op_a_r!(env, ret, retv, data, a, r, {
                             a.to_weakened_upvalue_ref()
                         }),
                     ToRefType::Deref =>
-                        op_a_r!(env, ret, retv, prog, a, r, {
+                        op_a_r!(env, ret, retv, data, a, r, {
                             a.deref()
                         }),
                 }
             },
-            Op::Argv(r)             => op_r!(env, ret, retv, prog, r, { env.argv() }),
+            Op::Argv(r)             => op_r!(env, ret, retv, data, r, { env.argv() }),
             Op::End                 => { break; },
             Op::Unwind              => { env.unwind_one(); },
             Op::IterInit(iterable, body_ops) => {
-                in_reg!(env, ret, prog, iterable);
+                in_reg!(env, ret, data, iterable);
 
                 // 1 unwind offset for push_iter, which needs to be preserved
                 // on break/next, as it is explicitly cleaned up.
@@ -540,7 +528,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         None
                     };
                 if let Some(v) = value {
-                    out_reg!(env, ret, retv, prog, ivar, v);
+                    out_reg!(env, ret, retv, data, ivar, v);
                 } else {
                     pc = env.loop_info.break_pc;
                 }
@@ -563,7 +551,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     };
                 env.setup_accumulator(v);
             },
-            Op::Add(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Add(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Int(a) = a {
                     VVal::Int(a.wrapping_add(b.i()))
                 } else if let VVal::Flt(f) = a {
@@ -576,7 +564,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     }
                 }
             }),
-            Op::Sub(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Sub(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Int(a) = a {
                     VVal::Int(a.wrapping_sub(b.i()))
                 } else if let VVal::Flt(f) = a {
@@ -589,7 +577,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     }
                 }
             }),
-            Op::Div(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Div(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Int(a) = a {
                     if b.i() == 0 {
                         env.unwind_to_depth(uw_depth);
@@ -622,7 +610,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     }
                 }
             }),
-            Op::Mul(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Mul(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Int(a) = a {
                     VVal::Int(a.wrapping_mul(b.i()))
                 } else if let VVal::Flt(f) = a {
@@ -635,38 +623,38 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     }
                 }
             }),
-            Op::Mod(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Mod(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Flt(f) = a {
                     VVal::Flt(f % b.f())
                 } else {
                     VVal::Int(a.i().wrapping_rem(b.i()))
                 }
             }),
-            Op::Le(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Le(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
                 else { VVal::Bol(a.i() <= b.i()) }
             }),
-            Op::Lt(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Lt(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f < b.f()) }
                 else { VVal::Bol(a.i() < b.i()) }
             }),
-            Op::Ge(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Ge(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f >= b.f()) }
                 else { VVal::Bol(a.i() >= b.i()) }
             }),
-            Op::Gt(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Gt(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f > b.f()) }
                 else { VVal::Bol(a.i() > b.i()) }
             }),
-            Op::Eq(b, a, r) => op_a_b_r!(env, ret, retv, prog, b, a, r, {
+            Op::Eq(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 VVal::Bol(a.eqv(&b))
             }),
-            Op::NewList(r) => op_r!(env, ret, retv, prog, r, { VVal::vec() }),
-            Op::ListPush(a, b, r) => op_a_b_r!(env, ret, retv, prog, a, b, r, {
+            Op::NewList(r) => op_r!(env, ret, retv, data, r, { VVal::vec() }),
+            Op::ListPush(a, b, r) => op_a_b_r!(env, ret, retv, data, a, b, r, {
                 b.push(handle_err!(a, "list element", retv));
                 b
             }),
-            Op::ListSplice(a, b, r) => op_a_b_r!(env, ret, retv, prog, a, b, r, {
+            Op::ListSplice(a, b, r) => op_a_b_r!(env, ret, retv, data, a, b, r, {
                 if let VVal::Iter(i) = a {
                     let mut i = i.borrow_mut();
                     loop {
@@ -683,66 +671,66 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
                 b
             }),
-            Op::NewMap(r) => op_r!(env, ret, retv, prog, r, { VVal::map() }),
-            Op::MapSetKey(v, k, m, r) => op_a_b_c_r!(env, ret, retv, prog, v, k, m, r, {
+            Op::NewMap(r) => op_r!(env, ret, retv, data, r, { VVal::map() }),
+            Op::MapSetKey(v, k, m, r) => op_a_b_c_r!(env, ret, retv, data, v, k, m, r, {
                 let v = handle_err!(v, "map value", retv);
                 let k = handle_err!(k, "map key", retv);
                 m.set_key(&k, v)?;
                 m
             }),
-            Op::GetIdx(o, idx, r) => op_a_r!(env, ret, retv, prog, o, r, {
+            Op::GetIdx(o, idx, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
                 .at(*idx as usize).unwrap_or_else(|| VVal::None)
             }),
-            Op::GetIdx2(o, idx, r) => op_a_r!(env, ret, retv, prog, o, r, {
+            Op::GetIdx2(o, idx, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
                 .at(idx.0 as usize).unwrap_or_else(|| VVal::None)
                 .at(idx.1 as usize).unwrap_or_else(|| VVal::None)
             }),
-            Op::GetIdx3(o, idx, r) => op_a_r!(env, ret, retv, prog, o, r, {
+            Op::GetIdx3(o, idx, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
                 .at(idx.0 as usize).unwrap_or_else(|| VVal::None)
                 .at(idx.1 as usize).unwrap_or_else(|| VVal::None)
                 .at(idx.2 as usize).unwrap_or_else(|| VVal::None)
             }),
-            Op::GetSym(o, sym, r) => op_a_r!(env, ret, retv, prog, o, r, {
+            Op::GetSym(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
                 .get_key(&sym).unwrap_or_else(|| VVal::None)
             }),
-            Op::GetSym2(o, sym, r) => op_a_r!(env, ret, retv, prog, o, r, {
+            Op::GetSym2(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
                 .get_key(&sym.0).unwrap_or_else(|| VVal::None)
                 .get_key(&sym.1).unwrap_or_else(|| VVal::None)
             }),
-            Op::GetSym3(o, sym, r) => op_a_r!(env, ret, retv, prog, o, r, {
+            Op::GetSym3(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
                 .get_key(&sym.0).unwrap_or_else(|| VVal::None)
                 .get_key(&sym.1).unwrap_or_else(|| VVal::None)
                 .get_key(&sym.2).unwrap_or_else(|| VVal::None)
             }),
             Op::GetKey(o, k, r) => {
-                in_reg!(env, ret, prog, k);
-                in_reg!(env, ret, prog, o);
+                in_reg!(env, ret, data, k);
+                in_reg!(env, ret, data, o);
 
                 let o = handle_err!(o, "field idx/key", retv);
                 let k = handle_err!(k, "map/list", retv);
                 let res = get_key!(o, k, get_key, env, retv, uw_depth, prog, pc);
-                out_reg!(env, ret, retv, prog, r, res);
+                out_reg!(env, ret, retv, data, r, res);
             },
             Op::Destr(a, info) => {
-                in_reg!(env, ret, prog, a);
+                in_reg!(env, ret, data, a);
                 info.destructure(env, a);
             },
-            Op::NewErr(e, r) => op_a_r!(env, ret, retv, prog, e, r, {
+            Op::NewErr(e, r) => op_a_r!(env, ret, retv, data, e, r, {
                 VVal::err(e, prog.debug[pc].clone().unwrap())
             }),
-            Op::NewClos(f, r) => op_a_r!(env, ret, retv, prog, f, r, {
+            Op::NewClos(f, r) => op_a_r!(env, ret, retv, data, f, r, {
                 let fun = f.clone_and_rebind_upvalues(|upvs, upvalues| {
                     copy_upvs(upvs, env, upvalues);
                 });
                 fun
             }),
-            Op::MapSplice(s, m, r) => op_a_b_r!(env, ret, retv, prog, s, m, r, {
+            Op::MapSplice(s, m, r) => op_a_b_r!(env, ret, retv, data, s, m, r, {
                 if let VVal::Iter(i) = s {
                     let mut i = i.borrow_mut();
                     loop {
@@ -783,8 +771,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 m
             }),
             Op::CallMethodKey(o, k, argc, r) => {
-                in_reg!(env, ret, prog, k);
-                in_reg!(env, ret, prog, o);
+                in_reg!(env, ret, data, k);
+                in_reg!(env, ret, data, o);
                 let o = handle_err!(o, "field idx/key", retv);
                 let k = handle_err!(k, "map/list", retv);
 
@@ -794,11 +782,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 env.push_unwind_self(o);
                 call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
                     env.unwind_one();
-                    out_reg!(env, ret, retv, prog, r, v);
+                    out_reg!(env, ret, retv, data, r, v);
                 });
             },
             Op::CallMethodSym(o, k, argc, r) => {
-                in_reg!(env, ret, prog, o);
+                in_reg!(env, ret, data, o);
                 let o = handle_err!(o, "field idx/key", retv);
 
                 let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::None);
@@ -807,7 +795,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 env.push_unwind_self(o);
                 call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
                     env.unwind_one();
-                    out_reg!(env, ret, retv, prog, r, v);
+                    out_reg!(env, ret, retv, data, r, v);
                 });
             },
             Op::Call(argc, r) => {
@@ -815,12 +803,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 let f = env.stk(argc + 1).clone();
 
                 call_func!(f, argc, argc + 1, env, retv, uw_depth, prog, pc, v, {
-                    out_reg!(env, ret, retv, prog, r, v);
+                    out_reg!(env, ret, retv, data, r, v);
                 });
             },
             Op::Apply(argv, func, r) => {
-                in_reg!(env, ret, prog, argv);
-                in_reg!(env, ret, prog, func);
+                in_reg!(env, ret, data, argv);
+                in_reg!(env, ret, data, func);
 
                 let mut argv = argv;
 
@@ -843,7 +831,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 env.popn(argc);
 
                 match call_ret {
-                    Ok(v) => { out_reg!(env, ret, retv, prog, r, v); },
+                    Ok(v) => { out_reg!(env, ret, retv, data, r, v); },
                     Err(StackAction::Return(ret)) => {
                         env.unwind_to_depth(uw_depth);
                         retv = Err(StackAction::Return(ret));
@@ -860,21 +848,21 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 pc = (pc as i32 + *jmp_offs) as usize;
             },
             Op::JmpIfN(a, jmp_offs) => {
-                in_reg!(env, ret, prog, a);
+                in_reg!(env, ret, data, a);
                 if !a.b() { pc = (pc as i32 + *jmp_offs) as usize; }
             },
             Op::OrJmp(a, jmp_offs, r) => {
-                in_reg!(env, ret, prog, a);
+                in_reg!(env, ret, data, a);
                 if a.b() {
                     pc = (pc as i32 + *jmp_offs) as usize;
-                    out_reg!(env, ret, retv, prog, r, a);
+                    out_reg!(env, ret, retv, data, r, a);
                 }
             },
             Op::AndJmp(a, jmp_offs, r) => {
-                in_reg!(env, ret, prog, a);
+                in_reg!(env, ret, data, a);
                 if !a.b() {
                     pc = (pc as i32 + *jmp_offs) as usize;
-                    out_reg!(env, ret, retv, prog, r, a);
+                    out_reg!(env, ret, retv, data, r, a);
                 }
             },
             Op::CtrlFlow(flw) => {
@@ -883,7 +871,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         handle_next!(env, pc, uw_depth, retv);
                     },
                     CtrlFlow::Break(a) => {
-                        in_reg!(env, ret, prog, a);
+                        in_reg!(env, ret, data, a);
                         let a = Box::new(a);
                         handle_break!(env, pc, a, uw_depth, retv);
                     },
@@ -912,7 +900,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         }
                     },
                     Builtin::Export(name, a) => {
-                        in_reg!(env, ret, prog, a);
+                        in_reg!(env, ret, data, a);
                         env.export_name(name, &a);
                     },
                 }

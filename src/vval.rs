@@ -779,6 +779,14 @@ impl Env {
     }
 
     #[inline]
+    pub fn cleanup_loop(&mut self) {
+        while self.sp > self.loop_info.sp {
+            self.pop();
+        }
+        self.unwind_to_depth(self.loop_info.uw_depth);
+    }
+
+    #[inline]
     pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize, uw_depth_offs: usize) {
         let uw_depth = self.unwind_depth() + 1 + uw_depth_offs;
         let uwa =
