@@ -195,45 +195,7 @@ In the following grammar, white space and comments are omitted:
                   ;
     arg_list      = "[", [ expr, { ",", expr }, [ "," ] ], "]"
                   | "[[", expr, "]]"  (* apply result vector of expr as argument list *)
-                  ;
-    field         = ".", ( integer | ident | value ), [ field ]
-                  ;
-    field_access  = field, "=", expr
-                  | field, arg_list
-                  | field
-                  (* please note, that a field access like:
-                     `obj.field` is equivalent to the call:
-                     `field[obj]`. That also means that
-                     `obj.field[...]` is transformed into
-                     `field[obj][...]`.
-                     The exception is "=" which assigns
-                     the field as specified.
-                     BUT: There is a special case, when you specify
-                     an `indent` it is quoted and interpreted as symbol. *)
-                  ;
-    call_no_ops   = value, { arg_list | field_access }, [ "~", expr ]
-                  ;
-    call          = value,
-                    { arg_list | field_access | bin_op | value },
-                    [ "~", expr ] (* this is a tail argument, if present the
-                                     expr is appended to the argument list *)
-                  ;
-    expr          = call, { "|", call }
-                  | call, { "|>", call }
-                  | call, { "||", call }
-                  ;
-    simple_assign = qident, "=", expr
-                  ;
-    destr_assign  = "(", [ qident, { ",", qident } ], ")", "=" expr
-                  ;
-    definition    = [ ref_specifier ], ( simple_assign | destr_assign )
-                  ;
-    import        = "!", "@import", symbol, [ "=" ], symbol
-                  | "!", "@wlambda"
-                  ;
-    export        = "!", "@export", symbol, [ "=" ], expr
-                  ;
-    statement     = "!" definition
+                  statement     = "!" definition
                   | "." simple_assign
                   | "." destr_assign
                   | import
@@ -257,6 +219,7 @@ pub mod state;
 
 pub use state::State;
 pub use state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
+use state::StrPart;
 
 /// Helper function for recording characters into a byte buffer.
 fn add_c_to_vec(v: &mut Vec<u8>, c: char) {
@@ -279,7 +242,7 @@ fn adchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
 
 /// Parsers a WLambda special quote string or byte buffer.
 fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
-    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("string"))); }
+    if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("string"))); }
 
     let quote_char = ps.expect_some(ps.peek())?;
     ps.consume();
@@ -361,7 +324,7 @@ fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
 
 /// Parsers a WLambda string or byte buffer.
 fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
-    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("string"))); }
+    if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("string"))); }
 
     ps.consume_if_eq('"');
 
@@ -381,6 +344,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
                             ps.consume();
                             let hex = ps.peek2();
                             if let Some(h) = hex {
+                                let h = h.to_string();
                                 ps.consume();
                                 ps.consume();
                                 if let Ok(cn) = u8::from_str_radix(&h, 16) {
@@ -406,9 +370,9 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
                                 return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "After unicode escape")));
                             }
 
-                            let uh : String = ps.take_while(|c| c.is_digit(16)).iter().collect();
+                            let uh = ps.take_while(|c| c.is_digit(16));
 
-                            if let Ok(cn) = u32::from_str_radix(&uh, 16) {
+                            if let Ok(cn) = u32::from_str_radix(&uh.to_string(), 16) {
                                 if let Some(c) = std::char::from_u32(cn) {
                                     adchr(&mut v, &mut s, bytes, c);
                                 } else {
@@ -456,7 +420,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 
 #[allow(clippy::cast_lossless)]
 fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
-    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("number"))); }
+    if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("number"))); }
 
     let c = ps.expect_some(ps.peek())?;
     let sign = match c {
@@ -479,7 +443,7 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
         _   => 1
     };
 
-    let radix_or_num : String = ps.take_while(|c| c.is_digit(10)).iter().collect();
+    let radix_or_num = ps.take_while(|c| c.is_digit(10)).to_string();
 
     let (radix, num) = if ps.consume_if_eq('r') {
         let radix = if let Ok(r) = u8::from_str_radix(&radix_or_num, 10) {
@@ -492,28 +456,28 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
             return Err(ps.err(ParseNumberError::UnsupportedRadix(radix)));
         }
 
-        (radix, ps.take_while(|c| c.is_digit(radix as u32)).iter().collect())
+        (radix, ps.take_while(|c| c.is_digit(radix as u32)).to_string())
     } else if ps.consume_if_eq('x') {
         if radix_or_num != "0" {
             return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('x', radix_or_num)));
         }
-        (16, ps.take_while(|c| c.is_digit(16)).iter().collect())
+        (16, ps.take_while(|c| c.is_digit(16)).to_string())
     } else if ps.consume_if_eq('b') {
         if radix_or_num != "0" {
             return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('b', radix_or_num)));
         }
-        (2, ps.take_while(|c| c.is_digit(2)).iter().collect())
+        (2, ps.take_while(|c| c.is_digit(2)).to_string())
     } else if ps.consume_if_eq('o') {
         if radix_or_num != "0" {
             return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('o', radix_or_num)));
         }
-        (8, ps.take_while(|c| c.is_digit(8)).iter().collect())
+        (8, ps.take_while(|c| c.is_digit(8)).to_string())
     } else {
         (10, radix_or_num)
     };
 
     let (is_float, fract_num) = if ps.consume_if_eq('.') {
-        let fract_digits : String = ps.take_while(|c| c.is_digit(radix as u32)).iter().collect();
+        let fract_digits = ps.take_while(|c| c.is_digit(radix as u32)).to_string();
         if let Ok(fract_num) = u64::from_str_radix(&fract_digits, radix as u32) {
             (true, (fract_num as f64) / (radix as f64).powf(fract_digits.len() as f64))
         } else {
@@ -615,7 +579,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
 
 fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
-    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("literal value"))); }
+    if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("literal value"))); }
     let c = ps.expect_some(ps.peek())?;
 
     match c {
@@ -850,7 +814,7 @@ fn make_sym(ps: &State, identifier: &str) -> VVal {
     id
 }
 
-fn make_binop(ps: &State, op: &str) -> VVal {
+fn make_binop(ps: &State, op: StrPart) -> VVal {
     if op == "&and" {
         ps.syn(Syntax::And)
 
@@ -888,7 +852,7 @@ fn make_binop(ps: &State, op: &str) -> VVal {
         ps.syn(Syntax::BinOpEq)
 
     } else {
-        make_to_call(ps, make_var(ps, op))
+        make_to_call(ps, make_var(ps, &op.to_string()))
     }
 }
 
@@ -923,7 +887,7 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
 
         Ok(identifier)
     } else {
-        let identifier : String =
+        let identifier =
             ps.take_while_wsc(|c| {
                 match c {
                    '.' | ',' | ';' | '{' | '}'
@@ -931,7 +895,7 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
                         => false,
                     _   => !c.is_whitespace()
                 }
-            }).iter().collect();
+            });
         Ok(identifier)
     }
 }
@@ -1097,8 +1061,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
 
         let value =
             if c.is_digit(10) {
-                let idx : String =
-                    ps.take_while(|c| c.is_digit(10)).iter().collect();
+                let idx = ps.take_while(|c| c.is_digit(10)).to_string();
                 if let Ok(idx_num) = i64::from_str_radix(&idx, 10) {
                     ps.skip_ws_and_comments();
                     VVal::Int(idx_num)
@@ -1173,7 +1136,7 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
         }
     }
 
-    if ps.at_eof {
+    if ps.at_end() {
         return Err(ps.err(ParseErrorKind::EOF("call args")));
     }
 
@@ -1188,40 +1151,46 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
     Ok(call)
 }
 
-fn get_op_prec(op: &str) -> i32 {
-    match op {
-        "^"                         => 15,
-        "*"  | "/" | "%"            => 14,
-        "-"  | "+"                  => 13,
-        "<<" | ">>"                 => 12,
-        "<"  | ">" | "<=" | ">="    => 11,
-        "==" | "!="                 => 10,
-        "&"                         => 9,
-        "&^"                        => 8,
-        "&|"                        => 7,
-        "&and"                      => 6,
-        "&or"                       => 5,
-        _                           => 0
-    }
+fn get_op_prec(op: StrPart) -> i32 {
+    if       op == "^"    { 15 }
+    else if  op == "*"
+          || op == "/"
+          || op == "%"    { 14 }
+    else if  op == "+"
+          || op == "-"    { 13 }
+    else if  op == "<<"
+          || op == ">>"   { 12 }
+    else if  op == "<"
+          || op == ">"
+          || op == "=>"
+          || op == "<="   { 11 }
+    else if  op == "=="
+          || op == "!="   { 10 }
+    else if  op == "&"    { 9 }
+    else if  op == "&^"   { 8 }
+    else if  op == "&|"   { 7 }
+    else if  op == "&and" { 6 }
+    else if  op == "&or"  { 5 }
+    else { 0 }
 }
 
-fn parse_binop(mut left: VVal, ps: &mut State, op: &str, binop: VVal) -> Result<VVal, ParseError> {
-    let prec = get_op_prec(op);
+fn parse_binop(mut left: VVal, ps: &mut State, prec: i32, binop: VVal) -> Result<VVal, ParseError> {
     let mut right = parse_call(ps, true)?;
 
     while let Some(next_op) = ps.peek_op() {
-        let next_prec = get_op_prec(&next_op);
-        let next_binop = make_binop(ps, &next_op);
+        let next_prec = get_op_prec(next_op);
+        let next_binop = make_binop(ps, next_op);
 
-        ps.consume_wsc_n(next_op.len());
+        let op_len = next_op.len();
+        ps.consume_wsc_n(op_len);
 
         if prec < next_prec {
-            right = parse_binop(right, ps, &next_op, next_binop)?;
+            right = parse_binop(right, ps, next_prec, next_binop)?;
         } else {
             binop.push(left);
             binop.push(right);
             left = binop;
-            return parse_binop(left, ps, &next_op, next_binop);
+            return parse_binop(left, ps, next_prec, next_binop);
         }
     }
 
@@ -1239,7 +1208,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
     // look ahead, if we see an expression delimiter.
     // because then, this is not going to be a call!
     // Also exception to parse_expr, we are excluding the '|'.
-    if ps.lookahead_one_of(";),]}|") || ps.at_eof {
+    if ps.lookahead_one_of(";),]}|") || ps.at_end() {
         return Ok(value);
     }
 
@@ -1275,9 +1244,11 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
             _ if op.is_some() => {
                 if binop_mode { break; }
                 let op = op.unwrap();
-                let binop = make_binop(ps, &op);
-                ps.consume_wsc_n(op.len());
-                value = parse_binop(value, ps, &op, binop)?;
+                let binop = make_binop(ps, op);
+                let op_len = op.len();
+                let op_prec = get_op_prec(op);
+                ps.consume_wsc_n(op_len);
+                value = parse_binop(value, ps, op_prec, binop)?;
             },
             '=' => { break; }, // '=' from parsing map keys
             _ => {
@@ -1301,7 +1272,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
 //                            '}' | ')' | ']' => true,
 //                            _               => false,
 //                        };
-//                    if !ps.at_eof() && !is_new_stmt && !was_closing_paren {
+//                    if !ps.at_end() && !is_new_stmt && !was_closing_paren {
 //                        return Err(ps.err(ParseErrorKind::BadIndent(
 //                            "Call argument does not belong to call, it needs a higher indentation.")));
 //                    }
@@ -1321,7 +1292,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
 
 fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
     let mut call = parse_call(ps, false)?;
-    if ps.at_eof {
+    if ps.at_end() {
         return Ok(call);
     }
 
@@ -1367,7 +1338,7 @@ fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
-    if ps.at_eof {
+    if ps.at_end() {
         return Err(ps.err(ParseErrorKind::EOF("assignment")));
     }
 
@@ -1407,7 +1378,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                 if !ps.consume_if_eq_wsc(',') { break; }
             }
 
-            if ps.at_eof {
+            if ps.at_end() {
                 return Err(ps.err(ParseErrorKind::EOF(
                     "destructuring assignment")));
             }
@@ -1443,7 +1414,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                 '!' => {
                     ps.consume_wsc();
                     if ps.consume_if_eq_wsc('@') {
-                        if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("special assignment"))); }
+                        if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("special assignment"))); }
                         let id = parse_identifier(ps)?;
                         match &id[..] {
                             "wlambda" => {
@@ -1506,7 +1477,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
         return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition")));
     }
 
-    if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("parsing arity definition"))); }
+    if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("parsing arity definition"))); }
 
     let arity = if ps.expect_some(ps.peek())? != '|' {
         let min = parse_num(ps)?;
@@ -1585,14 +1556,14 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
 
         while ps.consume_if_eq_wsc(';') {
             while ps.consume_if_eq_wsc(';') { }
-            if ps.at_eof || ps.consume_if_eq_wsc('}') { return Ok(block); }
+            if ps.at_end() || ps.consume_if_eq_wsc('}') { return Ok(block); }
             let next_stmt = parse_stmt(ps)?;
             block.push(next_stmt);
         }
     }
 
     if is_func {
-        if ps.at_eof { return Err(ps.err(ParseErrorKind::EOF("parsing block"))); }
+        if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("parsing block"))); }
         if !ps.consume_if_eq_wsc('}') {
             return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "When parsing a block")));
         }
@@ -1613,9 +1584,7 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
 /// ```
 pub fn parse<'a>(s: &str, filename: &str) -> Result<VVal, String> {
     let mut ps = State::new(s, filename);
-    let b = parse_block(&mut ps, false).map_err(|e| format!("{}", e));
-    println!("parsing done");
-    b
+    parse_block(&mut ps, false).map_err(|e| format!("{}", e))
 }
 
 #[cfg(test)]
@@ -1807,6 +1776,8 @@ mod tests {
         assert_eq!(parse("1 &and 2 &and 3 &and 4"),    "$[&Block,$[&And,$[&And,$[&And,1,2],3],4]]");
         assert_eq!(parse("$t &or $f"),                 "$[&Block,$[&Or,$true,$false]]");
         assert_eq!(parse("$t &and $f &or $f &and $f"), "$[&Block,$[&Or,$[&And,$true,$false],$[&And,$false,$false]]]");
+
+        assert_eq!(parse("20 & 10"),                "$[&Block,$[&Call,$[&Var,:\"&\"],20,10]]");
     }
 
     #[test]

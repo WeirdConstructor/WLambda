@@ -48,10 +48,15 @@ fn main() {
 
     let argv : Vec<String> = std::env::args().collect();
     if argv.len() > 1 {
-        match ctx.eval_file(&argv[1]) {
-            Ok(_) => (),
-            Err(e) => {
-                eprintln!("ERROR: {}", e);
+        if argv[1] == "-parse" {
+            let contents = std::fs::read_to_string(&argv[2]).unwrap();
+            parser::parse(&contents, &argv[2]);
+        } else {
+            match ctx.eval_file(&argv[1]) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!("ERROR: {}", e);
+                }
             }
         }
         return;

@@ -22,15 +22,14 @@ use std::fmt;
 /// ```
 #[allow(dead_code)]
 pub struct State {
-        chars:          Vec<char>,
-        peek_char:      char,
+        input:          Vec<char>,
+        ch_ptr:         usize,
         line_no:        u32,
         col_no:         u16,
         indent:         Option<u32>,
         line_indent:    u32,
         last_tok_char:  char,
         file:           FileRef,
-    pub at_eof:         bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -173,12 +172,46 @@ impl fmt::Display for ParseError {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct StrPart<'a> {
+    slice: &'a [char],
+}
+
+impl<'a, 'b> PartialEq<&'a str> for StrPart<'a> {
+    fn eq(&self, other: &&'a str) -> bool {
+        if other.len() != self.slice.len() { return false; }
+
+        let mut sc = other.chars();
+        for c in self.slice.iter() {
+            if let Some(oc) = sc.next() {
+                if *c != oc { return false; }
+            } else {
+                return false;
+            }
+        }
+
+        return true;
+    }
+    fn ne(&self, other: &&'a str) -> bool {
+        !self.eq(other)
+    }
+}
+
+impl<'a> StrPart<'a> {
+    pub fn to_string(&self) -> String {
+        let s : String = self.slice.iter().collect();
+        s
+    }
+
+    pub fn len(&self) -> usize { self.slice.len() }
+}
+
 #[allow(dead_code)]
 impl State {
     pub fn err<E: Into<ParseErrorKind>>(&self, kind: E) -> ParseError {
         ParseError {
             kind: kind.into(),
-            snip: self.rest(),
+            snip: self.rest().to_string(),
             line: self.line_no,
             col: self.col_no,
             file: self.file.clone(),
@@ -207,34 +240,48 @@ impl State {
     /// Returns the next character under the parse head.
     /// Returns `None` when the parse head is at EOF.
     pub fn peek(&self) -> Option<char> {
-        if self.at_eof { None } else { Some(self.peek_char) }
+        if self.at_end() { None } else { Some(self.input[self.ch_ptr]) }
+    }
+
+    /// Returns if the end of the input was reached.
+    #[inline]
+    pub fn at_end(&self) -> bool { self.ch_ptr >= self.input.len() }
+
+    /// Returns the remaining count of characters in the buffer.
+    pub fn rest_len(&self) -> usize { self.input.len() - self.ch_ptr }
+
+    /// Generates a StrPart slice:
+    fn spart(&self, a: usize, b: usize) -> StrPart {
+        StrPart { slice: &self.input[a..b] }
+    }
+
+    /// Generates a StrPart slice:
+    fn spart_ptr(&self, offs: usize) -> StrPart {
+        StrPart { slice: &self.input[self.ch_ptr..self.ch_ptr + offs] }
     }
 
     /// Returns the next 2 characters or `None` if EOF.
-    pub fn peek2(&self) -> Option<String> {
-        if self.chars.len() > 1 {
-            let s : String = self.chars[0..2].iter().collect();
-            Some(s)
+    pub fn peek2(&self) -> Option<StrPart> {
+        if self.rest_len() > 1 {
+            Some(self.spart_ptr(2))
         } else {
             None
         }
     }
 
     /// Returns the next 3 characters or `None` if EOF.
-    pub fn peek3(&self) -> Option<String> {
-        if self.chars.len() > 2 {
-            let s : String = self.chars[0..3].iter().collect();
-            Some(s)
+    pub fn peek3(&self) -> Option<StrPart> {
+        if self.rest_len() > 2 {
+            Some(self.spart_ptr(3))
         } else {
             None
         }
     }
 
     /// Returns the next 4 characters or `None` if EOF.
-    pub fn peek4(&self) -> Option<String> {
-        if self.chars.len() > 3 {
-            let s : String = self.chars[0..4].iter().collect();
-            Some(s)
+    pub fn peek4(&self) -> Option<StrPart> {
+        if self.rest_len() > 3 {
+            Some(self.spart_ptr(4))
         } else {
             None
         }
@@ -242,20 +289,25 @@ impl State {
 
     /// Tries to peek for an WLambda operator. Returns `None`
     /// either at EOF or if no operator could be found.
-    pub fn peek_op(&self) -> Option<String> {
-        if self.at_eof { return None; }
-        match self.peek_char {
+    pub fn peek_op(&self) -> Option<StrPart> {
+        if self.at_end() { return None; }
+        let ch = self.input[self.ch_ptr];
+        match ch {
             '+' | '-'
                 => {
-                    if let Some(s) = self.peek2() {
-                        if s.chars().nth(1).unwrap_or(' ').is_digit(10) {
+                    if let Some(_s) = self.peek2() {
+                        if self.rest_len() > 1
+                           && self.input[self.ch_ptr + 1].is_digit(10)
+                        {
                             return None;
                         }
                     }
-                    Some(self.peek_char.to_string())
+                    Some(self.spart_ptr(1))
                 },
             '*' | '/' | '%' | '^'
-                => { Some(self.peek_char.to_string()) },
+                => {
+                    Some(self.spart_ptr(1))
+                },
             '<' | '>' | '!' | '=' | '&' => {
                 if let Some(s) = self.peek4() {
                     if s == "&and" { return Some(s); }
@@ -264,14 +316,19 @@ impl State {
                     if s == "&or" { return Some(s); }
                 }
                 if let Some(s) = self.peek2() {
-                    match &s[0..2] {
-                          "<=" | ">=" | "!=" | "==" | "<<" | ">>"
-                        | "&|" | "&^" => { return Some(s); }
-                        _ => { }
-                    }
+                    if   s == "<="
+                      || s == ">="
+                      || s == "!="
+                      || s == "=="
+                      || s == "<<"
+                      || s == ">>"
+                      || s == "&|"
+                      || s == "&^"
+                    { return Some(s); }
                 }
-                if self.peek_char != '=' {
-                    Some(self.peek_char.to_string())
+
+                if ch != '=' {
+                    Some(self.spart_ptr(1))
                 } else {
                     None
                 }
@@ -282,10 +339,9 @@ impl State {
 
     /// Returns the rest of the code after the parse head,
     /// including the current character under the parse head.
-    pub fn rest(&self) -> String {
-        let s : String = self.chars.iter().collect();
-        let len = if s.len() > 50 { 50 } else { s.len() };
-        String::from(&s[0..len])
+    pub fn rest(&self) -> StrPart {
+        let len = if self.rest_len() > 50 { 50 } else { self.rest_len() };
+        self.spart_ptr(len)
     }
 
     /// Consumes characters while `pred` returns a true value.
@@ -320,23 +376,22 @@ impl State {
         false
     }
 
-    pub fn take_while_wsc<F>(&mut self, pred: F) -> Vec<char>
+    pub fn take_while_wsc<F>(&mut self, pred: F) -> String
         where F: Fn(char) -> bool {
-        let ret = self.take_while(pred);
+        let ret = self.take_while(pred).to_string();
         self.skip_ws_and_comments();
         ret
     }
 
-    pub fn take_while<F>(&mut self, pred: F) -> Vec<char>
+    pub fn take_while<F>(&mut self, pred: F) -> StrPart
         where F: Fn(char) -> bool {
 
-        let mut ret = Vec::new();
+        let start = self.ch_ptr;
         while let Some(c) = self.peek() {
             if !pred(c) { break; }
-            ret.push(c);
             self.consume();
         }
-        ret
+        self.spart(start, self.ch_ptr)
     }
 
     pub fn indent_pos(&self) -> IndentPos {
@@ -353,36 +408,29 @@ impl State {
 
     pub fn consume_lookahead(&mut self, s: &str) -> bool {
         if self.lookahead(s) {
-            for _ in s.chars() { self.chars.remove(0); }
-            if !self.chars.is_empty() {
-                self.peek_char = self.chars[0];
-            } else {
-                self.peek_char = ' ';
-                self.at_eof = true;
-            }
+            self.ch_ptr += s.len();
             return true;
         }
         false
     }
 
     pub fn lookahead_one_of(&self, s: &str) -> bool {
-        if self.at_eof { return false; }
+        if self.at_end() { return false; }
 
+        let pc = self.peek().unwrap();
         for c in s.chars() {
-            if self.peek_char == c {
-                return true;
-            }
+            if pc == c { return true; }
         }
         false
     }
 
     pub fn lookahead(&mut self, s: &str) -> bool {
-        if self.chars.len() < s.len() {
+        if self.rest_len() < s.len() {
             return false;
         }
 
         for (i, c) in s.chars().enumerate() {
-            if self.chars[i] != c {
+            if self.input[self.ch_ptr + i] != c {
                 return false;
             }
         }
@@ -403,9 +451,9 @@ impl State {
     }
 
     pub fn consume(&mut self) {
-        if self.at_eof { return }
+        if self.at_end() { return }
 
-        let c = self.peek_char;
+        let c = self.peek().unwrap();
         self.col_no = self.col_no.wrapping_add(1);
         if c == '\n' {
             self.line_no += 1;
@@ -422,15 +470,7 @@ impl State {
             self.last_tok_char = c;
         }
 
-        if !self.chars.is_empty() {
-            self.chars.remove(0);
-        }
-
-        if !self.chars.is_empty() {
-            self.peek_char = self.chars[0];
-        } else {
-            self.at_eof = true;
-        }
+        self.ch_ptr += 1;
     }
 
     fn skip_ws(&mut self) {
@@ -452,14 +492,6 @@ impl State {
         }
     }
 
-    fn init(&mut self) {
-        if !self.chars.is_empty() {
-            self.peek_char = self.chars[0];
-        } else {
-            self.at_eof = true;
-        }
-    }
-
     /// The constructor for the `parser::State`.
     ///
     /// ```rust
@@ -473,9 +505,8 @@ impl State {
     /// ```
     pub fn new(code: &str, filename: &str) -> State {
         let mut ps = State {
-            chars:          code.chars().collect(),
-            peek_char:      ' ',
-            at_eof:         false,
+            input:          code.chars().collect(),
+            ch_ptr:         0,
             line_no:        1,
             col_no:         1,
             indent:         Some(0),
@@ -483,7 +514,6 @@ impl State {
             last_tok_char:  ' ',
             file:           FileRef::new(filename),
         };
-        ps.init();
         ps.skip_ws_and_comments();
         ps
     }
