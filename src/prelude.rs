@@ -173,7 +173,12 @@ Smalltalk, LISP and Perl.
     - [4.16.4](#4164-iswref-value) - is_wref _value_
     - [4.16.5](#4165-stdstrengthen-ref) - std:strengthen _ref_
     - [4.16.6](#4166-stdsetref-ref-value) - std:set_ref _ref_ _value_
-  - [4.17](#417-calling-semantics-of-data-types) - Calling Semantics of Data Types
+  - [4.17](#417-iterators-iter-expression) - Iterators `$iter _expression_`
+    - [4.17.1](#4171-iterator-kinds) - Iterator Kinds
+    - [4.17.2](#4172-iterators-on-mutated-data) - Iterators on mutated data
+    - [4.17.3](#4173-splicing-an-iterator) - Splicing an Iterator
+    - [4.17.4](#4174-calling-an-iterator-with-a-function) - Calling an Iterator with a Function
+  - [4.18](#418-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
   - [5.1](#51-function-call-composition) - Function call composition
     - [5.1.1](#511--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
@@ -2766,7 +2771,7 @@ std:set_ref w3 14;      # Set reference via the weak reference in w3 to r3.
 std:assert_eq $*r3 14;
 ```
 
-### - Iterators `$iter _expression_`
+### <a name="417-iterators-iter-expression"></a>4.17 - Iterators `$iter _expression_`
 
 As a companion to the `iter` operation there are the iterator values.
 These are a special kind of values that generate a value when they are called.
@@ -2812,7 +2817,7 @@ iter i it {
 std:assert_eq sum 6;
 ```
 
-#### - Iterator Kinds
+#### <a name="4171-iterator-kinds"></a>4.17.1 - Iterator Kinds
 
 Here is a table of the behaviour of iterators created from WLambda data.
 
@@ -2838,7 +2843,7 @@ Here is a table of the behaviour of iterators created from WLambda data.
 | `$p(:values, map)`  | Returns the values of the _map_ in undefined order. |
 | `$p(:keys, map)`  | Returns the keys of the _map_ in undefined order. |
 
-#### - Iterators on mutated data
+#### <a name="4172-iterators-on-mutated-data"></a>4.17.2 - Iterators on mutated data
 
 Iterators hold a reference to the collection values. That means, if you mutate
 a vector while you iterate over it, it will not crash but it might produce
@@ -2861,7 +2866,7 @@ This will also work for maps, but as the order of the map entries
 is undefined it will produce very indeterministic effects and it's really
 not recommended.
 
-#### - Splicing an Iterator
+#### <a name="4173-splicing-an-iterator"></a>4.17.3 - Splicing an Iterator
 
 You can directly insert the values produced by an iterator into a vector or map:
 
@@ -2885,7 +2890,7 @@ std:assert_eq m.b 20;
 std:assert_eq m.x 99;
 ```
 
-#### - Calling an Iterator with a Function
+#### <a name="4174-calling-an-iterator-with-a-function"></a>4.17.4 - Calling an Iterator with a Function
 
 When an iterator gets called with a function as first argument
 it will repeatedly call that function until no more values are
@@ -2901,7 +2906,7 @@ it { .sum = sum + _ };
 std:assert_eq sum 6;
 ```
 
-### <a name="417-calling-semantics-of-data-types"></a>4.17 - Calling Semantics of Data Types
+### <a name="418-calling-semantics-of-data-types"></a>4.18 - Calling Semantics of Data Types
 
 You can call almost all basic data types of WLambda.
 Here is an overview of the data type calling semantics:
