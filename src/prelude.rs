@@ -2781,6 +2781,10 @@ You can create an iterator from vectors and maps, but also specialized
 iterators that return a range of numbers or only keys of a map.
 About this see the section _Iterator Kinds_ below.
 
+The `$iter` syntax takes a complete expression as argument, that means
+you can directly write `$iter function arg1 arg2 ...` without
+delimiting the function call.
+
 Here is an example how to make an iterator over a vector:
 
 ```wlambda
