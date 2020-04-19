@@ -2766,6 +2766,141 @@ std:set_ref w3 14;      # Set reference via the weak reference in w3 to r3.
 std:assert_eq $*r3 14;
 ```
 
+### - Iterators `$iter _expression_`
+
+As a companion to the `iter` operation there are the iterator values.
+These are a special kind of values that generate a value when they are called.
+It supports to make an iterator from the same values as the `iter` operation.
+
+You can create an iterator from vectors and maps, but also specialized
+iterators that return a range of numbers or only keys of a map.
+About this see the section _Iterator Kinds_ below.
+
+Here is an example how to make an iterator over a vector:
+
+```wlambda
+!it = $iter $[1,2,3,4];
+
+!first  = it[];     # returns an optional value $o(1)
+!second = it[];     # returns an optional value $o(2)
+
+std:assert_eq first    $o(1);
+std:assert_eq second   $o(2);
+```
+
+You can also directly cast an iterator, which will also
+make it return a value:
+
+```wlambda
+!it = $iter $[1,2,3,4];
+
+std:assert_eq (int it)  1;
+std:assert_eq (int it)  2;
+```
+
+You can pass an iterator also to the `iter` operation:
+
+```wlambda
+!it = $iter $[1,2,3];
+
+!sum = 0;
+
+iter i it {
+    .sum = sum + i;
+};
+
+std:assert_eq sum 6;
+```
+
+#### - Iterator Kinds
+
+Here is a table of the behaviour of iterators created from WLambda data.
+
+| Data      | Iterator return values |
+|-----------|-----------|
+| vector  | Each element of the vector. |
+| map  | Each key/value pair of the map in undefined order. |
+| `$none`   | Returns nothing  |
+| optional | Returns the optional value on first invocation. |
+| `$o()` | Returns nothing. |
+| int  | Returns the integer value on first invocation. |
+| float  | Returns the integer value on first invocation. |
+| string | Returns the individual characters as string. |
+| symbol | Returns the individual characters as string. |
+| byte vector | Returns the individual bytes as byte vector. |
+| `$error`  | Returns the error value on first invocation. |
+| `$i(a, b)`  | The integers in the range of _a_ to _b_, not including _b_. |
+| `$i(a, b, step)`  | The integers in the range of _a_ to _b_ advanced by _step_, not including _b_. |
+| `$f(a, b)`  | The floats in the range of _a_ to _b_ advanced by `1.0`, not including _b_. |
+| `$f(a, b, step)`  | The floats in the range of _a_ to _b_ advanced by _step_, not including _b_. |
+| `$p(:enumerate, map)`  | Returns integers in the range of `0` to `len map`. |
+| `$p(:enumerate, vector)`  | Returns integers in the range of `0` to `len vector`. |
+| `$p(:values, map)`  | Returns the values of the _map_ in undefined order. |
+| `$p(:keys, map)`  | Returns the keys of the _map_ in undefined order. |
+
+#### - Iterators on mutated data
+
+Iterators hold a reference to the collection values. That means, if you mutate
+a vector while you iterate over it, it will not crash but it might produce
+weird effects.
+
+```wlambda
+!v = $[1,2,3];
+!it = $iter v;
+
+iter i v {
+    ? i <= 3 {
+        std:push v i + 10;  # This is not recommended however...
+    };
+};
+
+std:assert_eq (str v) (str $[1, 2, 3, 11, 12, 13]);
+```
+
+This will also work for maps, but as the order of the map entries
+is undefined it will produce very indeterministic effects and it's really
+not recommended.
+
+#### - Splicing an Iterator
+
+You can directly insert the values produced by an iterator into a vector or map:
+
+```wlambda
+!it = $iter $[1,2,3,4];
+
+!v = $[10, 20, *it, 99];
+
+std:assert_eq (str v) (str $[10, 20, 1, 2, 3, 4, 99]);
+```
+
+Same goes for maps:
+
+```wlambda
+!it = $iter ${a = 10, b = 20};
+
+!m = ${ x = 99, *it };
+
+std:assert_eq m.a 10;
+std:assert_eq m.b 20;
+std:assert_eq m.x 99;
+```
+
+#### - Calling an Iterator with a Function
+
+When an iterator gets called with a function as first argument
+it will repeatedly call that function until no more values are
+available:
+
+```wlambda
+!it = $iter $[1,2,3];
+
+!sum = 0;
+
+it { .sum = sum + _ };
+
+std:assert_eq sum 6;
+```
+
 ### <a name="417-calling-semantics-of-data-types"></a>4.17 - Calling Semantics of Data Types
 
 You can call almost all basic data types of WLambda.
