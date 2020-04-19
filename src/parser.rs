@@ -1613,7 +1613,9 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
 /// ```
 pub fn parse<'a>(s: &str, filename: &str) -> Result<VVal, String> {
     let mut ps = State::new(s, filename);
-    parse_block(&mut ps, false).map_err(|e| format!("{}", e))
+    let b = parse_block(&mut ps, false).map_err(|e| format!("{}", e));
+    println!("parsing done");
+    b
 }
 
 #[cfg(test)]

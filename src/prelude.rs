@@ -3502,6 +3502,28 @@ constructs:
 | $+                | Evaluated to a function that can be called to add/append a new value to the current collection/accumulation. |
 | $@@               | Access the current accumulation value. |
 
+These syntaxes are not lexically scoped. That means `$+` and `$@@` can be used
+in other functions:
+
+```wlambda
+!out_mul = { $+ _ * 20 };
+
+!v = $@vec iter i $i(1,5) ~ out_mul i;
+
+std:assert_eq (str v) (str $[20, 40, 60, 80]);
+```
+
+However, due to issues with coupling your functions to the usage
+of accumulators this style is recommended:
+
+```wlambda
+!mul = { _ * 20 };
+
+!v = $@vec iter i $i(1,5) ~ $+ mul[i];
+
+std:assert_eq (str v) (str $[20, 40, 60, 80]);
+```
+
 #### <a name="731-transforming-a-vector"></a>7.3.1 - Transforming a vector
 
 If you just want to do something with items in a vector and
