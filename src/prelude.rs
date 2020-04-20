@@ -64,121 +64,122 @@ Smalltalk, LISP and Perl.
     - [4.4.4](#444-boolean-list-indexing) - Boolean List Indexing
   - [4.5](#45-64-bit-integers) - 64-Bit Integers
     - [4.5.1](#451-int-value) - int _value_
-  - [4.6](#46-isint-value) - is_int _value_
-    - [4.6.1](#461-stdnegi64-integer) - std:neg_i64 _integer_
-    - [4.6.2](#462-stdnoti64-integer) - std:not_i64 _integer_
-    - [4.6.3](#463-stdnegu32-integer) - std:neg_u32 _integer_
-    - [4.6.4](#464-stdnotu32-integer) - std:not_u32 _integer_
-  - [4.7](#47-64-bit-floats) - 64-Bit Floats
-    - [4.7.1](#471-float-value) - float _value_
-    - [4.7.2](#472-isfloat-value) - is_float _value_
-    - [4.7.3](#473-stdnumacos-float) - std:num:acos _float_
-    - [4.7.4](#474-stdnumacosh-float) - std:num:acosh _float_
-    - [4.7.5](#475-stdnumasin-float) - std:num:asin _float_
-    - [4.7.6](#476-stdnumasinh-float) - std:num:asinh _float_
-    - [4.7.7](#477-stdnumatan-float) - std:num:atan _float_
-    - [4.7.8](#478-stdnumatan2-y-x) - std:num:atan2 _y_ _x_
-    - [4.7.9](#479-stdnumatanh-float) - std:num:atanh _float_
-    - [4.7.10](#4710-stdnumcbrt-float) - std:num:cbrt _float_
-    - [4.7.11](#4711-stdnumceil-float) - std:num:ceil _float_
-    - [4.7.12](#4712-stdnumcos-float) - std:num:cos _float_
-    - [4.7.13](#4713-stdnumcosh-float) - std:num:cosh _float_
-    - [4.7.14](#4714-stdnumexp-float) - std:num:exp _float_
-    - [4.7.15](#4715-stdnumexp2-float) - std:num:exp2 _float_
-    - [4.7.16](#4716-stdnumexpm1-float) - std:num:exp_m1 _float_
-    - [4.7.17](#4717-stdnumfloor-float) - std:num:floor _float_
-    - [4.7.18](#4718-stdnumhypot-y-x) - std:num:hypot _y_ _x_
-    - [4.7.19](#4719-stdnumln-float) - std:num:ln _float_
-    - [4.7.20](#4720-stdnumlog-float) - std:num:log _float_
-    - [4.7.21](#4721-stdnumlog10-float) - std:num:log10 _float_
-    - [4.7.22](#4722-stdnumlog2-float) - std:num:log2 _float_
-    - [4.7.23](#4723-stdnumpow-float) - std:num:pow _float_
-    - [4.7.24](#4724-stdnumrecip-float) - std:num:recip _float_
-    - [4.7.25](#4725-stdnumround-float) - std:num:round _float_
-    - [4.7.26](#4726-stdnumsin-float) - std:num:sin _float_
-    - [4.7.27](#4727-stdnumsinh-float) - std:num:sinh _float_
-    - [4.7.28](#4728-stdnumsqrt-float) - std:num:sqrt _float_
-    - [4.7.29](#4729-stdnumtan-float) - std:num:tan _float_
-    - [4.7.30](#4730-stdnumtanh-float) - std:num:tanh _float_
-    - [4.7.31](#4731-stdnumtodegrees-float) - std:num:to_degrees _float_
-    - [4.7.32](#4732-stdnumtoradians-float) - std:num:to_radians _float_
-    - [4.7.33](#4733-stdnumtrunc-float) - std:num:trunc _float_
-    - [4.7.34](#4734-stdnumlerp-a-b-x) - std:num:lerp _a_ _b_ _x_
-    - [4.7.35](#4735-stdnumsmoothstep-a-b-x) - std:num:smoothstep _a_ _b_ _x_
-  - [4.8](#48-numeric-functions) - Numeric Functions
-    - [4.8.1](#481-stdnumabs-number) - std:num:abs _number_
-  - [4.9](#49-numerical-mathematical-vectors) - Numerical Mathematical Vectors
-    - [4.9.1](#491-vector-conversions) - Vector Conversions
-    - [4.9.2](#492-vector-component-access) - Vector Component Access
-    - [4.9.3](#493-named-field-access-and-swizzling) - Named Field Access and Swizzling
-    - [4.9.4](#494-euler-additionsubtraction) - Euler Addition/Subtraction
-    - [4.9.5](#495-scalar-multiplicationdivision) - Scalar Multiplication/Division
-    - [4.9.6](#496-unary-vector-operations) - Unary Vector Operations
-    - [4.9.7](#497-stdvdims-vec) - std:v:dims _vec_
-    - [4.9.8](#498-stdvmag2-vec) - std:v:mag2 _vec_
-    - [4.9.9](#499-stdvmag-vec) - std:v:mag _vec_
-    - [4.9.10](#4910-stdvnorm-vec) - std:v:norm _vec_
-    - [4.9.11](#4911-stdvdot-vec1-vec2) - std:v:dot _vec1_ _vec2_
-    - [4.9.12](#4912-stdvcross-vec1-vec2) - std:v:cross _vec1_ _vec2_
-    - [4.9.13](#4913-stdvlerp-vec1-vec2-t) - std:v:lerp _vec1_ _vec2_ _t_
-    - [4.9.14](#4914-stdvslerp-vec1-vec2-t) - std:v:slerp _vec1_ _vec2_ _t_
-    - [4.9.15](#4915-stdvvec2rad-vec) - std:v:vec2rad _vec_
-    - [4.9.16](#4916-stdvrad2vec-radians) - std:v:rad2vec _radians_
-  - [4.10](#410-strings) - Strings
-    - [4.10.1](#4101-str-value) - str _value_
-    - [4.10.2](#4102-isstr-value) - is_str _value_
-    - [4.10.3](#4103-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
-    - [4.10.4](#4104-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
-    - [4.10.5](#4105-stdstrlen-value) - std:str:len _value_
-    - [4.10.6](#4106-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
-    - [4.10.7](#4107-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
-    - [4.10.8](#4108-stdstrtrim-value) - std:str:trim _value_
-    - [4.10.9](#4109-stdstrtrimstart-value) - std:str:trim_start _value_
-    - [4.10.10](#41010-stdstrtrimend-value) - std:str:trim_end _value_
-    - [4.10.11](#41011-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
-    - [4.10.12](#41012-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
-    - [4.10.13](#41013-stdstrtobytes-string) - std:str:to_bytes _string_
-    - [4.10.14](#41014-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
-    - [4.10.15](#41015-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
-    - [4.10.16](#41016-stdstrtocharvec-string) - std:str:to_char_vec _string_
-    - [4.10.17](#41017-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
-    - [4.10.18](#41018-stdstrtolowercase-string) - std:str:to_lowercase _string_
-    - [4.10.19](#41019-stdstrtouppercase-string) - std:str:to_uppercase _string_
-  - [4.11](#411-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
-    - [4.11.1](#4111-call-properties-of-bytes) - Call Properties of Bytes
-    - [4.11.2](#4112-byte-conversion-functions) - Byte Conversion Functions
-    - [4.11.3](#4113-isbytes-value) - is_bytes _value_
-  - [4.12](#412-symbols) - Symbols
-  - [4.13](#413-pairs-pa-b) - Pairs `$p(a, b)`
-    - [4.13.1](#4131-pair-to-iterator) - Pair to Iterator
-      - [4.13.1.1](#41311-iter---enumerate) - Iter - Enumerate
-      - [4.13.1.2](#41312-iter---values) - Iter - Values
-      - [4.13.1.3](#41313-iter---keys) - Iter - Keys
-    - [4.13.2](#4132-ispair-value) - is_pair _value_
-  - [4.14](#414-vectors-or-lists) - Vectors (or Lists)
-    - [4.14.1](#4141-stdpush-vector-item) - std:push _vector_ _item_
-    - [4.14.2](#4142-stdpop-vector) - std:pop _vector_
-    - [4.14.3](#4143-stdunshift-vector-item) - std:unshift _vector_ _item_
-    - [4.14.4](#4144-vector-splicing) - Vector Splicing
-    - [4.14.5](#4145-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
-    - [4.14.6](#4146-stdprepend-vec-a-value-or-vec-) - std:prepend _vec-a_ _value-or-vec_ ...
-    - [4.14.7](#4147-stdtake-count-vector) - std:take _count_ _vector_
-    - [4.14.8](#4148-stddrop-count-vector) - std:drop _count_ _vector_
-  - [4.15](#415-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
-    - [4.15.1](#4151-map-splicing) - Map Splicing
-  - [4.16](#416-references) - References
-    - [4.16.1](#4161-stdtoref-value) - std:to_ref _value_
-    - [4.16.2](#4162-stdweaken-ref) - std:weaken _ref_
-    - [4.16.3](#4163-isref-value) - is_ref _value_
-    - [4.16.4](#4164-iswref-value) - is_wref _value_
-    - [4.16.5](#4165-stdstrengthen-ref) - std:strengthen _ref_
-    - [4.16.6](#4166-stdsetref-ref-value) - std:set_ref _ref_ _value_
-  - [4.17](#417-iterators-iter-expression) - Iterators `$iter _expression_`
-    - [4.17.1](#4171-iterator-kinds) - Iterator Kinds
-    - [4.17.2](#4172-iterators-on-mutated-data) - Iterators on mutated data
-    - [4.17.3](#4173-splicing-an-iterator) - Splicing an Iterator
-    - [4.17.4](#4174-calling-an-iterator-with-a-function) - Calling an Iterator with a Function
-  - [4.18](#418-calling-semantics-of-data-types) - Calling Semantics of Data Types
+    - [4.5.2](#452-isint-value) - is_int _value_
+    - [4.5.3](#453-stdnegi64-integer) - std:neg_i64 _integer_
+    - [4.5.4](#454-stdnoti64-integer) - std:not_i64 _integer_
+    - [4.5.5](#455-stdnegu32-integer) - std:neg_u32 _integer_
+    - [4.5.6](#456-stdnotu32-integer) - std:not_u32 _integer_
+  - [4.6](#46-64-bit-floats) - 64-Bit Floats
+    - [4.6.1](#461-float-value) - float _value_
+    - [4.6.2](#462-isfloat-value) - is_float _value_
+    - [4.6.3](#463-stdnumacos-float) - std:num:acos _float_
+    - [4.6.4](#464-stdnumacosh-float) - std:num:acosh _float_
+    - [4.6.5](#465-stdnumasin-float) - std:num:asin _float_
+    - [4.6.6](#466-stdnumasinh-float) - std:num:asinh _float_
+    - [4.6.7](#467-stdnumatan-float) - std:num:atan _float_
+    - [4.6.8](#468-stdnumatan2-y-x) - std:num:atan2 _y_ _x_
+    - [4.6.9](#469-stdnumatanh-float) - std:num:atanh _float_
+    - [4.6.10](#4610-stdnumcbrt-float) - std:num:cbrt _float_
+    - [4.6.11](#4611-stdnumceil-float) - std:num:ceil _float_
+    - [4.6.12](#4612-stdnumcos-float) - std:num:cos _float_
+    - [4.6.13](#4613-stdnumcosh-float) - std:num:cosh _float_
+    - [4.6.14](#4614-stdnumexp-float) - std:num:exp _float_
+    - [4.6.15](#4615-stdnumexp2-float) - std:num:exp2 _float_
+    - [4.6.16](#4616-stdnumexpm1-float) - std:num:exp_m1 _float_
+    - [4.6.17](#4617-stdnumfloor-float) - std:num:floor _float_
+    - [4.6.18](#4618-stdnumhypot-y-x) - std:num:hypot _y_ _x_
+    - [4.6.19](#4619-stdnumln-float) - std:num:ln _float_
+    - [4.6.20](#4620-stdnumlog-float) - std:num:log _float_
+    - [4.6.21](#4621-stdnumlog10-float) - std:num:log10 _float_
+    - [4.6.22](#4622-stdnumlog2-float) - std:num:log2 _float_
+    - [4.6.23](#4623-stdnumpow-float) - std:num:pow _float_
+    - [4.6.24](#4624-stdnumrecip-float) - std:num:recip _float_
+    - [4.6.25](#4625-stdnumround-float) - std:num:round _float_
+    - [4.6.26](#4626-stdnumsin-float) - std:num:sin _float_
+    - [4.6.27](#4627-stdnumsinh-float) - std:num:sinh _float_
+    - [4.6.28](#4628-stdnumsqrt-float) - std:num:sqrt _float_
+    - [4.6.29](#4629-stdnumtan-float) - std:num:tan _float_
+    - [4.6.30](#4630-stdnumtanh-float) - std:num:tanh _float_
+    - [4.6.31](#4631-stdnumtodegrees-float) - std:num:to_degrees _float_
+    - [4.6.32](#4632-stdnumtoradians-float) - std:num:to_radians _float_
+    - [4.6.33](#4633-stdnumtrunc-float) - std:num:trunc _float_
+    - [4.6.34](#4634-stdnumlerp-a-b-x) - std:num:lerp _a_ _b_ _x_
+    - [4.6.35](#4635-stdnumsmoothstep-a-b-x) - std:num:smoothstep _a_ _b_ _x_
+  - [4.7](#47-numeric-functions) - Numeric Functions
+    - [4.7.1](#471-stdnumabs-number) - std:num:abs _number_
+  - [4.8](#48-numerical-mathematical-vectors) - Numerical Mathematical Vectors
+    - [4.8.1](#481-vector-conversions) - Vector Conversions
+    - [4.8.2](#482-vector-component-access) - Vector Component Access
+    - [4.8.3](#483-named-field-access-and-swizzling) - Named Field Access and Swizzling
+    - [4.8.4](#484-euler-additionsubtraction) - Euler Addition/Subtraction
+    - [4.8.5](#485-scalar-multiplicationdivision) - Scalar Multiplication/Division
+    - [4.8.6](#486-unary-vector-operations) - Unary Vector Operations
+    - [4.8.7](#487-stdvdims-vec) - std:v:dims _vec_
+    - [4.8.8](#488-stdvmag2-vec) - std:v:mag2 _vec_
+    - [4.8.9](#489-stdvmag-vec) - std:v:mag _vec_
+    - [4.8.10](#4810-stdvnorm-vec) - std:v:norm _vec_
+    - [4.8.11](#4811-stdvdot-vec1-vec2) - std:v:dot _vec1_ _vec2_
+    - [4.8.12](#4812-stdvcross-vec1-vec2) - std:v:cross _vec1_ _vec2_
+    - [4.8.13](#4813-stdvlerp-vec1-vec2-t) - std:v:lerp _vec1_ _vec2_ _t_
+    - [4.8.14](#4814-stdvslerp-vec1-vec2-t) - std:v:slerp _vec1_ _vec2_ _t_
+    - [4.8.15](#4815-stdvvec2rad-vec) - std:v:vec2rad _vec_
+    - [4.8.16](#4816-stdvrad2vec-radians) - std:v:rad2vec _radians_
+  - [4.9](#49-strings) - Strings
+    - [4.9.1](#491-str-value) - str _value_
+    - [4.9.2](#492-isstr-value) - is_str _value_
+    - [4.9.3](#493-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
+    - [4.9.4](#494-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
+    - [4.9.5](#495-stdstrlen-value) - std:str:len _value_
+    - [4.9.6](#496-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
+    - [4.9.7](#497-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+    - [4.9.8](#498-stdstrtrim-value) - std:str:trim _value_
+    - [4.9.9](#499-stdstrtrimstart-value) - std:str:trim_start _value_
+    - [4.9.10](#4910-stdstrtrimend-value) - std:str:trim_end _value_
+    - [4.9.11](#4911-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
+    - [4.9.12](#4912-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
+    - [4.9.13](#4913-stdstrtobytes-string) - std:str:to_bytes _string_
+    - [4.9.14](#4914-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
+    - [4.9.15](#4915-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
+    - [4.9.16](#4916-stdstrtocharvec-string) - std:str:to_char_vec _string_
+    - [4.9.17](#4917-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
+    - [4.9.18](#4918-stdstrtolowercase-string) - std:str:to_lowercase _string_
+    - [4.9.19](#4919-stdstrtouppercase-string) - std:str:to_uppercase _string_
+  - [4.10](#410-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
+    - [4.10.1](#4101-call-properties-of-bytes) - Call Properties of Bytes
+    - [4.10.2](#4102-byte-conversion-functions) - Byte Conversion Functions
+    - [4.10.3](#4103-isbytes-value) - is_bytes _value_
+  - [4.11](#411-symbols) - Symbols
+  - [4.12](#412-pairs-pa-b) - Pairs `$p(a, b)`
+    - [4.12.1](#4121-pair-to-iterator) - Pair to Iterator
+      - [4.12.1.1](#41211-iter---enumerate) - Iter - Enumerate
+      - [4.12.1.2](#41212-iter---values) - Iter - Values
+      - [4.12.1.3](#41213-iter---keys) - Iter - Keys
+    - [4.12.2](#4122-ispair-value) - is_pair _value_
+  - [4.13](#413-vectors-or-lists) - Vectors (or Lists)
+    - [4.13.1](#4131-stdpush-vector-item) - std:push _vector_ _item_
+    - [4.13.2](#4132-stdpop-vector) - std:pop _vector_
+    - [4.13.3](#4133-stdunshift-vector-item) - std:unshift _vector_ _item_
+    - [4.13.4](#4134-vector-splicing) - Vector Splicing
+    - [4.13.5](#4135-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
+    - [4.13.6](#4136-stdprepend-vec-a-value-or-vec-) - std:prepend _vec-a_ _value-or-vec_ ...
+    - [4.13.7](#4137-stdtake-count-vector) - std:take _count_ _vector_
+    - [4.13.8](#4138-stddrop-count-vector) - std:drop _count_ _vector_
+  - [4.14](#414-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
+    - [4.14.1](#4141-map-splicing) - Map Splicing
+  - [4.15](#415-references) - References
+    - [4.15.1](#4151-stdtoref-value) - std:to_ref _value_
+    - [4.15.2](#4152-stdweaken-ref) - std:weaken _ref_
+    - [4.15.3](#4153-isref-value) - is_ref _value_
+    - [4.15.4](#4154-iswref-value) - is_wref _value_
+    - [4.15.5](#4155-stdstrengthen-ref) - std:strengthen _ref_
+    - [4.15.6](#4156-stdsetref-ref-value) - std:set_ref _ref_ _value_
+  - [4.16](#416-iterators-iter-expression) - Iterators `$iter _expression_`
+    - [4.16.1](#4161-iterator-kinds) - Iterator Kinds
+    - [4.16.2](#4162-iterators-on-mutated-data) - Iterators on mutated data
+    - [4.16.3](#4163-splicing-an-iterator) - Splicing an Iterator
+    - [4.16.4](#4164-calling-an-iterator-with-a-function) - Calling an Iterator with a Function
+    - [4.16.5](#4165-zip-iterators) - Zip Iterators
+  - [4.17](#417-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
   - [5.1](#51-function-call-composition) - Function call composition
     - [5.1.1](#511--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
@@ -195,9 +196,10 @@ Smalltalk, LISP and Perl.
 - [7](#7-loops-and-iteration) - Loops And Iteration
   - [7.1](#71-control-flow) - Control Flow
     - [7.1.1](#711-while-predicate-body) - while _predicate_ _body_
-    - [7.1.2](#712-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
-    - [7.1.3](#713-break-value) - break _value_
-    - [7.1.4](#714-next) - next
+    - [7.1.2](#712-iter-var-iterable-body) - iter _var_ _iterable_ _body_
+    - [7.1.3](#713-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
+    - [7.1.4](#714-break-value) - break _value_
+    - [7.1.5](#715-next) - next
   - [7.2](#72-collection-iteration) - Collection Iteration
     - [7.2.1](#721-iteration-over-vectors) - Iteration over vectors
     - [7.2.2](#722-iteration-over-maps) - Iteration over maps
@@ -1195,11 +1197,11 @@ std:assert_eq (int $[4,4,4])    3; # Same as `len`
 std:assert_eq (int ${a=4,b=4})  2; # Same as `len`
 ```
 
-### <a name="46-isint-value"></a>4.6 - is_int _value_
+#### <a name="452-isint-value"></a>4.5.2 - is_int _value_
 
 Returns `$true` if _value_ is of data type integer. Otherwise it returns `$false`.
 
-#### <a name="461-stdnegi64-integer"></a>4.6.1 - std:neg_i64 _integer_
+#### <a name="453-stdnegi64-integer"></a>4.5.3 - std:neg_i64 _integer_
 
 Negates the _integer_, which makes a negative from a positive and positive
 from a negative number.
@@ -1211,7 +1213,7 @@ std:assert_eq (std:neg_i64 1)      -1;
 std:assert_eq (std:neg_i64 0xFF)  -255;
 ```
 
-#### <a name="462-stdnoti64-integer"></a>4.6.2 - std:not_i64 _integer_
+#### <a name="454-stdnoti64-integer"></a>4.5.4 - std:not_i64 _integer_
 
 Flips the bits of the signed 64-Bit _integer_.
 
@@ -1222,7 +1224,7 @@ std:assert_eq (std:not_i64 1)      -2;
 std:assert_eq (std:not_i64 0xFF)  -256;
 ```
 
-#### <a name="463-stdnegu32-integer"></a>4.6.3 - std:neg_u32 _integer_
+#### <a name="455-stdnegu32-integer"></a>4.5.5 - std:neg_u32 _integer_
 
 Negates the _integer_ as if it was an unsigned 32-Bit integer.
 
@@ -1232,7 +1234,7 @@ std:assert_eq (std:neg_u32 0x1)    4294967295;
 std:assert_eq (std:neg_u32 0x0)    0;
 ```
 
-#### <a name="464-stdnotu32-integer"></a>4.6.4 - std:not_u32 _integer_
+#### <a name="456-stdnotu32-integer"></a>4.5.6 - std:not_u32 _integer_
 
 Flips the bits of the _integer_ as if it was an unsigned 32-Bit integer.
 
@@ -1242,7 +1244,7 @@ std:assert_eq (std:not_u32 0x1)    4294967294;
 std:assert_eq (std:not_u32 0x0)    4294967295;
 ```
 
-### <a name="47-64-bit-floats"></a>4.7 - 64-Bit Floats
+### <a name="46-64-bit-floats"></a>4.6 - 64-Bit Floats
 
 WLambda supports 64-Bit floating point numbers, aka _f64_ in Rust.
 Like with other numbers multiple radix literal forms are supported:
@@ -1261,7 +1263,7 @@ std:assert_eq 0b1011.101    11.625;
 std:assert_eq 4r3.3         3.75;
 ```
 
-#### <a name="471-float-value"></a>4.7.1 - float _value_
+#### <a name="461-float-value"></a>4.6.1 - float _value_
 
 This function casts _value_ into a float:
 
@@ -1277,7 +1279,7 @@ std:assert_eq (float $b"\xFF") 255.0;
 
 ```
 
-#### <a name="472-isfloat-value"></a>4.7.2 - is_float _value_
+#### <a name="462-isfloat-value"></a>4.6.2 - is_float _value_
 
 Returns `$true` if _value_ is a float, otherwise `$false` is returned.
 
@@ -1289,30 +1291,30 @@ std:assert ~ not ~ is_float 4;
 std:assert ~ not ~ is_float $true;
 ```
 
-#### <a name="473-stdnumacos-float"></a>4.7.3 - std:num:acos _float_
+#### <a name="463-stdnumacos-float"></a>4.6.3 - std:num:acos _float_
 
 Computes the arccosine of a number. Return value is in radians in the range [0,
 pi] or NaN if the number is outside the range [-1, 1].
 
-#### <a name="474-stdnumacosh-float"></a>4.7.4 - std:num:acosh _float_
+#### <a name="464-stdnumacosh-float"></a>4.6.4 - std:num:acosh _float_
 
 Inverse hyperbolic cosine function.
 
-#### <a name="475-stdnumasin-float"></a>4.7.5 - std:num:asin _float_
+#### <a name="465-stdnumasin-float"></a>4.6.5 - std:num:asin _float_
 
 Computes the arcsine of a number. Return value is in radians in the range
 [-pi/2, pi/2] or NaN if the number is outside the range [-1, 1].
 
-#### <a name="476-stdnumasinh-float"></a>4.7.6 - std:num:asinh _float_
+#### <a name="466-stdnumasinh-float"></a>4.6.6 - std:num:asinh _float_
 
 Inverse hyperbolic sine function.
 
-#### <a name="477-stdnumatan-float"></a>4.7.7 - std:num:atan _float_
+#### <a name="467-stdnumatan-float"></a>4.6.7 - std:num:atan _float_
 
 Computes the arctangent of a number. Return value is in radians in the range
 [-pi/2, pi/2].
 
-#### <a name="478-stdnumatan2-y-x"></a>4.7.8 - std:num:atan2 _y_ _x_
+#### <a name="468-stdnumatan2-y-x"></a>4.6.8 - std:num:atan2 _y_ _x_
 
 Computes the four quadrant arctangent of _y_ and other _x_ in radians.
 
@@ -1321,53 +1323,53 @@ Computes the four quadrant arctangent of _y_ and other _x_ in radians.
 - y >= 0: arctan(y/x) + pi -> (pi/2, pi]
 - y < 0: arctan(y/x) - pi -> (-pi, -pi/2)
 
-#### <a name="479-stdnumatanh-float"></a>4.7.9 - std:num:atanh _float_
+#### <a name="469-stdnumatanh-float"></a>4.6.9 - std:num:atanh _float_
 
 Inverse hyperbolic tangent function.
 
-#### <a name="4710-stdnumcbrt-float"></a>4.7.10 - std:num:cbrt _float_
+#### <a name="4610-stdnumcbrt-float"></a>4.6.10 - std:num:cbrt _float_
 
 Takes the cubic root of a number.
 
-#### <a name="4711-stdnumceil-float"></a>4.7.11 - std:num:ceil _float_
+#### <a name="4611-stdnumceil-float"></a>4.6.11 - std:num:ceil _float_
 
 Returns the smallest integer (still a float) greater than or equal to a number.
 
-#### <a name="4712-stdnumcos-float"></a>4.7.12 - std:num:cos _float_
+#### <a name="4612-stdnumcos-float"></a>4.6.12 - std:num:cos _float_
 
 Computes the cosine of a number (in radians).
 
-#### <a name="4713-stdnumcosh-float"></a>4.7.13 - std:num:cosh _float_
+#### <a name="4613-stdnumcosh-float"></a>4.6.13 - std:num:cosh _float_
 
 Hyperbolic cosine function.
 
-#### <a name="4714-stdnumexp-float"></a>4.7.14 - std:num:exp _float_
+#### <a name="4614-stdnumexp-float"></a>4.6.14 - std:num:exp _float_
 
 Returns e ^ _float_, (the exponential function).
 
-#### <a name="4715-stdnumexp2-float"></a>4.7.15 - std:num:exp2 _float_
+#### <a name="4615-stdnumexp2-float"></a>4.6.15 - std:num:exp2 _float_
 
 Returns 2 ^ _float_.
 
-#### <a name="4716-stdnumexpm1-float"></a>4.7.16 - std:num:exp_m1 _float_
+#### <a name="4616-stdnumexpm1-float"></a>4.6.16 - std:num:exp_m1 _float_
 
 Returns (e ^ _float_ - 1) in a way that is accurate even if the number is close
 to zero.
 
-#### <a name="4717-stdnumfloor-float"></a>4.7.17 - std:num:floor _float_
+#### <a name="4617-stdnumfloor-float"></a>4.6.17 - std:num:floor _float_
 
 Returns the largest integer (still as float) less than or equal to a number.
 
-#### <a name="4718-stdnumhypot-y-x"></a>4.7.18 - std:num:hypot _y_ _x_
+#### <a name="4618-stdnumhypot-y-x"></a>4.6.18 - std:num:hypot _y_ _x_
 
 Calculates the length of the hypotenuse of a right-angle triangle given legs of
 length _x_ and _y_.
 
-#### <a name="4719-stdnumln-float"></a>4.7.19 - std:num:ln _float_
+#### <a name="4619-stdnumln-float"></a>4.6.19 - std:num:ln _float_
 
 Returns the natural logarithm of the number.
 
-#### <a name="4720-stdnumlog-float"></a>4.7.20 - std:num:log _float_
+#### <a name="4620-stdnumlog-float"></a>4.6.20 - std:num:log _float_
 
 Returns the logarithm of the number with respect to an arbitrary base.
 
@@ -1375,61 +1377,61 @@ The result may not be correctly rounded owing to implementation details;
 `std:log2` can produce more accurate results for base 2, and `std:log10` can
 produce more accurate results for base 10.
 
-#### <a name="4721-stdnumlog10-float"></a>4.7.21 - std:num:log10 _float_
+#### <a name="4621-stdnumlog10-float"></a>4.6.21 - std:num:log10 _float_
 
 Returns the base 10 logarithm of the number.
 
-#### <a name="4722-stdnumlog2-float"></a>4.7.22 - std:num:log2 _float_
+#### <a name="4622-stdnumlog2-float"></a>4.6.22 - std:num:log2 _float_
 
 Returns the base 2 logarithm of the number.
 
-#### <a name="4723-stdnumpow-float"></a>4.7.23 - std:num:pow _float_
+#### <a name="4623-stdnumpow-float"></a>4.6.23 - std:num:pow _float_
 
 Raises a number to a floating point power.
 You may also use the `^` operator, which also works for integers.
 
-#### <a name="4724-stdnumrecip-float"></a>4.7.24 - std:num:recip _float_
+#### <a name="4624-stdnumrecip-float"></a>4.6.24 - std:num:recip _float_
 
 Takes the reciprocal (inverse) of a number, 1/x.
 
-#### <a name="4725-stdnumround-float"></a>4.7.25 - std:num:round _float_
+#### <a name="4625-stdnumround-float"></a>4.6.25 - std:num:round _float_
 
 Returns the nearest integer (still a float) to a number. Round half-way cases
 away from 0.0.
 
-#### <a name="4726-stdnumsin-float"></a>4.7.26 - std:num:sin _float_
+#### <a name="4626-stdnumsin-float"></a>4.6.26 - std:num:sin _float_
 
 Computes the sine of a number (in radians).
 
-#### <a name="4727-stdnumsinh-float"></a>4.7.27 - std:num:sinh _float_
+#### <a name="4627-stdnumsinh-float"></a>4.6.27 - std:num:sinh _float_
 
 Hyperbolic sine function.
 
-#### <a name="4728-stdnumsqrt-float"></a>4.7.28 - std:num:sqrt _float_
+#### <a name="4628-stdnumsqrt-float"></a>4.6.28 - std:num:sqrt _float_
 
 Takes the square root of a number.
 
-#### <a name="4729-stdnumtan-float"></a>4.7.29 - std:num:tan _float_
+#### <a name="4629-stdnumtan-float"></a>4.6.29 - std:num:tan _float_
 
 Computes the tangent of a number (in radians).
 
-#### <a name="4730-stdnumtanh-float"></a>4.7.30 - std:num:tanh _float_
+#### <a name="4630-stdnumtanh-float"></a>4.6.30 - std:num:tanh _float_
 
 Hyperbolic tangent function.
 
-#### <a name="4731-stdnumtodegrees-float"></a>4.7.31 - std:num:to_degrees _float_
+#### <a name="4631-stdnumtodegrees-float"></a>4.6.31 - std:num:to_degrees _float_
 
 Converts radians to degrees.
 
-#### <a name="4732-stdnumtoradians-float"></a>4.7.32 - std:num:to_radians _float_
+#### <a name="4632-stdnumtoradians-float"></a>4.6.32 - std:num:to_radians _float_
 
 Converts degrees to radians.
 
-#### <a name="4733-stdnumtrunc-float"></a>4.7.33 - std:num:trunc _float_
+#### <a name="4633-stdnumtrunc-float"></a>4.6.33 - std:num:trunc _float_
 
 Returns the integer part of a number.
 
-#### <a name="4734-stdnumlerp-a-b-x"></a>4.7.34 - std:num:lerp _a_ _b_ _x_
+#### <a name="4634-stdnumlerp-a-b-x"></a>4.6.34 - std:num:lerp _a_ _b_ _x_
 
 Linear interpolation between _a_ and _b_ by _x_. Where _x_ is
 in the range of `[0.0, 1.0]`.
@@ -1440,7 +1442,7 @@ in the range of `[0.0, 1.0]`.
 std:assert_eq res 50;
 ```
 
-#### <a name="4735-stdnumsmoothstep-a-b-x"></a>4.7.35 - std:num:smoothstep _a_ _b_ _x_
+#### <a name="4635-stdnumsmoothstep-a-b-x"></a>4.6.35 - std:num:smoothstep _a_ _b_ _x_
 
 Interpolates smoothly from 0.0 to 1.0 where _x_ is in the range of `[a, b]`.
 
@@ -1450,11 +1452,11 @@ Interpolates smoothly from 0.0 to 1.0 where _x_ is in the range of `[a, b]`.
 std:assert_eq res 28;
 ```
 
-### <a name="48-numeric-functions"></a>4.8 - Numeric Functions
+### <a name="47-numeric-functions"></a>4.7 - Numeric Functions
 
 These functions work for all types of numbers.
 
-#### <a name="481-stdnumabs-number"></a>4.8.1 - std:num:abs _number_
+#### <a name="471-stdnumabs-number"></a>4.7.1 - std:num:abs _number_
 
 Takes the absolute value of _number_. If _number_ is not a number
 it will be converted into an integer.
@@ -1464,7 +1466,7 @@ std:assert_eq (std:num:abs -10)     10;
 std:assert_eq (std:num:abs -13.3)   13.3;
 ```
 
-### <a name="49-numerical-mathematical-vectors"></a>4.9 - Numerical Mathematical Vectors
+### <a name="48-numerical-mathematical-vectors"></a>4.8 - Numerical Mathematical Vectors
 
 In order to aid in the development of GUIs, games, and other physics/geometry adjacent software,
 WLambda comes with a built in datatype for mathematical vectors, which can contain floats and integers
@@ -1486,7 +1488,7 @@ std:assert ~ (ivec2 $f(1.3, 2.7, -5.8)) == $i(1, 2);
 std:assert ~ (ivec $f(1.3, 2.7, -5.8))  == $i(1, 2, -5);
 ```
 
-#### <a name="491-vector-conversions"></a>4.9.1 - Vector Conversions
+#### <a name="481-vector-conversions"></a>4.8.1 - Vector Conversions
 
 There are eight functions for converting other values into vectors
 and vectors of integers into vectors of floats:
@@ -1508,7 +1510,7 @@ with `0`s and ignore dimensions as necessary.
 NOTE: `ivec` will always truncate (i.e. round down) floats into integers when converting,
 just like when converting floats into integers implicitly elsewhere in WLambda.
 
-#### <a name="492-vector-component-access"></a>4.9.2 - Vector Component Access
+#### <a name="482-vector-component-access"></a>4.8.2 - Vector Component Access
 
 There are 12 functions for accessing the components of vectors,
 but only four have unique behavior (the rest are aliases).
@@ -1533,7 +1535,7 @@ std:assert_eq my_vec.w my_vec.3;
 std:assert_eq my_vec.w my_vec.fourth;
 ```
 
-#### <a name="493-named-field-access-and-swizzling"></a>4.9.3 - Named Field Access and Swizzling
+#### <a name="483-named-field-access-and-swizzling"></a>4.8.3 - Named Field Access and Swizzling
 
 You can access the fields of numeric vectors with different keys:
 
@@ -1570,7 +1572,7 @@ std:assert_eq $i(2,3,4,5).zw    $i(4,5);
 ```
 
 
-#### <a name="494-euler-additionsubtraction"></a>4.9.4 - Euler Addition/Subtraction
+#### <a name="484-euler-additionsubtraction"></a>4.8.4 - Euler Addition/Subtraction
 
 You can add vectors to each other and subtract them from each other.
 
@@ -1590,7 +1592,7 @@ std:assert_eq[ $f(0.1, 0.9) + ${ w=7 } , $f(0.1, 0.9, 0, 7) ];
 std:assert_eq[ std:v:mag2 $i(-1, 5) + $i(1, -5) , 0.0 ];
 ```
 
-#### <a name="495-scalar-multiplicationdivision"></a>4.9.5 - Scalar Multiplication/Division
+#### <a name="485-scalar-multiplicationdivision"></a>4.8.5 - Scalar Multiplication/Division
 
 You can multiply and divide integer and float vectors by single numbers.
 This copies the vector, multiplies or divides each component of the vector by the single number,
@@ -1605,7 +1607,7 @@ std:assert ~ $f(0.5, 0) * 1.3 == $f(0.65,0);
 std:assert ~ (std:v:mag (std:v:norm $[40.19, 0.399]) * 10) == 10.0;
 ```
 
-#### <a name="496-unary-vector-operations"></a>4.9.6 - Unary Vector Operations
+#### <a name="486-unary-vector-operations"></a>4.8.6 - Unary Vector Operations
 
 Calling `-` on a vector returns a new vector with all of its fields negated.
 This is equivalent to multiplying the vector by `-1`.
@@ -1621,7 +1623,7 @@ std:assert_eq (+my_vec) my_vec;
 std:assert_eq[ my_vec + (-my_vec), my_vec * 0 ];
 ```
 
-#### <a name="497-stdvdims-vec"></a>4.9.7 - std:v:dims _vec_
+#### <a name="487-stdvdims-vec"></a>4.8.7 - std:v:dims _vec_
 
 You can use this function to retrieve the number of dimensions in _vec_.
 
@@ -1639,7 +1641,7 @@ std:assert_eq (std:v:dims ${w=0}) 4;
 std:assert_eq (std:v:dims $f(1,2)) (std:v:dims $i(1,2));
 ```
 
-#### <a name="498-stdvmag2-vec"></a>4.9.8 - std:v:mag2 _vec_
+#### <a name="488-stdvmag2-vec"></a>4.8.8 - std:v:mag2 _vec_
 
 Returns the magnitude of _vec_, squared.
 
@@ -1652,7 +1654,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag2 ${w=4}) 16.0;
 ```
 
-#### <a name="499-stdvmag-vec"></a>4.9.9 - std:v:mag _vec_
+#### <a name="489-stdvmag-vec"></a>4.8.9 - std:v:mag _vec_
 
 Returns the magnitude (also known as the length) of _vec_.
 
@@ -1662,7 +1664,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag ${w=4}) 4.0;
 ```
 
-#### <a name="4910-stdvnorm-vec"></a>4.9.10 - std:v:norm _vec_
+#### <a name="4810-stdvnorm-vec"></a>4.8.10 - std:v:norm _vec_
 
 Returns a new vector which has a magnitude of `1`, but points in the same direction as _vec_.
 Vectors with a length of one are also known as unit vectors.
@@ -1689,7 +1691,7 @@ These are the only `ivec2`s that have a length of `1`.
 std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
 ```
 
-#### <a name="4911-stdvdot-vec1-vec2"></a>4.9.11 - std:v:dot _vec1_ _vec2_
+#### <a name="4811-stdvdot-vec1-vec2"></a>4.8.11 - std:v:dot _vec1_ _vec2_
 
 Returns the sum of all components after multiplying each component
 in _vec1_ with the corresponding component of _vec2_.
@@ -1720,7 +1722,7 @@ If _vec1_ isn't an `fvec`, then it's coerced into an `ivec`, just like the other
 std:assert_eq[ (dir < 0) "left" "right", "left" ];
 ```
 
-#### <a name="4912-stdvcross-vec1-vec2"></a>4.9.12 - std:v:cross _vec1_ _vec2_
+#### <a name="4812-stdvcross-vec1-vec2"></a>4.8.12 - std:v:cross _vec1_ _vec2_
 
 Returns a vector perpendicular to _vec1_ and _vec2_.
 
@@ -1745,7 +1747,7 @@ std:assert_eq[(std:v:dot x y), (std:v:dot y z)];
 std:assert_eq[(std:v:dot y z), (std:v:dot z x)];
 ```
 
-#### <a name="4913-stdvlerp-vec1-vec2-t"></a>4.9.13 - std:v:lerp _vec1_ _vec2_ _t_
+#### <a name="4813-stdvlerp-vec1-vec2-t"></a>4.8.13 - std:v:lerp _vec1_ _vec2_ _t_
 
 `lerp` stands for linear interpolation.
 This function is useful when animating positions, whereas slerp is useful for animating rotations.
@@ -1768,7 +1770,7 @@ std:assert_eq[ (std:v:mag a) * 2 , std:v:mag (std:v:lerp $f(0,0) a 2.0) ];
 std:assert_eq[ std:v:lerp b a 1.5 , std:v:lerp a b -0.5 ];
 ```
 
-#### <a name="4914-stdvslerp-vec1-vec2-t"></a>4.9.14 - std:v:slerp _vec1_ _vec2_ _t_
+#### <a name="4814-stdvslerp-vec1-vec2-t"></a>4.8.14 - std:v:slerp _vec1_ _vec2_ _t_
 
 `slerp` stands for spherical linear interpolation.
 This function is useful when animating rotations, whereas lerp is useful for animating positions.
@@ -1801,7 +1803,7 @@ std:assert_rel_eq half.x four.x 0.000001;
 std:assert_rel_eq half.y four.y 0.000001;
 ```
 
-#### <a name="4915-stdvvec2rad-vec"></a>4.9.15 - std:v:vec2rad _vec_
+#### <a name="4815-stdvvec2rad-vec"></a>4.8.15 - std:v:vec2rad _vec_
 
 Creates a rotation in radians from the x and y components of _vec_.
 
@@ -1819,7 +1821,7 @@ std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad h) , 45.0 ];
 ```
 
-#### <a name="4916-stdvrad2vec-radians"></a>4.9.16 - std:v:rad2vec _radians_
+#### <a name="4816-stdvrad2vec-radians"></a>4.8.16 - std:v:rad2vec _radians_
 
 Creates a unit vector from _radians_.
 
@@ -1837,7 +1839,7 @@ std:assert_rel_eq r.x h.x 0.0001;
 std:assert_rel_eq r.y h.y 0.0001;
 ```
 
-### <a name="410-strings"></a>4.10 - Strings
+### <a name="49-strings"></a>4.9 - Strings
 
 Strings in WLambda are like Rust UTF-8 encoded Unicode strings.
 There is no character data type however. There are two types of literal
@@ -1851,7 +1853,7 @@ std:assert_eq $q/any delimiter may be used instead of/
 std:assert_eq "\u{2211}" "∑";
 ```
 
-#### <a name="4101-str-value"></a>4.10.1 - str _value_
+#### <a name="491-str-value"></a>4.9.1 - str _value_
 
 Casts _value_ to a string and returns it.
 Also dereferences a value.
@@ -1874,7 +1876,7 @@ std:assert_eq (str $o())       "";
 std:assert_eq (str ~ std:weaken x)   "10";
 ```
 
-#### <a name="4102-isstr-value"></a>4.10.2 - is_str _value_
+#### <a name="492-isstr-value"></a>4.9.2 - is_str _value_
 
 Returns `$true` if _value_ is a string.
 
@@ -1889,7 +1891,7 @@ std:assert ~ not ~ is_str $&&"foo";
 std:assert ~ is_str $*$&&"foo";
 ```
 
-#### <a name="4103-stdstrcat-a-b-"></a>4.10.3 - std:str:cat _a_ _b_ ...
+#### <a name="493-stdstrcat-a-b-"></a>4.9.3 - std:str:cat _a_ _b_ ...
 
 Stringifies (like with `str`) and concatenates all its arguments.
 If an argument is a vector, it's elements will be stringified and concatenated.
@@ -1913,7 +1915,7 @@ std:push out "XXX";
 std:assert_eq s "abc123XXX";
 ```
 
-#### <a name="4104-stdstrjoin-sep-vector"></a>4.10.4 - std:str:join _sep_ _vector_
+#### <a name="494-stdstrjoin-sep-vector"></a>4.9.4 - std:str:join _sep_ _vector_
 
 Join's the stringified elements of _vector_ with the _sep_ string.
 Will return an error if _vector_ is not a vector.
@@ -1924,7 +1926,7 @@ std:assert_eq
     "1::2::3";
 ```
 
-#### <a name="4105-stdstrlen-value"></a>4.10.5 - std:str:len _value_
+#### <a name="495-stdstrlen-value"></a>4.9.5 - std:str:len _value_
 
 Returns the length of the stringified _value_ in unicode characters.
 The core function `len` does return the number of bytes in the string
@@ -1939,7 +1941,7 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### <a name="4106-stdstrreplace-pattern-replacement-string"></a>4.10.6 - std:str:replace _pattern_ _replacement_ _string_
+#### <a name="496-stdstrreplace-pattern-replacement-string"></a>4.9.6 - std:str:replace _pattern_ _replacement_ _string_
 
 Replaces every occurence of _pattern_ in _string_ with _replacement_
 and returns a new string. All values will be casted to a string if
@@ -1955,7 +1957,7 @@ std:assert_eq s
 std:assert_eq s "1111";
 ```
 
-#### <a name="4107-stdstrreplacen-pattern-replacement-count-string"></a>4.10.7 - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+#### <a name="497-stdstrreplacen-pattern-replacement-count-string"></a>4.9.7 - std:str:replace_n _pattern_ _replacement_ _count_ _string_
 
 Replaces _count_ occurences of _pattern_ in _string_ with _replacement_
 and returns a new string. All values will be casted to a string if
@@ -1971,7 +1973,7 @@ std:assert_eq s
 std:assert_eq s "1119";
 ```
 
-#### <a name="4108-stdstrtrim-value"></a>4.10.8 - std:str:trim _value_
+#### <a name="498-stdstrtrim-value"></a>4.9.8 - std:str:trim _value_
 
 Trims off any (unicode) white space from the start and end of the
 stringified _value_.
@@ -1982,7 +1984,7 @@ std:assert_eq
     "fooo bar";
 ```
 
-#### <a name="4109-stdstrtrimstart-value"></a>4.10.9 - std:str:trim_start _value_
+#### <a name="499-stdstrtrimstart-value"></a>4.9.9 - std:str:trim_start _value_
 
 Trims off any (unicode) white space from the start of the stringified _value_.
 
@@ -1992,7 +1994,7 @@ std:assert_eq
     "fooo bar \n";
 ```
 
-#### <a name="41010-stdstrtrimend-value"></a>4.10.10 - std:str:trim_end _value_
+#### <a name="4910-stdstrtrimend-value"></a>4.9.10 - std:str:trim_end _value_
 
 Trims off any (unicode) white space from the end of the stringified _value_.
 
@@ -2002,7 +2004,7 @@ std:assert_eq
     "  \nfooo bar";
 ```
 
-#### <a name="41011-stdstrpadstart-len-pad-str-value"></a>4.10.11 - std:str:pad_start _len_ _pad-str_ _value_
+#### <a name="4911-stdstrpadstart-len-pad-str-value"></a>4.9.11 - std:str:pad_start _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
 at the start of the string.
@@ -2026,7 +2028,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="41012-stdstrpadend-len-pad-str-value"></a>4.10.12 - std:str:pad_end _len_ _pad-str_ _value_
+#### <a name="4912-stdstrpadend-len-pad-str-value"></a>4.9.12 - std:str:pad_end _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters,
 appending at the end.
@@ -2050,7 +2052,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="41013-stdstrtobytes-string"></a>4.10.13 - std:str:to_bytes _string_
+#### <a name="4913-stdstrtobytes-string"></a>4.9.13 - std:str:to_bytes _string_
 
 Encodes _string_ in UTF-8 and returns a byte vector containing all it's bytes.
 
@@ -2062,7 +2064,7 @@ std:assert_eq b $b"1234";
 std:assert_eq b $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
 ```
 
-#### <a name="41014-stdstrfromutf8-byte-vector"></a>4.10.14 - std:str:from_utf8 _byte-vector_
+#### <a name="4914-stdstrfromutf8-byte-vector"></a>4.9.14 - std:str:from_utf8 _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences an
@@ -2076,7 +2078,7 @@ std:assert_eq s "Äß日本人";
 std:assert_eq r "str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0";
 ```
 
-#### <a name="41015-stdstrfromutf8lossy-byte-vector"></a>4.10.15 - std:str:from_utf8_lossy _byte-vector_
+#### <a name="4915-stdstrfromutf8lossy-byte-vector"></a>4.9.15 - std:str:from_utf8_lossy _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences a `"�"` will be
@@ -2088,7 +2090,7 @@ inserted.
 std:assert_eq s "Ä�ß日本人��\0";
 ```
 
-#### <a name="41016-stdstrtocharvec-string"></a>4.10.16 - std:str:to_char_vec _string_
+#### <a name="4916-stdstrtocharvec-string"></a>4.9.16 - std:str:to_char_vec _string_
 
 Converts the _string_ into a vector of integers which represent the Unicode
 character number.
@@ -2101,7 +2103,7 @@ std:assert_eq (str v) ~ str $[49,50,51,52];
 std:assert_eq (str v) ~ str $[196,223,0x65E5,0x672C,0x4EBA];
 ```
 
-#### <a name="41017-stdstrfromcharvec-vector"></a>4.10.17 - std:str:from_char_vec _vector_
+#### <a name="4917-stdstrfromcharvec-vector"></a>4.9.17 - std:str:from_char_vec _vector_
 
 The reverse operation of `std:str:to_char_vec`. It converts
 a vector of integers to a unicode string. Any integer that has
@@ -2115,7 +2117,7 @@ std:assert_eq
     "12Äß日本人";
 ```
 
-#### <a name="41018-stdstrtolowercase-string"></a>4.10.18 - std:str:to_lowercase _string_
+#### <a name="4918-stdstrtolowercase-string"></a>4.9.18 - std:str:to_lowercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -2123,7 +2125,7 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_lowercase "ZABzabÄßÜÖ") "zabzabäßüö";
 ```
 
-#### <a name="41019-stdstrtouppercase-string"></a>4.10.19 - std:str:to_uppercase _string_
+#### <a name="4919-stdstrtouppercase-string"></a>4.9.19 - std:str:to_uppercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -2131,7 +2133,7 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 ```
 
-### <a name="411-bytes-or-byte-vectors"></a>4.11 - Bytes (or Byte Vectors)
+### <a name="410-bytes-or-byte-vectors"></a>4.10 - Bytes (or Byte Vectors)
 
 Bytes are a special kind of strings. Their literal form is:
 
@@ -2141,7 +2143,7 @@ $b"\xFF\xFD\x00";
 $Q/ABCDEF\xFD/;      # \xFD is not an escape sequence here!
 ```
 
-#### <a name="4111-call-properties-of-bytes"></a>4.11.1 - Call Properties of Bytes
+#### <a name="4101-call-properties-of-bytes"></a>4.10.1 - Call Properties of Bytes
 
 You can index inside a byte array by calling it with an integer:
 
@@ -2168,7 +2170,7 @@ std:assert_eq ($b"b" some_map) 30;
 std:assert_eq some_map.$b"a" 20;   # with method call syntax
 ```
 
-#### <a name="4112-byte-conversion-functions"></a>4.11.2 - Byte Conversion Functions
+#### <a name="4102-byte-conversion-functions"></a>4.10.2 - Byte Conversion Functions
 
 You can convert bytes to strings in a multitude of ways:
 
@@ -2216,7 +2218,7 @@ There is also an inverse operation to `bytes:to_hex`:
 std:assert_eq (std:bytes:from_hex ~ std:bytes:to_hex $b"ABC") $b"ABC";
 ```
 
-#### <a name="4113-isbytes-value"></a>4.11.3 - is_bytes _value_
+#### <a name="4103-isbytes-value"></a>4.10.3 - is_bytes _value_
 
 Returns `$true` if _value_ is a byte vector.
 
@@ -2225,7 +2227,7 @@ std:assert ~ is_bytes $b"ABC";
 std:assert ~ not ~ is_bytes "ABC";
 ```
 
-### <a name="412-symbols"></a>4.12 - Symbols
+### <a name="411-symbols"></a>4.11 - Symbols
 
 Symbols are a special kind of strings. Use them however you see fit. They will
 do a key lookup (on maps, vectors (as indices) and user values) if they are
@@ -2270,7 +2272,7 @@ match y
 std:assert_eq state "is off";
 ```
 
-### <a name="413-pairs-pa-b"></a>4.13 - Pairs `$p(a, b)`
+### <a name="412-pairs-pa-b"></a>4.12 - Pairs `$p(a, b)`
 
 A pair is an immutable tuple of 2 values. You can use it for returning two
 values from a function as it is a slight bit slimmer than a vector with two
@@ -2343,14 +2345,14 @@ std:assert std:ref_id[a] == id_a;
 std:assert std:ref_id[v.0] == id_a;
 ```
 
-#### <a name="4131-pair-to-iterator"></a>4.13.1 - Pair to Iterator
+#### <a name="4121-pair-to-iterator"></a>4.12.1 - Pair to Iterator
 
 Pairs play a special role if you make an iterator from it.
 It can be used to create a specialized iterator that only
 iterates over keys or values of a map. Or that enumerates
 a vector or map.
 
-##### <a name="41311-iter---enumerate"></a>4.13.1.1 - Iter - Enumerate
+##### <a name="41211-iter---enumerate"></a>4.12.1.1 - Iter - Enumerate
 
 If the first value of the pair is `:enumerate`
 it will enumerate entries in a map or values in a vector.
@@ -2377,7 +2379,7 @@ iter i $p(:enumerate, ${a = 10, b = 20})
 std:assert_eq (str v) (str $[0, 1]);
 ```
 
-##### <a name="41312-iter---values"></a>4.13.1.2 - Iter - Values
+##### <a name="41212-iter---values"></a>4.12.1.2 - Iter - Values
 
 This is useful for iterating over the values in a map in an undefined order:
 
@@ -2389,7 +2391,7 @@ This is useful for iterating over the values in a map in an undefined order:
 std:assert_eq sum 63;
 ```
 
-##### <a name="41313-iter---keys"></a>4.13.1.3 - Iter - Keys
+##### <a name="41213-iter---keys"></a>4.12.1.3 - Iter - Keys
 
 You can also iterate over map keys in an undefined order:
 
@@ -2401,7 +2403,7 @@ You can also iterate over map keys in an undefined order:
 std:assert_eq sum 60;
 ```
 
-#### <a name="4132-ispair-value"></a>4.13.2 - is_pair _value_
+#### <a name="4122-ispair-value"></a>4.12.2 - is_pair _value_
 
 Checks if _value_ is a pair.
 
@@ -2411,7 +2413,7 @@ std:assert not ~ is_pair $[1, 2];
 std:assert not ~ is_pair $i(1, 2);
 ```
 
-### <a name="414-vectors-or-lists"></a>4.14 - Vectors (or Lists)
+### <a name="413-vectors-or-lists"></a>4.13 - Vectors (or Lists)
 
 The literal syntax for vectors (or sometimes also called lists in WLambda)
 is `$[...]`. You may write any kind of expression in it and you will get
@@ -2439,7 +2441,7 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
-#### <a name="4141-stdpush-vector-item"></a>4.14.1 - std:push _vector_ _item_
+#### <a name="4131-stdpush-vector-item"></a>4.13.1 - std:push _vector_ _item_
 
 Pushes _item_ to the end of _vector_. Returns _item_.
 
@@ -2451,7 +2453,7 @@ std:push v 3;
 std:assert_eq (str v) (str $[1,2,3]);
 ```
 
-#### <a name="4142-stdpop-vector"></a>4.14.2 - std:pop _vector_
+#### <a name="4132-stdpop-vector"></a>4.13.2 - std:pop _vector_
 
 Pops off the last element of _vector_. Returns `$none` if the vector is empty
 or if _vector_ is not a vector.
@@ -2463,7 +2465,7 @@ std:assert_eq (std:pop v) 3;
 std:assert_eq (str v) (str $[1,2]);
 ```
 
-#### <a name="4143-stdunshift-vector-item"></a>4.14.3 - std:unshift _vector_ _item_
+#### <a name="4133-stdunshift-vector-item"></a>4.13.3 - std:unshift _vector_ _item_
 
 Inserts _item_ at the front of _vector_. Returns _item_ and mutates _vector_
 inplace. Be aware that this operation is of O(n) complexity.
@@ -2476,7 +2478,7 @@ std:unshift v 3;
 std:assert_eq (str v) (str $[3,1,2]);
 ```
 
-#### <a name="4144-vector-splicing"></a>4.14.4 - Vector Splicing
+#### <a name="4134-vector-splicing"></a>4.13.4 - Vector Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -2496,7 +2498,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-#### <a name="4145-stdappend-vec-a-value-or-vec-"></a>4.14.5 - std:append _vec-a_ _value-or-vec_ ...
+#### <a name="4135-stdappend-vec-a-value-or-vec-"></a>4.13.5 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
 If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
@@ -2515,7 +2517,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
 ```
 
-#### <a name="4146-stdprepend-vec-a-value-or-vec-"></a>4.14.6 - std:prepend _vec-a_ _value-or-vec_ ...
+#### <a name="4136-stdprepend-vec-a-value-or-vec-"></a>4.13.6 - std:prepend _vec-a_ _value-or-vec_ ...
 
 Prepends _value-or-vec_ and all following items to the front of _vec-a_.
 If _value-or-vec_ is a vector, all its items will be prepended to _vec-a_.
@@ -2534,7 +2536,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) (str $[:d, :c, :b, :a, 1]);
 ```
 
-#### <a name="4147-stdtake-count-vector"></a>4.14.7 - std:take _count_ _vector_
+#### <a name="4137-stdtake-count-vector"></a>4.13.7 - std:take _count_ _vector_
 
 Takes and returns the first _count_ elements of _vector_. Does not
 mutate _vector_.
@@ -2548,7 +2550,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[1,2,3,4]";
 ```
 
-#### <a name="4148-stddrop-count-vector"></a>4.14.8 - std:drop _count_ _vector_
+#### <a name="4138-stddrop-count-vector"></a>4.13.8 - std:drop _count_ _vector_
 
 Drops _count_ elements from _vector_ and returns them as new vector.
 Does not mutate _vector_.
@@ -2562,7 +2564,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[5,6]";
 ```
 
-### <a name="415-associative-maps-or-string-to-value-mappings"></a>4.15 - Associative Maps (or String to Value mappings)
+### <a name="414-associative-maps-or-string-to-value-mappings"></a>4.14 - Associative Maps (or String to Value mappings)
 
 Aside from vectors there are associative maps in WLambda. Their syntax is
 `${ key = expr, ... }`. The keys of these maps have to be strings,
@@ -2606,7 +2608,7 @@ the field accessing syntax `some_map.a`, the function is passed the map `some_ma
 via the special value `$self`. There is another special variable `$data`
 that allows you to access the `$self._data` field.
 
-#### <a name="4151-map-splicing"></a>4.15.1 - Map Splicing
+#### <a name="4141-map-splicing"></a>4.14.1 - Map Splicing
 
 Like vectors you can splice map values directly into map literals:
 
@@ -2625,7 +2627,7 @@ std:assert_eq (str ${*${a=10}}) "${a=10}";
 std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 ```
 
-### <a name="416-references"></a>4.16 - References
+### <a name="415-references"></a>4.15 - References
 
 Some data structures already have reference characteristics, such as strings,
 vectors and maps. There are 3 types of references in WLambda that handle
@@ -2681,7 +2683,7 @@ std:assert_eq $*x 20;
 
 Strong references can also be created using the `std:to_ref` function.
 
-#### <a name="4161-stdtoref-value"></a>4.16.1 - std:to_ref _value_
+#### <a name="4151-stdtoref-value"></a>4.15.1 - std:to_ref _value_
 
 Creates a new strong reference that refers to a cell that stores _value_.
 
@@ -2693,7 +2695,7 @@ std:assert_eq (std:ser:wlambda x) "$&&10";
 std:assert_eq $*x 10;
 ```
 
-#### <a name="4162-stdweaken-ref"></a>4.16.2 - std:weaken _ref_
+#### <a name="4152-stdweaken-ref"></a>4.15.2 - std:weaken _ref_
 
 You can weaken any of those two types of references manually using the
 `std:weaken` function.
@@ -2721,7 +2723,7 @@ std:assert_eq $*y $n;
 std:assert drop_check;
 ```
 
-#### <a name="4163-isref-value"></a>4.16.3 - is_ref _value_
+#### <a name="4153-isref-value"></a>4.15.3 - is_ref _value_
 
 Returns `$true` if _value_ is a reference (strong, weakable or weak).
 
@@ -2737,7 +2739,7 @@ std:assert ~ not ~ is_ref $true;
 std:assert ~ not ~ is_ref $none;
 ```
 
-#### <a name="4164-iswref-value"></a>4.16.4 - is_wref _value_
+#### <a name="4154-iswref-value"></a>4.15.4 - is_wref _value_
 
 Returns `$true` if _value_ is a weak reference.
 
@@ -2748,14 +2750,14 @@ std:assert ~ is_wref y;
 std:assert ~ not ~ is_wref x;
 ```
 
-#### <a name="4165-stdstrengthen-ref"></a>4.16.5 - std:strengthen _ref_
+#### <a name="4155-stdstrengthen-ref"></a>4.15.5 - std:strengthen _ref_
 
 You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
 TODO: Example
 
-#### <a name="4166-stdsetref-ref-value"></a>4.16.6 - std:set_ref _ref_ _value_
+#### <a name="4156-stdsetref-ref-value"></a>4.15.6 - std:set_ref _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -2780,7 +2782,7 @@ std:set_ref w3 14;      # Set reference via the weak reference in w3 to r3.
 std:assert_eq $*r3 14;
 ```
 
-### <a name="417-iterators-iter-expression"></a>4.17 - Iterators `$iter _expression_`
+### <a name="416-iterators-iter-expression"></a>4.16 - Iterators `$iter _expression_`
 
 As a companion to the `iter` operation there are the iterator values.
 These are a special kind of values that generate a value when they are called.
@@ -2830,7 +2832,7 @@ iter i it {
 std:assert_eq sum 6;
 ```
 
-#### <a name="4171-iterator-kinds"></a>4.17.1 - Iterator Kinds
+#### <a name="4161-iterator-kinds"></a>4.16.1 - Iterator Kinds
 
 Here is a table of the behaviour of iterators created from WLambda data.
 
@@ -2858,7 +2860,7 @@ Here is a table of the behaviour of iterators created from WLambda data.
 | `$p(iterator_a, iterator_b)` | Returns a zip operation of the elements returned by the iterator_a and iterator_b until one of both returns `$o()`. |
 | `$p(iterator, x)` | Returns a zip operation of the elements returned by the iterator and the newly created iterator`$iter x`. |
 
-#### <a name="4172-iterators-on-mutated-data"></a>4.17.2 - Iterators on mutated data
+#### <a name="4162-iterators-on-mutated-data"></a>4.16.2 - Iterators on mutated data
 
 Iterators hold a reference to the collection values. That means, if you mutate
 a vector while you iterate over it, it will not crash but it might produce
@@ -2881,7 +2883,7 @@ This will also work for maps, but as the order of the map entries
 is undefined it will produce very indeterministic effects and it's really
 not recommended.
 
-#### <a name="4173-splicing-an-iterator"></a>4.17.3 - Splicing an Iterator
+#### <a name="4163-splicing-an-iterator"></a>4.16.3 - Splicing an Iterator
 
 You can directly insert the values produced by an iterator into a vector or map:
 
@@ -2905,7 +2907,7 @@ std:assert_eq m.b 20;
 std:assert_eq m.x 99;
 ```
 
-#### <a name="4174-calling-an-iterator-with-a-function"></a>4.17.4 - Calling an Iterator with a Function
+#### <a name="4164-calling-an-iterator-with-a-function"></a>4.16.4 - Calling an Iterator with a Function
 
 When an iterator gets called with a function as first argument
 it will repeatedly call that function until no more values are
@@ -2921,7 +2923,7 @@ it { .sum = sum + _ };
 std:assert_eq sum 6;
 ```
 
-#### - Zip Iterators
+#### <a name="4165-zip-iterators"></a>4.16.5 - Zip Iterators
 
 To highlight this feature from the table above: You can zip two iterators if
 you pass an iterator as first part of a pair `$p(a, b)`:
@@ -2939,7 +2941,7 @@ std:assert_eq
     (str $[$p("a", 0), $p("b", 1), $p("c", 2)]);
 ```
 
-### <a name="418-calling-semantics-of-data-types"></a>4.18 - Calling Semantics of Data Types
+### <a name="417-calling-semantics-of-data-types"></a>4.17 - Calling Semantics of Data Types
 
 You can call almost all basic data types of WLambda.
 Here is an overview of the data type calling semantics:
@@ -3335,7 +3337,7 @@ std:assert_eq i 4;
 
 The first 
 
-#### - iter _var_ _iterable_ _body_
+#### <a name="712-iter-var-iterable-body"></a>7.1.2 - iter _var_ _iterable_ _body_
 
 This is the primary syntax of WLambda to iterate over collections,
 numeric ranges and generally everything you can create an iterator from
@@ -3452,7 +3454,7 @@ iter k $p(:keys, m) {
 std:assert_eq sum 30;
 ```
 
-#### <a name="712-range-start-end-step-fun"></a>7.1.2 - range _start_ _end_ _step_ _fun_
+#### <a name="713-range-start-end-step-fun"></a>7.1.3 - range _start_ _end_ _step_ _fun_
 
 `range` counts from _start_ to _end_ by increments of _step_ and calls _fun_
 with the counter. The iteration is inclusive, this means if _start_ == _end_
@@ -3485,7 +3487,7 @@ range 0.3 0.4 0.01 {
 std:assert_eq (str out) "$[30,31,32,33,34,35,36,37,38,39]";
 ```
 
-#### <a name="713-break-value"></a>7.1.3 - break _value_
+#### <a name="714-break-value"></a>7.1.4 - break _value_
 
 `break` stops the inner most iterative construct, which then will return _value_.
 This should work for all repeatedly calling operations, such as
@@ -3509,7 +3511,7 @@ An example where the list iteration is stopped:
 std:assert_eq val :XX;
 ```
 
-#### <a name="714-next"></a>7.1.4 - next
+#### <a name="715-next"></a>7.1.5 - next
 
 `next` stops execution of the current function or statement block and continues
 with the next iteration of the inner most iteration.
