@@ -2464,6 +2464,33 @@ fn check_const() {
 #[test]
 fn check_threads() {
     assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $b\"abc\" };
+    "), "$b\"abc\"");
+    assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $o(49) };
+    "), "$o(49)");
+    assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $p(:foo,2) };
+    "), "$p(:\"foo\",2)");
+    assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $f(1,2) };
+    "), "$f(1,2)");
+    assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $f(1,2,3) };
+    "), "$f(1,2,3)");
+    assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $f(1,2,3,4) };
+    "), "$f(1,2,3,4)");
+    assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $i(1,2) };
+    "), "$i(1,2)");
+    assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $i(1,2,3) };
+    "), "$i(1,2,3)");
+    assert_eq!(ve("
+        std:thread:join ~ std:thread:spawn $q{ $i(1,2,3,4) };
+    "), "$i(1,2,3,4)");
+    assert_eq!(ve("
         !h = std:thread:spawn $q( $[1,2,${a=20},:x] );
         std:thread:join h;
     "), "$[1,2,${a=20},:\"x\"]");

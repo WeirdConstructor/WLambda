@@ -1264,19 +1264,6 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                 }
 
                 value = parse_value(ps)?;
-//                if !ps.indent_pos().belongs_to(&call_indent) {
-//                    let is_new_stmt =
-//                        if let Some(c) = ps.peek() { c == ';' } else { false };
-//                    let was_closing_paren =
-//                        match ps.last_token_char() {
-//                            '}' | ')' | ']' => true,
-//                            _               => false,
-//                        };
-//                    if !ps.at_end() && !is_new_stmt && !was_closing_paren {
-//                        return Err(ps.err(ParseErrorKind::BadIndent(
-//                            "Call argument does not belong to call, it needs a higher indentation.")));
-//                    }
-//                }
             },
         }
     }

@@ -57,6 +57,8 @@ pub enum AVal {
     Int(i64),
     Flt(f64),
     Lst(Vec<AVal>),
+    Opt(Option<Box<AVal>>),
+    Pair(Box<(AVal, AVal)>),
     Map(FnvHashMap<String, AVal>),
     Atom(AtomicAVal),
 }
@@ -75,6 +77,10 @@ impl AVal {
                     } else {
                         v.insert(i as usize, av);
                     }
+                } else if let AVal::Pair(ref mut v) = self {
+                    let i = (i % 2).abs();
+                    if i == 0 { v.0 = av; }
+                    else      { v.1 = av; }
                 }
             },
             v => {
@@ -103,13 +109,16 @@ impl AVal {
                      SynPos { syn: Syntax::Block, line: 0,
                               col: 0, file: FileRef::new("?"), name: None }))))
             },
-            AVal::Bol(b) => VVal::Bol(*b),
-            AVal::Int(i) => VVal::Int(*i),
-            AVal::Flt(f) => VVal::Flt(*f),
-            AVal::Sym(s) => VVal::new_sym(s),
-            AVal::Str(s) => VVal::new_str(s),
-            AVal::Byt(b) => VVal::new_byt(b.clone()),
-            AVal::Atom(a) => VVal::Usr(Box::new(a.clone())),
+            AVal::Bol(b)       => VVal::Bol(*b),
+            AVal::Int(i)       => VVal::Int(*i),
+            AVal::Flt(f)       => VVal::Flt(*f),
+            AVal::Sym(s)       => VVal::new_sym(s),
+            AVal::Str(s)       => VVal::new_str(s),
+            AVal::Byt(b)       => VVal::new_byt(b.clone()),
+            AVal::Atom(a)      => VVal::Usr(Box::new(a.clone())),
+            AVal::Opt(None)    => VVal::opt_none(),
+            AVal::Opt(Some(a)) => VVal::opt(a.to_vval()),
+            AVal::Pair(p)      => VVal::pair(p.0.to_vval(), p.1.to_vval()),
             AVal::Lst(l) => {
                 let v = VVal::vec();
                 for av in l.iter() {
@@ -148,12 +157,19 @@ impl AVal {
                     Box::new(AVal::from_vval(&eb.0)),
                     format!("{}", eb.1))
             },
-            VVal::Bol(b) => AVal::Bol(*b),
-            VVal::Sym(s) => AVal::Sym(s.borrow().clone()),
-            VVal::Str(s) => AVal::Str(s.borrow().clone()),
-            VVal::Byt(b) => AVal::Byt(b.borrow().clone()),
-            VVal::Int(i) => AVal::Int(*i),
-            VVal::Flt(f) => AVal::Flt(*f),
+            VVal::Bol(b)       => AVal::Bol(*b),
+            VVal::Sym(s)       => AVal::Sym(s.borrow().clone()),
+            VVal::Str(s)       => AVal::Str(s.borrow().clone()),
+            VVal::Byt(b)       => AVal::Byt(b.borrow().clone()),
+            VVal::Int(i)       => AVal::Int(*i),
+            VVal::Flt(f)       => AVal::Flt(*f),
+            VVal::Opt(None)    => AVal::Opt(None),
+            VVal::Opt(Some(v)) => AVal::Opt(Some(Box::new(AVal::from_vval(v)))),
+            VVal::Pair(p) =>
+                AVal::Pair(
+                    Box::new((
+                        AVal::from_vval(&p.0),
+                        AVal::from_vval(&p.1)))),
             VVal::Lst(l) => {
                 let mut avec = vec![];
                 for vv in l.borrow().iter() {
