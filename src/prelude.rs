@@ -3066,7 +3066,8 @@ The call reordering of the `|>` operator looks like this:
 ### <a name="52-control-flow---returning"></a>5.2 - Control Flow - Returning
 
 WLambda uses labelled blocks for control flow, as returning from the current function would not be
-very helpful for the control flow in wlambda in case of conditional execution.
+very helpful for the control flow in wlambda in case of conditional execution using the
+boolean calling semantics.
 
 ```wlambda
 !some_func = \:outer {
