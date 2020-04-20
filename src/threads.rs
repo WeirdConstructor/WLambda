@@ -13,6 +13,7 @@ refer to the documentation of the `ThreadCreator` trait.
 
 use crate::vval::*;
 use crate::compiler::*;
+use crate::nvec::NVec;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -58,6 +59,8 @@ pub enum AVal {
     Flt(f64),
     Lst(Vec<AVal>),
     Opt(Option<Box<AVal>>),
+    FVec(NVec<f64>),
+    IVec(NVec<i64>),
     Pair(Box<(AVal, AVal)>),
     Map(FnvHashMap<String, AVal>),
     Atom(AtomicAVal),
@@ -119,6 +122,8 @@ impl AVal {
             AVal::Opt(None)    => VVal::opt_none(),
             AVal::Opt(Some(a)) => VVal::opt(a.to_vval()),
             AVal::Pair(p)      => VVal::pair(p.0.to_vval(), p.1.to_vval()),
+            AVal::FVec(v)      => VVal::FVec(*v),
+            AVal::IVec(v)      => VVal::IVec(*v),
             AVal::Lst(l) => {
                 let v = VVal::vec();
                 for av in l.iter() {
@@ -165,6 +170,8 @@ impl AVal {
             VVal::Flt(f)       => AVal::Flt(*f),
             VVal::Opt(None)    => AVal::Opt(None),
             VVal::Opt(Some(v)) => AVal::Opt(Some(Box::new(AVal::from_vval(v)))),
+            VVal::FVec(v)      => AVal::FVec(*v),
+            VVal::IVec(v)      => AVal::IVec(*v),
             VVal::Pair(p) =>
                 AVal::Pair(
                     Box::new((

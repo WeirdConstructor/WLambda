@@ -2295,6 +2295,15 @@ std:assert_eq v.tail  12;
 
 std:assert_eq v.first    11;
 std:assert_eq v.second   12;
+
+# Pairs are often used to represent map entries,
+# so you can use `key` and `value`
+# and the short forms `k` and `v` too:
+std:assert_eq v.value 11;
+std:assert_eq v.key   12;
+
+std:assert_eq v.v     11;
+std:assert_eq v.k     12;
 ```
 
 Comparison does happen by their contents:
@@ -3256,6 +3265,7 @@ WLambda has many ways to loop and iterate:
 - Counting loop with `range`
 - While some condition is `$true` with the `while` special form.
 - Over the items in a vector or map with the `iter` special form.
+- Calling an `$iter` iterator value with a function as first argument.
 - Over the items in a vector with either `for` or by calling the vector
 with a function as first argument.
 - Over the items in a map with either `for` or by calling the map
@@ -3305,10 +3315,132 @@ std:assert_eq i 4;
 
 The first 
 
+#### - iter _var_ _iterable_ _body_
+
+This is the primary syntax of WLambda to iterate over collections,
+numeric ranges and generally everything you can create an iterator from
+using the `$iter` syntax.
+
+The _var_ will be defined inside the _body_ and be filled with the
+value that was generated for the current iteration.
+And _iterable_ is everything that `$iter` can make an iterator from.
+Please refer to the section `Iterator Kinds` for a listing of this.
+
+Like usual, the control flow manipulators `next` and `break` also work
+for this kind of loop.
+
+Here is a simple example of how to iterate over all items of a vector
+in order:
+
+```wlambda
+!sum = 0;
+
+iter i $[1,2,3,4,5,6] {
+    .sum = sum + i;
+};
+
+std:assert_eq sum 21;
+```
+
+Even if you pass the syntax for constructing a function to `iter` it will
+create a block of statements from it. So this will work too (also for `while` above):
+
+```wlambda
+!sum = 0;
+
+iter i $[1,2,3,4,5,6] \.sum = sum + i;
+
+std:assert_eq sum 21;
+```
+
+However _body_ does not have to be a function definition or block, it can also
+be just a regular call argument:
+
+```wlambda
+!sum = 0;
+
+!inc = { .sum = sum + _; };
+
+iter i $[1,2,3,4] inc[i];
+
+std:assert_eq sum 10;
+```
+
+To iterate over a vector by index you can use this:
+
+```wlambda
+!v = $[1,2,3,4,5];
+!sum = 0;
+
+iter i $i(0, len v) {
+    .sum = sum + v.(i);
+};
+
+std:assert_eq sum 15;
+```
+
+Here is an example how to iterate over a range from 1 to 9 and
+collect the sum of those integers using an accumulator:
+
+```wlambda
+!sum = $@int iter i $i(1,10) ~ $+ i;
+
+std:assert_eq sum 45;
+```
+
+Iteration over a map is also easy and concise. The map entry
+will be represented using a pair value `$p(value, key)`.
+You can access the first and second element of a pair using the `v`/`value`
+and `k`/`key` keys of a pair (but also all other pair accessors defined
+in the section for pairs):
+
+```wlambda
+!sum = 0;
+
+iter i ${ a = 10, b = 20 } {
+    .sum = sum + i.v;
+};
+
+std:assert_eq sum 30;
+```
+
+Very useful for iterating just over the keys or values of a map can also be the
+special iterator values you get from the pair constructors:
+
+```wlambda
+!m = ${ a = 10, b = 20 };
+!sum = 0;
+
+iter v $p(:values, m) {
+    .sum = sum + v;
+};
+
+std:assert_eq sum 30;
+```
+
+Or if you need the keys:
+
+```wlambda
+!m = ${ a = 10, b = 20 };
+!sum = 0;
+
+iter k $p(:keys, m) {
+    std:displayln "FOO" k;
+    .sum = sum + m.(k);
+};
+
+std:assert_eq sum 30;
+```
+
 #### <a name="712-range-start-end-step-fun"></a>7.1.2 - range _start_ _end_ _step_ _fun_
 
-`range` counts from _start_ to _end_ by increments of _step_ and calls _fun_ with the counter. The
-iteration is inclusive, this means if _start_ == _end_ the function _fun_ will be called once.
+`range` counts from _start_ to _end_ by increments of _step_ and calls _fun_
+with the counter. The iteration is inclusive, this means if _start_ == _end_
+the function _fun_ will be called once.
+
+In contrast to `iter` this is not a special syntax, but just a regular function
+that calls another function repeatedly. You can control it using the `break` and
+`next` functions however.
 
 ```wlambda
 !out = $[];
@@ -3337,8 +3469,9 @@ std:assert_eq (str out) "$[30,31,32,33,34,35,36,37,38,39]";
 
 `break` stops the inner most iterative construct, which then will return _value_.
 This should work for all repeatedly calling operations, such as
-`for`, `while` and when calling lists directly. Also most library functions
+`for`, `while`, `iter` and when calling lists directly. Also most library functions
 that iteratively call you react to it, like `std:re:map` and `std:re:replace_all`.
+Be aware, that returning a value might not be supported by all iterative constructs.
 
 ```wlambda
 !ret = range 0 9 1 {!(i) = @;
@@ -3358,8 +3491,8 @@ std:assert_eq val :XX;
 
 #### <a name="714-next"></a>7.1.4 - next
 
-`next` stops execution of the current function and continues with the
-next iteration of the inner most iteration.
+`next` stops execution of the current function or statement block and continues
+with the next iteration of the inner most iteration.
 
 ```wlambda
 !sum = $@i $[1,2,3,4] {

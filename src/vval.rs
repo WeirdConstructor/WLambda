@@ -2923,8 +2923,8 @@ impl VVal {
             },
             VVal::Pair(_) => {
                 self.at(match key {
-                    "0" | "car" | "head" | "first"  => 0,
-                    "1" | "cdr" | "tail" | "second" => 1,
+                    "0" | "value" | "v" | "car" | "head" | "first"  => 0,
+                    "1" | "key"   | "k" | "cdr" | "tail" | "second" => 1,
                     _ => usize::from_str_radix(key, 10).unwrap_or(0),
                 })
             },

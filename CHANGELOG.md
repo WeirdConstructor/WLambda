@@ -30,6 +30,7 @@ the error occurred easier.
 * Feature: Added `iter <var> <list-expr> <block>` statement.
 * Feature: Added `std:delete` added for removing elements from maps or vectors.
 * Feature: Added `std:num:lerp` and `std:num:smoothstep` added.
+* Feature: Added pair values `$p(a, b)`.
 * Feature: Implemented optional values `$o(...)` and `$o()` for representing
 function return values that need a better distinction
 between `$none` and really no value.
