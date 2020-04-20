@@ -3065,6 +3065,55 @@ fn check_iter_data() {
         !it = $iter $i(5,8);
         $[:a, *it, :b]
     "), "$[:\"a\",5,6,7,:\"b\"]");
+
+    // zip!
+    assert_eq!(ve(r"
+        !it_a = $iter $[1, 2, 3, 4];
+        !it_b = $iter $[21, 22, 23];
+        !it = $iter $p(it_a, it_b);
+
+        $[it[][], it[][], it[][], it[]]
+    "), "$[$p(1,21),$p(2,22),$p(3,23),$o()]");
+
+    assert_eq!(ve(r"
+        !it_a = $iter $[1, 2, 3];
+        !it_b = $iter $[21, 22, 23, 24];
+        !it = $iter $p(it_a, it_b);
+
+        $[it[][], it[][], it[][], it[]]
+    "), "$[$p(1,21),$p(2,22),$p(3,23),$o()]");
+
+    assert_eq!(ve(r"
+        !it_a = $iter $[1, 2, 3];
+        !it_b = $[21, 22, 23, 24];
+        !it = $iter $p(it_a, it_b);
+
+        $[it[][], it[][], it[][], it[]]
+    "), "$[$p(1,21),$p(2,22),$p(3,23),$o()]");
+
+    assert_eq!(ve(r"
+        !it_a = $iter $[1, 2, 3, $none];
+        !it_b = $iter $[21, 22, 23, 24];
+        !it = $iter $p(it_a, it_b);
+
+        $[it[][], it[][], it[][], it[]]
+    "), "$[$p(1,21),$p(2,22),$p(3,23),$o($p($n,24))]");
+
+    assert_eq!(ve(r"
+        !it_a = $iter ${a = 10};
+        !it_b = $iter $[21, 22, 23, 24];
+        !it = $iter $p(it_a, it_b);
+
+        $[it[][], it[][]]
+    "), "$[$p($p(10,\"a\"),21),$n]");
+
+    assert_eq!(ve(r"
+        !it_a = $iter ${a = 10};
+        !it_b = ${b = 20};
+        !it = $iter $p(it_a, it_b);
+
+        $[it[][], it[][]]
+    "), "$[$p($p(10,\"a\"),$p(20,\"b\")),$n]");
 }
 
 #[test]

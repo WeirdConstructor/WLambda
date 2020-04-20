@@ -2855,6 +2855,8 @@ Here is a table of the behaviour of iterators created from WLambda data.
 | `$p(:enumerate, vector)`  | Returns integers in the range of `0` to `len vector`. |
 | `$p(:values, map)`  | Returns the values of the _map_ in undefined order. |
 | `$p(:keys, map)`  | Returns the keys of the _map_ in undefined order. |
+| `$p(iterator_a, iterator_b)` | Returns a zip operation of the elements returned by the iterator_a and iterator_b until one of both returns `$o()`. |
+| `$p(iterator, x)` | Returns a zip operation of the elements returned by the iterator and the newly created iterator`$iter x`. |
 
 #### <a name="4172-iterators-on-mutated-data"></a>4.17.2 - Iterators on mutated data
 
@@ -2917,6 +2919,24 @@ available:
 it { .sum = sum + _ };
 
 std:assert_eq sum 6;
+```
+
+#### - Zip Iterators
+
+To highlight this feature from the table above: You can zip two iterators if
+you pass an iterator as first part of a pair `$p(a, b)`:
+
+```wlambda
+!v = $["a", "b", "c"];
+
+!elems = $@vec
+    iter i $p($iter v, $iter $i(0, 10)) {
+        $+ i;
+    };
+
+std:assert_eq
+    (str elems)
+    (str $[$p("a", 0), $p("b", 1), $p("c", 2)]);
 ```
 
 ### <a name="418-calling-semantics-of-data-types"></a>4.18 - Calling Semantics of Data Types

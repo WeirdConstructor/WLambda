@@ -1673,32 +1673,96 @@ macro_rules! iter_next_value {
 
 macro_rules! pair_key_to_iter {
     ($p: ident) => {
-        $p.0.with_s_ref(|key: &str| -> VValIter {
-            let l =
-                match &key[..] {
-                    "keys"      => $p.1.keys(),
-                    "values"    => $p.1.values(),
-                    "enumerate" => $p.1.enumerate(),
-                    _ => {
-                        return std::iter::from_fn(
-                            Box::new(move || { None }))
-                    }
-                };
-            if let VVal::Lst(l) = l {
-                let l = l.clone();
-                let mut idx = 0;
+        if let VVal::Iter(ai) = &$p.0 {
+            let ai = ai.clone();
+
+            if let VVal::Iter(bi) = &$p.1 {
+                let bi = bi.clone();
+
                 std::iter::from_fn(Box::new(move || {
-                    if idx >= l.borrow().len() {
-                        return None;
+                    let a = ai.borrow_mut().next();
+                    if let Some((a, ak)) = a {
+                        let a =
+                            if let Some(ak) = ak {
+                                VVal::pair(a, ak)
+                            } else {
+                                a
+                            };
+
+                        let b = bi.borrow_mut().next();
+                        if let Some((b, bk)) = b {
+                            let b =
+                                if let Some(bk) = bk {
+                                    VVal::pair(b, bk)
+                                } else {
+                                    b
+                                };
+
+                            Some((a, Some(b)))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
                     }
-                    let r = Some((l.borrow()[idx].clone(), None));
-                    idx += 1;
-                    r
                 }))
             } else {
-                std::iter::from_fn(Box::new(move || { None }))
+                let mut bi = $p.1.iter();
+                std::iter::from_fn(Box::new(move || {
+                    let a = ai.borrow_mut().next();
+                    if let Some((a, ak)) = a {
+                        let a =
+                            if let Some(ak) = ak {
+                                VVal::pair(a, ak)
+                            } else {
+                                a
+                            };
+
+                        if let Some((b, bk)) = bi.next() {
+                            let b =
+                                if let Some(bk) = bk {
+                                    VVal::pair(b, bk)
+                                } else {
+                                    b
+                                };
+
+                            Some((VVal::pair(a, b), None))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }))
             }
-        })
+        } else {
+            $p.0.with_s_ref(|key: &str| -> VValIter {
+                let l =
+                    match &key[..] {
+                        "keys"      => $p.1.keys(),
+                        "values"    => $p.1.values(),
+                        "enumerate" => $p.1.enumerate(),
+                        _ => {
+                            return std::iter::from_fn(
+                                Box::new(move || { None }))
+                        }
+                    };
+                if let VVal::Lst(l) = l {
+                    let l = l.clone();
+                    let mut idx = 0;
+                    std::iter::from_fn(Box::new(move || {
+                        if idx >= l.borrow().len() {
+                            return None;
+                        }
+                        let r = Some((l.borrow()[idx].clone(), None));
+                        idx += 1;
+                        r
+                    }))
+                } else {
+                    std::iter::from_fn(Box::new(move || { None }))
+                }
+            })
+        }
     }
 }
 
