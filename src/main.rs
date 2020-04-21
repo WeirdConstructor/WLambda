@@ -19,7 +19,155 @@ use crate::compiler::{GlobalEnv, EvalContext};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+use std::cell::RefCell;
+use std::rc::Rc;
+use fnv::FnvHashMap;
+
+struct Cached {
+    obj: std::rc::Weak<RefCell<FnvHashMap<String, VVal>>>,
+    key: std::rc::Rc<RefCell<String>>,
+    idx: usize,
+}
+
+impl Cached {
+    fn is_entry(&self, o: &VVal, k: &VVal) -> Option<usize> {
+        if let Some(u) = self.obj.upgrade() {
+            if let VVal::Map(m) = o {
+                if let VVal::Str(s) = k {
+                    if std::rc::Rc::ptr_eq(m, &u) {
+                        if std::rc::Rc::ptr_eq(&self.key, &s) {
+                            Some(self.idx)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+fn benchme(n: usize) {
+    let v = VVal::map();
+    v.set_key_mv(String::from("x"), VVal::Int(10));
+    v.set_key_mv(String::from("y"), VVal::Int(11));
+    v.set_key_mv(String::from("a"), VVal::Int(12));
+    v.set_key_mv(String::from("b"), VVal::Int(13));
+
+    let t = std::time::Instant::now();
+    let mut sum = 0;
+    for i in 0..n {
+        let x = v.get_key("x").unwrap().i();
+        let y = v.get_key("y").unwrap().i();
+        let a = v.get_key("a").unwrap().i();
+        let b = v.get_key("b").unwrap().i();
+        sum += x + y + a + b;
+    }
+
+    println!("SUM: {} in {}", sum, t.elapsed().as_millis());
+
+    let t = std::time::Instant::now();
+    let k_x = VVal::new_str_mv(String::from("x"));
+    let k_y = VVal::new_str_mv(String::from("y"));
+    let k_a = VVal::new_str_mv(String::from("a"));
+    let k_b = VVal::new_str_mv(String::from("b"));
+    let mut c_x : Option<Cached> = None;
+    let mut c_y : Option<Cached> = None;
+    let mut c_a : Option<Cached> = None;
+    let mut c_b : Option<Cached> = None;
+    if let VVal::Map(f) = &v {
+        if let VVal::Str(s) = &k_x {
+            c_x = Some(Cached {
+                obj: Rc::downgrade(&f),
+                key: s.clone(),
+                idx: 0,
+            });
+        }
+        if let VVal::Str(s) = &k_y {
+            c_y = Some(Cached {
+                obj: Rc::downgrade(&f),
+                key: s.clone(),
+                idx: 1,
+            });
+        }
+        if let VVal::Str(s) = &k_a {
+            c_a = Some(Cached {
+                obj: Rc::downgrade(&f),
+                key: s.clone(),
+                idx: 2,
+            });
+        }
+        if let VVal::Str(s) = &k_b {
+            c_b = Some(Cached {
+                obj: Rc::downgrade(&f),
+                key: s.clone(),
+                idx: 3,
+            });
+        }
+    }
+    let dat = VVal::vec();
+    dat.set(0, VVal::Int(10));
+    dat.set(1, VVal::Int(11));
+    dat.set(2, VVal::Int(12));
+    dat.set(3, VVal::Int(13));
+    let mut sum = 0;
+    for i in 0..n {
+        let x =
+            if let Some(c_x) = &c_x {
+                if let Some(idx) = c_x.is_entry(&v, &k_x) {
+                    dat.at(idx).unwrap()
+                } else {
+                    VVal::None
+                }
+            } else {
+                    VVal::None
+            };
+        let y =
+            if let Some(c_y) = &c_y {
+                if let Some(idx) = c_y.is_entry(&v, &k_y) {
+                    dat.at(idx).unwrap()
+                } else {
+                    VVal::None
+                }
+            } else {
+                    VVal::None
+            };
+        let a =
+            if let Some(c_a) = &c_a {
+                if let Some(idx) = c_a.is_entry(&v, &k_a) {
+                    dat.at(idx).unwrap()
+                } else {
+                    VVal::None
+                }
+            } else {
+                    VVal::None
+            };
+        let b =
+            if let Some(c_b) = &c_b {
+                if let Some(idx) = c_b.is_entry(&v, &k_b) {
+                    dat.at(idx).unwrap()
+                } else {
+                    VVal::None
+                }
+            } else {
+                    VVal::None
+            };
+        sum += x.i() + y.i() + a.i() + b.i();
+    }
+
+    println!("SUM: {} in {}", sum, t.elapsed().as_millis());
+}
+
 fn main() {
+    //benchme(10000000);
 //    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
 //    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
 //    println!("sizeof {} NVec<f64> bytes", std::mem::size_of::<crate::nvec::NVec<f64>>());
