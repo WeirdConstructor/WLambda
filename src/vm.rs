@@ -1,6 +1,7 @@
 use crate::parser::{self};
 use crate::compiler::*;
 use crate::vval::*;
+use crate::nvec::NVec;
 use crate::ops::*;
 
 use std::rc::Rc;
@@ -1286,11 +1287,46 @@ fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                     }
                     Ok(m)
                 },
+                Syntax::IVec => {
+                    let a = vm_compile_const_value(&l[1])?;
+                    let b = vm_compile_const_value(&l[2])?;
+                    if l.len() > 3 {
+                        let c = vm_compile_const_value(&l[3])?;
+                        if l.len() == 5 {
+                            let d = vm_compile_const_value(&l[4])?;
+                            Ok(VVal::IVec(NVec::Vec4(a.i(), b.i(), c.i(), d.i())))
+                        } else {
+                            Ok(VVal::IVec(NVec::Vec3(a.i(), b.i(), c.i())))
+                        }
+                    } else {
+                        Ok(VVal::IVec(NVec::Vec2(a.i(), b.i())))
+                    }
+                },
+                Syntax::FVec => {
+                    let a = vm_compile_const_value(&l[1])?;
+                    let b = vm_compile_const_value(&l[2])?;
+                    if l.len() > 3 {
+                        let c = vm_compile_const_value(&l[3])?;
+                        if l.len() == 5 {
+                            let d = vm_compile_const_value(&l[4])?;
+                            Ok(VVal::FVec(NVec::Vec4(a.f(), b.f(), c.f(), d.f())))
+                        } else {
+                            Ok(VVal::FVec(NVec::Vec3(a.f(), b.f(), c.f())))
+                        }
+                    } else {
+                        Ok(VVal::FVec(NVec::Vec2(a.f(), b.f())))
+                    }
+                },
                 _ => Err(val.to_compile_err(
                     format!(
                         "Invalid literal in constant definition: {}",
                         val.s())).err().unwrap()),
             }
+        },
+        VVal::Pair(bx) => {
+            let a = vm_compile_const_value(&bx.0)?;
+            let b = vm_compile_const_value(&bx.1)?;
+            Ok(VVal::pair(a, b))
         },
         _ => Ok(val.clone()),
     }

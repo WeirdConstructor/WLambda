@@ -765,6 +765,14 @@ fn check_destructure() {
     assert_eq!(
         ve("!a = 0; !b = 0; .(a, b) = 40; $[a, b]"),
         "$[40,40]");
+
+    assert_eq!(ve("!(a, b, c, d) = $i(1, 2);        $[a, b, c, d]"), "$[1,2,$n,$n]");
+    assert_eq!(ve("!(a, b, c, d) = $i(1, 2, 3);     $[a, b, c, d]"), "$[1,2,3,$n]");
+    assert_eq!(ve("!(a, b, c, d) = $i(1, 2, 3, 4);  $[a, b, c, d]"), "$[1,2,3,4]");
+
+    assert_eq!(ve("!(a, b, c, d) = $f(1, 2);        $[a, b, c, d]"), "$[1,2,$n,$n]");
+    assert_eq!(ve("!(a, b, c, d) = $f(1, 2, 3);     $[a, b, c, d]"), "$[1,2,3,$n]");
+    assert_eq!(ve("!(a, b, c, d) = $f(1, 2, 3, 4);  $[a, b, c, d]"), "$[1,2,3,4]");
 }
 
 #[test]
@@ -2459,6 +2467,41 @@ fn check_const() {
         !@import c tests:test_mod_const;
         c:X2
     "), "$[1,2]");
+
+    assert_eq!(ve(r"
+        !:const K = $i(1, 2, 3);
+        K
+    "), "$i(1,2,3)");
+
+    assert_eq!(ve(r"
+        !:const K = $i(1, 2, 3, 5);
+        K
+    "), "$i(1,2,3,5)");
+
+    assert_eq!(ve(r"
+        !:const K = $i(1, 2);
+        K
+    "), "$i(1,2)");
+
+    assert_eq!(ve(r"
+        !:const K = $f(1, 2);
+        K
+    "), "$f(1,2)");
+
+    assert_eq!(ve(r"
+        !:const K = $f(1, 2, 3);
+        K
+    "), "$f(1,2,3)");
+
+    assert_eq!(ve(r"
+        !:const K = $f(1, 2, 3, 4);
+        K
+    "), "$f(1,2,3,4)");
+
+    assert_eq!(ve(r"
+        !:const P = $p(:a, :b);
+        $[P.v, P.k]
+    "), "$[:\"a\",:\"b\"]");
 }
 
 #[test]

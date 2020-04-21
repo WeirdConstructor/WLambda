@@ -336,6 +336,50 @@ std:assert_eq a 10;
 std:assert_eq b 20;
 ```
 
+#### - Destructuring to Variables
+
+Like highlighted in the previous section you can define and assign to
+multiple variables at once. Following data types support destructuring:
+
+- Vectors:
+```wlambda
+!(a, b, c) = $[1, 2, 3];
+
+std:assert_eq a 1;
+std:assert_eq b 2;
+std:assert_eq c 3;
+```
+- Maps:
+```wlambda
+!(x, foo, lol) = ${foo = 33, lol = 42, x = 2};
+
+std:assert_eq x   2;
+std:assert_eq foo 33;
+std:assert_eq lol 42;
+```
+- Pairs:
+```wlambda
+!(x, y) = $p("ex", "uepsilon");
+
+std:assert_eq x "ex";
+std:assert_eq y "uepsilon";
+```
+- Numerical Vectors:
+```wlambda
+!(x, y, z) = $i(3, 44, 4);
+
+std:assert_eq x 3;
+std:assert_eq y 44;
+std:assert_eq z 4;
+
+!(r, g, b, a) = $f(0.3, 1.0, 0.4, 1.0);
+
+std:assert_eq r 0.3;
+std:assert_eq g 1.0;
+std:assert_eq b 0.4;
+std:assert_eq a 1.0;
+```
+
 ### <a name="21-global-variables"></a>2.1 - Global Variables
 
 You can define global variables that are not bound to

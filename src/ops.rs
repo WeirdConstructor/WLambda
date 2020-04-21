@@ -1,5 +1,6 @@
 use crate::vval::*;
 use crate::compiler::*;
+use crate::nvec::NVec;
 
 #[derive(Clone)]
 pub struct Prog {
@@ -592,17 +593,24 @@ fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, rv: &VVal) {
     }
 }
 
+macro_rules! set_at_varpos {
+    ($self: ident, $env: ident, $pos: ident, $v: expr) => {
+        if $self.is_ref {
+            set_ref_at_varpos($env, $pos, $v);
+        } else {
+            set_env_at_varpos($env, $pos, $v);
+        }
+    }
+}
+
 impl DestructureInfo {
     pub fn destructure(&self, env: &mut Env, val: VVal) {
         match val {
             VVal::Lst(l) => {
                 let nul = VVal::None;
                 for (i, pos) in self.poses.iter().enumerate() {
-                    if self.is_ref {
-                        set_ref_at_varpos(env, pos, l.borrow().get(i).unwrap_or(&nul));
-                    } else {
-                        set_env_at_varpos(env, pos, l.borrow().get(i).unwrap_or(&nul));
-                    }
+                    set_at_varpos!(
+                        self, env, pos, l.borrow().get(i).unwrap_or(&nul));
                 }
             },
             VVal::Map(m) => {
@@ -610,39 +618,101 @@ impl DestructureInfo {
                     let vname = self.vars.at(i).unwrap().s_raw();
                     let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::None);
 
-                    if self.is_ref {
-                        set_ref_at_varpos(env, pos, &val);
-                    } else {
-                        set_env_at_varpos(env, pos, &val);
-                    }
+                    set_at_varpos!(self, env, pos, &val);
                 }
             },
             VVal::Pair(p) => {
                 let (lv, rv) = &*p;
 
                 if let Some(pos) = self.poses.get(0) {
-                    if self.is_ref {
-                        set_ref_at_varpos(env, pos, &lv);
-                    } else {
-                        set_env_at_varpos(env, pos, &lv);
-                    }
+                    set_at_varpos!(self, env, pos, &lv);
                 }
 
                 if let Some(pos) = self.poses.get(1) {
-                    if self.is_ref {
-                        set_ref_at_varpos(env, pos, &rv);
-                    } else {
-                        set_env_at_varpos(env, pos, &rv);
-                    }
+                    set_at_varpos!(self, env, pos, &rv);
+                }
+            },
+            VVal::IVec(NVec::Vec2(a, b)) => {
+                if let Some(pos) = self.poses.get(0) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(a));
+                }
+
+                if let Some(pos) = self.poses.get(1) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(b));
+                }
+            },
+            VVal::IVec(NVec::Vec3(a, b, c)) => {
+                if let Some(pos) = self.poses.get(0) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(a));
+                }
+
+                if let Some(pos) = self.poses.get(1) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(b));
+                }
+
+                if let Some(pos) = self.poses.get(2) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(c));
+                }
+            },
+            VVal::IVec(NVec::Vec4(a, b, c, d)) => {
+                if let Some(pos) = self.poses.get(0) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(a));
+                }
+
+                if let Some(pos) = self.poses.get(1) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(b));
+                }
+
+                if let Some(pos) = self.poses.get(2) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(c));
+                }
+
+                if let Some(pos) = self.poses.get(3) {
+                    set_at_varpos!(self, env, pos, &VVal::Int(d));
+                }
+            },
+            VVal::FVec(NVec::Vec2(a, b)) => {
+                if let Some(pos) = self.poses.get(0) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(a));
+                }
+
+                if let Some(pos) = self.poses.get(1) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(b));
+                }
+            },
+            VVal::FVec(NVec::Vec3(a, b, c)) => {
+                if let Some(pos) = self.poses.get(0) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(a));
+                }
+
+                if let Some(pos) = self.poses.get(1) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(b));
+                }
+
+                if let Some(pos) = self.poses.get(2) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(c));
+                }
+            },
+            VVal::FVec(NVec::Vec4(a, b, c, d)) => {
+                if let Some(pos) = self.poses.get(0) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(a));
+                }
+
+                if let Some(pos) = self.poses.get(1) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(b));
+                }
+
+                if let Some(pos) = self.poses.get(2) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(c));
+                }
+
+                if let Some(pos) = self.poses.get(3) {
+                    set_at_varpos!(self, env, pos, &VVal::Flt(d));
                 }
             },
             _ => {
                 for pos in self.poses.iter() {
-                    if self.is_ref {
-                        set_ref_at_varpos(env, pos, &val);
-                    } else {
-                        set_env_at_varpos(env, pos, &val);
-                    }
+                    set_at_varpos!(self, env, pos, &val);
                 }
             }
         }
