@@ -3239,3 +3239,35 @@ fn check_optionals() {
         "$[$true,$true,$true,$true,$true]");
 }
 
+#[test]
+fn check_code_string_literals() {
+    assert_eq!(ve(r#"
+        !code = $code 1 + 2;
+        code
+    "#), "\"1 + 2\"");
+    assert_eq!(ve(r#"
+        !code = $c {
+            !a = 302;
+            !b = $i(1, 2, 3);
+        };
+        code
+    "#), "\"{\\n            !a = 302;\\n            !b = $i(1, 2, 3);\\n        }\"");
+
+    assert_eq!(ve(r#"
+        !code = $c {
+            !a = 302;
+            !b = $i(1, 2, 3);
+            !x = $c (a b c "fff");
+        };
+        code
+    "#), "\"{\\n            !a = 302;\\n            !b = $i(1, 2, 3);\\n            !x = $c (a b c \\\"fff\\\");\\n        }\"");
+
+    assert_eq!(ve(r#"
+        !code = $c {
+            !a = 302;
+            !b = $i(1, 2, 3);
+            !x = 
+        };
+        code
+    "#), "PARSE ERROR: error[6,9:<compiler:s_eval>] Expected literal value, sub expression, block, key or identifier at code \'};\n        code\n    \'");
+}

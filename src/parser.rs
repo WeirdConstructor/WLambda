@@ -107,7 +107,9 @@ In the following grammar, white space and comments are omitted:
                   ;
     false         = "f" | "false"
                   ;
-    none          = "n" | "none
+    none          = "n" | "none"
+                  ;
+    code_string   = ("c" | "code" ), expr
                   ;
     pair          = "p", "(", expr, "," expr, ")"
                   ;
@@ -136,6 +138,7 @@ In the following grammar, white space and comments are omitted:
                   ;
     special_value = byte_string
                   | quote_string
+                  | code_string
                   | list
                   | map
                   | none
@@ -586,6 +589,21 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         'b' => { ps.consume(); parse_string(ps, true) },
         'q' => { ps.consume(); parse_q_string(ps, false) },
         'Q' => { ps.consume(); parse_q_string(ps, true) },
+        'c' => {
+            if ps.consume_lookahead("code") {
+                ps.skip_ws_and_comments();
+            } else {
+                ps.consume_wsc();
+            }
+
+            ps.push_collect();
+            parse_expr(ps)?;
+            let code = ps.pop_collect().to_string();
+
+            let mut vec = ps.syn(Syntax::Str);
+            vec.push(VVal::new_str_mv(code));
+            Ok(vec)
+        },
         '[' => parse_list(ps),
         '{' => parse_map(ps),
         'n' => {

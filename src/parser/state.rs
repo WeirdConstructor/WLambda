@@ -29,6 +29,7 @@ pub struct State {
         indent:         Option<u32>,
         line_indent:    u32,
         last_tok_char:  char,
+        code_capture:   Vec<usize>,
         file:           FileRef,
 }
 
@@ -512,6 +513,7 @@ impl State {
             indent:         Some(0),
             line_indent:    0,
             last_tok_char:  ' ',
+            code_capture:   vec![],
             file:           FileRef::new(filename),
         };
         ps.skip_ws_and_comments();
@@ -523,6 +525,15 @@ impl State {
             None => Err(self.err(ParseErrorKind::EOF("Unexpected EOF"))),
             Some(r) => Ok(r)
         }
+    }
+
+    pub fn push_collect(&mut self) {
+        self.code_capture.push(self.ch_ptr);
+    }
+
+    pub fn pop_collect(&mut self) -> StrPart {
+        let ptr = self.code_capture.pop().expect("previous push_collect");
+        self.spart(ptr, self.ch_ptr)
     }
 }
 

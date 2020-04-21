@@ -33,6 +33,7 @@ Smalltalk, LISP and Perl.
 
 - [1](#1-syntax) - Syntax
 - [2](#2-variable-definition-and-assignment) - Variable Definition and Assignment
+    - [2.0.1](#201-destructuring-to-variables) - Destructuring to Variables
   - [2.1](#21-global-variables) - Global Variables
   - [2.2](#22-constants) - Constants
 - [3](#3-functions-part-12) - Functions (part 1/2)
@@ -125,25 +126,26 @@ Smalltalk, LISP and Perl.
     - [4.8.15](#4815-stdvvec2rad-vec) - std:v:vec2rad _vec_
     - [4.8.16](#4816-stdvrad2vec-radians) - std:v:rad2vec _radians_
   - [4.9](#49-strings) - Strings
-    - [4.9.1](#491-str-value) - str _value_
-    - [4.9.2](#492-isstr-value) - is_str _value_
-    - [4.9.3](#493-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
-    - [4.9.4](#494-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
-    - [4.9.5](#495-stdstrlen-value) - std:str:len _value_
-    - [4.9.6](#496-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
-    - [4.9.7](#497-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
-    - [4.9.8](#498-stdstrtrim-value) - std:str:trim _value_
-    - [4.9.9](#499-stdstrtrimstart-value) - std:str:trim_start _value_
-    - [4.9.10](#4910-stdstrtrimend-value) - std:str:trim_end _value_
-    - [4.9.11](#4911-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
-    - [4.9.12](#4912-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
-    - [4.9.13](#4913-stdstrtobytes-string) - std:str:to_bytes _string_
-    - [4.9.14](#4914-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
-    - [4.9.15](#4915-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
-    - [4.9.16](#4916-stdstrtocharvec-string) - std:str:to_char_vec _string_
-    - [4.9.17](#4917-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
-    - [4.9.18](#4918-stdstrtolowercase-string) - std:str:to_lowercase _string_
-    - [4.9.19](#4919-stdstrtouppercase-string) - std:str:to_uppercase _string_
+    - [4.9.1](#491-string-literal-syntaxes) - String Literal Syntaxes
+    - [4.9.2](#492-str-value) - str _value_
+    - [4.9.3](#493-isstr-value) - is_str _value_
+    - [4.9.4](#494-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
+    - [4.9.5](#495-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
+    - [4.9.6](#496-stdstrlen-value) - std:str:len _value_
+    - [4.9.7](#497-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
+    - [4.9.8](#498-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+    - [4.9.9](#499-stdstrtrim-value) - std:str:trim _value_
+    - [4.9.10](#4910-stdstrtrimstart-value) - std:str:trim_start _value_
+    - [4.9.11](#4911-stdstrtrimend-value) - std:str:trim_end _value_
+    - [4.9.12](#4912-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
+    - [4.9.13](#4913-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
+    - [4.9.14](#4914-stdstrtobytes-string) - std:str:to_bytes _string_
+    - [4.9.15](#4915-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
+    - [4.9.16](#4916-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
+    - [4.9.17](#4917-stdstrtocharvec-string) - std:str:to_char_vec _string_
+    - [4.9.18](#4918-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
+    - [4.9.19](#4919-stdstrtolowercase-string) - std:str:to_lowercase _string_
+    - [4.9.20](#4920-stdstrtouppercase-string) - std:str:to_uppercase _string_
   - [4.10](#410-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
     - [4.10.1](#4101-call-properties-of-bytes) - Call Properties of Bytes
     - [4.10.2](#4102-byte-conversion-functions) - Byte Conversion Functions
@@ -336,7 +338,7 @@ std:assert_eq a 10;
 std:assert_eq b 20;
 ```
 
-#### - Destructuring to Variables
+#### <a name="201-destructuring-to-variables"></a>2.0.1 - Destructuring to Variables
 
 Like highlighted in the previous section you can define and assign to
 multiple variables at once. Following data types support destructuring:
@@ -1897,7 +1899,41 @@ std:assert_eq $q/any delimiter may be used instead of/
 std:assert_eq "\u{2211}" "∑";
 ```
 
-#### <a name="491-str-value"></a>4.9.1 - str _value_
+#### <a name="491-string-literal-syntaxes"></a>4.9.1 - String Literal Syntaxes
+
+There are multiple kinds of syntax constructs you can use to
+notate string (and byte vector) literals:
+
+- Regular strings
+```wlambda
+!s = "a b c";
+
+std:assert_eq s "a b c";
+```
+- Byte vectors
+- Quoted strings
+- Quoted byte vectors
+- WLambda code strings
+```wlambda
+# Short form $c works too.
+!code = $code {
+    !this = is a block;
+    It just needs to be in valid WLambda[:Syntax];
+    .x = But it does not need to pass the compiler
+        phase.x;
+};
+
+# Primary use case is `eval` and `std:thread:spawn`:
+!v = std:thread:join ~ std:thread:spawn $code {
+    !@import std std;
+    !res = "x" "y" "z";
+    std:str:cat res 33;
+}[];
+
+std:assert_eq v "xyz33";
+```
+
+#### <a name="492-str-value"></a>4.9.2 - str _value_
 
 Casts _value_ to a string and returns it.
 Also dereferences a value.
@@ -1920,7 +1956,7 @@ std:assert_eq (str $o())       "";
 std:assert_eq (str ~ std:weaken x)   "10";
 ```
 
-#### <a name="492-isstr-value"></a>4.9.2 - is_str _value_
+#### <a name="493-isstr-value"></a>4.9.3 - is_str _value_
 
 Returns `$true` if _value_ is a string.
 
@@ -1935,7 +1971,7 @@ std:assert ~ not ~ is_str $&&"foo";
 std:assert ~ is_str $*$&&"foo";
 ```
 
-#### <a name="493-stdstrcat-a-b-"></a>4.9.3 - std:str:cat _a_ _b_ ...
+#### <a name="494-stdstrcat-a-b-"></a>4.9.4 - std:str:cat _a_ _b_ ...
 
 Stringifies (like with `str`) and concatenates all its arguments.
 If an argument is a vector, it's elements will be stringified and concatenated.
@@ -1959,7 +1995,7 @@ std:push out "XXX";
 std:assert_eq s "abc123XXX";
 ```
 
-#### <a name="494-stdstrjoin-sep-vector"></a>4.9.4 - std:str:join _sep_ _vector_
+#### <a name="495-stdstrjoin-sep-vector"></a>4.9.5 - std:str:join _sep_ _vector_
 
 Join's the stringified elements of _vector_ with the _sep_ string.
 Will return an error if _vector_ is not a vector.
@@ -1970,7 +2006,7 @@ std:assert_eq
     "1::2::3";
 ```
 
-#### <a name="495-stdstrlen-value"></a>4.9.5 - std:str:len _value_
+#### <a name="496-stdstrlen-value"></a>4.9.6 - std:str:len _value_
 
 Returns the length of the stringified _value_ in unicode characters.
 The core function `len` does return the number of bytes in the string
@@ -1985,7 +2021,7 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### <a name="496-stdstrreplace-pattern-replacement-string"></a>4.9.6 - std:str:replace _pattern_ _replacement_ _string_
+#### <a name="497-stdstrreplace-pattern-replacement-string"></a>4.9.7 - std:str:replace _pattern_ _replacement_ _string_
 
 Replaces every occurence of _pattern_ in _string_ with _replacement_
 and returns a new string. All values will be casted to a string if
@@ -2001,7 +2037,7 @@ std:assert_eq s
 std:assert_eq s "1111";
 ```
 
-#### <a name="497-stdstrreplacen-pattern-replacement-count-string"></a>4.9.7 - std:str:replace_n _pattern_ _replacement_ _count_ _string_
+#### <a name="498-stdstrreplacen-pattern-replacement-count-string"></a>4.9.8 - std:str:replace_n _pattern_ _replacement_ _count_ _string_
 
 Replaces _count_ occurences of _pattern_ in _string_ with _replacement_
 and returns a new string. All values will be casted to a string if
@@ -2017,7 +2053,7 @@ std:assert_eq s
 std:assert_eq s "1119";
 ```
 
-#### <a name="498-stdstrtrim-value"></a>4.9.8 - std:str:trim _value_
+#### <a name="499-stdstrtrim-value"></a>4.9.9 - std:str:trim _value_
 
 Trims off any (unicode) white space from the start and end of the
 stringified _value_.
@@ -2028,7 +2064,7 @@ std:assert_eq
     "fooo bar";
 ```
 
-#### <a name="499-stdstrtrimstart-value"></a>4.9.9 - std:str:trim_start _value_
+#### <a name="4910-stdstrtrimstart-value"></a>4.9.10 - std:str:trim_start _value_
 
 Trims off any (unicode) white space from the start of the stringified _value_.
 
@@ -2038,7 +2074,7 @@ std:assert_eq
     "fooo bar \n";
 ```
 
-#### <a name="4910-stdstrtrimend-value"></a>4.9.10 - std:str:trim_end _value_
+#### <a name="4911-stdstrtrimend-value"></a>4.9.11 - std:str:trim_end _value_
 
 Trims off any (unicode) white space from the end of the stringified _value_.
 
@@ -2048,7 +2084,7 @@ std:assert_eq
     "  \nfooo bar";
 ```
 
-#### <a name="4911-stdstrpadstart-len-pad-str-value"></a>4.9.11 - std:str:pad_start _len_ _pad-str_ _value_
+#### <a name="4912-stdstrpadstart-len-pad-str-value"></a>4.9.12 - std:str:pad_start _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
 at the start of the string.
@@ -2072,7 +2108,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="4912-stdstrpadend-len-pad-str-value"></a>4.9.12 - std:str:pad_end _len_ _pad-str_ _value_
+#### <a name="4913-stdstrpadend-len-pad-str-value"></a>4.9.13 - std:str:pad_end _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters,
 appending at the end.
@@ -2096,7 +2132,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="4913-stdstrtobytes-string"></a>4.9.13 - std:str:to_bytes _string_
+#### <a name="4914-stdstrtobytes-string"></a>4.9.14 - std:str:to_bytes _string_
 
 Encodes _string_ in UTF-8 and returns a byte vector containing all it's bytes.
 
@@ -2108,7 +2144,7 @@ std:assert_eq b $b"1234";
 std:assert_eq b $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
 ```
 
-#### <a name="4914-stdstrfromutf8-byte-vector"></a>4.9.14 - std:str:from_utf8 _byte-vector_
+#### <a name="4915-stdstrfromutf8-byte-vector"></a>4.9.15 - std:str:from_utf8 _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences an
@@ -2122,7 +2158,7 @@ std:assert_eq s "Äß日本人";
 std:assert_eq r "str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0";
 ```
 
-#### <a name="4915-stdstrfromutf8lossy-byte-vector"></a>4.9.15 - std:str:from_utf8_lossy _byte-vector_
+#### <a name="4916-stdstrfromutf8lossy-byte-vector"></a>4.9.16 - std:str:from_utf8_lossy _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences a `"�"` will be
@@ -2134,7 +2170,7 @@ inserted.
 std:assert_eq s "Ä�ß日本人��\0";
 ```
 
-#### <a name="4916-stdstrtocharvec-string"></a>4.9.16 - std:str:to_char_vec _string_
+#### <a name="4917-stdstrtocharvec-string"></a>4.9.17 - std:str:to_char_vec _string_
 
 Converts the _string_ into a vector of integers which represent the Unicode
 character number.
@@ -2147,7 +2183,7 @@ std:assert_eq (str v) ~ str $[49,50,51,52];
 std:assert_eq (str v) ~ str $[196,223,0x65E5,0x672C,0x4EBA];
 ```
 
-#### <a name="4917-stdstrfromcharvec-vector"></a>4.9.17 - std:str:from_char_vec _vector_
+#### <a name="4918-stdstrfromcharvec-vector"></a>4.9.18 - std:str:from_char_vec _vector_
 
 The reverse operation of `std:str:to_char_vec`. It converts
 a vector of integers to a unicode string. Any integer that has
@@ -2161,7 +2197,7 @@ std:assert_eq
     "12Äß日本人";
 ```
 
-#### <a name="4918-stdstrtolowercase-string"></a>4.9.18 - std:str:to_lowercase _string_
+#### <a name="4919-stdstrtolowercase-string"></a>4.9.19 - std:str:to_lowercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -2169,7 +2205,7 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_lowercase "ZABzabÄßÜÖ") "zabzabäßüö";
 ```
 
-#### <a name="4919-stdstrtouppercase-string"></a>4.9.19 - std:str:to_uppercase _string_
+#### <a name="4920-stdstrtouppercase-string"></a>4.9.20 - std:str:to_uppercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 

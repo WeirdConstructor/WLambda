@@ -31,6 +31,8 @@ the error occurred easier.
 * Feature: Added `std:delete` added for removing elements from maps or vectors.
 * Feature: Added `std:num:lerp` and `std:num:smoothstep` added.
 * Feature: Added pair values `$p(a, b)`.
+* Feature: Added `$code <expr>` string literals for creating literal strings
+from (syntax checked) code snippets in WLambda.
 * Feature: Implemented optional values `$o(...)` and `$o()` for representing
 function return values that need a better distinction
 between `$none` and really no value.
