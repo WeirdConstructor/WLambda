@@ -105,18 +105,18 @@ range 1 5 1 {||
     };
 };
 
-range 1 5 1 {||
-    std:displayln "fib2 time:" ~ std:measure_time :ms {
-        !fib = $n;
-        .fib = \:fib {!n = _;
-#            !@dump_vm;
-            ? n == 0 (return :fib 0)
-               ~ ? n == 1 (return :fib 1)
-                 (return :fib (fib n - 1) + (fib n - 2));
-        };
-        std:displayln ~ fib 30;
-    };
-};
+#range 1 5 1 {||
+#    std:displayln "fib2 time:" ~ std:measure_time :ms {
+#        !fib = $n;
+#        .fib = \:fib {!n = _;
+##            !@dump_vm;
+#            ? n == 0 (return :fib 0)
+#               ~ ? n == 1 (return :fib 1)
+#                 (return :fib (fib n - 1) + (fib n - 2));
+#        };
+#        std:displayln ~ fib 30;
+#    };
+#};
 
 range 1 5 1 {|| std:displayln ~ std:measure_time :ms {||
     !x = 0;
@@ -133,9 +133,9 @@ range 1 5 1 {|| std:displayln ~ std:measure_time :ms {||
     x
 } };
 
-range 1 5 1 {|| std:displayln ~ std:measure_time :ms {||
-    !x = 0;
-    !inc = { .x = x + 1 };
-    iter i $i(0, 10000000) inc[];
-    x
-} };
+#range 1 5 1 {|| std:displayln ~ std:measure_time :ms {||
+#    !x = 0;
+#    !inc = { .x = x + 1 };
+#    iter i $i(0, 10000000) inc[];
+#    x
+#} };

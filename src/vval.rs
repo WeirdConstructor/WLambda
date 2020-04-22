@@ -20,6 +20,55 @@ use crate::ops::Prog;
 
 use fnv::FnvHashMap;
 
+#[derive(Debug, Clone)]
+pub struct HiddenClass {
+    key2idx: FnvHashMap<String, usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Obj {
+    class:  Rc<RefCell<HiddenClass>>,
+    data:   RefCell<Vec<VVal>>,
+}
+
+impl HiddenClass {
+    pub fn new() -> Self {
+        Self {
+            key2idx: FnvHashMap::with_capacity_and_hasher(5, Default::default()),
+        }
+    }
+}
+
+
+impl Obj {
+    pub fn new() -> Self {
+        Self {
+            class: Rc::new(RefCell::new(HiddenClass::new())),
+            data:  RefCell::new(Vec::with_capacity(2)),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.data.borrow().len()
+    }
+
+    pub fn set_key_mv(&self, key: String, v: VVal) {
+        if let Some(idx) = self.class.borrow().key2idx.get(&key) {
+            self.data.borrow_mut()[*idx] = v;
+            return
+        }
+
+        let next_idx = self.data.borrow().len();
+        self.class.borrow_mut().key2idx.insert(key, next_idx);
+        self.data.borrow_mut().insert(next_idx, v);
+    }
+
+    pub fn get_key(&self, key: &str) -> Option<VVal> {
+        let idx = *self.class.borrow().key2idx.get(key)?;
+        Some(self.data.borrow()[idx].clone())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FileRef {
     s: Rc<String>,
@@ -1414,6 +1463,8 @@ pub enum VVal {
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
     /// A mapping of strings to VVals.
     Map(Rc<RefCell<FnvHashMap<String, VVal>>>),
+    /// A mapping of strings to VVals optimized for often accessed properties.
+    Obj(Rc<Obj>),
     /// A function, see also [VValFun](struct.VValFun.html)
     Fun(Rc<VValFun>),
     /// A guarded VVal, that executes a given function when it is
@@ -1514,6 +1565,12 @@ impl CycleCheck {
             },
             VVal::Map(l) => {
                 for (_k, v) in l.borrow().iter() { self.touch_walk(&v); }
+            },
+            VVal::Obj(l) => {
+                for i in 0..l.as_ref().len() {
+                    let d = &l.data.borrow()[i];
+                    self.touch_walk(d);
+                }
             },
             VVal::DropFun(f) => { self.touch_walk(&f.v); },
             VVal::Fun(f) => {
@@ -2618,6 +2675,10 @@ impl VVal {
         VVal::Map(Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(2, Default::default()))))
     }
 
+    pub fn obj() -> VVal {
+        VVal::Obj(Rc::new(Obj::new()))
+    }
+
     pub fn sym(s: &str) -> VVal {
         VVal::Sym(std::rc::Rc::new(std::cell::RefCell::new(String::from(s))))
     }
@@ -2704,6 +2765,9 @@ impl VVal {
             },
             VVal::Map(l)  => {
                 if let VVal::Map(l2) = v { Rc::ptr_eq(l, l2) } else { false }
+            },
+            VVal::Obj(l)  => {
+                if let VVal::Obj(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
             VVal::Fun(l)  => {
                 if let VVal::Fun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
@@ -2976,6 +3040,7 @@ impl VVal {
     pub fn get_key(&self, key: &str) -> Option<VVal> {
         match self {
             VVal::Map(m) => m.borrow().get(key).cloned(),
+            VVal::Obj(o) => o.get_key(key),
             VVal::IVec(b) => {
                 Some(match key {
                     "0" | "first"  | "x" | "r" | "h" => b.x(),
@@ -3128,6 +3193,7 @@ impl VVal {
             VVal::Map(m) => {
                 m.borrow_mut().insert(key, val);
             },
+            VVal::Obj(o) => { o.set_key_mv(key, val); },
             VVal::Lst(l) => {
                 let idx = key.parse::<usize>().unwrap_or(0);
                 let mut v = l.borrow_mut();
@@ -3151,6 +3217,11 @@ impl VVal {
                     Ok(mut r)  => { r.insert(ks, val); Ok(()) },
                     Err(_)     => Err(StackAction::panic_borrow(self)),
                 }
+            },
+            VVal::Obj(o) => {
+                let ks = key.s_raw();
+                o.set_key_mv(ks, val);
+                Ok(())
             },
             VVal::Lst(l) => {
                 let idx = key.i() as usize;
@@ -3479,6 +3550,7 @@ impl VVal {
             VVal::Opt(_)     => String::from("optional"),
             VVal::Lst(_)     => String::from("vector"),
             VVal::Map(_)     => String::from("map"),
+            VVal::Obj(_)     => String::from("object"),
             VVal::Usr(_)     => String::from("userdata"),
             VVal::Fun(_)     => String::from("function"),
             VVal::IVec(_)    => String::from("integer_vector"),
@@ -3774,6 +3846,7 @@ impl VVal {
                 else { "$o()".to_string() },
             VVal::Lst(l)     => VVal::dump_vec_as_str(l, c),
             VVal::Map(l)     => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
+            VVal::Obj(l)     => format!("$object{{}}"),
             VVal::Usr(u)     => u.s(),
             VVal::Fun(f)     => {
                 let min = if f.min_args.is_none() { "any".to_string() }
@@ -3925,6 +3998,10 @@ impl serde::ser::Serialize for VVal {
                     seq.serialize_element(v)?;
                 }
                 seq.end()
+            },
+            VVal::Obj(l) => {
+                let mut map = serializer.serialize_map(Some(0))?;
+                map.end()
             },
             VVal::Map(l) => {
                 let hm = l.borrow();

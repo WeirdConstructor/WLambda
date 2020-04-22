@@ -41,6 +41,47 @@ impl Cached {
 }
 
 fn benchme(n: usize) {
+    let n2 = n / 10;
+    let t = std::time::Instant::now();
+    let o = VVal::map();
+    for i in 0..n2 {
+        o.set_key_mv(String::from("x"), VVal::Int(10));
+        o.set_key_mv(String::from("y"), VVal::Int(11));
+        o.set_key_mv(String::from("a"), VVal::Int(12));
+        o.set_key_mv(String::from("b"), VVal::Int(13));
+    }
+    println!("m_set_key {}", t.elapsed().as_millis());
+
+    let t = std::time::Instant::now();
+    let o = VVal::obj();
+    for i in 0..n2 {
+        o.set_key_mv(String::from("x"), VVal::Int(10));
+        o.set_key_mv(String::from("y"), VVal::Int(11));
+        o.set_key_mv(String::from("a"), VVal::Int(12));
+        o.set_key_mv(String::from("b"), VVal::Int(13));
+    }
+    println!("o_set_key in {}", t.elapsed().as_millis());
+
+    let t = std::time::Instant::now();
+    for i in 0..n2 {
+        let o = VVal::map();
+        o.set_key_mv(String::from("x"), VVal::Int(10));
+        o.set_key_mv(String::from("y"), VVal::Int(11));
+        o.set_key_mv(String::from("a"), VVal::Int(12));
+        o.set_key_mv(String::from("b"), VVal::Int(13));
+    }
+    println!("mn_set_key {}", t.elapsed().as_millis());
+
+    let t = std::time::Instant::now();
+    for i in 0..n2 {
+        let o = VVal::obj();
+        o.set_key_mv(String::from("x"), VVal::Int(10));
+        o.set_key_mv(String::from("y"), VVal::Int(11));
+        o.set_key_mv(String::from("a"), VVal::Int(12));
+        o.set_key_mv(String::from("b"), VVal::Int(13));
+    }
+    println!("on_set_key in {}", t.elapsed().as_millis());
+
     let v = VVal::map();
     v.set_key_mv(String::from("x"), VVal::Int(10));
     v.set_key_mv(String::from("y"), VVal::Int(11));
@@ -57,7 +98,26 @@ fn benchme(n: usize) {
         sum += x + y + a + b;
     }
 
-    println!("SUM: {} in {}", sum, t.elapsed().as_millis());
+    println!("m_get_key SUM: {} in {}", sum, t.elapsed().as_millis());
+
+    let vo = VVal::obj();
+    vo.set_key_mv(String::from("x"), VVal::Int(10));
+    vo.set_key_mv(String::from("y"), VVal::Int(11));
+    vo.set_key_mv(String::from("a"), VVal::Int(12));
+    vo.set_key_mv(String::from("b"), VVal::Int(13));
+
+    let t = std::time::Instant::now();
+    let mut sum = 0;
+    for i in 0..n {
+        let x = vo.get_key("x").unwrap().i();
+        let y = vo.get_key("y").unwrap().i();
+        let a = vo.get_key("a").unwrap().i();
+        let b = vo.get_key("b").unwrap().i();
+        sum += x + y + a + b;
+    }
+
+    println!("o_get_key SUM: {} in {}", sum, t.elapsed().as_millis());
+
 
     let t = std::time::Instant::now();
     let k_x = VVal::new_str_mv(String::from("x"));
@@ -148,11 +208,13 @@ fn benchme(n: usize) {
         sum += x.i() + y.i() + a.i() + b.i();
     }
 
-    println!("SUM: {} in {}", sum, t.elapsed().as_millis());
+    println!("m_get_key_il SUM: {} in {}", sum, t.elapsed().as_millis());
 }
 
 fn main() {
-    benchme(10000000);
+    for _i in 0..5 {
+        benchme(10000000);
+    }
 //    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
 //    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
 //    println!("sizeof {} NVec<f64> bytes", std::mem::size_of::<crate::nvec::NVec<f64>>());
