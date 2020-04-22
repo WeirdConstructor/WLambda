@@ -556,7 +556,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
             } else {
                 let key = if is_ident_start(c) {
-                    VVal::new_sym_mv(parse_identifier(ps)?)
+                    VVal::new_sym(&parse_identifier(ps)?)
                 } else {
                     parse_expr(ps)?
                 };
@@ -722,7 +722,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         ':' => {
             ps.consume_wsc();
             let capture = ps.syn(Syntax::CaptureRef);
-            capture.push(VVal::new_sym_mv(parse_identifier(ps)?));
+            capture.push(VVal::new_sym(&parse_identifier(ps)?));
             Ok(capture)
         },
         '&' => {
@@ -955,7 +955,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                     let block = parse_block(ps, true)?;
 
                     block.set_at(0, syn);
-                    block.insert_at(1, VVal::new_sym_mv(block_name));
+                    block.insert_at(1, VVal::new_sym(&block_name));
                     Ok(block)
                 } else {
                     let block = ps.syn(Syntax::Func);
@@ -1089,7 +1089,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
 
             } else if is_ident_start(c) {
                 let id = ps.syn(Syntax::Key);
-                id.push(VVal::new_sym_mv(parse_identifier(ps)?));
+                id.push(VVal::new_sym(&parse_identifier(ps)?));
                 id
             } else {
                 parse_value(ps)?
@@ -1379,7 +1379,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
             while let Some(c) = ps.peek() {
                 if c == ')' { break; }
-                ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
+                ids.push(VVal::new_sym(&parse_identifier(ps)?));
                 if !ps.consume_if_eq_wsc(',') { break; }
             }
 
@@ -1393,7 +1393,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     ')', "At the end of destructuring assignment")));
             }
         },
-        _ => { ids.push(VVal::new_sym_mv(parse_identifier(ps)?)); }
+        _ => { ids.push(VVal::new_sym(&parse_identifier(ps)?)); }
     }
 
     assign.push(ids);

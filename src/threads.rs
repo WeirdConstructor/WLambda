@@ -163,7 +163,7 @@ impl AVal {
                     format!("{}", eb.1))
             },
             VVal::Bol(b)       => AVal::Bol(*b),
-            VVal::Sym(s)       => AVal::Sym(s.borrow().clone()),
+            VVal::Sym(s)       => AVal::Sym(String::from(s.as_ref())),
             VVal::Str(s)       => AVal::Str(s.borrow().clone()),
             VVal::Byt(b)       => AVal::Byt(b.borrow().clone()),
             VVal::Int(i)       => AVal::Int(*i),

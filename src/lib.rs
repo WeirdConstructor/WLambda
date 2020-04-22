@@ -507,6 +507,7 @@ pub mod util;
 pub mod nvec;
 pub mod vval_user_obj;
 pub mod csv;
+mod str_int;
 
 pub use vval::VVal;
 pub use vval::Env;

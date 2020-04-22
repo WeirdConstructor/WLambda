@@ -5098,7 +5098,8 @@ pub fn core_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw())) },
         Some(1), Some(1), false);
     func!(st, "sym",
-        |env: &mut Env, _argc: usize| { Ok(VVal::new_sym_mv(env.arg(0).s_raw())) },
+        |env: &mut Env, _argc: usize|
+            env.arg(0).with_s_ref(|s: &str| { Ok(VVal::new_sym(s)) }),
         Some(1), Some(1), false);
     func!(st, "is_some",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_some())) },

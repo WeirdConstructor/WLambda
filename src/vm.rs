@@ -334,7 +334,7 @@ macro_rules! get_key {
         match $k {
             VVal::Int(i)  => $o.at(i as usize).unwrap_or_else(|| VVal::None),
             VVal::Bol(b)  => $o.at(b as usize).unwrap_or_else(|| VVal::None),
-            VVal::Sym(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::None),
+            VVal::Sym(sy) => $o.$method(sy.as_ref()).unwrap_or_else(|| VVal::None),
             VVal::Str(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::None),
             _ => {
                 $env.push($o.clone());
@@ -1722,7 +1722,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
 
                         let kc_pw = vm_compile2(&k, ce)?;
                         if let VVal::Sym(y) = k {
-                            ce.borrow_mut().recent_var = y.borrow().clone();
+                            ce.borrow_mut().recent_var = String::from(y.as_ref());
                         } else {
                             let recent_sym = ce.borrow().recent_sym.clone();
                             ce.borrow_mut().recent_var = recent_sym;

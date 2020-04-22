@@ -12,6 +12,7 @@ mod nvec;
 mod vval_user_obj;
 mod csv;
 mod threads;
+mod str_int;
 
 use vval::Env;
 use vval::VVal;
