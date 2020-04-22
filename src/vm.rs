@@ -1283,7 +1283,7 @@ fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                     for i in l.iter().skip(1) {
                         let key = vm_compile_const_value(&i.at(0).unwrap_or(VVal::None))?;
                         let val = vm_compile_const_value(&i.at(1).unwrap_or(VVal::None))?;
-                        m.set_key_mv(key.s_raw(), val);
+                        m.set_key_sym(key.to_sym(), val);
                     }
                     Ok(m)
                 },

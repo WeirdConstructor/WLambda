@@ -51,6 +51,7 @@ use crate::vval::VValFun;
 use crate::vval::StackAction;
 use crate::vval::CompileError;
 use crate::vval::VarPos;
+use crate::str_int::*;
 use crate::threads::*;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -133,7 +134,7 @@ impl LocalFileModuleResolver {
 ///```
 #[derive(Default, Debug, Clone)]
 pub struct SymbolTable {
-    symbols: FnvHashMap<String, VVal>,
+    symbols: FnvHashMap<Symbol, VVal>,
 }
 
 impl SymbolTable {
@@ -158,7 +159,7 @@ impl SymbolTable {
     /// value can be imported.
     #[allow(dead_code)]
     pub fn set(&mut self, name: &str, value: VVal) {
-        self.symbols.insert(String::from(name), value);
+        self.symbols.insert(s2sym(name), value);
     }
     
     /// Retrieves a value from the SymbolTable, if present.
@@ -171,7 +172,7 @@ impl SymbolTable {
     /// ```
     #[allow(dead_code)]
     pub fn get(&mut self, name: &str) -> Option<&VVal> {
-        self.symbols.get(name)
+        self.symbols.get(&s2sym(name))
     }
 
     /// Helper function for building symbol tables with functions in them.
@@ -193,7 +194,8 @@ impl SymbolTable {
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
 
         self.symbols.insert(
-            String::from(fnname), VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
+            s2sym(fnname),
+            VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
     }
 }
 

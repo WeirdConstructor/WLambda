@@ -21,55 +21,6 @@ use crate::ops::Prog;
 
 use fnv::FnvHashMap;
 
-#[derive(Debug, Clone)]
-pub struct HiddenClass {
-    key2idx: FnvHashMap<String, usize>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Obj {
-    class:  Rc<RefCell<HiddenClass>>,
-    data:   RefCell<Vec<(VVal,String)>>,
-}
-
-impl HiddenClass {
-    pub fn new() -> Self {
-        Self {
-            key2idx: FnvHashMap::with_capacity_and_hasher(5, Default::default()),
-        }
-    }
-}
-
-
-impl Obj {
-    pub fn new() -> Self {
-        Self {
-            class: Rc::new(RefCell::new(HiddenClass::new())),
-            data:  RefCell::new(Vec::with_capacity(5)),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.data.borrow().len()
-    }
-
-    pub fn set_key_mv(&self, key: String, v: VVal) {
-        if let Some(idx) = self.class.borrow().key2idx.get(&key) {
-            self.data.borrow_mut()[*idx].0 = v;
-            return
-        }
-
-        let next_idx = self.data.borrow().len();
-        self.class.borrow_mut().key2idx.insert(key.clone(), next_idx);
-        self.data.borrow_mut().insert(next_idx, (v, key));
-    }
-
-    pub fn get_key(&self, key: &str) -> Option<VVal> {
-        let idx = *self.class.borrow().key2idx.get(key)?;
-        Some(self.data.borrow()[idx].0.clone())
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct FileRef {
     s: Rc<String>,
@@ -465,7 +416,7 @@ impl Env {
     }
 
     pub fn export_name(&mut self, name: &str, value: &VVal) {
-        self.exports.insert(String::from(name), value.clone());
+        self.exports.insert(s2sym(name), value.clone());
     }
 
     #[inline]
@@ -1460,9 +1411,7 @@ pub enum VVal {
     /// A list (or vector) of VVals.
     Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
     /// A mapping of strings to VVals.
-    Map(Rc<RefCell<FnvHashMap<String, VVal>>>),
-    /// A mapping of strings to VVals optimized for often accessed properties.
-    Obj(Rc<Obj>),
+    Map(Rc<RefCell<FnvHashMap<Symbol, VVal>>>),
     /// A function, see also [VValFun](struct.VValFun.html)
     Fun(Rc<VValFun>),
     /// A guarded VVal, that executes a given function when it is
@@ -1563,12 +1512,6 @@ impl CycleCheck {
             },
             VVal::Map(l) => {
                 for (_k, v) in l.borrow().iter() { self.touch_walk(&v); }
-            },
-            VVal::Obj(l) => {
-                for i in 0..l.as_ref().len() {
-                    let d = &l.data.borrow()[i].0;
-                    self.touch_walk(d);
-                }
             },
             VVal::DropFun(f) => { self.touch_walk(&f.v); },
             VVal::Fun(f) => {
@@ -1916,7 +1859,7 @@ impl VVal {
             VVal::Map(m) => {
                 let out = VVal::map();
                 for (k, v) in m.borrow_mut().iter() {
-                    out.set_key_mv(k.to_string(), v.clone())
+                    out.set_key_sym(k.clone(), v.clone());
                 }
                 out
             },
@@ -2680,16 +2623,16 @@ impl VVal {
         VVal::Map(Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(2, Default::default()))))
     }
 
-    pub fn obj() -> VVal {
-        VVal::Obj(Rc::new(Obj::new()))
-    }
-
     pub fn sym(s: &str) -> VVal {
         VVal::Sym(s2sym(s))
     }
 
     pub fn to_sym(&self) -> Symbol {
-        self.with_s_ref(|s: &str| s2sym(s))
+        if let VVal::Sym(s) = self {
+            s.clone()
+        } else {
+            self.with_s_ref(|s: &str| s2sym(s))
+        }
     }
 
     #[allow(clippy::cast_ptr_alignment)]
@@ -2699,7 +2642,7 @@ impl VVal {
             VVal::Str(s)     => { &*s.borrow() as *const String as i64 },
             VVal::Byt(s)     => { &*s.borrow() as *const Vec<u8> as i64 },
             VVal::Lst(v)     => { &*v.borrow() as *const Vec<VVal> as i64 },
-            VVal::Map(v)     => { &*v.borrow() as *const FnvHashMap<String, VVal> as i64 },
+            VVal::Map(v)     => { &*v.borrow() as *const FnvHashMap<Symbol, VVal> as i64 },
             VVal::Iter(v)    => { &*v.borrow() as *const VValIter as i64 },
             VVal::Opt(p)     => { if let Some(p) = p { &*p.as_ref() as *const VVal as i64 } else { 0 } },
             VVal::Fun(f)     => { &**f as *const VValFun as i64 },
@@ -2717,26 +2660,6 @@ impl VVal {
             },
             _ => return None,
         })
-    }
-
-    pub fn ptr_eq_s(&self, rc: &Rc<RefCell<String>>) -> bool {
-        match self {
-            VVal::Str(s)  => { Rc::ptr_eq(s, rc) },
-            _ => false,
-        }
-    }
-
-    pub fn ptr_eq_m(&self, rc: &Weak<RefCell<FnvHashMap<String, VVal>>>) -> bool {
-        match self {
-            VVal::Map(m)  => {
-                if let Some(rc) = rc.upgrade() {
-                    Rc::ptr_eq(m, &rc)
-                } else {
-                    false
-                }
-            },
-            _ => false,
-        }
     }
 
     pub fn eqv(&self, v: &VVal) -> bool {
@@ -2773,9 +2696,6 @@ impl VVal {
             },
             VVal::Map(l)  => {
                 if let VVal::Map(l2) = v { Rc::ptr_eq(l, l2) } else { false }
-            },
-            VVal::Obj(l)  => {
-                if let VVal::Obj(l2) = v { Rc::ptr_eq(l, l2) } else { false }
             },
             VVal::Fun(l)  => {
                 if let VVal::Fun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
@@ -2858,22 +2778,22 @@ impl VVal {
         out.concat()
     }
 
-    fn dump_map_as_str(m: &Rc<RefCell<FnvHashMap<String,VVal>>>, c: &mut CycleCheck) -> String {
+    fn dump_map_as_str(m: &Rc<RefCell<FnvHashMap<Symbol,VVal>>>, c: &mut CycleCheck) -> String {
         let mut out : Vec<String> = Vec::new();
         let mut first = true;
         out.push(String::from("${"));
         let hm = m.borrow();
 
-        let mut keys : Vec<&String> = hm.keys().collect();
+        let mut keys : Vec<&Symbol> = hm.keys().collect();
         keys.sort();
         for k in keys {
             let v = hm.get(k).unwrap();
             if !first { out.push(String::from(",")); }
             else { first = false; }
-            if k.chars().any(char::is_whitespace) {
-                out.push(format!("\"{}\"", k));
+            if k.as_ref().chars().any(char::is_whitespace) {
+                out.push(format!("\"{}\"", k.as_ref()));
             } else {
-                out.push(k.to_string());
+                out.push(k.as_ref().to_string());
             }
             out.push(String::from("="));
             out.push(v.s_cy(c));
@@ -3008,7 +2928,7 @@ impl VVal {
 
     pub fn proto_data(&self) -> VVal {
         match self {
-            VVal::Map(m) => m.borrow().get("_data").cloned().unwrap_or(VVal::None),
+            VVal::Map(m) => m.borrow().get(&s2sym("_data")).cloned().unwrap_or(VVal::None),
             VVal::Lst(l) => {
                 if l.borrow().len() > 1 {
                     l.borrow()[1].clone()
@@ -3025,9 +2945,9 @@ impl VVal {
     pub fn proto_lookup(&self, key: &str) -> Option<VVal> {
         match self {
             VVal::Map(m) => {
-                if let Some(func) = m.borrow().get(key) {
+                if let Some(func) = m.borrow().get(&s2sym(key)) {
                     Some(func.clone())
-                } else if let Some(proto) = m.borrow().get("_proto") {
+                } else if let Some(proto) = m.borrow().get(&s2sym("_proto")) {
                     proto.proto_lookup(key)
                 } else {
                     None
@@ -3047,8 +2967,7 @@ impl VVal {
 
     pub fn get_key(&self, key: &str) -> Option<VVal> {
         match self {
-            VVal::Map(m) => m.borrow().get(key).cloned(),
-            VVal::Obj(o) => o.get_key(key),
+            VVal::Map(m) => m.borrow().get(&s2sym(key)).cloned(),
             VVal::IVec(b) => {
                 Some(match key {
                     "0" | "first"  | "x" | "r" | "h" => b.x(),
@@ -3105,9 +3024,9 @@ impl VVal {
         }
     }
 
-    pub fn set_map_key_fun<T>(&self, key: String, fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool)
+    pub fn set_map_key_fun<T>(&self, key: &str, fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool)
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
-        self.set_key_mv(key, VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
+        self.set_key_sym(s2sym(key), VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
     }
 
     pub fn deref(&self) -> VVal {
@@ -3157,9 +3076,9 @@ impl VVal {
     pub fn delete_key(&self, key: &VVal) -> Result<VVal, StackAction> {
         match self {
             VVal::Map(m) => {
-                let ks = key.s_raw();
+                let ks = key.to_sym();
                 match m.try_borrow_mut() {
-                    Ok(mut r)  => { Ok(r.remove(&ks).unwrap_or_else(|| VVal::None)) },
+                    Ok(mut r)  => Ok(r.remove(&ks).unwrap_or_else(|| VVal::None)),
                     Err(_)     => Err(StackAction::panic_borrow(self)),
                 }
             },
@@ -3196,40 +3115,32 @@ impl VVal {
         }
     }
 
-    pub fn set_key_mv(&self, key: String, val: VVal) {
+    pub fn set_key_str(&self, key: &str, val: VVal) -> Result<(), StackAction> {
+        self.set_key_sym(s2sym(key), val)
+    }
+
+    pub fn set_key_sym(&self, key: Symbol, val: VVal) -> Result<(), StackAction> {
         match self {
             VVal::Map(m) => {
-                m.borrow_mut().insert(key, val);
-            },
-            VVal::Obj(o) => { o.set_key_mv(key, val); },
-            VVal::Lst(l) => {
-                let idx = key.parse::<usize>().unwrap_or(0);
-                let mut v = l.borrow_mut();
-                if v.len() <= idx {
-                    v.resize(idx + 1, VVal::None);
+                match m.try_borrow_mut() {
+                    Ok(mut r)  => { r.insert(key, val); Ok(()) },
+                    Err(_)     => Err(StackAction::panic_borrow(self)),
                 }
-                v[idx] = val;
             },
-            VVal::Usr(u) => { u.set_key(&VVal::new_str_mv(key), val).unwrap(); },
-            v => v.with_deref(
-                |v| v.set_key_mv(key, val),
-                |_| ()),
+            _ => self.set_key(&VVal::Sym(key), val),
         }
     }
+
+
 
     pub fn set_key(&self, key: &VVal, val: VVal) -> Result<(), StackAction> {
         match self {
             VVal::Map(m) => {
-                let ks = key.s_raw();
+                let ks = key.to_sym();
                 match m.try_borrow_mut() {
                     Ok(mut r)  => { r.insert(ks, val); Ok(()) },
                     Err(_)     => Err(StackAction::panic_borrow(self)),
                 }
-            },
-            VVal::Obj(o) => {
-                let ks = key.s_raw();
-                o.set_key_mv(ks, val);
-                Ok(())
             },
             VVal::Lst(l) => {
                 let idx = key.i() as usize;
@@ -3558,7 +3469,6 @@ impl VVal {
             VVal::Opt(_)     => String::from("optional"),
             VVal::Lst(_)     => String::from("vector"),
             VVal::Map(_)     => String::from("map"),
-            VVal::Obj(_)     => String::from("object"),
             VVal::Usr(_)     => String::from("userdata"),
             VVal::Fun(_)     => String::from("function"),
             VVal::IVec(_)    => String::from("integer_vector"),
@@ -3592,9 +3502,9 @@ impl VVal {
     ///```
     /// use wlambda::VVal;
     /// let v = VVal::map();
-    /// v.set_key_mv(String::from("aaa"), VVal::Int(12));
-    /// v.set_key_mv(String::from("abc"), VVal::Int(13));
-    /// v.set_key_mv(String::from("zyy"), VVal::Int(14));
+    /// v.set_key_str("aaa", VVal::Int(12));
+    /// v.set_key_str("abc", VVal::Int(13));
+    /// v.set_key_str("zyy", VVal::Int(14));
     ///
     /// assert_eq!(v.v_k("abc").i(), 13);
     /// assert_eq!(v.v_ik("aaa"),    12);
@@ -3615,7 +3525,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::new_str("10"));
+    /// v.set_key_str("aaa", wlambda::VVal::new_str("10"));
     /// assert_eq!(v.v_ik("aaa"), 10);
     ///```
     pub fn v_ik(&self, key: &str)     -> i64 { self.v_k(key).i() }
@@ -3646,7 +3556,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::new_str("XYX"));
+    /// v.set_key_str("aaa", wlambda::VVal::new_str("XYX"));
     /// assert_eq!(v.v_s_rawk("aaa"), "XYX");
     ///```
     pub fn v_s_rawk(&self, key: &str) -> String { self.v_k(key).s_raw() }
@@ -3655,7 +3565,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::new_str("XYX"));
+    /// v.set_key_str("aaa", wlambda::VVal::new_str("XYX"));
     /// assert!(v.v_with_s_refk("aaa", |s: &str| s == "XYX"));
     ///```
     pub fn v_with_s_refk<T, R>(&self, key: &str, f: T) -> R
@@ -3677,7 +3587,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::Flt(12.2));
+    /// v.set_key_str("aaa", wlambda::VVal::Flt(12.2));
     /// assert_eq!(v.v_sk("aaa"), "12.2");
     ///```
     pub fn v_sk(&self, key: &str)     -> String { self.v_k(key).s() }
@@ -3695,7 +3605,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_key_mv(String::from("aaa"), wlambda::VVal::Flt(12.2));
+    /// v.set_key_str("aaa", wlambda::VVal::Flt(12.2));
     /// assert_eq!(v.v_fk("aaa"), 12.2);
     ///```
     pub fn v_fk(&self, key: &str)     -> f64 { self.v_k(key).f() }
@@ -3795,14 +3705,20 @@ impl VVal {
                 let m = map.borrow();
                 let o = N::zero().into_vval();
                 NVec::from_vval_tpl(
-                    (m.get("x").unwrap_or(&o), m.get("y").unwrap_or(&o), m.get("z"), m.get("w"))
+                    (m.get(&s2sym("x")).unwrap_or(&o),
+                     m.get(&s2sym("y")).unwrap_or(&o),
+                     m.get(&s2sym("z")),
+                     m.get(&s2sym("w")))
                 ).unwrap_or_else(|| {
                     // The only way from_vval_tpl can fail is if the fourth
                     // parameter is Some(_) but the third is None.
                     // That means that the following will always succeed
                     // (even if the above did not):
                     NVec::from_vval_tpl(
-                        (m.get("x").unwrap_or(&o), m.get("y").unwrap_or(&o), Some(&o), m.get("w"))
+                        (m.get(&s2sym("x")).unwrap_or(&o),
+                         m.get(&s2sym("y")).unwrap_or(&o),
+                         Some(&o),
+                         m.get(&s2sym("w")))
                     ).unwrap()
                 })
             },
@@ -3854,7 +3770,6 @@ impl VVal {
                 else { "$o()".to_string() },
             VVal::Lst(l)     => VVal::dump_vec_as_str(l, c),
             VVal::Map(l)     => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
-            VVal::Obj(l)     => format!("$object{{}}"),
             VVal::Usr(u)     => u.s(),
             VVal::Fun(f)     => {
                 let min = if f.min_args.is_none() { "any".to_string() }
@@ -4007,16 +3922,12 @@ impl serde::ser::Serialize for VVal {
                 }
                 seq.end()
             },
-            VVal::Obj(l) => {
-                let mut map = serializer.serialize_map(Some(0))?;
-                map.end()
-            },
             VVal::Map(l) => {
                 let hm = l.borrow();
 
                 let mut map = serializer.serialize_map(Some(l.borrow().len()))?;
                 for (k, v) in hm.iter() {
-                    map.serialize_entry(k, v)?;
+                    map.serialize_entry(k.as_ref(), v)?;
                 }
                 map.end()
             },
@@ -4102,7 +4013,7 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
 
         while let Some((ke, ve)) = map.next_entry()? {
             let k : VVal = ke;
-            v.set_key_mv(k.s_raw(), ve);
+            v.set_key(&k, ve);
         }
 
         Ok(v)

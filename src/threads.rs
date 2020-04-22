@@ -14,6 +14,7 @@ refer to the documentation of the `ThreadCreator` trait.
 use crate::vval::*;
 use crate::compiler::*;
 use crate::nvec::NVec;
+use crate::str_int::*;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -134,7 +135,8 @@ impl AVal {
             AVal::Map(m) => {
                 let mv = VVal::map();
                 for (k, v) in m.iter() {
-                    mv.set_key_mv(k.clone(), v.to_vval());
+                    let k = s2sym(k);
+                    mv.set_key_sym(k, v.to_vval());
                 }
                 mv
             },
@@ -188,7 +190,7 @@ impl AVal {
                 let mut amap =
                     FnvHashMap::with_capacity_and_hasher(2, Default::default());
                 for (k, v) in m.borrow().iter() {
-                    amap.insert(k.clone(), AVal::from_vval(v));
+                    amap.insert(String::from(k.as_ref()), AVal::from_vval(v));
                 }
                 AVal::Map(amap)
             },

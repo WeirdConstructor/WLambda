@@ -6,13 +6,28 @@ use std::cell::RefCell;
 
 struct StringInterner {
     strmap: HashMap<String, Weak<String>>,
+    fixed:  std::vec::Vec<Symbol>,
 }
 
 impl StringInterner {
     fn new() -> Self {
-        Self {
-            strmap: HashMap::new(),
-        }
+        let mut s = Self { strmap: HashMap::new(), fixed: vec![] };
+        let mut v = vec![];
+        v.push(s.s2sym("x"));
+        v.push(s.s2sym("y"));
+        v.push(s.s2sym("z"));
+        v.push(s.s2sym("w"));
+        v.push(s.s2sym("_data"));
+        v.push(s.s2sym("_proto"));
+        v.push(s.s2sym("r"));
+        v.push(s.s2sym("g"));
+        v.push(s.s2sym("b"));
+        v.push(s.s2sym("a"));
+        v.push(s.s2sym("h"));
+        v.push(s.s2sym("s"));
+        v.push(s.s2sym("v"));
+        s.fixed = v;
+        s
     }
 
     fn collect(&mut self) {
