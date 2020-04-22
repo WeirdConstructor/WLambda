@@ -2649,6 +2649,27 @@ impl VVal {
         })
     }
 
+    pub fn ptr_eq_s(&self, rc: &Rc<RefCell<String>>) -> bool {
+        match self {
+            VVal::Sym(s)  => { Rc::ptr_eq(s, rc) },
+            VVal::Str(s)  => { Rc::ptr_eq(s, rc) },
+            _ => false,
+        }
+    }
+
+    pub fn ptr_eq_m(&self, rc: &Weak<RefCell<FnvHashMap<String, VVal>>>) -> bool {
+        match self {
+            VVal::Map(m)  => {
+                if let Some(rc) = rc.upgrade() {
+                    Rc::ptr_eq(m, &rc)
+                } else {
+                    false
+                }
+            },
+            _ => false,
+        }
+    }
+
     pub fn eqv(&self, v: &VVal) -> bool {
         match self {
             VVal::None    => { if let VVal::None = v { true } else { false } },

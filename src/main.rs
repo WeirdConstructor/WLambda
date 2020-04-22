@@ -24,31 +24,16 @@ use std::rc::Rc;
 use fnv::FnvHashMap;
 
 struct Cached {
-    obj: std::rc::Weak<RefCell<FnvHashMap<String, VVal>>>,
+//    obj: std::rc::Weak<RefCell<FnvHashMap<String, VVal>>>,
+    obj: u64,
     key: std::rc::Rc<RefCell<String>>,
     idx: usize,
 }
 
 impl Cached {
-    fn is_entry(&self, o: &VVal, k: &VVal) -> Option<usize> {
-        if let Some(u) = self.obj.upgrade() {
-            if let VVal::Map(m) = o {
-                if let VVal::Str(s) = k {
-                    if std::rc::Rc::ptr_eq(m, &u) {
-                        if std::rc::Rc::ptr_eq(&self.key, &s) {
-                            Some(self.idx)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+    fn is_entry(&self, o: u64, k: &VVal) -> Option<usize> {
+        if self.obj == o && k.ptr_eq_s(&self.key) {
+            Some(self.idx)
         } else {
             None
         }
@@ -86,28 +71,28 @@ fn benchme(n: usize) {
     if let VVal::Map(f) = &v {
         if let VVal::Str(s) = &k_x {
             c_x = Some(Cached {
-                obj: Rc::downgrade(&f),
+                obj: 11,
                 key: s.clone(),
                 idx: 0,
             });
         }
         if let VVal::Str(s) = &k_y {
             c_y = Some(Cached {
-                obj: Rc::downgrade(&f),
+                obj: 11,
                 key: s.clone(),
                 idx: 1,
             });
         }
         if let VVal::Str(s) = &k_a {
             c_a = Some(Cached {
-                obj: Rc::downgrade(&f),
+                obj: 11,
                 key: s.clone(),
                 idx: 2,
             });
         }
         if let VVal::Str(s) = &k_b {
             c_b = Some(Cached {
-                obj: Rc::downgrade(&f),
+                obj: 11,
                 key: s.clone(),
                 idx: 3,
             });
@@ -122,7 +107,7 @@ fn benchme(n: usize) {
     for i in 0..n {
         let x =
             if let Some(c_x) = &c_x {
-                if let Some(idx) = c_x.is_entry(&v, &k_x) {
+                if let Some(idx) = c_x.is_entry(11, &k_x) {
                     dat.at(idx).unwrap()
                 } else {
                     VVal::None
@@ -132,7 +117,7 @@ fn benchme(n: usize) {
             };
         let y =
             if let Some(c_y) = &c_y {
-                if let Some(idx) = c_y.is_entry(&v, &k_y) {
+                if let Some(idx) = c_y.is_entry(11, &k_y) {
                     dat.at(idx).unwrap()
                 } else {
                     VVal::None
@@ -142,7 +127,7 @@ fn benchme(n: usize) {
             };
         let a =
             if let Some(c_a) = &c_a {
-                if let Some(idx) = c_a.is_entry(&v, &k_a) {
+                if let Some(idx) = c_a.is_entry(11, &k_a) {
                     dat.at(idx).unwrap()
                 } else {
                     VVal::None
@@ -152,7 +137,7 @@ fn benchme(n: usize) {
             };
         let b =
             if let Some(c_b) = &c_b {
-                if let Some(idx) = c_b.is_entry(&v, &k_b) {
+                if let Some(idx) = c_b.is_entry(11, &k_b) {
                     dat.at(idx).unwrap()
                 } else {
                     VVal::None
@@ -167,7 +152,7 @@ fn benchme(n: usize) {
 }
 
 fn main() {
-    //benchme(10000000);
+    benchme(10000000);
 //    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
 //    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
 //    println!("sizeof {} NVec<f64> bytes", std::mem::size_of::<crate::nvec::NVec<f64>>());
