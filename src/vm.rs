@@ -696,18 +696,18 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::GetSym(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key(&sym).unwrap_or_else(|| VVal::None)
+                .get_key_sym(&sym).unwrap_or_else(|| VVal::None)
             }),
             Op::GetSym2(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key(&sym.0).unwrap_or_else(|| VVal::None)
-                .get_key(&sym.1).unwrap_or_else(|| VVal::None)
+                .get_key_sym(&sym.0).unwrap_or_else(|| VVal::None)
+                .get_key_sym(&sym.1).unwrap_or_else(|| VVal::None)
             }),
             Op::GetSym3(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key(&sym.0).unwrap_or_else(|| VVal::None)
-                .get_key(&sym.1).unwrap_or_else(|| VVal::None)
-                .get_key(&sym.2).unwrap_or_else(|| VVal::None)
+                .get_key_sym(&sym.0).unwrap_or_else(|| VVal::None)
+                .get_key_sym(&sym.1).unwrap_or_else(|| VVal::None)
+                .get_key_sym(&sym.2).unwrap_or_else(|| VVal::None)
             }),
             Op::GetKey(o, k, r) => {
                 in_reg!(env, ret, data, k);
@@ -2108,7 +2108,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 },
                 Syntax::GetSym => {
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
-                    let sym = ast.at(2).unwrap().s_raw();
+                    let sym = ast.at(2).unwrap().to_sym();
                     pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.op_get_sym(
@@ -2117,8 +2117,8 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 },
                 Syntax::GetSym2 => {
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
-                    let sym  = ast.at(2).unwrap().s_raw();
-                    let sym2 = ast.at(3).unwrap().s_raw();
+                    let sym  = ast.at(2).unwrap().to_sym();
+                    let sym2 = ast.at(3).unwrap().to_sym();
                     pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.op_get_sym2(
@@ -2127,9 +2127,9 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                 },
                 Syntax::GetSym3 => {
                     let o_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
-                    let sym  = ast.at(2).unwrap().s_raw();
-                    let sym2 = ast.at(3).unwrap().s_raw();
-                    let sym3 = ast.at(4).unwrap().s_raw();
+                    let sym  = ast.at(2).unwrap().to_sym();
+                    let sym2 = ast.at(3).unwrap().to_sym();
+                    let sym3 = ast.at(4).unwrap().to_sym();
                     pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.op_get_sym3(

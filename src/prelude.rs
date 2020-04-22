@@ -2309,9 +2309,11 @@ std:assert ~ not ~ is_bytes "ABC";
 
 ### <a name="411-symbols"></a>4.11 - Symbols
 
-Symbols are a special kind of strings. Use them however you see fit. They will
-do a key lookup (on maps, vectors (as indices) and user values) if they are
-called with an argument.
+Symbols are a special kind of strings that are interned by the runtime.  That
+means, comparing two symbols is an O(1) operation and not an O(n) operation on
+the length of the string. Symbols are also used as keys for maps.  Use them
+however you see fit. They will do a key lookup (on maps, vectors (as indices)
+and user values) if they are called with an argument.
 
 ```wlambda
 std:assert_eq (:1 $[1,2,3]) 2;
@@ -2351,6 +2353,14 @@ match y
     :OFF {|| .state = "is off" };
 std:assert_eq state "is off";
 ```
+
+Keep in mind, that all symbols are interned strings. And if you create many
+symbols that are not used anymore, you might need to trigger a cleanup
+with `std:symbols::collect`.
+
+#### - std:symbols:collect[]
+
+Collect and remove all interned symbols that are no longer used.
 
 ### <a name="412-pairs-pa-b"></a>4.12 - Pairs `$p(a, b)`
 
@@ -2647,8 +2657,9 @@ std:assert_eq (str t) "$[5,6]";
 ### <a name="414-associative-maps-or-string-to-value-mappings"></a>4.14 - Associative Maps (or String to Value mappings)
 
 Aside from vectors there are associative maps in WLambda. Their syntax is
-`${ key = expr, ... }`. The keys of these maps have to be strings,
-the values in the literals can be any expression.
+`${ key = expr, ... }`. The keys of these maps have to be symbols (or strings),
+the values in the literals can be any expression. Keys for maps are interned strings,
+so keep that in mind if you fill a map with garbage keys.
 
 For iteration over a map please refer to [7.2 Collection Iteration](#72-collection-iteration).
 
@@ -6708,6 +6719,10 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "num:int_to_closed_open01", |env: &mut Env, _argc: usize| {
         Ok(VVal::Flt(util::u64_to_closed_open01(env.arg(0).i() as u64)))
     }, Some(1), Some(1), false);
+
+    func!(st, "symbols:collect", |env: &mut Env, _argc: usize| {
+        Ok(VVal::Int(crate::str_int::string_interner_collect()))
+    }, Some(0), Some(0), false);
 
     func!(st, "rand:split_mix64_next_closed_open01",
         |env: &mut Env, argc: usize| {

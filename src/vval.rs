@@ -2051,7 +2051,7 @@ impl VVal {
                 std::iter::from_fn(Box::new(move || {
                     let r = match m.borrow().iter().nth(idx) {
                         Some((k, v)) => {
-                            Some((v.clone(), Some(VVal::new_str(&k))))
+                            Some((v.clone(), Some(VVal::new_str(k.as_ref()))))
                         },
                         None => None,
                     };
@@ -2640,6 +2640,7 @@ impl VVal {
         Some(match self {
             VVal::Err(r)     => { &*r.borrow() as *const (VVal, SynPos) as i64 },
             VVal::Str(s)     => { &*s.borrow() as *const String as i64 },
+            VVal::Sym(s)     => { s.ref_id() },
             VVal::Byt(s)     => { &*s.borrow() as *const Vec<u8> as i64 },
             VVal::Lst(v)     => { &*v.borrow() as *const Vec<VVal> as i64 },
             VVal::Map(v)     => { &*v.borrow() as *const FnvHashMap<Symbol, VVal> as i64 },
@@ -2668,7 +2669,7 @@ impl VVal {
             VVal::Bol(ia) => { if let VVal::Bol(ib) = v { ia == ib } else { false } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { ia == ib } else { false } },
             VVal::Flt(ia) => { if let VVal::Flt(ib) = v { (ia - ib).abs() < std::f64::EPSILON } else { false } },
-            VVal::Sym(s)  => { if let VVal::Sym(ib) = v { Rc::ptr_eq(s, ib) } else { false } },
+            VVal::Sym(s)  => { if let VVal::Sym(ib) = v { s == ib } else { false } },
             VVal::Syn(s)  => { if let VVal::Syn(ib) = v { *s == *ib } else { false } },
             VVal::Str(s)  => { if let VVal::Str(ib) = v { *s == *ib } else { false } },
             VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s.borrow()[..] == s2.borrow()[..] } else { false } },
@@ -2962,6 +2963,13 @@ impl VVal {
                 }
             },
             v => v.with_deref(|v| v.proto_lookup(key), |_| None),
+        }
+    }
+
+    pub fn get_key_sym(&self, key: &Symbol) -> Option<VVal> {
+        match self {
+            VVal::Map(m) => m.borrow().get(key).cloned(),
+            _            => self.get_key(key.as_ref()),
         }
     }
 

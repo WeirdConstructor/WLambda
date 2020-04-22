@@ -1,6 +1,7 @@
 use crate::vval::*;
 use crate::compiler::*;
 use crate::nvec::NVec;
+use crate::str_int::*;
 
 #[derive(Clone)]
 pub struct Prog {
@@ -382,17 +383,17 @@ impl Prog {
         self.push_op(Op::GetIdx3(a, Box::new((i, i2, i3)), r));
     }
 
-    pub fn op_get_sym(&mut self, sp: &SynPos, a: ResPos, s: String, r: ResPos) {
+    pub fn op_get_sym(&mut self, sp: &SynPos, a: ResPos, s: Symbol, r: ResPos) {
         self.set_dbg(sp.clone());
         self.push_op(Op::GetSym(a, Box::new(s), r));
     }
 
-    pub fn op_get_sym2(&mut self, sp: &SynPos, a: ResPos, s: String, s2: String, r: ResPos) {
+    pub fn op_get_sym2(&mut self, sp: &SynPos, a: ResPos, s: Symbol, s2: Symbol, r: ResPos) {
         self.set_dbg(sp.clone());
         self.push_op(Op::GetSym2(a, Box::new((s, s2)), r));
     }
 
-    pub fn op_get_sym3(&mut self, sp: &SynPos, a: ResPos, s: String, s2: String, s3: String, r: ResPos) {
+    pub fn op_get_sym3(&mut self, sp: &SynPos, a: ResPos, s: Symbol, s2: Symbol, s3: Symbol, r: ResPos) {
         self.set_dbg(sp.clone());
         self.push_op(Op::GetSym3(a, Box::new((s, s2, s3)), r));
     }
@@ -615,8 +616,8 @@ impl DestructureInfo {
             },
             VVal::Map(m) => {
                 for (i, pos) in self.poses.iter().enumerate() {
-                    let vname = self.vars.at(i).unwrap().s_raw();
-                    let val = m.borrow().get(&vname).cloned().unwrap_or_else(|| VVal::None);
+                    let sym = self.vars.at(i).unwrap().to_sym();
+                    let val = m.borrow().get(&sym).cloned().unwrap_or_else(|| VVal::None);
 
                     set_at_varpos!(self, env, pos, &val);
                 }
@@ -831,9 +832,9 @@ pub enum Op {
     GetIdx(ResPos, u32, ResPos),
     GetIdx2(ResPos, Box<(u32, u32)>, ResPos),
     GetIdx3(ResPos, Box<(u32, u32, u32)>, ResPos),
-    GetSym(ResPos, Box<String>, ResPos),
-    GetSym2(ResPos, Box<(String, String)>, ResPos),
-    GetSym3(ResPos, Box<(String, String, String)>, ResPos),
+    GetSym(ResPos, Box<Symbol>, ResPos),
+    GetSym2(ResPos, Box<(Symbol, Symbol)>, ResPos),
+    GetSym3(ResPos, Box<(Symbol, Symbol, Symbol)>, ResPos),
     GetKey(ResPos, ResPos, ResPos),
     Destr(ResPos, Box<DestructureInfo>),
     Call(u16, ResPos),
