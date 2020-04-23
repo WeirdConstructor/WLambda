@@ -263,10 +263,26 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     let mut s = String::from("");
     let mut v : Vec<u8> = Vec::new();
 
-    while ps.peek().unwrap_or(quote_char) != quote_char {
-        let c = ps.expect_some(ps.peek())?;
-        ps.consume();
-        adchr(&mut v, &mut s, bytes, c);
+    let mut quote_stack : Vec<char> = vec![quote_char];
+
+    while !quote_stack.is_empty() {
+        let next_quote = *quote_stack.last().unwrap();
+
+        let mut cont_next = false;
+        while ps.peek().unwrap_or(next_quote) != next_quote {
+            let c = ps.expect_some(ps.peek())?;
+            ps.consume();
+            adchr(&mut v, &mut s, bytes, c);
+
+            match c {
+                '[' => { quote_stack.push(']'); cont_next = true; break; },
+                '(' => { quote_stack.push(')'); cont_next = true; break; },
+                '{' => { quote_stack.push('}'); cont_next = true; break; },
+                _ => (),
+            }
+        }
+
+        quote_stack.pop();
     }
 
     if bytes {
@@ -556,7 +572,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
 
             } else {
                 let key = if is_ident_start(c) {
-                    VVal::new_sym(&parse_identifier(ps)?)
+                    VVal::into_sym(parse_identifier(ps)?)
                 } else {
                     parse_expr(ps)?
                 };
@@ -596,9 +612,10 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
             }
 
-            ps.push_collect();
+            let code_start_pos = ps.remember();
             parse_expr(ps)?;
-            let code = ps.pop_collect().to_string();
+            let code_end_pos = ps.remember();
+            let code = ps.collect(code_start_pos, code_end_pos).to_string();
 
             let mut vec = ps.syn(Syntax::Str);
             vec.push(VVal::new_str_mv(code));
@@ -722,7 +739,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         ':' => {
             ps.consume_wsc();
             let capture = ps.syn(Syntax::CaptureRef);
-            capture.push(VVal::new_sym(&parse_identifier(ps)?));
+            capture.push(VVal::into_sym(parse_identifier(ps)?));
             Ok(capture)
         },
         '&' => {
@@ -914,7 +931,7 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
                     _   => !c.is_whitespace()
                 }
             });
-        Ok(identifier)
+        Ok(identifier.to_string())
     }
 }
 
@@ -955,7 +972,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                     let block = parse_block(ps, true)?;
 
                     block.set_at(0, syn);
-                    block.insert_at(1, VVal::new_sym(&block_name));
+                    block.insert_at(1, VVal::into_sym(block_name));
                     Ok(block)
                 } else {
                     let block = ps.syn(Syntax::Func);
@@ -1089,7 +1106,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
 
             } else if is_ident_start(c) {
                 let id = ps.syn(Syntax::Key);
-                id.push(VVal::new_sym(&parse_identifier(ps)?));
+                id.push(VVal::into_sym(parse_identifier(ps)?));
                 id
             } else {
                 parse_value(ps)?
@@ -1379,7 +1396,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
             while let Some(c) = ps.peek() {
                 if c == ')' { break; }
-                ids.push(VVal::new_sym(&parse_identifier(ps)?));
+                ids.push(VVal::into_sym(parse_identifier(ps)?));
                 if !ps.consume_if_eq_wsc(',') { break; }
             }
 
@@ -1393,7 +1410,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     ')', "At the end of destructuring assignment")));
             }
         },
-        _ => { ids.push(VVal::new_sym(&parse_identifier(ps)?)); }
+        _ => { ids.push(VVal::into_sym(parse_identifier(ps)?)); }
     }
 
     assign.push(ids);
@@ -1430,7 +1447,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                             },
                             "import" => {
                                 let mut prefix =
-                                    VVal::new_sym(&parse_identifier(ps)?);
+                                    VVal::into_sym(parse_identifier(ps)?);
                                 ps.skip_ws_and_comments();
                                 let name =
                                     if ps.peek().unwrap_or(';') == ';' {
@@ -1439,7 +1456,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                         p
                                     } else {
                                         ps.consume_if_eq_wsc('=');
-                                        VVal::new_sym(&parse_identifier(ps)?)
+                                        VVal::into_sym(parse_identifier(ps)?)
                                     };
 
                                 let imp = ps.syn(Syntax::Import);
@@ -1453,7 +1470,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                 ps.consume_if_eq_wsc('=');
                                 let expr = parse_expr(ps)?;
                                 let exp = ps.syn(Syntax::Export);
-                                exp.push(VVal::new_sym(&name));
+                                exp.push(VVal::into_sym(name));
                                 exp.push(expr);
                                 Ok(exp)
                             },

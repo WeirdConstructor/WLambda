@@ -62,6 +62,19 @@ impl StringInterner {
         self.strmap.insert(s.to_string(), Rc::downgrade(&rc));
         Symbol(rc)
     }
+
+    #[inline]
+    fn into_sym(&mut self, s: String) -> Symbol {
+        if let Some(wc) = self.strmap.get(&s) {
+            if let Some(rc) = wc.upgrade() {
+                return Symbol(rc);
+            }
+        }
+
+        let rc = Rc::new(s.clone());
+        self.strmap.insert(s, Rc::downgrade(&rc));
+        Symbol(rc)
+    }
 }
 
 thread_local! {
@@ -157,6 +170,13 @@ pub fn s2sym(s: &str) -> Symbol {
         si.borrow_mut().s2sym(s)
     })
 }
+
+pub fn into_sym(s: String) -> Symbol {
+    STR_INTERN.with(|si| {
+        si.borrow_mut().into_sym(s)
+    })
+}
+
 
 pub fn string_interner_collect() -> i64 {
     STR_INTERN.with(|si| {

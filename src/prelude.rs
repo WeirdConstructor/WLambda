@@ -2358,9 +2358,32 @@ Keep in mind, that all symbols are interned strings. And if you create many
 symbols that are not used anymore, you might need to trigger a cleanup
 with `std:symbols::collect`.
 
-#### - std:symbols:collect[]
+#### - std:symbols:collect
 
-Collect and remove all interned symbols that are no longer used.
+Collect and remove all interned symbols in the current thread that are no
+longer used. Returns the number of freed symbols. Please keep in mind, that
+the `std:ref_id` of any collected symbol will be different from a symbol that
+is created later with the same characters.
+
+If you rely on the reference ID of a symbol, you should make sure to keep it
+around. Literal symbols are always kept around as long as the code is running
+or referenced somewhere (eg.  by a function).
+
+```wlambda
+std:symbols:collect[];
+
+!probably_unique_sym = sym "onceonly_used";
+
+std:assert_eq
+    (std:ref_id ~ sym "onceonly_used")
+    (std:ref_id probably_unique_sym);
+
+std:assert_eq std:symbols:collect[] 0;
+
+.probably_unique_sym = $none;
+
+std:assert_eq std:symbols:collect[] 1;
+```
 
 ### <a name="412-pairs-pa-b"></a>4.12 - Pairs `$p(a, b)`
 

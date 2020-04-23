@@ -2544,16 +2544,16 @@ fn check_threads() {
             !@import std std;
 
             !a = std:sync:atom:read THREAD_ARG0;
-            !b = std:sync:atom:read a.5;
-            std:sync:atom:write a.5 a;
-            $[a.0, a.1, a.2, a.3, a.4, b]
-        } $[$[1,2,${a=20},:\"x\",\"oo\", at]];
+            !b = std:sync:atom:read a.7;
+            std:sync:atom:write a.7 a;
+            $[a.0, a.1, a.2, a.3, a.4, a.5, a.6, b]
+        } $[$[1,2,${a=20},:\"x\",\"oo\",$o(33),$p(1,$p(2,$i(3,4))), at]];
         $[
             std:thread:join h,
-            std:take 5 ~ std:sync:atom:read at
+            std:take 7 ~ std:sync:atom:read at
         ];
     "),
-    "$[$[1,2,${a=20},:\"x\",\"oo\",99],$[1,2,${a=20},:\"x\",\"oo\"]]");
+    "$[$[1,2,${a=20},$<1=>:\"x\",\"oo\",$o(33),$p(1,$p(2,$i(3,4))),99],$[1,2,${a=20},$<1>,\"oo\",$o(33),$p(1,$p(2,$i(3,4)))]]");
 }
 
 #[test]
@@ -3270,4 +3270,13 @@ fn check_code_string_literals() {
         };
         code
     "#), "PARSE ERROR: error[6,9:<compiler:s_eval>] Expected literal value, sub expression, block, key or identifier at code \'};\n        code\n    \'");
+}
+
+#[test]
+fn check_quote() {
+    assert_eq!(ve(r#"
+        $q#fewof wefewop
+            fwe { feofwef [ XX }(]})]w}
+        #
+    "#), "\"fewof wefewop\\n            fwe { feofwef [ XX }(]})]w}\\n        \"");
 }

@@ -1782,6 +1782,11 @@ impl VVal {
     }
 
     #[inline]
+    pub fn into_sym(s: String) -> VVal {
+        VVal::Sym(into_sym(s))
+    }
+
+    #[inline]
     pub fn new_byt(v: Vec<u8>) -> VVal {
         VVal::Byt(Rc::new(RefCell::new(v)))
     }

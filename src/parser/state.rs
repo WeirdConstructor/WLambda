@@ -22,15 +22,14 @@ use std::fmt;
 /// ```
 #[allow(dead_code)]
 pub struct State {
-        input:          Vec<char>,
-        ch_ptr:         usize,
-        line_no:        u32,
-        col_no:         u16,
-        indent:         Option<u32>,
-        line_indent:    u32,
-        last_tok_char:  char,
-        code_capture:   Vec<usize>,
-        file:           FileRef,
+    input:          Vec<char>,
+    ch_ptr:         usize,
+    line_no:        u32,
+    col_no:         u16,
+    indent:         Option<u32>,
+    line_indent:    u32,
+    last_tok_char:  char,
+    file:           FileRef,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -377,11 +376,13 @@ impl State {
         false
     }
 
-    pub fn take_while_wsc<F>(&mut self, pred: F) -> String
+    pub fn take_while_wsc<F>(&mut self, pred: F) -> StrPart
         where F: Fn(char) -> bool {
-        let ret = self.take_while(pred).to_string();
+        let start = self.remember();
+        self.take_while(pred);
+        let end = self.remember();
         self.skip_ws_and_comments();
-        ret
+        self.spart(start, end)
     }
 
     pub fn take_while<F>(&mut self, pred: F) -> StrPart
@@ -513,7 +514,6 @@ impl State {
             indent:         Some(0),
             line_indent:    0,
             last_tok_char:  ' ',
-            code_capture:   vec![],
             file:           FileRef::new(filename),
         };
         ps.skip_ws_and_comments();
@@ -527,13 +527,11 @@ impl State {
         }
     }
 
-    pub fn push_collect(&mut self) {
-        self.code_capture.push(self.ch_ptr);
+    pub fn remember(&mut self) -> usize {
+        self.ch_ptr
     }
 
-    pub fn pop_collect(&mut self) -> StrPart {
-        let ptr = self.code_capture.pop().expect("previous push_collect");
-        self.spart(ptr, self.ch_ptr)
+    pub fn collect(&mut self, start: usize, end: usize) -> StrPart {
+        self.spart(start, end)
     }
 }
-

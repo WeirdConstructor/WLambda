@@ -23,6 +23,8 @@ prelude or other pure Rust functions.
 * Change: Added recently defined variable name or key to syntax positions
 for functions. This might help finding the actual function where
 the error occurred easier.
+* Change: $q and $Q recognizes nested parenthesis now:
+`$q{parses { nested } stuff now! Also [}] is fine}`.
 * Optimization: Removed many unnecessary String allocations.
 * Feature: Added `not_i64` and `not_u32`.
 * Feature: Added compile time constant values: `!:const X = ...`.
