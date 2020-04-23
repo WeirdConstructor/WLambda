@@ -994,7 +994,7 @@ fn vm_compile_def2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool
                 panic!("Defining global did not return a global!");
             }
         } else {
-            let next_local = ce.borrow_mut().next_local();
+            let next_local = ce.borrow_mut().find_or_new_local(&varname);
             let val_pw = vm_compile2(&value, ce)?;
             ce.borrow_mut().def_local(&varname, next_local);
 

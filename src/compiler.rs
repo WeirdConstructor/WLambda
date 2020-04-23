@@ -888,6 +888,16 @@ impl BlockEnv {
         next_index
     }
 
+    fn find_local_in_current_block(&self, var: &str) -> Option<usize> {
+        let last_idx = self.local_map_stack.len() - 1;
+        let v = self.local_map_stack[last_idx].1.get(var)?;
+        if let VarPos::Local(idx) = v {
+            Some(*idx)
+        } else {
+            None
+        }
+    }
+
     fn def_local(&mut self, var: &str, idx: usize) {
         self.locals[idx].0 = String::from(var);
         let last_idx = self.local_map_stack.len() - 1;
@@ -991,6 +1001,19 @@ impl CompileEnv {
         self.block_env.def_local(s, idx);
     }
 
+    pub fn find_or_new_local(&mut self, var: &str) -> usize {
+        let idx =
+            if let Some(idx) = self.block_env.find_local_in_current_block(var) {
+                idx
+            } else {
+                self.block_env.next_local()
+            };
+        if (idx + 1) > self.locals_space {
+            self.locals_space = idx + 1;
+        }
+        idx
+    }
+
     pub fn next_local(&mut self) -> usize {
         let idx = self.block_env.next_local();
         if (idx + 1) > self.locals_space {
@@ -1008,10 +1031,7 @@ impl CompileEnv {
             self.global.borrow_mut().env.insert(String::from(s), r.clone());
             VarPos::Global(r)
         } else {
-            let idx = self.block_env.next_local();
-            if (idx + 1) > self.locals_space {
-                self.locals_space = idx + 1;
-            }
+            let idx = self.find_or_new_local(s);
             self.block_env.def_local(s, idx);
             VarPos::Local(idx)
         }

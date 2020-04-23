@@ -76,7 +76,6 @@ fn main() {
             match readline {
                 Ok(line) => {
                     rl.add_history_entry(line.as_str());
-
                     match ctx.eval(&line) {
                         Ok(v)  => { println!("> {}", v.s()); },
                         Err(e) => { println!("*** {}", e); }
@@ -96,7 +95,12 @@ fn main() {
         loop {
             use std::io::{self, BufRead};
             for line in io::stdin().lock().lines() {
-                match ctx.eval(&line.unwrap()) {
+                let l = line.unwrap();
+                    for i in 0..1000 {
+                        ctx.eval(&l);
+                    }
+
+                match ctx.eval(&l) {
                     Ok(v)  => { println!("> {}", v.s()); },
                     Err(e) => { println!("*** {}", e); }
                 }
