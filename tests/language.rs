@@ -2389,6 +2389,15 @@ fn check_accumulator() {
         };
         $@m $+ :l f[]
     "), "${l=10}");
+
+    assert_eq!(ve(r"
+        !res = $[];
+        std:push res $@s iter i $i(1, 3) {
+            !x = $@@;
+            $+ ~ str i;
+            std:push res $p(x, $@@);
+        };
+    "), "$[$p(\"\",$<1=>\"1\"),$p($<1>,$<2=>\"12\"),$<2>]");
 }
 
 #[test]
