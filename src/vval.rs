@@ -2449,9 +2449,10 @@ impl VVal {
                                 if argc > 1 {
                                     let from = arg_int as usize;
                                     let cnt  = e.arg(1).i() as usize;
-                                    let r : String =
-                                        vval_str.chars().skip(from).take(cnt).collect();
-                                    Ok(VVal::new_str_mv(r))
+                                    Ok(VVal::new_str_mv(
+                                        vval_str
+                                            .chars().skip(from).take(cnt)
+                                            .collect()))
                                 } else {
                                     let r = vval_str.chars().nth(arg_int as usize);
                                     match r {
@@ -2511,9 +2512,48 @@ impl VVal {
                     else { Ok(self.clone()) }
                 })
             },
-            VVal::Pair(_) => {
+            VVal::Pair(p) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    Ok(self.at(e.arg(0).i() as usize).unwrap_or(VVal::None))
+                    let a = &p.0;
+                    let b = &p.1;
+
+                    let first_arg = e.arg(0);
+
+                    match first_arg {
+                        VVal::Int(i) =>
+                            Ok(self.at(i as usize).unwrap_or(VVal::None)),
+                        VVal::Str(s) => {
+                            match (a, b) {
+                                (VVal::Int(from), VVal::Int(cnt)) => {
+                                    Ok(VVal::new_str_mv(
+                                        s.chars()
+                                         .skip(*from as usize)
+                                         .take(*cnt as usize).collect()))
+                                },
+                                (VVal::Str(splitstr), VVal::Int(max)) => {
+                                    let l = VVal::vec();
+                                    if *max > 0 {
+                                        for part in s.as_ref().splitn(*max as usize, splitstr.as_ref()) {
+                                            l.push(VVal::new_str(part));
+                                        }
+                                    } else {
+                                        for part in s.as_ref().split(splitstr.as_ref()) {
+                                            l.push(VVal::new_str(part));
+                                        }
+                                    }
+                                    Ok(l)
+                                },
+                                (VVal::Str(needle), VVal::Str(replace)) => {
+                                    Ok(VVal::new_str_mv(
+                                        s.as_ref()
+                                         .replace(
+                                            needle.as_ref(), replace.as_ref())))
+                                },
+                                _ => Ok(self.clone())
+                            }
+                        },
+                        _ => Ok(self.clone())
+                    }
                 })
             },
             VVal::Iter(i) => {

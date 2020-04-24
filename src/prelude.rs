@@ -2460,6 +2460,38 @@ std:assert std:ref_id[a] == id_a;
 std:assert std:ref_id[v.0] == id_a;
 ```
 
+#### - Pair string operations
+
+If you call a pair with a string or byte vector as argument, there are some
+operations that can be done:
+
+##### - `$p(_from_, _count_) _string_`
+
+Returns a substring starting at _from_ with the length _count_.
+
+```wlambda
+std:assert_eq ($p(2, 4) "abcdefgh") "cdef";
+```
+
+##### - `$p(_pattern_, _replacement_) _string_`
+
+Replaces all _pattern_ occurences in _string_ by _replacement_.
+
+```wlambda
+std:assert_eq ($p(";", "_") "A;B;D;EFG;HI") "A_B_D_EFG_HI";
+```
+
+##### - `$p(_split-pattern_, _max_) _string_`
+
+Splits _string_ at _split-pattern_ a _max_ number of times.
+If _max_ is 0, it is split completely.
+
+```wlambda
+std:assert_eq str[$p(";", 3) "A;B;D;EFG;HI"] ~ str $["A", "B", "D;EFG;HI"];
+
+std:assert_eq str[$p(";", 0) "A;B;D;EFG;HI"] ~ str $["A", "B", "D", "EFG", "HI"];
+```
+
 #### <a name="4121-pair-to-iterator"></a>4.12.1 - Pair to Iterator
 
 Pairs play a special role if you make an iterator from it.
@@ -3073,7 +3105,9 @@ Here is an overview of the data type calling semantics:
 | `$false`  | `$[1,2]`          | Will return the first element `1` of the list. |
 | symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
-|           |                   | |
+| $p(int_from, int_count) | string | Substring operation. (See also section about pairs) |
+| $p(string, int)         | string | Split operation. (See also section about pairs) |
+| $p(string, string)      | string | Replace all operation. (See also section about pairs) |
 |           |                   | |
 |           |                   | |
 |           |                   | |

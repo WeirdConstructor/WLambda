@@ -2727,6 +2727,11 @@ fn check_pairs() {
         $[std:ref_id[p1] == std:ref_id[p2],
           std:ref_id[p1] == std:ref_id[p2]]
     "), "$[$false,$false]");
+
+    assert_eq!(ve("$p(0, 3)             $q ABCDEFG "),    "\"ABC\"");
+    assert_eq!(ve("$p(\";\", 2)         $q AB;C;DE;FG "), "$[\"AB\",\"C;DE;FG\"]");
+    assert_eq!(ve("$p(\";\", 0)         $q AB;C;DE;FG "), "$[\"AB\",\"C\",\"DE\",\"FG\"]");
+    assert_eq!(ve("$p(\";\", \"_\")     $q AB;C;DE;FG "), "\"AB_C_DE_FG\"");
 }
 
 #[test]
