@@ -96,9 +96,6 @@ fn main() {
             use std::io::{self, BufRead};
             for line in io::stdin().lock().lines() {
                 let l = line.unwrap();
-                    for i in 0..1000 {
-                        ctx.eval(&l);
-                    }
 
                 match ctx.eval(&l) {
                     Ok(v)  => { println!("> {}", v.s()); },

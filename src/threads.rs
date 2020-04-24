@@ -136,7 +136,8 @@ impl AVal {
                 let mv = VVal::map();
                 for (k, v) in m.iter() {
                     let k = s2sym(k);
-                    mv.set_key_sym(k, v.to_vval());
+                    mv.set_key_sym(k, v.to_vval())
+                      .expect("AVal->VVal map not used more than once");
                 }
                 mv
             },
@@ -166,8 +167,8 @@ impl AVal {
             },
             VVal::Bol(b)       => AVal::Bol(*b),
             VVal::Sym(s)       => AVal::Sym(String::from(s.as_ref())),
-            VVal::Str(s)       => AVal::Str(s.borrow().clone()),
-            VVal::Byt(b)       => AVal::Byt(b.borrow().clone()),
+            VVal::Str(s)       => AVal::Str(s.as_ref().clone()),
+            VVal::Byt(b)       => AVal::Byt(b.as_ref().clone()),
             VVal::Int(i)       => AVal::Int(*i),
             VVal::Flt(f)       => AVal::Flt(*f),
             VVal::Opt(None)    => AVal::Opt(None),

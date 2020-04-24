@@ -335,7 +335,7 @@ macro_rules! get_key {
             VVal::Int(i)  => $o.at(i as usize).unwrap_or_else(|| VVal::None),
             VVal::Bol(b)  => $o.at(b as usize).unwrap_or_else(|| VVal::None),
             VVal::Sym(sy) => $o.$method(sy.as_ref()).unwrap_or_else(|| VVal::None),
-            VVal::Str(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::None),
+            VVal::Str(sy) => $o.$method(sy.as_ref()).unwrap_or_else(|| VVal::None),
             _ => {
                 $env.push($o.clone());
                 let call_ret = $k.call_internal($env, 1);
@@ -1281,7 +1281,8 @@ fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                     for i in l.iter().skip(1) {
                         let key = vm_compile_const_value(&i.at(0).unwrap_or(VVal::None))?;
                         let val = vm_compile_const_value(&i.at(1).unwrap_or(VVal::None))?;
-                        m.set_key_sym(key.to_sym(), val);
+                        m.set_key_sym(key.to_sym(), val)
+                         .expect("Const map not used more than once");
                     }
                     Ok(m)
                 },

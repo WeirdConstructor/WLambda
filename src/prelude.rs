@@ -1887,7 +1887,7 @@ std:assert_rel_eq r.y h.y 0.0001;
 
 ### <a name="49-strings"></a>4.9 - Strings
 
-Strings in WLambda are like Rust UTF-8 encoded Unicode strings.
+Strings in WLambda are like Rust UTF-8 encoded immutable Unicode strings.
 There is no character data type however. There are two types of literal
 forms for strings:
 
@@ -2215,7 +2215,9 @@ std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 
 ### <a name="410-bytes-or-byte-vectors"></a>4.10 - Bytes (or Byte Vectors)
 
-Bytes are a special kind of strings. Their literal form is:
+Bytes are a vector of bytes. Unlike strings they don't have any encoding.
+Literal syntax however supports inserting unicode characters:
+
 
 ```wlambda
 $b"abc";
@@ -4337,13 +4339,6 @@ std:assert_eq (str v) (str $[1,3]);
 std:assert_eq (std:delete m :a) 10;
 std:assert_eq (str m) (str ${b = 20});
 ```
-- Byte Vectors:
-```wlambda
-!b = $b"abc";
-
-std:assert_eq (std:delete b 1) (int $b"b");
-std:assert_eq b $b"ac";
-```
 
 Please note that this operation is potentially O(n) on vectors.
 
@@ -5628,7 +5623,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let b = env.arg(0);
             Ok(
                 if let VVal::Byt(u) = b {
-                    VVal::new_str_mv(String::from_utf8_lossy(&u.borrow()).to_string())
+                    VVal::new_str_mv(String::from_utf8_lossy(u.as_ref()).to_string())
                 } else {
                     VVal::None
                 })
@@ -5637,7 +5632,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let b = env.arg(0);
             if let VVal::Byt(u) = b {
-                match String::from_utf8(u.borrow().to_vec()) {
+                match String::from_utf8(u.to_vec()) {
                     Ok(s) => Ok(VVal::new_str_mv(s)),
                     Err(e) => {
                         Ok(env.new_err(
@@ -5686,9 +5681,9 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             if let VVal::Byt(u) = env.arg(0) {
                 Ok(VVal::vec_mv(
-                    u.borrow().iter()
-                        .map(|u| VVal::Int(i64::from(*u)))
-                        .collect()))
+                    u.iter()
+                     .map(|u| VVal::Int(i64::from(*u)))
+                     .collect()))
             } else {
                 Ok(VVal::vec_mv(
                     env.arg(0).as_bytes().iter()
@@ -5725,10 +5720,11 @@ pub fn std_symbol_table() -> SymbolTable {
                   '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
 
             if let VVal::Byt(u) = env.arg(0) {
-                let mut out : String = String::with_capacity(u.borrow().len() * 2);
+                let mut out : String =
+                    String::with_capacity(u.len() * 2);
 
                 if argc == 1 {
-                    for (a, b) in u.borrow().iter().map(|u|
+                    for (a, b) in u.iter().map(|u|
                                         (HEXCHARS[(u >> 4) as usize],
                                          HEXCHARS[(u & 0x0F) as usize])) {
                         out.push(a);
@@ -5741,7 +5737,7 @@ pub fn std_symbol_table() -> SymbolTable {
                         else { env.arg(2).s_raw() };
 
                     let mut len_counter = 0;
-                    for (a, b) in u.borrow().iter().map(|u|
+                    for (a, b) in u.iter().map(|u|
                                         (HEXCHARS[(u >> 4) as usize],
                                          HEXCHARS[(u & 0x0F) as usize])) {
                         if len_counter >= group_len { out.push_str(&group_sep); len_counter = 0; }
@@ -6054,7 +6050,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let tmp_filename = format!("{}~", filename);
             let contents     = env.arg(1);
             let buf = match contents {
-                VVal::Byt(b) => b.borrow().clone(),
+                VVal::Byt(b) => b.as_ref().clone(), // TODO: Remove clone
                 v            => v.with_s_ref(|v: &str| v.as_bytes().to_vec()),
             };
 
@@ -6100,7 +6096,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let filename     = env.arg(0).s_raw();
             let contents     = env.arg(1);
             let buf = match contents {
-                VVal::Byt(b) => b.borrow().clone(),
+                VVal::Byt(b) => b.as_ref().clone(), // TODO: Remove clone
                 v            => v.with_s_ref(|v: &str| v.as_bytes().to_vec()),
             };
 
@@ -6505,7 +6501,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "deser:msgpack",
         |env: &mut Env, _argc: usize| {
             if let VVal::Byt(u) = env.arg(0) {
-                match VVal::from_msgpack(&u.borrow()[..]) {
+                match VVal::from_msgpack(&u[..]) {
                     Ok(v) => Ok(v),
                     Err(e) => Ok(env.new_err(e)),
                 }
@@ -6743,7 +6739,7 @@ pub fn std_symbol_table() -> SymbolTable {
         Ok(VVal::Flt(util::u64_to_closed_open01(env.arg(0).i() as u64)))
     }, Some(1), Some(1), false);
 
-    func!(st, "symbols:collect", |env: &mut Env, _argc: usize| {
+    func!(st, "symbols:collect", |_env: &mut Env, _argc: usize| {
         Ok(VVal::Int(crate::str_int::string_interner_collect()))
     }, Some(0), Some(0), false);
 

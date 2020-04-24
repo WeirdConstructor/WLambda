@@ -13,6 +13,7 @@ of WLambda.
 to the end of the argument list now.
 * Incompatible Change: `VVal::set_map_key()` has been removed and replaced by
 `VVal::set_key_mv()`.
+* Incompatible Change: Strings and byte vectors are immutable data types now.
 * Potentially Incompatible Change: The compiler and evaluator was completely replaced
 by a VM and code generator for it.
 * Change: Function arguments are stored in right order (function, arg1, arg2, ...) on the

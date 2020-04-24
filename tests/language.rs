@@ -3185,7 +3185,6 @@ fn check_kve_funcs() {
 fn check_delete() {
     assert_eq!(ve("!v = $[1,2,3];     std:delete v 1; v"),          "$[1,3]");
     assert_eq!(ve("!v = ${a=10,b=20}; std:delete v :a; v"),     "${b=20}");
-    assert_eq!(ve("!b = $b\"abc\";    std:delete b 1; b"),         "$b\"ac\"");
 }
 
 #[test]

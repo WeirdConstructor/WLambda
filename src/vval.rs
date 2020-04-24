@@ -1864,7 +1864,9 @@ impl VVal {
             VVal::Map(m) => {
                 let out = VVal::map();
                 for (k, v) in m.borrow_mut().iter() {
-                    out.set_key_sym(k.clone(), v.clone());
+                    if let Err(_) = out.set_key_sym(k.clone(), v.clone()) {
+                        continue;
+                    }
                 }
                 out
             },
@@ -2484,13 +2486,13 @@ impl VVal {
                             },
                             VVal::Str(s2) => {
                                 if argc > 1 {
-                                    let mut accum = vval_str.borrow().clone() + &s2.borrow();
+                                    let mut accum = vval_str.as_ref().clone() + s2.as_ref();
                                     for i in 1..argc {
                                         e.arg_ref(i).unwrap().with_s_ref(|s: &str| accum += s);
                                     }
                                     Ok(VVal::new_str_mv(accum))
                                 } else {
-                                    Ok(VVal::new_str_mv(vval_str.borrow().clone() + &s2.borrow()))
+                                    Ok(VVal::new_str_mv(vval_str.as_ref().clone() + s2.as_ref()))
                                 }
                             },
                             VVal::Map(_) => Ok(
@@ -2649,9 +2651,9 @@ impl VVal {
     pub fn ref_id(&self) -> Option<i64> {
         Some(match self {
             VVal::Err(r)     => { &*r.borrow() as *const (VVal, SynPos) as i64 },
-            VVal::Str(s)     => { &*s.borrow() as *const String as i64 },
+            VVal::Str(s)     => { &*s.as_ref() as *const String as i64 },
+            VVal::Byt(s)     => { &*s.as_ref() as *const Vec<u8> as i64 },
             VVal::Sym(s)     => { s.ref_id() },
-            VVal::Byt(s)     => { &*s.borrow() as *const Vec<u8> as i64 },
             VVal::Lst(v)     => { &*v.borrow() as *const Vec<VVal> as i64 },
             VVal::Map(v)     => { &*v.borrow() as *const FnvHashMap<Symbol, VVal> as i64 },
             VVal::Iter(v)    => { &*v.borrow() as *const VValIter as i64 },
@@ -2682,7 +2684,7 @@ impl VVal {
             VVal::Sym(s)  => { if let VVal::Sym(ib) = v { s == ib } else { false } },
             VVal::Syn(s)  => { if let VVal::Syn(ib) = v { *s == *ib } else { false } },
             VVal::Str(s)  => { if let VVal::Str(ib) = v { *s == *ib } else { false } },
-            VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s.borrow()[..] == s2.borrow()[..] } else { false } },
+            VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s[..] == s2[..] } else { false } },
             VVal::Pair(b)  => {
                 if let VVal::Pair(b2) = v { b.0.eqv(&b2.0) && b.1.eqv(&b2.1) }
                 else { false }
@@ -2873,15 +2875,14 @@ impl VVal {
     pub fn at(&self, index: usize) -> Option<VVal> {
         match self {
             VVal::Byt(vval_bytes) => {
-                let bytes = vval_bytes.borrow();
-                if index as usize >= bytes.len() {
+                if index as usize >= vval_bytes.len() {
                     None
                 } else {
-                    Some(VVal::new_byt(vec![bytes[index as usize]]))
+                    Some(VVal::new_byt(vec![vval_bytes[index as usize]]))
                 }
             },
             VVal::Str(vval_str) => {
-                let opt_char = vval_str.borrow().chars().nth(index as usize);
+                let opt_char = vval_str.chars().nth(index as usize);
                 match opt_char {
                     None    => None,
                     Some(char) => {
@@ -3044,7 +3045,10 @@ impl VVal {
 
     pub fn set_map_key_fun<T>(&self, key: &str, fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool)
         where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
-        self.set_key_sym(s2sym(key), VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
+        self.set_key_sym(
+                s2sym(key),
+                VValFun::new_fun(fun, min_args, max_args, err_arg_ok))
+            .expect("Map not borrowed when using set_map_key_fun");
     }
 
     pub fn deref(&self) -> VVal {
@@ -3106,19 +3110,6 @@ impl VVal {
                     Ok(mut v) => {
                         if idx < v.len() {
                             Ok(v.remove(idx))
-                        } else {
-                            Ok(VVal::None)
-                        }
-                    },
-                    Err(_) => Err(StackAction::panic_borrow(self)),
-                }
-            },
-            VVal::Byt(b) => {
-                let idx = key.i() as usize;
-                match b.try_borrow_mut() {
-                    Ok(mut b) => {
-                        if idx < b.len() {
-                            Ok(VVal::Int(b.remove(idx) as i64))
                         } else {
                             Ok(VVal::None)
                         }
@@ -3190,30 +3181,36 @@ impl VVal {
 
     pub fn accum(&mut self, val: &VVal) {
         match self {
-            VVal::Byt(b) => {
-                let mut acc = b.borrow_mut();
+            VVal::Byt(ref mut b) => {
                 match val {
-                    VVal::Int(i) => { acc.push(*i as u8); },
-                    VVal::Flt(f) => { acc.push(*f as u8); },
-                    VVal::Str(s) => { acc.extend_from_slice(s.borrow().as_bytes()); },
-                    VVal::Sym(s) => { acc.extend_from_slice(s.as_bytes()); },
-                    VVal::Byt(s) => { acc.extend_from_slice(&s.borrow()); },
-                    VVal::Bol(b) => { acc.push(*b as u8); },
-                    _ => { val.with_s_ref(|s: &str| acc.extend_from_slice(s.as_bytes())); }
+                    VVal::Int(i) => { Rc::make_mut(b).push(*i as u8); },
+                    VVal::Flt(f) => { Rc::make_mut(b).push(*f as u8); },
+                    VVal::Str(s) => { Rc::make_mut(b).extend_from_slice(s.as_bytes()); },
+                    VVal::Sym(s) => { Rc::make_mut(b).extend_from_slice(s.as_bytes()); },
+                    VVal::Byt(s) => { Rc::make_mut(b).extend_from_slice(s.as_ref()); },
+                    VVal::Bol(o) => { Rc::make_mut(b).push(*o as u8); },
+                    _ => {
+                        val.with_s_ref(|s: &str|
+                            Rc::make_mut(b)
+                                .extend_from_slice(
+                                    s.as_bytes()));
+                    }
                 }
             },
-            VVal::Str(a) => {
-                let mut acc = a.borrow_mut();
+            VVal::Str(ref mut a) => {
                 match val {
-                    VVal::Str(s) => { acc.push_str(&s.borrow()); },
-                    VVal::Sym(s) => { acc.push_str(&*s); },
+                    VVal::Str(s) => { Rc::make_mut(a).push_str(s.as_ref()); },
+                    VVal::Sym(s) => { Rc::make_mut(a).push_str(&*s); },
                     VVal::Byt(s) => {
-                        for b in s.borrow().iter() {
+                        for b in s.as_ref().iter() {
                             let b = *b as char;
-                            acc.push(b);
+                            Rc::make_mut(a).push(b);
                         }
                     },
-                    _ => { val.with_s_ref(|s: &str| acc.push_str(s)); }
+                    _ => {
+                        val.with_s_ref(|s: &str|
+                            Rc::make_mut(a).push_str(s));
+                    }
                 }
             },
             VVal::Int(i) => { *i += val.i(); },
@@ -3240,8 +3237,8 @@ impl VVal {
         match self {
             VVal::Lst(l) => l.borrow().len(),
             VVal::Map(l) => l.borrow().len(),
-            VVal::Byt(l) => l.borrow().len(),
-            VVal::Str(l) => l.borrow().len(),
+            VVal::Byt(l) => l.len(),
+            VVal::Str(l) => l.len(),
             VVal::Sym(l) => l.len(),
             v => v.with_deref(|v| v.len(), |_| 0),
         }
@@ -3249,10 +3246,10 @@ impl VVal {
 
     pub fn s_len(&self) -> usize {
         match self {
-            VVal::Str(s)  => s.borrow().chars().count(),
+            VVal::Str(s)  => s.chars().count(),
             VVal::Sym(s)  => s.chars().count(),
             VVal::Usr(s)  => s.s_raw().chars().count(),
-            VVal::Byt(b)  => b.borrow().len(),
+            VVal::Byt(b)  => b.len(),
             VVal::None    => 0,
             _             => self.s().chars().count(),
         }
@@ -3279,10 +3276,10 @@ impl VVal {
     /// ```
     pub fn s_raw(&self) -> String {
         match self {
-            VVal::Str(s)  => s.borrow().clone(),
+            VVal::Str(s)  => s.as_ref().clone(),
             VVal::Sym(s)  => String::from(s.as_ref()),
             VVal::Usr(s)  => s.s_raw(),
-            VVal::Byt(s)  => s.borrow().iter().map(|b| *b as char).collect(),
+            VVal::Byt(s)  => s.iter().map(|b| *b as char).collect(),
             VVal::None    => String::from(""),
             v => v.with_deref(|v| {
                 if v.is_none() { "".to_string() }
@@ -3318,7 +3315,7 @@ impl VVal {
         where T: FnOnce(&str) -> R
     {
         match self {
-            VVal::Str(s)  => f(&s.borrow()),
+            VVal::Str(s)  => f(s.as_ref()),
             VVal::Sym(s)  => f(&*s),
             VVal::Usr(s)  => f(&s.s_raw()),
             VVal::Byt(_)  => f(&self.s_raw()),
@@ -3645,9 +3642,9 @@ impl VVal {
     #[allow(clippy::cast_lossless)]
     pub fn f(&self) -> f64 {
         match self {
-            VVal::Str(s)     => (*s).borrow().parse::<f64>().unwrap_or(0.0),
+            VVal::Str(s)     => (*s).parse::<f64>().unwrap_or(0.0),
             VVal::Sym(s)     => (*s).parse::<f64>().unwrap_or(0.0),
-            VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as f64 } else { 0.0 },
+            VVal::Byt(s)     => if s.len() > 0 { s[0] as f64 } else { 0.0 },
             VVal::None       => 0.0,
             VVal::Err(_)     => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
@@ -3669,9 +3666,9 @@ impl VVal {
     #[allow(clippy::cast_lossless)]
     pub fn i(&self) -> i64 {
         match self {
-            VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0),
+            VVal::Str(s)     => (*s).parse::<i64>().unwrap_or(0),
             VVal::Sym(s)     => (*s).parse::<i64>().unwrap_or(0),
-            VVal::Byt(s)     => if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 },
+            VVal::Byt(s)     => if s.len() > 0 { s[0] as i64 } else { 0 as i64 },
             VVal::None       => 0,
             VVal::Err(_)     => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
@@ -3693,9 +3690,9 @@ impl VVal {
     #[allow(clippy::cast_lossless)]
     pub fn b(&self) -> bool {
         match self {
-            VVal::Str(s)     => (*s).borrow().parse::<i64>().unwrap_or(0) != 0,
+            VVal::Str(s)     => (*s).parse::<i64>().unwrap_or(0) != 0,
             VVal::Sym(s)     => (*s).parse::<i64>().unwrap_or(0) != 0,
-            VVal::Byt(s)     => (if (*s).borrow().len() > 0 { (*s).borrow()[0] as i64 } else { 0 as i64 }) != 0,
+            VVal::Byt(s)     => (if s.len() > 0 { s[0] as i64 } else { 0 as i64 }) != 0,
             VVal::None       => false,
             VVal::Err(_)     => false,
             VVal::Bol(b)     => *b,
@@ -3772,9 +3769,9 @@ impl VVal {
             String::from("")
         };
         let s = match self {
-            VVal::Str(s)     => format_vval_str(&s.borrow(), false),
+            VVal::Str(_)     => self.with_s_ref(|s| format_vval_str(s, false)),
             VVal::Sym(s)     => format!(":\"{}\"", *s),
-            VVal::Byt(s)     => format!("$b{}", format_vval_byt(&s.borrow())),
+            VVal::Byt(s)     => format!("$b{}", format_vval_byt(s.as_ref())),
             VVal::None       => "$n".to_string(),
             VVal::Err(e)     => format!("$e{} {}", (*e).borrow().1, (*e).borrow().0.s_cy(c)),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
@@ -3825,7 +3822,7 @@ impl VVal {
 
     pub fn as_bytes(&self) -> std::vec::Vec<u8> {
         match self {
-            VVal::Byt(b) => b.borrow().clone(),
+            VVal::Byt(b) => b.as_ref().clone(),
             v => v.with_deref(
                 |v| v.as_bytes(),
                 |v| v.map_or_else(
@@ -3909,7 +3906,7 @@ impl serde::ser::Serialize for VVal {
         match self {
             VVal::Str(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Sym(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
-            VVal::Byt(b)     => serializer.serialize_bytes(&b.borrow()[..]),
+            VVal::Byt(b)     => serializer.serialize_bytes(&b[..]),
             VVal::None       => serializer.serialize_none(),
             VVal::Iter(_)    => serializer.serialize_none(),
             VVal::Err(_)     => serializer.serialize_str(&self.s()),
@@ -4031,7 +4028,8 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
 
         while let Some((ke, ve)) = map.next_entry()? {
             let k : VVal = ke;
-            v.set_key(&k, ve);
+            v.set_key(&k, ve)
+             .expect("Deserialized map not used more than once");
         }
 
         Ok(v)

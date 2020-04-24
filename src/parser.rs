@@ -282,7 +282,9 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
             }
         }
 
-        quote_stack.pop();
+        if !cont_next {
+            quote_stack.pop();
+        }
     }
 
     if bytes {
@@ -617,7 +619,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             let code_end_pos = ps.remember();
             let code = ps.collect(code_start_pos, code_end_pos).to_string();
 
-            let mut vec = ps.syn(Syntax::Str);
+            let vec = ps.syn(Syntax::Str);
             vec.push(VVal::new_str_mv(code));
             Ok(vec)
         },
