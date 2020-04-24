@@ -2463,7 +2463,7 @@ impl VVal {
                             },
                             VVal::Fun(_) => {
                                 let mut ret = VVal::None;
-                                for c in vval_str.borrow().chars() {
+                                for c in vval_str.chars() {
                                     e.push(VVal::new_str_mv(c.to_string()));
                                     let el = first_arg.call_internal(e, 1);
                                     e.popn(1);
@@ -2478,8 +2478,8 @@ impl VVal {
                             },
                             VVal::Lst(_) => {
                                 let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
-                                let cnt  = first_arg.at(1).unwrap_or_else(|| VVal::Int((vval_str.borrow().len() - from) as i64)).i() as usize;
-                                let r : String = vval_str.borrow().chars().skip(from).take(cnt).collect();
+                                let cnt  = first_arg.at(1).unwrap_or_else(|| VVal::Int((vval_str.len() - from) as i64)).i() as usize;
+                                let r : String = vval_str.chars().skip(from).take(cnt).collect();
                                 Ok(VVal::new_str_mv(r))
                             },
                             VVal::Str(s2) => {
@@ -2493,7 +2493,10 @@ impl VVal {
                                     Ok(VVal::new_str_mv(vval_str.borrow().clone() + &s2.borrow()))
                                 }
                             },
-                            VVal::Map(_) => Ok(first_arg.get_key(&vval_str.borrow()).unwrap_or(VVal::None)),
+                            VVal::Map(_) => Ok(
+                                first_arg
+                                    .get_key(vval_str.as_ref())
+                                    .unwrap_or(VVal::None)),
                             _ => Ok(VVal::None)
                         }
                     } else { Ok(self.clone()) }
