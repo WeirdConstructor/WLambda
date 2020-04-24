@@ -405,8 +405,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 VVal::Iter(Rc::new(RefCell::new(a.iter())))
             }),
             Op::NewNVec(vp, r) => {
-                use crate::nvec::NVec;
-
                 match vp.as_ref() {
                     NVecPos::IVec2(a, b) => {
                         in_reg!(env, ret, data, a);

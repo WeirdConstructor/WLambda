@@ -1388,9 +1388,9 @@ pub enum VVal {
     /// Representation of an interned string aka symbol or key.
     Sym(Symbol),
     /// Representation of a unicode/text string.
-    Str(Rc<RefCell<String>>),
+    Str(Rc<String>),
     /// Representation of a byte buffer.
-    Byt(Rc<RefCell<Vec<u8>>>),
+    Byt(Rc<Vec<u8>>),
     /// Integer value
     Int(i64),
     /// Float value
@@ -1768,12 +1768,12 @@ macro_rules! pair_key_to_iter {
 impl VVal {
     #[inline]
     pub fn new_str(s: &str) -> VVal {
-        VVal::Str(Rc::new(RefCell::new(String::from(s))))
+        VVal::Str(Rc::new(String::from(s)))
     }
 
     #[inline]
     pub fn new_str_mv(s: String) -> VVal {
-        VVal::Str(Rc::new(RefCell::new(s)))
+        VVal::Str(Rc::new(s))
     }
 
     #[inline]
@@ -1788,7 +1788,7 @@ impl VVal {
 
     #[inline]
     pub fn new_byt(v: Vec<u8>) -> VVal {
-        VVal::Byt(Rc::new(RefCell::new(v)))
+        VVal::Byt(Rc::new(v))
     }
 
     #[inline]
@@ -1869,7 +1869,7 @@ impl VVal {
                 out
             },
             VVal::Str(s) => {
-                VVal::new_str_mv(s.borrow_mut().clone())
+                VVal::new_str_mv(s.as_ref().clone())
             },
             v => v.with_deref(
                 |v| v.shallow_clone(),
@@ -2068,8 +2068,8 @@ impl VVal {
                 let b = b.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    if idx >= b.borrow().len() { return None; }
-                    let r = Some((VVal::new_byt(vec![b.borrow()[idx]]), None));
+                    if idx >= b.len() { return None; }
+                    let r = Some((VVal::new_byt(vec![b[idx]]), None));
                     idx += 1;
                     r
                 }))
@@ -2090,11 +2090,13 @@ impl VVal {
                 let s = s.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    let r = match s.borrow().chars().nth(idx) {
-                        Some(chr) => Some((VVal::new_str_mv(chr.to_string()), None)),
+                    let r = match s[idx..].chars().nth(0) {
+                        Some(chr) => {
+                            idx += chr.len_utf8();
+                            Some((VVal::new_str_mv(chr.to_string()), None))
+                        },
                         None      => None,
                     };
-                    idx += 1;
                     r
                 }))
             },
@@ -2366,14 +2368,13 @@ impl VVal {
                         match first_arg {
                             VVal::Byt(b2) => {
                                 if argc > 1 {
-                                    // TODO: Fix the extra clone here:
-                                    let mut accum = vval_bytes.borrow().clone();
-                                    accum.extend_from_slice(&b2.borrow());
+                                    let mut accum = vval_bytes.as_ref().clone();
+                                    accum.extend_from_slice(b2.as_ref());
                                     for i in 2..argc {
                                         match e.arg(i) {
                                             VVal::Byt(b3) =>
                                                 accum.extend_from_slice(
-                                                    &b3.borrow()),
+                                                    b3.as_ref()),
                                             _ =>
                                                 accum.extend_from_slice(
                                                     &e.arg(i).as_bytes()),
@@ -2381,8 +2382,8 @@ impl VVal {
                                     }
                                     Ok(VVal::new_byt(accum))
                                 } else {
-                                    let mut accum = vval_bytes.borrow().clone();
-                                    accum.extend_from_slice(&b2.borrow());
+                                    let mut accum = vval_bytes.as_ref().clone();
+                                    accum.extend_from_slice(b2.as_ref());
                                     Ok(VVal::new_byt(accum))
                                 }
                             },
@@ -2391,21 +2392,21 @@ impl VVal {
                                     let from = arg_int as usize;
                                     let cnt  = e.arg(1).i() as usize;
                                     let r : Vec<u8> =
-                                        vval_bytes.borrow().iter().skip(from)
-                                                  .take(cnt).copied().collect();
+                                        vval_bytes.iter()
+                                            .skip(from).take(cnt).copied()
+                                            .collect();
                                     Ok(VVal::new_byt(r))
                                 } else {
-                                    let r = vval_bytes.borrow();
-                                    if arg_int as usize >= r.len() {
+                                    if arg_int as usize >= vval_bytes.len() {
                                         Ok(VVal::None)
                                     } else {
-                                        Ok(VVal::new_byt(vec![r[arg_int as usize]]))
+                                        Ok(VVal::new_byt(vec![vval_bytes[arg_int as usize]]))
                                     }
                                 }
                             },
                             VVal::Fun(_) => {
                                 let mut ret = VVal::None;
-                                for c in vval_bytes.borrow().iter() {
+                                for c in vval_bytes.iter() {
                                     e.push(VVal::new_byt(vec![*c]));
                                     let el = first_arg.call_internal(e, 1);
                                     e.popn(1);
@@ -2424,11 +2425,11 @@ impl VVal {
                                              .i() as usize;
                                 let cnt  =
                                     first_arg.at(1).unwrap_or_else(
-                                        || VVal::Int((vval_bytes.borrow().len() - from) as i64))
+                                        || VVal::Int((vval_bytes.len() - from) as i64))
                                     .i() as usize;
                                 let r : Vec<u8> =
-                                    vval_bytes.borrow().iter().skip(from)
-                                              .take(cnt).copied().collect();
+                                    vval_bytes.iter()
+                                        .skip(from).take(cnt).copied().collect();
                                 Ok(VVal::new_byt(r))
                             },
                             VVal::Map(_) => Ok(self.with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::None))),
@@ -2446,10 +2447,11 @@ impl VVal {
                                 if argc > 1 {
                                     let from = arg_int as usize;
                                     let cnt  = e.arg(1).i() as usize;
-                                    let r : String = vval_str.borrow().chars().skip(from).take(cnt).collect();
+                                    let r : String =
+                                        vval_str.chars().skip(from).take(cnt).collect();
                                     Ok(VVal::new_str_mv(r))
                                 } else {
-                                    let r = vval_str.borrow().chars().nth(arg_int as usize);
+                                    let r = vval_str.chars().nth(arg_int as usize);
                                     match r {
                                         None    => Ok(VVal::new_str("")),
                                         Some(c) => {
