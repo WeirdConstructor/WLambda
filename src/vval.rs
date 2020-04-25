@@ -1218,13 +1218,15 @@ impl VValFun {
 ///     fn get_key(&self, key: &str) -> Option<VVal> {
 ///         Some(VVal::new_str(key))
 ///     }
-///     fn call_method(&self, key: &str, args: &[VVal]) -> Result<VVal, StackAction> {
+///     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+///         let args = env.argv_ref();
 ///         match key {
 ///             "test" => Ok(VVal::Int(42)),
 ///             _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
 ///         }
 ///     }
-///     fn call(&self, args: &[VVal]) -> Result<VVal, StackAction> {
+///     fn call(&self, env: &mut Env) -> Result<VVal, StackAction> {
+///         let args = env.argv_ref();
 ///         if args.len() < 0 {
 ///             return Err(StackAction::panic_msg(
 ///                 format!("{} called with too few arguments", self.s())));
@@ -1337,9 +1339,11 @@ pub trait VValUserData {
     fn get_key(&self, _key: &str) -> Option<VVal> { None }
     /// This method is called, when the user data object is used in a method call directly.
     /// Use this to implement convenient APIs for the user of the user data object.
-    fn call_method(&self, _key: &str, _argv: &[VVal]) -> Result<VVal, StackAction> { Ok(VVal::None) }
+    /// To quickly get the arguments you may use `env.argv_ref()`.
+    fn call_method(&self, _key: &str, _env: &mut Env) -> Result<VVal, StackAction> { Ok(VVal::None) }
     /// This method is called when the user data is called.
-    fn call(&self, _args: &[VVal]) -> Result<VVal, StackAction> { Ok(VVal::None) }
+    /// To quickly get the arguments you may use `env.argv_ref()`.
+    fn call(&self, _env: &mut Env) -> Result<VVal, StackAction> { Ok(VVal::None) }
     /// This should be implemented simply by returning
     /// a mutable reference to the concrete type self.
     /// It allows you to access your data structure from inside
@@ -2613,8 +2617,7 @@ impl VVal {
                 }
             },
             VVal::Usr(ud) => {
-                env.with_local_call_info(
-                    argc, |e: &mut Env| ud.call(e.argv_ref()))
+                env.with_local_call_info(argc, |e: &mut Env| ud.call(e))
             },
             VVal::DropFun(v) => v.v.call_internal(env, argc),
             VVal::Ref(v)     => v.borrow().call_internal(env, argc),
@@ -3741,24 +3744,26 @@ impl VVal {
     #[allow(clippy::cast_lossless)]
     pub fn b(&self) -> bool {
         match self {
-            VVal::Str(s)     => (*s).parse::<i64>().unwrap_or(0) != 0,
-            VVal::Sym(s)     => (*s).parse::<i64>().unwrap_or(0) != 0,
-            VVal::Byt(s)     => (if s.len() > 0 { s[0] as i64 } else { 0 as i64 }) != 0,
-            VVal::None       => false,
-            VVal::Err(_)     => false,
-            VVal::Bol(b)     => *b,
-            VVal::Syn(s)     => (s.syn.clone() as i64) != 0,
-            VVal::Pair(b)    => b.0.b() || b.1.b(),
-            VVal::Int(i)     => (*i) != 0,
-            VVal::Flt(f)     => (*f as i64) != 0,
-            VVal::Lst(l)     => (l.borrow().len() as i64) != 0,
-            VVal::Map(l)     => (l.borrow().len() as i64) != 0,
-            VVal::Usr(u)     => u.b(),
-            VVal::Fun(_)     => true,
-            VVal::IVec(iv)   => iv.x().b(),
-            VVal::FVec(fv)   => fv.x().b(),
-            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.b() }, false),
-            v => v.with_deref(|v| v.b(), |_| false),
+            VVal::Str(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
+            VVal::Sym(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
+            VVal::Byt(s)       => (if s.len() > 0 { s[0] as i64 } else { 0 as i64 }) != 0,
+            VVal::None         => false,
+            VVal::Err(_)       => false,
+            VVal::Bol(b)       => *b,
+            VVal::Syn(s)       => (s.syn.clone() as i64) != 0,
+            VVal::Pair(b)      => b.0.b() || b.1.b(),
+            VVal::Int(i)       => (*i) != 0,
+            VVal::Flt(f)       => (*f as i64) != 0,
+            VVal::Lst(l)       => (l.borrow().len() as i64) != 0,
+            VVal::Map(l)       => (l.borrow().len() as i64) != 0,
+            VVal::Usr(u)       => u.b(),
+            VVal::Fun(_)       => true,
+            VVal::Opt(None)    => false,
+            VVal::Opt(Some(_)) => true,
+            VVal::IVec(iv)     => iv.x().b(),
+            VVal::FVec(fv)     => fv.x().b(),
+            VVal::Iter(i)      => iter_next_value!(i.borrow_mut(), v, { v.b() }, false),
+            v                  => v.with_deref(|v| v.b(), |_| false),
         }
     }
 
@@ -3879,6 +3884,26 @@ impl VVal {
                 |v| v.map_or_else(
                     || vec![],
                     |v| v.with_s_ref(|s: &str| s.as_bytes().to_vec()))),
+        }
+    }
+
+    pub fn to_duration(&self) -> Result<std::time::Duration, VVal> {
+        match self {
+            VVal::Int(i) => Ok(std::time::Duration::from_millis(*i as u64)),
+            VVal::Pair(b) => {
+                let a = &b.0;
+                let b = &b.1;
+
+                a.with_s_ref(|astr|
+                    match astr {
+                        "s"  => Ok(std::time::Duration::from_secs(b.i() as u64)),
+                        "ms" => Ok(std::time::Duration::from_millis(b.i() as u64)),
+                        "us" => Ok(std::time::Duration::from_micros(b.i() as u64)),
+                        "ns" => Ok(std::time::Duration::from_nanos(b.i() as u64)),
+                        _    => Err(VVal::err_msg(&format!("Bad duration: {}", self.s()))),
+                    })
+            },
+            _ => Err(VVal::err_msg(&format!("Bad duration: {}", self.s()))),
         }
     }
 

@@ -319,7 +319,7 @@ impl AValChannel {
         }
     }
 
-    pub fn recv(&self) -> VVal {
+    pub fn try_recv(&self) -> VVal {
         match self.receiver.lock() {
             Ok(guard) => {
                 match guard.try_recv() {
@@ -342,10 +342,11 @@ impl std::fmt::Debug for AValChannel {
 
 impl VValUserData for AValChannel {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-    fn call_method(&self, key: &str, argv: &[VVal]) -> Result<VVal, StackAction> {
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv_ref();
         match key {
-            "recv" => Ok(self.recv()),
-            "recv_sync" => Ok(self.recv_timeout(0)),
+            "recv" => Ok(self.recv_timeout(0)),
+            "try_recv" => Ok(self.try_recv()),
             "recv_timeout" => {
                 if argv.len() != 1 {
                     return
@@ -366,7 +367,12 @@ impl VValUserData for AValChannel {
 
                 Ok(self.send(&argv[0]))
             },
-            _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
+            _ => {
+                return
+                    Err(StackAction::panic_str(
+                        format!("unknown method called: {}", key),
+                        None))
+            },
         }
     }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
@@ -428,7 +434,8 @@ impl AtomicAVal {
 
 impl VValUserData for AtomicAVal {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-    fn call_method(&self, key: &str, args: &[VVal]) -> Result<VVal, StackAction> {
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let args = env.argv_ref();
         match key {
             "read" => Ok(self.read()),
             "swap" => {
@@ -439,7 +446,12 @@ impl VValUserData for AtomicAVal {
                 self.write(v);
                 Ok(v.clone())
             },
-            _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
+            _ => {
+                return
+                    Err(StackAction::panic_str(
+                        format!("Unknown method called: {}", key),
+                        None))
+            },
         }
     }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
@@ -547,10 +559,15 @@ impl DefaultThreadHandle {
 
 impl VValUserData for DefaultThreadHandle {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-    fn call_method(&self, key: &str, _args: &[VVal]) -> Result<VVal, StackAction> {
+    fn call_method(&self, key: &str, _env: &mut Env) -> Result<VVal, StackAction> {
         match key {
             "join" => Ok(self.join()),
-            _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
+            _ => {
+                return
+                    Err(StackAction::panic_str(
+                        format!("Unknown method called: {}", key),
+                        None))
+            },
         }
     }
     fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {

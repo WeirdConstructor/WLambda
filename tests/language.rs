@@ -1375,7 +1375,12 @@ fn check_userdata() {
         fn get_key(&self, key: &str) -> Option<VVal> {
             Some(VVal::new_str(key))
         }
-        fn call(&self, args: &[VVal]) -> Result<VVal, StackAction> {
+        fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+            let args = env.argv_ref();
+            Ok(VVal::pair(VVal::new_str(key), args[0].clone()))
+        }
+        fn call(&self, env: &mut Env) -> Result<VVal, StackAction> {
+            let args = env.argv_ref();
             Ok(args[0].clone())
         }
         fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
@@ -1408,11 +1413,13 @@ fn check_userdata() {
     let r = &mut ctx.eval(r#"
         !x = new_mytype[];
         !i = modify_mytype x;
-        $[i, x, x.foo, x :foo2]
+        $[i, x, x.foo, x :foo2, x.foo[99], x[:kkk]]
     "#).unwrap();
 
     assert_eq!(
-        r.s(), "$[98,$<MyType((14, 84))>,\"foo\",:\"foo2\"]", "Userdata implementation works");
+        r.s(),
+        "$[98,$<MyType((14, 84))>,\"foo\",:\"foo2\",$p(\"foo\",99),:\"kkk\"]",
+        "Userdata implementation works");
 }
 
 #[test]
@@ -2581,6 +2588,32 @@ fn check_threads() {
 
         $[h.join[], msg[]];
     "#), "$[99,20]");
+
+    assert_eq!(ve(r#"
+        !chan = std:sync:mpsc:new[];
+        !chan2 = std:sync:mpsc:new[];
+        !h = std:thread:spawn ($code {
+            !@import std std;
+            !@wlambda;
+
+            !m = chan2.recv[];
+            chan.send m;
+            99
+        }[]) ${ chan = chan, chan2 = chan2 };
+
+        !msg = chan.try_recv[];
+        std:assert_eq (type msg) "optional";
+        std:assert ~ not msg;
+
+        chan2.send "test";
+        !msg = $n;
+        while not[msg] {
+            .msg = chan.try_recv[];
+            std:thread:sleep $p(:ms, 10);
+        };
+
+        $[h.join[], msg[]];
+    "#), "$[99,\"test\"]");
 }
 
 #[test]
@@ -3250,6 +3283,13 @@ fn check_optionals() {
     assert_eq!(ve("$o() == $o()"),      "$true");
     assert_eq!(ve("$o() == $o(10)"),    "$false");
     assert_eq!(ve("$o(10) == $o()"),    "$false");
+
+    assert_eq!(ve("bool $o()"),         "$false");
+    assert_eq!(ve("bool $o(30)"),       "$true");
+    assert_eq!(ve("bool $o(\"test\")"), "$true");
+    assert_eq!(ve("not $o(30)"),        "$false");
+    assert_eq!(ve("not $o()"),          "$true");
+    assert_eq!(ve("not $o(\"xx\")"),    "$false");
 
     assert_eq!(ve("$o(10)[]"),    "10");
     assert_eq!(ve("$o()[]"),      "$n");

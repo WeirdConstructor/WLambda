@@ -306,7 +306,8 @@ macro_rules! call_ud_method {
         {
             let call_ret =
                 $env.with_local_call_info(
-                    $argc, |env| $ud.call_method($key, env.argv_ref()));
+                    $argc, |env| $ud.call_method($key, env));
+            $env.popn($argc);
             match call_ret {
                 Ok($call_ret) => $cont,
                 Err(StackAction::Return(ret)) => {

@@ -6850,6 +6850,15 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(AValChannel::new())
         }, Some(0), Some(0), false);
 
+    func!(st, "thread:sleep",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0).to_duration() {
+                Ok(dur) => std::thread::sleep(dur),
+                Err(v)  => { return Ok(v); },
+            }
+            Ok(VVal::Bol(true))
+        }, Some(1), Some(1), false);
+
     func!(st, "thread:spawn",
         move |env: &mut Env, argc: usize| {
             let avs =
