@@ -293,24 +293,24 @@ impl AValChannel {
         }
     }
 
-    pub fn recv_timeout(&self, timeout_ms: i64) -> VVal {
+    pub fn recv_timeout(&self, dur: Option<std::time::Duration>) -> VVal {
         match self.receiver.lock() {
             Ok(guard) => {
-                if timeout_ms == 0 {
-                    match guard.recv() {
-                        Ok(av) => av.to_vval(),
-                        Err(_) =>
-                            VVal::err_msg(&format!("recv disconnected")),
-                    }
-                } else {
-                    match guard.recv_timeout(
-                        std::time::Duration::from_millis(
-                            timeout_ms as u64))
-                    {
-                        Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
-                        Err(RecvTimeoutError::Timeout)      => VVal::Opt(None),
-                        Err(RecvTimeoutError::Disconnected) =>
-                            VVal::err_msg(&format!("recv_timeout disconnected")),
+                match dur {
+                    None => {
+                        match guard.recv() {
+                            Ok(av) => av.to_vval(),
+                            Err(_) =>
+                                VVal::err_msg(&format!("recv disconnected")),
+                        }
+                    },
+                    Some(dur) => {
+                        match guard.recv_timeout(dur) {
+                            Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
+                            Err(RecvTimeoutError::Timeout)      => VVal::Opt(None),
+                            Err(RecvTimeoutError::Disconnected) =>
+                                VVal::err_msg(&format!("recv_timeout disconnected")),
+                        }
                     }
                 }
             },
@@ -345,7 +345,7 @@ impl VValUserData for AValChannel {
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         let argv = env.argv_ref();
         match key {
-            "recv" => Ok(self.recv_timeout(0)),
+            "recv" => Ok(self.recv_timeout(None)),
             "try_recv" => Ok(self.try_recv()),
             "recv_timeout" => {
                 if argv.len() != 1 {
@@ -355,7 +355,7 @@ impl VValUserData for AValChannel {
                             None))
                 }
 
-                Ok(self.recv_timeout(argv[0].i()))
+                Ok(self.recv_timeout(Some(argv[0].to_duration()?)))
             },
             "send" => {
                 if argv.len() != 1 {

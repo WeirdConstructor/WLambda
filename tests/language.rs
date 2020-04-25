@@ -2583,7 +2583,7 @@ fn check_threads() {
             99
         }[]) ${ chan = chan };
 
-        !msg = chan.recv_timeout 1000;
+        !msg = chan.recv_timeout $p(:ms, 1000);
         std:assert_eq (type msg) "optional";
 
         $[h.join[], msg[]];

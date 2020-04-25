@@ -1046,6 +1046,12 @@ impl StackAction {
     }
 }
 
+impl From<VVal> for StackAction {
+    fn from(v: VVal) -> StackAction {
+        StackAction::panic(v, None)
+    }
+}
+
 /// Position of a variable represented in the `CompileEnv`.
 #[derive(Debug, Clone)]
 pub enum VarPos {
