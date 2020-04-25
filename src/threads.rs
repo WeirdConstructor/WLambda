@@ -253,28 +253,42 @@ pub struct AValChannel {
     receiver:   Arc<Mutex<Receiver<AVal>>>,
 }
 
+#[derive(Clone, Debug)]
+pub struct ForkSenderError(String);
+
 impl AValChannel {
-    pub fn new() -> VVal {
+    pub(crate) fn new_direct() -> AValChannel {
         let (send, recv) = std::sync::mpsc::channel();
-        VVal::Usr(Box::new(Self {
+        Self {
             sender:     Arc::new(Mutex::new(send)),
             receiver:   Arc::new(Mutex::new(recv)),
-        }))
+        }
     }
 
-    pub fn fork_sender(&self) -> VVal {
+    pub fn new() -> VVal {
+        VVal::Usr(Box::new(Self::new_direct()))
+    }
+
+    pub(crate) fn fork_sender_direct(&self) -> Result<Self, ForkSenderError> {
         match self.sender.lock() {
             Ok(guard) => {
                 let receiver = self.receiver.clone();
                 let new_sender : Sender<AVal> = guard.clone();
-                VVal::Usr(Box::new(Self {
+                Ok(Self {
                     sender: Arc::new(Mutex::new(new_sender)),
                     receiver,
-                }))
+                })
             },
-            Err(e) =>
+            Err(e) => Err(ForkSenderError(format!("{}", e))),
+        }
+    }
+
+    pub fn fork_sender(&self) -> VVal {
+        match self.fork_sender_direct() {
+            Ok(channel) => VVal::Usr(Box::new(channel)),
+            Err(ForkSenderError(msg)) =>
                 VVal::err_msg(
-                    &format!("Failed to fork sender, can't get lock: {}", e)),
+                    &format!("Failed to fork sender, can't get lock: {}", msg)),
         }
     }
 

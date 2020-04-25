@@ -16,6 +16,7 @@ to the end of the argument list now.
 * Incompatible Change: Strings and byte vectors are immutable data types now.
 * Incompatible Change: VValUserData::call takes an Env now instead of the
 argument vector directly.
+* Incompatible Change: Replaced MsgHandle by wlambda::rpc_helper::RPCHandle.
 * Potentially Incompatible Change: The compiler and evaluator was completely replaced
 by a VM and code generator for it.
 * Change: Function arguments are stored in right order (function, arg1, arg2, ...) on the

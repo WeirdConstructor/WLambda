@@ -503,6 +503,7 @@ pub mod ops;
 pub mod vm;
 pub mod prelude;
 pub mod threads;
+pub mod rpc_helper;
 pub mod util;
 pub mod nvec;
 pub mod vval_user_obj;
