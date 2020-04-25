@@ -4713,6 +4713,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use crate::compiler::*;
 use crate::vval::*;
+use crate::nvec::*;
 use crate::util;
 use std::rc::Rc;
 use crate::threads::*;
@@ -6663,6 +6664,40 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::FVec(crate::nvec::NVec::rad2vec(env.arg(0).f())))
         }, Some(1), Some(1), false);
 
+//    func!(st, "v:hex2hsva_i",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
+//
+//    func!(st, "v:hex2hsva_f",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
+
+    func!(st, "v:hex2rgba_i",
+        |env: &mut Env, _argc: usize| {
+            let (r, g, b, a) =
+                env.arg(0).with_s_ref(|s| util::hex2rgba(s));
+            Ok(VVal::IVec(NVec::from_tpl(
+                (r as i64, g as i64, Some(b as i64), Some(a as i64))).unwrap()))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:hex2rgba_f",
+        |env: &mut Env, _argc: usize| {
+            let (r, g, b, a) =
+                env.arg(0).with_s_ref(|s| util::hex2rgbaf(s));
+            Ok(VVal::FVec(NVec::from_tpl((r, g, Some(b), Some(a))).unwrap()))
+        }, Some(1), Some(1), false);
+
+//    func!(st, "v:rgba2hex",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
+//
+//    func!(st, "v:hsv2rgb",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
+
+//    func!(st, "v:rgb2hsv",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
 
     func!(st, "sort",
         |env: &mut Env, argc: usize| {
@@ -6867,19 +6902,6 @@ pub fn std_symbol_table() -> SymbolTable {
                     for (i, (v, k)) in env.arg(1).iter().enumerate() {
                         let av = AtomicAVal::new();
                         av.write(&v);
-//                            if let VVal::Usr(mut vu) = v {
-//                                if let Some(avu) = vu.as_any().downcast_mut::<AtomicAVal>() {
-//                                    avu.clone()
-//                                } else if let Some(avc) = vu.as_any().downcast_mut::<AValChannel>() {
-//                                    avc.clone()
-//                                } else {
-//                                    AtomicAVal::new()
-//                                }
-//                            } else {
-//                                let av = AtomicAVal::new();
-//                                av.write(&v);
-//                                av
-//                            };
 
                         if let Some(k) = k {
                             avs.push((k.s_raw(), av));

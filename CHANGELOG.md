@@ -46,6 +46,7 @@ between `$none` and really no value.
 * Feature: Implemented iterator values `$iter ...` that can either be called
 directly of passed to `iter`.
 * Feature: Symbols are now fully interned strings (per thread).
+* Feature: Added color functions `std:v:hex2rgba_*`.
 * Documentation: More!
 
 0.4.4 (2020-03-06)

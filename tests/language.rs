@@ -3357,3 +3357,9 @@ fn check_quote() {
         #
     "#), "\"fewof wefewop\\n            fwe { feofwef [ XX }(]})]w}\\n        \"");
 }
+
+#[test]
+fn check_color_functions() {
+    assert_eq!(ve("ivec ~ (std:v:hex2rgba_f :33C0CC80) * 100"), "$i(20,75,80,50)");
+    assert_eq!(ve("std:v:hex2rgba_i :33C0CC80"),                "$i(51,192,204,128)");
+}
