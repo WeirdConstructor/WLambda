@@ -1924,11 +1924,11 @@ std:assert_eq s "a b c";
 };
 
 # Primary use case is `eval` and `std:thread:spawn`:
-!v = std:thread:join ~ std:thread:spawn $code {
+!v = (std:thread:spawn $code {
     !@import std std;
     !res = "x" "y" "z";
     std:str:cat res 33;
-}[];
+}[]).join[];
 
 std:assert_eq v "xyz33";
 ```
@@ -6845,57 +6845,10 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::Usr(Box::new(av)))
         }, Some(1), Some(1), false);
 
-    func!(st, "sync:atom:read",
-        |env: &mut Env, _argc: usize| {
-            let av = env.arg(0);
-            if let VVal::Usr(mut avu) = av {
-                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
-                    Ok(ud.read())
-                } else {
-                    Ok(env.new_err(
-                        format!("Value is not an AtomicAVal: {}", avu.s())))
-                }
-            } else {
-                Ok(env.new_err(
-                    format!("Value is not a user data AtomicAVal: {}", av.s())))
-            }
-        }, Some(1), Some(1), false);
-
-    func!(st, "sync:atom:swap",
-        |env: &mut Env, _argc: usize| {
-            let av = env.arg(0);
-            if let VVal::Usr(mut avu) = av {
-                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
-                    let v = env.arg(1);
-                    Ok(ud.swap(&v))
-                } else {
-                    Ok(env.new_err(
-                        format!("Value is not an AtomicAVal: {}", avu.s())))
-                }
-            } else {
-                Ok(env.new_err(
-                    format!("Value is not a user data AtomicAVal: {}", av.s())))
-            }
-        }, Some(2), Some(2), false);
-
-
-    func!(st, "sync:atom:write",
-        |env: &mut Env, _argc: usize| {
-            let av = env.arg(0);
-            if let VVal::Usr(mut avu) = av {
-                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
-                    let v = env.arg(1);
-                    ud.write(&v);
-                    Ok(v)
-                } else {
-                    Ok(env.new_err(
-                        format!("Value is not an AtomicAVal: {}", avu.s())))
-                }
-            } else {
-                Ok(env.new_err(
-                    format!("Value is not a user data AtomicAVal: {}", av.s())))
-            }
-        }, Some(2), Some(2), false);
+    func!(st, "sync:mpsc:new",
+        |_env: &mut Env, _argc: usize| {
+            Ok(AValChannel::new())
+        }, Some(0), Some(0), false);
 
     func!(st, "thread:spawn",
         move |env: &mut Env, argc: usize| {
@@ -6903,18 +6856,21 @@ pub fn std_symbol_table() -> SymbolTable {
                 if argc > 1 {
                     let mut avs = vec![];
                     for (i, (v, k)) in env.arg(1).iter().enumerate() {
-                        let av =
-                            if let VVal::Usr(mut vu) = v {
-                                if let Some(avu) = vu.as_any().downcast_mut::<AtomicAVal>() {
-                                    avu.clone()
-                                } else {
-                                    AtomicAVal::new()
-                                }
-                            } else {
-                                let av = AtomicAVal::new();
-                                av.write(&v);
-                                av
-                            };
+                        let av = AtomicAVal::new();
+                        av.write(&v);
+//                            if let VVal::Usr(mut vu) = v {
+//                                if let Some(avu) = vu.as_any().downcast_mut::<AtomicAVal>() {
+//                                    avu.clone()
+//                                } else if let Some(avc) = vu.as_any().downcast_mut::<AValChannel>() {
+//                                    avc.clone()
+//                                } else {
+//                                    AtomicAVal::new()
+//                                }
+//                            } else {
+//                                let av = AtomicAVal::new();
+//                                av.write(&v);
+//                                av
+//                            };
 
                         if let Some(k) = k {
                             avs.push((k.s_raw(), av));
@@ -6948,22 +6904,6 @@ pub fn std_symbol_table() -> SymbolTable {
                     None))
             }
         }, Some(1), Some(2), false);
-
-    func!(st, "thread:join",
-        move |env: &mut Env, _argc: usize| {
-            let hdl = env.arg(0);
-            if let VVal::Usr(mut hdl) = hdl {
-                if let Some(ud) = hdl.as_any().downcast_mut::<DefaultThreadHandle>() {
-                    Ok(ud.join(env))
-                } else {
-                    Ok(env.new_err(
-                        format!("Value is not a DefaultThreadHandle: {}", hdl.s())))
-                }
-            } else {
-                Ok(env.new_err(
-                    format!("Value is not a user data DefaultThreadHandle: {}", hdl.s())))
-            }
-        }, Some(1), Some(1), false);
 
     st
 }

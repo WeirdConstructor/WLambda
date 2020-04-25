@@ -27,6 +27,8 @@ the error occurred easier.
 * Change: $q and $Q recognizes nested parenthesis now:
 `$q{parses { nested } stuff now! Also [}] is fine}`.
 * Optimization: Removed many unnecessary String allocations.
+* Feature: VValUserData can now define a `call_method(...)` trait function,
+that will be called when a method call is invoked on the object: `obj.method[...]`.
 * Feature: Added `not_i64` and `not_u32`.
 * Feature: Added compile time constant values: `!:const X = ...`.
 * Feature: Added if statement `? <cond> <then> <else>`.

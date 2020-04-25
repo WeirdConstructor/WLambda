@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::RwLock;
-use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{Receiver, Sender, TryRecvError, RecvTimeoutError};
 use std::fmt::Formatter;
 
 use fnv::FnvHashMap;
@@ -64,6 +64,7 @@ pub enum AVal {
     IVec(NVec<i64>),
     Pair(Box<(AVal, AVal)>),
     Map(FnvHashMap<String, AVal>),
+    Chan(AValChannel),
     Atom(AtomicAVal),
 }
 
@@ -120,6 +121,7 @@ impl AVal {
             AVal::Str(s)       => VVal::new_str(s),
             AVal::Byt(b)       => VVal::new_byt(b.clone()),
             AVal::Atom(a)      => VVal::Usr(Box::new(a.clone())),
+            AVal::Chan(a)      => VVal::Usr(Box::new(a.clone())),
             AVal::Opt(None)    => VVal::opt_none(),
             AVal::Opt(Some(a)) => VVal::opt(a.to_vval()),
             AVal::Pair(p)      => VVal::pair(p.0.to_vval(), p.1.to_vval()),
@@ -199,7 +201,8 @@ impl AVal {
                 let mut cl_ud = u.clone_ud();
                 if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicAVal>() {
                     AVal::Atom(ud.clone())
-
+                } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AValChannel>() {
+                    AVal::Chan(ud.clone())
                 } else {
                     AVal::None
                 }
@@ -213,16 +216,16 @@ impl AVal {
 ///
 /// ```text
 /// !atom = std:sync:atom:new 10;
-/// !queue = std:sync:mpsc:new[];
+/// !channel = std:sync:mpsc:new[];
 /// !thrd = std:spawn_thread $q{
 ///     !val = main.read;
 ///     main.write $[1,$[0,1],3];
 ///
 ///     main.read_at 0;
 ///     main.write_at $[1, 0] 320;
-///     q.push $["done", 10];
+///     q.send $["done", 10];
 ///
-/// } ${ main = atom, q = queue };
+/// } ${ main = atom, q = channel };
 ///
 /// !item = queue.pop[];
 /// .item = queue.pop_timeout 1000;
@@ -244,56 +247,132 @@ impl Default for AtomicAVal {
     fn default() -> Self { AtomicAVal::new() }
 }
 
-#[allow(dead_code)]
-pub struct AValSender(Rc<Sender<AVal>>);
-
-#[allow(dead_code)]
-impl AValSender {
-    pub fn send(&self, v: &VVal) -> VVal {
-        if let Err(e) = self.0.send(AVal::from_vval(v)) {
-            VVal::err_msg(&format!("send error: {}", e))
-        } else {
-            VVal::Bol(true)
-        }
-    }
+#[derive(Clone)]
+pub struct AValChannel {
+    sender:     Arc<Mutex<Sender<AVal>>>,
+    receiver:   Arc<Mutex<Receiver<AVal>>>,
 }
 
-#[allow(dead_code)]
-pub struct AValReceiver(Arc<Mutex<Receiver<AVal>>>);
+impl AValChannel {
+    pub fn new() -> VVal {
+        let (send, recv) = std::sync::mpsc::channel();
+        VVal::Usr(Box::new(Self {
+            sender:     Arc::new(Mutex::new(send)),
+            receiver:   Arc::new(Mutex::new(recv)),
+        }))
+    }
 
-#[allow(dead_code)]
-impl AValReceiver {
-    pub fn try_recv(&self, _timeout: i64) -> VVal {
-        match self.0.lock() {
+    pub fn fork_sender(&self) -> VVal {
+        match self.sender.lock() {
             Ok(guard) => {
-                match guard.try_recv() {
-                    Ok(av) => av.to_vval(),
-                    Err(TryRecvError::Empty) => VVal::None,
-                    Err(e) => {
-                        VVal::err_msg(&format!("try_recv error: {}", e))
+                let receiver = self.receiver.clone();
+                let new_sender : Sender<AVal> = guard.clone();
+                VVal::Usr(Box::new(Self {
+                    sender: Arc::new(Mutex::new(new_sender)),
+                    receiver,
+                }))
+            },
+            Err(e) =>
+                VVal::err_msg(
+                    &format!("Failed to fork sender, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn send(&self, msg: &VVal) -> VVal {
+        match self.sender.lock() {
+            Ok(guard) => {
+                let msg = AVal::from_vval(msg);
+                if let Err(e) = guard.send(msg) {
+                    VVal::err_msg(&format!("Failed to send: {}", e))
+                } else {
+                    VVal::Bol(true)
+                }
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to send, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn recv_timeout(&self, timeout_ms: i64) -> VVal {
+        match self.receiver.lock() {
+            Ok(guard) => {
+                if timeout_ms == 0 {
+                    match guard.recv() {
+                        Ok(av) => av.to_vval(),
+                        Err(_) =>
+                            VVal::err_msg(&format!("recv disconnected")),
+                    }
+                } else {
+                    match guard.recv_timeout(
+                        std::time::Duration::from_millis(
+                            timeout_ms as u64))
+                    {
+                        Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
+                        Err(RecvTimeoutError::Timeout)      => VVal::Opt(None),
+                        Err(RecvTimeoutError::Disconnected) =>
+                            VVal::err_msg(&format!("recv_timeout disconnected")),
                     }
                 }
             },
-            Err(e) => {
-                VVal::err_msg(&format!("try_recv error: {}", e))
-            }
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to receive, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn recv(&self) -> VVal {
+        match self.receiver.lock() {
+            Ok(guard) => {
+                match guard.try_recv() {
+                    Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
+                    Err(TryRecvError::Empty) => VVal::Opt(None),
+                    Err(e) => VVal::err_msg(&format!("try_recv error: {}", e)),
+                }
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to receive, can't get lock: {}", e)),
         }
     }
 }
 
-//impl VValUserData for Sender {
-//    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-//    fn clone_ud(&self) -> Box<dyn VValUserData> {
-//        Box::new(self.clone())
-//    }
-//}
-//
-//impl VValUserData for ReadLock {
-//    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-//    fn clone_ud(&self) -> Box<dyn VValUserData> {
-//        Box::new(self.clone())
-//    }
-//}
+impl std::fmt::Debug for AValChannel {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "<<AValChannel>>")
+    }
+}
+
+impl VValUserData for AValChannel {
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn call_method(&self, key: &str, argv: &[VVal]) -> Result<VVal, StackAction> {
+        match key {
+            "recv" => Ok(self.recv()),
+            "recv_sync" => Ok(self.recv_timeout(0)),
+            "recv_timeout" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("recv_timeout method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.recv_timeout(argv[0].i()))
+            },
+            "send" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("send method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.send(&argv[0]))
+            },
+            _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
+        }
+    }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
+    }
+}
 
 impl AtomicAVal {
     /// Creates a new empty instance, containing AVal::None.
@@ -349,6 +428,20 @@ impl AtomicAVal {
 
 impl VValUserData for AtomicAVal {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn call_method(&self, key: &str, args: &[VVal]) -> Result<VVal, StackAction> {
+        match key {
+            "read" => Ok(self.read()),
+            "swap" => {
+                Ok(self.swap(&args[0]))
+            },
+            "write" => {
+                let v = &args[0];
+                self.write(v);
+                Ok(v.clone())
+            },
+            _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
+        }
+    }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
         Box::new(self.clone())
     }
@@ -442,19 +535,24 @@ pub struct DefaultThreadHandle(Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>
 
 impl DefaultThreadHandle {
     /// Joins the handle, and returns the result VVal of the thread.
-    pub fn join(&self, env: &mut Env) -> VVal {
+    pub fn join(&self) -> VVal {
         let hdl = std::mem::replace(&mut (*self.0.borrow_mut()), None);
         if let Some(h) = hdl {
             h.join().unwrap().to_vval()
         } else {
-            env.new_err(
-                "DefaultThreadHandle already joined!".to_string())
+            VVal::err_msg("DefaultThreadHandle already joined!")
         }
     }
 }
 
 impl VValUserData for DefaultThreadHandle {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn call_method(&self, key: &str, _args: &[VVal]) -> Result<VVal, StackAction> {
+        match key {
+            "join" => Ok(self.join()),
+            _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
+        }
+    }
     fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
         Box::new(self.clone())
     }
@@ -473,7 +571,8 @@ impl ThreadCreator for DefaultThreadCreator {
 
                 if let Some(globals) = globals {
                     for (k, av) in globals {
-                        genv.borrow_mut().set_var(&k, &VVal::Usr(Box::new(av)));
+                        let v = av.read();
+                        genv.borrow_mut().set_var(&k, &v);
                     }
                 }
 

@@ -2398,6 +2398,8 @@ fn check_accumulator() {
             std:push res $p(x, $@@);
         };
     "), "$[$p(\"\",$<1=>\"1\"),$p($<1>,$<2=>\"12\"),$<2>]");
+
+    assert_eq!(ve(r#"$@i $p(";", 0) "1;3;44;2;4" |> $+"#), "54");
 }
 
 #[test]
@@ -2516,35 +2518,35 @@ fn check_const() {
 #[test]
 fn check_threads() {
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $b\"abc\" };
+        (std:thread:spawn $q{ $b\"abc\" }).join[];
     "), "$b\"abc\"");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $o(49) };
+        (std:thread:spawn $q{ $o(49) }).join[];
     "), "$o(49)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $p(:foo,2) };
+        (std:thread:spawn $q{ $p(:foo,2) }).join[];
     "), "$p(:\"foo\",2)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $f(1,2) };
+        (std:thread:spawn $q{ $f(1,2) }).join[];
     "), "$f(1,2)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $f(1,2,3) };
+        (std:thread:spawn $q{ $f(1,2,3) }).join[];
     "), "$f(1,2,3)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $f(1,2,3,4) };
+        (std:thread:spawn $q{ $f(1,2,3,4) }).join[];
     "), "$f(1,2,3,4)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $i(1,2) };
+        (std:thread:spawn $q{ $i(1,2) }).join[];
     "), "$i(1,2)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $i(1,2,3) };
+        (std:thread:spawn $q{ $i(1,2,3) }).join[];
     "), "$i(1,2,3)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $i(1,2,3,4) };
+        (std:thread:spawn $q{ $i(1,2,3,4) }).join[];
     "), "$i(1,2,3,4)");
     assert_eq!(ve("
         !h = std:thread:spawn $q( $[1,2,${a=20},:x] );
-        std:thread:join h;
+        h.join[];
     "), "$[1,2,${a=20},:\"x\"]");
     assert_eq!(ve("
         !at = std:sync:atom:new 99;
@@ -2552,17 +2554,33 @@ fn check_threads() {
             !@wlambda;
             !@import std std;
 
-            !a = std:sync:atom:read THREAD_ARG0;
-            !b = std:sync:atom:read a.7;
-            std:sync:atom:write a.7 a;
+            !a = THREAD_ARG0;
+            !b = a.7.read[];
+            a.7.write a;
             $[a.0, a.1, a.2, a.3, a.4, a.5, a.6, b]
         } $[$[1,2,${a=20},:\"x\",\"oo\",$o(33),$p(1,$p(2,$i(3,4))), at]];
         $[
-            std:thread:join h,
-            std:take 7 ~ std:sync:atom:read at
+            h.join[],
+            std:take 7 ~ at.read[]
         ];
     "),
     "$[$[1,2,${a=20},$<1=>:\"x\",\"oo\",$o(33),$p(1,$p(2,$i(3,4))),99],$[1,2,${a=20},$<1>,\"oo\",$o(33),$p(1,$p(2,$i(3,4)))]]");
+
+    assert_eq!(ve(r#"
+        !chan = std:sync:mpsc:new[];
+        !h = std:thread:spawn ($code {
+            !@import std std;
+            !@wlambda;
+
+            chan.send 20;
+            99
+        }[]) ${ chan = chan };
+
+        !msg = chan.recv_timeout 1000;
+        std:assert_eq (type msg) "optional";
+
+        $[h.join[], msg[]];
+    "#), "$[99,20]");
 }
 
 #[test]
@@ -3287,6 +3305,12 @@ fn check_code_string_literals() {
 
 #[test]
 fn check_quote() {
+    assert_eq!(ve(r#"
+        $[$q{fewof wefewop
+            fwe []
+            []
+        }, 121]
+    "#), "$[\"fewof wefewop\\n            fwe []\\n            []\\n        \",121]");
     assert_eq!(ve(r#"
         $q#fewof wefewop
             fwe { feofwef [ XX }(]})]w}

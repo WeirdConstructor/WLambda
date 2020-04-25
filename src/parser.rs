@@ -283,7 +283,15 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
         }
 
         if !cont_next {
+            if !ps.consume_if_eq(next_quote) {
+                return Err(ps.err(
+                    ParseErrorKind::UnexpectedToken(next_quote, "")));
+            }
+
             quote_stack.pop();
+            if !quote_stack.is_empty() {
+                adchr(&mut v, &mut s, bytes, next_quote);
+            }
         }
     }
 
@@ -291,10 +299,6 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
         vec.push(VVal::new_byt(v));
     } else {
         vec.push(VVal::new_str(&s));
-    }
-
-    if !ps.consume_if_eq(quote_char) {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken(quote_char, "")));
     }
 
     ps.skip_ws_and_comments();

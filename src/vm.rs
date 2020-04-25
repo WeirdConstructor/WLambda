@@ -301,6 +301,36 @@ macro_rules! handle_break {
     }
 }
 
+macro_rules! call_ud_method {
+    ($ud: ident, $key: ident, $argc: ident, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident, $call_ret: ident, $cont: block) => {
+        {
+            let call_ret =
+                $env.with_local_call_info(
+                    $argc, |env| $ud.call_method($key, env.argv_ref()));
+            match call_ret {
+                Ok($call_ret) => $cont,
+                Err(StackAction::Return(ret)) => {
+                    $env.unwind_to_depth($uw_depth);
+                    $retv = Err(StackAction::Return(ret));
+                    break;
+                },
+                Err(StackAction::Next) => {
+                    handle_next!($env, $pc, $uw_depth, $retv);
+                },
+                Err(StackAction::Break(v)) => {
+                    handle_break!($env, $pc, v, $uw_depth, $retv);
+                },
+                Err(sa) => {
+                    $env.unwind_to_depth($uw_depth);
+                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                    break;
+                },
+            }
+        }
+    }
+}
+
+
 macro_rules! call_func {
     ($f: ident, $argc: ident, $popc: expr, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident, $call_ret: ident, $cont: block) => {
         {
@@ -774,28 +804,44 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 in_reg!(env, ret, data, o);
                 let o = handle_err!(o, "field idx/key", retv);
                 let k = handle_err!(k, "map/list", retv);
-
-                let f = get_key!(o, k, proto_lookup, env, retv, uw_depth, prog, pc);
-
                 let argc = *argc as usize;
-                env.push_unwind_self(o);
-                call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
-                    env.unwind_one();
-                    out_reg!(env, ret, retv, data, r, v);
-                });
+
+                if let VVal::Usr(u) = o {
+                    let k = k.s_raw();
+                    let ks = &k;
+                    call_ud_method!(u, ks, argc, env, retv, uw_depth, prog, pc, v, {
+                        out_reg!(env, ret, retv, data, r, v);
+                    })
+
+                } else {
+                    let f = get_key!(o, k, proto_lookup, env, retv, uw_depth, prog, pc);
+                    env.push_unwind_self(o);
+                    call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                        env.unwind_one();
+                        out_reg!(env, ret, retv, data, r, v);
+                    });
+                }
             },
             Op::CallMethodSym(o, k, argc, r) => {
                 in_reg!(env, ret, data, o);
                 let o = handle_err!(o, "field idx/key", retv);
-
-                let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::None);
-
                 let argc = *argc as usize;
-                env.push_unwind_self(o);
-                call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
-                    env.unwind_one();
-                    out_reg!(env, ret, retv, data, r, v);
-                });
+
+                if let VVal::Usr(u) = o {
+                    let k = &*k;
+                    call_ud_method!(u, k, argc, env, retv, uw_depth, prog, pc, v, {
+                        out_reg!(env, ret, retv, data, r, v);
+                    })
+
+                } else {
+                    let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::None);
+                    env.push_unwind_self(o);
+                    call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                        env.unwind_one();
+                        out_reg!(env, ret, retv, data, r, v);
+                    });
+                }
+
             },
             Op::Call(argc, r) => {
                 let argc = *argc as usize;

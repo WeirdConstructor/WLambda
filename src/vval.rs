@@ -592,6 +592,11 @@ impl Env {
     }
 
     #[inline]
+    pub fn argv_ref(&self) -> &[VVal] {
+        &self.args[(self.bp - self.argc)..self.bp]
+    }
+
+    #[inline]
     pub fn get_up_raw(&mut self, i: usize) -> VVal {
         //d// println!("GET UP {}: {:?}", i, self.fun.upvalues);
         self.call_stack.last().unwrap().upvalues[i].clone()
@@ -1213,6 +1218,12 @@ impl VValFun {
 ///     fn get_key(&self, key: &str) -> Option<VVal> {
 ///         Some(VVal::new_str(key))
 ///     }
+///     fn call_method(&self, key: &str, args: &[VVal]) -> Result<VVal, StackAction> {
+///         match key {
+///             "test" => Ok(VVal::Int(42)),
+///             _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
+///         }
+///     }
 ///     fn call(&self, args: &[VVal]) -> Result<VVal, StackAction> {
 ///         if args.len() < 0 {
 ///             return Err(StackAction::panic_msg(
@@ -1324,6 +1335,9 @@ pub trait VValUserData {
     /// This method returns some value that your user data
     /// associates with the given key.
     fn get_key(&self, _key: &str) -> Option<VVal> { None }
+    /// This method is called, when the user data object is used in a method call directly.
+    /// Use this to implement convenient APIs for the user of the user data object.
+    fn call_method(&self, _key: &str, _argv: &[VVal]) -> Result<VVal, StackAction> { Ok(VVal::None) }
     /// This method is called when the user data is called.
     fn call(&self, _args: &[VVal]) -> Result<VVal, StackAction> { Ok(VVal::None) }
     /// This should be implemented simply by returning
@@ -2599,11 +2613,8 @@ impl VVal {
                 }
             },
             VVal::Usr(ud) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    let mut args = vec![];
-                    for i in 0..argc { args.push(e.arg(i)) }
-                    ud.call(&args)
-                })
+                env.with_local_call_info(
+                    argc, |e: &mut Env| ud.call(e.argv_ref()))
             },
             VVal::DropFun(v) => v.v.call_internal(env, argc),
             VVal::Ref(v)     => v.borrow().call_internal(env, argc),
