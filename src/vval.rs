@@ -1585,6 +1585,10 @@ impl CycleCheck {
     }
 
     fn backref(&mut self, v: &VVal) -> Option<(bool, String)> {
+        // Do not generate back refs for symbols. they are interned
+        // anyways!
+        if let VVal::Sym(_) = v { return None; }
+
         let id =
             if let Some(id) = v.ref_id() { id }
             else { return None; };
