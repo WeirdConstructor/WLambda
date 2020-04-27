@@ -125,6 +125,8 @@ Smalltalk, LISP and Perl.
     - [4.8.14](#4814-stdvslerp-vec1-vec2-t) - std:v:slerp _vec1_ _vec2_ _t_
     - [4.8.15](#4815-stdvvec2rad-vec) - std:v:vec2rad _vec_
     - [4.8.16](#4816-stdvrad2vec-radians) - std:v:rad2vec _radians_
+    - [4.8.17](#4817-stdvhex2rgbaf-string) - std:v:hex2rgba_f _string_
+    - [4.8.18](#4818-stdvhex2rgbai-string) - std:v:hex2rgba_i _string_
   - [4.9](#49-strings) - Strings
     - [4.9.1](#491-string-literal-syntaxes) - String Literal Syntaxes
     - [4.9.2](#492-str-value) - str _value_
@@ -151,12 +153,17 @@ Smalltalk, LISP and Perl.
     - [4.10.2](#4102-byte-conversion-functions) - Byte Conversion Functions
     - [4.10.3](#4103-isbytes-value) - is_bytes _value_
   - [4.11](#411-symbols) - Symbols
+    - [4.11.1](#4111-stdsymbolscollect) - std:symbols:collect
   - [4.12](#412-pairs-pa-b) - Pairs `$p(a, b)`
-    - [4.12.1](#4121-pair-to-iterator) - Pair to Iterator
-      - [4.12.1.1](#41211-iter---enumerate) - Iter - Enumerate
-      - [4.12.1.2](#41212-iter---values) - Iter - Values
-      - [4.12.1.3](#41213-iter---keys) - Iter - Keys
-    - [4.12.2](#4122-ispair-value) - is_pair _value_
+    - [4.12.1](#4121-pair-string-operations) - Pair string operations
+      - [4.12.1.1](#41211-pfrom-count-string) - `$p(_from_, _count_) _string_`
+      - [4.12.1.2](#41212-ppattern-replacement-string) - `$p(_pattern_, _replacement_) _string_`
+      - [4.12.1.3](#41213-psplit-pattern-max-string) - `$p(_split-pattern_, _max_) _string_`
+    - [4.12.2](#4122-pair-to-iterator) - Pair to Iterator
+      - [4.12.2.1](#41221-iter---enumerate) - Iter - Enumerate
+      - [4.12.2.2](#41222-iter---values) - Iter - Values
+      - [4.12.2.3](#41223-iter---keys) - Iter - Keys
+    - [4.12.3](#4123-ispair-value) - is_pair _value_
   - [4.13](#413-vectors-or-lists) - Vectors (or Lists)
     - [4.13.1](#4131-stdpush-vector-item) - std:push _vector_ _item_
     - [4.13.2](#4132-stdpop-vector) - std:pop _vector_
@@ -1885,7 +1892,7 @@ std:assert_rel_eq r.x h.x 0.0001;
 std:assert_rel_eq r.y h.y 0.0001;
 ```
 
-#### - std:v:hex2rgba_f _string_
+#### <a name="4817-stdvhex2rgbaf-string"></a>4.8.17 - std:v:hex2rgba_f _string_
 
 Interprets _string_ as an hex encoded color and
 returns a 4 element big float vector. The color components
@@ -1914,7 +1921,7 @@ std:assert_rel_eq color2.b 0.2   0.001;
 std:assert_rel_eq color2.a 1.0   0.001;
 ```
 
-#### - std:v:hex2rgba_i _string_
+#### <a name="4818-stdvhex2rgbai-string"></a>4.8.18 - std:v:hex2rgba_i _string_
 
 Like `std:v:hex2rgba_f` this function converts a hex encoded color
 from _string_ but returns an integer vector with 4 elements.
@@ -2412,7 +2419,7 @@ Keep in mind, that all symbols are interned strings. And if you create many
 symbols that are not used anymore, you might need to trigger a cleanup
 with `std:symbols::collect`.
 
-#### - std:symbols:collect
+#### <a name="4111-stdsymbolscollect"></a>4.11.1 - std:symbols:collect
 
 Collect and remove all interned symbols in the current thread that are no
 longer used. Returns the number of freed symbols. Please keep in mind, that
@@ -2512,12 +2519,12 @@ std:assert std:ref_id[a] == id_a;
 std:assert std:ref_id[v.0] == id_a;
 ```
 
-#### - Pair string operations
+#### <a name="4121-pair-string-operations"></a>4.12.1 - Pair string operations
 
 If you call a pair with a string or byte vector as argument, there are some
 operations that can be done:
 
-##### - `$p(_from_, _count_) _string_`
+##### <a name="41211-pfrom-count-string"></a>4.12.1.1 - `$p(_from_, _count_) _string_`
 
 Returns a substring starting at _from_ with the length _count_.
 
@@ -2525,7 +2532,7 @@ Returns a substring starting at _from_ with the length _count_.
 std:assert_eq ($p(2, 4) "abcdefgh") "cdef";
 ```
 
-##### - `$p(_pattern_, _replacement_) _string_`
+##### <a name="41212-ppattern-replacement-string"></a>4.12.1.2 - `$p(_pattern_, _replacement_) _string_`
 
 Replaces all _pattern_ occurences in _string_ by _replacement_.
 
@@ -2533,7 +2540,7 @@ Replaces all _pattern_ occurences in _string_ by _replacement_.
 std:assert_eq ($p(";", "_") "A;B;D;EFG;HI") "A_B_D_EFG_HI";
 ```
 
-##### - `$p(_split-pattern_, _max_) _string_`
+##### <a name="41213-psplit-pattern-max-string"></a>4.12.1.3 - `$p(_split-pattern_, _max_) _string_`
 
 Splits _string_ at _split-pattern_ a _max_ number of times.
 If _max_ is 0, it is split completely.
@@ -2544,14 +2551,14 @@ std:assert_eq str[$p(";", 3) "A;B;D;EFG;HI"] ~ str $["A", "B", "D;EFG;HI"];
 std:assert_eq str[$p(";", 0) "A;B;D;EFG;HI"] ~ str $["A", "B", "D", "EFG", "HI"];
 ```
 
-#### <a name="4121-pair-to-iterator"></a>4.12.1 - Pair to Iterator
+#### <a name="4122-pair-to-iterator"></a>4.12.2 - Pair to Iterator
 
 Pairs play a special role if you make an iterator from it.
 It can be used to create a specialized iterator that only
 iterates over keys or values of a map. Or that enumerates
 a vector or map.
 
-##### <a name="41211-iter---enumerate"></a>4.12.1.1 - Iter - Enumerate
+##### <a name="41221-iter---enumerate"></a>4.12.2.1 - Iter - Enumerate
 
 If the first value of the pair is `:enumerate`
 it will enumerate entries in a map or values in a vector.
@@ -2578,7 +2585,7 @@ iter i $p(:enumerate, ${a = 10, b = 20})
 std:assert_eq (str v) (str $[0, 1]);
 ```
 
-##### <a name="41212-iter---values"></a>4.12.1.2 - Iter - Values
+##### <a name="41222-iter---values"></a>4.12.2.2 - Iter - Values
 
 This is useful for iterating over the values in a map in an undefined order:
 
@@ -2590,7 +2597,7 @@ This is useful for iterating over the values in a map in an undefined order:
 std:assert_eq sum 63;
 ```
 
-##### <a name="41213-iter---keys"></a>4.12.1.3 - Iter - Keys
+##### <a name="41223-iter---keys"></a>4.12.2.3 - Iter - Keys
 
 You can also iterate over map keys in an undefined order:
 
@@ -2602,7 +2609,7 @@ You can also iterate over map keys in an undefined order:
 std:assert_eq sum 60;
 ```
 
-#### <a name="4122-ispair-value"></a>4.12.2 - is_pair _value_
+#### <a name="4123-ispair-value"></a>4.12.3 - is_pair _value_
 
 Checks if _value_ is a pair.
 
