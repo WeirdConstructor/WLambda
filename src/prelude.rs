@@ -1885,6 +1885,56 @@ std:assert_rel_eq r.x h.x 0.0001;
 std:assert_rel_eq r.y h.y 0.0001;
 ```
 
+#### - std:v:hex2rgba_f _string_
+
+Interprets _string_ as an hex encoded color and
+returns a 4 element big float vector. The color components
+of the float vector go from 0.0 to 1.0.
+
+The string can be:
+
+- 8 characters: `"RRGGBBAA"`
+- 6 characters: `"RRGGBB"`, alpha will be 1.0
+- 4 characters: `"RGBA"`
+- 3 characters: `"RGB"`, alpha will be 1.0
+- 2 characters: `"YY"`, where YY is put into R, G and B. Alpha will be 1.0.
+
+```wlambda
+!color = std:v:hex2rgba_f "FF00FFFF";
+
+std:assert_rel_eq color.r 1.0 0.001;
+std:assert_rel_eq color.g 0.0 0.001;
+std:assert_rel_eq color.b 1.0 0.001;
+std:assert_rel_eq color.a 1.0 0.001;
+
+!color2 = std:v:hex2rgba_f "C83F";
+std:assert_rel_eq color2.r 0.8   0.001;
+std:assert_rel_eq color2.g 0.533 0.001;
+std:assert_rel_eq color2.b 0.2   0.001;
+std:assert_rel_eq color2.a 1.0   0.001;
+```
+
+#### - std:v:hex2rgba_i _string_
+
+Like `std:v:hex2rgba_f` this function converts a hex encoded color
+from _string_ but returns an integer vector with 4 elements.
+The integers are in the range of 0 to 255.
+
+```wlambda
+!color = std:v:hex2rgba_i "FF00FFFF";
+
+std:assert_eq color.r 255;
+std:assert_eq color.g 0;
+std:assert_eq color.b 255;
+std:assert_eq color.a 255;
+
+!color2 = std:v:hex2rgba_i "C83F";
+std:assert_eq color2.r 204;
+std:assert_eq color2.g 136;
+std:assert_eq color2.b 51;
+std:assert_eq color2.a 255;
+```
+
 ### <a name="49-strings"></a>4.9 - Strings
 
 Strings in WLambda are like Rust UTF-8 encoded immutable Unicode strings.
