@@ -1920,6 +1920,8 @@ Like `std:v:hex2rgba_f` this function converts a hex encoded color
 from _string_ but returns an integer vector with 4 elements.
 The integers are in the range of 0 to 255.
 
+About the format of _string_ please refer to `std:v:hex2rgba_f`.
+
 ```wlambda
 !color = std:v:hex2rgba_i "FF00FFFF";
 
