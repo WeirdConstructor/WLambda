@@ -2779,10 +2779,33 @@ fn check_pairs() {
           std:ref_id[p1] == std:ref_id[p2]]
     "), "$[$false,$false]");
 
-    assert_eq!(ve("$p(0, 3)             $q ABCDEFG "),    "\"ABC\"");
-    assert_eq!(ve("$p(\";\", 2)         $q AB;C;DE;FG "), "$[\"AB\",\"C;DE;FG\"]");
-    assert_eq!(ve("$p(\";\", 0)         $q AB;C;DE;FG "), "$[\"AB\",\"C\",\"DE\",\"FG\"]");
-    assert_eq!(ve("$p(\";\", \"_\")     $q AB;C;DE;FG "), "\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p(0, 3)             $q ABCDEFG "),      "\"ABC\"");
+    assert_eq!(ve("$p(\";\", 2)         $q AB.C.DE.FG "),   "$[\"AB.C.DE.FG\"]");
+    assert_eq!(ve("$p(\";\", 2)         $q AB;C;DE;FG "),   "$[\"AB\",\"C;DE;FG\"]");
+    assert_eq!(ve("$p(\";\", 2)         $q ;C;DE;FG "),     "$[\"\",\"C;DE;FG\"]");
+    assert_eq!(ve("$p(\";\", 3)         $q ;C; "),          "$[\"\",\"C\",\"\"]");
+    assert_eq!(ve("$p(\";\", 0)         $q AB;C;DE;FG "),   "$[\"AB\",\"C\",\"DE\",\"FG\"]");
+    assert_eq!(ve("$p(\";\", 0)         $q ;C;DE; "),       "$[\"\",\"C\",\"DE\",\"\"]");
+    assert_eq!(ve("$p(\";\", \"_\")     $q AB;C;DE;FG "),   "\"AB_C_DE_FG\"");
+
+    assert_eq!(ve("$p(0, 3)               $Q ABCDEFG "),      "$b\"ABC\"");
+    assert_eq!(ve("$p($b\";\", 2)         $Q AB;C;DE;FG "),   "$[$b\"AB\",$b\"C;DE;FG\"]");
+    assert_eq!(ve("$p($b\";\", 2)         $Q ;C;DE;FG "),     "$[$b\"\",$b\"C;DE;FG\"]");
+    assert_eq!(ve("$p($b\";\", 3)         $Q ;C; "),          "$[$b\"\",$b\"C\",$b\"\"]");
+    assert_eq!(ve("$p($b\";\", 0)         $Q AB;C;DE;FG "),   "$[$b\"AB\",$b\"C\",$b\"DE\",$b\"FG\"]");
+    assert_eq!(ve("$p($b\";\", 0)         $Q ;C;DE; "),       "$[$b\"\",$b\"C\",$b\"DE\",$b\"\"]");
+
+    assert_eq!(ve("$p($b\";;\", 2)        $Q AB;C;DE;FG "),   "$[$b\"AB;C;DE;FG\"]");
+    assert_eq!(ve("$p($b\";;\", 2)        $Q AB;;C;;DE;;FG "),"$[$b\"AB\",$b\"C;;DE;;FG\"]");
+    assert_eq!(ve("$p($b\";;\", 2)        $Q ;;C;;DE;;FG "),  "$[$b\"\",$b\"C;;DE;;FG\"]");
+    assert_eq!(ve("$p($b\";;\", 3)        $Q ;;C; "),         "$[$b\"\",$b\"C;\"]");
+    assert_eq!(ve("$p($b\";;\", 3)        $Q ;;C;; "),        "$[$b\"\",$b\"C\",$b\"\"]");
+    assert_eq!(ve("$p($b\";;\", 0)        $Q AB;;C;;DE;;FG "),"$[$b\"AB\",$b\"C\",$b\"DE\",$b\"FG\"]");
+    assert_eq!(ve("$p($b\";;\", 0)        $Q ;;C;;DE;; "),    "$[$b\"\",$b\"C\",$b\"DE\",$b\"\"]");
+    assert_eq!(ve("$p($b\";;\", 0)        $Q ;;C;;DE; "),     "$[$b\"\",$b\"C\",$b\"DE;\"]");
+
+    assert_eq!(ve("$p($b\";\", $b\"_\")   $Q AB;C;DE;FG "),     "\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p($b\";;\", $b\"_\")  $Q AB;;C;;DE;;FG "),  "\"AB_C_DE_FG\"");
 }
 
 #[test]
