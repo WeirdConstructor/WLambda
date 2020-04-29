@@ -2804,8 +2804,10 @@ fn check_pairs() {
     assert_eq!(ve("$p($b\";;\", 0)        $Q ;;C;;DE;; "),    "$[$b\"\",$b\"C\",$b\"DE\",$b\"\"]");
     assert_eq!(ve("$p($b\";;\", 0)        $Q ;;C;;DE; "),     "$[$b\"\",$b\"C\",$b\"DE;\"]");
 
-    assert_eq!(ve("$p($b\";\", $b\"_\")   $Q AB;C;DE;FG "),     "\"AB_C_DE_FG\"");
-    assert_eq!(ve("$p($b\";;\", $b\"_\")  $Q AB;;C;;DE;;FG "),  "\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p($b\";\", $b\"_\")     $Q AB;C;DE;FG "),               "$b\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p($b\";;\", $b\"_\")    $Q AB;;C;;DE;;FG "),            "$b\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p($b\";;;\", $b\"_\")   $Q ;;;AB;;;C;;;DE;;;FG;;; "),   "$b\"_AB_C_DE_FG_\"");
+    assert_eq!(ve("$p($b\";;\", $b\"____\") $Q AB;;C;;DE;;FG "),            "$b\"AB____C____DE____FG\"");
 }
 
 #[test]

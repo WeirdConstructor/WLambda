@@ -4777,6 +4777,33 @@ _sm_state_.
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
 
+### - Utility Functions
+
+#### - std:dump_upvals _function_
+
+Returns a vector of all the upvalues of the _function_.
+Please use this function for debugging purposes only, as the order of the
+variables, while consistent for a specific WLambda version,
+is not defined at this point.
+
+```wlambda
+!x = 1;
+!y = 2;
+!fun = { _ + x + y };
+
+std:assert_eq fun[3]   6;
+.x = 3;
+std:assert_eq fun[3]   8;
+
+!upvs = std:dump_upvals fun;
+std:assert_eq (str upvs) "$[$(&)3,$(&)2]";
+.y = 4;
+std:assert_eq (str upvs) "$[$(&)3,$(&)4]";
+
+std:assert_eq $*(upvs.0) 3;
+std:assert_eq $*(upvs.1) 4;
+```
+
 */
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -6245,9 +6272,9 @@ pub fn std_symbol_table() -> SymbolTable {
             print_value(env, argc, true)
         }, None, None, false);
 
-    func!(st, "dump_func",
+    func!(st, "dump_upvals",
         |env: &mut Env, _argc: usize| {
-            if let VVal::Fun(f) = env.arg(0) {
+            if let VVal::Fun(f) = env.arg(0).deref() {
                 return Ok(f.dump_upvals());
             }
             Ok(VVal::None)

@@ -1198,7 +1198,7 @@ impl VValFun {
     pub fn dump_upvals(&self) -> VVal {
         let v = VVal::vec();
         for uv in self.upvalues.iter() {
-            v.push(VVal::new_str_mv(uv.s()));
+            v.push(uv.clone());
         }
         v
     }
@@ -2607,12 +2607,33 @@ impl VVal {
 
                                     Ok(out)
                                 },
-//                                (VVal::Byt(needle), VVal::Byt(replace)) => {
-//                                    Ok(VVal::new_str_mv(
-//                                        s.as_ref()
-//                                         .replace(
-//                                            needle.as_ref(), replace.as_ref())))
-//                                },
+                                (VVal::Byt(needle), VVal::Byt(replace)) => {
+                                    let inp        = s.as_ref();
+                                    let needle     = needle.as_ref();
+                                    let needle_len = needle.len();
+
+                                    if needle_len > inp.len() {
+                                        Ok(VVal::Byt(s))
+                                    } else {
+                                        let mut out : Vec<u8>
+                                            = Vec::with_capacity(inp.len());
+
+                                        let mut i = 0;
+                                        while i < inp.len() {
+                                            if    i <= (inp.len() - needle_len)
+                                               && inp[i..(i + needle_len)] == needle[0..needle_len]
+                                            {
+                                                out.extend_from_slice(&replace.as_ref()[..]);
+                                                i += needle_len;
+                                            } else {
+                                                out.push(inp[i]);
+                                                i += 1;
+                                            }
+                                        }
+
+                                        Ok(VVal::new_byt(out))
+                                    }
+                                },
                                 _ => Ok(self.clone())
                             }
                         },
