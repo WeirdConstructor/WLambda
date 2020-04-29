@@ -156,10 +156,10 @@ Smalltalk, LISP and Perl.
     - [4.11.1](#4111-stdsymbolscollect) - std:symbols:collect
   - [4.12](#412-pairs-pa-b) - Pairs `$p(a, b)`
     - [4.12.1](#4121-cons-a-b) - cons _a_ _b_
-    - [4.12.2](#4122-pair-string-operations) - Pair string operations
-      - [4.12.2.1](#41221-pfrom-count-string) - `$p(_from_, _count_) _string_`
-      - [4.12.2.2](#41222-ppattern-replacement-string) - `$p(_pattern_, _replacement_) _string_`
-      - [4.12.2.3](#41223-psplit-pattern-max-string) - `$p(_split-pattern_, _max_) _string_`
+    - [4.12.2](#4122-pair-stringbyte-vector-operations) - Pair string/byte vector operations
+      - [4.12.2.1](#41221-pfrom-count-string-or-byte-vec) - `$p(_from_, _count_) _string-or-byte-vec_`
+      - [4.12.2.2](#41222-ppattern-replacement-string-or-byte-vec) - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
+      - [4.12.2.3](#41223-psplit-pattern-max-string-or-byte-vec) - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
     - [4.12.3](#4123-pair-to-iterator) - Pair to Iterator
       - [4.12.3.1](#41231-iter---enumerate) - Iter - Enumerate
       - [4.12.3.2](#41232-iter---values) - Iter - Values
@@ -2532,12 +2532,12 @@ Creates a new pair from the values _a_ and _b_.
 std:assert_eq p $p(3, 4);
 ```
 
-#### <a name="4122-pair-string-operations"></a>4.12.2 - Pair string operations
+#### <a name="4122-pair-stringbyte-vector-operations"></a>4.12.2 - Pair string/byte vector operations
 
 If you call a pair with a string or byte vector as argument, there are some
 operations that can be done:
 
-##### <a name="41221-pfrom-count-string"></a>4.12.2.1 - `$p(_from_, _count_) _string_`
+##### <a name="41221-pfrom-count-string-or-byte-vec"></a>4.12.2.1 - `$p(_from_, _count_) _string-or-byte-vec_`
 
 Returns a substring starting at _from_ with the length _count_.
 
@@ -2545,7 +2545,13 @@ Returns a substring starting at _from_ with the length _count_.
 std:assert_eq ($p(2, 4) "abcdefgh") "cdef";
 ```
 
-##### <a name="41222-ppattern-replacement-string"></a>4.12.2.2 - `$p(_pattern_, _replacement_) _string_`
+The same works for byte vectors:
+
+```wlambda
+std:assert_eq ($p(2, 4) $b"abcdefgh") $b"cdef";
+```
+
+##### <a name="41222-ppattern-replacement-string-or-byte-vec"></a>4.12.2.2 - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
 
 Replaces all _pattern_ occurences in _string_ by _replacement_.
 
@@ -2553,7 +2559,13 @@ Replaces all _pattern_ occurences in _string_ by _replacement_.
 std:assert_eq ($p(";", "_") "A;B;D;EFG;HI") "A_B_D_EFG_HI";
 ```
 
-##### <a name="41223-psplit-pattern-max-string"></a>4.12.2.3 - `$p(_split-pattern_, _max_) _string_`
+The same works for byte vectors:
+
+```wlambda
+std:assert_eq ($p($b";", $b"_") $b"A;B;D;EFG;HI") $b"A_B_D_EFG_HI";
+```
+
+##### <a name="41223-psplit-pattern-max-string-or-byte-vec"></a>4.12.2.3 - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
 
 Splits _string_ at _split-pattern_ a _max_ number of times.
 If _max_ is 0, it is split completely.
@@ -2562,6 +2574,12 @@ If _max_ is 0, it is split completely.
 std:assert_eq str[$p(";", 3) "A;B;D;EFG;HI"] ~ str $["A", "B", "D;EFG;HI"];
 
 std:assert_eq str[$p(";", 0) "A;B;D;EFG;HI"] ~ str $["A", "B", "D", "EFG", "HI"];
+```
+
+The same works for byte vectors:
+
+```wlambda
+std:assert_eq str[$p($b";", 0) $b"A;B;D;EFG;HI"] ~ str $[$b"A", $b"B", $b"D", $b"EFG", $b"HI"];
 ```
 
 #### <a name="4123-pair-to-iterator"></a>4.12.3 - Pair to Iterator
