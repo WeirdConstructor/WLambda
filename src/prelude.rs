@@ -291,6 +291,8 @@ Smalltalk, LISP and Perl.
     - [12.5.2](#1252-stdrandsplitmix64newfrom-seed) - std:rand:split_mix64_new_from _seed_
     - [12.5.3](#1253-stdrandsplitmix64next-smstate-count) - std:rand:split_mix64_next _sm_state_ \[_count_]
     - [12.5.4](#1254-stdrandsplitmix64nextopen01-smstate-count) - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
+  - [12.6](#126-utility-functions) - Utility Functions
+    - [12.6.1](#1261-stddumpupvals-function) - std:dump_upvals _function_
 
 -----
 
@@ -4777,9 +4779,9 @@ _sm_state_.
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
 
-### - Utility Functions
+### <a name="126-utility-functions"></a>12.6 - Utility Functions
 
-#### - std:dump_upvals _function_
+#### <a name="1261-stddumpupvals-function"></a>12.6.1 - std:dump_upvals _function_
 
 Returns a vector of all the upvalues of the _function_.
 Please use this function for debugging purposes only, as the order of the
