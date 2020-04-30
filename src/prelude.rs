@@ -3205,8 +3205,19 @@ Here is an overview of the data type calling semantics:
 | symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
 | $p(int_from, int_count) | string | Substring operation. (See also section about pairs) |
+| $i(int_from, int_count, ...) | string | Substring operation. |
+| string | $i(int_from, int_count, ...) | Substring operation. |
 | $p(string, int)         | string | Split operation. (See also section about pairs) |
+| string | $p(string, int) | Split operation. |
 | $p(string, string)      | string | Replace all operation. (See also section about pairs) |
+| string | $p(string, string) | Replace all operation. |
+| $p(int_from, int_count) | byte_vec | Substring operation. (See also section about pairs) |
+| $i(int_from, int_count, ...) | byte_vec | Substring operation on the byte vector. |
+| byte_vec | $i(int_from, int_count, ...) | Substring operation on the byte vector. |
+| $p(byte_vec, int)       | byte_vec | Split operation. (See also section about pairs) |
+| byte_vec | $p(byte_vec, int) | Split operation. |
+| $p(byte_vec, byte_vec)  | byte_vec | Replace all operation. (See also section about pairs) |
+| byte_vec | $p(byte_vec, byte_vec) | Replace all operation. |
 | $o()      | -                 | Returns $none. |
 | $o(x)     | -                 | Returns _x_. |
 | $o()      | *                 | Calls $none with arguments, leading to a panic. |

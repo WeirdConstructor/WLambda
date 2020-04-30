@@ -2808,6 +2808,12 @@ fn check_pairs() {
     assert_eq!(ve("$p($b\";;\", $b\"_\")    $Q AB;;C;;DE;;FG "),            "$b\"AB_C_DE_FG\"");
     assert_eq!(ve("$p($b\";;;\", $b\"_\")   $Q ;;;AB;;;C;;;DE;;;FG;;; "),   "$b\"_AB_C_DE_FG_\"");
     assert_eq!(ve("$p($b\";;\", $b\"____\") $Q AB;;C;;DE;;FG "),            "$b\"AB____C____DE____FG\"");
+
+    assert_eq!(ve("$q AB;;C;;DE;;FG  $p(\";;\", \"____\")"),                "\"AB____C____DE____FG\"");
+    assert_eq!(ve("$Q AB;;C;;DE;;FG  $p($b\";;\", $b\"____\")"),            "$b\"AB____C____DE____FG\"");
+
+    assert_eq!(ve("$q ABCDEF  $i(2,3)"), "\"CDE\"");
+    assert_eq!(ve("$Q ABCDEF  $i(2,3)"), "$b\"CDE\"");
 }
 
 #[test]

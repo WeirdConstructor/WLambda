@@ -1792,6 +1792,148 @@ macro_rules! pair_key_to_iter {
     }
 }
 
+fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
+    match val {
+        VVal::Byt(s) => {
+            VVal::new_byt(
+                s.iter()
+                 .skip(from as usize)
+                 .take(cnt as usize).copied().collect())
+        },
+        VVal::Str(s) => {
+            VVal::new_str_mv(
+                s.chars()
+                 .skip(from as usize)
+                 .take(cnt as usize).collect())
+        },
+        _ => VVal::None,
+    }
+}
+
+
+fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
+    match val {
+        VVal::Int(i) =>
+            if i % 2 == 0 { a.clone() }
+            else          { b.clone() },
+        VVal::Byt(s) => {
+            match (a, b) {
+                (VVal::Int(from), VVal::Int(cnt)) => {
+                    range_extract(*from, *cnt, val)
+                },
+                (VVal::Byt(splitstr), VVal::Int(max)) => {
+                    let out      = VVal::vec();
+                    let splitstr = &splitstr.as_ref()[..];
+                    let len      = s.len();
+                    let ss_len   = splitstr.len();
+                    let inp      = &s.as_ref()[..];
+
+                    if ss_len > len {
+                        out.push(VVal::new_byt(inp[..].to_vec()));
+                    } else {
+                        let mut i            = 0;
+                        let mut last_split_i = 0;
+
+                        while i < len {
+                            if i + ss_len > len { break; }
+                            if inp[i..(i + ss_len)] == *splitstr {
+                                out.push(
+                                    VVal::new_byt(
+                                        inp[last_split_i..i]
+                                        .to_vec()));
+
+                                i += ss_len;
+                                last_split_i = i;
+
+                                if *max > 0
+                                   && (out.len() + 1) >= *max as usize
+                                {
+                                    out.push(
+                                        VVal::new_byt(
+                                            inp[last_split_i..len]
+                                            .to_vec()));
+                                    i += inp[last_split_i..len].len();
+                                    last_split_i = i + 1; // total end!
+                                    break;
+                                }
+                            } else {
+                                i += 1;
+                            }
+                        }
+
+                        if last_split_i < i {
+                            out.push(
+                                VVal::new_byt(
+                                    inp[last_split_i..len]
+                                    .to_vec()));
+                        } else if last_split_i == i {
+                            out.push(VVal::new_byt(vec![]));
+                        }
+                    }
+
+                    out
+                },
+                (VVal::Byt(needle), VVal::Byt(replace)) => {
+                    let inp        = s.as_ref();
+                    let needle     = needle.as_ref();
+                    let needle_len = needle.len();
+
+                    if needle_len > inp.len() {
+                        VVal::Byt(s.clone())
+                    } else {
+                        let mut out : Vec<u8>
+                            = Vec::with_capacity(inp.len());
+
+                        let mut i = 0;
+                        while i < inp.len() {
+                            if    i <= (inp.len() - needle_len)
+                               && inp[i..(i + needle_len)] == needle[0..needle_len]
+                            {
+                                out.extend_from_slice(&replace.as_ref()[..]);
+                                i += needle_len;
+                            } else {
+                                out.push(inp[i]);
+                                i += 1;
+                            }
+                        }
+
+                        VVal::new_byt(out)
+                    }
+                },
+                _ => VVal::None
+            }
+        },
+        VVal::Str(s) => {
+            match (a, b) {
+                (VVal::Int(from), VVal::Int(cnt)) => {
+                    range_extract(*from, *cnt, val)
+                },
+                (VVal::Str(splitstr), VVal::Int(max)) => {
+                    let l = VVal::vec();
+                    if *max > 0 {
+                        for part in s.as_ref().splitn(*max as usize, splitstr.as_ref()) {
+                            l.push(VVal::new_str(part));
+                        }
+                    } else {
+                        for part in s.as_ref().split(splitstr.as_ref()) {
+                            l.push(VVal::new_str(part));
+                        }
+                    }
+                    l
+                },
+                (VVal::Str(needle), VVal::Str(replace)) => {
+                    VVal::new_str_mv(
+                        s.as_ref()
+                         .replace(
+                            needle.as_ref(), replace.as_ref()))
+                },
+                _ => VVal::None
+            }
+        },
+        _ => VVal::None
+    }
+}
+
 #[allow(dead_code)]
 impl VVal {
     #[inline]
@@ -2459,6 +2601,8 @@ impl VVal {
                                         .skip(from).take(cnt).copied().collect();
                                 Ok(VVal::new_byt(r))
                             },
+                            VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
+                            VVal::IVec(iv) => Ok(range_extract(iv.x_raw(), iv.y_raw(), self)),
                             VVal::Map(_) => Ok(self.with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::None))),
                             _ => Ok(VVal::None)
                         }
@@ -2525,6 +2669,8 @@ impl VVal {
                                 first_arg
                                     .get_key(vval_str.as_ref())
                                     .unwrap_or(VVal::None)),
+                            VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
+                            VVal::IVec(iv) => Ok(range_extract(iv.x_raw(), iv.y_raw(), self)),
                             _ => Ok(VVal::None)
                         }
                     } else { Ok(self.clone()) }
@@ -2539,136 +2685,14 @@ impl VVal {
             },
             VVal::Pair(p) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    let a = &p.0;
-                    let b = &p.1;
-
-                    let first_arg = e.arg(0);
-
-                    match first_arg {
-                        VVal::Int(i) =>
-                            Ok(self.at(i as usize).unwrap_or(VVal::None)),
-                        VVal::Byt(s) => {
-                            match (a, b) {
-                                (VVal::Int(from), VVal::Int(cnt)) => {
-                                    Ok(VVal::new_byt(
-                                        s.iter()
-                                         .skip(*from as usize)
-                                         .take(*cnt as usize).copied().collect()))
-                                },
-                                (VVal::Byt(splitstr), VVal::Int(max)) => {
-                                    let out      = VVal::vec();
-                                    let splitstr = &splitstr.as_ref()[..];
-                                    let len      = s.len();
-                                    let ss_len   = splitstr.len();
-                                    let inp      = &s.as_ref()[..];
-
-                                    if ss_len > len {
-                                        out.push(VVal::new_byt(inp[..].to_vec()));
-                                    } else {
-                                        let mut i            = 0;
-                                        let mut last_split_i = 0;
-
-                                        while i < len {
-                                            if i + ss_len > len { break; }
-                                            if inp[i..(i + ss_len)] == *splitstr {
-                                                out.push(
-                                                    VVal::new_byt(
-                                                        inp[last_split_i..i]
-                                                        .to_vec()));
-
-                                                i += ss_len;
-                                                last_split_i = i;
-
-                                                if *max > 0
-                                                   && (out.len() + 1) >= *max as usize
-                                                {
-                                                    out.push(
-                                                        VVal::new_byt(
-                                                            inp[last_split_i..len]
-                                                            .to_vec()));
-                                                    i += inp[last_split_i..len].len();
-                                                    last_split_i = i + 1; // total end!
-                                                    break;
-                                                }
-                                            } else {
-                                                i += 1;
-                                            }
-                                        }
-
-                                        if last_split_i < i {
-                                            out.push(
-                                                VVal::new_byt(
-                                                    inp[last_split_i..len]
-                                                    .to_vec()));
-                                        } else if last_split_i == i {
-                                            out.push(VVal::new_byt(vec![]));
-                                        }
-                                    }
-
-                                    Ok(out)
-                                },
-                                (VVal::Byt(needle), VVal::Byt(replace)) => {
-                                    let inp        = s.as_ref();
-                                    let needle     = needle.as_ref();
-                                    let needle_len = needle.len();
-
-                                    if needle_len > inp.len() {
-                                        Ok(VVal::Byt(s))
-                                    } else {
-                                        let mut out : Vec<u8>
-                                            = Vec::with_capacity(inp.len());
-
-                                        let mut i = 0;
-                                        while i < inp.len() {
-                                            if    i <= (inp.len() - needle_len)
-                                               && inp[i..(i + needle_len)] == needle[0..needle_len]
-                                            {
-                                                out.extend_from_slice(&replace.as_ref()[..]);
-                                                i += needle_len;
-                                            } else {
-                                                out.push(inp[i]);
-                                                i += 1;
-                                            }
-                                        }
-
-                                        Ok(VVal::new_byt(out))
-                                    }
-                                },
-                                _ => Ok(self.clone())
-                            }
-                        },
-                        VVal::Str(s) => {
-                            match (a, b) {
-                                (VVal::Int(from), VVal::Int(cnt)) => {
-                                    Ok(VVal::new_str_mv(
-                                        s.chars()
-                                         .skip(*from as usize)
-                                         .take(*cnt as usize).collect()))
-                                },
-                                (VVal::Str(splitstr), VVal::Int(max)) => {
-                                    let l = VVal::vec();
-                                    if *max > 0 {
-                                        for part in s.as_ref().splitn(*max as usize, splitstr.as_ref()) {
-                                            l.push(VVal::new_str(part));
-                                        }
-                                    } else {
-                                        for part in s.as_ref().split(splitstr.as_ref()) {
-                                            l.push(VVal::new_str(part));
-                                        }
-                                    }
-                                    Ok(l)
-                                },
-                                (VVal::Str(needle), VVal::Str(replace)) => {
-                                    Ok(VVal::new_str_mv(
-                                        s.as_ref()
-                                         .replace(
-                                            needle.as_ref(), replace.as_ref())))
-                                },
-                                _ => Ok(self.clone())
-                            }
-                        },
-                        _ => Ok(self.clone())
-                    }
+                    if argc != 1 { return Ok(VVal::None) }
+                    Ok(pair_extract(&p.0, &p.1, e.arg_ref(0).unwrap()))
+                })
+            },
+            VVal::IVec(iv) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    if argc != 1 { return Ok(VVal::None) }
+                    Ok(range_extract(iv.x_raw(), iv.y_raw(), e.arg_ref(0).unwrap()))
                 })
             },
             VVal::Iter(i) => {
