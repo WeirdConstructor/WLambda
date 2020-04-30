@@ -904,6 +904,15 @@ std:assert_eq $*$o()    $none;
 std:assert_eq $*$o(10)  10;
 ```
 
+Calls with more than one argument are forwarded to the contents:
+
+```wlambda
+std:assert_eq ($o("xx") "yy")  "xxyy";
+
+!x = { _ * 20 };
+std:assert_eq ($o(x) 30)    600;
+```
+
 #### <a name="421-isoptional-value"></a>4.2.1 - is_optional _value_
 
 Returns `$true` if _value_ is an optional value. That means either `$o()` or
@@ -3198,10 +3207,10 @@ Here is an overview of the data type calling semantics:
 | $p(int_from, int_count) | string | Substring operation. (See also section about pairs) |
 | $p(string, int)         | string | Split operation. (See also section about pairs) |
 | $p(string, string)      | string | Replace all operation. (See also section about pairs) |
-|           |                   | |
-|           |                   | |
-|           |                   | |
-|           |                   | |
+| $o()      | -                 | Returns $none. |
+| $o(x)     | -                 | Returns _x_. |
+| $o()      | *                 | Calls $none with arguments, leading to a panic. |
+| $o(x)     | *                 | Calls _x_ with the given arguments. |
 |           |                   | |
 
 ## <a name="5-functions-part-22"></a>5 - Functions (part 2/2)

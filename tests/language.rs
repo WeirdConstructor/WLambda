@@ -3316,8 +3316,11 @@ fn check_optionals() {
     assert_eq!(ve("not $o()"),          "$true");
     assert_eq!(ve("not $o(\"xx\")"),    "$false");
 
-    assert_eq!(ve("$o(10)[]"),    "10");
-    assert_eq!(ve("$o()[]"),      "$n");
+    assert_eq!(ve("$o(10)[]"),              "10");
+    assert_eq!(ve("$o()[]"),                "$n");
+
+    assert_eq!(ve("$o() 340"),                   "EXEC ERR: Caught [1,6:<compiler:s_eval>(Call)] SA::Panic(\"Calling $none is invalid\")");
+    assert_eq!(ve("$o(\"f\") \"a\" 340 4 :vvv"), "\"fa3404vvv\"");
 
     assert_eq!(ve(r"
         !x = $o(10);

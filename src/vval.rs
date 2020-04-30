@@ -2707,10 +2707,18 @@ impl VVal {
                 }
             },
             VVal::Opt(v) => {
-                if let Some(v) = v {
-                    Ok(v.as_ref().clone())
+                if argc == 0 {
+                    if let Some(v) = v {
+                        Ok(v.as_ref().clone())
+                    } else {
+                        Ok(VVal::None)
+                    }
                 } else {
-                    Ok(VVal::None)
+                    let v =
+                        if let Some(v) = v { v.as_ref().clone() }
+                        else               { VVal::None };
+
+                    v.call_internal(env, argc)
                 }
             },
             VVal::Usr(ud) => {
