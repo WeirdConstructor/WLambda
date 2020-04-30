@@ -904,7 +904,7 @@ std:assert_eq $*$o()    $none;
 std:assert_eq $*$o(10)  10;
 ```
 
-Calls with more than one argument are forwarded to the contents:
+Calls with more than zero arguments are forwarded to the contents:
 
 ```wlambda
 std:assert_eq ($o("xx") "yy")  "xxyy";
