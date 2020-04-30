@@ -65,6 +65,7 @@ pub enum AVal {
     Pair(Box<(AVal, AVal)>),
     Map(FnvHashMap<String, AVal>),
     Chan(AValChannel),
+    Slot(AtomicValSlot),
     Atom(AtomicAVal),
 }
 
@@ -122,6 +123,7 @@ impl AVal {
             AVal::Byt(b)       => VVal::new_byt(b.clone()),
             AVal::Atom(a)      => VVal::Usr(Box::new(a.clone())),
             AVal::Chan(a)      => VVal::Usr(Box::new(a.clone())),
+            AVal::Slot(a)      => VVal::Usr(Box::new(a.clone())),
             AVal::Opt(None)    => VVal::opt_none(),
             AVal::Opt(Some(a)) => VVal::opt(a.to_vval()),
             AVal::Pair(p)      => VVal::pair(p.0.to_vval(), p.1.to_vval()),
@@ -203,6 +205,8 @@ impl AVal {
                     AVal::Atom(ud.clone())
                 } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AValChannel>() {
                     AVal::Chan(ud.clone())
+                } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicValSlot>() {
+                    AVal::Slot(ud.clone())
                 } else {
                     AVal::None
                 }
@@ -245,6 +249,33 @@ pub struct AtomicAVal(Arc<RwLock<AVal>>);
 
 impl Default for AtomicAVal {
     fn default() -> Self { AtomicAVal::new() }
+}
+
+#[derive(Clone, Debug)]
+pub struct AtomicValSlot {
+    val: Mutex<AVal>,
+    cv:  Condvar,
+}
+
+impl AtomicValSlot {
+    fn new() -> Arc<AtomicValSlot> {
+        Arc::new(AtomicValSlot {
+            val: Mutex::new(AVal::None),
+            cv: Condvar::new(),
+        })
+    }
+
+    fn store(&self, av: AVal) {
+        let mut mx = self.val.lock().unwrap();
+        *mx = av;
+        self.cv.notify();
+    }
+
+    fn wait(&self) -> AVal {
+        let mut mx = self.val.lock().unwrap();
+        let res = self.cv.wait(mx).unwrap();
+        *res
+    }
 }
 
 #[derive(Clone)]
