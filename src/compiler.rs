@@ -802,7 +802,6 @@ pub enum ArityParam {
 #[derive(Debug, Clone)]
 struct BlockEnv {
     local_map_stack: std::vec::Vec<(usize, Box<std::collections::HashMap<String, VarPos>>)>,
-    reuse_stk_slot: Rc<RefCell<std::vec::Vec<usize>>>,
     locals:          std::vec::Vec<(String, CompileLocal)>,
 }
 
@@ -838,7 +837,6 @@ impl BlockEnv {
         Self {
             local_map_stack: vec![(0, Box::new(std::collections::HashMap::new()))],
             locals:          vec![],
-            reuse_stk_slot: Rc::new(RefCell::new(vec![])),
         }
     }
 

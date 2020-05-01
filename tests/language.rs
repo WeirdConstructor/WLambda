@@ -2617,6 +2617,53 @@ fn check_threads() {
 }
 
 #[test]
+fn check_thread_valslot() {
+    assert_eq!(ve(r#"
+        !slt1 = std:sync:slot:new[];
+        !slt2 = std:sync:slot:new[];
+
+        std:assert slt1.check_empty[];
+
+        std:assert_eq slt1.try_recv[] $o();
+
+        !h = std:thread:spawn ($code {
+            slt1.send $p(:x, $[1,2,3]);
+            slt2.wait[];
+        }[]) ${ slt1 = slt1, slt2 = slt2 };
+
+        !r1 = slt1.wait[];
+
+        std:assert_eq (str r1) (str $p(:x, $[1,2,3]));
+        slt2.send $true;
+        h.join[]
+    "#), "$true");
+
+    assert_eq!(ve(r#"
+        !slt1 = std:sync:slot:new[];
+        !slt2 = std:sync:slot:new[];
+
+        !h = std:thread:spawn ($code {
+            std:displayln "BAR";
+ #           std:thread:sleep $p(:ms, 500);
+            std:displayln "FOO";
+            slt1.send 44;
+        }[]) ${ slt1 = slt1, slt2 = slt2 };
+
+            std:displayln "BARA";
+        !r1 = slt1.recv_timeout $p(:ms, 100);
+        std:assert_eq r1 $o();
+        .r1 = slt1.recv_timeout $p(:ms, 100);
+        std:assert_eq r1 $o();
+        .r1 = slt1.recv_timeout $p(:ms, 500);
+        std:assert_eq r1 "??";
+
+            std:displayln "BARE";
+
+        h.join[]
+    "#), "");
+}
+
+#[test]
 fn check_nvec() {
     assert_eq!(ve("$i(1, 2)"),                  "$i(1,2)");
     assert_eq!(ve("$i(1, 2) * 2"),              "$i(2,4)");

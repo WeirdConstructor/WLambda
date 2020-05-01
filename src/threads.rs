@@ -18,9 +18,7 @@ use crate::str_int::*;
 
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::RwLock;
+use std::sync::{Arc, Mutex, RwLock, Condvar};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, RecvTimeoutError};
 use std::fmt::Formatter;
 
@@ -65,7 +63,7 @@ pub enum AVal {
     Pair(Box<(AVal, AVal)>),
     Map(FnvHashMap<String, AVal>),
     Chan(AValChannel),
-    Slot(AtomicValSlot),
+    Slot(AtomicAValSlot),
     Atom(AtomicAVal),
 }
 
@@ -205,7 +203,7 @@ impl AVal {
                     AVal::Atom(ud.clone())
                 } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AValChannel>() {
                     AVal::Chan(ud.clone())
-                } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicValSlot>() {
+                } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicAValSlot>() {
                     AVal::Slot(ud.clone())
                 } else {
                     AVal::None
@@ -251,30 +249,232 @@ impl Default for AtomicAVal {
     fn default() -> Self { AtomicAVal::new() }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AtomicValSlot {
-    val: Mutex<AVal>,
-    cv:  Condvar,
+    val: Mutex<(AVal, bool)>,
+    cv_send:  Condvar,
+    cv_recv:  Condvar,
 }
 
-impl AtomicValSlot {
-    fn new() -> Arc<AtomicValSlot> {
-        Arc::new(AtomicValSlot {
-            val: Mutex::new(AVal::None),
-            cv: Condvar::new(),
-        })
+#[derive(Clone, Debug)]
+pub struct AtomicAValSlot(Arc<AtomicValSlot>);
+
+impl AtomicAValSlot {
+    pub fn new() -> Self {
+        Self(Arc::new(AtomicValSlot {
+            val: Mutex::new((AVal::None, false)),
+            cv_recv: Condvar::new(),
+            cv_send: Condvar::new(),
+        }))
     }
 
-    fn store(&self, av: AVal) {
-        let mut mx = self.val.lock().unwrap();
-        *mx = av;
-        self.cv.notify();
+    pub fn wait_empty(&self, dur: Option<std::time::Duration>) -> VVal {
+        let mut guard =
+            match self.0.val.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    return
+                        VVal::err_msg(
+                            &format!(
+                                "Failed to receive, can't get lock: {}", e))
+                }
+            };
+
+        if let Some(dur) = dur {
+            loop {
+                match self.0.cv_recv.wait_timeout(guard, dur) {
+                    Ok(wait_res) => {
+                        guard = wait_res.0;
+
+                        if wait_res.1.timed_out() {
+                            return VVal::Bol(false);
+
+                        } else if !guard.1 {
+                            return VVal::Bol(true);
+                        }
+                    },
+                    Err(e) => {
+                        return
+                            VVal::err_msg(
+                                &format!(
+                                    "Failed to receive, poison error: {}",
+                                    e));
+                    },
+                }
+            }
+        } else {
+            loop {
+                match self.0.cv_recv.wait(guard) {
+                    Ok(next_guard) => {
+                        guard = next_guard;
+
+                        if !guard.1 {
+                            return VVal::Bol(true);
+                        }
+                    },
+                    Err(e) => {
+                        return
+                            VVal::err_msg(
+                                &format!(
+                                    "Failed to receive, poison error: {}",
+                                    e));
+                    },
+                }
+            }
+        }
     }
 
-    fn wait(&self) -> AVal {
-        let mut mx = self.val.lock().unwrap();
-        let res = self.cv.wait(mx).unwrap();
-        *res
+    pub fn check_empty(&self) -> VVal {
+        match self.0.val.lock() {
+            Ok(guard) => VVal::Bol(!guard.1),
+            Err(e) =>
+                VVal::err_msg(
+                    &format!(
+                        "Failed to check empty, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn send(&self, msg: &VVal) -> VVal {
+        match self.0.val.lock() {
+            Ok(mut guard) => {
+                *guard = (AVal::from_vval(msg), true);
+                self.0.cv_send.notify_one();
+                VVal::Bol(true)
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to send, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn recv_timeout(&self, dur: Option<std::time::Duration>) -> VVal {
+        let mut guard =
+            match self.0.val.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    return
+                        VVal::err_msg(
+                            &format!(
+                                "Failed to receive, can't get lock: {}", e))
+                }
+            };
+
+        if let Some(dur) = dur {
+            loop {
+                println!("FUR {:?}", dur);
+                match self.0.cv_send.wait_timeout(guard, dur) {
+                    Ok(wait_res) => {
+                        guard = wait_res.0;
+                        println!("OGOGO {:?}", guard);
+
+                        if wait_res.1.timed_out() {
+                            return VVal::opt_none();
+
+                        } else if guard.1 {
+                            let val = guard.0.to_vval();
+                            *guard = (AVal::None, false);
+                            self.0.cv_recv.notify_one();
+                            return val;
+                        }
+                    },
+                    Err(e) => {
+                        return
+                            VVal::err_msg(
+                                &format!(
+                                    "Failed to receive, poison error: {}",
+                                    e));
+                    },
+                }
+            }
+        } else {
+            loop {
+                match self.0.cv_send.wait(guard) {
+                    Ok(next_guard) => {
+                        guard = next_guard;
+
+                        if guard.1 {
+                            let val = guard.0.to_vval();
+                            *guard = (AVal::None, false);
+                            return val;
+                        }
+                    },
+                    Err(e) => {
+                        return
+                            VVal::err_msg(
+                                &format!(
+                                    "Failed to receive, poison error: {}",
+                                    e));
+                    },
+                }
+            }
+        }
+    }
+
+    pub fn try_recv(&self) -> VVal {
+        match self.0.val.lock() {
+            Ok(mut guard) => {
+                if guard.1 {
+                    let val = guard.0.to_vval();
+                    *guard = (AVal::None, false);
+                    VVal::opt(val)
+                } else {
+                    VVal::opt_none()
+                }
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to receive, can't get lock: {}", e)),
+        }
+    }
+}
+
+impl VValUserData for AtomicAValSlot {
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv_ref();
+        match key {
+            "wait" => Ok(self.recv_timeout(None)),
+            "try_recv" => Ok(self.try_recv()),
+            "recv_timeout" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("recv_timeout method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.recv_timeout(Some(argv[0].to_duration()?)))
+            },
+            "send" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("send method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.send(&argv[0]))
+            },
+            "check_empty" => Ok(self.check_empty()),
+            "wait_empty" => Ok(self.wait_empty(None)),
+            "wait_empty_timeout" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("wait_empty_timeout method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.wait_empty(Some(argv[0].to_duration()?)))
+            },
+            _ => {
+                return
+                    Err(StackAction::panic_str(
+                        format!("unknown method called: {}", key),
+                        None))
+            },
+        }
+    }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
     }
 }
 

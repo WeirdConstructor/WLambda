@@ -7022,6 +7022,11 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(AValChannel::new())
         }, Some(0), Some(0), false);
 
+    func!(st, "sync:slot:new",
+        |_env: &mut Env, _argc: usize| {
+            Ok(VVal::Usr(Box::new(AtomicAValSlot::new())))
+        }, Some(0), Some(0), false);
+
     func!(st, "thread:sleep",
         |env: &mut Env, _argc: usize| {
             match env.arg(0).to_duration() {
