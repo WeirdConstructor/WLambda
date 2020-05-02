@@ -4680,6 +4680,22 @@ the file to the given filename.
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
+### - Threading
+
+WLambda leverages the `std::thread` implementation of Rust's standard library
+to provide safe threading. Threading works by spawning new threads that
+get sent a piece of WLambda code (as string) and some arguments.
+
+Most WLambda data can be shared between threads. An exception are
+UserData values that are not thread safe. Also things like sharing
+cyclic data structures are not possible, as the references are currently
+broken up.
+
+Sharing data is done by WLambda by transforming the _VVal_ data structures
+into a thread safe shareable represenation called _AVal_. An AVal is a
+deep copy of the original VVal and can additionally contain atoms (see `std:sync:atom:new`),
+MPSC queues (see `std:sync:mpsc:new`) and value slots (see `std:sync:slot:new`).
+
 ## <a name="12-optional-standard-library"></a>12 - Optional Standard Library
 
 ### <a name="121-serialization"></a>12.1 - serialization
