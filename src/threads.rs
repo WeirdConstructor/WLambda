@@ -788,7 +788,7 @@ impl std::fmt::Debug for dyn ThreadCreator {
 ///
 /// See also `GlobalEnv::new_default` for further information
 /// how this may be used.
-pub struct DefaultThreadCreator();
+pub(crate) struct DefaultThreadCreator();
 
 #[allow(clippy::new_without_default)]
 impl DefaultThreadCreator {
@@ -799,7 +799,7 @@ impl DefaultThreadCreator {
 /// this JoinHandle wrapper is used. It provides a way to wrap it
 /// into a `VValUserData` and use it by the WLambda function `std:thread:join`.
 #[derive(Clone)]
-pub struct DefaultThreadHandle {
+pub(crate) struct DefaultThreadHandle {
     ready_slot:    AtomicAValSlot,
     thread_handle: Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>>,
 }

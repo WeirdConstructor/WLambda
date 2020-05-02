@@ -2672,6 +2672,31 @@ fn check_thread_valslot() {
 
         h.join[]
     "#), "100");
+
+
+    assert_eq!(ve(r#"
+        !slt1 = std:sync:slot:new[];
+
+        !h = std:thread:spawn ($code {
+            !@import std;
+            _READY.send $true;
+
+            std:assert_eq _READY.check_empty[] $false;
+
+            slt1.send :ok;
+
+            !ret = _READY.wait_empty[];
+            std:assert_eq ret $true;
+
+            100
+        }[]) ${ slt1 = slt1 };
+
+        slt1.recv_timeout $p(:ms, 500);
+
+        std:assert ~ unwrap h.recv_ready[];
+
+        h.join[]
+    "#), "100");
 }
 
 #[test]
