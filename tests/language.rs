@@ -2559,7 +2559,7 @@ fn check_threads() {
         !at = std:sync:atom:new 99;
         !h = std:thread:spawn $q{
             !@wlambda;
-            !@import std std;
+            !@import std;
 
             !a = THREAD_ARG0;
             !b = a.7.read[];
@@ -2576,7 +2576,7 @@ fn check_threads() {
     assert_eq!(ve(r#"
         !chan = std:sync:mpsc:new[];
         !h = std:thread:spawn ($code {
-            !@import std std;
+            !@import std;
             !@wlambda;
 
             chan.send 20;
@@ -2593,7 +2593,7 @@ fn check_threads() {
         !chan = std:sync:mpsc:new[];
         !chan2 = std:sync:mpsc:new[];
         !h = std:thread:spawn ($code {
-            !@import std std;
+            !@import std;
             !@wlambda;
 
             !m = chan2.recv[];
@@ -2627,11 +2627,16 @@ fn check_thread_valslot() {
         std:assert_eq slt1.try_recv[] $o();
 
         !h = std:thread:spawn ($code {
+            !@import std;
+            _READY.send 11;
+
             slt1.send $p(:x, $[1,2,3]);
-            slt2.wait[];
+            slt2.recv[];
         }[]) ${ slt1 = slt1, slt2 = slt2 };
 
-        !r1 = slt1.wait[];
+        std:assert_eq h.recv_ready[] 11;
+
+        !r1 = slt1.recv[];
 
         std:assert_eq (str r1) (str $p(:x, $[1,2,3]));
         slt2.send $true;
@@ -2643,24 +2648,30 @@ fn check_thread_valslot() {
         !slt2 = std:sync:slot:new[];
 
         !h = std:thread:spawn ($code {
-            std:displayln "BAR";
- #           std:thread:sleep $p(:ms, 500);
-            std:displayln "FOO";
+            !@import std;
+            _READY.send $true;
+
+            slt2.send 45;
+            std:thread:sleep $p(:ms, 500);
             slt1.send 44;
+
+            100
         }[]) ${ slt1 = slt1, slt2 = slt2 };
 
-            std:displayln "BARA";
+        std:assert ~ unwrap h.recv_ready[];
+
         !r1 = slt1.recv_timeout $p(:ms, 100);
         std:assert_eq r1 $o();
+
+        std:assert_eq slt2.try_recv[] $o(45);
+
         .r1 = slt1.recv_timeout $p(:ms, 100);
         std:assert_eq r1 $o();
         .r1 = slt1.recv_timeout $p(:ms, 500);
-        std:assert_eq r1 "??";
-
-            std:displayln "BARE";
+        std:assert_eq r1 44;
 
         h.join[]
-    "#), "");
+    "#), "100");
 }
 
 #[test]

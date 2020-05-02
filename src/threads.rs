@@ -280,6 +280,10 @@ impl AtomicAValSlot {
                 }
             };
 
+        if !guard.1 {
+            return VVal::Bol(true);
+        }
+
         if let Some(dur) = dur {
             loop {
                 match self.0.cv_recv.wait_timeout(guard, dur) {
@@ -358,13 +362,18 @@ impl AtomicAValSlot {
                 }
             };
 
+        if guard.1 {
+            let val = guard.0.to_vval();
+            *guard = (AVal::None, false);
+            self.0.cv_recv.notify_one();
+            return val;
+        }
+
         if let Some(dur) = dur {
             loop {
-                println!("FUR {:?}", dur);
                 match self.0.cv_send.wait_timeout(guard, dur) {
                     Ok(wait_res) => {
                         guard = wait_res.0;
-                        println!("OGOGO {:?}", guard);
 
                         if wait_res.1.timed_out() {
                             return VVal::opt_none();
@@ -394,6 +403,7 @@ impl AtomicAValSlot {
                         if guard.1 {
                             let val = guard.0.to_vval();
                             *guard = (AVal::None, false);
+                            self.0.cv_recv.notify_one();
                             return val;
                         }
                     },
@@ -415,6 +425,7 @@ impl AtomicAValSlot {
                 if guard.1 {
                     let val = guard.0.to_vval();
                     *guard = (AVal::None, false);
+                    self.0.cv_recv.notify_one();
                     VVal::opt(val)
                 } else {
                     VVal::opt_none()
@@ -431,7 +442,7 @@ impl VValUserData for AtomicAValSlot {
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         let argv = env.argv_ref();
         match key {
-            "wait" => Ok(self.recv_timeout(None)),
+            "recv" => Ok(self.recv_timeout(None)),
             "try_recv" => Ok(self.try_recv()),
             "recv_timeout" => {
                 if argv.len() != 1 {
@@ -788,25 +799,41 @@ impl DefaultThreadCreator {
 /// this JoinHandle wrapper is used. It provides a way to wrap it
 /// into a `VValUserData` and use it by the WLambda function `std:thread:join`.
 #[derive(Clone)]
-pub struct DefaultThreadHandle(Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>>);
+pub struct DefaultThreadHandle {
+    ready_slot:    AtomicAValSlot,
+    thread_handle: Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>>,
+}
 
 impl DefaultThreadHandle {
     /// Joins the handle, and returns the result VVal of the thread.
     pub fn join(&self) -> VVal {
-        let hdl = std::mem::replace(&mut (*self.0.borrow_mut()), None);
+        let hdl = std::mem::replace(&mut (*self.thread_handle.borrow_mut()), None);
         if let Some(h) = hdl {
             h.join().unwrap().to_vval()
         } else {
             VVal::err_msg("DefaultThreadHandle already joined!")
         }
     }
+
+    /// Returns an AtomicAValSlot, that can be used to check if the thread
+    /// successfully started or ran into an error.
+    pub fn get_ready_slot(&self) -> VVal {
+        VVal::Usr(Box::new(self.ready_slot.clone()))
+    }
 }
 
 impl VValUserData for DefaultThreadHandle {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-    fn call_method(&self, key: &str, _env: &mut Env) -> Result<VVal, StackAction> {
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         match key {
-            "join" => Ok(self.join()),
+            "join"       => Ok(self.join()),
+            "recv_ready" => {
+                if let VVal::Usr(b) = self.get_ready_slot() {
+                    b.call_method("recv", env)
+                } else {
+                    Ok(VVal::err_msg("Invalid _READY value!"))
+                }
+            },
             _ => {
                 return
                     Err(StackAction::panic_str(
@@ -825,11 +852,18 @@ impl ThreadCreator for DefaultThreadCreator {
              code: String,
              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
 
+        let ready = AtomicAValSlot::new();
         let tcc = tc.clone();
+
+        let trdy = ready.clone();
         let hdl =
             std::thread::spawn(move || {
                 let genv = GlobalEnv::new_empty_default();
                 genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
+
+                genv.borrow_mut().set_var(
+                    "_READY",
+                    &VVal::Usr(Box::new(trdy.clone())));
 
                 if let Some(globals) = globals {
                     for (k, av) in globals {
@@ -843,13 +877,20 @@ impl ThreadCreator for DefaultThreadCreator {
                 match ctx.eval(&code) {
                     Ok(v) => AVal::from_vval(&v),
                     Err(e) => {
-                        AVal::Err(
-                            Box::new(
-                                AVal::Str(format!("Error in Thread: {}", e))),
-                            String::from("?"))
+                        let ret =
+                            AVal::Err(
+                                Box::new(
+                                    AVal::Str(format!("Error in Thread: {}", e))),
+                                String::from("?"));
+                        trdy.send(&ret.to_vval());
+                        ret
                     }
                 }
             });
-        VVal::Usr(Box::new(DefaultThreadHandle(Rc::new(RefCell::new(Some(hdl))))))
+
+        VVal::Usr(Box::new(DefaultThreadHandle {
+            ready_slot: ready,
+            thread_handle: Rc::new(RefCell::new(Some(hdl)))
+        }))
     }
 }

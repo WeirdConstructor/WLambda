@@ -132,6 +132,10 @@ In the following grammar, white space and comments are omitted:
                     (* returns the current accumulator value *)
                   | "+" (* resolves to the current accumulator function *)
                   ;
+    import        = "@import", ident, [ ident ]
+                  ;
+    export        = "@export", ident, [ "=" ], expr
+                  ;
     capture_ref   = ":", var
                   ;
     deref         = "*", value
@@ -1452,14 +1456,12 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                 Ok(imp)
                             },
                             "import" => {
-                                let mut prefix =
+                                let prefix =
                                     VVal::into_sym(parse_identifier(ps)?);
                                 ps.skip_ws_and_comments();
                                 let name =
                                     if ps.peek().unwrap_or(';') == ';' {
-                                        let p = prefix;
-                                        prefix = VVal::None;
-                                        p
+                                        prefix.clone()
                                     } else {
                                         ps.consume_if_eq_wsc('=');
                                         VVal::into_sym(parse_identifier(ps)?)

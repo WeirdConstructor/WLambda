@@ -4389,8 +4389,12 @@ You can also skip the prefix:
 
 ```wlambda
 !@import std;
+
 !v = $[];
-push v 10; push v 20;
+
+std:push v 10;
+std:push v 20;
+
 std:assert_eq (str v) "$[10,20]";
 ```
 
