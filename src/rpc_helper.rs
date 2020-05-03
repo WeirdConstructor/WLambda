@@ -8,6 +8,7 @@ const RPC_MSG_SEND : i64 = 2;
 #[derive(Clone)]
 pub struct RPCHandle {
     free_queue: AValChannel,
+    error_channel: AValChannel,
     request_queue:  AValChannel,
 }
 
@@ -15,6 +16,7 @@ impl RPCHandle {
     pub fn new() -> Self {
         Self {
             free_queue:     AValChannel::new_direct(),
+            error_channel:  AValChannel::new_direct(),
             request_queue:  AValChannel::new_direct(),
         }
     }
@@ -56,33 +58,41 @@ impl RPCHandle {
 
     fn get_request(&self) -> Option<AtomicAValSlot> {
         match self.free_queue.try_recv() {
-            Ok(VVal::Usr(ud)) => {
-                if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicAValSlot>() {
-                    Some(ud)
+            VVal::Usr(mut ud) => {
+                if let Some(ud) = ud.as_any().downcast_ref::<AtomicAValSlot>() {
+                    Some(ud.clone())
                 } else {
-                    Some(AtomicAValSlot::new()),
+                    Some(AtomicAValSlot::new())
                 }
             },
-            Ok(_) | Err(TryRecvError::Empty) => Some(AtomicAValSlot::new()),
-            Err(e) => None,
+            VVal::None => Some(AtomicAValSlot::new()),
+            _ => None,
         }
     }
 
     pub fn call(&self, target: &str, args: VVal) -> VVal {
+        let resp = self.get_request().expect("AtomicAValSlot allocation");
+
         let v = VVal::vec();
         v.push(VVal::Int(RPC_MSG_CALL));
+        v.push(VVal::Usr(Box::new(resp.clone())));
         v.push(VVal::new_sym(target));
         v.push(args);
-        self.send_channel.send(&v);
-        self.reply_channel.recv_timeout(None)
+
+        self.request_queue.send(&v);
+        let ret = resp.recv_timeout(None);
+        self.free_queue.send(&v.at(1).expect("the AtomicAValSlot"));
+        ret
     }
 
     pub fn send(&self, target: &str, args: VVal) {
         let v = VVal::vec();
         v.push(VVal::Int(RPC_MSG_SEND));
+        v.push(VVal::None);
         v.push(VVal::new_sym(target));
         v.push(args);
-        self.send_channel.send(&v);
+
+        self.request_queue.send(&v);
     }
 
     pub fn fetch_error(&self) -> Option<VVal> {
@@ -130,29 +140,41 @@ pub fn rpc_handler_step(
     handle: &RPCHandle,
     timeout: std::time::Duration) -> Result<(), RPCHandlerError>
 {
-    let res = handle.send_channel.recv_timeout(Some(timeout));
+    let res = handle.request_queue.recv_timeout(Some(timeout));
     if res.is_err() {
         Err(RPCHandlerError::Disconnected)
 
     } else if let VVal::Opt(Some(m)) = res {
         let cmd  = m.at(0).unwrap_or_else(|| VVal::None).i();
-        let name = m.at(1).unwrap_or_else(|| VVal::None);
-        let args = m.at(2).unwrap_or_else(|| VVal::None);
+        let resp = m.at(1).unwrap_or_else(|| VVal::None);
+        let name = m.at(2).unwrap_or_else(|| VVal::None);
+        let args = m.at(3).unwrap_or_else(|| VVal::None);
 
         match cmd {
             RPC_MSG_CALL => {
-                name.with_s_ref(|name| {
-                    if let Some(v) = ctx.get_global_var(name) {
-                        let arg =
-                            if args.is_none() { vec![] }
-                            else { args.to_vec() };
-                        let ret = ctx.call(&v, &arg).unwrap_or_else(|_| VVal::None);
-                        handle.reply_channel.send(&ret);
-                    } else {
-                        handle.reply_channel.send(
-                            &VVal::err_msg(&format!("No such global on call: {}", name)));
-                    }
-                });
+                if let VVal::Usr(mut resp) = resp {
+                    let resp =
+                        resp.as_any()
+                            .downcast_mut::<AtomicAValSlot>()
+                            .expect("AtomicAValSlot in RPC_MSG_CALL");
+
+                    name.with_s_ref(|name| {
+                        if let Some(v) = ctx.get_global_var(name) {
+                            let arg =
+                                if args.is_none() { vec![] }
+                                else { args.to_vec() };
+                            let ret =
+                                ctx.call(&v, &arg).unwrap_or_else(|_| VVal::None);
+                            resp.send(&ret);
+                        } else {
+                            resp.send(
+                                &VVal::err_msg(
+                                    &format!("No such global on call: {}", name)));
+                        }
+                    });
+                } else {
+                    panic!("Didn't get a AtomicAValSlot in RPC_MSG_CALL");
+                }
             },
             RPC_MSG_SEND => {
                 name.with_s_ref(|name| {
