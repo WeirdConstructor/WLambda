@@ -938,7 +938,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             println!("{}OP[{:<2} {:>3}]: {:<40}      | sp: {:>3}, bp: {:>3}, uws: {:>3} | {}",
                                      (if i == pc { ">" } else { " " }),
                                      env.vm_nest,
-                                     pc, format!("{:?}", op),
+                                     i, format!("{:?}", op),
                                      env.sp, env.bp, env.unwind_depth(), syn);
                             if i == pc {
                                 env.dump_stack();

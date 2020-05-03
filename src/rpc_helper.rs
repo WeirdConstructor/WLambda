@@ -7,17 +7,15 @@ const RPC_MSG_SEND : i64 = 2;
 
 #[derive(Clone)]
 pub struct RPCHandle {
-    send_channel:  AValChannel,
-    reply_channel: AValChannel,
-    error_channel: AValChannel,
+    free_queue: AValChannel,
+    request_queue:  AValChannel,
 }
 
 impl RPCHandle {
     pub fn new() -> Self {
         Self {
-            send_channel:  AValChannel::new_direct(),
-            reply_channel: AValChannel::new_direct(),
-            error_channel: AValChannel::new_direct(),
+            free_queue:     AValChannel::new_direct(),
+            request_queue:  AValChannel::new_direct(),
         }
     }
 
@@ -54,6 +52,20 @@ impl RPCHandle {
                     caller.send(&env.arg(0).s_raw(), args);
                     Ok(VVal::None)
                 }, Some(1), None, false));
+    }
+
+    fn get_request(&self) -> Option<AtomicAValSlot> {
+        match self.free_queue.try_recv() {
+            Ok(VVal::Usr(ud)) => {
+                if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicAValSlot>() {
+                    Some(ud)
+                } else {
+                    Some(AtomicAValSlot::new()),
+                }
+            },
+            Ok(_) | Err(TryRecvError::Empty) => Some(AtomicAValSlot::new()),
+            Err(e) => None,
+        }
     }
 
     pub fn call(&self, target: &str, args: VVal) -> VVal {
