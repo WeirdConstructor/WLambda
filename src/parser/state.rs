@@ -366,6 +366,15 @@ impl State {
         res
     }
 
+    /// Consumes the `expected_char` and possibly following
+    /// white space following it. Returns true if
+    /// `expected_char` was found.
+    pub fn consume_if_eq_ws(&mut self, expected_char: char) -> bool {
+        let res = self.consume_if_eq(expected_char);
+        self.skip_ws();
+        res
+    }
+
     pub fn consume_if_eq(&mut self, expected_char: char) -> bool {
         if let Some(c) = self.peek() {
             if c == expected_char {

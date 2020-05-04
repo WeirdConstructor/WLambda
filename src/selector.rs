@@ -18,7 +18,10 @@ Selector Syntax:
                   (* special sequence: "\\" => "\" and "\]" => "]" *)
                 ;
 
-    ident       = { ?any character except whitespace, "?", "/", "\", "|", "'", "&", ":", "[", "*" or "="? }
+    ident       = { ?any character except whitespace,
+                    "?", "/", "\", "|",
+                    "'", "&", ":", ";", "$", "(", ")",
+                    "{", "}", "[", "]", "*" or "="? }
                   (* allows the usual backslash escaping! *)
                 ;
 
@@ -36,7 +39,10 @@ Selector Syntax:
     key         = index | pattern
                 ;
 
-    kv_item     = "{", { key, "=", pattern }, "}"
+    kv          = key, "=", pattern
+                ;
+
+    kv_item     = "{", kv, { ",", kv }, "}"
                 ;
 
     kv_match    = kv_item, "&", kv_match
@@ -55,7 +61,114 @@ Selector Syntax:
 
 */
 
+fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
+    let uh = ps.take_while(|c|
+        match c {
+           '?' | '/' | '\\' | '|' | '{' | '}'
+         | '[' | ']' | '(' | ')' | '\''
+         | '&' | '$' | ':' | ';' | '*' | '='
+                => false,
+            _   => !c.is_whitespace()
+    });
+
+    let r =
+        VVal::pair(
+            VVal::new_sym("Ident"),
+            VVal::new_sym(&uh.to_string()));
+
+    ps.skip_ws();
+
+    Ok(r)
+}
+
+fn parse_char_class(ps: &mut State) -> Result<VVal, ParseError> {
+}
+
+fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
+}
+
+fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
+    let pat = VVal::vec1(VVal::new_sym("Pattern"));
+
+    while !ps.at_end() && !ps.lookahead_one_of("'&:;$)=/|") {
+        let element =
+            match ps.expect_some(ps.peek())? {
+                '*' => VVal::new_sym("Glob"),
+                '?' => VVal::new_sym("AnyChar"),
+                '[' => parse_char_class(ps)?,
+                '(' => parse_capture(ps)?,
+                '\\' => {
+                    ps.consume();
+                    let next = ps.expect_some(ps.peek())?;
+                    ps.consume();
+                    let mut b = [0; 4];
+                    VVal::pair(
+                        VVal::new_sym("Ident"),
+                        VVal::new_sym(next.encode_utf8(&mut b)))
+                },
+                _   => parse_ident(ps)?
+            };
+        pat.push(element)
+    }
+
+    Ok(pat)
+}
+
+fn parse_index(ps: &mut State) -> Result<VVal, ParseError> {
+    let uh = ps.take_while(|c| c.is_digit(10));
+    ps.skip_ws();
+
+    if let Ok(cn) = i64::from_str_radix(&uh.to_string(), 10) {
+        Ok(VVal::Int(cn as i64))
+    } else {
+        Err(ps.err(ParseErrorKind::BadEscape("Bad number as index")))
+    }
+}
+
+fn parse_key(ps: &mut State) -> Result<VVal, ParseError> {
+    match ps.expect_some(ps.peek())? {
+          '0' | '1' | '2' | '3' | '4'
+        | '5' | '6' | '7' | '8' | '9'
+            => parse_index(ps),
+        _   => parse_pattern(ps),
+    }
+}
+
+fn parse_kv(ps: &mut State) -> Result<VVal, ParseError> {
+    let key = parse_key(ps)?;
+
+    if !ps.consume_if_eq_ws('=') {
+        return Err(ps.err(
+            ParseErrorKind::UnexpectedToken('=', "in key/value node pattern")));
+    }
+
+    let val = parse_pattern(ps)?;
+
+    Ok(VVal::vec2(key, val))
+}
+
 fn parse_kv_item(ps: &mut State) -> Result<VVal, ParseError> {
+    if !ps.consume_if_eq_ws('{') {
+        return Err(ps.err(
+            ParseErrorKind::UnexpectedToken('{', "in key/value node pattern")));
+    }
+
+    let kv = parse_kv(ps)?;
+
+    let v = VVal::vec2(VVal::new_sym("KV"), kv);
+
+    while ps.expect_some(ps.peek())? == ',' {
+        ps.consume_ws();
+        let kv = parse_kv(ps)?;
+        v.push(kv);
+    }
+
+    if !ps.consume_if_eq_es('}') {
+        return Err(ps.err(
+            ParseErrorKind::UnexpectedToken('}', "in key/value node pattern")));
+    }
+
+    Ok(v)
 }
 
 fn parse_kv_match(ps: &mut State) -> Result<VVal, ParseError> {
@@ -126,7 +239,7 @@ fn parse_selector_pattern(ps: &mut State) -> Result<VVal, ParseError> {
     let node = parse_node(ps)?;
     selector.push(node);
 
-    while ps.consume_if_eq('/') {
+    while ps.consume_if_eq_ws('/') {
         let node = parse_node(ps)?;
         selector.push(node);
     }
