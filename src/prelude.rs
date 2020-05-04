@@ -6453,6 +6453,13 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(1), Some(2), true);
 
+    func!(st, "tree_select",
+        |env: &mut Env, _argc: usize| {
+            let slct = env.arg(0);
+            let tree = env.arg(1);
+            Ok(util::tree_select(&slct, &tree))
+        }, Some(2), Some(2), false);
+
     func!(st, "ser:csv",
         |env: &mut Env, _argc: usize| {
             use crate::csv;

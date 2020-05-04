@@ -1979,6 +1979,30 @@ impl VVal {
     }
 
     #[inline]
+    pub fn vec1(a: VVal) -> VVal {
+        let v = Self::vec();
+        v.push(a);
+        v
+    }
+
+    #[inline]
+    pub fn vec2(a: VVal, b: VVal) -> VVal {
+        let v = Self::vec();
+        v.push(a);
+        v.push(b);
+        v
+    }
+
+    #[inline]
+    pub fn vec3(a: VVal, b: VVal, c: VVal) -> VVal {
+        let v = Self::vec();
+        v.push(a);
+        v.push(b);
+        v.push(c);
+        v
+    }
+
+    #[inline]
     pub fn opt(v: VVal) -> VVal {
         VVal::Opt(Some(Rc::new(v)))
     }

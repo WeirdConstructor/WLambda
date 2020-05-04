@@ -452,6 +452,11 @@ impl State {
         self.skip_ws_and_comments();
     }
 
+    pub fn consume_ws(&mut self) {
+        self.consume();
+        self.skip_ws();
+    }
+
     pub fn consume(&mut self) {
         if self.at_end() { return }
 
