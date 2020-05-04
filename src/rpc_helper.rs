@@ -58,14 +58,19 @@ impl RPCHandle {
 
     fn get_request(&self) -> Option<AtomicAValSlot> {
         match self.free_queue.try_recv() {
-            VVal::Usr(mut ud) => {
-                if let Some(ud) = ud.as_any().downcast_ref::<AtomicAValSlot>() {
-                    Some(ud.clone())
+            VVal::Opt(Some(o)) => {
+                if let VVal::Usr(mut ud) = (*o).clone() {
+                    if let Some(ud) = ud.as_any().downcast_ref::<AtomicAValSlot>() {
+                        Some(ud.clone())
+                    } else {
+                        Some(AtomicAValSlot::new())
+                    }
                 } else {
-                    Some(AtomicAValSlot::new())
+                    None
                 }
             },
-            VVal::None => Some(AtomicAValSlot::new()),
+            VVal::Opt(None)
+            | VVal::None => Some(AtomicAValSlot::new()),
             _ => None,
         }
     }
