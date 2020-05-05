@@ -489,7 +489,7 @@ impl State {
         self.ch_ptr += 1;
     }
 
-    fn skip_ws(&mut self) {
+    pub fn skip_ws(&mut self) {
         self.consume_while(char::is_whitespace);
     }
 

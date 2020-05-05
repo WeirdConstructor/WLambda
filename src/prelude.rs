@@ -2752,7 +2752,7 @@ If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
 ```wlambda
 !v = std:append $[1,2,3] :a :b $[:c, :d];
 
-std:assert_eq (str v) "$[1,2,3,:\"a\",:\"b\",:\"c\",:\"d\"]";
+std:assert_eq (str v) "$[1,2,3,:a,:b,:c,:d]";
 ```
 
 If _vec-a_ is not a vector, a vector containing it will be created:
@@ -2760,7 +2760,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 ```wlambda
 !v = std:append 1 :a :b $[:c, :d];
 
-std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
+std:assert_eq (str v) "$[1,:a,:b,:c,:d]";
 ```
 
 #### <a name="4136-stdprepend-vec-a-value-or-vec-"></a>4.13.6 - std:prepend _vec-a_ _value-or-vec_ ...
@@ -4713,7 +4713,7 @@ in the WLambda syntax as debug output that might change in future versions.
 ```wlambda
 std:assert_eq (std:ser:wlambda "foo") $q|"foo"|;
 std:assert_eq (std:ser:wlambda $none) $q|$n|;
-std:assert_eq (std:ser:wlambda $[1,:a]) $q|$[1,:"a"]|;
+std:assert_eq (std:ser:wlambda $[1,:a]) $q|$[1,:a]|;
 ```
 
 #### <a name="1212-stdserjson-data-nopretty"></a>12.1.2 - std:ser:json _data_ \[_no_pretty_]
@@ -6453,12 +6453,12 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(1), Some(2), true);
 
-    func!(st, "tree_select",
-        |env: &mut Env, _argc: usize| {
-            let slct = env.arg(0);
-            let tree = env.arg(1);
-            Ok(util::tree_select(&slct, &tree))
-        }, Some(2), Some(2), false);
+//    func!(st, "tree_select",
+//        |env: &mut Env, _argc: usize| {
+//            let slct = env.arg(0);
+//            let tree = env.arg(1);
+//            Ok(util::tree_select(&slct, &tree))
+//        }, Some(2), Some(2), false);
 
     func!(st, "ser:csv",
         |env: &mut Env, _argc: usize| {

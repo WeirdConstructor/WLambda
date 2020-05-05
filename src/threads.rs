@@ -100,7 +100,7 @@ impl AVal {
     ///
     /// ```
     /// use wlambda::*;
-    /// assert_eq!(AVal::Sym(String::from("x")).to_vval().s(), ":\"x\"");
+    /// assert_eq!(AVal::Sym(String::from("x")).to_vval().s(), ":x");
     /// ```
     pub fn to_vval(&self) -> VVal {
         match self {

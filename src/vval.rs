@@ -2998,6 +2998,18 @@ impl VVal {
         out.concat()
     }
 
+    fn dump_sym(s: &str) -> String {
+        if s.chars().all(|c|
+            c.is_alphanumeric()
+            || c == '_' || c == '-' || c == '+'
+            || c == '&' || c == '@')
+        {
+            format!(":{}", s)
+        } else {
+            format!(":\"{}\"", s)
+        }
+    }
+
     fn dump_map_as_str(m: &Rc<RefCell<FnvHashMap<Symbol,VVal>>>, c: &mut CycleCheck) -> String {
         let mut out : Vec<String> = Vec::new();
         let mut first = true;
@@ -3979,7 +3991,7 @@ impl VVal {
         };
         let s = match self {
             VVal::Str(_)     => self.with_s_ref(|s| format_vval_str(s, false)),
-            VVal::Sym(s)     => format!(":\"{}\"", *s),
+            VVal::Sym(s)     => VVal::dump_sym(&*s),
             VVal::Byt(s)     => format!("$b{}", format_vval_byt(s.as_ref())),
             VVal::None       => "$n".to_string(),
             VVal::Err(e)     => format!("$e{} {}", (*e).borrow().1, (*e).borrow().0.s_cy(c)),

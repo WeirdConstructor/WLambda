@@ -2401,7 +2401,7 @@ mod tests {
     fn vm_data() {
         assert_eq!(gen("10"),      "10");
         assert_eq!(gen("\"foo\""), "\"foo\"");
-        assert_eq!(gen(":foo"),    ":\"foo\"");
+        assert_eq!(gen(":foo"),    ":foo");
     }
 
     #[test]
