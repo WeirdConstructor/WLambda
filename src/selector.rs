@@ -127,7 +127,7 @@ fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
-    let pat = VVal::vec1(VVal::new_sym("Pat"));
+    let pat = VVal::vec();
 
     while !ps.at_end() && !ps.lookahead_one_of("'&:^;$)]}=/|,") {
         let element =
@@ -311,18 +311,129 @@ fn parse_selector(s: &str) -> Result<VVal, String> {
 pub struct SelectorState {
 }
 
-pub type SelNode = Box<dyn Fn(&mut SelectorState) -> VVal>;
+impl SelectorState {
+    fn new() -> Self {
+        Self {
+        }
+    }
+}
 
-//fn compile_selector(sel: &VVal) -> SelNode {
-//    if let VVal::Lst(_) = sel {
-//        let first = sel.at(0).unwrap_or_else(|| VVal::None);
-//        if first == VVal::new_sym("Path") {
-//        }
-//        match first {
-//        }
-//    } else {
-//    }
-//}
+pub type PatternNode = Box<dyn Fn(&[char], &mut SelectorState) -> (VVal, usize)>;
+pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal)>;
+
+fn compile_pattern(pat: &VVal, sn: SelNode) -> PatternNode {
+    let pattern = n.at(0).expect("proper pattern").to_sym();
+
+    let mut next : Option<PatternNode> = None;
+
+    if pattern == VVal::new_sym("Pat") {
+
+        for i in 0..(n.len() - 1) {
+            let p = n.at(n.len() - i).expect("pattern item");
+
+            if p.is_pair() && p.at(0).unwrap() == VVal::new_sym("I") {
+                let key_str = p.at(1).unwrap().clone();
+
+                let mn = std::mem::replace(&mut next, None);
+                next = Box::new(move |s: &[char], st: &mut SelectorState| {
+                    key_str.with_s_ref(|y| {
+                        let y_len = y.len();
+
+                        if s.len() >= y_len && s[0..y_len] == y {
+                            if let Some(n) = mn {
+                                if y_len == s.len() {
+                                    (VVal::Bol(true), y_len)
+                                } else {
+                                    let (m, len) = (*n)(s[y_len..], st);
+                                    (m, y_len + len)
+                                }
+                            } else {
+                                (VVal::Bol(true), y_len)
+                            }
+                        } else {
+                            (VVal::None, 0)
+                        }
+                    })
+                });
+
+            } else {
+                next = Box::new(|s: &[char], st: &mut SelectorState| {
+                    (VVal::None, 0)
+                });
+            }
+        }
+//
+//        let mut full_str =
+//            Box::new(move |v: &VVal, st: &mut SelectorState| {
+//                let (r, _) = v.with_s_ref(|s| { next(&s[..], st) });
+//                r
+//            });
+    }
+
+    if let Some(n) = next {
+        next
+    } else {
+        Box::new(|s: &[char], st: &mut SelectorState| { (VVal::None, 0) })
+    }
+}
+
+fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
+    if k.is_int() {
+        let i = k.i();
+
+        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+            if let Some(v) = v.at(i as usize) {
+                (*sn)(&v, st, capts);
+            }
+        })
+    } else {
+        let pat = compile_pattern(k, sn);
+
+        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+            let mut captures = VVal::None;
+
+            for (v, k) in v.iter() {
+                if let Some(k) = k {
+                    k.with_s_ref(|s| {
+                        let (r, _) = (*pat)(&s[..], st);
+                        if r.b() {
+                            (*sn)(&v, st, capts);
+                        }
+                    });
+                } else {
+                    panic!("not implemented yet");
+                }
+            }
+        })
+    }
+}
+
+fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
+    let node_type = n.at(0).expect("proper node").to_sym();
+
+    if node_type == VVal::new_sym("NK") {
+        compile_key(&n.at(1).unwrap_or_else(|| VVal::None), sn)
+    } else {
+        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| { })
+    }
+}
+
+fn compile_selector(sel: &VVal) -> SelNode {
+    if let VVal::Lst(_) = sel {
+        println!("SELE {}", sel.s());
+
+        let first = sel.at(0).unwrap_or_else(|| VVal::None);
+        if first == VVal::new_sym("Path") {
+            for i in 1..sel.len() {
+                let nod = sel.at(i).expect("proper path");
+            }
+        }
+
+        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| { })
+    } else {
+        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| { })
+    }
+}
 
 //fn tree_select(slct: &VVal, tree: &VVal) -> VVal {
 //    let path = VVal::vec();
@@ -338,6 +449,25 @@ mod tests {
             Ok(v)  => v.s(),
             Err(e) => format!("Error: {}", e),
         }
+    }
+
+    fn pev(s: &str, v: VVal) -> String {
+        let sel_ast =
+            match parse_selector(s) {
+                Ok(v)  => v,
+                Err(e) => { return format!("Error: {}", e); },
+            };
+        let sn = compile_selector(&sel_ast);
+        let mut state = SelectorState::new();
+        let ret = (*sn)(&v, &mut state);
+        ret.s()
+    }
+
+    #[test]
+    fn check_selector_match_path() {
+        assert_eq!(
+            pev("a", VVal::map1("a", VVal::vec1(VVal::Int(20)))),
+            "");
     }
 
     #[test]
