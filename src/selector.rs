@@ -9,7 +9,7 @@ Selector Syntax:
                 ;
 
     ident       = { ?any character except whitespace,
-                    "?", "/", "\", "|", "^",
+                    "?", "/", "\", "|", "^", ",",
                     "'", "&", ":", ";", "$", "(", ")",
                     "{", "}", "[", "]", "*" or "="? }
                   (* allows the usual backslash escaping! *)
@@ -66,7 +66,7 @@ fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
         match c {
            '?' | '/' | '\\' | '|' | '{' | '}'
          | '[' | ']' | '(' | ')' | '\'' | '^'
-         | '&' | '$' | ':' | ';' | '*' | '='
+         | '&' | '$' | ':' | ';' | '*' | '=' | ','
                 => false,
             _   => !c.is_whitespace()
     });
@@ -105,8 +105,8 @@ fn parse_char_class(ps: &mut State) -> Result<VVal, ParseError> {
 
     Ok(VVal::pair(
         VVal::new_sym(
-            if neg { "CCls" }
-            else   { "NCCls" }),
+            if neg { "NCCls" }
+            else   { "CCls" }),
         VVal::new_str_mv(chars)))
 }
 
@@ -129,11 +129,11 @@ fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
 fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
     let pat = VVal::vec1(VVal::new_sym("Pat"));
 
-    while !ps.at_end() && !ps.lookahead_one_of("'&:^;$)]}=/|") {
+    while !ps.at_end() && !ps.lookahead_one_of("'&:^;$)]}=/|,") {
         let element =
             match ps.expect_some(ps.peek())? {
-                '*' => VVal::new_sym("Glob"),
-                '?' => VVal::new_sym("Any"),
+                '*' => { ps.consume(); VVal::new_sym("Glob") },
+                '?' => { ps.consume(); VVal::new_sym("Any") },
                 '[' => parse_char_class(ps)?,
                 '(' => parse_capture(ps)?,
                 '\\' => {
@@ -179,7 +179,7 @@ fn parse_kv(ps: &mut State) -> Result<VVal, ParseError> {
 
     if !ps.consume_if_eq_ws('=') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('=', "in key/value node pattern")));
+            ParseErrorKind::UnexpectedToken('=', "in key/value")));
     }
 
     let val = parse_pattern(ps)?;
@@ -190,7 +190,7 @@ fn parse_kv(ps: &mut State) -> Result<VVal, ParseError> {
 fn parse_kv_item(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_ws('{') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('{', "in key/value node pattern")));
+            ParseErrorKind::UnexpectedToken('{', "in key/value node pattern start")));
     }
 
     let kv = parse_kv(ps)?;
@@ -203,9 +203,11 @@ fn parse_kv_item(ps: &mut State) -> Result<VVal, ParseError> {
         v.push(kv);
     }
 
+    let c = ps.peek().unwrap_or('\0');
+
     if !ps.consume_if_eq_ws('}') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('}', "in key/value node pattern")));
+            ParseErrorKind::UnexpectedToken('}', "in key/value node pattern end")));
     }
 
     Ok(v)
@@ -241,7 +243,14 @@ fn parse_node(ps: &mut State) -> Result<VVal, ParseError> {
     let c = ps.expect_some(ps.peek())?;
 
     if c == '*' && ps.lookahead("**") {
+        ps.consume_lookahead("**");
+        ps.skip_ws();
         Ok(VVal::vec1(VVal::new_sym("RecGlob")))
+
+    } else if c == '*' {
+        ps.consume_ws();
+        Ok(VVal::vec1(VVal::new_sym("Glob")))
+
     } else {
         match c {
             ':' => {
@@ -299,6 +308,22 @@ fn parse_selector(s: &str) -> Result<VVal, String> {
     parse_selector_pattern(&mut ps).map_err(|e| format!("{}", e))
 }
 
+pub struct SelectorState {
+}
+
+pub type SelNode = Box<dyn Fn(&mut SelectorState) -> VVal>;
+
+//fn compile_selector(sel: &VVal) -> SelNode {
+//    if let VVal::Lst(_) = sel {
+//        let first = sel.at(0).unwrap_or_else(|| VVal::None);
+//        if first == VVal::new_sym("Path") {
+//        }
+//        match first {
+//        }
+//    } else {
+//    }
+//}
+
 //fn tree_select(slct: &VVal, tree: &VVal) -> VVal {
 //    let path = VVal::vec();
 //    slct.with_s_ref(|s| parse_select(&s.chars().collect(), path));
@@ -318,6 +343,33 @@ mod tests {
     #[test]
     fn check_selector_node_path() {
         assert_eq!(p("a"),     "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]]]");
+        assert_eq!(p("a/0/2"), "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]],$[:NK,0],$[:NK,2]]");
         assert_eq!(p("a/b/c"), "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]],$[:NK,$[:Pat,$p(:I,:b)]],$[:NK,$[:Pat,$p(:I,:c)]]]");
+
+        assert_eq!(p("a/^b/c/^"), "Error: error[1,9:<selector>] EOF while parsing: Unexpected EOF at code \'\'");
+        assert_eq!(p("a/^b/c/^*"), "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]],$[:NCap,$[:NK,$[:Pat,$p(:I,:b)]]],$[:NK,$[:Pat,$p(:I,:c)]],$[:NCap,$[:Glob]]]");
+        assert_eq!(p("a/^b/^c"), "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]],$[:NCap,$[:NK,$[:Pat,$p(:I,:b)]]],$[:NCap,$[:NK,$[:Pat,$p(:I,:c)]]]]");
+    }
+
+    #[test]
+    fn check_selector_globs() {
+        assert_eq!(p("*"),      "$[:Path,$[:Glob]]");
+        assert_eq!(p("**"),     "$[:Path,$[:RecGlob]]");
+        assert_eq!(p("^**"),    "$[:Path,$[:NCap,$[:RecGlob]]]");
+        assert_eq!(p("^*"),     "$[:Path,$[:NCap,$[:Glob]]]");
+
+        assert_eq!(p("*/*/a"),   "$[:Path,$[:Glob],$[:Glob],$[:NK,$[:Pat,$p(:I,:a)]]]");
+        assert_eq!(p("*  /  *  /   a   "),   "$[:Path,$[:Glob],$[:Glob],$[:NK,$[:Pat,$p(:I,:a)]]]");
+        assert_eq!(p("**/^a/**"), "$[:Path,$[:RecGlob],$[:NCap,$[:NK,$[:Pat,$p(:I,:a)]]],$[:RecGlob]]");
+    }
+
+    #[test]
+    fn check_selector_kvmatch() {
+        assert_eq!(p(":{b=a,a=20}"),                                "$[:Path,$[:NKVM,$[:KV,$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:a)]],$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]]]]]");
+        assert_eq!(p("a : { a = 20 }"),                             "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]]]]]");
+        assert_eq!(p("a : { a = 20, b=a(a?)[^ABC]cc*f}"),           "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]],$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:a),$p(:PatCap,$[:Pat,$p(:I,:a),:Any]),$p(:NCCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
+        assert_eq!(p("a : { a = 20, b=a(a?)[ABC]cc*f}"),            "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]],$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:a),$p(:PatCap,$[:Pat,$p(:I,:a),:Any]),$p(:CCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
+        assert_eq!(p("a : { a = 20 } | { b = 20 }"),                "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:Or,$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]]],$[:KV,$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:20)]]]]]]");
+        assert_eq!(p("a : { a = 20 } | { b = 20 } & { x = 10}"),    "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:Or,$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]]],$[:KV,$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:20)]]]]]]");
     }
 }
