@@ -2844,22 +2844,22 @@ impl VVal {
 
     pub fn map1(k: &str, v: VVal) -> VVal {
         let m = VVal::map();
-        m.set_key_str(k, v);
+        m.set_key_str(k, v).expect("single use");
         m
     }
 
     pub fn map2(k: &str, v: VVal, k2: &str, v2: VVal) -> VVal {
         let m = VVal::map();
-        m.set_key_str(k, v);
-        m.set_key_str(k2, v2);
+        m.set_key_str(k, v).expect("single use");
+        m.set_key_str(k2, v2).expect("single use");
         m
     }
 
     pub fn map3(k: &str, v: VVal, k2: &str, v2: VVal, k3: &str, v3: VVal) -> VVal {
         let m = VVal::map();
-        m.set_key_str(k, v);
-        m.set_key_str(k2, v2);
-        m.set_key_str(k3, v3);
+        m.set_key_str(k, v).expect("single use");
+        m.set_key_str(k2, v2).expect("single use");
+        m.set_key_str(k3, v3).expect("single use");
         m
     }
 

@@ -339,7 +339,7 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
                         let y_len = y.len();
 
                         if s.starts_with(y) {
-                            if let Some(n) = mn {
+                            if let Some(n) = &mn {
                                 if y_len == s.len() {
                                     (VVal::Bol(true), y_len)
                                 } else {
@@ -388,12 +388,18 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
     } else {
         let pat = compile_pattern(k);
 
+        // TODO: If pattern can be simplified to a single string,
+        //       optimize it by trying to access that key directly!
+        //       (like above)
+
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
             for (v, k) in v.iter() {
+                println!("pAT: {}: {:?}", v.s(), k);
                 if let Some(k) = k {
                     k.with_s_ref(|s| {
                         let (r, _) = (*pat)(&s[..], st);
                         if r.b() {
+                            println!("XOOO: {}", v.s());
                             (*sn)(&v, st, capts);
                         }
                     });
@@ -411,7 +417,9 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
     if node_type == s2sym("NK") {
         compile_key(&n.at(1).unwrap_or_else(|| VVal::None), sn)
     } else {
-        Box::new(move |_v: &VVal, _st: &mut SelectorState, _capts: &VVal| { })
+        Box::new(move |_v: &VVal, _st: &mut SelectorState, _capts: &VVal| {
+            panic!("Unimplemented node type: {}", node_type);
+        })
     }
 }
 
@@ -421,37 +429,30 @@ fn compile_selector(sel: &VVal) -> SelNode {
 
         let first = sel.at(0).unwrap_or_else(|| VVal::None);
         if first.to_sym() == s2sym("Path") {
-            let next : Option<SelNode> = None;
+            let mut next : Option<SelNode> = Some(Box::new(
+                |v: &VVal, _st: &mut SelectorState, capts: &VVal| {
+                    capts.push(v.clone());
+                }));
 
+            // TODO: Find bug!
             for i in 1..(sel.len() - 1) {
-
                 let nod = sel.at(sel.len() - i).expect("proper path");
-                let cur = compile_node(nod);
-
-                let mn = std::mem::replace(&mut next, None);
-                next = Some(Box::new(
-                    move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
-                        if (*cur)(v, st, capts) {
-                            if let Some(n) = mn {
-                                (*n)(v, st, capts)
-                            } else {
-                                capts.push(v);
-                                true
-                            }
-                        } else {
-                            false
-                        }
-                    }));
+                let n = std::mem::replace(&mut next, None).unwrap();
+                let cur = compile_node(&nod, n);
+                next = Some(cur);
             }
 
-            if let Some(n) = next {
-                return n;
-            }
+            next.unwrap()
+        } else {
+            Box::new(move |_v: &VVal, _st: &mut SelectorState, _capts: &VVal| {
+                panic!("unimplemented selector type: {}", first.s());
+            })
         }
-
-        Box::new(move |_v: &VVal, _st: &mut SelectorState, _capts: &VVal| { })
     } else {
-        Box::new(move |_v: &VVal, _st: &mut SelectorState, _capts: &VVal| { })
+        let sel = sel.clone();
+        Box::new(move |_v: &VVal, _st: &mut SelectorState, _capts: &VVal| {
+            panic!("unimplemented selector type?: {}", sel.s());
+        })
     }
 }
 
@@ -479,8 +480,9 @@ mod tests {
             };
         let sn = compile_selector(&sel_ast);
         let mut state = SelectorState::new();
-        let ret = (*sn)(&v, &mut state);
-        ret.s()
+        let capts = VVal::vec();
+        (*sn)(&v, &mut state, &capts);
+        capts.s()
     }
 
     #[test]
