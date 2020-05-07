@@ -136,14 +136,14 @@ fn parse_pattern_s(ps: &mut State) -> Result<VVal, ParseError> {
     while !ps.at_end() && !ps.lookahead_one_of("'&:^;$)]}=/|,") {
         let element =
             match ps.expect_some(ps.peek())? {
-                '*' => { ps.consume(); VVal::new_sym("Glob") },
-                '?' => { ps.consume(); VVal::new_sym("Any") },
+                '*' => { ps.consume_ws(); VVal::new_sym("Glob") },
+                '?' => { ps.consume_ws(); VVal::new_sym("Any") },
                 '[' => parse_char_class(ps)?,
                 '(' => parse_capture(ps)?,
                 '\\' => {
                     ps.consume();
                     let next = ps.expect_some(ps.peek())?;
-                    ps.consume();
+                    ps.consume_ws();
                     let mut b = [0; 4];
                     VVal::pair(
                         VVal::new_sym("S"),
@@ -267,10 +267,6 @@ fn parse_node(ps: &mut State) -> Result<VVal, ParseError> {
         ps.skip_ws();
         Ok(VVal::vec1(VVal::new_sym("RecGlob")))
 
-    } else if c == '*' {
-        ps.consume_ws();
-        Ok(VVal::vec1(VVal::new_sym("Glob")))
-
     } else {
         match c {
             ':' => {
@@ -361,12 +357,8 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
 
                     if s.starts_with(y) {
                         if let Some(n) = &mn {
-                            if y_len == s.len() {
-                                (VVal::Bol(true), y_len)
-                            } else {
-                                let (m, len) = (*n)(&s[y_len..], st);
-                                (m, y_len + len)
-                            }
+                            let (m, len) = (*n)(&s[y_len..], st);
+                            (m, y_len + len)
                         } else {
                             (VVal::Bol(true), y_len)
                         }
@@ -377,15 +369,49 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
             }));
 
         } else if p.to_sym() == s2sym("Any") {
-            next = Some(Box::new(|s: &str, _st: &mut SelectorState| {
+            let mn = std::mem::replace(&mut next, None);
+            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
+
                 if let Some(c) = s.chars().nth(0) {
-                    (VVal::Bol(true), c.len_utf8())
+
+                    if let Some(n) = &mn {
+                        let (m, len) = (*n)(&s[1..], st);
+                        (m, c.len_utf8() + len)
+                    } else {
+                        (VVal::Bol(true), c.len_utf8())
+                    }
                 } else {
                     (VVal::None, 0)
                 }
             }));
 
+        } else if p.to_sym() == s2sym("Glob") {
+            let mn = std::mem::replace(&mut next, None);
+            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
+
+                if let Some(n) = &mn {
+                    let s_len = s.len();
+                    let mut c_try_len = s_len;
+                    while c_try_len > 0 {
+                        let (m, len) = (*n)(&s[..c_try_len], st);
+                        if m.b() {
+                            return (m, len);
+                        }
+
+                        c_try_len -= 1;
+                        while c_try_len > 0 && !s.is_char_boundary(c_try_len) {
+                            c_try_len -= 1;
+                        }
+                    }
+
+                    (VVal::Bol(true), 0)
+                } else {
+                    (VVal::Bol(true), s.len())
+                }
+            }));
+
         } else {
+//            panic!("NOT IMPLEMENTED PAT TYP: {}", p.s());
             next = Some(Box::new(|_s: &str, _st: &mut SelectorState| {
                 (VVal::None, 0)
             }));
@@ -417,13 +443,19 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
 
             return
                 Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
-                    (*sn)(
-                        &v.get_key_sym(&key).unwrap_or_else(|| VVal::None),
-                        st,
-                        capts)
+                    if let Some(v) = v.get_key_sym(&key) {
+                        (*sn)(&v, st, capts);
+                    }
+                });
+
+        } else if k.len() == 1 && pat.to_sym() == s2sym("Glob") {
+            return
+                Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+                    for (v, _) in v.iter() {
+                        (*sn)(&v, st, capts);
+                    }
                 });
         }
-
 
         let pat = compile_pattern(k);
 
@@ -433,7 +465,7 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
                 if let Some(k) = k {
                     k.with_s_ref(|s| {
                         let (r, len) = (*pat)(&s[..], st);
-                        println!("PATR: {}", r.s());
+                        println!("PATR: {} {} {}", r.s(), len, s.len());
                         if r.b() && len == s.len() {
                             println!("XOOO: {}", v.s());
                             (*sn)(&v, st, capts);
@@ -553,6 +585,17 @@ mod tests {
 
         assert_eq!(pev("?/1",       &v1), "$[$p(2,4)]");
         assert_eq!(pev("?/2",       &v1), "$[\"F0O\"]");
+
+        assert_eq!(pev("?b/1",      &v1), "$[44]");
+        assert_eq!(pev("a?/1",      &v1), "$[44]");
+        assert_eq!(pev("??ab/1",    &v1), "$[9]");
+
+        assert_eq!(pev("*/X",       &v1), "$[]");
+        assert_eq!(pev("*/?/X",     &v1), "$[10]");
+        assert_eq!(pev("*/*/X",     &v1), "$[10]");
+        assert_eq!(pev("*/2/2",     &v1), "$[\"O\"]");
+
+        assert_eq!(pev("*ab",       &v1), "$[\"F0O\"]");
     }
 
     #[test]
@@ -562,22 +605,24 @@ mod tests {
         assert_eq!(p("a/b/c"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NK,$[$p(:I,:b)]],$[:NK,$[$p(:I,:c)]]]");
 
         assert_eq!(p("a/^b/c/^"), "Error: error[1,9:<selector>] EOF while parsing: Unexpected EOF at code \'\'");
-        assert_eq!(p("a/^b/c/^*"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NCap,$[:NK,$[$p(:I,:b)]]],$[:NK,$[$p(:I,:c)]],$[:NCap,$[:Glob]]]");
+        assert_eq!(p("a/^b/c/^*"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NCap,$[:NK,$[$p(:I,:b)]]],$[:NK,$[$p(:I,:c)]],$[:NCap,$[:NK,$[:Glob]]]]");
         assert_eq!(p("a/^b/^c"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NCap,$[:NK,$[$p(:I,:b)]]],$[:NCap,$[:NK,$[$p(:I,:c)]]]]");
     }
 
     #[test]
     fn check_selector_globs() {
-        assert_eq!(p("*"),      "$[:Path,$[:Glob]]");
+        assert_eq!(p("*"),      "$[:Path,$[:NK,$[:Glob]]]");
         assert_eq!(p("**"),     "$[:Path,$[:RecGlob]]");
         assert_eq!(p("^**"),    "$[:Path,$[:NCap,$[:RecGlob]]]");
-        assert_eq!(p("^*"),     "$[:Path,$[:NCap,$[:Glob]]]");
+        assert_eq!(p("^*"),     "$[:Path,$[:NCap,$[:NK,$[:Glob]]]]");
 
         assert_eq!(p("(*|a?)"), "$[:Path,$[:NK,$[$p(:PatCap,$[:Opt,$[:Glob],$[$p(:I,:a),:Any]])]]]");
 
-        assert_eq!(p("*/*/a"),   "$[:Path,$[:Glob],$[:Glob],$[:NK,$[$p(:I,:a)]]]");
-        assert_eq!(p("*  /  *  /   a   "),   "$[:Path,$[:Glob],$[:Glob],$[:NK,$[$p(:I,:a)]]]");
+        assert_eq!(p("*/*/a"),   "$[:Path,$[:NK,$[:Glob]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:a)]]]");
+        assert_eq!(p("*  /  *  /   a   "),   "$[:Path,$[:NK,$[:Glob]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:a)]]]");
         assert_eq!(p("**/^a/**"), "$[:Path,$[:RecGlob],$[:NCap,$[:NK,$[$p(:I,:a)]]],$[:RecGlob]]");
+
+        assert_eq!(p("?a"),    "$[:Path,$[:NK,$[:Any,$p(:I,:a)]]]");
     }
 
     #[test]

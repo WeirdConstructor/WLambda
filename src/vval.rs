@@ -3261,16 +3261,23 @@ impl VVal {
                 self.at(match key {
                     "0" | "value" | "v" | "car" | "head" | "first"  => 0,
                     "1" | "key"   | "k" | "cdr" | "tail" | "second" => 1,
-                    _ => usize::from_str_radix(key, 10).unwrap_or(0),
+                    _ => {
+                        if !key.chars().all(|c| c.is_digit(10)) { return None; }
+                        usize::from_str_radix(key, 10).unwrap_or(0)
+                    }
                 })
             },
             VVal::Iter(i) => {
+                if !key.chars().all(|c| c.is_digit(10)) { return None; }
+
                 let index = usize::from_str_radix(key, 10).unwrap_or(0);
                 let mut i = i.borrow_mut();
                 for _ in 0..index { i.next(); }
                 iter_next_value!(i, v, { Some(v) }, None)
             },
             VVal::Lst(l) => {
+                if !key.chars().all(|c| c.is_digit(10)) { return None; }
+
                 let idx = usize::from_str_radix(key, 10).unwrap_or(0);
                 if idx < l.borrow().len() {
                     Some(l.borrow()[idx].clone())
