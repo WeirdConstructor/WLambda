@@ -502,6 +502,7 @@ mod tests {
 
         assert_eq!(pev("a",         &v1), "$[$[20,$p(2,4),\"F0O\"]]");
         assert_eq!(pev("a/2/2",     &v1), "$[\"O\"]");
+        assert_eq!(pev("a/2/1",     &v1), "$[\"0\"]");
         assert_eq!(pev("ab/0",      &v1), "$[33]");
     }
 
