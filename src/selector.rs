@@ -325,48 +325,39 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
 
     let mut next : Option<PatternNode> = None;
 
-    if pattern == s2sym("Pat") {
+    for i in 0..pat.len() {
+        let p = pat.at(pat.len() - (i + 1)).expect("pattern item");
 
-        for i in 1..(pat.len() - 1) {
-            let p = pat.at(pat.len() - i).expect("pattern item");
+        if p.is_pair() && p.at(0).unwrap() == VVal::new_sym("I") {
+            let key_str = p.at(1).unwrap().clone();
 
-            if p.is_pair() && p.at(0).unwrap() == VVal::new_sym("I") {
-                let key_str = p.at(1).unwrap().clone();
+            let mn = std::mem::replace(&mut next, None);
+            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
+                key_str.with_s_ref(|y| {
+                    let y_len = y.len();
 
-                let mn = std::mem::replace(&mut next, None);
-                next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-                    key_str.with_s_ref(|y| {
-                        let y_len = y.len();
-
-                        if s.starts_with(y) {
-                            if let Some(n) = &mn {
-                                if y_len == s.len() {
-                                    (VVal::Bol(true), y_len)
-                                } else {
-                                    let (m, len) = (*n)(&s[y_len..], st);
-                                    (m, y_len + len)
-                                }
-                            } else {
+                    if s.starts_with(y) {
+                        if let Some(n) = &mn {
+                            if y_len == s.len() {
                                 (VVal::Bol(true), y_len)
+                            } else {
+                                let (m, len) = (*n)(&s[y_len..], st);
+                                (m, y_len + len)
                             }
                         } else {
-                            (VVal::None, 0)
+                            (VVal::Bol(true), y_len)
                         }
-                    })
-                }));
+                    } else {
+                        (VVal::None, 0)
+                    }
+                })
+            }));
 
-            } else {
-                next = Some(Box::new(|_s: &str, _st: &mut SelectorState| {
-                    (VVal::None, 0)
-                }));
-            }
+        } else {
+            next = Some(Box::new(|_s: &str, _st: &mut SelectorState| {
+                (VVal::None, 0)
+            }));
         }
-//
-//        let mut full_str =
-//            Box::new(move |v: &VVal, st: &mut SelectorState| {
-//                let (r, _) = v.with_s_ref(|s| { next(&s[..], st) });
-//                r
-//            });
     }
 
     if let Some(n) = next {
@@ -386,11 +377,23 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
             }
         })
     } else {
-        let pat = compile_pattern(k);
+        let pat = k.at(0).unwrap_or_else(|| VVal::None);
+        let pat_type = k.at(0).unwrap_or_else(|| VVal::None).at(0).unwrap_or_else(|| VVal::None);
 
-        // TODO: If pattern can be simplified to a single string,
-        //       optimize it by trying to access that key directly!
-        //       (like above)
+        if k.len() == 1 && pat.is_pair() && pat_type.to_sym() == s2sym("I") {
+            let key = pat.at(1).unwrap_or_else(|| VVal::None).to_sym();
+
+            return
+                Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+                    (*sn)(
+                        &v.get_key_sym(&key).unwrap_or_else(|| VVal::None),
+                        st,
+                        capts)
+                });
+        }
+
+
+        let pat = compile_pattern(k);
 
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
             for (v, k) in v.iter() {
@@ -398,6 +401,7 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
                 if let Some(k) = k {
                     k.with_s_ref(|s| {
                         let (r, _) = (*pat)(&s[..], st);
+                        println!("PATR: {}", r.s());
                         if r.b() {
                             println!("XOOO: {}", v.s());
                             (*sn)(&v, st, capts);
@@ -425,7 +429,6 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
 
 fn compile_selector(sel: &VVal) -> SelNode {
     if let VVal::Lst(_) = sel {
-        println!("SELE {}", sel.s());
 
         let first = sel.at(0).unwrap_or_else(|| VVal::None);
         if first.to_sym() == s2sym("Path") {
@@ -434,8 +437,7 @@ fn compile_selector(sel: &VVal) -> SelNode {
                     capts.push(v.clone());
                 }));
 
-            // TODO: Find bug!
-            for i in 1..(sel.len() - 1) {
+            for i in 1..sel.len() {
                 let nod = sel.at(sel.len() - i).expect("proper path");
                 let n = std::mem::replace(&mut next, None).unwrap();
                 let cur = compile_node(&nod, n);
@@ -472,7 +474,7 @@ mod tests {
         }
     }
 
-    fn pev(s: &str, v: VVal) -> String {
+    fn pev(s: &str, v: &VVal) -> String {
         let sel_ast =
             match parse_selector(s) {
                 Ok(v)  => v,
@@ -481,15 +483,26 @@ mod tests {
         let sn = compile_selector(&sel_ast);
         let mut state = SelectorState::new();
         let capts = VVal::vec();
-        (*sn)(&v, &mut state, &capts);
+        (*sn)(v, &mut state, &capts);
         capts.s()
     }
 
     #[test]
     fn check_selector_match_path() {
-        assert_eq!(
-            pev("a", VVal::map1("a", VVal::vec1(VVal::Int(20)))),
-            "");
+        let v1 =
+            VVal::map2("a",
+                VVal::vec3(
+                    VVal::Int(20),
+                    VVal::pair(VVal::Int(2), VVal::Int(4)),
+                    VVal::new_str("F0O")),
+                "ab",
+                VVal::vec2(
+                    VVal::Int(33),
+                    VVal::Int(44)));
+
+        assert_eq!(pev("a",         &v1), "$[$[20,$p(2,4),\"F0O\"]]");
+        assert_eq!(pev("a/2/2",     &v1), "$[\"O\"]");
+        assert_eq!(pev("ab/0",      &v1), "$[33]");
     }
 
     #[test]
