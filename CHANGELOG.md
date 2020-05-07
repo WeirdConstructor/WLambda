@@ -13,6 +13,10 @@ of WLambda.
 to the end of the argument list now.
 * Incompatible Change: `VVal::set_map_key()` has been removed and replaced by
 `VVal::set_key_mv()`.
+* Incompatible Change: Strings and byte vectors are immutable data types now.
+* Incompatible Change: VValUserData::call takes an Env now instead of the
+argument vector directly.
+* Incompatible Change: Replaced MsgHandle by wlambda::rpc_helper::RPCHandle.
 * Potentially Incompatible Change: The compiler and evaluator was completely replaced
 by a VM and code generator for it.
 * Change: Function arguments are stored in right order (function, arg1, arg2, ...) on the
@@ -26,6 +30,8 @@ the error occurred easier.
 * Change: $q and $Q recognizes nested parenthesis now:
 `$q{parses { nested } stuff now! Also [}] is fine}`.
 * Optimization: Removed many unnecessary String allocations.
+* Feature: VValUserData can now define a `call_method(...)` trait function,
+that will be called when a method call is invoked on the object: `obj.method[...]`.
 * Feature: Added `not_i64` and `not_u32`.
 * Feature: Added compile time constant values: `!:const X = ...`.
 * Feature: Added if statement `? <cond> <then> <else>`.
@@ -41,6 +47,7 @@ between `$none` and really no value.
 * Feature: Implemented iterator values `$iter ...` that can either be called
 directly of passed to `iter`.
 * Feature: Symbols are now fully interned strings (per thread).
+* Feature: Added color functions `std:v:hex2rgba_*`.
 * Documentation: More!
 
 0.4.4 (2020-03-06)

@@ -63,8 +63,8 @@ fn check_function_string_rep() {
 
 #[test]
 fn check_pick() {
-    assert_eq!(ve("pick $t :v :h"), ":\"v\"");
-    assert_eq!(ve("pick $f :v :h"), ":\"h\"");
+    assert_eq!(ve("pick $t :v :h"), ":v");
+    assert_eq!(ve("pick $f :v :h"), ":h");
 }
 
 #[test]
@@ -96,8 +96,8 @@ fn check_list_boolean_indexing() {
     assert_eq!(ve("$[$[1, 2], $[3, 4]] $f"),                                        "3");
     assert_eq!(ve("$@v$[$[1, 2], $[3, 4]] \\_|$t|$+"),                              "$[2,4]");
     assert_eq!(ve("$@v$[$[1, 2], $[3, 4]] \\_|$f|$+"),                              "$[1,3]");
-    assert_eq!(ve("$f $[:a, :b]"),                                                  ":\"a\"");
-    assert_eq!(ve("$t $[:a, :b]"),                                                  ":\"b\"");
+    assert_eq!(ve("$f $[:a, :b]"),                                                  ":a");
+    assert_eq!(ve("$t $[:a, :b]"),                                                  ":b");
 }
 
 #[test]
@@ -493,7 +493,7 @@ fn check_strengthen() {
 fn check_call_primitives() {
     assert_eq!(ve("13[]"), "13");
     assert_eq!(ve("$t[]"), "$true");
-    assert_eq!(ve(":foo"), ":\"foo\"");
+    assert_eq!(ve(":foo"), ":foo");
     assert_eq!(ve("$n[]"),
         "EXEC ERR: Caught [1,3:<compiler:s_eval>(Call)] SA::Panic(\"Calling $none is invalid\")");
 }
@@ -1136,7 +1136,7 @@ fn check_prelude() {
     assert_eq!(ve("int $n"),            "0");
     assert_eq!(ve("float $q$10.2$"),    "10.2");
     assert_eq!(ve("str 10.3"),          "\"10.3\"");
-    assert_eq!(ve("sym \"foo\""),       ":\"foo\"");
+    assert_eq!(ve("sym \"foo\""),       ":foo");
     assert_eq!(ve("sym 10.4"),          ":\"10.4\"");
     assert_eq!(ve("(bool $e :fail) { 10 } { 20 }"), "20");
     assert_eq!(ve("std:fold 1 { _ + _1 } $[1,2,3,4]"), "11");
@@ -1251,8 +1251,8 @@ fn check_prelude_assert() {
 fn check_prelude_str() {
     assert_eq!(ve("std:str:to_uppercase $q foo "), "\"FOO\"");
     assert_eq!(ve("std:str:to_lowercase $q FOO "), "\"foo\"");
-    assert_eq!(ve("std:str:join \",\" $[1,2,3,${a=:x}]"), "\"1,2,3,${a=:\\\"x\\\"}\"");
-    assert_eq!(ve("std:str:cat $[1,2,3,${a=:x}]"), "\"123${a=:\\\"x\\\"}\"");
+    assert_eq!(ve("std:str:join \",\" $[1,2,3,${a=:x}]"), "\"1,2,3,${a=:x}\"");
+    assert_eq!(ve("std:str:cat $[1,2,3,${a=:x}]"), "\"123${a=:x}\"");
 }
 
 #[test]
@@ -1375,7 +1375,12 @@ fn check_userdata() {
         fn get_key(&self, key: &str) -> Option<VVal> {
             Some(VVal::new_str(key))
         }
-        fn call(&self, args: &[VVal]) -> Result<VVal, StackAction> {
+        fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+            let args = env.argv_ref();
+            Ok(VVal::pair(VVal::new_str(key), args[0].clone()))
+        }
+        fn call(&self, env: &mut Env) -> Result<VVal, StackAction> {
+            let args = env.argv_ref();
             Ok(args[0].clone())
         }
         fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
@@ -1408,11 +1413,13 @@ fn check_userdata() {
     let r = &mut ctx.eval(r#"
         !x = new_mytype[];
         !i = modify_mytype x;
-        $[i, x, x.foo, x :foo2]
+        $[i, x, x.foo, x :foo2, x.foo[99], x[:kkk]]
     "#).unwrap();
 
     assert_eq!(
-        r.s(), "$[98,$<MyType((14, 84))>,\"foo\",:\"foo2\"]", "Userdata implementation works");
+        r.s(),
+        "$[98,$<MyType((14, 84))>,\"foo\",:foo2,$p(\"foo\",99),:kkk]",
+        "Userdata implementation works");
 }
 
 #[test]
@@ -1858,8 +1865,8 @@ fn check_shuffle() {
 
 #[test]
 fn check_sort() {
-    assert_eq!(ve("std:sort std:cmp:str:asc  $[:c, :x, :a, :b]"),    "$[:\"a\",:\"b\",:\"c\",:\"x\"]");
-    assert_eq!(ve("std:sort std:cmp:str:desc $[:c, :x, :a, :b]"),    "$[:\"x\",:\"c\",:\"b\",:\"a\"]");
+    assert_eq!(ve("std:sort std:cmp:str:asc  $[:c, :x, :a, :b]"),    "$[:a,:b,:c,:x]");
+    assert_eq!(ve("std:sort std:cmp:str:desc $[:c, :x, :a, :b]"),    "$[:x,:c,:b,:a]");
     assert_eq!(ve("std:sort std:cmp:str:asc  $[3, 2, 5, 9, 0, -1]"), "$[-1,0,2,3,5,9]");
     assert_eq!(ve("std:sort std:cmp:str:desc $[3, 2, 5, 9, 0, -1]"), "$[9,5,3,2,0,-1]");
     assert_eq!(ve("std:sort std:cmp:num:asc  $[3, 2, 5, 9, 0, -1]"), "$[-1,0,2,3,5,9]");
@@ -2389,6 +2396,17 @@ fn check_accumulator() {
         };
         $@m $+ :l f[]
     "), "${l=10}");
+
+    assert_eq!(ve(r"
+        !res = $[];
+        std:push res $@s iter i $i(1, 3) {
+            !x = $@@;
+            $+ ~ str i;
+            std:push res $p(x, $@@);
+        };
+    "), "$[$p(\"\",$<1=>\"1\"),$p($<1>,$<2=>\"12\"),$<2>]");
+
+    assert_eq!(ve(r#"$@i $p(";", 0) "1;3;44;2;4" |> $+"#), "54");
 }
 
 #[test]
@@ -2451,7 +2469,7 @@ fn check_error_reporting_func() {
 fn check_const() {
     assert_eq!(ve("!:const X = 32; X"),                     "32");
     assert_eq!(ve("!:const X = 32.4; X"),                   "32.4");
-    assert_eq!(ve("!:const X = :XX; X"),                    ":\"XX\"");
+    assert_eq!(ve("!:const X = :XX; X"),                    ":XX");
     assert_eq!(ve("!:const X = $[1,2]; X.1"),               "2");
     assert_eq!(ve("!:const X = ${A=32}; X.A"),              "32");
     assert_eq!(ve("!:const X = \"fo\"; X"),                 "\"fo\"");
@@ -2501,59 +2519,184 @@ fn check_const() {
     assert_eq!(ve(r"
         !:const P = $p(:a, :b);
         $[P.v, P.k]
-    "), "$[:\"a\",:\"b\"]");
+    "), "$[:a,:b]");
 }
 
 #[test]
 fn check_threads() {
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $b\"abc\" };
+        (std:thread:spawn $q{ $b\"abc\" }).join[];
     "), "$b\"abc\"");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $o(49) };
+        (std:thread:spawn $q{ $o(49) }).join[];
     "), "$o(49)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $p(:foo,2) };
-    "), "$p(:\"foo\",2)");
+        (std:thread:spawn $q{ $p(:foo,2) }).join[];
+    "), "$p(:foo,2)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $f(1,2) };
+        (std:thread:spawn $q{ $f(1,2) }).join[];
     "), "$f(1,2)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $f(1,2,3) };
+        (std:thread:spawn $q{ $f(1,2,3) }).join[];
     "), "$f(1,2,3)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $f(1,2,3,4) };
+        (std:thread:spawn $q{ $f(1,2,3,4) }).join[];
     "), "$f(1,2,3,4)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $i(1,2) };
+        (std:thread:spawn $q{ $i(1,2) }).join[];
     "), "$i(1,2)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $i(1,2,3) };
+        (std:thread:spawn $q{ $i(1,2,3) }).join[];
     "), "$i(1,2,3)");
     assert_eq!(ve("
-        std:thread:join ~ std:thread:spawn $q{ $i(1,2,3,4) };
+        (std:thread:spawn $q{ $i(1,2,3,4) }).join[];
     "), "$i(1,2,3,4)");
     assert_eq!(ve("
         !h = std:thread:spawn $q( $[1,2,${a=20},:x] );
-        std:thread:join h;
-    "), "$[1,2,${a=20},:\"x\"]");
+        h.join[];
+    "), "$[1,2,${a=20},:x]");
     assert_eq!(ve("
         !at = std:sync:atom:new 99;
         !h = std:thread:spawn $q{
             !@wlambda;
-            !@import std std;
+            !@import std;
 
-            !a = std:sync:atom:read THREAD_ARG0;
-            !b = std:sync:atom:read a.7;
-            std:sync:atom:write a.7 a;
+            !a = THREAD_ARG0;
+            !b = a.7.read[];
+            a.7.write a;
             $[a.0, a.1, a.2, a.3, a.4, a.5, a.6, b]
-        } $[$[1,2,${a=20},:\"x\",\"oo\",$o(33),$p(1,$p(2,$i(3,4))), at]];
+        } $[$[1,2,${a=20},:x,\"oo\",$o(33),$p(1,$p(2,$i(3,4))), at]];
         $[
-            std:thread:join h,
-            std:take 7 ~ std:sync:atom:read at
+            h.join[],
+            std:take 7 ~ at.read[]
         ];
     "),
-    "$[$[1,2,${a=20},$<1=>:\"x\",\"oo\",$o(33),$p(1,$p(2,$i(3,4))),99],$[1,2,${a=20},$<1>,\"oo\",$o(33),$p(1,$p(2,$i(3,4)))]]");
+    "$[$[1,2,${a=20},:x,\"oo\",$o(33),$p(1,$p(2,$i(3,4))),99],$[1,2,${a=20},:x,\"oo\",$o(33),$p(1,$p(2,$i(3,4)))]]");
+
+    assert_eq!(ve(r#"
+        !chan = std:sync:mpsc:new[];
+        !h = std:thread:spawn ($code {
+            !@import std;
+            !@wlambda;
+
+            chan.send 20;
+            99
+        }[]) ${ chan = chan };
+
+        !msg = chan.recv_timeout $p(:ms, 1000);
+        std:assert_eq (type msg) "optional";
+
+        $[h.join[], msg[]];
+    "#), "$[99,20]");
+
+    assert_eq!(ve(r#"
+        !chan = std:sync:mpsc:new[];
+        !chan2 = std:sync:mpsc:new[];
+        !h = std:thread:spawn ($code {
+            !@import std;
+            !@wlambda;
+
+            !m = chan2.recv[];
+            chan.send m;
+            99
+        }[]) ${ chan = chan, chan2 = chan2 };
+
+        !msg = chan.try_recv[];
+        std:assert_eq (type msg) "optional";
+        std:assert ~ not msg;
+
+        chan2.send "test";
+        !msg = $n;
+        while not[msg] {
+            .msg = chan.try_recv[];
+            std:thread:sleep $p(:ms, 10);
+        };
+
+        $[h.join[], msg[]];
+    "#), "$[99,\"test\"]");
+}
+
+#[test]
+fn check_thread_valslot() {
+    assert_eq!(ve(r#"
+        !slt1 = std:sync:slot:new[];
+        !slt2 = std:sync:slot:new[];
+
+        std:assert slt1.check_empty[];
+
+        std:assert_eq slt1.try_recv[] $o();
+
+        !h = std:thread:spawn ($code {
+            !@import std;
+            _READY.send 11;
+
+            slt1.send $p(:x, $[1,2,3]);
+            slt2.recv[];
+        }[]) ${ slt1 = slt1, slt2 = slt2 };
+
+        std:assert_eq h.recv_ready[] 11;
+
+        !r1 = slt1.recv[];
+
+        std:assert_eq (str r1) (str $p(:x, $[1,2,3]));
+        slt2.send $true;
+        h.join[]
+    "#), "$true");
+
+    assert_eq!(ve(r#"
+        !slt1 = std:sync:slot:new[];
+        !slt2 = std:sync:slot:new[];
+
+        !h = std:thread:spawn ($code {
+            !@import std;
+            _READY.send $true;
+
+            slt2.send 45;
+            std:thread:sleep $p(:ms, 500);
+            slt1.send 44;
+
+            100
+        }[]) ${ slt1 = slt1, slt2 = slt2 };
+
+        std:assert ~ unwrap h.recv_ready[];
+
+        !r1 = slt1.recv_timeout $p(:ms, 100);
+        std:assert_eq r1 $o();
+
+        std:assert_eq slt2.try_recv[] $o(45);
+
+        .r1 = slt1.recv_timeout $p(:ms, 100);
+        std:assert_eq r1 $o();
+        .r1 = slt1.recv_timeout $p(:ms, 500);
+        std:assert_eq r1 44;
+
+        h.join[]
+    "#), "100");
+
+
+    assert_eq!(ve(r#"
+        !slt1 = std:sync:slot:new[];
+
+        !h = std:thread:spawn ($code {
+            !@import std;
+            _READY.send $true;
+
+            std:assert_eq _READY.check_empty[] $false;
+
+            slt1.send :ok;
+
+            !ret = _READY.wait_empty[];
+            std:assert_eq ret $true;
+
+            100
+        }[]) ${ slt1 = slt1 };
+
+        slt1.recv_timeout $p(:ms, 500);
+
+        std:assert ~ unwrap h.recv_ready[];
+
+        h.join[]
+    "#), "100");
 }
 
 #[test]
@@ -2687,19 +2830,19 @@ fn check_nvec() {
 #[test]
 fn check_pairs() {
     assert_eq!(ve("$p(1 + 2, 3 + 4)"),  "$p(3,7)");
-    assert_eq!(ve("$p(:a, :f).0"),      ":\"a\"");
-    assert_eq!(ve("$p(:a, :f).1"),      ":\"f\"");
-    assert_eq!(ve("$p(:a, :f).car"),    ":\"a\"");
-    assert_eq!(ve("$p(:a, :f).cdr"),    ":\"f\"");
-    assert_eq!(ve("$p(:a, :f).first"),  ":\"a\"");
-    assert_eq!(ve("$p(:a, :f).second"), ":\"f\"");
-    assert_eq!(ve("$p(:a, :f).head"),   ":\"a\"");
-    assert_eq!(ve("$p(:a, :f).tail"),   ":\"f\"");
-    assert_eq!(ve("$true $p(:a, :f)"),  ":\"f\"");
-    assert_eq!(ve("$false $p(:a, :f)"), ":\"a\"");
-    assert_eq!(ve("cons :a :f"),        "$p(:\"a\",:\"f\")");
-    assert_eq!(ve("cons :a :f |> 0"),   ":\"a\"");
-    assert_eq!(ve("cons :a :f |> 1"),   ":\"f\"");
+    assert_eq!(ve("$p(:a, :f).0"),      ":a");
+    assert_eq!(ve("$p(:a, :f).1"),      ":f");
+    assert_eq!(ve("$p(:a, :f).car"),    ":a");
+    assert_eq!(ve("$p(:a, :f).cdr"),    ":f");
+    assert_eq!(ve("$p(:a, :f).first"),  ":a");
+    assert_eq!(ve("$p(:a, :f).second"), ":f");
+    assert_eq!(ve("$p(:a, :f).head"),   ":a");
+    assert_eq!(ve("$p(:a, :f).tail"),   ":f");
+    assert_eq!(ve("$true $p(:a, :f)"),  ":f");
+    assert_eq!(ve("$false $p(:a, :f)"), ":a");
+    assert_eq!(ve("cons :a :f"),        "$p(:a,:f)");
+    assert_eq!(ve("cons :a :f |> 0"),   ":a");
+    assert_eq!(ve("cons :a :f |> 1"),   ":f");
 
     assert_eq!(ve("(cons :a :f) == $p(:a,:f)"),   "$true");
     assert_eq!(ve("(cons :b :f) == $p(:a,:f)"),   "$false");
@@ -2718,6 +2861,42 @@ fn check_pairs() {
         $[std:ref_id[p1] == std:ref_id[p2],
           std:ref_id[p1] == std:ref_id[p2]]
     "), "$[$false,$false]");
+
+    assert_eq!(ve("$p(0, 3)             $q ABCDEFG "),      "\"ABC\"");
+    assert_eq!(ve("$p(\";\", 2)         $q AB.C.DE.FG "),   "$[\"AB.C.DE.FG\"]");
+    assert_eq!(ve("$p(\";\", 2)         $q AB;C;DE;FG "),   "$[\"AB\",\"C;DE;FG\"]");
+    assert_eq!(ve("$p(\";\", 2)         $q ;C;DE;FG "),     "$[\"\",\"C;DE;FG\"]");
+    assert_eq!(ve("$p(\";\", 3)         $q ;C; "),          "$[\"\",\"C\",\"\"]");
+    assert_eq!(ve("$p(\";\", 0)         $q AB;C;DE;FG "),   "$[\"AB\",\"C\",\"DE\",\"FG\"]");
+    assert_eq!(ve("$p(\";\", 0)         $q ;C;DE; "),       "$[\"\",\"C\",\"DE\",\"\"]");
+    assert_eq!(ve("$p(\";\", \"_\")     $q AB;C;DE;FG "),   "\"AB_C_DE_FG\"");
+
+    assert_eq!(ve("$p(0, 3)               $Q ABCDEFG "),      "$b\"ABC\"");
+    assert_eq!(ve("$p($b\";\", 2)         $Q AB;C;DE;FG "),   "$[$b\"AB\",$b\"C;DE;FG\"]");
+    assert_eq!(ve("$p($b\";\", 2)         $Q ;C;DE;FG "),     "$[$b\"\",$b\"C;DE;FG\"]");
+    assert_eq!(ve("$p($b\";\", 3)         $Q ;C; "),          "$[$b\"\",$b\"C\",$b\"\"]");
+    assert_eq!(ve("$p($b\";\", 0)         $Q AB;C;DE;FG "),   "$[$b\"AB\",$b\"C\",$b\"DE\",$b\"FG\"]");
+    assert_eq!(ve("$p($b\";\", 0)         $Q ;C;DE; "),       "$[$b\"\",$b\"C\",$b\"DE\",$b\"\"]");
+
+    assert_eq!(ve("$p($b\";;\", 2)        $Q AB;C;DE;FG "),   "$[$b\"AB;C;DE;FG\"]");
+    assert_eq!(ve("$p($b\";;\", 2)        $Q AB;;C;;DE;;FG "),"$[$b\"AB\",$b\"C;;DE;;FG\"]");
+    assert_eq!(ve("$p($b\";;\", 2)        $Q ;;C;;DE;;FG "),  "$[$b\"\",$b\"C;;DE;;FG\"]");
+    assert_eq!(ve("$p($b\";;\", 3)        $Q ;;C; "),         "$[$b\"\",$b\"C;\"]");
+    assert_eq!(ve("$p($b\";;\", 3)        $Q ;;C;; "),        "$[$b\"\",$b\"C\",$b\"\"]");
+    assert_eq!(ve("$p($b\";;\", 0)        $Q AB;;C;;DE;;FG "),"$[$b\"AB\",$b\"C\",$b\"DE\",$b\"FG\"]");
+    assert_eq!(ve("$p($b\";;\", 0)        $Q ;;C;;DE;; "),    "$[$b\"\",$b\"C\",$b\"DE\",$b\"\"]");
+    assert_eq!(ve("$p($b\";;\", 0)        $Q ;;C;;DE; "),     "$[$b\"\",$b\"C\",$b\"DE;\"]");
+
+    assert_eq!(ve("$p($b\";\", $b\"_\")     $Q AB;C;DE;FG "),               "$b\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p($b\";;\", $b\"_\")    $Q AB;;C;;DE;;FG "),            "$b\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p($b\";;;\", $b\"_\")   $Q ;;;AB;;;C;;;DE;;;FG;;; "),   "$b\"_AB_C_DE_FG_\"");
+    assert_eq!(ve("$p($b\";;\", $b\"____\") $Q AB;;C;;DE;;FG "),            "$b\"AB____C____DE____FG\"");
+
+    assert_eq!(ve("$q AB;;C;;DE;;FG  $p(\";;\", \"____\")"),                "\"AB____C____DE____FG\"");
+    assert_eq!(ve("$Q AB;;C;;DE;;FG  $p($b\";;\", $b\"____\")"),            "$b\"AB____C____DE____FG\"");
+
+    assert_eq!(ve("$q ABCDEF  $i(2,3)"), "\"CDE\"");
+    assert_eq!(ve("$Q ABCDEF  $i(2,3)"), "$b\"CDE\"");
 }
 
 #[test]
@@ -3107,7 +3286,7 @@ fn check_iter_data() {
     assert_eq!(ve(r"
         !it = $iter $i(5,8);
         $[:a, *it, :b]
-    "), "$[:\"a\",5,6,7,:\"b\"]");
+    "), "$[:a,5,6,7,:b]");
 
     // zip!
     assert_eq!(ve(r"
@@ -3185,7 +3364,6 @@ fn check_kve_funcs() {
 fn check_delete() {
     assert_eq!(ve("!v = $[1,2,3];     std:delete v 1; v"),          "$[1,3]");
     assert_eq!(ve("!v = ${a=10,b=20}; std:delete v :a; v"),     "${b=20}");
-    assert_eq!(ve("!b = $b\"abc\";    std:delete b 1; b"),         "$b\"ac\"");
 }
 
 #[test]
@@ -3220,8 +3398,18 @@ fn check_optionals() {
     assert_eq!(ve("$o() == $o(10)"),    "$false");
     assert_eq!(ve("$o(10) == $o()"),    "$false");
 
-    assert_eq!(ve("$o(10)[]"),    "10");
-    assert_eq!(ve("$o()[]"),      "$n");
+    assert_eq!(ve("bool $o()"),         "$false");
+    assert_eq!(ve("bool $o(30)"),       "$true");
+    assert_eq!(ve("bool $o(\"test\")"), "$true");
+    assert_eq!(ve("not $o(30)"),        "$false");
+    assert_eq!(ve("not $o()"),          "$true");
+    assert_eq!(ve("not $o(\"xx\")"),    "$false");
+
+    assert_eq!(ve("$o(10)[]"),              "10");
+    assert_eq!(ve("$o()[]"),                "$n");
+
+    assert_eq!(ve("$o() 340"),                   "EXEC ERR: Caught [1,6:<compiler:s_eval>(Call)] SA::Panic(\"Calling $none is invalid\")");
+    assert_eq!(ve("$o(\"f\") \"a\" 340 4 :vvv"), "\"fa3404vvv\"");
 
     assert_eq!(ve(r"
         !x = $o(10);
@@ -3275,8 +3463,20 @@ fn check_code_string_literals() {
 #[test]
 fn check_quote() {
     assert_eq!(ve(r#"
+        $[$q{fewof wefewop
+            fwe []
+            []
+        }, 121]
+    "#), "$[\"fewof wefewop\\n            fwe []\\n            []\\n        \",121]");
+    assert_eq!(ve(r#"
         $q#fewof wefewop
             fwe { feofwef [ XX }(]})]w}
         #
     "#), "\"fewof wefewop\\n            fwe { feofwef [ XX }(]})]w}\\n        \"");
+}
+
+#[test]
+fn check_color_functions() {
+    assert_eq!(ve("ivec ~ (std:v:hex2rgba_f :33C0CC80) * 100"), "$i(20,75,80,50)");
+    assert_eq!(ve("std:v:hex2rgba_i :33C0CC80"),                "$i(51,192,204,128)");
 }

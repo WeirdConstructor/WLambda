@@ -274,7 +274,7 @@ pub fn hex2rgba(s: &str) -> (u8, u8, u8, u8) {
             shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
             shiftaddup4(u8::from_str_radix(&s[1..2], 16).unwrap_or(0)),
             shiftaddup4(u8::from_str_radix(&s[2..3], 16).unwrap_or(0)),
-            shiftaddup4(u8::from_str_radix(&s[3..4], 16).unwrap_or(0xF)),
+            shiftaddup4(u8::from_str_radix(&s[3..4], 16).unwrap_or(0xFF)),
         ),
         3 => (
             shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),

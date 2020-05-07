@@ -301,6 +301,37 @@ macro_rules! handle_break {
     }
 }
 
+macro_rules! call_ud_method {
+    ($ud: ident, $key: ident, $argc: ident, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident, $call_ret: ident, $cont: block) => {
+        {
+            let call_ret =
+                $env.with_local_call_info(
+                    $argc, |env| $ud.call_method($key, env));
+            $env.popn($argc);
+            match call_ret {
+                Ok($call_ret) => $cont,
+                Err(StackAction::Return(ret)) => {
+                    $env.unwind_to_depth($uw_depth);
+                    $retv = Err(StackAction::Return(ret));
+                    break;
+                },
+                Err(StackAction::Next) => {
+                    handle_next!($env, $pc, $uw_depth, $retv);
+                },
+                Err(StackAction::Break(v)) => {
+                    handle_break!($env, $pc, v, $uw_depth, $retv);
+                },
+                Err(sa) => {
+                    $env.unwind_to_depth($uw_depth);
+                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                    break;
+                },
+            }
+        }
+    }
+}
+
+
 macro_rules! call_func {
     ($f: ident, $argc: ident, $popc: expr, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident, $call_ret: ident, $cont: block) => {
         {
@@ -335,7 +366,7 @@ macro_rules! get_key {
             VVal::Int(i)  => $o.at(i as usize).unwrap_or_else(|| VVal::None),
             VVal::Bol(b)  => $o.at(b as usize).unwrap_or_else(|| VVal::None),
             VVal::Sym(sy) => $o.$method(sy.as_ref()).unwrap_or_else(|| VVal::None),
-            VVal::Str(sy) => $o.$method(&sy.borrow()).unwrap_or_else(|| VVal::None),
+            VVal::Str(sy) => $o.$method(sy.as_ref()).unwrap_or_else(|| VVal::None),
             _ => {
                 $env.push($o.clone());
                 let call_ret = $k.call_internal($env, 1);
@@ -405,8 +436,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 VVal::Iter(Rc::new(RefCell::new(a.iter())))
             }),
             Op::NewNVec(vp, r) => {
-                use crate::nvec::NVec;
-
                 match vp.as_ref() {
                     NVecPos::IVec2(a, b) => {
                         in_reg!(env, ret, data, a);
@@ -776,28 +805,44 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 in_reg!(env, ret, data, o);
                 let o = handle_err!(o, "field idx/key", retv);
                 let k = handle_err!(k, "map/list", retv);
-
-                let f = get_key!(o, k, proto_lookup, env, retv, uw_depth, prog, pc);
-
                 let argc = *argc as usize;
-                env.push_unwind_self(o);
-                call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
-                    env.unwind_one();
-                    out_reg!(env, ret, retv, data, r, v);
-                });
+
+                if let VVal::Usr(u) = o {
+                    let k = k.s_raw();
+                    let ks = &k;
+                    call_ud_method!(u, ks, argc, env, retv, uw_depth, prog, pc, v, {
+                        out_reg!(env, ret, retv, data, r, v);
+                    })
+
+                } else {
+                    let f = get_key!(o, k, proto_lookup, env, retv, uw_depth, prog, pc);
+                    env.push_unwind_self(o);
+                    call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                        env.unwind_one();
+                        out_reg!(env, ret, retv, data, r, v);
+                    });
+                }
             },
             Op::CallMethodSym(o, k, argc, r) => {
                 in_reg!(env, ret, data, o);
                 let o = handle_err!(o, "field idx/key", retv);
-
-                let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::None);
-
                 let argc = *argc as usize;
-                env.push_unwind_self(o);
-                call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
-                    env.unwind_one();
-                    out_reg!(env, ret, retv, data, r, v);
-                });
+
+                if let VVal::Usr(u) = o {
+                    let k = &*k;
+                    call_ud_method!(u, k, argc, env, retv, uw_depth, prog, pc, v, {
+                        out_reg!(env, ret, retv, data, r, v);
+                    })
+
+                } else {
+                    let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::None);
+                    env.push_unwind_self(o);
+                    call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
+                        env.unwind_one();
+                        out_reg!(env, ret, retv, data, r, v);
+                    });
+                }
+
             },
             Op::Call(argc, r) => {
                 let argc = *argc as usize;
@@ -893,7 +938,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             println!("{}OP[{:<2} {:>3}]: {:<40}      | sp: {:>3}, bp: {:>3}, uws: {:>3} | {}",
                                      (if i == pc { ">" } else { " " }),
                                      env.vm_nest,
-                                     pc, format!("{:?}", op),
+                                     i, format!("{:?}", op),
                                      env.sp, env.bp, env.unwind_depth(), syn);
                             if i == pc {
                                 env.dump_stack();
@@ -1283,7 +1328,8 @@ fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                     for i in l.iter().skip(1) {
                         let key = vm_compile_const_value(&i.at(0).unwrap_or(VVal::None))?;
                         let val = vm_compile_const_value(&i.at(1).unwrap_or(VVal::None))?;
-                        m.set_key_sym(key.to_sym(), val);
+                        m.set_key_sym(key.to_sym(), val)
+                         .expect("Const map not used more than once");
                     }
                     Ok(m)
                 },
@@ -2355,7 +2401,7 @@ mod tests {
     fn vm_data() {
         assert_eq!(gen("10"),      "10");
         assert_eq!(gen("\"foo\""), "\"foo\"");
-        assert_eq!(gen(":foo"),    ":\"foo\"");
+        assert_eq!(gen(":foo"),    ":foo");
     }
 
     #[test]

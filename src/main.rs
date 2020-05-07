@@ -1,22 +1,9 @@
 // Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
-mod vval;
-mod parser;
-mod compiler;
-mod ops;
-mod vm;
-mod prelude;
-mod util;
-mod nvec;
-mod vval_user_obj;
-mod csv;
-mod threads;
-mod str_int;
-
-use vval::Env;
-use vval::VVal;
-use crate::compiler::{GlobalEnv, EvalContext};
+use wlambda::vval::Env;
+use wlambda::vval::VVal;
+use wlambda::compiler::{GlobalEnv, EvalContext};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -51,7 +38,7 @@ fn main() {
     if argv.len() > 1 {
         if argv[1] == "-parse" {
             let contents = std::fs::read_to_string(&argv[2]).unwrap();
-            parser::parse(&contents, &argv[2]);
+            wlambda::parser::parse(&contents, &argv[2]).expect("successful parse");
         } else {
             match ctx.eval_file(&argv[1]) {
                 Ok(_) => (),
@@ -96,9 +83,6 @@ fn main() {
             use std::io::{self, BufRead};
             for line in io::stdin().lock().lines() {
                 let l = line.unwrap();
-                    for i in 0..1000 {
-                        ctx.eval(&l);
-                    }
 
                 match ctx.eval(&l) {
                     Ok(v)  => { println!("> {}", v.s()); },

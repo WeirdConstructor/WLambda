@@ -18,10 +18,8 @@ use crate::str_int::*;
 
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::RwLock;
-use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::sync::{Arc, Mutex, RwLock, Condvar};
+use std::sync::mpsc::{Receiver, Sender, TryRecvError, RecvTimeoutError};
 use std::fmt::Formatter;
 
 use fnv::FnvHashMap;
@@ -64,6 +62,8 @@ pub enum AVal {
     IVec(NVec<i64>),
     Pair(Box<(AVal, AVal)>),
     Map(FnvHashMap<String, AVal>),
+    Chan(AValChannel),
+    Slot(AtomicAValSlot),
     Atom(AtomicAVal),
 }
 
@@ -100,7 +100,7 @@ impl AVal {
     ///
     /// ```
     /// use wlambda::*;
-    /// assert_eq!(AVal::Sym(String::from("x")).to_vval().s(), ":\"x\"");
+    /// assert_eq!(AVal::Sym(String::from("x")).to_vval().s(), ":x");
     /// ```
     pub fn to_vval(&self) -> VVal {
         match self {
@@ -120,6 +120,8 @@ impl AVal {
             AVal::Str(s)       => VVal::new_str(s),
             AVal::Byt(b)       => VVal::new_byt(b.clone()),
             AVal::Atom(a)      => VVal::Usr(Box::new(a.clone())),
+            AVal::Chan(a)      => VVal::Usr(Box::new(a.clone())),
+            AVal::Slot(a)      => VVal::Usr(Box::new(a.clone())),
             AVal::Opt(None)    => VVal::opt_none(),
             AVal::Opt(Some(a)) => VVal::opt(a.to_vval()),
             AVal::Pair(p)      => VVal::pair(p.0.to_vval(), p.1.to_vval()),
@@ -136,7 +138,8 @@ impl AVal {
                 let mv = VVal::map();
                 for (k, v) in m.iter() {
                     let k = s2sym(k);
-                    mv.set_key_sym(k, v.to_vval());
+                    mv.set_key_sym(k, v.to_vval())
+                      .expect("AVal->VVal map not used more than once");
                 }
                 mv
             },
@@ -166,8 +169,8 @@ impl AVal {
             },
             VVal::Bol(b)       => AVal::Bol(*b),
             VVal::Sym(s)       => AVal::Sym(String::from(s.as_ref())),
-            VVal::Str(s)       => AVal::Str(s.borrow().clone()),
-            VVal::Byt(b)       => AVal::Byt(b.borrow().clone()),
+            VVal::Str(s)       => AVal::Str(s.as_ref().clone()),
+            VVal::Byt(b)       => AVal::Byt(b.as_ref().clone()),
             VVal::Int(i)       => AVal::Int(*i),
             VVal::Flt(f)       => AVal::Flt(*f),
             VVal::Opt(None)    => AVal::Opt(None),
@@ -198,7 +201,10 @@ impl AVal {
                 let mut cl_ud = u.clone_ud();
                 if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicAVal>() {
                     AVal::Atom(ud.clone())
-
+                } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AValChannel>() {
+                    AVal::Chan(ud.clone())
+                } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicAValSlot>() {
+                    AVal::Slot(ud.clone())
                 } else {
                     AVal::None
                 }
@@ -212,16 +218,16 @@ impl AVal {
 ///
 /// ```text
 /// !atom = std:sync:atom:new 10;
-/// !queue = std:sync:mpsc:new[];
+/// !channel = std:sync:mpsc:new[];
 /// !thrd = std:spawn_thread $q{
 ///     !val = main.read;
 ///     main.write $[1,$[0,1],3];
 ///
 ///     main.read_at 0;
 ///     main.write_at $[1, 0] 320;
-///     q.push $["done", 10];
+///     q.send $["done", 10];
 ///
-/// } ${ main = atom, q = queue };
+/// } ${ main = atom, q = channel };
 ///
 /// !item = queue.pop[];
 /// .item = queue.pop_timeout 1000;
@@ -243,56 +249,392 @@ impl Default for AtomicAVal {
     fn default() -> Self { AtomicAVal::new() }
 }
 
-#[allow(dead_code)]
-pub struct AValSender(Rc<Sender<AVal>>);
-
-#[allow(dead_code)]
-impl AValSender {
-    pub fn send(&self, v: &VVal) -> VVal {
-        if let Err(e) = self.0.send(AVal::from_vval(v)) {
-            VVal::err_msg(&format!("send error: {}", e))
-        } else {
-            VVal::Bol(true)
-        }
-    }
+#[derive(Debug)]
+pub struct AtomicValSlot {
+    val: Mutex<(AVal, bool)>,
+    cv_send:  Condvar,
+    cv_recv:  Condvar,
 }
 
-#[allow(dead_code)]
-pub struct AValReceiver(Arc<Mutex<Receiver<AVal>>>);
+#[derive(Clone, Debug)]
+pub struct AtomicAValSlot(Arc<AtomicValSlot>);
 
-#[allow(dead_code)]
-impl AValReceiver {
-    pub fn try_recv(&self, _timeout: i64) -> VVal {
-        match self.0.lock() {
-            Ok(guard) => {
-                match guard.try_recv() {
-                    Ok(av) => av.to_vval(),
-                    Err(TryRecvError::Empty) => VVal::None,
-                    Err(e) => {
-                        VVal::err_msg(&format!("try_recv error: {}", e))
-                    }
+impl AtomicAValSlot {
+    pub fn new() -> Self {
+        Self(Arc::new(AtomicValSlot {
+            val: Mutex::new((AVal::None, false)),
+            cv_recv: Condvar::new(),
+            cv_send: Condvar::new(),
+        }))
+    }
+
+    pub fn wait_empty(&self, dur: Option<std::time::Duration>) -> VVal {
+        let mut guard =
+            match self.0.val.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    return
+                        VVal::err_msg(
+                            &format!(
+                                "Failed to receive, can't get lock: {}", e))
                 }
-            },
-            Err(e) => {
-                VVal::err_msg(&format!("try_recv error: {}", e))
+            };
+
+        if !guard.1 {
+            return VVal::Bol(true);
+        }
+
+        if let Some(dur) = dur {
+            loop {
+                match self.0.cv_recv.wait_timeout(guard, dur) {
+                    Ok(wait_res) => {
+                        guard = wait_res.0;
+
+                        if wait_res.1.timed_out() {
+                            return VVal::Bol(false);
+
+                        } else if !guard.1 {
+                            return VVal::Bol(true);
+                        }
+                    },
+                    Err(e) => {
+                        return
+                            VVal::err_msg(
+                                &format!(
+                                    "Failed to receive, poison error: {}",
+                                    e));
+                    },
+                }
+            }
+        } else {
+            loop {
+                match self.0.cv_recv.wait(guard) {
+                    Ok(next_guard) => {
+                        guard = next_guard;
+
+                        if !guard.1 {
+                            return VVal::Bol(true);
+                        }
+                    },
+                    Err(e) => {
+                        return
+                            VVal::err_msg(
+                                &format!(
+                                    "Failed to receive, poison error: {}",
+                                    e));
+                    },
+                }
             }
         }
     }
+
+    pub fn check_empty(&self) -> VVal {
+        match self.0.val.lock() {
+            Ok(guard) => VVal::Bol(!guard.1),
+            Err(e) =>
+                VVal::err_msg(
+                    &format!(
+                        "Failed to check empty, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn send(&self, msg: &VVal) -> VVal {
+        match self.0.val.lock() {
+            Ok(mut guard) => {
+                *guard = (AVal::from_vval(msg), true);
+                self.0.cv_send.notify_one();
+                VVal::Bol(true)
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to send, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn recv_timeout(&self, dur: Option<std::time::Duration>) -> VVal {
+        let mut guard =
+            match self.0.val.lock() {
+                Ok(guard) => guard,
+                Err(e) => {
+                    return
+                        VVal::err_msg(
+                            &format!(
+                                "Failed to receive, can't get lock: {}", e))
+                }
+            };
+
+        if guard.1 {
+            let val = guard.0.to_vval();
+            *guard = (AVal::None, false);
+            self.0.cv_recv.notify_one();
+            return val;
+        }
+
+        if let Some(dur) = dur {
+            loop {
+                match self.0.cv_send.wait_timeout(guard, dur) {
+                    Ok(wait_res) => {
+                        guard = wait_res.0;
+
+                        if wait_res.1.timed_out() {
+                            return VVal::opt_none();
+
+                        } else if guard.1 {
+                            let val = guard.0.to_vval();
+                            *guard = (AVal::None, false);
+                            self.0.cv_recv.notify_one();
+                            return val;
+                        }
+                    },
+                    Err(e) => {
+                        return
+                            VVal::err_msg(
+                                &format!(
+                                    "Failed to receive, poison error: {}",
+                                    e));
+                    },
+                }
+            }
+        } else {
+            loop {
+                match self.0.cv_send.wait(guard) {
+                    Ok(next_guard) => {
+                        guard = next_guard;
+
+                        if guard.1 {
+                            let val = guard.0.to_vval();
+                            *guard = (AVal::None, false);
+                            self.0.cv_recv.notify_one();
+                            return val;
+                        }
+                    },
+                    Err(e) => {
+                        return
+                            VVal::err_msg(
+                                &format!(
+                                    "Failed to receive, poison error: {}",
+                                    e));
+                    },
+                }
+            }
+        }
+    }
+
+    pub fn try_recv(&self) -> VVal {
+        match self.0.val.lock() {
+            Ok(mut guard) => {
+                if guard.1 {
+                    let val = guard.0.to_vval();
+                    *guard = (AVal::None, false);
+                    self.0.cv_recv.notify_one();
+                    VVal::opt(val)
+                } else {
+                    VVal::opt_none()
+                }
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to receive, can't get lock: {}", e)),
+        }
+    }
 }
 
-//impl VValUserData for Sender {
-//    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-//    fn clone_ud(&self) -> Box<dyn VValUserData> {
-//        Box::new(self.clone())
-//    }
-//}
-//
-//impl VValUserData for ReadLock {
-//    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-//    fn clone_ud(&self) -> Box<dyn VValUserData> {
-//        Box::new(self.clone())
-//    }
-//}
+impl VValUserData for AtomicAValSlot {
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv_ref();
+        match key {
+            "recv" => Ok(self.recv_timeout(None)),
+            "try_recv" => Ok(self.try_recv()),
+            "recv_timeout" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("recv_timeout method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.recv_timeout(Some(argv[0].to_duration()?)))
+            },
+            "send" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("send method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.send(&argv[0]))
+            },
+            "check_empty" => Ok(self.check_empty()),
+            "wait_empty" => Ok(self.wait_empty(None)),
+            "wait_empty_timeout" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("wait_empty_timeout method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.wait_empty(Some(argv[0].to_duration()?)))
+            },
+            _ => {
+                return
+                    Err(StackAction::panic_str(
+                        format!("unknown method called: {}", key),
+                        None))
+            },
+        }
+    }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Clone)]
+pub struct AValChannel {
+    sender:     Arc<Mutex<Sender<AVal>>>,
+    receiver:   Arc<Mutex<Receiver<AVal>>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ForkSenderError(String);
+
+impl AValChannel {
+    pub(crate) fn new_direct() -> AValChannel {
+        let (send, recv) = std::sync::mpsc::channel();
+        Self {
+            sender:     Arc::new(Mutex::new(send)),
+            receiver:   Arc::new(Mutex::new(recv)),
+        }
+    }
+
+    pub fn new() -> VVal {
+        VVal::Usr(Box::new(Self::new_direct()))
+    }
+
+    pub(crate) fn fork_sender_direct(&self) -> Result<Self, ForkSenderError> {
+        match self.sender.lock() {
+            Ok(guard) => {
+                let receiver = self.receiver.clone();
+                let new_sender : Sender<AVal> = guard.clone();
+                Ok(Self {
+                    sender: Arc::new(Mutex::new(new_sender)),
+                    receiver,
+                })
+            },
+            Err(e) => Err(ForkSenderError(format!("{}", e))),
+        }
+    }
+
+    pub fn fork_sender(&self) -> VVal {
+        match self.fork_sender_direct() {
+            Ok(channel) => VVal::Usr(Box::new(channel)),
+            Err(ForkSenderError(msg)) =>
+                VVal::err_msg(
+                    &format!("Failed to fork sender, can't get lock: {}", msg)),
+        }
+    }
+
+    pub fn send(&self, msg: &VVal) -> VVal {
+        match self.sender.lock() {
+            Ok(guard) => {
+                let msg = AVal::from_vval(msg);
+                if let Err(e) = guard.send(msg) {
+                    VVal::err_msg(&format!("Failed to send: {}", e))
+                } else {
+                    VVal::Bol(true)
+                }
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to send, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn recv_timeout(&self, dur: Option<std::time::Duration>) -> VVal {
+        match self.receiver.lock() {
+            Ok(guard) => {
+                match dur {
+                    None => {
+                        match guard.recv() {
+                            Ok(av) => av.to_vval(),
+                            Err(_) =>
+                                VVal::err_msg(&format!("recv disconnected")),
+                        }
+                    },
+                    Some(dur) => {
+                        match guard.recv_timeout(dur) {
+                            Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
+                            Err(RecvTimeoutError::Timeout)      => VVal::Opt(None),
+                            Err(RecvTimeoutError::Disconnected) =>
+                                VVal::err_msg(&format!("recv_timeout disconnected")),
+                        }
+                    }
+                }
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to receive, can't get lock: {}", e)),
+        }
+    }
+
+    pub fn try_recv(&self) -> VVal {
+        match self.receiver.lock() {
+            Ok(guard) => {
+                match guard.try_recv() {
+                    Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
+                    Err(TryRecvError::Empty) => VVal::Opt(None),
+                    Err(e) => VVal::err_msg(&format!("try_recv error: {}", e)),
+                }
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Failed to receive, can't get lock: {}", e)),
+        }
+    }
+}
+
+impl std::fmt::Debug for AValChannel {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "<<AValChannel>>")
+    }
+}
+
+impl VValUserData for AValChannel {
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv_ref();
+        match key {
+            "recv" => Ok(self.recv_timeout(None)),
+            "try_recv" => Ok(self.try_recv()),
+            "recv_timeout" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("recv_timeout method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.recv_timeout(Some(argv[0].to_duration()?)))
+            },
+            "send" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            format!("send method expects 1 argument"),
+                            None))
+                }
+
+                Ok(self.send(&argv[0]))
+            },
+            _ => {
+                return
+                    Err(StackAction::panic_str(
+                        format!("unknown method called: {}", key),
+                        None))
+            },
+        }
+    }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
+    }
+}
 
 impl AtomicAVal {
     /// Creates a new empty instance, containing AVal::None.
@@ -348,6 +690,26 @@ impl AtomicAVal {
 
 impl VValUserData for AtomicAVal {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let args = env.argv_ref();
+        match key {
+            "read" => Ok(self.read()),
+            "swap" => {
+                Ok(self.swap(&args[0]))
+            },
+            "write" => {
+                let v = &args[0];
+                self.write(v);
+                Ok(v.clone())
+            },
+            _ => {
+                return
+                    Err(StackAction::panic_str(
+                        format!("Unknown method called: {}", key),
+                        None))
+            },
+        }
+    }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
         Box::new(self.clone())
     }
@@ -426,7 +788,7 @@ impl std::fmt::Debug for dyn ThreadCreator {
 ///
 /// See also `GlobalEnv::new_default` for further information
 /// how this may be used.
-pub struct DefaultThreadCreator();
+pub(crate) struct DefaultThreadCreator();
 
 #[allow(clippy::new_without_default)]
 impl DefaultThreadCreator {
@@ -437,23 +799,49 @@ impl DefaultThreadCreator {
 /// this JoinHandle wrapper is used. It provides a way to wrap it
 /// into a `VValUserData` and use it by the WLambda function `std:thread:join`.
 #[derive(Clone)]
-pub struct DefaultThreadHandle(Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>>);
+pub(crate) struct DefaultThreadHandle {
+    ready_slot:    AtomicAValSlot,
+    thread_handle: Rc<RefCell<Option<std::thread::JoinHandle<AVal>>>>,
+}
 
 impl DefaultThreadHandle {
     /// Joins the handle, and returns the result VVal of the thread.
-    pub fn join(&self, env: &mut Env) -> VVal {
-        let hdl = std::mem::replace(&mut (*self.0.borrow_mut()), None);
+    pub fn join(&self) -> VVal {
+        let hdl = std::mem::replace(&mut (*self.thread_handle.borrow_mut()), None);
         if let Some(h) = hdl {
             h.join().unwrap().to_vval()
         } else {
-            env.new_err(
-                "DefaultThreadHandle already joined!".to_string())
+            VVal::err_msg("DefaultThreadHandle already joined!")
         }
+    }
+
+    /// Returns an AtomicAValSlot, that can be used to check if the thread
+    /// successfully started or ran into an error.
+    pub fn get_ready_slot(&self) -> VVal {
+        VVal::Usr(Box::new(self.ready_slot.clone()))
     }
 }
 
 impl VValUserData for DefaultThreadHandle {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        match key {
+            "join"       => Ok(self.join()),
+            "recv_ready" => {
+                if let VVal::Usr(b) = self.get_ready_slot() {
+                    b.call_method("recv", env)
+                } else {
+                    Ok(VVal::err_msg("Invalid _READY value!"))
+                }
+            },
+            _ => {
+                return
+                    Err(StackAction::panic_str(
+                        format!("Unknown method called: {}", key),
+                        None))
+            },
+        }
+    }
     fn clone_ud(&self) -> Box<dyn crate::vval::VValUserData> {
         Box::new(self.clone())
     }
@@ -464,15 +852,23 @@ impl ThreadCreator for DefaultThreadCreator {
              code: String,
              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
 
+        let ready = AtomicAValSlot::new();
         let tcc = tc.clone();
+
+        let trdy = ready.clone();
         let hdl =
             std::thread::spawn(move || {
                 let genv = GlobalEnv::new_empty_default();
                 genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
 
+                genv.borrow_mut().set_var(
+                    "_READY",
+                    &VVal::Usr(Box::new(trdy.clone())));
+
                 if let Some(globals) = globals {
                     for (k, av) in globals {
-                        genv.borrow_mut().set_var(&k, &VVal::Usr(Box::new(av)));
+                        let v = av.read();
+                        genv.borrow_mut().set_var(&k, &v);
                     }
                 }
 
@@ -481,13 +877,20 @@ impl ThreadCreator for DefaultThreadCreator {
                 match ctx.eval(&code) {
                     Ok(v) => AVal::from_vval(&v),
                     Err(e) => {
-                        AVal::Err(
-                            Box::new(
-                                AVal::Str(format!("Error in Thread: {}", e))),
-                            String::from("?"))
+                        let ret =
+                            AVal::Err(
+                                Box::new(
+                                    AVal::Str(format!("Error in Thread: {}", e))),
+                                String::from("?"));
+                        trdy.send(&ret.to_vval());
+                        ret
                     }
                 }
             });
-        VVal::Usr(Box::new(DefaultThreadHandle(Rc::new(RefCell::new(Some(hdl))))))
+
+        VVal::Usr(Box::new(DefaultThreadHandle {
+            ready_slot: ready,
+            thread_handle: Rc::new(RefCell::new(Some(hdl)))
+        }))
     }
 }

@@ -8,7 +8,7 @@ WLambda - Embeddable Scripting Language for Rust
 This crate provides a small and simple embeddable scripting language.
 Its syntax gravitates around functions and argument composition for functions.
 A core concept is that everything is callable. It could be regarded as LISP
-without parenthesis, or as a mixture of Perl, JavaScript and LISP/Scheme.
+without parenthesis, or as a mixture of Perl, Lua, JavaScript and LISP/Scheme/Clojure.
 
 Here are some of its properties:
 
@@ -34,7 +34,7 @@ of Rust's Result type.
 The embedding API and all internal operations rely on a data structure
 made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
-Here you can find the [WLambda Language Reference](prelude/index.html#wlambda-reference).
+Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 
 # API Hello World
 
@@ -503,10 +503,12 @@ pub mod ops;
 pub mod vm;
 pub mod prelude;
 pub mod threads;
+pub mod rpc_helper;
 pub mod util;
 pub mod nvec;
 pub mod vval_user_obj;
 pub mod csv;
+pub mod selector;
 mod str_int;
 
 pub use vval::VVal;

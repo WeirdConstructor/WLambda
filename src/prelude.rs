@@ -125,6 +125,8 @@ Smalltalk, LISP and Perl.
     - [4.8.14](#4814-stdvslerp-vec1-vec2-t) - std:v:slerp _vec1_ _vec2_ _t_
     - [4.8.15](#4815-stdvvec2rad-vec) - std:v:vec2rad _vec_
     - [4.8.16](#4816-stdvrad2vec-radians) - std:v:rad2vec _radians_
+    - [4.8.17](#4817-stdvhex2rgbaf-string) - std:v:hex2rgba_f _string_
+    - [4.8.18](#4818-stdvhex2rgbai-string) - std:v:hex2rgba_i _string_
   - [4.9](#49-strings) - Strings
     - [4.9.1](#491-string-literal-syntaxes) - String Literal Syntaxes
     - [4.9.2](#492-str-value) - str _value_
@@ -151,12 +153,18 @@ Smalltalk, LISP and Perl.
     - [4.10.2](#4102-byte-conversion-functions) - Byte Conversion Functions
     - [4.10.3](#4103-isbytes-value) - is_bytes _value_
   - [4.11](#411-symbols) - Symbols
+    - [4.11.1](#4111-stdsymbolscollect) - std:symbols:collect
   - [4.12](#412-pairs-pa-b) - Pairs `$p(a, b)`
-    - [4.12.1](#4121-pair-to-iterator) - Pair to Iterator
-      - [4.12.1.1](#41211-iter---enumerate) - Iter - Enumerate
-      - [4.12.1.2](#41212-iter---values) - Iter - Values
-      - [4.12.1.3](#41213-iter---keys) - Iter - Keys
-    - [4.12.2](#4122-ispair-value) - is_pair _value_
+    - [4.12.1](#4121-cons-a-b) - cons _a_ _b_
+    - [4.12.2](#4122-pair-stringbyte-vector-operations) - Pair string/byte vector operations
+      - [4.12.2.1](#41221-pfrom-count-string-or-byte-vec) - `$p(_from_, _count_) _string-or-byte-vec_`
+      - [4.12.2.2](#41222-ppattern-replacement-string-or-byte-vec) - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
+      - [4.12.2.3](#41223-psplit-pattern-max-string-or-byte-vec) - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
+    - [4.12.3](#4123-pair-to-iterator) - Pair to Iterator
+      - [4.12.3.1](#41231-iter---enumerate) - Iter - Enumerate
+      - [4.12.3.2](#41232-iter---values) - Iter - Values
+      - [4.12.3.3](#41233-iter---keys) - Iter - Keys
+    - [4.12.4](#4124-ispair-value) - is_pair _value_
   - [4.13](#413-vectors-or-lists) - Vectors (or Lists)
     - [4.13.1](#4131-stdpush-vector-item) - std:push _vector_ _item_
     - [4.13.2](#4132-stdpop-vector) - std:pop _vector_
@@ -283,6 +291,8 @@ Smalltalk, LISP and Perl.
     - [12.5.2](#1252-stdrandsplitmix64newfrom-seed) - std:rand:split_mix64_new_from _seed_
     - [12.5.3](#1253-stdrandsplitmix64next-smstate-count) - std:rand:split_mix64_next _sm_state_ \[_count_]
     - [12.5.4](#1254-stdrandsplitmix64nextopen01-smstate-count) - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
+  - [12.6](#126-utility-functions) - Utility Functions
+    - [12.6.1](#1261-stddumpupvals-function) - std:dump_upvals _function_
 
 -----
 
@@ -892,6 +902,15 @@ An optional value can also be dereferenced:
 ```wlambda
 std:assert_eq $*$o()    $none;
 std:assert_eq $*$o(10)  10;
+```
+
+Calls with more than zero arguments are forwarded to the contents:
+
+```wlambda
+std:assert_eq ($o("xx") "yy")  "xxyy";
+
+!x = { _ * 20 };
+std:assert_eq ($o(x) 30)    600;
 ```
 
 #### <a name="421-isoptional-value"></a>4.2.1 - is_optional _value_
@@ -1885,9 +1904,61 @@ std:assert_rel_eq r.x h.x 0.0001;
 std:assert_rel_eq r.y h.y 0.0001;
 ```
 
+#### <a name="4817-stdvhex2rgbaf-string"></a>4.8.17 - std:v:hex2rgba_f _string_
+
+Interprets _string_ as an hex encoded color and
+returns a 4 element big float vector. The color components
+of the float vector go from 0.0 to 1.0.
+
+The string can be:
+
+- 8 characters: `"RRGGBBAA"`
+- 6 characters: `"RRGGBB"`, alpha will be 1.0
+- 4 characters: `"RGBA"`
+- 3 characters: `"RGB"`, alpha will be 1.0
+- 2 characters: `"YY"`, where YY is put into R, G and B. Alpha will be 1.0.
+
+```wlambda
+!color = std:v:hex2rgba_f "FF00FFFF";
+
+std:assert_rel_eq color.r 1.0 0.001;
+std:assert_rel_eq color.g 0.0 0.001;
+std:assert_rel_eq color.b 1.0 0.001;
+std:assert_rel_eq color.a 1.0 0.001;
+
+!color2 = std:v:hex2rgba_f "C83F";
+std:assert_rel_eq color2.r 0.8   0.001;
+std:assert_rel_eq color2.g 0.533 0.001;
+std:assert_rel_eq color2.b 0.2   0.001;
+std:assert_rel_eq color2.a 1.0   0.001;
+```
+
+#### <a name="4818-stdvhex2rgbai-string"></a>4.8.18 - std:v:hex2rgba_i _string_
+
+Like `std:v:hex2rgba_f` this function converts a hex encoded color
+from _string_ but returns an integer vector with 4 elements.
+The integers are in the range of 0 to 255.
+
+About the format of _string_ please refer to `std:v:hex2rgba_f`.
+
+```wlambda
+!color = std:v:hex2rgba_i "FF00FFFF";
+
+std:assert_eq color.r 255;
+std:assert_eq color.g 0;
+std:assert_eq color.b 255;
+std:assert_eq color.a 255;
+
+!color2 = std:v:hex2rgba_i "C83F";
+std:assert_eq color2.r 204;
+std:assert_eq color2.g 136;
+std:assert_eq color2.b 51;
+std:assert_eq color2.a 255;
+```
+
 ### <a name="49-strings"></a>4.9 - Strings
 
-Strings in WLambda are like Rust UTF-8 encoded Unicode strings.
+Strings in WLambda are like Rust UTF-8 encoded immutable Unicode strings.
 There is no character data type however. There are two types of literal
 forms for strings:
 
@@ -1924,11 +1995,11 @@ std:assert_eq s "a b c";
 };
 
 # Primary use case is `eval` and `std:thread:spawn`:
-!v = std:thread:join ~ std:thread:spawn $code {
+!v = (std:thread:spawn $code {
     !@import std std;
     !res = "x" "y" "z";
     std:str:cat res 33;
-}[];
+}[]).join[];
 
 std:assert_eq v "xyz33";
 ```
@@ -2215,7 +2286,9 @@ std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 
 ### <a name="410-bytes-or-byte-vectors"></a>4.10 - Bytes (or Byte Vectors)
 
-Bytes are a special kind of strings. Their literal form is:
+Bytes are a vector of bytes. Unlike strings they don't have any encoding.
+Literal syntax however supports inserting unicode characters:
+
 
 ```wlambda
 $b"abc";
@@ -2358,7 +2431,7 @@ Keep in mind, that all symbols are interned strings. And if you create many
 symbols that are not used anymore, you might need to trigger a cleanup
 with `std:symbols::collect`.
 
-#### - std:symbols:collect
+#### <a name="4111-stdsymbolscollect"></a>4.11.1 - std:symbols:collect
 
 Collect and remove all interned symbols in the current thread that are no
 longer used. Returns the number of freed symbols. Please keep in mind, that
@@ -2458,14 +2531,74 @@ std:assert std:ref_id[a] == id_a;
 std:assert std:ref_id[v.0] == id_a;
 ```
 
-#### <a name="4121-pair-to-iterator"></a>4.12.1 - Pair to Iterator
+#### <a name="4121-cons-a-b"></a>4.12.1 - cons _a_ _b_
+
+Creates a new pair from the values _a_ and _b_.
+
+```wlambda
+!p = cons 3 4;
+
+std:assert_eq p $p(3, 4);
+```
+
+#### <a name="4122-pair-stringbyte-vector-operations"></a>4.12.2 - Pair string/byte vector operations
+
+If you call a pair with a string or byte vector as argument, there are some
+operations that can be done:
+
+##### <a name="41221-pfrom-count-string-or-byte-vec"></a>4.12.2.1 - `$p(_from_, _count_) _string-or-byte-vec_`
+
+Returns a substring starting at _from_ with the length _count_.
+
+```wlambda
+std:assert_eq ($p(2, 4) "abcdefgh") "cdef";
+```
+
+The same works for byte vectors:
+
+```wlambda
+std:assert_eq ($p(2, 4) $b"abcdefgh") $b"cdef";
+```
+
+##### <a name="41222-ppattern-replacement-string-or-byte-vec"></a>4.12.2.2 - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
+
+Replaces all _pattern_ occurences in _string_ by _replacement_.
+
+```wlambda
+std:assert_eq ($p(";", "_") "A;B;D;EFG;HI") "A_B_D_EFG_HI";
+```
+
+The same works for byte vectors:
+
+```wlambda
+std:assert_eq ($p($b";", $b"_") $b"A;B;D;EFG;HI") $b"A_B_D_EFG_HI";
+```
+
+##### <a name="41223-psplit-pattern-max-string-or-byte-vec"></a>4.12.2.3 - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
+
+Splits _string_ at _split-pattern_ a _max_ number of times.
+If _max_ is 0, it is split completely.
+
+```wlambda
+std:assert_eq str[$p(";", 3) "A;B;D;EFG;HI"] ~ str $["A", "B", "D;EFG;HI"];
+
+std:assert_eq str[$p(";", 0) "A;B;D;EFG;HI"] ~ str $["A", "B", "D", "EFG", "HI"];
+```
+
+The same works for byte vectors:
+
+```wlambda
+std:assert_eq str[$p($b";", 0) $b"A;B;D;EFG;HI"] ~ str $[$b"A", $b"B", $b"D", $b"EFG", $b"HI"];
+```
+
+#### <a name="4123-pair-to-iterator"></a>4.12.3 - Pair to Iterator
 
 Pairs play a special role if you make an iterator from it.
 It can be used to create a specialized iterator that only
 iterates over keys or values of a map. Or that enumerates
 a vector or map.
 
-##### <a name="41211-iter---enumerate"></a>4.12.1.1 - Iter - Enumerate
+##### <a name="41231-iter---enumerate"></a>4.12.3.1 - Iter - Enumerate
 
 If the first value of the pair is `:enumerate`
 it will enumerate entries in a map or values in a vector.
@@ -2492,7 +2625,7 @@ iter i $p(:enumerate, ${a = 10, b = 20})
 std:assert_eq (str v) (str $[0, 1]);
 ```
 
-##### <a name="41212-iter---values"></a>4.12.1.2 - Iter - Values
+##### <a name="41232-iter---values"></a>4.12.3.2 - Iter - Values
 
 This is useful for iterating over the values in a map in an undefined order:
 
@@ -2504,7 +2637,7 @@ This is useful for iterating over the values in a map in an undefined order:
 std:assert_eq sum 63;
 ```
 
-##### <a name="41213-iter---keys"></a>4.12.1.3 - Iter - Keys
+##### <a name="41233-iter---keys"></a>4.12.3.3 - Iter - Keys
 
 You can also iterate over map keys in an undefined order:
 
@@ -2516,7 +2649,7 @@ You can also iterate over map keys in an undefined order:
 std:assert_eq sum 60;
 ```
 
-#### <a name="4122-ispair-value"></a>4.12.2 - is_pair _value_
+#### <a name="4124-ispair-value"></a>4.12.4 - is_pair _value_
 
 Checks if _value_ is a pair.
 
@@ -2619,7 +2752,7 @@ If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
 ```wlambda
 !v = std:append $[1,2,3] :a :b $[:c, :d];
 
-std:assert_eq (str v) "$[1,2,3,:\"a\",:\"b\",:\"c\",:\"d\"]";
+std:assert_eq (str v) "$[1,2,3,:a,:b,:c,:d]";
 ```
 
 If _vec-a_ is not a vector, a vector containing it will be created:
@@ -2627,7 +2760,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 ```wlambda
 !v = std:append 1 :a :b $[:c, :d];
 
-std:assert_eq (str v) "$[1,:\"a\",:\"b\",:\"c\",:\"d\"]";
+std:assert_eq (str v) "$[1,:a,:b,:c,:d]";
 ```
 
 #### <a name="4136-stdprepend-vec-a-value-or-vec-"></a>4.13.6 - std:prepend _vec-a_ _value-or-vec_ ...
@@ -3071,11 +3204,24 @@ Here is an overview of the data type calling semantics:
 | `$false`  | `$[1,2]`          | Will return the first element `1` of the list. |
 | symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
-|           |                   | |
-|           |                   | |
-|           |                   | |
-|           |                   | |
-|           |                   | |
+| $p(int_from, int_count) | string | Substring operation. (See also section about pairs) |
+| $i(int_from, int_count, ...) | string | Substring operation. |
+| string | $i(int_from, int_count, ...) | Substring operation. |
+| $p(string, int)         | string | Split operation. (See also section about pairs) |
+| string | $p(string, int) | Split operation. |
+| $p(string, string)      | string | Replace all operation. (See also section about pairs) |
+| string | $p(string, string) | Replace all operation. |
+| $p(int_from, int_count) | byte_vec | Substring operation. (See also section about pairs) |
+| $i(int_from, int_count, ...) | byte_vec | Substring operation on the byte vector. |
+| byte_vec | $i(int_from, int_count, ...) | Substring operation on the byte vector. |
+| $p(byte_vec, int)       | byte_vec | Split operation. (See also section about pairs) |
+| byte_vec | $p(byte_vec, int) | Split operation. |
+| $p(byte_vec, byte_vec)  | byte_vec | Replace all operation. (See also section about pairs) |
+| byte_vec | $p(byte_vec, byte_vec) | Replace all operation. |
+| $o()      | -                 | Returns $none. |
+| $o(x)     | -                 | Returns _x_. |
+| $o()      | *                 | Calls $none with arguments, leading to a panic. |
+| $o(x)     | *                 | Calls _x_ with the given arguments. |
 |           |                   | |
 
 ## <a name="5-functions-part-22"></a>5 - Functions (part 2/2)
@@ -4243,8 +4389,12 @@ You can also skip the prefix:
 
 ```wlambda
 !@import std;
+
 !v = $[];
-push v 10; push v 20;
+
+std:push v 10;
+std:push v 20;
+
 std:assert_eq (str v) "$[10,20]";
 ```
 
@@ -4336,13 +4486,6 @@ std:assert_eq (str v) (str $[1,3]);
 
 std:assert_eq (std:delete m :a) 10;
 std:assert_eq (str m) (str ${b = 20});
-```
-- Byte Vectors:
-```wlambda
-!b = $b"abc";
-
-std:assert_eq (std:delete b 1) (int $b"b");
-std:assert_eq b $b"ac";
 ```
 
 Please note that this operation is potentially O(n) on vectors.
@@ -4537,6 +4680,22 @@ the file to the given filename.
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
+### - Threading
+
+WLambda leverages the `std::thread` implementation of Rust's standard library
+to provide safe threading. Threading works by spawning new threads that
+get sent a piece of WLambda code (as string) and some arguments.
+
+Most WLambda data can be shared between threads. An exception are
+UserData values that are not thread safe. Also things like sharing
+cyclic data structures are not possible, as the references are currently
+broken up.
+
+Sharing data is done by WLambda by transforming the _VVal_ data structures
+into a thread safe shareable represenation called _AVal_. An AVal is a
+deep copy of the original VVal and can additionally contain atoms (see `std:sync:atom:new`),
+MPSC queues (see `std:sync:mpsc:new`) and value slots (see `std:sync:slot:new`).
+
 ## <a name="12-optional-standard-library"></a>12 - Optional Standard Library
 
 ### <a name="121-serialization"></a>12.1 - serialization
@@ -4554,7 +4713,7 @@ in the WLambda syntax as debug output that might change in future versions.
 ```wlambda
 std:assert_eq (std:ser:wlambda "foo") $q|"foo"|;
 std:assert_eq (std:ser:wlambda $none) $q|$n|;
-std:assert_eq (std:ser:wlambda $[1,:a]) $q|$[1,:"a"]|;
+std:assert_eq (std:ser:wlambda $[1,:a]) $q|$[1,:a]|;
 ```
 
 #### <a name="1212-stdserjson-data-nopretty"></a>12.1.2 - std:ser:json _data_ \[_no_pretty_]
@@ -4678,12 +4837,40 @@ _sm_state_.
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
 
+### <a name="126-utility-functions"></a>12.6 - Utility Functions
+
+#### <a name="1261-stddumpupvals-function"></a>12.6.1 - std:dump_upvals _function_
+
+Returns a vector of all the upvalues of the _function_.
+Please use this function for debugging purposes only, as the order of the
+variables, while consistent for a specific WLambda version,
+is not defined at this point.
+
+```wlambda
+!x = 1;
+!y = 2;
+!fun = { _ + x + y };
+
+std:assert_eq fun[3]   6;
+.x = 3;
+std:assert_eq fun[3]   8;
+
+!upvs = std:dump_upvals fun;
+std:assert_eq (str upvs) "$[$(&)3,$(&)2]";
+.y = 4;
+std:assert_eq (str upvs) "$[$(&)3,$(&)4]";
+
+std:assert_eq $*(upvs.0) 3;
+std:assert_eq $*(upvs.1) 4;
+```
+
 */
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use crate::compiler::*;
 use crate::vval::*;
+use crate::nvec::*;
 use crate::util;
 use std::rc::Rc;
 use crate::threads::*;
@@ -5628,7 +5815,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let b = env.arg(0);
             Ok(
                 if let VVal::Byt(u) = b {
-                    VVal::new_str_mv(String::from_utf8_lossy(&u.borrow()).to_string())
+                    VVal::new_str_mv(String::from_utf8_lossy(u.as_ref()).to_string())
                 } else {
                     VVal::None
                 })
@@ -5637,7 +5824,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let b = env.arg(0);
             if let VVal::Byt(u) = b {
-                match String::from_utf8(u.borrow().to_vec()) {
+                match String::from_utf8(u.to_vec()) {
                     Ok(s) => Ok(VVal::new_str_mv(s)),
                     Err(e) => {
                         Ok(env.new_err(
@@ -5686,9 +5873,9 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             if let VVal::Byt(u) = env.arg(0) {
                 Ok(VVal::vec_mv(
-                    u.borrow().iter()
-                        .map(|u| VVal::Int(i64::from(*u)))
-                        .collect()))
+                    u.iter()
+                     .map(|u| VVal::Int(i64::from(*u)))
+                     .collect()))
             } else {
                 Ok(VVal::vec_mv(
                     env.arg(0).as_bytes().iter()
@@ -5725,10 +5912,11 @@ pub fn std_symbol_table() -> SymbolTable {
                   '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
 
             if let VVal::Byt(u) = env.arg(0) {
-                let mut out : String = String::with_capacity(u.borrow().len() * 2);
+                let mut out : String =
+                    String::with_capacity(u.len() * 2);
 
                 if argc == 1 {
-                    for (a, b) in u.borrow().iter().map(|u|
+                    for (a, b) in u.iter().map(|u|
                                         (HEXCHARS[(u >> 4) as usize],
                                          HEXCHARS[(u & 0x0F) as usize])) {
                         out.push(a);
@@ -5741,7 +5929,7 @@ pub fn std_symbol_table() -> SymbolTable {
                         else { env.arg(2).s_raw() };
 
                     let mut len_counter = 0;
-                    for (a, b) in u.borrow().iter().map(|u|
+                    for (a, b) in u.iter().map(|u|
                                         (HEXCHARS[(u >> 4) as usize],
                                          HEXCHARS[(u & 0x0F) as usize])) {
                         if len_counter >= group_len { out.push_str(&group_sep); len_counter = 0; }
@@ -6054,7 +6242,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let tmp_filename = format!("{}~", filename);
             let contents     = env.arg(1);
             let buf = match contents {
-                VVal::Byt(b) => b.borrow().clone(),
+                VVal::Byt(b) => b.as_ref().clone(), // TODO: Remove clone
                 v            => v.with_s_ref(|v: &str| v.as_bytes().to_vec()),
             };
 
@@ -6100,7 +6288,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let filename     = env.arg(0).s_raw();
             let contents     = env.arg(1);
             let buf = match contents {
-                VVal::Byt(b) => b.borrow().clone(),
+                VVal::Byt(b) => b.as_ref().clone(), // TODO: Remove clone
                 v            => v.with_s_ref(|v: &str| v.as_bytes().to_vec()),
             };
 
@@ -6144,9 +6332,9 @@ pub fn std_symbol_table() -> SymbolTable {
             print_value(env, argc, true)
         }, None, None, false);
 
-    func!(st, "dump_func",
+    func!(st, "dump_upvals",
         |env: &mut Env, _argc: usize| {
-            if let VVal::Fun(f) = env.arg(0) {
+            if let VVal::Fun(f) = env.arg(0).deref() {
                 return Ok(f.dump_upvals());
             }
             Ok(VVal::None)
@@ -6264,6 +6452,13 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(env.arg(0))
             }
         }, Some(1), Some(2), true);
+
+//    func!(st, "tree_select",
+//        |env: &mut Env, _argc: usize| {
+//            let slct = env.arg(0);
+//            let tree = env.arg(1);
+//            Ok(util::tree_select(&slct, &tree))
+//        }, Some(2), Some(2), false);
 
     func!(st, "ser:csv",
         |env: &mut Env, _argc: usize| {
@@ -6505,7 +6700,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "deser:msgpack",
         |env: &mut Env, _argc: usize| {
             if let VVal::Byt(u) = env.arg(0) {
-                match VVal::from_msgpack(&u.borrow()[..]) {
+                match VVal::from_msgpack(&u[..]) {
                     Ok(v) => Ok(v),
                     Err(e) => Ok(env.new_err(e)),
                 }
@@ -6633,6 +6828,40 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::FVec(crate::nvec::NVec::rad2vec(env.arg(0).f())))
         }, Some(1), Some(1), false);
 
+//    func!(st, "v:hex2hsva_i",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
+//
+//    func!(st, "v:hex2hsva_f",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
+
+    func!(st, "v:hex2rgba_i",
+        |env: &mut Env, _argc: usize| {
+            let (r, g, b, a) =
+                env.arg(0).with_s_ref(|s| util::hex2rgba(s));
+            Ok(VVal::IVec(NVec::from_tpl(
+                (r as i64, g as i64, Some(b as i64), Some(a as i64))).unwrap()))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:hex2rgba_f",
+        |env: &mut Env, _argc: usize| {
+            let (r, g, b, a) =
+                env.arg(0).with_s_ref(|s| util::hex2rgbaf(s));
+            Ok(VVal::FVec(NVec::from_tpl((r, g, Some(b), Some(a))).unwrap()))
+        }, Some(1), Some(1), false);
+
+//    func!(st, "v:rgba2hex",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
+//
+//    func!(st, "v:hsv2rgb",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
+
+//    func!(st, "v:rgb2hsv",
+//        |env: &mut Env, _argc: usize| {
+//        }, Some(1), Some(1), false);
 
     func!(st, "sort",
         |env: &mut Env, argc: usize| {
@@ -6743,7 +6972,7 @@ pub fn std_symbol_table() -> SymbolTable {
         Ok(VVal::Flt(util::u64_to_closed_open01(env.arg(0).i() as u64)))
     }, Some(1), Some(1), false);
 
-    func!(st, "symbols:collect", |env: &mut Env, _argc: usize| {
+    func!(st, "symbols:collect", |_env: &mut Env, _argc: usize| {
         Ok(VVal::Int(crate::str_int::string_interner_collect()))
     }, Some(0), Some(0), false);
 
@@ -6815,57 +7044,24 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::Usr(Box::new(av)))
         }, Some(1), Some(1), false);
 
-    func!(st, "sync:atom:read",
+    func!(st, "sync:mpsc:new",
+        |_env: &mut Env, _argc: usize| {
+            Ok(AValChannel::new())
+        }, Some(0), Some(0), false);
+
+    func!(st, "sync:slot:new",
+        |_env: &mut Env, _argc: usize| {
+            Ok(VVal::Usr(Box::new(AtomicAValSlot::new())))
+        }, Some(0), Some(0), false);
+
+    func!(st, "thread:sleep",
         |env: &mut Env, _argc: usize| {
-            let av = env.arg(0);
-            if let VVal::Usr(mut avu) = av {
-                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
-                    Ok(ud.read())
-                } else {
-                    Ok(env.new_err(
-                        format!("Value is not an AtomicAVal: {}", avu.s())))
-                }
-            } else {
-                Ok(env.new_err(
-                    format!("Value is not a user data AtomicAVal: {}", av.s())))
+            match env.arg(0).to_duration() {
+                Ok(dur) => std::thread::sleep(dur),
+                Err(v)  => { return Ok(v); },
             }
+            Ok(VVal::Bol(true))
         }, Some(1), Some(1), false);
-
-    func!(st, "sync:atom:swap",
-        |env: &mut Env, _argc: usize| {
-            let av = env.arg(0);
-            if let VVal::Usr(mut avu) = av {
-                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
-                    let v = env.arg(1);
-                    Ok(ud.swap(&v))
-                } else {
-                    Ok(env.new_err(
-                        format!("Value is not an AtomicAVal: {}", avu.s())))
-                }
-            } else {
-                Ok(env.new_err(
-                    format!("Value is not a user data AtomicAVal: {}", av.s())))
-            }
-        }, Some(2), Some(2), false);
-
-
-    func!(st, "sync:atom:write",
-        |env: &mut Env, _argc: usize| {
-            let av = env.arg(0);
-            if let VVal::Usr(mut avu) = av {
-                if let Some(ud) = avu.as_any().downcast_mut::<AtomicAVal>() {
-                    let v = env.arg(1);
-                    ud.write(&v);
-                    Ok(v)
-                } else {
-                    Ok(env.new_err(
-                        format!("Value is not an AtomicAVal: {}", avu.s())))
-                }
-            } else {
-                Ok(env.new_err(
-                    format!("Value is not a user data AtomicAVal: {}", av.s())))
-            }
-        }, Some(2), Some(2), false);
 
     func!(st, "thread:spawn",
         move |env: &mut Env, argc: usize| {
@@ -6873,18 +7069,8 @@ pub fn std_symbol_table() -> SymbolTable {
                 if argc > 1 {
                     let mut avs = vec![];
                     for (i, (v, k)) in env.arg(1).iter().enumerate() {
-                        let av =
-                            if let VVal::Usr(mut vu) = v {
-                                if let Some(avu) = vu.as_any().downcast_mut::<AtomicAVal>() {
-                                    avu.clone()
-                                } else {
-                                    AtomicAVal::new()
-                                }
-                            } else {
-                                let av = AtomicAVal::new();
-                                av.write(&v);
-                                av
-                            };
+                        let av = AtomicAVal::new();
+                        av.write(&v);
 
                         if let Some(k) = k {
                             avs.push((k.s_raw(), av));
@@ -6918,22 +7104,6 @@ pub fn std_symbol_table() -> SymbolTable {
                     None))
             }
         }, Some(1), Some(2), false);
-
-    func!(st, "thread:join",
-        move |env: &mut Env, _argc: usize| {
-            let hdl = env.arg(0);
-            if let VVal::Usr(mut hdl) = hdl {
-                if let Some(ud) = hdl.as_any().downcast_mut::<DefaultThreadHandle>() {
-                    Ok(ud.join(env))
-                } else {
-                    Ok(env.new_err(
-                        format!("Value is not a DefaultThreadHandle: {}", hdl.s())))
-                }
-            } else {
-                Ok(env.new_err(
-                    format!("Value is not a user data DefaultThreadHandle: {}", hdl.s())))
-            }
-        }, Some(1), Some(1), false);
 
     st
 }
