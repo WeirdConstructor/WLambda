@@ -18,12 +18,15 @@ Selector Syntax:
     index       = digit, { digit }
                 ;
 
-    pattern     = "*", [ pattern ]
+    pattern_s   = "*", [ pattern ]
                 | "?", [ pattern ]
                 | "[", { class_char }, "]"
                 | "[^", { class_char }, "]"
-                | "(", pattern, ")"         (* maybe for later: captures *)
+                | "(", pattern_opts, ")"         (* maybe for later: captures *)
                 | ident, [ pattern ]
+                ;
+
+    pattern     = pattern_s, { "|", pattern_s }
                 ;
 
     key         = index | pattern
@@ -127,7 +130,7 @@ fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(VVal::pair(VVal::new_sym("PatCap"), p))
 }
 
-fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
+fn parse_pattern_s(ps: &mut State) -> Result<VVal, ParseError> {
     let pat = VVal::vec();
 
     while !ps.at_end() && !ps.lookahead_one_of("'&:^;$)]}=/|,") {
@@ -150,6 +153,24 @@ fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
             };
 
         pat.push(element);
+    }
+
+    Ok(pat)
+}
+
+fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
+    let mut pat = parse_pattern_s(ps)?;
+
+    let mut append = false;
+    while ps.consume_if_eq_ws('|') {
+        let next_opt_pat = parse_pattern_s(ps)?;
+
+        if append {
+            pat.push(next_opt_pat);
+        } else {
+            pat = VVal::vec3(VVal::new_sym("Opt"), pat, next_opt_pat);
+            append = true;
+        }
     }
 
     Ok(pat)
@@ -328,6 +349,8 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
     for i in 0..pat.len() {
         let p = pat.at(pat.len() - (i + 1)).expect("pattern item");
 
+        println!("PAT COMP: {}", p.s());
+
         if p.is_pair() && p.at(0).unwrap() == VVal::new_sym("I") {
             let key_str = p.at(1).unwrap().clone();
 
@@ -351,6 +374,15 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
                         (VVal::None, 0)
                     }
                 })
+            }));
+
+        } else if p.to_sym() == s2sym("Any") {
+            next = Some(Box::new(|s: &str, _st: &mut SelectorState| {
+                if let Some(c) = s.chars().nth(0) {
+                    (VVal::Bol(true), c.len_utf8())
+                } else {
+                    (VVal::None, 0)
+                }
             }));
 
         } else {
@@ -396,19 +428,24 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
         let pat = compile_pattern(k);
 
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
-            for (v, k) in v.iter() {
+            for (i, (v, k)) in v.iter().enumerate() {
                 println!("pAT: {}: {:?}", v.s(), k);
                 if let Some(k) = k {
                     k.with_s_ref(|s| {
-                        let (r, _) = (*pat)(&s[..], st);
+                        let (r, len) = (*pat)(&s[..], st);
                         println!("PATR: {}", r.s());
-                        if r.b() {
+                        if r.b() && len == s.len() {
                             println!("XOOO: {}", v.s());
                             (*sn)(&v, st, capts);
                         }
                     });
                 } else {
-                    panic!("not implemented yet");
+                    let idx_str = format!("{}", i);
+
+                    let (r, len) = (*pat)(&idx_str[..], st);
+                    if r.b() && len == idx_str.len() {
+                        (*sn)(&v, st, capts);
+                    }
                 }
             }
         })
@@ -429,6 +466,7 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
 
 fn compile_selector(sel: &VVal) -> SelNode {
     if let VVal::Lst(_) = sel {
+        println!("COM SELECTOR: {}", sel.s());
 
         let first = sel.at(0).unwrap_or_else(|| VVal::None);
         if first.to_sym() == s2sym("Path") {
@@ -490,7 +528,7 @@ mod tests {
     #[test]
     fn check_selector_match_path() {
         let v1 =
-            VVal::map2("a",
+            VVal::map3("a",
                 VVal::vec3(
                     VVal::Int(20),
                     VVal::pair(VVal::Int(2), VVal::Int(4)),
@@ -498,23 +536,34 @@ mod tests {
                 "ab",
                 VVal::vec2(
                     VVal::Int(33),
-                    VVal::Int(44)));
+                    VVal::Int(44)),
+                "xyab",
+                VVal::vec3(
+                    VVal::Int(8),
+                    VVal::Int(9),
+                    VVal::map2("X", VVal::Int(10), "Y", VVal::Int(20))));
 
         assert_eq!(pev("a",         &v1), "$[$[20,$p(2,4),\"F0O\"]]");
         assert_eq!(pev("a/2/2",     &v1), "$[\"O\"]");
         assert_eq!(pev("a/2/1",     &v1), "$[\"0\"]");
         assert_eq!(pev("ab/0",      &v1), "$[33]");
+
+        assert_eq!(pev("a/?",       &v1), "$[20,$p(2,4),\"F0O\"]");
+        assert_eq!(pev("a/?/1",     &v1), "$[4,\"0\"]");
+
+        assert_eq!(pev("?/1",       &v1), "$[$p(2,4)]");
+        assert_eq!(pev("?/2",       &v1), "$[\"F0O\"]");
     }
 
     #[test]
     fn check_selector_node_path() {
-        assert_eq!(p("a"),     "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]]]");
-        assert_eq!(p("a/0/2"), "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]],$[:NK,0],$[:NK,2]]");
-        assert_eq!(p("a/b/c"), "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]],$[:NK,$[:Pat,$p(:I,:b)]],$[:NK,$[:Pat,$p(:I,:c)]]]");
+        assert_eq!(p("a"),     "$[:Path,$[:NK,$[$p(:I,:a)]]]");
+        assert_eq!(p("a/0/2"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NK,0],$[:NK,2]]");
+        assert_eq!(p("a/b/c"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NK,$[$p(:I,:b)]],$[:NK,$[$p(:I,:c)]]]");
 
         assert_eq!(p("a/^b/c/^"), "Error: error[1,9:<selector>] EOF while parsing: Unexpected EOF at code \'\'");
-        assert_eq!(p("a/^b/c/^*"), "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]],$[:NCap,$[:NK,$[:Pat,$p(:I,:b)]]],$[:NK,$[:Pat,$p(:I,:c)]],$[:NCap,$[:Glob]]]");
-        assert_eq!(p("a/^b/^c"), "$[:Path,$[:NK,$[:Pat,$p(:I,:a)]],$[:NCap,$[:NK,$[:Pat,$p(:I,:b)]]],$[:NCap,$[:NK,$[:Pat,$p(:I,:c)]]]]");
+        assert_eq!(p("a/^b/c/^*"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NCap,$[:NK,$[$p(:I,:b)]]],$[:NK,$[$p(:I,:c)]],$[:NCap,$[:Glob]]]");
+        assert_eq!(p("a/^b/^c"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NCap,$[:NK,$[$p(:I,:b)]]],$[:NCap,$[:NK,$[$p(:I,:c)]]]]");
     }
 
     #[test]
@@ -524,18 +573,20 @@ mod tests {
         assert_eq!(p("^**"),    "$[:Path,$[:NCap,$[:RecGlob]]]");
         assert_eq!(p("^*"),     "$[:Path,$[:NCap,$[:Glob]]]");
 
-        assert_eq!(p("*/*/a"),   "$[:Path,$[:Glob],$[:Glob],$[:NK,$[:Pat,$p(:I,:a)]]]");
-        assert_eq!(p("*  /  *  /   a   "),   "$[:Path,$[:Glob],$[:Glob],$[:NK,$[:Pat,$p(:I,:a)]]]");
-        assert_eq!(p("**/^a/**"), "$[:Path,$[:RecGlob],$[:NCap,$[:NK,$[:Pat,$p(:I,:a)]]],$[:RecGlob]]");
+        assert_eq!(p("(*|a?)"), "$[:Path,$[:NK,$[$p(:PatCap,$[:Opt,$[:Glob],$[$p(:I,:a),:Any]])]]]");
+
+        assert_eq!(p("*/*/a"),   "$[:Path,$[:Glob],$[:Glob],$[:NK,$[$p(:I,:a)]]]");
+        assert_eq!(p("*  /  *  /   a   "),   "$[:Path,$[:Glob],$[:Glob],$[:NK,$[$p(:I,:a)]]]");
+        assert_eq!(p("**/^a/**"), "$[:Path,$[:RecGlob],$[:NCap,$[:NK,$[$p(:I,:a)]]],$[:RecGlob]]");
     }
 
     #[test]
     fn check_selector_kvmatch() {
-        assert_eq!(p(":{b=a,a=20}"),                                "$[:Path,$[:NKVM,$[:KV,$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:a)]],$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]]]]]");
-        assert_eq!(p("a : { a = 20 }"),                             "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]]]]]");
-        assert_eq!(p("a : { a = 20, b=a(a?)[^ABC]cc*f}"),           "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]],$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:a),$p(:PatCap,$[:Pat,$p(:I,:a),:Any]),$p(:NCCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
-        assert_eq!(p("a : { a = 20, b=a(a?)[ABC]cc*f}"),            "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]],$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:a),$p(:PatCap,$[:Pat,$p(:I,:a),:Any]),$p(:CCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
-        assert_eq!(p("a : { a = 20 } | { b = 20 }"),                "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:Or,$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]]],$[:KV,$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:20)]]]]]]");
-        assert_eq!(p("a : { a = 20 } | { b = 20 } & { x = 10}"),    "$[:Path,$[:NKLA_KVM,$[:Pat,$p(:I,:a)],$[:Or,$[:KV,$[$[:Pat,$p(:I,:a)],$[:Pat,$p(:I,:20)]]],$[:KV,$[$[:Pat,$p(:I,:b)],$[:Pat,$p(:I,:20)]]]]]]");
+        assert_eq!(p(":{b=a,a=20}"),                                "$[:Path,$[:NKVM,$[:KV,$[$[$p(:I,:b)],$[$p(:I,:a)]],$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
+        assert_eq!(p("a : { a = 20 }"),                             "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
+        assert_eq!(p("a : { a = 20, b=a(a?)[^ABC]cc*f}"),           "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatCap,$[$p(:I,:a),:Any]),$p(:NCCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
+        assert_eq!(p("a : { a = 20, b=a(a?)[ABC]cc*f}"),            "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatCap,$[$p(:I,:a),:Any]),$p(:CCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
+        assert_eq!(p("a : { a = 20 } | { b = 20 }"),                "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]]]]]");
+        assert_eq!(p("a : { a = 20 } | { b = 20 } & { x = 10}"),    "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]]]]]");
     }
 }
