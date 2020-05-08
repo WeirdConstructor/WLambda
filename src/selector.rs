@@ -98,7 +98,13 @@ fn parse_char_class(ps: &mut State) -> Result<VVal, ParseError> {
     let mut c = ps.expect_some(ps.peek())?;
     while c != ']' {
         ps.consume();
-        chars.push(c);
+        if c == '\\' {
+            let c = ps.expect_some(ps.peek())?;
+            ps.consume();
+            chars.push(c);
+        } else {
+            chars.push(c);
+        }
         c = ps.expect_some(ps.peek())?;
     }
 
@@ -146,7 +152,7 @@ fn parse_pattern_s(ps: &mut State) -> Result<VVal, ParseError> {
                     ps.consume_ws();
                     let mut b = [0; 4];
                     VVal::pair(
-                        VVal::new_sym("S"),
+                        VVal::new_sym("I"),
                         VVal::new_sym(next.encode_utf8(&mut b)))
                 },
                 _   => parse_ident(ps)?
@@ -347,38 +353,99 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
 
         println!("PAT COMP: {}", p.s());
 
-        if p.is_pair() && p.at(0).unwrap() == VVal::new_sym("I") {
-            let key_str = p.at(1).unwrap().clone();
+        if p.is_pair() {
+            let pat_pair_type = p.at(0).unwrap().to_sym();
 
-            let mn = std::mem::replace(&mut next, None);
-            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-                key_str.with_s_ref(|y| {
-                    let y_len = y.len();
+            if pat_pair_type == s2sym("I") {
+                let key_str = p.at(1).unwrap().clone();
 
-                    if s.starts_with(y) {
-                        if let Some(n) = &mn {
-                            let (m, len) = (*n)(&s[y_len..], st);
-                            (m, y_len + len)
+                let mn = std::mem::replace(&mut next, None);
+                next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
+                    key_str.with_s_ref(|y| {
+                        let y_len = y.len();
+
+                        if s.starts_with(y) {
+                            if let Some(n) = &mn {
+                                let (m, len) = (*n)(&s[y_len..], st);
+                                (m, y_len + len)
+                            } else {
+                                (VVal::Bol(true), y_len)
+                            }
                         } else {
-                            (VVal::Bol(true), y_len)
+                            (VVal::None, 0)
                         }
-                    } else {
+                    })
+                }));
+            } else if pat_pair_type == s2sym("CCls") {
+                let chars = p.at(1).unwrap().clone();
+
+                let mn = std::mem::replace(&mut next, None);
+                next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
+                    chars.with_s_ref(|chrs| {
+                        if let Some(c) = s.chars().nth(0) {
+                            let c_len = c.len_utf8();
+
+                            for mc in chrs.chars() {
+                                if c == mc {
+                                    if let Some(n) = &mn {
+                                        let (m, len) = (*n)(&s[c_len..], st);
+                                        return (m, c_len + len);
+                                    } else {
+                                        return (VVal::Bol(true), c_len);
+                                    }
+                                }
+                            }
+                        }
+
                         (VVal::None, 0)
-                    }
-                })
-            }));
+                    })
+                }));
+
+            } else if pat_pair_type == s2sym("NCCls") {
+                let chars = p.at(1).unwrap().clone();
+
+                let mn = std::mem::replace(&mut next, None);
+                next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
+                    chars.with_s_ref(|chrs| {
+                        if let Some(c) = s.chars().nth(0) {
+                            for mc in chrs.chars() {
+                                if c == mc {
+                                    return (VVal::None, 0);
+                                }
+                            }
+
+                            let c_len = c.len_utf8();
+
+                            if let Some(n) = &mn {
+                                let (m, len) = (*n)(&s[c_len..], st);
+                                return (m, c_len + len);
+                            } else {
+                                return (VVal::Bol(true), c_len);
+                            }
+                        }
+                        (VVal::None, 0)
+                    })
+                }));
+
+
+            } else {
+                next = Some(Box::new(|_s: &str, _st: &mut SelectorState| {
+                    (VVal::None, 0)
+                }));
+            }
 
         } else if p.to_sym() == s2sym("Any") {
             let mn = std::mem::replace(&mut next, None);
             next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
 
                 if let Some(c) = s.chars().nth(0) {
+                    let c_len = c.len_utf8();
 
                     if let Some(n) = &mn {
-                        let (m, len) = (*n)(&s[1..], st);
+                        let (m, len) = (*n)(&s[c_len..], st);
                         (m, c.len_utf8() + len)
                     } else {
-                        (VVal::Bol(true), c.len_utf8())
+                        (VVal::Bol(true), c_len)
                     }
                 } else {
                     (VVal::None, 0)
@@ -393,14 +460,14 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
                     let s_len = s.len();
                     let mut c_try_len = s_len;
                     while c_try_len > 0 {
-                        let (m, len) = (*n)(&s[..c_try_len], st);
-                        if m.b() {
-                            return (m, len);
-                        }
-
                         c_try_len -= 1;
                         while c_try_len > 0 && !s.is_char_boundary(c_try_len) {
                             c_try_len -= 1;
+                        }
+
+                        let (m, len) = (*n)(&s[c_try_len..], st);
+                        if m.b() {
+                            return (m, c_try_len + len);
                         }
                     }
 
@@ -461,13 +528,10 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
 
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
             for (i, (v, k)) in v.iter().enumerate() {
-                println!("pAT: {}: {:?}", v.s(), k);
                 if let Some(k) = k {
                     k.with_s_ref(|s| {
                         let (r, len) = (*pat)(&s[..], st);
-                        println!("PATR: {} {} {}", r.s(), len, s.len());
                         if r.b() && len == s.len() {
-                            println!("XOOO: {}", v.s());
                             (*sn)(&v, st, capts);
                         }
                     });
@@ -595,7 +659,37 @@ mod tests {
         assert_eq!(pev("*/*/X",     &v1), "$[10]");
         assert_eq!(pev("*/2/2",     &v1), "$[\"O\"]");
 
-        assert_eq!(pev("*ab",       &v1), "$[\"F0O\"]");
+        assert_eq!(pev("*ab/*/X",   &v1), "$[10]");
+
+        assert_eq!(pev("[xy][xy]*/[01]",    &v1), "$[8,9]");
+        assert_eq!(pev("[^xy][^xy]/[01]",   &v1), "$[33,44]");
+        assert_eq!(pev("a/[^01]",           &v1), "$[33,44]");
+    }
+
+    #[test]
+    fn check_selector_match_esc() {
+        let v1 =
+            VVal::map3("\\",
+                VVal::vec3(
+                    VVal::Int(20),
+                    VVal::pair(VVal::Int(2), VVal::Int(4)),
+                    VVal::new_str("F0O%/{}[]")),
+                "//",
+                VVal::vec2(
+                    VVal::Int(33),
+                    VVal::Int(44)),
+                "?*",
+                VVal::vec3(
+                    VVal::Int(8),
+                    VVal::Int(9),
+                    VVal::map2("*", VVal::Int(10), "|", VVal::Int(20))));
+
+        assert_eq!(pev("*/*/\\*", &v1),     "$[10]");
+        assert_eq!(pev("*/*/\\|", &v1),     "$[20]");
+
+        assert_eq!(pev("[\\\\]*/1", &v1),   "$[$p(2,4)]");
+        assert_eq!(pev("[\\/]*/0", &v1),    "$[33]");
+        assert_eq!(pev("\\/\\//0", &v1),    "$[33]");
     }
 
     #[test]
