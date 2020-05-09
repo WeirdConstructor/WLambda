@@ -3480,3 +3480,13 @@ fn check_color_functions() {
     assert_eq!(ve("ivec ~ (std:v:hex2rgba_f :33C0CC80) * 100"), "$i(20,75,80,50)");
     assert_eq!(ve("std:v:hex2rgba_i :33C0CC80"),                "$i(51,192,204,128)");
 }
+
+#[test]
+fn check_tree_match() {
+    assert_eq!(ve("type $S(a/b)"), "\"function\"");
+    assert_eq!(ve("type $X(a/b)"), "\"function\"");
+
+    assert_eq!(ve("$S(a/b) ${a = ${b = 20}}"),              "20");
+    assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\1 }"), "\"bbbbb\"");
+    assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\_ }"), "$[\"abbbbbc\",\"bbbbb\"]");
+}

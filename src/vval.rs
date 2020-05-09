@@ -164,6 +164,9 @@ pub enum Syntax {
     MapSplice,
     VecSplice,
     Accum,
+    GlobVar,
+    Selector,
+    Pattern,
 }
 
 #[derive(Clone)]

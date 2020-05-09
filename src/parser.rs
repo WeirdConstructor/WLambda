@@ -88,6 +88,13 @@ In the following grammar, white space and comments are omitted:
     quote_string  = "q", ?any character as quote?, { ?any character? }, ?any character as quote?
                   | "Q", ?any character as quote?, { ?any character? }, ?any character as quote?
                     (* but Q generates a byte string instead! *)
+    selector      = "S", ?any character as quote?, selector_rs_syntax, ?any character as quote?
+                    (* parses substring like 'q', but constructs a
+                       selector_rs_syntax matcher at compile time *)
+                  ;
+    pattern       = "X", ?any character as quote?, selector_rs_pattern_syntax, ?any character as quote?
+                    (* parses substring like 'q', but constructs a pattern matcher
+                       at compile time *)
                   ;
     list_expr     = "*", expr   (* splices the vector result of 'expr'
                                    into the currently parsed list *)
@@ -132,6 +139,13 @@ In the following grammar, white space and comments are omitted:
                     (* returns the current accumulator value *)
                   | "+" (* resolves to the current accumulator function *)
                   ;
+    capture_variable = (? 1 or N digits ?)      (* index of capture, 0 is the
+                                                   matched string/path *)
+                     | "_"                      (* list of all captures *)
+                     (* a capture variable is a regular global variable that
+                        can even be assigned to. it's just also written by
+                        the selectors and pattern match functions! *)
+                     ;
     import        = "@import", ident, [ ident ]
                   ;
     export        = "@export", ident, [ "=" ], expr
@@ -157,6 +171,9 @@ In the following grammar, white space and comments are omitted:
                   | deref
                   | capture_ref
                   | accumulator
+                  | selector
+                  | pattern
+                  | "\", capture_variable
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
