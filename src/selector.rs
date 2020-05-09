@@ -9,7 +9,7 @@ Selector Syntax:
                 ;
 
     ident       = { ?any character except whitespace,
-                    "?", "/", "\", "|", "^", ",",
+                    "!", "?", "/", "\", "|", "^", ",",
                     "'", "&", ":", ";", "$", "(", ")",
                     "{", "}", "[", "]", "*" or "="? }
                   (* allows the usual backslash escaping! *)
@@ -22,7 +22,7 @@ Selector Syntax:
                 | "?", [ pattern ]
                 | "[", { class_char }, "]"
                 | "[^", { class_char }, "]"
-                | "(", pattern_opts, ")"         (* maybe for later: captures *)
+                | "(", pattern, ")"         (* maybe for later: captures *)
                 | ident, [ pattern ]
                 ;
 
@@ -43,8 +43,8 @@ Selector Syntax:
                 | kv_item
                 ;
 
-    node        = key, [":", kv_match]
-                | ":", kv_match
+    node        = key, [":", ["!"], [ selector ], kv_match]
+                | ":", ["!"], [ selector ], kv_match
                 | "^", node (* marks it for referencing it in the result set *)
                 | "**"
                 ;
@@ -68,7 +68,7 @@ use crate::str_int::s2sym;
 fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
     let uh = ps.take_while(|c|
         match c {
-           '?' | '/' | '\\' | '|' | '{' | '}'
+           '!' | '?' | '/' | '\\' | '|' | '{' | '}'
          | '[' | ']' | '(' | ')' | '\'' | '^'
          | '&' | '$' | ':' | ';' | '*' | '=' | ','
                 => false,
@@ -126,14 +126,42 @@ fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
             ParseErrorKind::UnexpectedToken('(', "in capture")));
     }
 
-    let p = parse_pattern(ps)?;
+    let (no_capture, p) =
+        if ps.consume_if_eq_ws('{') {
+            let ctrl =
+                if let Some(c) = ps.expect_some(ps.peek())? {
+                    match c {
+                        '!' => { ps.consume_ws(); Some(VVal::new_sym("Not") },
+                        _   => None,
+                    }
+                } else {
+                    None
+                }
+
+            if !ps.consume_if_eq_ws('}') {
+                return Err(ps.err(
+                    ParseErrorKind::UnexpectedToken('}', "in capture")));
+            }
+
+            if let Some(ctrl) = ctrl {
+                (true, VVal::pair(ctrl, parse_pattern(ps)?))
+            } else {
+                (true, parse_pattern(ps)?)
+            }
+        } else {
+            (false, parse_pattern(ps)?)
+        };
 
     if !ps.consume_if_eq_ws(')') {
         return Err(ps.err(
             ParseErrorKind::UnexpectedToken(')', "in capture")));
     }
 
-    Ok(VVal::pair(VVal::new_sym("PatCap"), p))
+    if no_capture {
+        Ok(VVal::pair(VVal::new_sym("PatSub"), p))
+    } else {
+        Ok(VVal::pair(VVal::new_sym("PatCap"), p))
+    }
 }
 
 fn parse_pattern_s(ps: &mut State) -> Result<VVal, ParseError> {
@@ -277,6 +305,9 @@ fn parse_node(ps: &mut State) -> Result<VVal, ParseError> {
         match c {
             ':' => {
                 ps.consume_ws();
+                // TODO: FIXME: Parse "!" here for negated kv matches!
+                // TODO: FIXME: Parse selector here, that will
+                //              act as recursive self-select on the current value
                 Ok(VVal::vec2(
                     VVal::new_sym("NKVM"),
                     parse_kv_match(ps)?))
@@ -664,6 +695,9 @@ mod tests {
         assert_eq!(pev("[xy][xy]*/[01]",    &v1), "$[8,9]");
         assert_eq!(pev("[^xy][^xy]/[01]",   &v1), "$[33,44]");
         assert_eq!(pev("a/[^01]",           &v1), "$[33,44]");
+
+        assert_eq!(pev("({!}a*)/[01]",      &v1), "");
+        assert_eq!(pev("a/({!}[01])",       &v1), "");
     }
 
     #[test]
@@ -717,6 +751,13 @@ mod tests {
         assert_eq!(p("**/^a/**"), "$[:Path,$[:RecGlob],$[:NCap,$[:NK,$[$p(:I,:a)]]],$[:RecGlob]]");
 
         assert_eq!(p("?a"),    "$[:Path,$[:NK,$[:Any,$p(:I,:a)]]]");
+    }
+
+    #[test]
+    fn check_subpat() {
+        assert_eq!(p("({}abc)"),                ""),
+        assert_eq!(p("({!}abc)"),               ""),
+        assert_eq!(p("(\\{abc)"),               ""),
     }
 
     #[test]
