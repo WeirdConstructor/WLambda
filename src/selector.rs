@@ -18,11 +18,23 @@ Selector Syntax:
     index       = digit, { digit }
                 ;
 
+    pat_mod     = "!"           (* matches if sub pattern does not match *)
+                | "*"           (* matches sub pattern 0 or N times *)
+                | "+"           (* matches sub pattern 1 or N times *)
+                | "?"           (* matches sub pattern 0 or 1 times *)
+                | "="           (* zero width lookahead *)
+                ;
+
+    modifier    = "{", pat_mod, "}"
+                ;
+
     pattern_s   = "*", [ pattern ]
                 | "?", [ pattern ]
                 | "[", { class_char }, "]"
                 | "[^", { class_char }, "]"
-                | "(", pattern, ")"         (* maybe for later: captures *)
+                | "(", modifier, pattern, ")"   (* if modifier: no capturing *)
+                | "^"                       (* string start *)
+                | "$"                       (* string end *)
                 | ident, [ pattern ]
                 ;
 
@@ -86,12 +98,12 @@ fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_char_class(ps: &mut State) -> Result<VVal, ParseError> {
-    if !ps.consume_if_eq_ws('[') {
+    if !ps.consume_if_eq('[') {
         return Err(ps.err(
             ParseErrorKind::UnexpectedToken('[', "in char class")));
     }
 
-    let neg = ps.consume_if_eq_ws('^');
+    let neg = ps.consume_if_eq('^');
 
     let mut chars = String::new();
 
@@ -101,6 +113,7 @@ fn parse_char_class(ps: &mut State) -> Result<VVal, ParseError> {
         if c == '\\' {
             let c = ps.expect_some(ps.peek())?;
             ps.consume();
+            // TODO: Factor out the \-Parsing of parse_string() in parser.rs!
             chars.push(c);
         } else {
             chars.push(c);
@@ -132,6 +145,10 @@ fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
                 if let Some(c) = ps.expect_some(ps.peek())? {
                     match c {
                         '!' => { ps.consume_ws(); Some(VVal::new_sym("Not") },
+                        '*' => { ps.consume_ws(); Some(VVal::new_sym("N0") },
+                        '+' => { ps.consume_ws(); Some(VVal::new_sym("N1") },
+                        '?' => { ps.consume_ws(); Some(VVal::new_sym("Opt") },
+                        '=' => { ps.consume_ws(); Some(VVal::new_sym("ZwLA") },
                         _   => None,
                     }
                 } else {
@@ -172,6 +189,8 @@ fn parse_pattern_s(ps: &mut State) -> Result<VVal, ParseError> {
             match ps.expect_some(ps.peek())? {
                 '*' => { ps.consume_ws(); VVal::new_sym("Glob") },
                 '?' => { ps.consume_ws(); VVal::new_sym("Any") },
+                '^' => { ps.consume_ws(); VVal::new_sym("Start") },
+                '$' => { ps.consume_ws(); VVal::new_sym("End") },
                 '[' => parse_char_class(ps)?,
                 '(' => parse_capture(ps)?,
                 '\\' => {
@@ -623,6 +642,12 @@ fn compile_selector(sel: &VVal) -> SelNode {
     }
 }
 
+fn compile_single_pattern(v: &VVal) -> PatternNode {
+    panic!("implement a pattern that matches either at the \
+            start only or anywhere in the string if the first \
+            element is or is not a \"Start\" (^)");
+}
+
 //fn tree_select(slct: &VVal, tree: &VVal) -> VVal {
 //    let path = VVal::vec();
 //    slct.with_s_ref(|s| parse_select(&s.chars().collect(), path));
@@ -631,6 +656,22 @@ fn compile_selector(sel: &VVal) -> SelNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pat(s: &str, st: &str) -> String {
+        match parse_pattern(s) {
+            Ok(v) => {
+                let pn = compile_single_pattern(v);
+                let mut ss = SelectorState::new();
+                let (r, len) = (*pn)(st, &mut ss);
+                if len == ss.len() {
+                    r.s()
+                } else {
+                    "-nomatch-"
+                }
+            },
+            Err(e) => format!("Error: {}", e),
+        }
+    }
 
     fn p(s: &str) -> String {
         match parse_selector(s) {
@@ -698,6 +739,11 @@ mod tests {
 
         assert_eq!(pev("({!}a*)/[01]",      &v1), "");
         assert_eq!(pev("a/({!}[01])",       &v1), "");
+
+        assert_eq!(pev("({+}[xy])ab/0",     &v1), "");
+        assert_eq!(pev("a({+}b)/0",         &v1), "");
+        assert_eq!(pev("({*}[xy])ab/0",     &v1), "");
+        assert_eq!(pev("({?}[xy])[xy]ab/0", &v1), "");
     }
 
     #[test]
@@ -754,13 +800,6 @@ mod tests {
     }
 
     #[test]
-    fn check_subpat() {
-        assert_eq!(p("({}abc)"),                ""),
-        assert_eq!(p("({!}abc)"),               ""),
-        assert_eq!(p("(\\{abc)"),               ""),
-    }
-
-    #[test]
     fn check_selector_kvmatch() {
         assert_eq!(p(":{b=a,a=20}"),                                "$[:Path,$[:NKVM,$[:KV,$[$[$p(:I,:b)],$[$p(:I,:a)]],$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
         assert_eq!(p("a : { a = 20 }"),                             "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
@@ -768,5 +807,29 @@ mod tests {
         assert_eq!(p("a : { a = 20, b=a(a?)[ABC]cc*f}"),            "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatCap,$[$p(:I,:a),:Any]),$p(:CCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
         assert_eq!(p("a : { a = 20 } | { b = 20 }"),                "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]]]]]");
         assert_eq!(p("a : { a = 20 } | { b = 20 } & { x = 10}"),    "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]]]]]");
+    }
+
+    #[test]
+    fn check_selector_subpat() {
+        assert_eq!(p("({}^abc$)"),              "");
+
+        assert_eq!(p("({}abc)"),                "");
+        assert_eq!(p("({!}abc)"),               "");
+        assert_eq!(p("({*}abc)"),               "");
+        assert_eq!(p("({+}abc)"),               "");
+        assert_eq!(p("({?}abc)"),               "");
+        assert_eq!(p("({=}abc)"),               "");
+        assert_eq!(p("(\\{abc)"),               "");
+    }
+
+    #[test]
+    fn check_patterns() {
+        assert_eq!(pat("^A(B)C$",           "ABC"),         "B");
+        assert_eq!(pat("(BC)",              "ABC"),         "BC");
+        assert_eq!(pat("^[ ]$",             " "),           "BC");
+        assert_eq!(pat("^({*}[ ])$",        "   "),         "BC");
+        assert_eq!(pat("[\\t\\0\\u0101]",   "\0"),          "");
+        assert_eq!(pat("[\\t\\0\\u0101]",   "\t"),          "");
+        assert_eq!(pat("[\\t\\0\\u0101]",   "ā"),           "");
     }
 }
