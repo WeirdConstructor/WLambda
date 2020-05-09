@@ -136,28 +136,24 @@ fn parse_char_class(ps: &mut State) -> Result<VVal, ParseError> {
 fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_ws('(') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('(', "in capture")));
+            ParseErrorKind::UnexpectedToken('(', "in sub pattern")));
     }
 
     let (no_capture, p) =
         if ps.consume_if_eq_ws('{') {
             let ctrl =
-                if let Some(c) = ps.expect_some(ps.peek())? {
-                    match c {
-                        '!' => { ps.consume_ws(); Some(VVal::new_sym("Not") },
-                        '*' => { ps.consume_ws(); Some(VVal::new_sym("N0") },
-                        '+' => { ps.consume_ws(); Some(VVal::new_sym("N1") },
-                        '?' => { ps.consume_ws(); Some(VVal::new_sym("Opt") },
-                        '=' => { ps.consume_ws(); Some(VVal::new_sym("ZwLA") },
-                        _   => None,
-                    }
-                } else {
-                    None
-                }
+                match ps.expect_some(ps.peek())? {
+                    '*' => { ps.consume_ws(); Some(VVal::new_sym("N0")) },
+                    '+' => { ps.consume_ws(); Some(VVal::new_sym("N1")) },
+                    '?' => { ps.consume_ws(); Some(VVal::new_sym("Opt")) },
+                    '!' => { ps.consume_ws(); Some(VVal::new_sym("ZwNegLA")) },
+                    '=' => { ps.consume_ws(); Some(VVal::new_sym("ZwLA")) },
+                    _   => None,
+                };
 
             if !ps.consume_if_eq_ws('}') {
                 return Err(ps.err(
-                    ParseErrorKind::UnexpectedToken('}', "in capture")));
+                    ParseErrorKind::UnexpectedToken('}', "in sub pattern")));
             }
 
             if let Some(ctrl) = ctrl {
@@ -171,7 +167,7 @@ fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
 
     if !ps.consume_if_eq_ws(')') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken(')', "in capture")));
+            ParseErrorKind::UnexpectedToken(')', "in sub pattern")));
     }
 
     if no_capture {
@@ -393,11 +389,97 @@ impl SelectorState {
 pub type PatternNode = Box<dyn Fn(&str, &mut SelectorState) -> (VVal, usize)>;
 pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal)>;
 
+fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> PatternNode {
+    if pat.is_pair() {
+        let sub_type = pat.at(0).expect("proper pattern").to_sym();
+        let sub      = pat.at(1).expect("sub pattern");
+        let sub_pat  = compile_pattern(&sub);
+
+        if sub_type == s2sym("ZwNegLA") {
+            Box::new(move |s: &str, st: &mut SelectorState| {
+                let (m, _) = (*sub_pat)(s, st);
+                if m.b() {
+                    return (VVal::None, 0);
+                }
+
+                if let Some(n) = &next {
+                    (*n)(&s, st)
+                } else {
+                    (VVal::Bol(true), s.len())
+                }
+            })
+
+        } else if sub_type == s2sym("ZwLA") {
+            Box::new(move |s: &str, st: &mut SelectorState| {
+                let (m, len) = (*sub_pat)(s, st);
+                if !m.b() {
+                    return (VVal::None, 0);
+                }
+
+                if let Some(n) = &next {
+                    (*n)(&s, st)
+                } else {
+                    (VVal::Bol(true), s.len())
+                }
+            })
+
+        } else if sub_type == s2sym("N1") {
+            Box::new(move |s: &str, st: &mut SelectorState| {
+                let (m, len) = (*sub_pat)(s, st);
+                println!("N1 MATH [{}] m: {} len: {}", s, m.b(), len);
+                if !m.b() {
+                    return (VVal::None, 0);
+                }
+
+                let mut matched     = true;
+                let mut match_len   = len;
+
+                while matched {
+                    let (m, len) = (*sub_pat)(&s[match_len..], st);
+                    println!("N1 MATH [{}] m: {} len: {}", s, m.b(), len);
+                    matched = m.b();
+                    if matched {
+                        if len == 0 { break; }
+                        match_len += len;
+                    }
+                }
+
+                if let Some(n) = &next {
+                    (*n)(&s[match_len..], st)
+                } else {
+                    (VVal::Bol(true), match_len)
+                }
+            })
+
+        } else {
+            Box::new(move |s: &str, st: &mut SelectorState| {
+                panic!("NOT IMPLEMENTED: {}", sub_type.to_string())
+            })
+        }
+
+    } else {
+        println!("COMPILE SUB PATTERN: [{}]", pat.s());
+        let p = compile_pattern(&pat);
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            let (r, len1) = (*p)(s, st);
+            if !r.b() {
+                return (VVal::None, 0);
+            }
+
+            if let Some(n) = &next {
+                let (r, len2) = (*n)(&s[len1..], st);
+                (r, len1 + len2)
+            } else {
+                (r, len1)
+            }
+        })
+    }
+}
+
 fn compile_pattern(pat: &VVal) -> PatternNode {
-    let pattern = pat.at(0).expect("proper pattern").to_sym();
+    println!("COMPILE PATTERN [{}]", pat.s());
 
     let mut next : Option<PatternNode> = None;
-
     for i in 0..pat.len() {
         let p = pat.at(pat.len() - (i + 1)).expect("pattern item");
 
@@ -477,6 +559,19 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
                     })
                 }));
 
+            } else if pat_pair_type == s2sym("PatSub") {
+                let mn = std::mem::replace(&mut next, None);
+                next = Some(
+                    compile_sub_pattern(
+                        &p.at(1).expect("sub pattern"), false, mn))
+
+            } else if pat_pair_type == s2sym("PatCap") {
+                let mn = std::mem::replace(&mut next, None);
+                // TODO: Make some capture closure, that pushes the captures
+                //       on some capture stack?
+                next = Some(
+                    compile_sub_pattern(
+                        &p.at(1).expect("sub pattern"), true, mn));
 
             } else {
                 next = Some(Box::new(|_s: &str, _st: &mut SelectorState| {
@@ -528,8 +623,8 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
             }));
 
         } else {
-//            panic!("NOT IMPLEMENTED PAT TYP: {}", p.s());
-            next = Some(Box::new(|_s: &str, _st: &mut SelectorState| {
+            next = Some(Box::new(move |_s: &str, _st: &mut SelectorState| {
+                panic!("unimplemented pattern type: {}", p.s());
                 (VVal::None, 0)
             }));
         }
@@ -657,16 +752,18 @@ fn compile_single_pattern(v: &VVal) -> PatternNode {
 mod tests {
     use super::*;
 
-    fn pat(s: &str, st: &str) -> String {
-        match parse_pattern(s) {
+    fn pat(pat: &str, st: &str) -> String {
+        let mut ps = State::new(pat, "<pattern>");
+        ps.skip_ws();
+        match parse_pattern(&mut ps) {
             Ok(v) => {
-                let pn = compile_single_pattern(v);
+                let pn = compile_single_pattern(&v);
                 let mut ss = SelectorState::new();
                 let (r, len) = (*pn)(st, &mut ss);
-                if len == ss.len() {
+                if len == st.len() {
                     r.s()
                 } else {
-                    "-nomatch-"
+                    "-nomatch-".to_string()
                 }
             },
             Err(e) => format!("Error: {}", e),
@@ -735,10 +832,17 @@ mod tests {
 
         assert_eq!(pev("[xy][xy]*/[01]",    &v1), "$[8,9]");
         assert_eq!(pev("[^xy][^xy]/[01]",   &v1), "$[33,44]");
-        assert_eq!(pev("a/[^01]",           &v1), "$[33,44]");
+        assert_eq!(pev("a/[^01]",           &v1), "$[\"F0O\"]");
 
-        assert_eq!(pev("({!}a*)/[01]",      &v1), "");
-        assert_eq!(pev("a/({!}[01])",       &v1), "");
+        assert_eq!(pev("({}ab)/[01]",       &v1), "$[33,44]");
+        assert_eq!(pev("({}x)y({}a)b/[01]", &v1), "$[8,9]");
+        assert_eq!(pev("({!}a)*/[01]",      &v1), "$[8,9]");
+        assert_eq!(pev("a/({!}[01])",       &v1), "$[\"F0O\"]");
+
+        assert_eq!(pev("({=}x)*/[01]",      &v1), "$[8,9]");
+        assert_eq!(pev("({=}ab)*/[01]",     &v1), "$[33,44]");
+        assert_eq!(pev("a({=}b)*/[01]",     &v1), "$[33,44]");
+        assert_eq!(pev("({!}x)*({=}b)/[01]",&v1), "$[33,44]");
 
         assert_eq!(pev("({+}[xy])ab/0",     &v1), "");
         assert_eq!(pev("a({+}b)/0",         &v1), "");
