@@ -390,6 +390,7 @@ pub type PatternNode = Box<dyn Fn(&str, &mut SelectorState) -> (VVal, usize)>;
 pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal)>;
 
 fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> PatternNode {
+    println!("COMP SUB PAT {}", pat.s());
     if pat.is_pair() {
         let sub_type = pat.at(0).expect("proper pattern").to_sym();
         let sub      = pat.at(1).expect("sub pattern");
@@ -426,7 +427,6 @@ fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> 
         } else if sub_type == s2sym("N1") {
             Box::new(move |s: &str, st: &mut SelectorState| {
                 let (m, len) = (*sub_pat)(s, st);
-                println!("N1 MATH [{}] m: {} len: {}", s, m.b(), len);
                 if !m.b() {
                     return (VVal::None, 0);
                 }
@@ -436,7 +436,6 @@ fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> 
 
                 while matched {
                     let (m, len) = (*sub_pat)(&s[match_len..], st);
-                    println!("N1 MATH [{}] m: {} len: {}", s, m.b(), len);
                     matched = m.b();
                     if matched {
                         if len == 0 { break; }
@@ -445,7 +444,12 @@ fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> 
                 }
 
                 if let Some(n) = &next {
-                    (*n)(&s[match_len..], st)
+                    let (m, len) = (*n)(&s[match_len..], st);
+                    if m.b() {
+                        (m, match_len + len)
+                    } else {
+                        (VVal::None, 0)
+                    }
                 } else {
                     (VVal::Bol(true), match_len)
                 }
@@ -494,6 +498,7 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
                 let mn = std::mem::replace(&mut next, None);
                 next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
                     key_str.with_s_ref(|y| {
+                        println!("I: [{}]", s);
                         let y_len = y.len();
 
                         if s.starts_with(y) {
@@ -706,8 +711,8 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
 }
 
 fn compile_selector(sel: &VVal) -> SelNode {
+    println!("***** COM SELECTOR: {}", sel.s());
     if let VVal::Lst(_) = sel {
-        println!("COM SELECTOR: {}", sel.s());
 
         let first = sel.at(0).unwrap_or_else(|| VVal::None);
         if first.to_sym() == s2sym("Path") {
@@ -844,8 +849,8 @@ mod tests {
         assert_eq!(pev("a({=}b)*/[01]",     &v1), "$[33,44]");
         assert_eq!(pev("({!}x)*({=}b)/[01]",&v1), "$[33,44]");
 
-        assert_eq!(pev("({+}[xy])ab/0",     &v1), "");
-        assert_eq!(pev("a({+}b)/0",         &v1), "");
+        assert_eq!(pev("({+}[xy])ab/0",     &v1), "$[8]");
+        assert_eq!(pev("a({+}b)/0",         &v1), "$[33]");
         assert_eq!(pev("({*}[xy])ab/0",     &v1), "");
         assert_eq!(pev("({?}[xy])[xy]ab/0", &v1), "");
     }
