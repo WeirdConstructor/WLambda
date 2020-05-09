@@ -5,40 +5,50 @@ Selector Syntax:
 ```ebnf
 
     class_char  = { ?any character except "]"? }
-                  (* special sequence: "\\" => "\" and "\]" => "]" *)
+                  (* special sequence: "\^" => "^" and "\\" => "\"
+                     and "\]" => "]" *)
                 ;
 
-    ident       = { ?any character except whitespace,
+    ident_char  = { ?any character except whitespace,
                     "!", "?", "/", "\", "|", "^", ",",
                     "'", "&", ":", ";", "$", "(", ")",
                     "{", "}", "[", "]", "*" or "="? }
                   (* allows the usual backslash escaping! *)
                 ;
 
+    ident       = ident_char, { ident_char }
+                ;
+
     index       = digit, { digit }
                 ;
 
-    pat_mod     = "!"           (* matches if sub pattern does not match *)
-                | "*"           (* matches sub pattern 0 or N times *)
-                | "+"           (* matches sub pattern 1 or N times *)
-                | "?"           (* matches sub pattern 0 or 1 times *)
-                | "="           (* zero width lookahead *)
+    pat_regex   = "*", pat_glob_rx (* matches sub pattern 0 or N times *)
+                | "+", pat_glob_rx (* matches sub pattern 1 or N times *)
+                | "?", pat_glob_rx (* matches sub pattern 0 or 1 times *)
+                | "!", pat_glob_rx (* matches (zero width) if next pattern does not match *)
+                | "=", pat_glob_rx (* matches (zero width) if next pattern does match *)
+                | "^"              (* matches (zero width) start of string *)
+                | "$"              (* matches (zero width) end of string *)
                 ;
 
-    modifier    = "{", pat_mod, "}"
+    pat_glob_rx = pat_glob
+                | ident_char
                 ;
 
-    pattern_s   = "*", [ pattern ]
-                | "?", [ pattern ]
+    pat_glob    = "*"           (* 0 or N any characters *)
+                | "?"           (* 0 or 1 any character *)
                 | "[", { class_char }, "]"
                 | "[^", { class_char }, "]"
-                | "(", modifier, pattern, ")"   (* if modifier: no capturing *)
-                | "^"                       (* string start *)
-                | "$"                       (* string end *)
-                | ident, [ pattern ]
+                | "(", "^", pattern, ")"   (* no capturing sub group *)
+                | "(", pattern, ")"   (* capturing sub group *)
+                | "$", pat_regex
                 ;
 
-    pattern     = pattern_s, { "|", pattern_s }
+    pat_s       = pat_glob, { pat_s }
+                | ident
+                ;
+
+    pattern     = pat_s, { "|", pat_s }
                 ;
 
     key         = index | pattern
@@ -58,7 +68,7 @@ Selector Syntax:
     node        = key, [":", ["!"], [ selector ], kv_match]
                 | ":", ["!"], [ selector ], kv_match
                 | "^", node (* marks it for referencing it in the result set *)
-                | "**"
+                | "**"      (* deep expensive recursion *)
                 ;
 
     selector    = node, { "/", node }
@@ -839,20 +849,20 @@ mod tests {
         assert_eq!(pev("[^xy][^xy]/[01]",   &v1), "$[33,44]");
         assert_eq!(pev("a/[^01]",           &v1), "$[\"F0O\"]");
 
-        assert_eq!(pev("({}ab)/[01]",       &v1), "$[33,44]");
-        assert_eq!(pev("({}x)y({}a)b/[01]", &v1), "$[8,9]");
-        assert_eq!(pev("({!}a)*/[01]",      &v1), "$[8,9]");
-        assert_eq!(pev("a/({!}[01])",       &v1), "$[\"F0O\"]");
+        assert_eq!(pev("(ab)/[01]",         &v1), "$[33,44]");
+        assert_eq!(pev("(x)y(a)b/[01]",     &v1), "$[8,9]");
+        assert_eq!(pev("$!(a)*/[01]",       &v1), "$[8,9]");
+        assert_eq!(pev("a/$![01]",          &v1), "$[\"F0O\"]");
 
-        assert_eq!(pev("({=}x)*/[01]",      &v1), "$[8,9]");
-        assert_eq!(pev("({=}ab)*/[01]",     &v1), "$[33,44]");
-        assert_eq!(pev("a({=}b)*/[01]",     &v1), "$[33,44]");
-        assert_eq!(pev("({!}x)*({=}b)/[01]",&v1), "$[33,44]");
+        assert_eq!(pev("$=}x*/[01]",        &v1), "$[8,9]");
+        assert_eq!(pev("$=}(ab)*/[01]",     &v1), "$[33,44]");
+        assert_eq!(pev("a$=b*/[01]",        &v1), "$[33,44]");
+        assert_eq!(pev("$!x*$=b/[01]",      &v1), "$[33,44]");
 
-        assert_eq!(pev("({+}[xy])ab/0",     &v1), "$[8]");
-        assert_eq!(pev("a({+}b)/0",         &v1), "$[33]");
-        assert_eq!(pev("({*}[xy])ab/0",     &v1), "");
-        assert_eq!(pev("({?}[xy])[xy]ab/0", &v1), "");
+        assert_eq!(pev("$+[xy]ab/0",     &v1), "$[8]");
+        assert_eq!(pev("a$+b/0",         &v1), "$[33]");
+        assert_eq!(pev("$*[xy]ab/0",     &v1), "");
+        assert_eq!(pev("$?[xy][xy]ab/0", &v1), "");
     }
 
     #[test]
@@ -920,15 +930,17 @@ mod tests {
 
     #[test]
     fn check_selector_subpat() {
-        assert_eq!(p("({}^abc$)"),              "");
+        assert_eq!(p("(^abc$$)"),               "");
+        assert_eq!(p("(\\^abc$$)"),             "");
 
-        assert_eq!(p("({}abc)"),                "");
-        assert_eq!(p("({!}abc)"),               "");
-        assert_eq!(p("({*}abc)"),               "");
-        assert_eq!(p("({+}abc)"),               "");
-        assert_eq!(p("({?}abc)"),               "");
-        assert_eq!(p("({=}abc)"),               "");
-        assert_eq!(p("(\\{abc)"),               "");
+        assert_eq!(p("(abc)"),                  "");
+        assert_eq!(p("$!(abc)"),                "");
+        assert_eq!(p("$*(abc)"),                "");
+        assert_eq!(p("$+(abc)"),                "");
+        assert_eq!(p("$?(abc)"),                "");
+        assert_eq!(p("$=(abc)"),                "");
+        assert_eq!(p("$^abc$$"),                "");
+        assert_eq!(p("(\\$abc)"),               "");
     }
 
     #[test]
@@ -936,7 +948,7 @@ mod tests {
         assert_eq!(pat("^A(B)C$",           "ABC"),         "B");
         assert_eq!(pat("(BC)",              "ABC"),         "BC");
         assert_eq!(pat("^[ ]$",             " "),           "BC");
-        assert_eq!(pat("^({*}[ ])$",        "   "),         "BC");
+        assert_eq!(pat("^$*[ ]$",        "   "),         "BC");
         assert_eq!(pat("[\\t\\0\\u0101]",   "\0"),          "");
         assert_eq!(pat("[\\t\\0\\u0101]",   "\t"),          "");
         assert_eq!(pat("[\\t\\0\\u0101]",   "ā"),           "");
