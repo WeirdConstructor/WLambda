@@ -3,6 +3,10 @@ Selector Syntax:
 
 
 ```ebnf
+    (* NOTE: Whitespace is not part of a pattern in most places. This means
+             if you want to match whitespace, you will have to escape
+             it either with a '\', with a [ ] character class or match
+             one whitespace char with $s. *)
 
     class_char  = { ?any character except "]"? }
                   (* special sequence: "\^" => "^" and "\\" => "\"
@@ -22,33 +26,43 @@ Selector Syntax:
     index       = digit, { digit }
                 ;
 
-    pat_regex   = "*", pat_glob_rx (* matches sub pattern 0 or N times *)
-                | "+", pat_glob_rx (* matches sub pattern 1 or N times *)
-                | "?", pat_glob_rx (* matches sub pattern 0 or 1 times *)
-                | "!", pat_glob_rx (* matches (zero width) if next pattern does not match *)
-                | "=", pat_glob_rx (* matches (zero width) if next pattern does match *)
-                | "^"              (* matches (zero width) start of string *)
-                | "$"              (* matches (zero width) end of string *)
-                ;
-
-    pat_glob_rx = pat_glob
+    rx_atom     = pat_glob
                 | ident_char
                 ;
 
-    pat_glob    = "*"           (* 0 or N any characters *)
-                | "?"           (* 0 or 1 any character *)
-                | "[", { class_char }, "]"
-                | "[^", { class_char }, "]"
-                | "(", "^", pattern, ")"   (* no capturing sub group *)
-                | "(", pattern, ")"   (* capturing sub group *)
-                | "$", pat_regex
-                ;
-
-    pat_s       = pat_glob, { pat_s }
+    glob_atom   = pat_glob
                 | ident
                 ;
 
-    pattern     = pat_s, { "|", pat_s }
+    pat_regex   = "*", rx_atom     (* matches sub pattern 0 or N times *)
+                | "+", rx_atom     (* matches sub pattern 1 or N times *)
+                | "?", rx_atom     (* matches sub pattern 0 or 1 times *)
+                | "!", rx_atom     (* matches (zero width) if next pattern does not match *)
+                | "=", rx_atom     (* matches (zero width) if next pattern does match *)
+                | "^"              (* matches (zero width) start of string *)
+                | "$"              (* matches (zero width) end of string *)
+                | "s"              (* matches one whitespace character *)
+                ;
+
+    glob_group  = "(", "^", pattern, ")"    (* capturing sub group *)
+                | "(", pattern, ")"         (* sub group *)
+                ;
+
+    glob_cclass = "[", { class_char }, "]"  (* character class match for 1 char *)
+                | "[^", { class_char }, "]" (* negated character class match for 1 char *)
+                ;
+
+    pat_glob    = "*"                       (* 0 or N any characters *)
+                | "?"                       (* any character *)
+                | "$", pat_regex
+                | glob_cclass
+                | glob_group
+                ;
+
+    pat_branch  = { glob_atom }
+                ;
+
+    pattern     = pat_branch, { "|", pat_branch }
                 ;
 
     key         = index | pattern
@@ -86,16 +100,18 @@ pub use crate::parser::state::{ParseValueError, ParseNumberError, ParseError, Pa
 
 use crate::str_int::s2sym;
 
+fn is_ident_char(c: char) -> bool {
+    match c {
+          '!' | '?' | '/' | '\\' | '|' | '{' | '}'
+        | '[' | ']' | '(' | ')' | '\'' | '^'
+        | '&' | '$' | ':' | ';' | '*' | '=' | ','
+               => false,
+           _   => !c.is_whitespace(),
+    }
+}
 
 fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
-    let uh = ps.take_while(|c|
-        match c {
-           '!' | '?' | '/' | '\\' | '|' | '{' | '}'
-         | '[' | ']' | '(' | ')' | '\'' | '^'
-         | '&' | '$' | ':' | ';' | '*' | '=' | ','
-                => false,
-            _   => !c.is_whitespace()
-    });
+    let uh = ps.take_while(|c| is_ident_char(c));
 
     let r =
         VVal::pair(
@@ -107,7 +123,26 @@ fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(r)
 }
 
-fn parse_char_class(ps: &mut State) -> Result<VVal, ParseError> {
+fn parse_ident_char(ps: &mut State) -> Result<VVal, ParseError> {
+    let uh = ps.take_while(|c| is_ident_char(c));
+    let c = ps.expect_some(ps.peek())?;
+    if !is_ident_char(c) {
+        return Err(ps.err(
+            ParseErrorKind::UnexpectedToken(c, "Expected identifier character")));
+    }
+
+    let mut b = [0; 4];
+    let r =
+        VVal::pair(
+            VVal::new_sym("I"),
+            VVal::new_sym(c.encode_utf8(&mut b)));
+
+    ps.skip_ws();
+
+    Ok(r)
+}
+
+fn parse_glob_cclass(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq('[') {
         return Err(ps.err(
             ParseErrorKind::UnexpectedToken('[', "in char class")));
@@ -143,86 +178,106 @@ fn parse_char_class(ps: &mut State) -> Result<VVal, ParseError> {
         VVal::new_str_mv(chars)))
 }
 
-fn parse_capture(ps: &mut State) -> Result<VVal, ParseError> {
+fn parse_pat_regex(ps: &mut State) -> Result<VVal, ParseError> {
+    let c = ps.expect_some(ps.peek())?;
+    match c {
+        '*' => {
+            ps.consume_ws();
+            Ok(VVal::pair(VVal::new_sym("N0"), parse_rx_atom(ps)?))
+        },
+        '+' => {
+            ps.consume_ws();
+            Ok(VVal::pair(VVal::new_sym("N1"), parse_rx_atom(ps)?))
+        },
+        '?' => {
+            ps.consume_ws();
+            Ok(VVal::pair(VVal::new_sym("Opt"), parse_rx_atom(ps)?))
+        },
+        '!' => {
+            ps.consume_ws();
+            Ok(VVal::pair(VVal::new_sym("ZwNegLA"), parse_rx_atom(ps)?))
+        },
+        '=' => {
+            ps.consume_ws();
+            Ok(VVal::pair(VVal::new_sym("ZwLA"), parse_rx_atom(ps)?))
+        },
+        '^' => { ps.consume_ws(); Ok(VVal::new_sym("Start")) },
+        '$' => { ps.consume_ws(); Ok(VVal::new_sym("End")) },
+        's' => { ps.consume_ws(); Ok(VVal::new_sym("WsChar")) },
+        'S' => { ps.consume_ws(); Ok(VVal::new_sym("NWsChar")) },
+        _ =>
+            Err(ps.err(
+                ParseErrorKind::UnexpectedToken(c, "in glob pattern"))),
+    }
+}
+
+fn parse_glob_group(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_ws('(') {
         return Err(ps.err(
             ParseErrorKind::UnexpectedToken('(', "in sub pattern")));
     }
 
-    let (no_capture, p) =
-        if ps.consume_if_eq_ws('{') {
-            let ctrl =
-                match ps.expect_some(ps.peek())? {
-                    '*' => { ps.consume_ws(); Some(VVal::new_sym("N0")) },
-                    '+' => { ps.consume_ws(); Some(VVal::new_sym("N1")) },
-                    '?' => { ps.consume_ws(); Some(VVal::new_sym("Opt")) },
-                    '!' => { ps.consume_ws(); Some(VVal::new_sym("ZwNegLA")) },
-                    '=' => { ps.consume_ws(); Some(VVal::new_sym("ZwLA")) },
-                    _   => None,
-                };
-
-            if !ps.consume_if_eq_ws('}') {
-                return Err(ps.err(
-                    ParseErrorKind::UnexpectedToken('}', "in sub pattern")));
-            }
-
-            if let Some(ctrl) = ctrl {
-                (true, VVal::pair(ctrl, parse_pattern(ps)?))
-            } else {
-                (true, parse_pattern(ps)?)
-            }
-        } else {
-            (false, parse_pattern(ps)?)
-        };
+    let capture = ps.consume_if_eq_ws('^');
+    let p       = parse_pattern(ps)?;
 
     if !ps.consume_if_eq_ws(')') {
         return Err(ps.err(
             ParseErrorKind::UnexpectedToken(')', "in sub pattern")));
     }
 
-    if no_capture {
-        Ok(VVal::pair(VVal::new_sym("PatSub"), p))
-    } else {
+    if capture {
         Ok(VVal::pair(VVal::new_sym("PatCap"), p))
+    } else {
+        Ok(VVal::pair(VVal::new_sym("PatSub"), p))
     }
 }
 
-fn parse_pattern_s(ps: &mut State) -> Result<VVal, ParseError> {
-    let pat = VVal::vec();
+fn parse_pat_glob(ps: &mut State) -> Result<VVal, ParseError> {
+    let c = ps.expect_some(ps.peek())?;
+    match c {
+        '*' => { ps.consume_ws(); Ok(VVal::new_sym("Glob")) },
+        '?' => { ps.consume_ws(); Ok(VVal::new_sym("Any")) },
+        '$' => { ps.consume_ws(); parse_pat_regex(ps) },
+        '[' => parse_glob_cclass(ps),
+        '(' => parse_glob_group(ps),
+        _ =>
+            Err(ps.err(
+                ParseErrorKind::UnexpectedToken(c, "in glob pattern"))),
+    }
+}
 
-    while !ps.at_end() && !ps.lookahead_one_of("'&:^;$)]}=/|,") {
-        let element =
-            match ps.expect_some(ps.peek())? {
-                '*' => { ps.consume_ws(); VVal::new_sym("Glob") },
-                '?' => { ps.consume_ws(); VVal::new_sym("Any") },
-                '^' => { ps.consume_ws(); VVal::new_sym("Start") },
-                '$' => { ps.consume_ws(); VVal::new_sym("End") },
-                '[' => parse_char_class(ps)?,
-                '(' => parse_capture(ps)?,
-                '\\' => {
-                    ps.consume();
-                    let next = ps.expect_some(ps.peek())?;
-                    ps.consume_ws();
-                    let mut b = [0; 4];
-                    VVal::pair(
-                        VVal::new_sym("I"),
-                        VVal::new_sym(next.encode_utf8(&mut b)))
-                },
-                _   => parse_ident(ps)?
-            };
+fn parse_rx_atom(ps: &mut State) ->  Result<VVal, ParseError> {
+    match ps.expect_some(ps.peek())? {
+        '*' | '?' | '[' | '(' | '$'
+            => parse_pat_glob(ps),
+        _   => parse_ident_char(ps)
+    }
+}
 
-        pat.push(element);
+fn parse_glob_atom(ps: &mut State) ->  Result<VVal, ParseError> {
+    match ps.expect_some(ps.peek())? {
+        '*' | '?' | '[' | '(' | '$'
+            => parse_pat_glob(ps),
+        _   => parse_ident(ps)
+    }
+}
+
+fn parse_pat_branch(ps: &mut State) -> Result<VVal, ParseError> {
+    let pat_branch = VVal::vec();
+
+    while !ps.at_end() && !ps.lookahead_one_of("|:&=)]}") {
+        pat_branch.push(parse_glob_atom(ps)?);
     }
 
-    Ok(pat)
+    Ok(pat_branch)
 }
 
 fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
-    let mut pat = parse_pattern_s(ps)?;
+    let mut pat = parse_pat_branch(ps)?;
 
     let mut append = false;
     while ps.consume_if_eq_ws('|') {
-        let next_opt_pat = parse_pattern_s(ps)?;
+        let next_opt_pat = parse_pat_branch(ps)?;
 
         if append {
             pat.push(next_opt_pat);
