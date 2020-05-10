@@ -113,6 +113,13 @@ fn is_ident_char(c: char) -> bool {
 fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
     let uh = ps.take_while(|c| is_ident_char(c));
 
+    if uh.len() == 0 {
+        return Err(ps.err(
+            ParseErrorKind::UnexpectedToken(
+                ps.peek().unwrap_or(' '),
+                "Expected identifier character")));
+    }
+
     let r =
         VVal::pair(
             VVal::new_sym("I"),
@@ -265,7 +272,8 @@ fn parse_glob_atom(ps: &mut State) ->  Result<VVal, ParseError> {
 fn parse_pat_branch(ps: &mut State) -> Result<VVal, ParseError> {
     let pat_branch = VVal::vec();
 
-    while !ps.at_end() && !ps.lookahead_one_of("|:&=)]}") {
+    while !ps.at_end() && !ps.lookahead_one_of("|:&=)]}/,") {
+        println!("GO {}", ps.rest().to_string());
         pat_branch.push(parse_glob_atom(ps)?);
     }
 
@@ -426,6 +434,7 @@ fn parse_selector_pattern(ps: &mut State) -> Result<VVal, ParseError> {
     selector.push(node);
 
     while ps.consume_if_eq_ws('/') {
+        println!("PARSE NODE: {}", ps.rest().to_string());
         let node = parse_node(ps)?;
         selector.push(node);
     }
@@ -860,91 +869,91 @@ mod tests {
         capts.s()
     }
 
-    #[test]
-    fn check_selector_match_path() {
-        let v1 =
-            VVal::map3("a",
-                VVal::vec3(
-                    VVal::Int(20),
-                    VVal::pair(VVal::Int(2), VVal::Int(4)),
-                    VVal::new_str("F0O")),
-                "ab",
-                VVal::vec2(
-                    VVal::Int(33),
-                    VVal::Int(44)),
-                "xyab",
-                VVal::vec3(
-                    VVal::Int(8),
-                    VVal::Int(9),
-                    VVal::map2("X", VVal::Int(10), "Y", VVal::Int(20))));
-
-        assert_eq!(pev("a",         &v1), "$[$[20,$p(2,4),\"F0O\"]]");
-        assert_eq!(pev("a/2/2",     &v1), "$[\"O\"]");
-        assert_eq!(pev("a/2/1",     &v1), "$[\"0\"]");
-        assert_eq!(pev("ab/0",      &v1), "$[33]");
-
-        assert_eq!(pev("a/?",       &v1), "$[20,$p(2,4),\"F0O\"]");
-        assert_eq!(pev("a/?/1",     &v1), "$[4,\"0\"]");
-
-        assert_eq!(pev("?/1",       &v1), "$[$p(2,4)]");
-        assert_eq!(pev("?/2",       &v1), "$[\"F0O\"]");
-
-        assert_eq!(pev("?b/1",      &v1), "$[44]");
-        assert_eq!(pev("a?/1",      &v1), "$[44]");
-        assert_eq!(pev("??ab/1",    &v1), "$[9]");
-
-        assert_eq!(pev("*/X",       &v1), "$[]");
-        assert_eq!(pev("*/?/X",     &v1), "$[10]");
-        assert_eq!(pev("*/*/X",     &v1), "$[10]");
-        assert_eq!(pev("*/2/2",     &v1), "$[\"O\"]");
-
-        assert_eq!(pev("*ab/*/X",   &v1), "$[10]");
-
-        assert_eq!(pev("[xy][xy]*/[01]",    &v1), "$[8,9]");
-        assert_eq!(pev("[^xy][^xy]/[01]",   &v1), "$[33,44]");
-        assert_eq!(pev("a/[^01]",           &v1), "$[\"F0O\"]");
-
-        assert_eq!(pev("(ab)/[01]",         &v1), "$[33,44]");
-        assert_eq!(pev("(x)y(a)b/[01]",     &v1), "$[8,9]");
-        assert_eq!(pev("$!(a)*/[01]",       &v1), "$[8,9]");
-        assert_eq!(pev("a/$![01]",          &v1), "$[\"F0O\"]");
-
-        assert_eq!(pev("$=}x*/[01]",        &v1), "$[8,9]");
-        assert_eq!(pev("$=}(ab)*/[01]",     &v1), "$[33,44]");
-        assert_eq!(pev("a$=b*/[01]",        &v1), "$[33,44]");
-        assert_eq!(pev("$!x*$=b/[01]",      &v1), "$[33,44]");
-
-        assert_eq!(pev("$+[xy]ab/0",     &v1), "$[8]");
-        assert_eq!(pev("a$+b/0",         &v1), "$[33]");
-        assert_eq!(pev("$*[xy]ab/0",     &v1), "");
-        assert_eq!(pev("$?[xy][xy]ab/0", &v1), "");
-    }
-
-    #[test]
-    fn check_selector_match_esc() {
-        let v1 =
-            VVal::map3("\\",
-                VVal::vec3(
-                    VVal::Int(20),
-                    VVal::pair(VVal::Int(2), VVal::Int(4)),
-                    VVal::new_str("F0O%/{}[]")),
-                "//",
-                VVal::vec2(
-                    VVal::Int(33),
-                    VVal::Int(44)),
-                "?*",
-                VVal::vec3(
-                    VVal::Int(8),
-                    VVal::Int(9),
-                    VVal::map2("*", VVal::Int(10), "|", VVal::Int(20))));
-
-        assert_eq!(pev("*/*/\\*", &v1),     "$[10]");
-        assert_eq!(pev("*/*/\\|", &v1),     "$[20]");
-
-        assert_eq!(pev("[\\\\]*/1", &v1),   "$[$p(2,4)]");
-        assert_eq!(pev("[\\/]*/0", &v1),    "$[33]");
-        assert_eq!(pev("\\/\\//0", &v1),    "$[33]");
-    }
+//    #[test]
+//    fn check_selector_match_path() {
+//        let v1 =
+//            VVal::map3("a",
+//                VVal::vec3(
+//                    VVal::Int(20),
+//                    VVal::pair(VVal::Int(2), VVal::Int(4)),
+//                    VVal::new_str("F0O")),
+//                "ab",
+//                VVal::vec2(
+//                    VVal::Int(33),
+//                    VVal::Int(44)),
+//                "xyab",
+//                VVal::vec3(
+//                    VVal::Int(8),
+//                    VVal::Int(9),
+//                    VVal::map2("X", VVal::Int(10), "Y", VVal::Int(20))));
+//
+//        assert_eq!(pev("a",         &v1), "$[$[20,$p(2,4),\"F0O\"]]");
+//        assert_eq!(pev("a/2/2",     &v1), "$[\"O\"]");
+//        assert_eq!(pev("a/2/1",     &v1), "$[\"0\"]");
+//        assert_eq!(pev("ab/0",      &v1), "$[33]");
+//
+//        assert_eq!(pev("a/?",       &v1), "$[20,$p(2,4),\"F0O\"]");
+//        assert_eq!(pev("a/?/1",     &v1), "$[4,\"0\"]");
+//
+//        assert_eq!(pev("?/1",       &v1), "$[$p(2,4)]");
+//        assert_eq!(pev("?/2",       &v1), "$[\"F0O\"]");
+//
+//        assert_eq!(pev("?b/1",      &v1), "$[44]");
+//        assert_eq!(pev("a?/1",      &v1), "$[44]");
+//        assert_eq!(pev("??ab/1",    &v1), "$[9]");
+//
+//        assert_eq!(pev("*/X",       &v1), "$[]");
+//        assert_eq!(pev("*/?/X",     &v1), "$[10]");
+//        assert_eq!(pev("*/*/X",     &v1), "$[10]");
+//        assert_eq!(pev("*/2/2",     &v1), "$[\"O\"]");
+//
+//        assert_eq!(pev("*ab/*/X",   &v1), "$[10]");
+//
+//        assert_eq!(pev("[xy][xy]*/[01]",    &v1), "$[8,9]");
+//        assert_eq!(pev("[^xy][^xy]/[01]",   &v1), "$[33,44]");
+//        assert_eq!(pev("a/[^01]",           &v1), "$[\"F0O\"]");
+//
+//        assert_eq!(pev("(ab)/[01]",         &v1), "$[33,44]");
+//        assert_eq!(pev("(x)y(a)b/[01]",     &v1), "$[8,9]");
+//        assert_eq!(pev("$!(a)*/[01]",       &v1), "$[8,9]");
+//        assert_eq!(pev("a/$![01]",          &v1), "$[\"F0O\"]");
+//
+//        assert_eq!(pev("$=}x*/[01]",        &v1), "$[8,9]");
+//        assert_eq!(pev("$=}(ab)*/[01]",     &v1), "$[33,44]");
+//        assert_eq!(pev("a$=b*/[01]",        &v1), "$[33,44]");
+//        assert_eq!(pev("$!x*$=b/[01]",      &v1), "$[33,44]");
+//
+//        assert_eq!(pev("$+[xy]ab/0",     &v1), "$[8]");
+//        assert_eq!(pev("a$+b/0",         &v1), "$[33]");
+//        assert_eq!(pev("$*[xy]ab/0",     &v1), "");
+//        assert_eq!(pev("$?[xy][xy]ab/0", &v1), "");
+//    }
+//
+//    #[test]
+//    fn check_selector_match_esc() {
+//        let v1 =
+//            VVal::map3("\\",
+//                VVal::vec3(
+//                    VVal::Int(20),
+//                    VVal::pair(VVal::Int(2), VVal::Int(4)),
+//                    VVal::new_str("F0O%/{}[]")),
+//                "//",
+//                VVal::vec2(
+//                    VVal::Int(33),
+//                    VVal::Int(44)),
+//                "?*",
+//                VVal::vec3(
+//                    VVal::Int(8),
+//                    VVal::Int(9),
+//                    VVal::map2("*", VVal::Int(10), "|", VVal::Int(20))));
+//
+//        assert_eq!(pev("*/*/\\*", &v1),     "$[10]");
+//        assert_eq!(pev("*/*/\\|", &v1),     "$[20]");
+//
+//        assert_eq!(pev("[\\\\]*/1", &v1),   "$[$p(2,4)]");
+//        assert_eq!(pev("[\\/]*/0", &v1),    "$[33]");
+//        assert_eq!(pev("\\/\\//0", &v1),    "$[33]");
+//    }
 
     #[test]
     fn check_selector_node_path() {
@@ -977,8 +986,8 @@ mod tests {
     fn check_selector_kvmatch() {
         assert_eq!(p(":{b=a,a=20}"),                                "$[:Path,$[:NKVM,$[:KV,$[$[$p(:I,:b)],$[$p(:I,:a)]],$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
         assert_eq!(p("a : { a = 20 }"),                             "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
-        assert_eq!(p("a : { a = 20, b=a(a?)[^ABC]cc*f}"),           "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatCap,$[$p(:I,:a),:Any]),$p(:NCCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
-        assert_eq!(p("a : { a = 20, b=a(a?)[ABC]cc*f}"),            "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatCap,$[$p(:I,:a),:Any]),$p(:CCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
+        assert_eq!(p("a : { a = 20, b=a(a?)[^ABC]cc*f}"),           "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatSub,$[$p(:I,:a),:Any]),$p(:NCCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
+        assert_eq!(p("a : { a = 20, b=a(a?)[ABC]cc*f}"),            "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatSub,$[$p(:I,:a),:Any]),$p(:CCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
         assert_eq!(p("a : { a = 20 } | { b = 20 }"),                "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]]]]]");
         assert_eq!(p("a : { a = 20 } | { b = 20 } & { x = 10}"),    "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]]]]]");
     }
@@ -1000,10 +1009,10 @@ mod tests {
 
     #[test]
     fn check_patterns() {
-        assert_eq!(pat("^A(B)C$",           "ABC"),         "B");
-        assert_eq!(pat("(BC)",              "ABC"),         "BC");
-        assert_eq!(pat("^[ ]$",             " "),           "BC");
-        assert_eq!(pat("^$*[ ]$",        "   "),         "BC");
+        assert_eq!(pat("$^A(B)C$$",             "ABC"),         "B");
+        assert_eq!(pat("(BC)",                  "ABC"),         "BC");
+        assert_eq!(pat("$^[ ]$$",               " "),           "BC");
+        assert_eq!(pat("$^$*[ ]$$",             "   "),         "BC");
         assert_eq!(pat("[\\t\\0\\u0101]",   "\0"),          "");
         assert_eq!(pat("[\\t\\0\\u0101]",   "\t"),          "");
         assert_eq!(pat("[\\t\\0\\u0101]",   "ā"),           "");
