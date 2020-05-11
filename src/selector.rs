@@ -743,11 +743,7 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
         }
     }
 
-    if let Some(n) = next {
-        n
-    } else {
-        Box::new(|_s: &str, _st: &mut SelectorState| { (VVal::None, 0) })
-    }
+    next.unwrap()
 }
 
 fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
