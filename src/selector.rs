@@ -456,6 +456,7 @@ fn parse_selector(s: &str) -> Result<VVal, String> {
     parse_selector_pattern(&mut ps).map_err(|e| format!("{}", e))
 }
 
+#[derive(Debug, Clone)]
 pub struct SelectorState {
     orig_string_len: usize,
     captures:        Vec<(usize, usize)>,
@@ -498,249 +499,282 @@ struct StrSlice<'a> {
 pub type PatternNode = Box<dyn Fn(&str, &mut SelectorState) -> (VVal, usize)>;
 pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal)>;
 
-fn compile_sub_pattern(pat: &VVal, capture: bool, next: PatternNode) -> PatternNode {
-    println!("COMP SUB PAT {}", pat.s());
-    if pat.is_pair() {
-        let sub_type    = pat.at(0).expect("proper pattern").to_sym();
-        let sub         = pat.at(1).expect("sub pattern");
-        let mut sub_pat = compile_pattern(&sub);
-
+//fn compile_sub_pattern(pat: &VVal, capture: bool, mut next: PatternNode) -> PatternNode {
+//    println!("COMP SUB PAT {}", pat.s());
+//
+//    if capture {
+//        next =
+//            Box::new(move |s: &str, st: &mut SelectorState| {
+//                let ret = (*next)(s, st);
+//                st.pop_capture();
+//                ret
+//            });
+//    }
+//
+//    if pat.is_pair() {
+//        let sub_type    = pat.at(0).expect("proper pattern").to_sym();
+//        let sub         = pat.at(1).expect("sub pattern");
+//        let mut sub_pat = compile_pattern_branch(&sub);
+//
 //        if capture {
 //            sub_pat =
 //                Box::new(move |s: &str, st: &mut SelectorState| {
-//                    let (m, l) = 
-//                    st.push_capture(s, 
+//                    let (m, l) = (*sub_pat)(s, st);
+//                    st.push_capture(s, l);
 //                    (m, l)
 //                });
 //        }
+//
+//
+//        } else {
+//            Box::new(move |s: &str, st: &mut SelectorState| {
+//                panic!("NOT IMPLEMENTED: {}", sub_type.to_string())
+//            })
+//        }
+//
+//    } else {
+//
+//        println!("COMPILE SUB PATTERN: [{}]", pat.s());
+//        let mut p = compile_pattern_branch(&pat);
+//
+//        if capture {
+//            p =
+//                Box::new(move |s: &str, st: &mut SelectorState| {
+//                    let (m, l) = (*p)(s, st);
+//                    st.push_capture(s, l);
+//                    (m, l)
+//                });
+//        }
+//
+//        Box::new(move |s: &str, st: &mut SelectorState| {
+//            let (r, len1) = (*p)(s, st);
+//            if !r.b() {
+//                return (VVal::None, 0);
+//            }
+//
+//            let (r, len2) = (*next)(&s[len1..], st);
+//            (r, len1 + len2)
+//        })
+//    }
+//}
 
-        if sub_type == s2sym("ZwNegLA") {
-            Box::new(move |s: &str, st: &mut SelectorState| {
-                let (m, _) = (*sub_pat)(s, st);
-                if m.b() {
-                    return (VVal::None, 0);
-                }
+fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
+    let pair_type = p.at(0).unwrap().to_sym();
+    let pair_val  = p.at(1).unwrap_or_else(|| VVal::None);
 
-                (*next)(&s, st)
-            })
+    if pair_type == s2sym("I") {
+        let key_str = pair_val.clone();
 
-        } else if sub_type == s2sym("ZwLA") {
-            Box::new(move |s: &str, st: &mut SelectorState| {
-                let (m, len) = (*sub_pat)(s, st);
-                if !m.b() {
-                    return (VVal::None, 0);
-                }
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            key_str.with_s_ref(|y| {
+                println!("I: [{}]", s);
+                let y_len = y.len();
 
-                (*next)(&s, st)
-            })
-
-        } else if sub_type == s2sym("N1") {
-            Box::new(move |s: &str, st: &mut SelectorState| {
-                let (m, len) = (*sub_pat)(s, st);
-                if !m.b() {
-                    return (VVal::None, 0);
-                }
-
-                let mut matched     = true;
-                let mut match_len   = len;
-
-                while matched {
-                    let (m, len) = (*sub_pat)(&s[match_len..], st);
-                    matched = m.b();
-                    if matched {
-                        if len == 0 { break; }
-                        match_len += len;
-                    }
-                }
-
-                let (m, len) = (*next)(&s[match_len..], st);
-                if m.b() {
-                    (m, match_len + len)
+                if s.starts_with(y) {
+                    let (m, len) = (*next)(&s[y_len..], st);
+                    (m, y_len + len)
                 } else {
                     (VVal::None, 0)
                 }
             })
+        })
 
-        } else {
-            Box::new(move |s: &str, st: &mut SelectorState| {
-                panic!("NOT IMPLEMENTED: {}", sub_type.to_string())
-            })
-        }
+    } else if pair_type == s2sym("CCls") {
+        let chars = pair_val.clone();
 
-    } else {
-        println!("COMPILE SUB PATTERN: [{}]", pat.s());
-        let p = compile_pattern(&pat);
         Box::new(move |s: &str, st: &mut SelectorState| {
-            let (r, len1) = (*p)(s, st);
-            if !r.b() {
+            chars.with_s_ref(|chrs| {
+                if let Some(c) = s.chars().nth(0) {
+                    let c_len = c.len_utf8();
+
+                    for mc in chrs.chars() {
+                        if c == mc {
+                            let (m, len) = (*next)(&s[c_len..], st);
+                            return (m, c_len + len);
+                        }
+                    }
+                }
+
+                (VVal::None, 0)
+            })
+        })
+
+    } else if pair_type == s2sym("NCCls") {
+        let chars = pair_val.clone();
+
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            chars.with_s_ref(|chrs| {
+                if let Some(c) = s.chars().nth(0) {
+                    for mc in chrs.chars() {
+                        if c == mc {
+                            return (VVal::None, 0);
+                        }
+                    }
+
+                    let c_len = c.len_utf8();
+
+                    let (m, len) = (*next)(&s[c_len..], st);
+                    (m, c_len + len)
+                } else {
+                    (VVal::None, 0)
+                }
+            })
+        })
+
+    } else if pair_type == s2sym("PatSub") {
+        let sub = compile_pattern_branch(&pair_val); //, false, next);
+
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            let (m, l) = (*sub)(s, st);
+            if m.b() {
+                let (m2, l2) = (*next)(&s[l..], st);
+                (m2, l + l2)
+            } else {
+                (VVal::None, 0)
+            }
+        })
+//        next = compile_pattern_branch(&pair_val, false, next);
+
+    } else if pair_type == s2sym("PatCap") {
+        let sub = compile_pattern_branch(&pair_val); //, true, next);
+        // TODO: Arrange capturing!
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            let (m, l) = (*sub)(s, st);
+            if m.b() {
+                let (m2, l2) = (*next)(&s[l..], st);
+                (m2, l + l2)
+            } else {
+                (VVal::None, 0)
+            }
+        })
+//        next = compile_pattern_branch(&pair_val, true, next);
+
+    } else if pair_type == s2sym("ZwNegLA") {
+        let mut sub_pat = compile_atom(&pair_val);
+
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            let (m, _) = (*sub_pat)(s, st);
+            if m.b() {
                 return (VVal::None, 0);
             }
 
-            let (r, len2) = (*next)(&s[len1..], st);
-            (r, len1 + len2)
+            (*next)(&s, st)
         })
+
+    } else if pair_type == s2sym("ZwLA") {
+        let mut sub_pat = compile_atom(&pair_val);
+
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            let (m, len) = (*sub_pat)(s, st);
+            if !m.b() {
+                return (VVal::None, 0);
+            }
+
+            (*next)(&s, st)
+        })
+
+    } else if pair_type == s2sym("N1") {
+        let mut sub_pat = compile_atom(&pair_val);
+
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            let (m, len) = (*sub_pat)(s, st);
+            if !m.b() {
+                return (VVal::None, 0);
+            }
+
+            let mut matched     = true;
+            let mut match_len   = len;
+
+            while matched {
+                let (m, len) = (*sub_pat)(&s[match_len..], st);
+                matched = m.b();
+                if matched {
+                    if len == 0 { break; }
+                    match_len += len;
+                }
+            }
+
+            let (m, len) = (*next)(&s[match_len..], st);
+            if m.b() {
+                (m, match_len + len)
+            } else {
+                (VVal::None, 0)
+            }
+        })
+
+    } else if p.to_sym() == s2sym("Any") {
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            if let Some(c) = s.chars().nth(0) {
+                let c_len = c.len_utf8();
+
+                let (m, len) = (*next)(&s[c_len..], st);
+                (m, c_len + len)
+            } else {
+                (VVal::None, 0)
+            }
+        });
+
+    } else if p.to_sym() == s2sym("Glob") {
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            let s_len = s.len();
+            let mut c_try_len = s_len;
+            while c_try_len > 0 {
+                c_try_len -= 1;
+                while c_try_len > 0 && !s.is_char_boundary(c_try_len) {
+                    c_try_len -= 1;
+                }
+
+                let (m, len) = (*next)(&s[c_try_len..], st);
+                if m.b() {
+                    return (m, c_try_len + len);
+                }
+            }
+
+            (VVal::None, 0)
+        });
+
+    } else if p.to_sym() == s2sym("Start") {
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            if st.is_str_start(s) {
+                let (m, len) = (*next)(&s[..], st);
+                (m, len)
+            } else {
+                (VVal::None, 0)
+            }
+        });
+
+    } else if p.to_sym() == s2sym("End") {
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            if s.len() == 0 {
+                let (m, len) = (*next)(&s[..], st);
+                (m, len)
+            } else {
+                (VVal::None, 0)
+            }
+        });
+
+    } else {
+        panic!("UNKNOWN ATOM: {}", p.s());
     }
 }
 
-fn compile_pattern(pat: &VVal) -> PatternNode {
+fn compile_pattern_branch(pat: &VVal) -> PatternNode {
     println!("COMPILE PATTERN [{}]", pat.s());
 
     let mut next : Option<PatternNode> =
         Some(Box::new(move |s: &str, st: &mut SelectorState| {
-            println!("LEAF PATTERN MATCH {}", s);
+            // TODO: Needs to be done by the caller of compile_pattern_branch!
+            //       And passed like usual as continuation.
+            println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
             (VVal::Bol(true), 0)
         }));
 
     for i in 0..pat.len() {
         let p = pat.at(pat.len() - (i + 1)).expect("pattern item");
-
         println!("PAT COMP: {}", p.s());
 
-        if p.is_pair() {
-            let pat_pair_type = p.at(0).unwrap().to_sym();
-
-            if pat_pair_type == s2sym("I") {
-                let key_str = p.at(1).unwrap().clone();
-
-                let my_next = std::mem::replace(&mut next, None);
-                next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-                    key_str.with_s_ref(|y| {
-                        println!("I: [{}]", s);
-                        let y_len = y.len();
-
-                        if s.starts_with(y) {
-                            let (m, len) = (my_next.as_ref().unwrap())(&s[y_len..], st);
-                            (m, y_len + len)
-                        } else {
-                            (VVal::None, 0)
-                        }
-                    })
-                }));
-            } else if pat_pair_type == s2sym("CCls") {
-                let chars = p.at(1).unwrap().clone();
-
-                let my_next = std::mem::replace(&mut next, None);
-                next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-                    chars.with_s_ref(|chrs| {
-                        if let Some(c) = s.chars().nth(0) {
-                            let c_len = c.len_utf8();
-
-                            for mc in chrs.chars() {
-                                if c == mc {
-                                    let (m, len) = (my_next.as_ref().unwrap())(&s[c_len..], st);
-                                    return (m, c_len + len);
-                                }
-                            }
-                        }
-
-                        (VVal::None, 0)
-                    })
-                }));
-
-            } else if pat_pair_type == s2sym("NCCls") {
-                let chars = p.at(1).unwrap().clone();
-
-                let my_next = std::mem::replace(&mut next, None);
-                next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-                    chars.with_s_ref(|chrs| {
-                        if let Some(c) = s.chars().nth(0) {
-                            for mc in chrs.chars() {
-                                if c == mc {
-                                    return (VVal::None, 0);
-                                }
-                            }
-
-                            let c_len = c.len_utf8();
-
-                            let (m, len) = (my_next.as_ref().unwrap())(&s[c_len..], st);
-                            return (m, c_len + len);
-                        }
-                        (VVal::None, 0)
-                    })
-                }));
-
-            } else if pat_pair_type == s2sym("PatSub") {
-                let my_next = std::mem::replace(&mut next, None);
-                next = Some(
-                    compile_sub_pattern(
-                        &p.at(1).expect("sub pattern"), false, my_next.unwrap()))
-
-            } else if pat_pair_type == s2sym("PatCap") {
-                let my_next = std::mem::replace(&mut next, None);
-                next = Some(
-                    compile_sub_pattern(
-                        &p.at(1).expect("sub pattern"), true, my_next.unwrap()));
-
-            } else {
-                next = Some(Box::new(|_s: &str, _st: &mut SelectorState| {
-                    (VVal::None, 0)
-                }));
-            }
-
-        } else if p.to_sym() == s2sym("Any") {
-            let my_next = std::mem::replace(&mut next, None);
-            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-
-                if let Some(c) = s.chars().nth(0) {
-                    let c_len = c.len_utf8();
-
-                    let (m, len) = (my_next.as_ref().unwrap())(&s[c_len..], st);
-                    (m, c_len + len)
-                } else {
-                    (VVal::None, 0)
-                }
-            }));
-
-        } else if p.to_sym() == s2sym("Glob") {
-            let my_next = std::mem::replace(&mut next, None);
-            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-
-                let s_len = s.len();
-                let mut c_try_len = s_len;
-                while c_try_len > 0 {
-                    c_try_len -= 1;
-                    while c_try_len > 0 && !s.is_char_boundary(c_try_len) {
-                        c_try_len -= 1;
-                    }
-
-                    let (m, len) = (my_next.as_ref().unwrap())(&s[c_try_len..], st);
-                    if m.b() {
-                        return (m, c_try_len + len);
-                    }
-                }
-
-                (VVal::None, 0)
-            }));
-
-        } else if p.to_sym() == s2sym("Start") {
-            let my_next = std::mem::replace(&mut next, None);
-            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-                if st.is_str_start(s) {
-                    let (m, len) = (my_next.as_ref().unwrap())(&s[..], st);
-                    (m, len)
-                } else {
-                    (VVal::None, 0)
-                }
-            }));
-
-        } else if p.to_sym() == s2sym("End") {
-            let my_next = std::mem::replace(&mut next, None);
-            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
-                if s.len() == 0 {
-                    let (m, len) = (my_next.as_ref().unwrap())(&s[..], st);
-                    (m, len)
-                } else {
-                    (VVal::None, 0)
-                }
-            }));
-
-
-        } else {
-            next = Some(Box::new(move |_s: &str, _st: &mut SelectorState| {
-                // (VVal::None, 0)
-                panic!("unimplemented pattern type: {}", p.s());
-            }));
-        }
+        let my_next = std::mem::replace(&mut next, None);
+        next = Some(compile_atom(p, my_next.unwrap()));
     }
 
     next.unwrap()
@@ -778,7 +812,7 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
                 });
         }
 
-        let pat = compile_pattern(k);
+        let pat = compile_pattern_branch(k);
 
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
             for (i, (v, k)) in v.iter().enumerate() {
@@ -853,7 +887,7 @@ fn compile_selector(sel: &VVal) -> SelNode {
 }
 
 fn compile_single_pattern(v: &VVal) -> PatternNode {
-    let pat = compile_pattern(v);
+    let pat = compile_pattern_branch(v);
 
     Box::new(move |s: &str, st: &mut SelectorState| {
         for i in 0..s.len() {
@@ -1055,16 +1089,19 @@ mod tests {
 
     #[test]
     fn check_patterns() {
-        assert_eq!(pat("$^ABC$$",               "ABC"),         "ABC");
-        assert_eq!(pat("$^AB$$C",               "ABC"),         "-nomatch-");
-        assert_eq!(pat("A$^ABC$$",              "ABC"),         "-nomatch-");
+//        assert_eq!(pat("$^ABC$$",               "ABC"),         "ABC");
+//        assert_eq!(pat("$^AB$$C",               "ABC"),         "-nomatch-");
+//        assert_eq!(pat("A$^ABC$$",              "ABC"),         "-nomatch-");
 
-        assert_eq!(pat("$^A(B)C$$",             "ABC"),         "B");
-        assert_eq!(pat("(BC)",                  "ABC"),         "BC");
-        assert_eq!(pat("$^[ ]$$",               " "),           "BC");
-        assert_eq!(pat("$^$*[ ]$$",             "   "),         "BC");
-        assert_eq!(pat("[\\t\\0\\u0101]",   "\0"),          "");
-        assert_eq!(pat("[\\t\\0\\u0101]",   "\t"),          "");
-        assert_eq!(pat("[\\t\\0\\u0101]",   "ā"),           "");
+        assert_eq!(pat("$^A($+BB)C$$",            "ABBBC"),       "B");
+        assert_eq!(pat("$^A($*BB)C$$",            "ABBBC"),       "B");
+        assert_eq!(pat("$^A(^B)C$$",              "ABC"),         "B");
+        assert_eq!(pat("$^A(^$*B)C$$",            "ABBBC"),       "B");
+//        assert_eq!(pat("(^BC)",                 "ABC"),         "BC");
+//        assert_eq!(pat("$^[ ]$$",               " "),           "BC");
+//        assert_eq!(pat("$^$*[ ]$$",             "   "),         "BC");
+//        assert_eq!(pat("[\\t\\0\\u0101]",   "\0"),          "");
+//        assert_eq!(pat("[\\t\\0\\u0101]",   "\t"),          "");
+//        assert_eq!(pat("[\\t\\0\\u0101]",   "ā"),           "");
     }
 }
