@@ -458,13 +458,24 @@ fn parse_selector(s: &str) -> Result<VVal, String> {
 
 pub struct SelectorState {
     orig_string_len: usize,
+    captures:        Vec<(usize, usize)>,
 }
 
 impl SelectorState {
     fn new() -> Self {
         Self {
             orig_string_len: 0,
+            captures:        Vec::new(),
         }
+    }
+
+    fn push_capture(&mut self, s: &str, len: usize) {
+        let offs = self.orig_string_len - s.len();
+        self.captures.push((offs, offs + len));
+    }
+
+    fn pop_capture(&mut self) {
+        self.captures.pop();
     }
 
     fn is_str_start(&self, s: &str) -> bool {
@@ -480,15 +491,28 @@ impl SelectorState {
     }
 }
 
+struct StrSlice<'a> {
+    s: &'a str,
+}
+
 pub type PatternNode = Box<dyn Fn(&str, &mut SelectorState) -> (VVal, usize)>;
 pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal)>;
 
-fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> PatternNode {
+fn compile_sub_pattern(pat: &VVal, capture: bool, next: PatternNode) -> PatternNode {
     println!("COMP SUB PAT {}", pat.s());
     if pat.is_pair() {
-        let sub_type = pat.at(0).expect("proper pattern").to_sym();
-        let sub      = pat.at(1).expect("sub pattern");
-        let sub_pat  = compile_pattern(&sub);
+        let sub_type    = pat.at(0).expect("proper pattern").to_sym();
+        let sub         = pat.at(1).expect("sub pattern");
+        let mut sub_pat = compile_pattern(&sub);
+
+//        if capture {
+//            sub_pat =
+//                Box::new(move |s: &str, st: &mut SelectorState| {
+//                    let (m, l) = 
+//                    st.push_capture(s, 
+//                    (m, l)
+//                });
+//        }
 
         if sub_type == s2sym("ZwNegLA") {
             Box::new(move |s: &str, st: &mut SelectorState| {
@@ -497,11 +521,7 @@ fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> 
                     return (VVal::None, 0);
                 }
 
-                if let Some(n) = &next {
-                    (*n)(&s, st)
-                } else {
-                    (VVal::Bol(true), s.len())
-                }
+                (*next)(&s, st)
             })
 
         } else if sub_type == s2sym("ZwLA") {
@@ -511,11 +531,7 @@ fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> 
                     return (VVal::None, 0);
                 }
 
-                if let Some(n) = &next {
-                    (*n)(&s, st)
-                } else {
-                    (VVal::Bol(true), s.len())
-                }
+                (*next)(&s, st)
             })
 
         } else if sub_type == s2sym("N1") {
@@ -537,15 +553,11 @@ fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> 
                     }
                 }
 
-                if let Some(n) = &next {
-                    let (m, len) = (*n)(&s[match_len..], st);
-                    if m.b() {
-                        (m, match_len + len)
-                    } else {
-                        (VVal::None, 0)
-                    }
+                let (m, len) = (*next)(&s[match_len..], st);
+                if m.b() {
+                    (m, match_len + len)
                 } else {
-                    (VVal::Bol(true), match_len)
+                    (VVal::None, 0)
                 }
             })
 
@@ -564,12 +576,8 @@ fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> 
                 return (VVal::None, 0);
             }
 
-            if let Some(n) = &next {
-                let (r, len2) = (*n)(&s[len1..], st);
-                (r, len1 + len2)
-            } else {
-                (r, len1)
-            }
+            let (r, len2) = (*next)(&s[len1..], st);
+            (r, len1 + len2)
         })
     }
 }
@@ -577,7 +585,12 @@ fn compile_sub_pattern(pat: &VVal, capture: bool, next: Option<PatternNode>) -> 
 fn compile_pattern(pat: &VVal) -> PatternNode {
     println!("COMPILE PATTERN [{}]", pat.s());
 
-    let mut next : Option<PatternNode> = None;
+    let mut next : Option<PatternNode> =
+        Some(Box::new(move |s: &str, st: &mut SelectorState| {
+            println!("LEAF PATTERN MATCH {}", s);
+            (VVal::Bol(true), 0)
+        }));
+
     for i in 0..pat.len() {
         let p = pat.at(pat.len() - (i + 1)).expect("pattern item");
 
@@ -589,19 +602,15 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
             if pat_pair_type == s2sym("I") {
                 let key_str = p.at(1).unwrap().clone();
 
-                let mn = std::mem::replace(&mut next, None);
+                let my_next = std::mem::replace(&mut next, None);
                 next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
                     key_str.with_s_ref(|y| {
                         println!("I: [{}]", s);
                         let y_len = y.len();
 
                         if s.starts_with(y) {
-                            if let Some(n) = &mn {
-                                let (m, len) = (*n)(&s[y_len..], st);
-                                (m, y_len + len)
-                            } else {
-                                (VVal::Bol(true), y_len)
-                            }
+                            let (m, len) = (my_next.as_ref().unwrap())(&s[y_len..], st);
+                            (m, y_len + len)
                         } else {
                             (VVal::None, 0)
                         }
@@ -610,7 +619,7 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
             } else if pat_pair_type == s2sym("CCls") {
                 let chars = p.at(1).unwrap().clone();
 
-                let mn = std::mem::replace(&mut next, None);
+                let my_next = std::mem::replace(&mut next, None);
                 next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
                     chars.with_s_ref(|chrs| {
                         if let Some(c) = s.chars().nth(0) {
@@ -618,12 +627,8 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
 
                             for mc in chrs.chars() {
                                 if c == mc {
-                                    if let Some(n) = &mn {
-                                        let (m, len) = (*n)(&s[c_len..], st);
-                                        return (m, c_len + len);
-                                    } else {
-                                        return (VVal::Bol(true), c_len);
-                                    }
+                                    let (m, len) = (my_next.as_ref().unwrap())(&s[c_len..], st);
+                                    return (m, c_len + len);
                                 }
                             }
                         }
@@ -635,7 +640,7 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
             } else if pat_pair_type == s2sym("NCCls") {
                 let chars = p.at(1).unwrap().clone();
 
-                let mn = std::mem::replace(&mut next, None);
+                let my_next = std::mem::replace(&mut next, None);
                 next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
                     chars.with_s_ref(|chrs| {
                         if let Some(c) = s.chars().nth(0) {
@@ -647,30 +652,24 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
 
                             let c_len = c.len_utf8();
 
-                            if let Some(n) = &mn {
-                                let (m, len) = (*n)(&s[c_len..], st);
-                                return (m, c_len + len);
-                            } else {
-                                return (VVal::Bol(true), c_len);
-                            }
+                            let (m, len) = (my_next.as_ref().unwrap())(&s[c_len..], st);
+                            return (m, c_len + len);
                         }
                         (VVal::None, 0)
                     })
                 }));
 
             } else if pat_pair_type == s2sym("PatSub") {
-                let mn = std::mem::replace(&mut next, None);
+                let my_next = std::mem::replace(&mut next, None);
                 next = Some(
                     compile_sub_pattern(
-                        &p.at(1).expect("sub pattern"), false, mn))
+                        &p.at(1).expect("sub pattern"), false, my_next.unwrap()))
 
             } else if pat_pair_type == s2sym("PatCap") {
-                let mn = std::mem::replace(&mut next, None);
-                // TODO: Make some capture closure, that pushes the captures
-                //       on some capture stack?
+                let my_next = std::mem::replace(&mut next, None);
                 next = Some(
                     compile_sub_pattern(
-                        &p.at(1).expect("sub pattern"), true, mn));
+                        &p.at(1).expect("sub pattern"), true, my_next.unwrap()));
 
             } else {
                 next = Some(Box::new(|_s: &str, _st: &mut SelectorState| {
@@ -679,73 +678,57 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
             }
 
         } else if p.to_sym() == s2sym("Any") {
-            let mn = std::mem::replace(&mut next, None);
+            let my_next = std::mem::replace(&mut next, None);
             next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
 
                 if let Some(c) = s.chars().nth(0) {
                     let c_len = c.len_utf8();
 
-                    if let Some(n) = &mn {
-                        let (m, len) = (*n)(&s[c_len..], st);
-                        (m, c.len_utf8() + len)
-                    } else {
-                        (VVal::Bol(true), c_len)
-                    }
+                    let (m, len) = (my_next.as_ref().unwrap())(&s[c_len..], st);
+                    (m, c_len + len)
                 } else {
                     (VVal::None, 0)
                 }
             }));
 
         } else if p.to_sym() == s2sym("Glob") {
-            let mn = std::mem::replace(&mut next, None);
+            let my_next = std::mem::replace(&mut next, None);
             next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
 
-                if let Some(n) = &mn {
-                    let s_len = s.len();
-                    let mut c_try_len = s_len;
-                    while c_try_len > 0 {
+                let s_len = s.len();
+                let mut c_try_len = s_len;
+                while c_try_len > 0 {
+                    c_try_len -= 1;
+                    while c_try_len > 0 && !s.is_char_boundary(c_try_len) {
                         c_try_len -= 1;
-                        while c_try_len > 0 && !s.is_char_boundary(c_try_len) {
-                            c_try_len -= 1;
-                        }
-
-                        let (m, len) = (*n)(&s[c_try_len..], st);
-                        if m.b() {
-                            return (m, c_try_len + len);
-                        }
                     }
 
-                    (VVal::Bol(true), 0)
-                } else {
-                    (VVal::Bol(true), s.len())
+                    let (m, len) = (my_next.as_ref().unwrap())(&s[c_try_len..], st);
+                    if m.b() {
+                        return (m, c_try_len + len);
+                    }
                 }
+
+                (VVal::None, 0)
             }));
 
         } else if p.to_sym() == s2sym("Start") {
-            let mn = std::mem::replace(&mut next, None);
+            let my_next = std::mem::replace(&mut next, None);
             next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
                 if st.is_str_start(s) {
-                    if let Some(n) = &mn {
-                        let (m, len) = (*n)(&s[..], st);
-                        (m, len)
-                    } else {
-                        (VVal::Bol(true), 0)
-                    }
+                    let (m, len) = (my_next.as_ref().unwrap())(&s[..], st);
+                    (m, len)
                 } else {
                     (VVal::None, 0)
                 }
             }));
 
         } else if p.to_sym() == s2sym("End") {
-            let mn = std::mem::replace(&mut next, None);
+            let my_next = std::mem::replace(&mut next, None);
             next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
                 if s.len() == 0 {
-                    if let Some(n) = &mn {
-                        let (m, len) = (*n)(&s[..], st);
-                        (m, len)
-                    } else {
-                        (VVal::Bol(true), 0)
-                    }
+                    let (m, len) = (my_next.as_ref().unwrap())(&s[..], st);
+                    (m, len)
                 } else {
                     (VVal::None, 0)
                 }
