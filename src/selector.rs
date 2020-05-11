@@ -110,8 +110,38 @@ fn is_ident_char(c: char) -> bool {
     }
 }
 
-fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
-    let uh = ps.take_while(|c| is_ident_char(c));
+fn parse_ident_char(ps: &mut State) -> Result<Option<char>, ParseError> {
+    if let Some(c) = ps.peek() {
+        match c {
+            '\\' => {
+                ps.consume();
+                let c = ps.expect_some(ps.peek())?;
+                ps.consume_ws();
+                Ok(Some(c))
+            },
+            c if is_ident_char(c) => {
+                ps.consume_ws();
+                Ok(Some(c))
+            },
+            _ => Ok(None),
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+fn parse_ident(ps: &mut State, one_char: bool) -> Result<VVal, ParseError> {
+    let mut uh = String::new();
+
+    if one_char {
+        if let Some(c) = parse_ident_char(ps)? {
+            uh.push(c);
+        }
+    } else {
+        while let Some(c) = parse_ident_char(ps)? {
+            uh.push(c);
+        }
+    }
 
     if uh.len() == 0 {
         return Err(ps.err(
@@ -120,31 +150,7 @@ fn parse_ident(ps: &mut State) -> Result<VVal, ParseError> {
                 "Expected identifier character")));
     }
 
-    let r =
-        VVal::pair(
-            VVal::new_sym("I"),
-            VVal::new_sym(&uh.to_string()));
-
-    ps.skip_ws();
-
-    Ok(r)
-}
-
-fn parse_ident_char(ps: &mut State) -> Result<VVal, ParseError> {
-    let uh = ps.take_while(|c| is_ident_char(c));
-    let c = ps.expect_some(ps.peek())?;
-    if !is_ident_char(c) {
-        return Err(ps.err(
-            ParseErrorKind::UnexpectedToken(c, "Expected identifier character")));
-    }
-
-    let mut b = [0; 4];
-    let r =
-        VVal::pair(
-            VVal::new_sym("I"),
-            VVal::new_sym(c.encode_utf8(&mut b)));
-
-    ps.skip_ws();
+    let r = VVal::pair(VVal::new_sym("I"), VVal::new_sym(&uh));
 
     Ok(r)
 }
@@ -257,7 +263,7 @@ fn parse_rx_atom(ps: &mut State) ->  Result<VVal, ParseError> {
     match ps.expect_some(ps.peek())? {
         '*' | '?' | '[' | '(' | '$'
             => parse_pat_glob(ps),
-        _   => parse_ident_char(ps)
+        _   => parse_ident(ps, true)
     }
 }
 
@@ -265,7 +271,7 @@ fn parse_glob_atom(ps: &mut State) ->  Result<VVal, ParseError> {
     match ps.expect_some(ps.peek())? {
         '*' | '?' | '[' | '(' | '$'
             => parse_pat_glob(ps),
-        _   => parse_ident(ps)
+        _   => parse_ident(ps, false)
     }
 }
 
@@ -451,12 +457,26 @@ fn parse_selector(s: &str) -> Result<VVal, String> {
 }
 
 pub struct SelectorState {
+    orig_string_len: usize,
 }
 
 impl SelectorState {
     fn new() -> Self {
         Self {
+            orig_string_len: 0,
         }
+    }
+
+    fn is_str_start(&self, s: &str) -> bool {
+        self.orig_string_len == s.len()
+    }
+
+    fn set_str(&mut self, s: &str) -> usize {
+        std::mem::replace(&mut self.orig_string_len, s.len())
+    }
+
+    fn restore_str(&mut self, os_len: usize) {
+        self.orig_string_len = os_len;
     }
 }
 
@@ -701,10 +721,41 @@ fn compile_pattern(pat: &VVal) -> PatternNode {
                 }
             }));
 
+        } else if p.to_sym() == s2sym("Start") {
+            let mn = std::mem::replace(&mut next, None);
+            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
+                if st.is_str_start(s) {
+                    if let Some(n) = &mn {
+                        let (m, len) = (*n)(&s[..], st);
+                        (m, len)
+                    } else {
+                        (VVal::Bol(true), 0)
+                    }
+                } else {
+                    (VVal::None, 0)
+                }
+            }));
+
+        } else if p.to_sym() == s2sym("End") {
+            let mn = std::mem::replace(&mut next, None);
+            next = Some(Box::new(move |s: &str, st: &mut SelectorState| {
+                if s.len() == 0 {
+                    if let Some(n) = &mn {
+                        let (m, len) = (*n)(&s[..], st);
+                        (m, len)
+                    } else {
+                        (VVal::Bol(true), 0)
+                    }
+                } else {
+                    (VVal::None, 0)
+                }
+            }));
+
+
         } else {
             next = Some(Box::new(move |_s: &str, _st: &mut SelectorState| {
+                // (VVal::None, 0)
                 panic!("unimplemented pattern type: {}", p.s());
-                (VVal::None, 0)
             }));
         }
     }
@@ -754,7 +805,10 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
             for (i, (v, k)) in v.iter().enumerate() {
                 if let Some(k) = k {
                     k.with_s_ref(|s| {
+                        let old_str = st.set_str(&s[..]);
                         let (r, len) = (*pat)(&s[..], st);
+                        st.restore_str(old_str);
+
                         if r.b() && len == s.len() {
                             (*sn)(&v, st, capts);
                         }
@@ -762,7 +816,10 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
                 } else {
                     let idx_str = format!("{}", i);
 
+                    let old_str = st.set_str(&idx_str[..]);
                     let (r, len) = (*pat)(&idx_str[..], st);
+                    st.restore_str(old_str);
+
                     if r.b() && len == idx_str.len() {
                         (*sn)(&v, st, capts);
                     }
@@ -817,15 +874,19 @@ fn compile_selector(sel: &VVal) -> SelNode {
 }
 
 fn compile_single_pattern(v: &VVal) -> PatternNode {
-    panic!("implement a pattern that matches either at the \
-            start only or anywhere in the string if the first \
-            element is or is not a \"Start\" (^)");
-}
+    let pat = compile_pattern(v);
 
-//fn tree_select(slct: &VVal, tree: &VVal) -> VVal {
-//    let path = VVal::vec();
-//    slct.with_s_ref(|s| parse_select(&s.chars().collect(), path));
-//}
+    Box::new(move |s: &str, st: &mut SelectorState| {
+        for i in 0..s.len() {
+            let (r, len) = (*pat)(&s[i..], st);
+            if r.b() {
+                return (VVal::new_str(&s[i..]), len);
+            }
+        }
+
+        (VVal::None, 0)
+    })
+}
 
 #[cfg(test)]
 mod tests {
@@ -838,9 +899,10 @@ mod tests {
             Ok(v) => {
                 let pn = compile_single_pattern(&v);
                 let mut ss = SelectorState::new();
+                ss.set_str(st);
                 let (r, len) = (*pn)(st, &mut ss);
-                if len == st.len() {
-                    r.s()
+                if r.is_some() {
+                    r.s_raw()
                 } else {
                     "-nomatch-".to_string()
                 }
@@ -973,7 +1035,11 @@ mod tests {
         assert_eq!(p("^**"),    "$[:Path,$[:NCap,$[:RecGlob]]]");
         assert_eq!(p("^*"),     "$[:Path,$[:NCap,$[:NK,$[:Glob]]]]");
 
-        assert_eq!(p("(*|a?)"), "$[:Path,$[:NK,$[$p(:PatCap,$[:Opt,$[:Glob],$[$p(:I,:a),:Any]])]]]");
+        assert_eq!(p("(a)"),    "$[:Path,$[:NK,$[$p(:PatSub,$[$p(:I,:a)])]]]");
+        assert_eq!(p("(^a)"),   "$[:Path,$[:NK,$[$p(:PatCap,$[$p(:I,:a)])]]]");
+        assert_eq!(p("^(^a)"),  "$[:Path,$[:NCap,$[:NK,$[$p(:PatCap,$[$p(:I,:a)])]]]]");
+
+        assert_eq!(p("(*|a?)"), "$[:Path,$[:NK,$[$p(:PatSub,$[:Opt,$[:Glob],$[$p(:I,:a),:Any]])]]]");
 
         assert_eq!(p("*/*/a"),   "$[:Path,$[:NK,$[:Glob]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:a)]]]");
         assert_eq!(p("*  /  *  /   a   "),   "$[:Path,$[:NK,$[:Glob]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:a)]]]");
@@ -994,21 +1060,26 @@ mod tests {
 
     #[test]
     fn check_selector_subpat() {
-        assert_eq!(p("(^abc$$)"),               "");
-        assert_eq!(p("(\\^abc$$)"),             "");
+        assert_eq!(p("(^abc$$)"),               "$[:Path,$[:NK,$[$p(:PatCap,$[$p(:I,:abc),:End])]]]");
+        assert_eq!(p("(\\^abc$$)"),             "$[:Path,$[:NK,$[$p(:PatSub,$[$p(:I,:\"^abc\"),:End])]]]");
 
-        assert_eq!(p("(abc)"),                  "");
-        assert_eq!(p("$!(abc)"),                "");
-        assert_eq!(p("$*(abc)"),                "");
-        assert_eq!(p("$+(abc)"),                "");
-        assert_eq!(p("$?(abc)"),                "");
-        assert_eq!(p("$=(abc)"),                "");
-        assert_eq!(p("$^abc$$"),                "");
-        assert_eq!(p("(\\$abc)"),               "");
+        assert_eq!(p("(abc)"),                  "$[:Path,$[:NK,$[$p(:PatSub,$[$p(:I,:abc)])]]]");
+        assert_eq!(p("$!abc"),                  "$[:Path,$[:NK,$[$p(:ZwNegLA,$p(:I,:a)),$p(:I,:bc)]]]");
+        assert_eq!(p("$!(abc)"),                "$[:Path,$[:NK,$[$p(:ZwNegLA,$p(:PatSub,$[$p(:I,:abc)]))]]]");
+        assert_eq!(p("$*(abc)"),                "$[:Path,$[:NK,$[$p(:N0,$p(:PatSub,$[$p(:I,:abc)]))]]]");
+        assert_eq!(p("$+(abc)"),                "$[:Path,$[:NK,$[$p(:N1,$p(:PatSub,$[$p(:I,:abc)]))]]]");
+        assert_eq!(p("$?(abc)"),                "$[:Path,$[:NK,$[$p(:Opt,$p(:PatSub,$[$p(:I,:abc)]))]]]");
+        assert_eq!(p("$=(abc)"),                "$[:Path,$[:NK,$[$p(:ZwLA,$p(:PatSub,$[$p(:I,:abc)]))]]]");
+        assert_eq!(p("$^abc$$"),                "$[:Path,$[:NK,$[:Start,$p(:I,:abc),:End]]]");
+        assert_eq!(p("(\\$abc)"),               "$[:Path,$[:NK,$[$p(:PatSub,$[$p(:I,:\"$abc\")])]]]");
     }
 
     #[test]
     fn check_patterns() {
+        assert_eq!(pat("$^ABC$$",               "ABC"),         "ABC");
+        assert_eq!(pat("$^AB$$C",               "ABC"),         "-nomatch-");
+        assert_eq!(pat("A$^ABC$$",              "ABC"),         "-nomatch-");
+
         assert_eq!(pat("$^A(B)C$$",             "ABC"),         "B");
         assert_eq!(pat("(BC)",                  "ABC"),         "BC");
         assert_eq!(pat("$^[ ]$$",               " "),           "BC");
