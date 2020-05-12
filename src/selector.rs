@@ -36,6 +36,8 @@ Selector Syntax:
 
     pat_regex   = "*", rx_atom     (* matches sub pattern 0 or N times *)
                 | "+", rx_atom     (* matches sub pattern 1 or N times *)
+                | "<", [ ("*" | "+") ], rx_atom
+                                   (* non greedy version of the above *)
                 | "?", rx_atom     (* matches sub pattern 0 or 1 times *)
                 | "!", rx_atom     (* matches (zero width) if next pattern does not match *)
                 | "=", rx_atom     (* matches (zero width) if next pattern does match *)
@@ -202,6 +204,24 @@ fn parse_pat_regex(ps: &mut State) -> Result<VVal, ParseError> {
             ps.consume_ws();
             Ok(VVal::pair(VVal::new_sym("N1"), parse_rx_atom(ps)?))
         },
+        '<' => {
+            ps.consume_ws();
+            let c = ps.expect_some(ps.peek())?;
+            match c {
+                '*' => {
+                    ps.consume_ws();
+                    Ok(VVal::pair(VVal::new_sym("N0-"), parse_rx_atom(ps)?))
+                },
+                '+' => {
+                    ps.consume_ws();
+                    Ok(VVal::pair(VVal::new_sym("N1-"), parse_rx_atom(ps)?))
+                },
+                _ =>
+                    Err(ps.err(
+                        ParseErrorKind::UnexpectedToken(
+                            c, "in non-greedy regex pattern"))),
+            }
+        }
         '?' => {
             ps.consume_ws();
             Ok(VVal::pair(VVal::new_sym("Opt"), parse_rx_atom(ps)?))
@@ -220,7 +240,7 @@ fn parse_pat_regex(ps: &mut State) -> Result<VVal, ParseError> {
         'S' => { ps.consume_ws(); Ok(VVal::new_sym("NWsChar")) },
         _ =>
             Err(ps.err(
-                ParseErrorKind::UnexpectedToken(c, "in glob pattern"))),
+                ParseErrorKind::UnexpectedToken(c, "in regex pattern"))),
     }
 }
 
@@ -558,11 +578,27 @@ pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal)>;
 //    }
 //}
 
+macro_rules! while_lengthen_str {
+    ($s: ident, $try_len: ident, $b: block) => {
+        let mut $try_len = 0;
+
+        while $try_len <= $s.len() {
+            println!("WLS-TRY {} [{}]", $try_len, &$s[$try_len..]);
+            $b;
+
+            $try_len += 1;
+            while $try_len <= $s.len() && !$s.is_char_boundary($try_len) {
+                $try_len += 1;
+            }
+        }
+    }
+}
+
 macro_rules! while_shorten_str {
     ($s: ident, $try_len: ident, $b: block) => {
         let mut $try_len = $s.len();
 
-        println!("WSS-TRY0 [{}]", &$s[$try_len..]);
+        //d// println!("WSS-TRY0 [{}]", &$s[$try_len..]);
         $b;
 
         while $try_len > 0 {
@@ -571,8 +607,18 @@ macro_rules! while_shorten_str {
                 $try_len -= 1;
             }
 
-            println!("WSS-TRY [{}]", &$s[$try_len..]);
+            //d// println!("WSS-TRY [{}]", &$s[$try_len..]);
             $b;
+        }
+    }
+}
+
+macro_rules! vari_str_glob {
+    ($s: ident, $try_len: ident, $greedy: expr, $b: block) => {
+        if $greedy {
+            while_shorten_str!($s, $try_len, $b);
+        } else {
+            while_lengthen_str!($s, $try_len, $b);
         }
     }
 }
@@ -701,7 +747,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                 (*next)(&s, st)
             })
 
-        } else if pair_type == s2sym("N1") {
+        } else if pair_type == s2sym("N1") || pair_type == s2sym("N1-") {
             let sub_pat =
                 compile_atom(&pair_val,
                     Box::new(move |s: &str, st: &mut SelectorState|
@@ -729,19 +775,40 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                     (VVal::Bol(true), match_len)
                 });
 
-            Box::new(move |s: &str, st: &mut SelectorState| {
-                while_shorten_str!(s, try_len, {
-                    let (m_sp, len_sp) = (*sub_pat)(&s[..try_len], st);
-                    if m_sp.b() && len_sp == try_len {
-                        let (m, len) = (*next)(&s[try_len..], st);
-                        if m.b() {
-                            return (m, try_len + len);
-                        }
-                    }
-                });
+            let mut greedy = pair_type == s2sym("N1");
 
-                (VVal::None, 0)
-            })
+            if greedy {
+                Box::new(move |s: &str, st: &mut SelectorState| {
+                    while_shorten_str!(s, try_len, {
+                        let (m_sp, len_sp) = (*sub_pat)(&s[..try_len], st);
+                        if m_sp.b() && len_sp == try_len {
+                            let (m, len) = (*next)(&s[try_len..], st);
+                            if m.b() {
+                                return (m, try_len + len);
+                            }
+                        }
+                    });
+
+                    (VVal::None, 0)
+                })
+            } else {
+                Box::new(move |s: &str, st: &mut SelectorState| {
+                    while_lengthen_str!(s, try_len, {
+                        println!("NONG s=[{}]", &s[..try_len]);
+                        let (m_sp, len_sp) = (*sub_pat)(&s[..try_len], st);
+                        if m_sp.b() {
+                            println!("NONG len_sp={}", len_sp);
+                            let (m, len) = (*next)(&s[len_sp..try_len], st);
+                            if m.b() {
+                                println!("NONG len={}", len);
+                                return (m, len_sp + len);
+                            }
+                        }
+                    });
+
+                    (VVal::None, 0)
+                })
+            }
         } else {
             panic!("Unknown pair atom: {}", p.s());
         }
@@ -782,6 +849,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     } else if p.to_sym() == s2sym("End") {
         Box::new(move |s: &str, st: &mut SelectorState| {
+            println!("MATCH END: [{}]", s);
             if s.len() == 0 {
                 let (m, len) = (*next)(&s[..], st);
                 (m, len)
@@ -927,10 +995,16 @@ fn compile_single_pattern(v: &VVal) -> PatternNode {
     let pat = compile_pattern_branch(v);
 
     Box::new(move |s: &str, st: &mut SelectorState| {
-        for i in 0..s.len() {
+        let mut i = 0;
+        while i <= s.len() {
             let (r, len) = (*pat)(&s[i..], st);
             if r.b() {
                 return (VVal::new_str(&s[i..]), len);
+            }
+
+            i += 1;
+            while i <= s.len() && !s.is_char_boundary(i) {
+                i += 1;
             }
         }
 
@@ -1126,6 +1200,19 @@ mod tests {
 
     #[test]
     fn check_patterns() {
+        assert_eq!(pat("A($<+B)$$",       "ABB"),         "ABB");
+        panic!("FOOO");
+        assert_eq!(pat("A($<+B)",         "ABB"),         "ABB");
+        assert_eq!(pat("A($<+B)",         "AB"),          "AB");
+        assert_eq!(pat("A($<+B)",         "ABBB"),        "ABBB");
+        assert_eq!(pat("$^A($<+B)$$",     "ABB"),         "ABB");
+        assert_eq!(pat("$^A($<+B)$$",     "ABBB"),        "ABBBC");
+        assert_eq!(pat("$^$+A($<+B)$$",   "ABBB"),        "ABBBC");
+        assert_eq!(pat("$^$<+A($<+B)$$",  "ABBB"),        "ABBBC");
+        assert_eq!(pat("$^$<+A($<+B)$$",  "ABBB"),        "ABBBC");
+        assert_eq!(pat("$^$<+A($<+B)C$$", "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^A($<+B)$$",     "AB"),          "AB");
+
         assert_eq!(pat("$^ABC$$",               "ABC"),         "ABC");
         assert_eq!(pat("$^AB$$C",               "ABC"),         "-nomatch-");
         assert_eq!(pat("A$^ABC$$",              "ABC"),         "-nomatch-");
@@ -1138,15 +1225,20 @@ mod tests {
         assert_eq!(pat("$^$+A((B)$+B)$$",         "ABB"),         "ABB");
         assert_eq!(pat("$^$+BC$$",                "BC"),          "BC");
 
-        assert_eq!(pat("$^($+B)C$$",              "BC"),          "BC");
-        assert_eq!(pat("$^$+A($+B)C$$",           "ABC"),         "ABC");
-        assert_eq!(pat("$^$+A((B)$+B)C$$",        "ABBC"),        "ABBC");
-        assert_eq!(pat("$^$+A($+(B)$+B)C$$",      "ABBBC"),       "ABBBC");
-        assert_eq!(pat("$^$+A($+($+B)$+B)C$$",    "ABBBC"),       "ABBBC");
-
         assert_eq!(pat("$^$+C$$",                 "C"),           "C");
         assert_eq!(pat("$^ABBB$+C$$",             "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$+A($+($+B)$+B)$+C$$",  "ABBBC"),       "ABBBC");
+
+        assert_eq!(pat("$^($<+B)C$$",                   "BC"),          "BC");
+        assert_eq!(pat("$^$<+A($<+B)C$$",               "ABC"),         "ABC");
+        assert_eq!(pat("$^$<+A((B)$<+B)C$$",            "ABBC"),        "ABBC");
+        assert_eq!(pat("$^$<+A($<+(B)$<+B)C$$",         "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^$<+A($<+($<+B)$<+B)C$$",      "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^$<+A($<+($<+B)$<+B)C$$",      "ABBBC"),       "ABBBC");
+
+        assert_eq!(pat("$^$<+C$$",                      "C"),           "C");
+        assert_eq!(pat("$^ABBB$<+C$$",                  "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^$<+A($<+($<+B)$<+B)$<+C$$",   "ABBBC"),       "ABBBC");
 
         assert_eq!(pat("$^A($*BB)C$$",            "ABBBC"),       "B");
         assert_eq!(pat("$^A(^B)C$$",              "ABC"),         "B");
