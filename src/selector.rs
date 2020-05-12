@@ -650,7 +650,10 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 //        next = compile_pattern_branch(&pair_val, true, next);
 
     } else if pair_type == s2sym("ZwNegLA") {
-        let mut sub_pat = compile_atom(&pair_val);
+        let mut sub_pat =
+            compile_atom(&pair_val,
+                Box::new(move |s: &str, st: &mut SelectorState|
+                    (VVal::Bol(true), 0)));
 
         Box::new(move |s: &str, st: &mut SelectorState| {
             let (m, _) = (*sub_pat)(s, st);
@@ -662,7 +665,10 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
         })
 
     } else if pair_type == s2sym("ZwLA") {
-        let mut sub_pat = compile_atom(&pair_val);
+        let mut sub_pat =
+            compile_atom(&pair_val,
+                Box::new(move |s: &str, st: &mut SelectorState|
+                    (VVal::Bol(true), 0)));
 
         Box::new(move |s: &str, st: &mut SelectorState| {
             let (m, len) = (*sub_pat)(s, st);
@@ -674,7 +680,10 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
         })
 
     } else if pair_type == s2sym("N1") {
-        let mut sub_pat = compile_atom(&pair_val);
+        let mut sub_pat =
+            compile_atom(&pair_val,
+                Box::new(move |s: &str, st: &mut SelectorState|
+                    (VVal::Bol(true), 0)));
 
         Box::new(move |s: &str, st: &mut SelectorState| {
             let (m, len) = (*sub_pat)(s, st);
