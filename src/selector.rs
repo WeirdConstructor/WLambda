@@ -690,32 +690,21 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             })
 
         } else if pair_type == s2sym("PatSub") {
-            let sub = compile_pattern_branch(&pair_val); //, false, next);
-
-            Box::new(move |s: &str, st: &mut SelectorState| {
-                let (m, l) = (*sub)(s, st);
-                if m.b() {
-                    let (m2, l2) = (*next)(&s[l..], st);
-                    (m2, l + l2)
-                } else {
-                    (VVal::None, 0)
-                }
-            })
-    //        next = compile_pattern_branch(&pair_val, false, next);
+            compile_pattern_branch(&pair_val, next)
 
         } else if pair_type == s2sym("PatCap") {
-            let sub = compile_pattern_branch(&pair_val); //, true, next);
+            let sub = compile_pattern_branch(&pair_val, next); //, true, next);
             // TODO: Arrange capturing!
             Box::new(move |s: &str, st: &mut SelectorState| {
                 let (m, l) = (*sub)(s, st);
-                if m.b() {
-                    let (m2, l2) = (*next)(&s[l..], st);
-                    (m2, l + l2)
-                } else {
-                    (VVal::None, 0)
-                }
+                (m, l)
+//                if m.b() {
+//                    let (m2, l2) = (*next)(&s[l..], st);
+//                    (m2, l + l2)
+//                } else {
+//                    (VVal::None, 0)
+//                }
             })
-    //        next = compile_pattern_branch(&pair_val, true, next);
 
         } else if pair_type == s2sym("ZwNegLA") {
             let mut sub_pat =
@@ -863,16 +852,10 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
     }
 }
 
-fn compile_pattern_branch(pat: &VVal) -> PatternNode {
+fn compile_pattern_branch(pat: &VVal, next: PatternNode) -> PatternNode {
     println!("COMPILE PATTERN [{}]", pat.s());
 
-    let mut next : Option<PatternNode> =
-        Some(Box::new(move |s: &str, st: &mut SelectorState| {
-            // TODO: Needs to be done by the caller of compile_pattern_branch!
-            //       And passed like usual as continuation.
-            println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
-            (VVal::Bol(true), 0)
-        }));
+    let mut next : Option<PatternNode> = Some(next);
 
     for i in 0..pat.len() {
         let p = pat.at(pat.len() - (i + 1)).expect("pattern item");
@@ -917,7 +900,13 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
                 });
         }
 
-        let pat = compile_pattern_branch(k);
+        let pat = compile_pattern_branch(k,
+            Box::new(move |s: &str, st: &mut SelectorState| {
+                // TODO: Needs to be done by the caller of compile_pattern_branch!
+                //       And passed like usual as continuation.
+                println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
+                (VVal::Bol(true), 0)
+            }));
 
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
             for (i, (v, k)) in v.iter().enumerate() {
@@ -992,14 +981,20 @@ fn compile_selector(sel: &VVal) -> SelNode {
 }
 
 fn compile_single_pattern(v: &VVal) -> PatternNode {
-    let pat = compile_pattern_branch(v);
+    let pat = compile_pattern_branch(v,
+        Box::new(move |s: &str, st: &mut SelectorState| {
+            // TODO: Needs to be done by the caller of compile_pattern_branch!
+            //       And passed like usual as continuation.
+            println!("*** BRANCH LEAF SINGLE PATTERN MATCH {}| {:?}", s, st.captures);
+            (VVal::Bol(true), 0)
+        }));
 
     Box::new(move |s: &str, st: &mut SelectorState| {
         let mut i = 0;
         while i <= s.len() {
             let (r, len) = (*pat)(&s[i..], st);
             if r.b() {
-                return (VVal::new_str(&s[i..]), len);
+                return (VVal::new_str(&s[i..len]), len);
             }
 
             i += 1;
@@ -1200,18 +1195,27 @@ mod tests {
 
     #[test]
     fn check_patterns() {
+//        assert_eq!(pat("A($<+B)",         "ABB"),         "AB");
+//        assert_eq!(pat("A($<+B)",         "AB"),          "AB");
+//        assert_eq!(pat("A($<+B)",         "ABBB"),        "AB");
+
         assert_eq!(pat("A($<+B)$$",       "ABB"),         "ABB");
         panic!("FOOO");
-        assert_eq!(pat("A($<+B)",         "ABB"),         "ABB");
-        assert_eq!(pat("A($<+B)",         "AB"),          "AB");
-        assert_eq!(pat("A($<+B)",         "ABBB"),        "ABBB");
+
         assert_eq!(pat("$^A($<+B)$$",     "ABB"),         "ABB");
-        assert_eq!(pat("$^A($<+B)$$",     "ABBB"),        "ABBBC");
-        assert_eq!(pat("$^$+A($<+B)$$",   "ABBB"),        "ABBBC");
-        assert_eq!(pat("$^$<+A($<+B)$$",  "ABBB"),        "ABBBC");
-        assert_eq!(pat("$^$<+A($<+B)$$",  "ABBB"),        "ABBBC");
+        assert_eq!(pat("$^A($<+B)$$",     "ABBB"),        "ABBB");
+        assert_eq!(pat("$^$+A($<+B)$$",   "ABBB"),        "ABBB");
+        assert_eq!(pat("$^$<+A($<+B)$$",  "ABBB"),        "ABBB");
+        assert_eq!(pat("$^$<+A($<+B)$$",  "ABBB"),        "ABBB");
         assert_eq!(pat("$^$<+A($<+B)C$$", "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^A($<+B)$$",     "AB"),          "AB");
+        assert_eq!(pat("$^A($<+B)",       "ABB"),         "AB");
+        assert_eq!(pat("$^A($<+B)",       "ABBB"),        "AB");
+        assert_eq!(pat("$^$+A($<+B)",     "AABBB"),        "AAB");
+        assert_eq!(pat("$^$<+A($<+B)",    "AABBB"),        "AAB");
+        assert_eq!(pat("$^$<+A($<+B)",    "AABBB"),        "AAB");
+        assert_eq!(pat("$^$<+A($<+B)C",   "AABBBC"),       "AABBBC");
+        assert_eq!(pat("$^A($<+B)",       "AB"),           "AB");
 
         assert_eq!(pat("$^ABC$$",               "ABC"),         "ABC");
         assert_eq!(pat("$^AB$$C",               "ABC"),         "-nomatch-");
