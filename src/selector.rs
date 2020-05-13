@@ -539,7 +539,7 @@ impl<'a> RxBuf<'a> {
     }
 
     fn is_at_end(&self) -> bool {
-        (self.offs + self.s.len()) == self.orig_len
+        self.offs == self.orig_len
     }
 
     fn offs(&self, offs: usize) -> Self {
@@ -634,7 +634,7 @@ macro_rules! while_lengthen_str {
         let mut $try_len = 0;
 
         while $try_len <= $s.s.len() {
-            println!("WLS-TRY {} [{}]", $try_len, &$s.s[$try_len..]);
+            println!("WLS-TRY {} [{}]", $try_len, &$s.limit_len($try_len).s);
             $b;
 
             $try_len += 1;
@@ -822,7 +822,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                     while_shorten_str!(s, try_len, {
                         let (m_sp, len_sp) = (*sub_pat)(s.limit_len(try_len), st);
                         if m_sp.b() && len_sp == try_len {
-                            let (m, len) = (*next)(s.offs(try_len), st);
+                            let (m, len) = (*next)(s.offs(len_sp), st);
                             if m.b() {
                                 return (m, try_len + len);
                             }
@@ -837,8 +837,8 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                         println!("NONG s=[{}]", s.limit_len(try_len));
                         let (m_sp, len_sp) = (*sub_pat)(s.limit_len(try_len), st);
                         if m_sp.b() {
-                            println!("NONG len_sp={}", len_sp);
-                            let (m, len) = (*next)(s.sub(len_sp, try_len), st);
+                            println!("NONG len_sp={} r=[{}]", len_sp, s.offs(len_sp).s);
+                            let (m, len) = (*next)(s.offs(len_sp), st);
                             if m.b() {
                                 println!("NONG len={}", len);
                                 return (m, len_sp + len);
@@ -889,7 +889,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     } else if p.to_sym() == s2sym("End") {
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
-            println!("MATCH END: [{}]", s);
+            println!("MATCH END: [{}] atend={}", s, s.is_at_end());
             if s.is_at_end() {
                 let (m, len) = (*next)(s, st);
                 (m, len)
@@ -1289,6 +1289,16 @@ mod tests {
         assert_eq!(pat("$^($<+B)C$$",                   "BC"),          "BC");
         assert_eq!(pat("$^$<+A($<+B)C$$",               "ABC"),         "ABC");
         assert_eq!(pat("$^$<+A((B)$<+B)C$$",            "ABBC"),        "ABBC");
+        assert_eq!(pat("$^$<+BB$$",         "BB"),       "BB");
+        assert_eq!(pat("$<+BB$$",         "BB"),       "BB");
+        assert_eq!(pat("$+BB$$",         "BB"),       "BB");
+        assert_eq!(pat("$^$<+BB$$",         "BB"),       "BB");
+        assert_eq!(pat("$^$<+B$$",         "B"),       "B");
+        assert_eq!(pat("$^$<+BB$$",         "BBB"),       "BBB");
+        assert_eq!(pat("$^A$<+BB$$",         "ABBB"),       "ABBB");
+        assert_eq!(pat("$^A$<+BBC$$",         "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^A($<+B$<+B)C$$",         "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^$<+A($<+B$<+B)C$$",         "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$<+A($<+(B)$<+B)C$$",         "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$<+A($<+($<+B)$<+B)C$$",      "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$<+A($<+($<+B)$<+B)C$$",      "ABBBC"),       "ABBBC");
