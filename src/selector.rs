@@ -787,18 +787,29 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                 (*next)(s, st)
             })
 
-        } else if pair_type == s2sym("N1") || pair_type == s2sym("N1-") {
+        } else if pair_type == s2sym("N1")
+               || pair_type == s2sym("N1-")
+               || pair_type == s2sym("N0")
+               || pair_type == s2sym("N0-")
+        {
             let sub_pat =
                 compile_atom(&pair_val,
                     Box::new(move |s: RxBuf, st: &mut SelectorState|
                         (VVal::Bol(true), 0)));
 
+            let n0 = pair_type == s2sym("N0") || pair_type == s2sym("N0-");
+
             let sub_pat =
                 Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                    let (m, len) = (*sub_pat)(s, st);
-                    if !m.b() {
-                        return (VVal::None, 0);
-                    }
+                    let len =
+                        if n0 { 0 }
+                        else {
+                            let (m, len) = (*sub_pat)(s, st);
+                            if !m.b() {
+                                return (VVal::None, 0);
+                            }
+                            len
+                        };
 
                     let mut matched     = true;
                     let mut match_len   = len;
@@ -815,7 +826,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                     (VVal::Bol(true), match_len)
                 });
 
-            let mut greedy = pair_type == s2sym("N1");
+            let greedy = pair_type == s2sym("N1");
 
             if greedy {
                 Box::new(move |s: RxBuf, st: &mut SelectorState| {
@@ -1289,16 +1300,16 @@ mod tests {
         assert_eq!(pat("$^($<+B)C$$",                   "BC"),          "BC");
         assert_eq!(pat("$^$<+A($<+B)C$$",               "ABC"),         "ABC");
         assert_eq!(pat("$^$<+A((B)$<+B)C$$",            "ABBC"),        "ABBC");
-        assert_eq!(pat("$^$<+BB$$",         "BB"),       "BB");
-        assert_eq!(pat("$<+BB$$",         "BB"),       "BB");
-        assert_eq!(pat("$+BB$$",         "BB"),       "BB");
-        assert_eq!(pat("$^$<+BB$$",         "BB"),       "BB");
-        assert_eq!(pat("$^$<+B$$",         "B"),       "B");
-        assert_eq!(pat("$^$<+BB$$",         "BBB"),       "BBB");
-        assert_eq!(pat("$^A$<+BB$$",         "ABBB"),       "ABBB");
-        assert_eq!(pat("$^A$<+BBC$$",         "ABBBC"),       "ABBBC");
-        assert_eq!(pat("$^A($<+B$<+B)C$$",         "ABBBC"),       "ABBBC");
-        assert_eq!(pat("$^$<+A($<+B$<+B)C$$",         "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^$<+BB$$",                     "BB"),       "BB");
+        assert_eq!(pat("$<+BB$$",                       "BB"),       "BB");
+        assert_eq!(pat("$+BB$$",                        "BB"),       "BB");
+        assert_eq!(pat("$^$<+BB$$",                     "BB"),       "BB");
+        assert_eq!(pat("$^$<+B$$",                      "B"),       "B");
+        assert_eq!(pat("$^$<+BB$$",                     "BBB"),       "BBB");
+        assert_eq!(pat("$^A$<+BB$$",                    "ABBB"),       "ABBB");
+        assert_eq!(pat("$^A$<+BBC$$",                   "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^A($<+B$<+B)C$$",              "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^$<+A($<+B$<+B)C$$",           "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$<+A($<+(B)$<+B)C$$",         "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$<+A($<+($<+B)$<+B)C$$",      "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$<+A($<+($<+B)$<+B)C$$",      "ABBBC"),       "ABBBC");
@@ -1307,8 +1318,8 @@ mod tests {
         assert_eq!(pat("$^ABBB$<+C$$",                  "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$<+A($<+($<+B)$<+B)$<+C$$",   "ABBBC"),       "ABBBC");
 
-        assert_eq!(pat("$^A($*BB)C$$",            "ABBBC"),       "B");
-        assert_eq!(pat("$^A(^B)C$$",              "ABC"),         "B");
+        assert_eq!(pat("$^A($*BB)C$$",                  "ABBBC"),       "B");
+        assert_eq!(pat("$^A(^B)C$$",                    "ABC"),         "B");
         assert_eq!(pat("$^A(^$*B)C$$",            "ABBBC"),       "B");
 //        assert_eq!(pat("(^BC)",                 "ABC"),         "BC");
 //        assert_eq!(pat("$^[ ]$$",               " "),           "BC");
