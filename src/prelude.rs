@@ -6607,7 +6607,7 @@ pub fn std_symbol_table() -> SymbolTable {
                         }
                     })
                 }, Some(2), Some(2), false))
-        }, Some(3), Some(3), false);
+        }, Some(1), Some(1), false);
 
     #[cfg(feature="regex")]
     func!(st, "re:match",
