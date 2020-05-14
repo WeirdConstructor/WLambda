@@ -6078,6 +6078,22 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::Flt(x * x * (3.0 - (2.0 * x))))
         }, Some(3), Some(3), false);
 
+    func!(st, "fs:rename",
+        |env: &mut Env, _argc: usize| {
+            let from = env.arg(0);
+            let to   = env.arg(1);
+            from.with_s_ref(|from| to.with_s_ref(|to| {
+                if let Err(e) = std::fs::rename(&from, &to) {
+                    return Ok(env.new_err(
+                        format!(
+                            "Couldn't rename file '{}' to file '{}': {}",
+                            from, to, e)));
+                }
+
+                Ok(VVal::Bol(true))
+            }))
+        }, Some(2), Some(2), false);
+
     func!(st, "io:lines",
         |env: &mut Env, _argc: usize| {
             let f = env.arg(0);
