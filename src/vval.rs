@@ -2086,7 +2086,7 @@ impl VVal {
         }
     }
 
-    pub fn sort<F>(&mut self, compare: F)
+    pub fn sort<F>(&self, compare: F)
         where F: FnMut(&VVal, &VVal) -> std::cmp::Ordering
     {
         if let VVal::Lst(v) = self {

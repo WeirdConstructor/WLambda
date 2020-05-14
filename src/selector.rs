@@ -521,7 +521,7 @@ pub struct RxBuf<'a> {
 
 impl std::fmt::Display for RxBuf<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.s)
+        write!(f, "{}[{},{}]", self.s, self.offs, self.orig_len)
     }
 }
 
@@ -560,7 +560,7 @@ impl<'a> RxBuf<'a> {
 
     fn sub(&self, offs: usize, len: usize) -> Self {
         Self {
-            s:        &self.s[offs..len],
+            s:        &self.s[offs..(len + offs)],
             offs:     self.offs + offs,
             orig_len: self.orig_len,
         }
@@ -569,65 +569,6 @@ impl<'a> RxBuf<'a> {
 
 pub type PatternNode = Box<dyn Fn(RxBuf, &mut SelectorState) -> (VVal, usize)>;
 pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal)>;
-
-//fn compile_sub_pattern(pat: &VVal, capture: bool, mut next: PatternNode) -> PatternNode {
-//    println!("COMP SUB PAT {}", pat.s());
-//
-//    if capture {
-//        next =
-//            Box::new(move |s: &str, st: &mut SelectorState| {
-//                let ret = (*next)(s, st);
-//                st.pop_capture();
-//                ret
-//            });
-//    }
-//
-//    if pat.is_pair() {
-//        let sub_type    = pat.at(0).expect("proper pattern").to_sym();
-//        let sub         = pat.at(1).expect("sub pattern");
-//        let mut sub_pat = compile_pattern_branch(&sub);
-//
-//        if capture {
-//            sub_pat =
-//                Box::new(move |s: &str, st: &mut SelectorState| {
-//                    let (m, l) = (*sub_pat)(s, st);
-//                    st.push_capture(s, l);
-//                    (m, l)
-//                });
-//        }
-//
-//
-//        } else {
-//            Box::new(move |s: &str, st: &mut SelectorState| {
-//                panic!("NOT IMPLEMENTED: {}", sub_type.to_string())
-//            })
-//        }
-//
-//    } else {
-//
-//        println!("COMPILE SUB PATTERN: [{}]", pat.s());
-//        let mut p = compile_pattern_branch(&pat);
-//
-//        if capture {
-//            p =
-//                Box::new(move |s: &str, st: &mut SelectorState| {
-//                    let (m, l) = (*p)(s, st);
-//                    st.push_capture(s, l);
-//                    (m, l)
-//                });
-//        }
-//
-//        Box::new(move |s: &str, st: &mut SelectorState| {
-//            let (r, len1) = (*p)(s, st);
-//            if !r.b() {
-//                return (VVal::None, 0);
-//            }
-//
-//            let (r, len2) = (*next)(&s[len1..], st);
-//            (r, len1 + len2)
-//        })
-//    }
-//}
 
 macro_rules! while_lengthen_str {
     ($s: ident, $try_len: ident, $b: block) => {
@@ -1112,68 +1053,75 @@ mod tests {
         let mut state = SelectorState::new();
         let capts = VVal::vec();
         (*sn)(v, &mut state, &capts);
+        capts.sort(|a: &VVal, b: &VVal| {
+            if a.is_int() || a.is_float() {
+                a.compare_num(b)
+            } else {
+                a.compare_str(b)
+            }
+        });
         capts.s()
     }
 
-//    #[test]
-//    fn check_selector_match_path() {
-//        let v1 =
-//            VVal::map3("a",
-//                VVal::vec3(
-//                    VVal::Int(20),
-//                    VVal::pair(VVal::Int(2), VVal::Int(4)),
-//                    VVal::new_str("F0O")),
-//                "ab",
-//                VVal::vec2(
-//                    VVal::Int(33),
-//                    VVal::Int(44)),
-//                "xyab",
-//                VVal::vec3(
-//                    VVal::Int(8),
-//                    VVal::Int(9),
-//                    VVal::map2("X", VVal::Int(10), "Y", VVal::Int(20))));
-//
-//        assert_eq!(pev("a",         &v1), "$[$[20,$p(2,4),\"F0O\"]]");
-//        assert_eq!(pev("a/2/2",     &v1), "$[\"O\"]");
-//        assert_eq!(pev("a/2/1",     &v1), "$[\"0\"]");
-//        assert_eq!(pev("ab/0",      &v1), "$[33]");
-//
-//        assert_eq!(pev("a/?",       &v1), "$[20,$p(2,4),\"F0O\"]");
-//        assert_eq!(pev("a/?/1",     &v1), "$[4,\"0\"]");
-//
-//        assert_eq!(pev("?/1",       &v1), "$[$p(2,4)]");
-//        assert_eq!(pev("?/2",       &v1), "$[\"F0O\"]");
-//
-//        assert_eq!(pev("?b/1",      &v1), "$[44]");
-//        assert_eq!(pev("a?/1",      &v1), "$[44]");
-//        assert_eq!(pev("??ab/1",    &v1), "$[9]");
-//
-//        assert_eq!(pev("*/X",       &v1), "$[]");
-//        assert_eq!(pev("*/?/X",     &v1), "$[10]");
-//        assert_eq!(pev("*/*/X",     &v1), "$[10]");
-//        assert_eq!(pev("*/2/2",     &v1), "$[\"O\"]");
-//
-//        assert_eq!(pev("*ab/*/X",   &v1), "$[10]");
-//
-//        assert_eq!(pev("[xy][xy]*/[01]",    &v1), "$[8,9]");
-//        assert_eq!(pev("[^xy][^xy]/[01]",   &v1), "$[33,44]");
-//        assert_eq!(pev("a/[^01]",           &v1), "$[\"F0O\"]");
-//
-//        assert_eq!(pev("(ab)/[01]",         &v1), "$[33,44]");
-//        assert_eq!(pev("(x)y(a)b/[01]",     &v1), "$[8,9]");
-//        assert_eq!(pev("$!(a)*/[01]",       &v1), "$[8,9]");
-//        assert_eq!(pev("a/$![01]",          &v1), "$[\"F0O\"]");
-//
-//        assert_eq!(pev("$=}x*/[01]",        &v1), "$[8,9]");
-//        assert_eq!(pev("$=}(ab)*/[01]",     &v1), "$[33,44]");
-//        assert_eq!(pev("a$=b*/[01]",        &v1), "$[33,44]");
-//        assert_eq!(pev("$!x*$=b/[01]",      &v1), "$[33,44]");
-//
-//        assert_eq!(pev("$+[xy]ab/0",     &v1), "$[8]");
-//        assert_eq!(pev("a$+b/0",         &v1), "$[33]");
-//        assert_eq!(pev("$*[xy]ab/0",     &v1), "");
-//        assert_eq!(pev("$?[xy][xy]ab/0", &v1), "");
-//    }
+    #[test]
+    fn check_selector_match_path() {
+        let v1 =
+            VVal::map3("a",
+                VVal::vec3(
+                    VVal::Int(20),
+                    VVal::pair(VVal::Int(2), VVal::Int(4)),
+                    VVal::new_str("F0O")),
+                "ab",
+                VVal::vec2(
+                    VVal::Int(33),
+                    VVal::Int(44)),
+                "xyab",
+                VVal::vec3(
+                    VVal::Int(8),
+                    VVal::Int(9),
+                    VVal::map2("X", VVal::Int(10), "Y", VVal::Int(20))));
+
+        assert_eq!(pev("a",         &v1), "$[$[20,$p(2,4),\"F0O\"]]");
+        assert_eq!(pev("a/2/2",     &v1), "$[\"O\"]");
+        assert_eq!(pev("a/2/1",     &v1), "$[\"0\"]");
+        assert_eq!(pev("ab/0",      &v1), "$[33]");
+
+        assert_eq!(pev("a/?",       &v1), "$[$p(2,4),20,\"F0O\"]");
+        assert_eq!(pev("a/?/1",     &v1), "$[\"0\",4]");
+
+        assert_eq!(pev("?/1",       &v1), "$[$p(2,4)]");
+        assert_eq!(pev("?/2",       &v1), "$[\"F0O\"]");
+
+        assert_eq!(pev("?b/1",      &v1), "$[44]");
+        assert_eq!(pev("a?/1",      &v1), "$[44]");
+        assert_eq!(pev("??ab/1",    &v1), "$[9]");
+
+        assert_eq!(pev("*/X",       &v1), "$[]");
+        assert_eq!(pev("*/?/X",     &v1), "$[10]");
+        assert_eq!(pev("*/*/X",     &v1), "$[10]");
+        assert_eq!(pev("*/2/2",     &v1), "$[\"O\"]");
+
+        assert_eq!(pev("*ab/*/X",   &v1), "$[10]");
+
+        assert_eq!(pev("[xy][xy]*/[01]",    &v1), "$[8,9]");
+        assert_eq!(pev("[^xy][^xy]/[01]",   &v1), "$[33,44]");
+        assert_eq!(pev("a/[^01]",           &v1), "$[\"F0O\"]");
+
+        assert_eq!(pev("(ab)/[01]",         &v1), "$[33,44]");
+        assert_eq!(pev("(x)y(a)b/[01]",     &v1), "$[8,9]");
+        assert_eq!(pev("$!(a)*/[01]",       &v1), "$[8,9]");
+        assert_eq!(pev("a/$![01]?",         &v1), "$[\"F0O\"]");
+
+        assert_eq!(pev("$=x*/[01]",        &v1), "$[8,9]");
+        assert_eq!(pev("$=(ab)*/[01]",     &v1), "$[33,44]");
+        assert_eq!(pev("a$=b*/[01]",       &v1), "$[33,44]");
+        assert_eq!(pev("$!x*$=b?/[01]",    &v1), "$[33,44]");
+
+        assert_eq!(pev("$+[xy]ab/0",     &v1), "$[8]");
+        assert_eq!(pev("a$+b/0",         &v1), "$[33]");
+        assert_eq!(pev("$*[xy]ab/0",     &v1), "$[8,33]");
+        assert_eq!(pev("$?[xy][xy]ab/0", &v1), "");
+    }
 //
 //    #[test]
 //    fn check_selector_match_esc() {
@@ -1318,14 +1266,22 @@ mod tests {
         assert_eq!(pat("$^ABBB$<+C$$",                  "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$<+A($<+($<+B)$<+B)$<+C$$",   "ABBBC"),       "ABBBC");
 
-        assert_eq!(pat("$^A($*BB)C$$",                  "ABBBC"),       "B");
-        assert_eq!(pat("$^A(^B)C$$",                    "ABC"),         "B");
-        assert_eq!(pat("$^A(^$*B)C$$",            "ABBBC"),       "B");
-//        assert_eq!(pat("(^BC)",                 "ABC"),         "BC");
-//        assert_eq!(pat("$^[ ]$$",               " "),           "BC");
-//        assert_eq!(pat("$^$*[ ]$$",             "   "),         "BC");
-//        assert_eq!(pat("[\\t\\0\\u0101]",   "\0"),          "");
-//        assert_eq!(pat("[\\t\\0\\u0101]",   "\t"),          "");
-//        assert_eq!(pat("[\\t\\0\\u0101]",   "ā"),           "");
+        assert_eq!(pat("$^A($*BB)C$$",                  "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^A(^B)C$$",                    "ABC"),         "ABC");
+        assert_eq!(pat("$^A(^$*B)C$$",                  "ABBBC"),       "ABBBC");
+        assert_eq!(pat("BC",                            "ABC"),         "BC");
+        assert_eq!(pat("(BC)",                          "ABC"),         "BC");
+        assert_eq!(pat("(^BC)",                         "ABC"),         "BC");
+        assert_eq!(pat("$^[ ]$$",                       " "),           " ");
+        assert_eq!(pat("$^$*[ ]$$",                     "   "),         "   ");
+
+        assert_eq!(pat("$^ $!x*$=b? $$",                "ab"),          "ab");
+        assert_eq!(pat("$^ $!x*$=b? $$",                "xyab"),        "-nomatch-");
+
+        assert_eq!(pat("$*($?ab)",                      "abbbababb"),   "");
+
+        assert_eq!(pat("[\\t\\0\\u0101]",               "\0"),          "");
+        assert_eq!(pat("[\\t\\0\\u0101]",               "\t"),          "");
+        assert_eq!(pat("[\\t\\0\\u0101]",               "ā"),           "");
     }
 }
