@@ -6567,6 +6567,49 @@ pub fn std_symbol_table() -> SymbolTable {
         }, Some(3), Some(3), false);
 
     #[cfg(feature="regex")]
+    func!(st, "re:match_compile",
+        |env: &mut Env, _argc: usize| {
+            use regex::Regex;
+            let re   = env.arg(0);
+
+            let rx = re.with_s_ref(|re: &str| Regex::new(&re));
+            if let Err(e) = rx {
+                return Ok(env.new_err(
+                    format!("Regex '{}' did not compile: {}", re.s_raw(), e)));
+            }
+            let rx = rx.unwrap();
+
+            Ok(VValFun::new_fun(
+                move |env: &mut Env, argc: usize| {
+                    let text = env.arg(0);
+                    let f    = env.arg(1);
+
+                    text.with_s_ref(|text: &str| {
+                        match rx.captures(text) {
+                            Some(c) => {
+                                let captures = VVal::vec();
+                                for cap in c.iter() {
+                                    match cap {
+                                        None    => { captures.push(VVal::None); },
+                                        Some(c) => {
+                                            captures.push(VVal::new_str(c.as_str()));
+                                        }
+                                    }
+                                }
+                                env.push(captures);
+                                let rv = f.call_internal(env, 1);
+                                env.popn(1);
+                                rv
+                            },
+                            None => {
+                                Ok(VVal::None)
+                            }
+                        }
+                    })
+                }, Some(2), Some(2), false))
+        }, Some(3), Some(3), false);
+
+    #[cfg(feature="regex")]
     func!(st, "re:match",
         |env: &mut Env, _argc: usize| {
             use regex::Regex;
