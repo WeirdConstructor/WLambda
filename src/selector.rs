@@ -728,6 +728,21 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                 (*next)(s, st)
             })
 
+        } else if pair_type == s2sym("Opt") {
+            let sub_pat =
+                compile_atom(&pair_val,
+                    Box::new(move |s: RxBuf, st: &mut SelectorState|
+                        (VVal::Bol(true), 0)));
+
+            Box::new(move |s: RxBuf, st: &mut SelectorState| {
+                let (m, len) = (*sub_pat)(s, st);
+                if m.b() {
+                    (*next)(s.offs(len), st)
+                } else {
+                    (*next)(s, st)
+                }
+            })
+
         } else if pair_type == s2sym("N1")
                || pair_type == s2sym("N1-")
                || pair_type == s2sym("N0")
