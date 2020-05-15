@@ -728,9 +728,14 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                         (VVal::Bol(true), 0)));
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                let (m, len) = (*sub_pat)(s, st);
+                let (m, o_len) = (*sub_pat)(s, st);
                 if m.b() {
-                    (*next)(s.offs(len), st)
+                    let (m, len) = (*next)(s.offs(o_len), st);
+                    if m.b() {
+                        (m, o_len + len)
+                    } else {
+                        (VVal::None, 0)
+                    }
                 } else {
                     (*next)(s, st)
                 }
@@ -1126,7 +1131,7 @@ mod tests {
         assert_eq!(pev("$+[xy]ab/0",        &v1), "$[8]");
         assert_eq!(pev("a$+b/0",            &v1), "$[33]");
         assert_eq!(pev("$*[xy]ab/0",        &v1), "$[8,33]");
-//        assert_eq!(pev("$?[xy][xy]ab/0", &v1), "");
+        assert_eq!(pev("$?[xy][xy]ab/0",    &v1), "$[8]");
 
         let v2 = VVal::map1("\t", VVal::Int(12));
         assert_eq!(pev("\\t",               &v2), "$[12]");
@@ -1293,5 +1298,13 @@ mod tests {
         assert_eq!(pat("[\\t\\0\\u{0101}]",               "\0"),          "\u{0}");
         assert_eq!(pat("[\\t\\0\\u{0101}]",               "\t"),          "\t");
         assert_eq!(pat("[\\t\\0\\u{0101}]",               "ā"),           "ā");
+
+        assert_eq!(pat("a$?[xy]a",                        "aa"),         "aa");
+        assert_eq!(pat("$^$?[xy]$$",                      "a"),          "-nomatch-");
+        assert_eq!(pat("$?[xy]",                          "x"),          "x");
+        assert_eq!(pat("$?[xy]a",                         "xa"),         "xa");
+        assert_eq!(pat("$?[xy][xy]abc$$",                 "xyabc"),      "xyabc");
+        assert_eq!(pat("$?[xy][xy]ab",                    "xyab"),       "xyab");
+        assert_eq!(pat("$?[xy][xy]ab$$",                  "xyab"),       "xyab");
     }
 }
