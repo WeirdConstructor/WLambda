@@ -64,7 +64,7 @@ Selector Syntax:
     pat_branch  = { glob_atom }
                 ;
 
-    pattern     = pat_branch, { "|", pat_branch }
+    pattern     = pat_branch, [ "|", pattern ]
                 ;
 
     key         = index | pattern
@@ -98,6 +98,8 @@ use crate::vval::VVal;
 pub use crate::parser::state::State;
 pub use crate::parser::state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
 pub use crate::parser::{parse_str_backslash, EscSeqValue};
+
+use std::rc::Rc;
 
 use crate::str_int::s2sym;
 
@@ -311,16 +313,9 @@ fn parse_pat_branch(ps: &mut State) -> Result<VVal, ParseError> {
 fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
     let mut pat = parse_pat_branch(ps)?;
 
-    let mut append = false;
-    while ps.consume_if_eq_ws('|') {
-        let next_opt_pat = parse_pat_branch(ps)?;
-
-        if append {
-            pat.push(next_opt_pat);
-        } else {
-            pat = VVal::vec3(VVal::new_sym("Opt"), pat, next_opt_pat);
-            append = true;
-        }
+    if ps.consume_if_eq_ws('|') {
+        let pat_alt = parse_pattern(ps)?;
+        pat = VVal::vec3(VVal::new_sym("Alt"), pat, pat_alt);
     }
 
     Ok(pat)
@@ -675,10 +670,10 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             })
 
         } else if pair_type == s2sym("PatSub") {
-            compile_pattern_branch(&pair_val, next)
+            compile_pattern(&pair_val, next)
 
         } else if pair_type == s2sym("PatCap") {
-            let sub = compile_pattern_branch(&pair_val, next); //, true, next);
+            let sub = compile_pattern(&pair_val, next); //, true, next);
             // TODO: Arrange capturing!
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
                 let (m, l) = (*sub)(s, st);
@@ -863,13 +858,20 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             }
         })
 
+    } else if p.is_vec() {
+        if p.len() == 0 {
+            Box::new(move |s: RxBuf, st: &mut SelectorState| { (VVal::Bol(true), 0) })
+        } else {
+            panic!("UNKNOWN ATOM: {}", p.s());
+        }
+
     } else {
         panic!("UNKNOWN ATOM: {}", p.s());
     }
 }
 
 fn compile_pattern_branch(pat: &VVal, next: PatternNode) -> PatternNode {
-    println!("COMPILE PATTERN [{}]", pat.s());
+    println!("COMPILE PATTERN BRANCH [{}]", pat.s());
 
     let mut next : Option<PatternNode> = Some(next);
 
@@ -882,6 +884,39 @@ fn compile_pattern_branch(pat: &VVal, next: PatternNode) -> PatternNode {
     }
 
     next.unwrap()
+}
+
+fn compile_pattern(pat: &VVal, next: PatternNode) -> PatternNode {
+    println!("COMPILE PATTERN [{}]", pat.s());
+
+    let first = pat.at(0).unwrap_or_else(|| VVal::None);
+    if first.is_sym() && first.to_sym() == s2sym("Alt") {
+        let next_a : Rc<PatternNode> = Rc::from(next);
+        let next_b : Rc<PatternNode> = next_a.clone();
+
+        let branch_a =
+            compile_pattern_branch(
+                &pat.at(1).expect("left hand side alt branch"),
+                Box::new(move |s: RxBuf, st: &mut SelectorState|
+                    (*next_a)(s, st)));
+
+        let branch_b =
+            compile_pattern(
+                &pat.at(2).expect("right hand side alt branch"),
+                Box::new(move |s: RxBuf, st: &mut SelectorState|
+                    (*next_b)(s, st)));
+
+        Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            let (ma, a_len) = (branch_a)(s, st);
+            if ma.b() {
+                (ma, a_len)
+            } else {
+                (branch_b)(s, st)
+            }
+        })
+    } else {
+        compile_pattern_branch(pat, next)
+    }
 }
 
 fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
@@ -916,10 +951,8 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
                 });
         }
 
-        let pat = compile_pattern_branch(k,
+        let pat = compile_pattern(k,
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                // TODO: Needs to be done by the caller of compile_pattern_branch!
-                //       And passed like usual as continuation.
                 println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
                 (VVal::Bol(true), 0)
             }));
@@ -999,7 +1032,7 @@ fn compile_selector(sel: &VVal) -> SelNode {
 }
 
 fn compile_single_pattern(v: &VVal) -> PatternNode {
-    let pat = compile_pattern_branch(v,
+    let pat = compile_pattern(v,
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
             println!("*** BRANCH LEAF SINGLE PATTERN MATCH {}| {:?}", s, st.captures);
             (VVal::Bol(true), 0)
@@ -1186,7 +1219,7 @@ mod tests {
         assert_eq!(p("(^a)"),   "$[:Path,$[:NK,$[$p(:PatCap,$[$p(:I,:a)])]]]");
         assert_eq!(p("^(^a)"),  "$[:Path,$[:NCap,$[:NK,$[$p(:PatCap,$[$p(:I,:a)])]]]]");
 
-        assert_eq!(p("(*|a?)"), "$[:Path,$[:NK,$[$p(:PatSub,$[:Opt,$[:Glob],$[$p(:I,:a),:Any]])]]]");
+        assert_eq!(p("(*|a?)"), "$[:Path,$[:NK,$[$p(:PatSub,$[:Alt,$[:Glob],$[$p(:I,:a),:Any]])]]]");
 
         assert_eq!(p("*/*/a"),   "$[:Path,$[:NK,$[:Glob]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:a)]]]");
         assert_eq!(p("*  /  *  /   a   "),   "$[:Path,$[:NK,$[:Glob]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:a)]]]");
@@ -1306,5 +1339,11 @@ mod tests {
         assert_eq!(pat("$?[xy][xy]abc$$",                 "xyabc"),      "xyabc");
         assert_eq!(pat("$?[xy][xy]ab",                    "xyab"),       "xyab");
         assert_eq!(pat("$?[xy][xy]ab$$",                  "xyab"),       "xyab");
+
+        assert_eq!(pat("xyab|ab",                         "xyab"),       "xyab");
+        assert_eq!(pat("xyab|ab",                         "jjab"),       "ab");
+        assert_eq!(pat("(x|y|z)(y|x)(ab|)",               "xyab"),       "xyab");
+        assert_eq!(pat("$+(x|y|z)(y|x)(ab|)",             "zxyab"),      "zxyab");
+        assert_eq!(pat("$^ $*(x|y|z)(ab|) $$",            "zxyab"),      "zxyab");
     }
 }
