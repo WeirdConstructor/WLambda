@@ -34,6 +34,12 @@ Selector Syntax:
                 | ident
                 ;
 
+    rx_match_mod = "L"             (* transforms the input string from the match
+                                      position on to lower case. *)
+                 | "U"             (* transforms the input string from the match
+                                      position on to upper case. *)
+                 ;
+
     pat_regex   = "*", rx_atom     (* matches sub pattern 0 or N times *)
                 | "+", rx_atom     (* matches sub pattern 1 or N times *)
                 | "<", [ ("*" | "+") ], rx_atom
@@ -44,6 +50,7 @@ Selector Syntax:
                 | "^"              (* matches (zero width) start of string *)
                 | "$"              (* matches (zero width) end of string *)
                 | "s"              (* matches one whitespace character *)
+                | "&", rx_match_mod
                 ;
 
     glob_group  = "(", "^", pattern, ")"    (* capturing sub group *)
@@ -241,6 +248,15 @@ fn parse_pat_regex(ps: &mut State) -> Result<VVal, ParseError> {
         },
         '^' => { ps.consume_ws(); Ok(VVal::new_sym("Start")) },
         '$' => { ps.consume_ws(); Ok(VVal::new_sym("End")) },
+        '&' => { ps.consume_ws();
+            match ps.expect_some(ps.peek())? {
+                'L' => { ps.consume_ws(); Ok(VVal::new_sym("ToLowercase")) },
+                'U' => { ps.consume_ws(); Ok(VVal::new_sym("ToUppercase")) },
+                c =>
+                    Err(ps.err(
+                        ParseErrorKind::UnexpectedToken(c, "match modifier"))),
+            }
+        },
         's' => { ps.consume_ws(); Ok(VVal::new_sym("WsChar")) },
         'S' => { ps.consume_ws(); Ok(VVal::new_sym("NWsChar")) },
         c =>
@@ -884,6 +900,28 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             }
         })
 
+    } else if p.to_sym() == s2sym("ToLowercase") {
+        Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            let s_lower = s.s.to_lowercase();
+            let rx = RxBuf {
+                s:              &s_lower[..],
+                offs:           s.offs,
+                orig_len:       s.orig_len,
+            };
+            (*next)(rx, st)
+        })
+
+    } else if p.to_sym() == s2sym("ToUppercase") {
+        Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            let s_upper = s.s.to_uppercase();
+            let rx = RxBuf {
+                s:              &s_upper[..],
+                offs:           s.offs,
+                orig_len:       s.orig_len,
+            };
+            (*next)(rx, st)
+        })
+
     } else if p.is_vec() {
         if p.len() == 0 {
             Box::new(move |s: RxBuf, st: &mut SelectorState| { (VVal::Bol(true), 0) })
@@ -1395,5 +1433,9 @@ mod tests {
 
         assert_eq!(pat("$^ $+$s $$",        "  \t\n\r  "),              "  \t\n\r  ");
         assert_eq!(pat(" $+ $S ",           "  \t\nXXJFJF\r  "),        "XXJFJF");
+
+        assert_eq!(pat("AB $&L $+b $&U C",  " ABbbBbc "),               "ABbbBbc");
+        assert_eq!(pat("$&U A$+BC",         " abbbbbc "),               "abbbbbc");
+        assert_eq!(pat("$&L a$+bc",         " ABBBBBC "),               "ABBBBBC");
     }
 }
