@@ -93,9 +93,14 @@ In the following grammar, white space and comments are omitted:
                        selector_rs_syntax matcher at compile time *)
                   ;
     pattern       = "X", ?any character as quote?, selector_rs_pattern_syntax, ?any character as quote?
-                    (* parses substring like 'q', but constructs a pattern matcher
-                       at compile time *)
+                    (* parses substring like 'q', but constructs a
+                       pattern matcher at compile time *)
                   ;
+    struct_match  = "P", expr   (* compiles expr as structure matcher function.
+                                   If called, it matches the first argument against
+                                   the literal structure and returns a map of
+                                   matched variables. If nothing matches $none
+                                   is returned. *)
     list_expr     = "*", expr   (* splices the vector result of 'expr'
                                    into the currently parsed list *)
                   | expr
@@ -173,6 +178,7 @@ In the following grammar, white space and comments are omitted:
                   | accumulator
                   | selector
                   | pattern
+                  | struct_match
                   | "\", capture_variable
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
@@ -219,7 +225,45 @@ In the following grammar, white space and comments are omitted:
                   ;
     arg_list      = "[", [ expr, { ",", expr }, [ "," ] ], "]"
                   | "[[", expr, "]]"  (* apply result vector of expr as argument list *)
-                  statement     = "!" definition
+                  ;
+    field         = ".", ( integer | ident | value ), [ field ]
+                  ;
+    field_access  = field, "=", expr
+                  | field, arg_list
+                  | field
+                  (* please note, that a field access like:
+                     `obj.field` is equivalent to the call:
+                     `field[obj]`. That also means that
+                     `obj.field[...]` is transformed into
+                     `field[obj][...]`.
+                     The exception is "=" which assigns
+                     the field as specified.
+                     BUT: There is a special case, when you specify
+                     an `indent` it is quoted and interpreted as symbol. *)
+                  ;
+    call_no_ops   = value, { arg_list | field_access }, [ "~", expr ]
+                  ;
+    call          = value,
+                    { arg_list | field_access | bin_op | value },
+                    [ "~", expr ] (* this is a tail argument, if present the
+                                     expr is appended to the argument list *)
+                  ;
+    expr          = call, { "|", call }
+                  | call, { "|>", call }
+                  | call, { "||", call }
+                  ;
+    simple_assign = qident, "=", expr
+                  ;
+    destr_assign  = "(", [ qident, { ",", qident } ], ")", "=" expr
+                  ;
+    definition    = [ ref_specifier ], ( simple_assign | destr_assign )
+                  ;
+    import        = "!", "@import", symbol, [ [ "=" ], symbol ]
+                  | "!", "@wlambda"
+                  ;
+    export        = "!", "@export", symbol, [ "=" ], expr
+                  ;
+    statement     = "!" definition
                   | "." simple_assign
                   | "." destr_assign
                   | import
@@ -232,6 +276,17 @@ In the following grammar, white space and comments are omitted:
     code          = block
                   ;
 ```
+
+## Special Forms
+
+There are certain calls that are handled by the compiler differently.
+
+- `? _condition_ _then-block-or-expr_ [_else-block-or-expr_]`
+- `while _condition_ _block-or-expr_`
+- `iter _var_ _value-expr_ _block-or-expr_`
+- `next _x_`
+- `break`
+- `match _value-expr_ _struct-match-expr-a_ _expr-a_ { _struct-match-expr-b _expr-b_ } _else-expr_`
 
 */
 

@@ -1110,12 +1110,12 @@ A usage example:
     }
 };
 
-!x = $&$n;
+!x = $n;
 
 # The first function of on_error will be called with the unwrapped
 # error if an error occured.
 on_error {|4| .x = _; } ~ func 13;
-std:assert_eq $*x "this failed!";
+std:assert_eq x "this failed!";
 
 !ret = on_error {|4| .x = _; } ~ func 1;
 std:assert_eq ret "all ok!";

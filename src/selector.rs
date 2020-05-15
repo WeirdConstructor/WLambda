@@ -1003,8 +1003,6 @@ fn compile_selector(sel: &VVal) -> SelNode {
 fn compile_single_pattern(v: &VVal) -> PatternNode {
     let pat = compile_pattern_branch(v,
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
-            // TODO: Needs to be done by the caller of compile_pattern_branch!
-            //       And passed like usual as continuation.
             println!("*** BRANCH LEAF SINGLE PATTERN MATCH {}| {:?}", s, st.captures);
             (VVal::Bol(true), 0)
         }));
