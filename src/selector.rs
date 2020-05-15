@@ -1086,6 +1086,11 @@ fn compile_single_pattern(v: &VVal) -> PatternNode {
 mod tests {
     use super::*;
 
+    pub fn v(s: &str) -> VVal {
+        let mut ctx = crate::EvalContext::new_default();
+        ctx.eval(s).expect("correct compilation")
+    }
+
     fn pat(pat: &str, st: &str) -> String {
         let mut ps = State::new(pat, "<pattern>");
         ps.skip_ws();
@@ -1221,6 +1226,22 @@ mod tests {
         assert_eq!(pev("[\\\\]*/1", &v1),   "$[$p(2,4)]");
         assert_eq!(pev("[\\/]*/0", &v1),    "$[33]");
         assert_eq!(pev("\\/\\//0", &v1),    "$[33]");
+    }
+
+    #[test]
+    fn check_selector_kv_match() {
+        let v1 = v(r#"
+            $[
+                ${ a = :test, x = 10 },
+                ${ b = :test, x = 11 },
+                ${ a = :test, x = 12 },
+                ${ c = :test, y = 15, x = 22 },
+                ${ a = :test, y = 16, x = 23 },
+            ]
+        "#);
+
+        assert_eq!(pev("*/[xy]",        &v1), "$[10,11,12,15,16,22,23]");
+        assert_eq!(pev("*:{a = test}",  &v1), "");
     }
 
     #[test]
