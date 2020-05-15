@@ -487,9 +487,8 @@ impl SelectorState {
         }
     }
 
-    fn push_capture(&mut self, s: &str, len: usize) {
-        let offs = self.orig_string_len - s.len();
-        self.captures.push((offs, offs + len));
+    fn push_capture(&mut self, s: &RxBuf) {
+        self.captures.push((s.offs, s.s.len()));
     }
 
     fn pop_capture(&mut self) {
