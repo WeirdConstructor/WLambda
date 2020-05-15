@@ -94,11 +94,10 @@ Selector Syntax:
 */
 
 use crate::vval::VVal;
-//use crate::vval::Syntax;
 
 pub use crate::parser::state::State;
 pub use crate::parser::state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
-//use crate::parser::state::StrPart;
+pub use crate::parser::{parse_str_backslash, EscSeqValue};
 
 use crate::str_int::s2sym;
 
@@ -117,8 +116,12 @@ fn parse_ident_char(ps: &mut State) -> Result<Option<char>, ParseError> {
         match c {
             '\\' => {
                 ps.consume();
-                let c = ps.expect_some(ps.peek())?;
-                ps.consume_ws();
+                let c =
+                    match parse_str_backslash(ps)? {
+                        EscSeqValue::Char(c) => c,
+                        EscSeqValue::Byte(b) => b as char,
+                    };
+                ps.skip_ws();
                 Ok(Some(c))
             },
             c if is_ident_char(c) => {
@@ -149,7 +152,7 @@ fn parse_ident(ps: &mut State, one_char: bool) -> Result<VVal, ParseError> {
         return Err(ps.err(
             ParseErrorKind::UnexpectedToken(
                 ps.peek().unwrap_or(' '),
-                "Expected identifier character")));
+                "identifier character")));
     }
 
     let r = VVal::pair(VVal::new_sym("I"), VVal::new_sym(&uh));
@@ -160,7 +163,7 @@ fn parse_ident(ps: &mut State, one_char: bool) -> Result<VVal, ParseError> {
 fn parse_glob_cclass(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq('[') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('[', "in char class")));
+            ParseErrorKind::ExpectedToken('[', "char class start")));
     }
 
     let neg = ps.consume_if_eq('^');
@@ -171,9 +174,11 @@ fn parse_glob_cclass(ps: &mut State) -> Result<VVal, ParseError> {
     while c != ']' {
         ps.consume();
         if c == '\\' {
-            let c = ps.expect_some(ps.peek())?;
-            ps.consume();
-            // TODO: Factor out the \-Parsing of parse_string() in parser.rs!
+            let c =
+                match parse_str_backslash(ps)? {
+                    EscSeqValue::Char(c) => c,
+                    EscSeqValue::Byte(b) => b as char,
+                };
             chars.push(c);
         } else {
             chars.push(c);
@@ -183,7 +188,7 @@ fn parse_glob_cclass(ps: &mut State) -> Result<VVal, ParseError> {
 
     if !ps.consume_if_eq_ws(']') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken(']', "in char class")));
+            ParseErrorKind::ExpectedToken(']', "char class end")));
     }
 
     Ok(VVal::pair(
@@ -194,8 +199,7 @@ fn parse_glob_cclass(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_pat_regex(ps: &mut State) -> Result<VVal, ParseError> {
-    let c = ps.expect_some(ps.peek())?;
-    match c {
+    match ps.expect_some(ps.peek())? {
         '*' => {
             ps.consume_ws();
             Ok(VVal::pair(VVal::new_sym("N0"), parse_rx_atom(ps)?))
@@ -206,8 +210,7 @@ fn parse_pat_regex(ps: &mut State) -> Result<VVal, ParseError> {
         },
         '<' => {
             ps.consume_ws();
-            let c = ps.expect_some(ps.peek())?;
-            match c {
+            match ps.expect_some(ps.peek())? {
                 '*' => {
                     ps.consume_ws();
                     Ok(VVal::pair(VVal::new_sym("N0-"), parse_rx_atom(ps)?))
@@ -216,10 +219,10 @@ fn parse_pat_regex(ps: &mut State) -> Result<VVal, ParseError> {
                     ps.consume_ws();
                     Ok(VVal::pair(VVal::new_sym("N1-"), parse_rx_atom(ps)?))
                 },
-                _ =>
+                c =>
                     Err(ps.err(
                         ParseErrorKind::UnexpectedToken(
-                            c, "in non-greedy regex pattern"))),
+                            c, "non-greedy regex pattern"))),
             }
         }
         '?' => {
@@ -238,16 +241,16 @@ fn parse_pat_regex(ps: &mut State) -> Result<VVal, ParseError> {
         '$' => { ps.consume_ws(); Ok(VVal::new_sym("End")) },
         's' => { ps.consume_ws(); Ok(VVal::new_sym("WsChar")) },
         'S' => { ps.consume_ws(); Ok(VVal::new_sym("NWsChar")) },
-        _ =>
+        c =>
             Err(ps.err(
-                ParseErrorKind::UnexpectedToken(c, "in regex pattern"))),
+                ParseErrorKind::UnexpectedToken(c, "regex pattern"))),
     }
 }
 
 fn parse_glob_group(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_ws('(') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('(', "in sub pattern")));
+            ParseErrorKind::ExpectedToken('(', "sub pattern start")));
     }
 
     let capture = ps.consume_if_eq_ws('^');
@@ -255,7 +258,7 @@ fn parse_glob_group(ps: &mut State) -> Result<VVal, ParseError> {
 
     if !ps.consume_if_eq_ws(')') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken(')', "in sub pattern")));
+            ParseErrorKind::ExpectedToken(')', "sub pattern end")));
     }
 
     if capture {
@@ -266,14 +269,13 @@ fn parse_glob_group(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_pat_glob(ps: &mut State) -> Result<VVal, ParseError> {
-    let c = ps.expect_some(ps.peek())?;
-    match c {
+    match ps.expect_some(ps.peek())? {
         '*' => { ps.consume_ws(); Ok(VVal::new_sym("Glob")) },
         '?' => { ps.consume_ws(); Ok(VVal::new_sym("Any")) },
         '$' => { ps.consume_ws(); parse_pat_regex(ps) },
         '[' => parse_glob_cclass(ps),
         '(' => parse_glob_group(ps),
-        _ =>
+        c =>
             Err(ps.err(
                 ParseErrorKind::UnexpectedToken(c, "in glob pattern"))),
     }
@@ -349,7 +351,7 @@ fn parse_kv(ps: &mut State) -> Result<VVal, ParseError> {
 
     if !ps.consume_if_eq_ws('=') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('=', "in key/value")));
+            ParseErrorKind::ExpectedToken('=', "key/value pattern")));
     }
 
     let val = parse_pattern(ps)?;
@@ -360,7 +362,7 @@ fn parse_kv(ps: &mut State) -> Result<VVal, ParseError> {
 fn parse_kv_item(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_ws('{') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('{', "in key/value node pattern start")));
+            ParseErrorKind::ExpectedToken('{', "key/value node pattern start")));
     }
 
     let kv = parse_kv(ps)?;
@@ -375,7 +377,7 @@ fn parse_kv_item(ps: &mut State) -> Result<VVal, ParseError> {
 
     if !ps.consume_if_eq_ws('}') {
         return Err(ps.err(
-            ParseErrorKind::UnexpectedToken('}', "in key/value node pattern end")));
+            ParseErrorKind::ExpectedToken('}', "in key/value node pattern end")));
     }
 
     Ok(v)
@@ -605,16 +607,6 @@ macro_rules! while_shorten_str {
     }
 }
 
-macro_rules! vari_str_glob {
-    ($s: ident, $try_len: ident, $greedy: expr, $b: block) => {
-        if $greedy {
-            while_shorten_str!($s, $try_len, $b);
-        } else {
-            while_lengthen_str!($s, $try_len, $b);
-        }
-    }
-}
-
 fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
     println!("COMPILE ATOM {}", p.s());
 
@@ -644,6 +636,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
                 chars.with_s_ref(|chrs| {
+                    println!("CLASCHARS {:?}", chrs);
                     if let Some(c) = s.s.chars().nth(0) {
                         let c_len = c.len_utf8();
 
@@ -1125,15 +1118,19 @@ mod tests {
         assert_eq!(pev("$!(a)*/[01]",       &v1), "$[8,9]");
         assert_eq!(pev("a/$![01]?",         &v1), "$[\"F0O\"]");
 
-        assert_eq!(pev("$=x*/[01]",        &v1), "$[8,9]");
-        assert_eq!(pev("$=(ab)*/[01]",     &v1), "$[33,44]");
-        assert_eq!(pev("a$=b*/[01]",       &v1), "$[33,44]");
-        assert_eq!(pev("$!x*$=b?/[01]",    &v1), "$[33,44]");
+        assert_eq!(pev("$=x*/[01]",         &v1), "$[8,9]");
+        assert_eq!(pev("$=(ab)*/[01]",      &v1), "$[33,44]");
+        assert_eq!(pev("a$=b*/[01]",        &v1), "$[33,44]");
+        assert_eq!(pev("$!x*$=b?/[01]",     &v1), "$[33,44]");
 
-        assert_eq!(pev("$+[xy]ab/0",     &v1), "$[8]");
-        assert_eq!(pev("a$+b/0",         &v1), "$[33]");
-        assert_eq!(pev("$*[xy]ab/0",     &v1), "$[8,33]");
-        assert_eq!(pev("$?[xy][xy]ab/0", &v1), "");
+        assert_eq!(pev("$+[xy]ab/0",        &v1), "$[8]");
+        assert_eq!(pev("a$+b/0",            &v1), "$[33]");
+        assert_eq!(pev("$*[xy]ab/0",        &v1), "$[8,33]");
+//        assert_eq!(pev("$?[xy][xy]ab/0", &v1), "");
+
+        let v2 = VVal::map1("\t", VVal::Int(12));
+        assert_eq!(pev("\\t",               &v2), "$[12]");
+        assert_eq!(pev("[\\t]",             &v2), "$[12]");
     }
 //
 //    #[test]
@@ -1293,8 +1290,8 @@ mod tests {
 
         assert_eq!(pat("$*($?ab)",                      "abbbababb"),   "");
 
-        assert_eq!(pat("[\\t\\0\\u0101]",               "\0"),          "");
-        assert_eq!(pat("[\\t\\0\\u0101]",               "\t"),          "");
-        assert_eq!(pat("[\\t\\0\\u0101]",               "ā"),           "");
+        assert_eq!(pat("[\\t\\0\\u{0101}]",               "\0"),          "\u{0}");
+        assert_eq!(pat("[\\t\\0\\u{0101}]",               "\t"),          "\t");
+        assert_eq!(pat("[\\t\\0\\u{0101}]",               "ā"),           "ā");
     }
 }

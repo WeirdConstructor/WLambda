@@ -53,6 +53,7 @@ impl IndentPos {
 #[derive(Debug, PartialEq)]
 pub enum ParseErrorKind {
     UnexpectedToken(char, &'static str),
+    ExpectedToken(char, &'static str),
     BadEscape(&'static str),
     BadIndent(&'static str),
     BadValue(ParseValueError),
@@ -65,7 +66,8 @@ impl fmt::Display for ParseErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use ParseErrorKind::*;
         match self {
-            UnexpectedToken(c, s) => write!(f, "Unexpected token '{}'. {}", c, s),
+            UnexpectedToken(c, s) => write!(f, "Unexpected token '{}'. At {}", c, s),
+            ExpectedToken(c, s)   => write!(f, "Expected token '{}'. At {}", c, s),
             BadEscape(s)          => write!(f, "{}", s),
             BadIndent(s)          => write!(f, "{}", s),
             BadValue(s)           => write!(f, "{}", s),
@@ -213,7 +215,7 @@ impl State {
             kind: kind.into(),
             snip: self.rest().to_string(),
             line: self.line_no,
-            col: self.col_no,
+            col:  self.col_no,
             file: self.file.clone(),
         }
     }

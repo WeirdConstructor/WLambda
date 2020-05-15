@@ -149,7 +149,8 @@ In the following grammar, white space and comments are omitted:
                      | "_"                      (* list of all captures *)
                      (* a capture variable is a regular global variable that
                         can even be assigned to. it's just also written by
-                        the selectors and pattern match functions! *)
+                        the selectors and pattern match functions!
+                        You could also access them using `\\_` or `\\1`. *)
                      ;
     import        = "@import", ident, [ ident ]
                   ;
@@ -314,7 +315,7 @@ fn add_c_to_vec(v: &mut Vec<u8>, c: char) {
 
 /// Helper function for recording a string character either
 /// as byte for a byte buffer in `v` or as character for a `String` `s`.
-fn adchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
+fn addchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
     if b { add_c_to_vec(v, c); }
     else { s.push(c); }
 }
@@ -348,7 +349,7 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
         while ps.peek().unwrap_or(next_quote) != next_quote {
             let c = ps.expect_some(ps.peek())?;
             ps.consume();
-            adchr(&mut v, &mut s, bytes, c);
+            addchr(&mut v, &mut s, bytes, c);
 
             match c {
                 '[' => { quote_stack.push(']'); cont_next = true; break; },
@@ -361,12 +362,12 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
         if !cont_next {
             if !ps.consume_if_eq(next_quote) {
                 return Err(ps.err(
-                    ParseErrorKind::UnexpectedToken(next_quote, "")));
+                    ParseErrorKind::ExpectedToken(next_quote, "quote string end")));
             }
 
             quote_stack.pop();
             if !quote_stack.is_empty() {
-                adchr(&mut v, &mut s, bytes, next_quote);
+                addchr(&mut v, &mut s, bytes, next_quote);
             }
         }
     }
@@ -390,14 +391,14 @@ enum NVecKind {
 /// Parses the part of a numerical vector that comes after the declaration,
 /// in `$i(1, 2, 3)` `$i` is the declaration.
 fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
-    match ps.peek() {
-        Some('(') => {
+    match ps.expect_some(ps.peek())? {
+        '(' => {
             ps.consume_wsc();
             let vec = ps.syn(match kind {
                 NVecKind::Int => Syntax::IVec,
                 NVecKind::Flt => Syntax::FVec,
             });
-            
+
             vec.push(parse_expr(ps)?);
             while ps.consume_if_eq_wsc(',') {
                 vec.push(parse_expr(ps)?);
@@ -407,27 +408,88 @@ fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
             let dim = vec.len() - 1;
 
             if !ps.consume_if_eq_wsc(')') {
-                Err(ps.err(ParseErrorKind::UnexpectedToken(')', "")))
+                Err(ps.err(ParseErrorKind::ExpectedToken(')', "numerical vector end")))
             } else if dim > 4 || dim < 1 {
                 Err(ps.err(ParseValueError::VectorLength))
             } else {
                 Ok(vec)
             }
         },
-        Some(t) => Err(ps.err(ParseErrorKind::UnexpectedToken(
-            t,
-            "To make a numerical vector, parenthesis must follow $i and $f",
-        ))),
-        None => Err(ps.err(ParseErrorKind::EOF("numerical vector body"))),
+        _ => Err(ps.err(ParseErrorKind::ExpectedToken('(', "numerical vector start"))),
     }
 }
 
+pub fn parse_2hex(ps: &mut State) -> Result<u8, ParseError> {
+    let hex = ps.peek2();
+    if let Some(h) = hex {
+        let h = h.to_string();
+        ps.consume();
+        ps.consume();
+        if let Ok(cn) = u8::from_str_radix(&h, 16) {
+            Ok(cn)
+        } else {
+            Err(ps.err(ParseErrorKind::BadEscape("Bad hex escape in string")))
+        }
+    } else {
+        Err(ps.err(ParseErrorKind::EOF("string hex escape")))
+    }
+}
+
+pub fn parse_unicode_hex(ps: &mut State) -> Result<char, ParseError> {
+    if !ps.consume_if_eq('{') {
+        return Err(ps.err(ParseErrorKind::ExpectedToken('{', "unicode escape start")));
+    }
+
+    let uh = ps.take_while(|c| c.is_digit(16));
+
+    let c =
+        if let Ok(cn) = u32::from_str_radix(&uh.to_string(), 16) {
+            if let Some(c) = std::char::from_u32(cn) {
+                c
+            } else {
+                return Err(ps.err(ParseErrorKind::BadEscape(
+                    "Bad char in unicode escape in string"
+                )));
+            }
+        } else {
+            return Err(ps.err(ParseErrorKind::BadEscape(
+                "Bad unicode hex escape in string"
+            )));
+        };
+
+    if !ps.consume_if_eq('}') {
+        return Err(ps.err(ParseErrorKind::ExpectedToken('}', "unicode escape end")));
+    }
+
+    Ok(c)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EscSeqValue {
+    Char(char),
+    Byte(u8),
+}
+
+pub fn parse_str_backslash(ps: &mut State) -> Result<EscSeqValue, ParseError>
+{
+    match ps.expect_some(ps.peek())? {
+        'n' => { ps.consume(); Ok(EscSeqValue::Char('\n')) },
+        'r' => { ps.consume(); Ok(EscSeqValue::Char('\r')) },
+        't' => { ps.consume(); Ok(EscSeqValue::Char('\t')) },
+        '0' => { ps.consume(); Ok(EscSeqValue::Char('\0')) },
+        'x' => { ps.consume(); Ok(EscSeqValue::Byte(parse_2hex(ps)?)) },
+        'u' => { ps.consume(); Ok(EscSeqValue::Char(parse_unicode_hex(ps)?)) },
+        c   => { ps.consume(); Ok(EscSeqValue::Char(c)) },
+    }
+}
 
 /// Parsers a WLambda string or byte buffer.
 fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("string"))); }
 
-    ps.consume_if_eq('"');
+    if !ps.consume_if_eq('"') {
+        return Err(ps.err(ParseErrorKind::ExpectedToken('\"', "string start")));
+    }
 
     let vec = ps.syn(Syntax::Str);
 
@@ -439,68 +501,14 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
         match c {
             '\\' => {
                 ps.consume();
-                if let Some(c) = ps.peek() {
-                    match c {
-                        'x' => {
-                            ps.consume();
-                            let hex = ps.peek2();
-                            if let Some(h) = hex {
-                                let h = h.to_string();
-                                ps.consume();
-                                ps.consume();
-                                if let Ok(cn) = u8::from_str_radix(&h, 16) {
-                                    if bytes { v.push(cn) }
-                                    else { s.push(cn as char); }
-                                } else {
-                                    return Err(ps.err(ParseErrorKind::BadEscape("Bad hex escape in string")));
-                                }
-                            } else {
-                                return Err(ps.err(ParseErrorKind::EOF("string hex escape")));
-                            }
-                        },
-                        'n'  => { ps.consume(); adchr(&mut v, &mut s, bytes, '\n'); },
-                        'r'  => { ps.consume(); adchr(&mut v, &mut s, bytes, '\r'); },
-                        't'  => { ps.consume(); adchr(&mut v, &mut s, bytes, '\t'); },
-                        '\\' => { ps.consume(); adchr(&mut v, &mut s, bytes, '\\'); },
-                        '0'  => { ps.consume(); adchr(&mut v, &mut s, bytes, '\0'); },
-                        '\'' => { ps.consume(); adchr(&mut v, &mut s, bytes, '\''); },
-                        '"'  => { ps.consume(); adchr(&mut v, &mut s, bytes, '"'); },
-                        'u' => {
-                            ps.consume();
-                            if !ps.consume_if_eq('{') {
-                                return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "After unicode escape")));
-                            }
-
-                            let uh = ps.take_while(|c| c.is_digit(16));
-
-                            if let Ok(cn) = u32::from_str_radix(&uh.to_string(), 16) {
-                                if let Some(c) = std::char::from_u32(cn) {
-                                    adchr(&mut v, &mut s, bytes, c);
-                                } else {
-                                    return Err(ps.err(ParseErrorKind::BadEscape(
-                                        "Bad char in unicode escape in string"
-                                    )));
-                                }
-                            } else {
-                                return Err(ps.err(ParseErrorKind::BadEscape(
-                                    "Bad unicode hex escape in string"
-                                )));
-                            }
-
-                            if !ps.consume_if_eq('}') {
-                                return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "After unicode escape")));
-                            }
-                        },
-                        c => { ps.consume(); adchr(&mut v, &mut s, bytes, c); },
-                    }
-                } else {
-                    return Err(ps.err(ParseErrorKind::EOF("string escape")));
+                match parse_str_backslash(ps)? {
+                    EscSeqValue::Char(c) => addchr(&mut v, &mut s, bytes, c),
+                    EscSeqValue::Byte(b) =>
+                        if bytes { v.push(b); }
+                        else     { s.push(b as char); },
                 }
             },
-            _ => {
-                ps.consume();
-                adchr(&mut v, &mut s, bytes, c);
-            },
+            _ => { ps.consume(); addchr(&mut v, &mut s, bytes, c); },
         }
     }
 
@@ -511,7 +519,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     }
 
     if !ps.consume_if_eq('"') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('\"', "")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken('\"', "string end")));
     }
 
     ps.skip_ws_and_comments();
@@ -612,7 +620,7 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
 
 fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_wsc('[') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('[', "At list")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken('[', "list start")));
     }
 
     let list = ps.syn(Syntax::Lst);
@@ -629,7 +637,7 @@ fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
     }
 
     if !ps.consume_if_eq_wsc(']') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken(']', "At the end of list")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken(']', "list end")));
     }
 
     Ok(list)
@@ -638,7 +646,7 @@ fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
 fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
     //println!("parse_map [{}]", ps.rest());
     if !ps.consume_if_eq_wsc('{') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "At map")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken('{', "map start")));
     }
 
     let map = ps.syn(Syntax::Map);
@@ -659,7 +667,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
                     parse_expr(ps)?
                 };
                 if !ps.consume_if_eq_wsc('=') {
-                    return Err(ps.err(ParseErrorKind::UnexpectedToken('=', "After reading map key")));
+                    return Err(ps.err(ParseErrorKind::ExpectedToken('=', "map key")));
                 }
 
                 let elem = VVal::vec();
@@ -672,7 +680,7 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
     }
 
     if !ps.consume_if_eq_wsc('}') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "At the end of a map")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken('}', "map end")));
     }
 
     Ok(map)
@@ -781,7 +789,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         'o' => {
             ps.consume_wsc();
             if !ps.consume_if_eq_wsc('(') {
-                return Err(ps.err(ParseErrorKind::UnexpectedToken('(', "At the start of $o(...)")))
+                return Err(ps.err(ParseErrorKind::ExpectedToken('(', "start of optional value")))
             }
 
             if ps.consume_if_eq_wsc(')') {
@@ -794,14 +802,14 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 if ps.consume_if_eq_wsc(')') {
                     Ok(opt_v)
                 } else {
-                    Err(ps.err(ParseErrorKind::UnexpectedToken(')', "At the end of a $o(...)")))
+                    Err(ps.err(ParseErrorKind::ExpectedToken(')', "end of optional value")))
                 }
             }
         },
         'p' => {
             ps.consume_wsc();
             if !ps.consume_if_eq_wsc('(') {
-                return Err(ps.err(ParseErrorKind::UnexpectedToken('(', "At the start of a pair")))
+                return Err(ps.err(ParseErrorKind::ExpectedToken('(', "pair start")))
             }
             let a = parse_expr(ps)?;
             let ret =
@@ -815,7 +823,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             if ps.consume_if_eq_wsc(')') {
                 Ok(ret)
             } else {
-                Err(ps.err(ParseErrorKind::UnexpectedToken(')', "At the end of a pair")))
+                Err(ps.err(ParseErrorKind::ExpectedToken(')', "pair end")))
             }
         },
         ':' => {
@@ -997,7 +1005,7 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
         }
 
         if !ps.consume_if_eq('`') {
-            return Err(ps.err(ParseErrorKind::UnexpectedToken('`', "")));
+            return Err(ps.err(ParseErrorKind::ExpectedToken('`', "quoted identifier end")));
         }
 
         ps.skip_ws_and_comments();
@@ -1032,7 +1040,9 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume_wsc();
                 let expr = parse_expr(ps)?;
                 if !ps.consume_if_eq_wsc(')') {
-                    return Err(ps.err(ParseErrorKind::UnexpectedToken(')', "In sub expression")));
+                    return Err(ps.err(
+                        ParseErrorKind::ExpectedToken(
+                            ')', "sub expression end")));
                 }
                 Ok(expr)
             },
@@ -1227,7 +1237,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
 
 fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a mut VVal, ParseError> {
     if !ps.consume_if_eq_wsc('[') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('[', "At start of call arguments")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken('[', "call arguments start")));
     }
 
     let is_apply = ps.consume_if_eq_wsc('[');
@@ -1258,11 +1268,11 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
     }
 
     if is_apply && !ps.consume_if_eq_wsc(']') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken(']', "While reading apply arguments")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken(']', "apply arguments end")));
     }
 
     if !ps.consume_if_eq_wsc(']') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken(']', "While reading call arguments")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken(']', "call arguments end")));
     }
 
     Ok(call)
@@ -1488,8 +1498,8 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
             }
 
             if !ps.consume_if_eq_wsc(')') {
-                return Err(ps.err(ParseErrorKind::UnexpectedToken(
-                    ')', "At the end of destructuring assignment")));
+                return Err(ps.err(ParseErrorKind::ExpectedToken(
+                    ')', "destructuring assignment end")));
             }
         },
         _ => { ids.push(VVal::into_sym(parse_identifier(ps)?)); }
@@ -1498,7 +1508,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     assign.push(ids);
 
     if !ps.consume_if_eq_wsc('=') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('=', "In assignment")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken('=', "assignment")));
     }
 
     assign.push(parse_expr(ps)?);
@@ -1576,7 +1586,8 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
 /// Parses an arity definition for a function.
 fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_if_eq_wsc('|') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition")));
+        return Err(ps.err(
+            ParseErrorKind::ExpectedToken('|', "arity definition start")));
     }
 
     if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("parsing arity definition"))); }
@@ -1609,7 +1620,8 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
     };
 
     if !ps.consume_if_eq_wsc('|') {
-        return Err(ps.err(ParseErrorKind::UnexpectedToken('|', "When parsing an arity definition")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken(
+            '|', "arity definition end")));
     }
 
     Ok(arity)
@@ -1638,7 +1650,7 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
     //println!("parse_block [{}]", ps.rest());
     if is_func {
         if !ps.consume_if_eq_wsc('{') {
-            return Err(ps.err(ParseErrorKind::UnexpectedToken('{', "When parsing a block")));
+            return Err(ps.err(ParseErrorKind::ExpectedToken('{', "block start")));
         }
     }
 
@@ -1665,9 +1677,11 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
     }
 
     if is_func {
-        if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("parsing block"))); }
+        if ps.at_end() {
+            return Err(ps.err(ParseErrorKind::EOF("parsing block")));
+        }
         if !ps.consume_if_eq_wsc('}') {
-            return Err(ps.err(ParseErrorKind::UnexpectedToken('}', "When parsing a block")));
+            return Err(ps.err(ParseErrorKind::ExpectedToken('}', "block end")));
         }
     }
 

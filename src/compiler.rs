@@ -161,7 +161,7 @@ impl SymbolTable {
     pub fn set(&mut self, name: &str, value: VVal) {
         self.symbols.insert(s2sym(name), value);
     }
-    
+
     /// Retrieves a value from the SymbolTable, if present.
     /// ```
     /// use wlambda::{VVal, EvalContext};
