@@ -630,7 +630,6 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
                 chars.with_s_ref(|chrs| {
-                    println!("CLASCHARS {:?}", chrs);
                     if let Some(c) = s.s.chars().nth(0) {
                         let c_len = c.len_utf8();
 
@@ -811,6 +810,34 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
         } else {
             panic!("Unknown pair atom: {}", p.s());
         }
+
+    } else if p.to_sym() == s2sym("WsChar") {
+        Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            if let Some(c) = s.s.chars().nth(0) {
+                let c_len = c.len_utf8();
+
+                if c.is_whitespace() {
+                    let (m, len) = (*next)(s.offs(c_len), st);
+                    return (m, c_len + len);
+                }
+            }
+
+            (VVal::None, 0)
+        })
+
+    } else if p.to_sym() == s2sym("NWsChar") {
+        Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            if let Some(c) = s.s.chars().nth(0) {
+                let c_len = c.len_utf8();
+
+                if !c.is_whitespace() {
+                    let (m, len) = (*next)(s.offs(c_len), st);
+                    return (m, c_len + len);
+                }
+            }
+
+            (VVal::None, 0)
+        })
 
     } else if p.to_sym() == s2sym("Any") {
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
@@ -1169,32 +1196,32 @@ mod tests {
         assert_eq!(pev("\\t",               &v2), "$[12]");
         assert_eq!(pev("[\\t]",             &v2), "$[12]");
     }
-//
-//    #[test]
-//    fn check_selector_match_esc() {
-//        let v1 =
-//            VVal::map3("\\",
-//                VVal::vec3(
-//                    VVal::Int(20),
-//                    VVal::pair(VVal::Int(2), VVal::Int(4)),
-//                    VVal::new_str("F0O%/{}[]")),
-//                "//",
-//                VVal::vec2(
-//                    VVal::Int(33),
-//                    VVal::Int(44)),
-//                "?*",
-//                VVal::vec3(
-//                    VVal::Int(8),
-//                    VVal::Int(9),
-//                    VVal::map2("*", VVal::Int(10), "|", VVal::Int(20))));
-//
-//        assert_eq!(pev("*/*/\\*", &v1),     "$[10]");
-//        assert_eq!(pev("*/*/\\|", &v1),     "$[20]");
-//
-//        assert_eq!(pev("[\\\\]*/1", &v1),   "$[$p(2,4)]");
-//        assert_eq!(pev("[\\/]*/0", &v1),    "$[33]");
-//        assert_eq!(pev("\\/\\//0", &v1),    "$[33]");
-//    }
+
+    #[test]
+    fn check_selector_match_esc() {
+        let v1 =
+            VVal::map3("\\",
+                VVal::vec3(
+                    VVal::Int(20),
+                    VVal::pair(VVal::Int(2), VVal::Int(4)),
+                    VVal::new_str("F0O%/{}[]")),
+                "//",
+                VVal::vec2(
+                    VVal::Int(33),
+                    VVal::Int(44)),
+                "?*",
+                VVal::vec3(
+                    VVal::Int(8),
+                    VVal::Int(9),
+                    VVal::map2("*", VVal::Int(10), "|", VVal::Int(20))));
+
+        assert_eq!(pev("*/*/\\*", &v1),     "$[10]");
+        assert_eq!(pev("*/*/\\|", &v1),     "$[20]");
+
+        assert_eq!(pev("[\\\\]*/1", &v1),   "$[$p(2,4)]");
+        assert_eq!(pev("[\\/]*/0", &v1),    "$[33]");
+        assert_eq!(pev("\\/\\//0", &v1),    "$[33]");
+    }
 
     #[test]
     fn check_selector_node_path() {
@@ -1344,5 +1371,8 @@ mod tests {
         assert_eq!(pat("(x|y|z)(y|x)(ab|)",               "xyab"),       "xyab");
         assert_eq!(pat("$+(x|y|z)(y|x)(ab|)",             "zxyab"),      "zxyab");
         assert_eq!(pat("$^ $*(x|y|z)(ab|) $$",            "zxyab"),      "zxyab");
+
+        assert_eq!(pat("$^ $+$s $$",        "  \t\n\r  "),              "  \t\n\r  ");
+        assert_eq!(pat(" $+ $S ",           "  \t\nXXJFJF\r  "),        "XXJFJF");
     }
 }
