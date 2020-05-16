@@ -1,6 +1,5 @@
 /*!
-Selector Syntax:
-
+Selector and WLambda-Regex Syntax:
 
 ```ebnf
     (* NOTE: Whitespace is not part of a pattern in most places. This means
@@ -503,8 +502,14 @@ impl SelectorState {
         }
     }
 
-    fn push_capture(&mut self, s: &RxBuf) {
-        self.captures.push((s.offs, s.s.len()));
+    fn push_capture_start(&mut self, s: &RxBuf) {
+        self.captures.push((s.offs, 0));
+    }
+
+    fn set_capture_end(&mut self, s: &RxBuf) {
+        let idx = self.captures.len() - 1;
+        let offs = self.captures[idx].0;
+        self.captures[idx].1 = s.offs - offs;
     }
 
     fn pop_capture(&mut self) {
@@ -687,17 +692,18 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             compile_pattern(&pair_val, next)
 
         } else if pair_type == s2sym("PatCap") {
-            let sub = compile_pattern(&pair_val, next); //, true, next);
-            // TODO: Arrange capturing!
+            let sub =
+                compile_pattern(&pair_val,
+                    Box::new(move |s: RxBuf, st: &mut SelectorState| {
+                        st.set_capture_end(&s);
+                        (*next)(s, st)
+                    }));
+
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
+                st.push_capture_start(&s);
                 let (m, l) = (*sub)(s, st);
+                st.pop_capture();
                 (m, l)
-//                if m.b() {
-//                    let (m2, l2) = (*next)(&s[l..], st);
-//                    (m2, l + l2)
-//                } else {
-//                    (VVal::None, 0)
-//                }
             })
 
         } else if pair_type == s2sym("ZwNegLA") {
@@ -757,8 +763,9 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
         {
             let sub_pat =
                 compile_atom(&pair_val,
-                    Box::new(move |s: RxBuf, st: &mut SelectorState|
-                        (VVal::Bol(true), 0)));
+                    Box::new(move |s: RxBuf, st: &mut SelectorState| {
+                        println!("SUB PATTERN CAPTURES {:?}", st.captures);
+                        (VVal::Bol(true), 0) }));
 
             let n0 = pair_type == s2sym("N0") || pair_type == s2sym("N0-");
 
@@ -805,6 +812,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
                     (VVal::None, 0)
                 })
+
             } else {
                 Box::new(move |s: RxBuf, st: &mut SelectorState| {
                     while_lengthen_str!(s, try_len, {
@@ -891,7 +899,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     } else if p.to_sym() == s2sym("End") {
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
-            println!("MATCH END: [{}] atend={}", s, s.is_at_end());
+            println!("MATCH END: [{}] atend={} [CAP {:?}]", s, s.is_at_end(), st.captures);
             if s.is_at_end() {
                 let (m, len) = (*next)(s, st);
                 (m, len)
@@ -1437,5 +1445,15 @@ mod tests {
         assert_eq!(pat("AB $&L $+b $&U C",  " ABbbBbc "),               "ABbbBbc");
         assert_eq!(pat("$&U A$+BC",         " abbbbbc "),               "abbbbbc");
         assert_eq!(pat("$&L a$+bc",         " ABBBBBC "),               "ABBBBBC");
+    }
+
+    #[test]
+    fn check_patterns_capture() {
+        assert_eq!(pat("$+(AA|BB|XX)",                "AABBBXX"),     "");
+        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "");
+        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "");
+        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "");
+        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
+        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
     }
 }
