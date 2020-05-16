@@ -764,13 +764,24 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             let sub_pat =
                 compile_atom(&pair_val,
                     Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                        println!("SUB PATTERN CAPTURES {:?}", st.captures);
+                        println!("SUB PATTERN CAPTURES [{}] {:?}", s, st.captures);
+                        //  TODO FIXME: Maybe try to report back the matched
+                        //              sub length via Rc<RefCell<>> here to
+                        //              the loop below. so we can advance the
+                        //              input to sub_pat by the actual sub pattern,
+                        //              while returning the successful overall result!
                         (VVal::Bol(true), 0) }));
 
             let n0 = pair_type == s2sym("N0") || pair_type == s2sym("N0-");
 
+            let greedy =
+                   pair_type == s2sym("N1")
+                || pair_type == s2sym("N0");
+
             let sub_pat =
                 Box::new(move |s: RxBuf, st: &mut SelectorState| {
+                    println!("Nx START [{}]", s);
+
                     let len =
                         if n0 { 0 }
                         else {
@@ -784,53 +795,78 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                     let mut matched     = true;
                     let mut match_len   = len;
 
+                    println!("Nx A [{}]", s.offs(match_len));
+                    let mut last_next_res = (*next)(s.offs(match_len), st);
+                    if last_next_res.0.b() {
+                        last_next_res.1 += match_len;
+                    }
+
+                    if !greedy && last_next_res.0.b() {
+                        println!("N0_ res: {:?}", last_next_res);
+                        return last_next_res;
+                    }
+
+                    // TODO: REVISIT THIS! It should not be necessary to shorten
+                    //       or lengthen the string. Just take a greed policy and check
+                    //       if next matches should suffice?!
                     while matched {
                         let (m, len) = (*sub_pat)(s.offs(match_len), st);
+                        println!("Nx_ subpat while [{}] b={} len res = {}", s.offs(match_len), m.b(), len);
                         matched = m.b();
                         if matched {
                             if len == 0 { break; }
                             match_len += len;
+                            let mut next_res = (*next)(s.offs(match_len), st);
+                            if next_res.0.b() {
+                                next_res.1 += match_len;
+                                last_next_res = next_res;
+                            }
+                            if !greedy && last_next_res.0.b() {
+                                println!("Nx_ res: {:?}", last_next_res);
+                                return last_next_res;
+                            }
                         }
                     }
 
-                    (VVal::Bol(true), match_len)
+                    println!("Nx res: {:?}", last_next_res);
+                    last_next_res
                 });
 
-            let greedy = pair_type == s2sym("N1");
-
-            if greedy {
-                Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                    while_shorten_str!(s, try_len, {
-                        let (m_sp, len_sp) = (*sub_pat)(s.limit_len(try_len), st);
-                        if m_sp.b() && len_sp == try_len {
-                            let (m, len) = (*next)(s.offs(len_sp), st);
-                            if m.b() {
-                                return (m, try_len + len);
-                            }
-                        }
-                    });
-
-                    (VVal::None, 0)
-                })
-
-            } else {
-                Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                    while_lengthen_str!(s, try_len, {
-                        println!("NONG s=[{}]", s.limit_len(try_len));
-                        let (m_sp, len_sp) = (*sub_pat)(s.limit_len(try_len), st);
-                        if m_sp.b() {
-                            println!("NONG len_sp={} r=[{}]", len_sp, s.offs(len_sp).s);
-                            let (m, len) = (*next)(s.offs(len_sp), st);
-                            if m.b() {
-                                println!("NONG len={}", len);
-                                return (m, len_sp + len);
-                            }
-                        }
-                    });
-
-                    (VVal::None, 0)
-                })
-            }
+            sub_pat
+//
+//            if greedy {
+//                Box::new(move |s: RxBuf, st: &mut SelectorState| {
+//                    while_shorten_str!(s, try_len, {
+//                        let (m_sp, len_sp) = (*sub_pat)(s.limit_len(try_len), st);
+//                        if m_sp.b() && len_sp == try_len {
+//                            let (m, len) = (*next)(s.offs(len_sp), st);
+//                            if m.b() {
+//                                return (m, try_len + len);
+//                            }
+//                        }
+//                    });
+//
+//                    (VVal::None, 0)
+//                })
+//
+//            } else {
+//                Box::new(move |s: RxBuf, st: &mut SelectorState| {
+//                    while_lengthen_str!(s, try_len, {
+//                        println!("NONG s=[{}]", s.limit_len(try_len));
+//                        let (m_sp, len_sp) = (*sub_pat)(s.limit_len(try_len), st);
+//                        if m_sp.b() {
+//                            println!("NONG len_sp={} r=[{}]", len_sp, s.offs(len_sp).s);
+//                            let (m, len) = (*next)(s.offs(len_sp), st);
+//                            if m.b() {
+//                                println!("NONG len={}", len);
+//                                return (m, len_sp + len);
+//                            }
+//                        }
+//                    });
+//
+//                    (VVal::None, 0)
+//                })
+//            }
         } else {
             panic!("Unknown pair atom: {}", p.s());
         }
@@ -1349,6 +1385,12 @@ mod tests {
 
     #[test]
     fn check_patterns() {
+        assert_eq!(pat("$^A($+($+B)B)C$$",        "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^A($+(($+B)B)B)C$$",        "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^A($+(($+B))B)C$$",        "ABBBC"),       "ABBBC");
+        assert_eq!(pat("$^A($+(($+B)B))C$$",        "ABBBC"),       "ABBBC");
+        panic!("FO");
+
         assert_eq!(pat("A($<+B)",         "ABB"),         "AB");
         assert_eq!(pat("A($<+B)",         "AB"),          "AB");
         assert_eq!(pat("A($<+B)",         "ABBB"),        "AB");
@@ -1376,7 +1418,7 @@ mod tests {
 
         assert_eq!(pat("$^A($+BB)C$$",            "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^A($+(B)B)C$$",          "ABBBC"),       "ABBBC");
-        assert_eq!(pat("$^A($+($+B)B)C$$",        "ABBBC"),       "ABBBC");
+        // >> assert_eq!(pat("$^A($+($+B)B)C$$",        "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$+A($+($+B)B)C$$",      "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$+A$+(B)$+BC$$",        "ABBBC"),       "ABBBC");
         assert_eq!(pat("$^$+A((B)$+B)$$",         "ABB"),         "ABB");
@@ -1449,11 +1491,10 @@ mod tests {
 
     #[test]
     fn check_patterns_capture() {
-        assert_eq!(pat("$+(AA|BB|XX)",                "AABBBXX"),     "");
-        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "");
-        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "");
-        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "");
-        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
-        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
+//        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "");
+//        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "");
+//        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "");
+//        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
+//        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
     }
 }
