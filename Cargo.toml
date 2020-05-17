@@ -24,6 +24,9 @@ serde_json = { version = "1.0.39", optional = true }
 rmp-serde  = { version = "0.14.0", optional = true }
 mint       = { version = "0.5.4",  optional = true }
 
+[dev-dependencies]
+regex-syntax = { version = "0.6.8" }
+
 [profile.release]
 debug = true
 #opt-level="z"
