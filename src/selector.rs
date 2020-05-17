@@ -511,11 +511,11 @@ impl SelectorState {
         self.captures.push((s.offs, 0));
     }
 
-    fn set_capture_end(&mut self, s: &RxBuf) -> (usize, usize) {
+    fn set_capture_end(&mut self, s: &RxBuf) -> (usize, (usize, usize)) {
         let idx = self.captures.len() - 1;
         let offs = self.captures[idx].0;
         self.captures[idx].1 = s.offs - offs;
-        self.captures[idx].clone()
+        (idx, self.captures[idx].clone())
     }
 
     fn pop_capture(&mut self) {
@@ -591,11 +591,48 @@ impl<'a> RxBuf<'a> {
 }
 
 #[derive(Debug, Clone)]
+pub struct CaptureNode {
+    idx:  usize,
+    len:  usize,
+    next: Option<Box<CaptureNode>>,
+}
+
+impl CaptureNode {
+    fn add_capture_to(&self, idx: usize, res: &mut PatResult) {
+        if let Some(n) = &self.next {
+            n.add_capture_to(idx, res);
+        }
+
+        res.add_capture((idx, (self.idx, self.len)));
+    }
+
+    fn to_test_string(&self, input: &str) -> String {
+        if let Some(n) = &self.next {
+            input[self.idx..(self.idx + self.len)].to_string()
+            + "/"
+            + &n.to_test_string(input)
+        } else {
+            input[self.idx..(self.idx + self.len)].to_string()
+        }
+    }
+}
+
+fn append_capture(cap_idx: usize, v: &mut Vec<Option<Box<CaptureNode>>>, cap: &(usize, usize)) {
+    let pos = v.get_mut(cap_idx).unwrap();
+    let tail = std::mem::replace(pos, None);
+    *pos = Some(Box::new(CaptureNode {
+        idx: cap.0,
+        len: cap.1,
+        next: tail
+    }));
+}
+
+#[derive(Debug, Clone)]
 pub struct PatResult {
     matched:        bool,
     match_len:      usize,
     offs:           usize,
-    captures:       Option<Vec<(usize, usize)>>,
+    captures:       Option<Vec<Option<Box<CaptureNode>>>>,
 }
 
 impl PatResult {
@@ -620,12 +657,33 @@ impl PatResult {
         self
     }
 
-    fn capture(mut self, cap: (usize, usize)) -> Self {
-        if let Some(c) = &mut self.captures {
-            c.push(cap);
-        } else {
-            self.captures = Some(vec![cap]);
+    fn merge_captures(mut self, res: &PatResult) -> Self {
+        if let Some(c) = &res.captures {
+            for (idx, cap) in c.iter().enumerate() {
+                if let Some(cap) = cap {
+                    cap.add_capture_to(idx, &mut self);
+                }
+            }
         }
+        self
+    }
+
+    fn add_capture(&mut self, cap: (usize, (usize, usize))) {
+        if self.captures.is_none() {
+            self.captures = Some(vec![]);
+        }
+        if let Some(c) = &mut self.captures {
+            let idx = cap.0;
+            let cap = cap.1;
+            if idx >= c.len() {
+                c.resize(idx + 1, None);
+            }
+            append_capture(idx, c, &cap);
+        }
+    }
+
+    fn capture(mut self, cap: (usize, (usize, usize))) -> Self {
+        self.add_capture(cap);
         self
     }
 
@@ -647,8 +705,12 @@ impl PatResult {
 
         if let Some(c) = &self.captures {
             for cap in c.iter().rev() {
-                s += "-";
-                s += &input[cap.0..(cap.0 + cap.1)];
+                if let Some(cap) = cap {
+                    s += "-";
+                    s += &cap.to_test_string(input);
+                } else {
+                    s += "$n";
+                }
             }
         }
 
@@ -885,7 +947,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                     let next_res = (*sub_pat)(s.offs(match_offs), st);
 
                     if next_res.b() {
-                        res = next_res.len(match_offs);
+                        res = next_res.len(match_offs).merge_captures(&res);
                         if !greedy { break; }
                     }
 
@@ -1240,20 +1302,24 @@ mod tests {
             Ast::Repetition(rep) => {
                 match &rep.op.kind {
                     RepetitionKind::ZeroOrOne => {
-                        "$?".to_string() + &re_ast2wlpat(rep.ast.as_ref())
+                        if rep.greedy {
+                            "$?".to_string() + &re_ast2wlpat(rep.ast.as_ref())
+                        } else {
+                            "$<?".to_string() + &re_ast2wlpat(rep.ast.as_ref())
+                        }
                     },
                     RepetitionKind::OneOrMore => {
                         if rep.greedy {
-                            "$<+".to_string() + &re_ast2wlpat(rep.ast.as_ref())
-                        } else {
                             "$+".to_string() + &re_ast2wlpat(rep.ast.as_ref())
+                        } else {
+                            "$<+".to_string() + &re_ast2wlpat(rep.ast.as_ref())
                         }
                     },
                     RepetitionKind::ZeroOrMore => {
                         if rep.greedy {
-                            "$<*".to_string() + &re_ast2wlpat(rep.ast.as_ref())
-                        } else {
                             "$*".to_string() + &re_ast2wlpat(rep.ast.as_ref())
+                        } else {
+                            "$<*".to_string() + &re_ast2wlpat(rep.ast.as_ref())
                         }
                     },
                     _ => panic!("Unimplemented rep op: {:?}", rep),
@@ -2115,13 +2181,13 @@ mod tests {
 //assert_eq!(rep(r"\b.\b",                     "a"),                         "a");
     }
 
-//    #[test]
-//    fn check_patterns_capture() {
-//        assert_eq!(pat("(^ab|cd)e",                        "cde"),        "cde");
-//        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "");
-//        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "");
-//        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "");
-//        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
-//        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
-//    }
+    #[test]
+    fn check_pattern_capture() {
+        assert_eq!(pat("(^ab|cd)e",                    "cde"),        "cde-cd");
+        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "AABB-AA/BB");
+        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "AABBBXX-A/A/B/B/B/X/X");
+        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "AA-AA");
+        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
+        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",   "AABBBXX"),     "");
+    }
 }
