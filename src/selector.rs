@@ -947,7 +947,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                     let next_res = (*sub_pat)(s.offs(match_offs), st);
 
                     if next_res.b() {
-                        res = next_res.len(match_offs).merge_captures(&res);
+                        res = next_res.len(match_offs);
                         if !greedy { break; }
                     }
 
