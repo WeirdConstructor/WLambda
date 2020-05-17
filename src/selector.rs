@@ -788,6 +788,8 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
             if n0 {
                 Box::new(move |s: RxBuf, st: &mut SelectorState| {
+                    println!("ENTER n0({})", sub_pat_str);
+
                     let mut res = (*next_n0)(s, st);
                     if !greedy && res.0.b() {
                         return res;
@@ -815,6 +817,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                         }
                     }
 
+                    println!("EXIT n0({}) [{:?}]", sub_pat_str, res);
                     res
                 })
             } else {
@@ -1448,8 +1451,6 @@ mod tests {
 
     #[test]
     fn check_patterns() {
-        assert_eq!(pat("$*($?ab)",                      "abbbababb"),   "");
-//        panic!("FO");
 
         assert_eq!(pat("A($<+B)",         "ABB"),         "AB");
         assert_eq!(pat("A($<+B)",         "AB"),          "AB");
@@ -1524,7 +1525,19 @@ mod tests {
         assert_eq!(pat("$^ $!x*$=b? $$",                "ab"),          "ab");
         assert_eq!(pat("$^ $!x*$=b? $$",                "xyab"),        "-nomatch-");
 
-        //>> assert_eq!(pat("$*($?ab)",                      "abbbababb"),   "");
+        assert_eq!(pat("$+($?abab)",                      "abbbxababb"),   "abab");
+        assert_eq!(pat("$*($?abab)",                      "abbbxababb"),   "");
+        assert_eq!(pat("$+(x$?abab)",                     "abbbxababb"),        "xabab");
+        assert_eq!(pat("$+(x$?abab)",                     "abbbxababxababb"),   "xababxabab");
+        assert_eq!(pat("$<+(x$?abab)",                    "abbbxababxababb"),   "xabab");
+        assert_eq!(pat("bbb$*(x$?abab)",                  "abbbxababxababb"),   "bbbxababxabab");
+        assert_eq!(pat("bbb$<*(x$?abab)x",                "abbbxababxababb"),   "bbbx");
+        assert_eq!(pat("bbb$<*?ba",                       "abbbxababxababb"),   "bbbxaba");
+        assert_eq!(pat("bbb$*?ba",                        "abbbxababxababb"),   "bbbxababxaba");
+        assert_eq!(pat("bbb$<*(x$?abab)",                 "abbbxababxababb"),   "bbb");
+        assert_eq!(pat("$*(a$?b)",                        "abbbababb"),   "ab");
+        assert_eq!(pat("$*($?ab)",                        "abbbababb"),   "abbbababb");
+        assert_eq!(pat("$<*($?ab)",                       "abbbababb"),   "");
 
         assert_eq!(pat("[\\t\\0\\u{0101}]",               "\0"),          "\u{0}");
         assert_eq!(pat("[\\t\\0\\u{0101}]",               "\t"),          "\t");
