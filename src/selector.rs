@@ -707,7 +707,7 @@ impl PatResult {
         let mut s = input[self.offs..(self.offs + self.match_len)].to_string();
 
         if let Some(c) = &self.captures {
-            for cap in c.iter().rev() {
+            for cap in c.iter() {
                 if let Some(cap) = cap {
                     s += "-";
                     s += &cap.to_test_string(input);
@@ -2206,17 +2206,18 @@ mod tests {
 
     #[test]
     fn check_pattern_capture() {
-//        assert_eq!(pat("(^ab|cd)e",                    "cde"),        "cde-cd");
+        assert_eq!(pat("(^ab|cd)e",                    "cde"),        "cde-cd");
 
-        assert_eq!(pat("(^(^AA)C)$$",                "AAC"),     "AAC-AA-AAC");
-        assert_eq!(pat("(^$<+(^aa)$*(^a)$+(^AA) | $<+(^aa)$*(^a)$+(^AA)C)$$",                "aaaaAAAAC"),     "AABB-AA/BB");
-//        assert_eq!(pat("$<+(^aa)$*(^a)$+(^AA)",                "aaaaAAAA"),     "AABB-AA/BB");
-//        assert_eq!(pat("$+(^aa|bb)$+(^A(A)|B(B)|X(X))",                "aabbAABBBXX"),     "AABB-AA/BB");
-//        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "AABB-AA/BB");
+        assert_eq!(pat("(^(^AA)C)$$",                                  "AAC"),             "AAC-AAC-AA");
+        assert_eq!(pat("$<+(^aa)$*(^a)$+(^AA)",                        "aaaaAAAA"),        "aaaaAAAA-aa-a-AA");
+        assert_eq!(pat("$+(^aa|bb)$+(^A(A)|B(B)|X(X))",                "aabbAABBBXX"),     "aabbAABB-bb-BB");
+        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "AABB-BB");
 
-//        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "AABBBXX-A/A/B/B/B/X/X");
-//        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "AA-AA");
-//        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
-//        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",   "AABBBXX"),     "");
+        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "AABBBXX-X");
+        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "AA-AA");
+        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "AABBBXX-AA-BBB-X");
+        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",   "AABBBXX"),     "AABBBXX-AA--BBB-X");
+
+        assert_eq!(pat("(^$<+(^aa)$*(^a)$+(^AA) | $<+(^aa)$*(^a)$+(^AA)C)$$",   "aaaaAAAAC"),       "aaaaAAAAC-aaaaAAAAC-aa-a-AA");
     }
 }
