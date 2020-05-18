@@ -82,13 +82,16 @@ Selector and WLambda-Regex Syntax:
     kv_item     = "{", kv, { ",", kv }, "}"
                 ;
 
-    kv_match    = kv_item, "&", kv_match
-                | kv_item, "|", kv_match
-                | kv_item
+    node_match  = ":", ["!"], "(", selector, ")"
+                | ":", ["!"], kv_item
                 ;
 
-    node        = key, [":", ["!"], [ selector ], kv_match]
-                | ":", ["!"], [ selector ], kv_match
+    node_cond   = node_match
+                | node_match, "&", node_cond
+                | node_match, "|", node_cond
+                ;
+
+    node        = key, { node_cond }
                 | "^", node (* marks it for referencing it in the result set *)
                 | "**"      (* deep expensive recursion *)
                 ;
@@ -398,8 +401,42 @@ fn parse_kv_item(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(v)
 }
 
-fn parse_kv_match(ps: &mut State) -> Result<VVal, ParseError> {
-    let item = parse_kv_item(ps)?;
+fn parse_node_match(ps: &mut State) -> Result<VVal, ParseError> {
+    if !ps.consume_if_eq_ws(':') {
+        return Err(ps.err(
+            ParseErrorKind::ExpectedToken(
+                ':', "start of node match")));
+    }
+
+    let negated = ps.consume_if_eq_ws('!');
+
+    let mut ret =
+        if ps.consume_if_eq_ws('(') {
+            let mut ret =
+                VVal::vec2(
+                    VVal::new_sym("LA"),
+                    parse_selector_pattern(ps)?);
+
+            if !ps.consume_if_eq_ws(')') {
+                return Err(ps.err(
+                    ParseErrorKind::ExpectedToken(
+                        ')', "at end of look-ahead selector")));
+            }
+
+            ret
+        } else {
+            parse_kv_item(ps)?
+        };
+
+    if negated {
+        ret = VVal::vec2(VVal::new_sym("Not"), ret);
+    }
+
+    Ok(ret)
+}
+
+fn parse_node_cond(ps: &mut State) -> Result<VVal, ParseError> {
+    let nm = parse_node_match(ps)?;
 
     match ps.peek().unwrap_or('\0') {
         '&' => {
@@ -407,8 +444,8 @@ fn parse_kv_match(ps: &mut State) -> Result<VVal, ParseError> {
 
             let v = VVal::vec();
             v.push(VVal::new_sym("And"));
-            v.push(item);
-            v.push(parse_kv_item(ps)?);
+            v.push(nm);
+            v.push(parse_node_cond(ps)?);
             Ok(v)
         },
         '|' => {
@@ -416,11 +453,11 @@ fn parse_kv_match(ps: &mut State) -> Result<VVal, ParseError> {
 
             let v = VVal::vec();
             v.push(VVal::new_sym("Or"));
-            v.push(item);
-            v.push(parse_kv_item(ps)?);
+            v.push(nm);
+            v.push(parse_node_cond(ps)?);
             Ok(v)
         },
-        _ => Ok(item),
+        _ => Ok(nm),
     }
 }
 
@@ -434,15 +471,6 @@ fn parse_node(ps: &mut State) -> Result<VVal, ParseError> {
 
     } else {
         match c {
-            ':' => {
-                ps.consume_ws();
-                // TODO: FIXME: Parse "!" here for negated kv matches!
-                // TODO: FIXME: Parse selector here, that will
-                //              act as recursive self-select on the current value
-                Ok(VVal::vec2(
-                    VVal::new_sym("NKVM"),
-                    parse_kv_match(ps)?))
-            },
             '^' => {
                 ps.consume_ws();
                 Ok(VVal::vec2(
@@ -451,19 +479,12 @@ fn parse_node(ps: &mut State) -> Result<VVal, ParseError> {
             },
             _ => {
                 let key = parse_key(ps)?;
-
-                match ps.peek().unwrap_or('\0') {
-                    ':' => {
-                        ps.consume_ws();
-                        let kvm = parse_kv_match(ps)?;
-                        Ok(VVal::vec3(
-                            VVal::new_sym("NKLA_KVM"),
-                            key, kvm))
-                    },
-                    _ =>
-                        Ok(VVal::vec2(
-                            VVal::new_sym("NK"),
-                            key))
+                if ps.peek().unwrap_or('\0') == ':' {
+                    Ok(VVal::vec3(
+                        VVal::new_sym("NK"), key, parse_node_cond(ps)?))
+                } else {
+                    Ok(VVal::vec2(
+                        VVal::new_sym("NK"), key))
                 }
             }
         }
@@ -482,15 +503,24 @@ fn parse_selector_pattern(ps: &mut State) -> Result<VVal, ParseError> {
         selector.push(node);
     }
 
-    ps.skip_ws();
-
     Ok(selector)
 }
 
-fn parse_selector(s: &str) -> Result<VVal, String> {
+fn parse_selector(s: &str) -> Result<VVal, ParseError> {
     let mut ps = State::new(s, "<selector>");
     ps.skip_ws();
-    parse_selector_pattern(&mut ps).map_err(|e| format!("{}", e))
+
+    let ret = parse_selector_pattern(&mut ps)?;
+
+    ps.skip_ws();
+
+    if !ps.at_end() {
+        return Err(ps.err(
+            ParseErrorKind::UnexpectedToken(
+                ps.peek().unwrap(), "end of selector")));
+    }
+
+    Ok(ret)
 }
 
 #[derive(Debug, Clone)]
@@ -722,7 +752,7 @@ impl PatResult {
 }
 
 pub type PatternNode = Box<dyn Fn(RxBuf, &mut SelectorState) -> PatResult>;
-pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal)>;
+pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal) -> bool>;
 
 //macro_rules! while_lengthen_str {
 //    ($s: ident, $try_len: ident, $b: block) => {
@@ -1142,13 +1172,27 @@ fn compile_pattern(pat: &VVal, next: PatternNode) -> PatternNode {
     }
 }
 
+fn match_pattern(pat: &PatternNode, s: &str, st: &mut SelectorState) -> bool {
+    let old_str = st.set_str(&s[..]);
+
+    let rb  = RxBuf::new(&s[..]);
+    let res = (*pat)(rb, st);
+
+    st.restore_str(old_str);
+
+    res.b()
+    && res.match_len == s.len()
+}
+
 fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
     if k.is_int() {
         let i = k.i();
 
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
             if let Some(v) = v.at(i as usize) {
-                (*sn)(&v, st, capts);
+                (*sn)(&v, st, capts)
+            } else {
+                false
             }
         })
     } else {
@@ -1161,16 +1205,23 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
             return
                 Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
                     if let Some(v) = v.get_key_sym(&key) {
-                        (*sn)(&v, st, capts);
+                        (*sn)(&v, st, capts)
+                    } else {
+                        false
                     }
                 });
 
         } else if k.len() == 1 && pat.to_sym() == s2sym("Glob") {
             return
                 Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+                    let mut found = false;
                     for (v, _) in v.iter() {
-                        (*sn)(&v, st, capts);
+                        if (*sn)(&v, st, capts) {
+                            found = true;
+                        }
                     }
+
+                    found
                 });
         }
 
@@ -1181,56 +1232,84 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
             }));
 
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+            let mut found = false;
+
             for (i, (v, k)) in v.iter().enumerate() {
                 if let Some(k) = k {
                     k.with_s_ref(|s| {
-                        let old_str = st.set_str(&s[..]);
-                        let rb = RxBuf::new(&s[..]);
-                        let res = (*pat)(rb, st);
-                        st.restore_str(old_str);
-
-                        if res.b() && res.match_len == s.len() {
-                            (*sn)(&v, st, capts);
+                        if match_pattern(&pat, s, st) {
+                            if (*sn)(&v, st, capts) {
+                                found = true;
+                            }
                         }
                     });
 
                 } else {
                     let idx_str = format!("{}", i);
 
-                    let old_str = st.set_str(&idx_str[..]);
-                    let rb = RxBuf::new(&idx_str[..]);
-                    let res = (*pat)(rb, st);
-                    st.restore_str(old_str);
-
-                    if res.b() && res.match_len == idx_str.len() {
-                        (*sn)(&v, st, capts);
+                    if match_pattern(&pat, &idx_str[..], st) {
+                        if (*sn)(&v, st, capts) {
+                            found = true;
+                        }
                     }
                 }
             }
+
+            found
         })
     }
 }
 
 fn compile_kv(kv: &VVal) -> SelNode {
+    let pat =
+        compile_pattern(&kv.at(1).expect("pattern in kv"),
+            Box::new(move |s: RxBuf, st: &mut SelectorState| {
+                println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
+                PatResult::matched()
+            }));
+
+    compile_key(
+        &kv.at(0).expect("key in kv"),
+        Box::new(move |v: &VVal, st: &mut SelectorState, _capts: &VVal|
+            v.with_s_ref(|s| match_pattern(&pat, s, st))))
 }
 
 fn compile_kv_match(kvm: &VVal, sn: SelNode) -> SelNode {
-    let node_type = kvm.at(0).expect("proper kv_match").to_sym();
-
-    if node_type == s2sym("And") {
-        panic!("And kv match not yet implemented");
-    } else if node_type == s2sym("Or") {
-        panic!("Or kv match not yet implemented");
-    } else if node_type == s2sym("KV") {
-        let mut kv_conds = vec![];
-        for i in 1..kvm.len() {
-            kv_conds.push(compile_kv(kvm.at(i).unwrap()));
+    let mut kv_conds = vec![];
+    for i in 1..kvm.len() {
+        kv_conds.push(compile_kv(&kvm.at(i).unwrap()));
+    }
+    Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+        for kv in kv_conds.iter() {
+            if !(*kv)(v, st, capts) {
+                return false;
+            }
         }
-        Box::new(move |v: &VVal, _st: &mut SelectorState, _capts: &VVal| {
-            
-        })
+
+        (*sn)(v, st, capts)
+    })
+}
+
+fn compile_node_cond(n: &VVal, sn: SelNode) -> SelNode {
+    let node_type = n.at(0).expect("proper node condition").to_sym();
+
+    if node_type == s2sym("KV") {
+        compile_kv_match(&n, sn)
+
+    } else if node_type == s2sym("LA") {
+        panic!("Unsupported node cond: {}", node_type);
+
+    } else if node_type == s2sym("And") {
+        panic!("Unsupported node cond: {}", node_type);
+
+    } else if node_type == s2sym("Or") {
+        panic!("Unsupported node cond: {}", node_type);
+
+    } else if node_type == s2sym("Not") {
+        panic!("Unsupported node cond: {}", node_type);
+
     } else {
-        panic!("Unsupported node type: {}", node_type.to_string());
+        panic!("Unsupported node cond: {}", node_type);
     }
 }
 
@@ -1238,10 +1317,15 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
     let node_type = n.at(0).expect("proper node").to_sym();
 
     if node_type == s2sym("NK") {
-        compile_key(&n.at(1).unwrap_or_else(|| VVal::None), sn)
+        let sn =
+            if let Some(node_cond) = n.at(2) {
+                compile_node_cond(&node_cond, sn)
+            } else {
+                sn
+            };
 
-    } else if node_type == s2sym("NKVM") {
-        compile_kv_match(&n.at(1).unwrap_or_else(|| VVal::None), sn)
+        compile_key(
+            &n.at(1).unwrap_or_else(|| VVal::None), sn)
 
     } else {
         Box::new(move |_v: &VVal, _st: &mut SelectorState, _capts: &VVal| {
@@ -1259,6 +1343,7 @@ fn compile_selector(sel: &VVal) -> SelNode {
             let mut next : Option<SelNode> = Some(Box::new(
                 |v: &VVal, _st: &mut SelectorState, capts: &VVal| {
                     capts.push(v.clone());
+                    true
                 }));
 
             for i in 1..sel.len() {
@@ -1544,17 +1629,20 @@ mod tests {
     fn check_selector_kv_match() {
         let v1 = v(r#"
             $[
-                ${ a = :test, x = 10 },
-                ${ b = :test, x = 11 },
-                ${ a = :test, x = 12 },
-                ${ c = :test, y = 15, x = 22 },
-                ${ a = :test, y = 16, x = 23 },
+                ${ a = :test, x = 10        , childs = $[10, 20], },
+                ${ b = :test, x = 11        , childs = $[11, 21, 31], },
+                ${ a = :test, x = 12        , childs = $[12, 22, 32, 42], },
+                ${ c = :test, y = 15, x = 22, childs = $[13, 23, 33, 43, 53], },
+                ${ a = :test, y = 16, x = 23, childs = $[14, 24, 34, 44, 54, 64], },
             ]
         "#);
 
-        assert_eq!(pev("*/[xy]",        &v1), "$[10,11,12,15,16,22,23]");
-        assert_eq!(pev("*/:{a = test, x = 1* }", &v1), "");
-        assert_eq!(pev("*:{a = test}",  &v1), "");
+        assert_eq!(pev("*/[xy]",                    &v1), "$[10,11,12,15,16,22,23]");
+        assert_eq!(pev("*/:{a = test, x = 1* }",    &v1), "$[]");
+        assert_eq!(pev("*:{a = test, x = 1* }",     &v1), "$[${a=:test,childs=$[10,20],x=10},${a=:test,childs=$[12,22,32,42],x=12}]");
+        assert_eq!(pev("*:{a = test, x = 2* }/y",   &v1), "$[16]");
+        assert_eq!(pev("*:{[ab] = test }/childs/*", &v1), "$[10,11,12,14,20,21,22,24,31,32,34,42,44,54,64]");
+        assert_eq!(pev("*:{a = test}/[xy]",         &v1), "$[10,12,16,23]");
     }
 
     #[test]
@@ -1589,13 +1677,15 @@ mod tests {
     }
 
     #[test]
-    fn check_selector_kvmatch() {
-        assert_eq!(p(":{b=a,a=20}"),                                "$[:Path,$[:NKVM,$[:KV,$[$[$p(:I,:b)],$[$p(:I,:a)]],$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
-        assert_eq!(p("a : { a = 20 }"),                             "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
-        assert_eq!(p("a : { a = 20, b=a(a?)[^ABC]cc*f}"),           "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatSub,$[$p(:I,:a),:Any]),$p(:NCCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
-        assert_eq!(p("a : { a = 20, b=a(a?)[ABC]cc*f}"),            "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatSub,$[$p(:I,:a),:Any]),$p(:CCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
-        assert_eq!(p("a : { a = 20 } | { b = 20 }"),                "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]]]]]");
-        assert_eq!(p("a : { a = 20 } | { b = 20 } & { x = 10}"),    "$[:Path,$[:NKLA_KVM,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]]]]]");
+    fn check_selector_kvmatch_parse() {
+        assert_eq!(p("*:{b=a}"),                                   "$[:Path,$[:NK,$[:Glob],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:a)]]]]]");
+        assert_eq!(p(":{b=a,a=20}"),                               "$[:Path,$[:NK,$[],$[:KV,$[$[$p(:I,:b)],$[$p(:I,:a)]],$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
+        assert_eq!(p("a : { a = 20 }"),                            "$[:Path,$[:NK,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]");
+        assert_eq!(p("a :!{ a = 20 }"),                            "$[:Path,$[:NK,$[$p(:I,:a)],$[:Not,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]]]]]");
+        assert_eq!(p("a : { a = 20, b=a(a?)[^ABC]cc*f}"),          "$[:Path,$[:NK,$[$p(:I,:a)],$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]],$[$[$p(:I,:b)],$[$p(:I,:a),$p(:PatSub,$[$p(:I,:a),:Any]),$p(:NCCls,\"ABC\"),$p(:I,:cc),:Glob,$p(:I,:f)]]]]]");
+        assert_eq!(p("a : { a = 20 } | :{ b = 20 } & :{ x = 10}"), "$[:Path,$[:NK,$[$p(:I,:a)],$[:Or,$[:KV,$[$[$p(:I,:a)],$[$p(:I,:20)]]],$[:And,$[:KV,$[$[$p(:I,:b)],$[$p(:I,:20)]]],$[:KV,$[$[$p(:I,:x)],$[$p(:I,:10)]]]]]]]");
+        assert_eq!(p("a : (b/*/c)"),   "$[:Path,$[:NK,$[$p(:I,:a)],$[:LA,$[:Path,$[:NK,$[$p(:I,:b)]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:c)]]]]]]");
+        assert_eq!(p("a :!(b/*/c)"),   "$[:Path,$[:NK,$[$p(:I,:a)],$[:Not,$[:LA,$[:Path,$[:NK,$[$p(:I,:b)]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:c)]]]]]]]");
     }
 
     #[test]

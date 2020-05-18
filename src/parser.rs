@@ -1301,7 +1301,9 @@ fn get_op_prec(op: StrPart) -> i32 {
     else { 0 }
 }
 
-fn parse_binop(mut left: VVal, ps: &mut State, prec: i32, binop: VVal) -> Result<VVal, ParseError> {
+fn parse_binop(mut left: VVal, ps: &mut State, prec: i32, binop: VVal)
+    -> Result<VVal, ParseError>
+{
     let mut right = parse_call(ps, true)?;
 
     while let Some(next_op) = ps.peek_op() {
