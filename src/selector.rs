@@ -1211,11 +1211,38 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
     }
 }
 
+fn compile_kv(kv: &VVal) -> SelNode {
+}
+
+fn compile_kv_match(kvm: &VVal, sn: SelNode) -> SelNode {
+    let node_type = kvm.at(0).expect("proper kv_match").to_sym();
+
+    if node_type == s2sym("And") {
+        panic!("And kv match not yet implemented");
+    } else if node_type == s2sym("Or") {
+        panic!("Or kv match not yet implemented");
+    } else if node_type == s2sym("KV") {
+        let mut kv_conds = vec![];
+        for i in 1..kvm.len() {
+            kv_conds.push(compile_kv(kvm.at(i).unwrap()));
+        }
+        Box::new(move |v: &VVal, _st: &mut SelectorState, _capts: &VVal| {
+            
+        })
+    } else {
+        panic!("Unsupported node type: {}", node_type.to_string());
+    }
+}
+
 fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
     let node_type = n.at(0).expect("proper node").to_sym();
 
     if node_type == s2sym("NK") {
         compile_key(&n.at(1).unwrap_or_else(|| VVal::None), sn)
+
+    } else if node_type == s2sym("NKVM") {
+        compile_kv_match(&n.at(1).unwrap_or_else(|| VVal::None), sn)
+
     } else {
         Box::new(move |_v: &VVal, _st: &mut SelectorState, _capts: &VVal| {
             panic!("Unimplemented node type: {}", node_type);
@@ -1526,6 +1553,7 @@ mod tests {
         "#);
 
         assert_eq!(pev("*/[xy]",        &v1), "$[10,11,12,15,16,22,23]");
+        assert_eq!(pev("*/:{a = test, x = 1* }", &v1), "");
         assert_eq!(pev("*:{a = test}",  &v1), "");
     }
 
