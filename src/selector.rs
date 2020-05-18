@@ -507,18 +507,21 @@ impl SelectorState {
         }
     }
 
-    fn push_capture_start(&mut self, s: &RxBuf) {
+    fn push_capture_start(&mut self, s: &RxBuf) -> usize {
+        println!("###### PUSH CAP START [{}] => ({}, 0) ({:?})", s, s.offs, self.captures);
         self.captures.push((s.offs, 0));
+        self.captures.len() - 1
     }
 
-    fn set_capture_end(&mut self, s: &RxBuf) -> (usize, (usize, usize)) {
-        let idx = self.captures.len() - 1;
+    fn set_capture_end(&mut self, idx: usize, s: &RxBuf) -> (usize, (usize, usize)) {
+        println!("###### SET CAP END [{}] => ({:?})", s, self.captures);
         let offs = self.captures[idx].0;
         self.captures[idx].1 = s.offs - offs;
         (idx, self.captures[idx].clone())
     }
 
     fn pop_capture(&mut self) {
+        println!("###### POP CAP ({:?})", self.captures);
         self.captures.pop();
     }
 
@@ -822,15 +825,35 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             compile_pattern(&pair_val, next)
 
         } else if pair_type == s2sym("PatCap") {
+//            let prev_caps : Rc<RefCell<Option<Vec<(usize, (usize, usize))>>>> =
+//                Rc::new(RefCell::new(None));
+            let cap_idx   = Rc::new(RefCell::new(0));
+            let cap_idx_b = cap_idx.clone();
+
             let sub =
                 compile_pattern(&pair_val,
                     Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                        let cap = st.set_capture_end(&s);
-                        (*next)(s, st).capture(cap)
+                        let cap = st.set_capture_end(*cap_idx.borrow(), &s);
+                        println!("PatCap>>>>>>>> {:?}", cap);
+                        let mut res = (*next)(s, st).capture(cap);
+//                        if prev_caps.borrow().is_none() {
+//                            (*prev_caps.borrow_mut()) = Some(vec![]);
+//                        }
+//                        if let Some(pc) = prev_caps.borrow_mut().as_mut() {
+//                            pc.push(cap);
+//                        }
+//                        if res.b() {
+//                            if let Some(pc) = prev_caps.borrow_mut().as_mut() {
+//                                for cap in pc.iter() {
+//                                    res = res.capture(*cap);
+//                                }
+//                            }
+//                        }
+                        res
                     }));
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                st.push_capture_start(&s);
+                (*cap_idx_b.borrow_mut()) = st.push_capture_start(&s);
                 let res = (*sub)(s, st);
                 st.pop_capture();
                 res
@@ -2183,11 +2206,17 @@ mod tests {
 
     #[test]
     fn check_pattern_capture() {
-        assert_eq!(pat("(^ab|cd)e",                    "cde"),        "cde-cd");
-        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "AABB-AA/BB");
-        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "AABBBXX-A/A/B/B/B/X/X");
-        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "AA-AA");
-        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
-        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",   "AABBBXX"),     "");
+//        assert_eq!(pat("(^ab|cd)e",                    "cde"),        "cde-cd");
+
+        assert_eq!(pat("(^(^AA)C)$$",                "AAC"),     "AAC-AA-AAC");
+        assert_eq!(pat("(^$<+(^aa)$*(^a)$+(^AA) | $<+(^aa)$*(^a)$+(^AA)C)$$",                "aaaaAAAAC"),     "AABB-AA/BB");
+//        assert_eq!(pat("$<+(^aa)$*(^a)$+(^AA)",                "aaaaAAAA"),     "AABB-AA/BB");
+//        assert_eq!(pat("$+(^aa|bb)$+(^A(A)|B(B)|X(X))",                "aabbAABBBXX"),     "AABB-AA/BB");
+//        assert_eq!(pat("$+(^AA|BB|XX)",                "AABBBXX"),     "AABB-AA/BB");
+
+//        assert_eq!(pat("$+(^A|B|X)",                   "AABBBXX"),     "AABBBXX-A/A/B/B/B/X/X");
+//        assert_eq!(pat("(^$+A|$+B|$+X)",               "AABBBXX"),     "AA-AA");
+//        assert_eq!(pat("(^$+A)(^$+B)$+(^X)$$",         "AABBBXX"),     "");
+//        assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",   "AABBBXX"),     "");
     }
 }
