@@ -2328,28 +2328,16 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     }
                 },
                 Syntax::Pattern => {
-                    let res_ref = (VVal::None).to_ref();
-                    ce.borrow_mut().global.borrow_mut().set_var("\\", &res_ref);
+                    let res_ref =
+                        ce.borrow_mut().global.borrow_mut()
+                          .get_var_ref("\\")
+                          .unwrap_or_else(|| VVal::None);
 
                     ast.at(1).unwrap().with_s_ref(|pat_src| {
-                        match selector::create_regex_find_function(pat_src) {
+                        match selector::create_regex_find_function(pat_src, res_ref) {
                             Ok(fun) => {
-                                let rx_fun =
-                                    VValFun::new_fun(
-                                        move |env: &mut Env, _argc: usize| {
-                                            if let Some(s) = env.arg_ref(0) {
-                                                Ok(s.with_s_ref(|s| {
-                                                    let pat_res = fun(s);
-                                                    let r = pat_res.to_vval(s);
-                                                    res_ref.set_ref(r.clone());
-                                                    r
-                                                }))
-                                            } else {
-                                                Ok(VVal::None)
-                                            }
-                                        }, Some(1), Some(1), false);
                                 pw_provides_result_pos!(prog, {
-                                    prog.data_pos(rx_fun.clone())
+                                    prog.data_pos(fun.clone())
                                 })
                             },
                             Err(e) => {

@@ -111,7 +111,7 @@ Selector and WLambda-Regex Syntax:
 
 */
 
-use crate::vval::VVal;
+use crate::vval::{VVal, Env, VValFun};
 
 pub use crate::parser::state::State;
 pub use crate::parser::state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
@@ -1538,19 +1538,29 @@ fn compile_find_pattern(v: &VVal) -> PatternNode {
 /// find the compiled regular expression in it.
 /// The returned function then returns a `PatResult` which stores
 /// the captures and whether the pattern matched.
-pub fn create_regex_find_function(pat: &str)
-    -> Result<Box<dyn Fn(&str) -> PatResult>, ParseError>
+pub fn create_regex_find_function(pat: &str, result_ref: VVal)
+    -> Result<VVal, ParseError>
 {
     let mut ps = State::new(pat, "<pattern>");
     ps.skip_ws();
     let pattern = parse_pattern(&mut ps)?;
     let comp_pat = compile_find_pattern(&pattern);
 
-    Ok(Box::new(move |s: &str| {
-        let mut ss = SelectorState::new();
-        ss.set_str(s);
-        (*comp_pat)(RxBuf::new(s), &mut ss)
-    }))
+    Ok(VValFun::new_fun(
+        move |env: &mut Env, _argc: usize| {
+            if let Some(s) = env.arg_ref(0) {
+                Ok(s.with_s_ref(|s| {
+                    let mut ss = SelectorState::new();
+                    ss.set_str(s);
+                    let pat_res = (*comp_pat)(RxBuf::new(s), &mut ss);
+                    let r = pat_res.to_vval(s);
+                    result_ref.set_ref(r.clone());
+                    r
+                }))
+            } else {
+                Ok(VVal::None)
+            }
+        }, Some(1), Some(1), false))
 }
 
 #[cfg(test)]

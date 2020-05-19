@@ -310,7 +310,10 @@ impl GlobalEnv {
     /// See also [EvalContext::set_global_var()](struct.EvalContext.html#method.set_global_var)
     #[allow(dead_code)]
     pub fn set_var(&mut self, var: &str, val: &VVal) {
-        self.env.insert(String::from(var), val.to_ref());
+        match self.env.get(var) {
+            Some(v) => { v.set_ref(val.clone()); }
+            None    => { self.env.insert(String::from(var), val.to_ref()); }
+        }
     }
 
     /// Returns the value of a global variable.
@@ -320,6 +323,17 @@ impl GlobalEnv {
     pub fn get_var(&mut self, var: &str) -> Option<VVal> {
         match self.env.get(var) {
             Some(v) => Some(v.deref()),
+            None    => None,
+        }
+    }
+
+    /// Returns the reference to the value of a global variable.
+    ///
+    /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
+    #[allow(dead_code)]
+    pub fn get_var_ref(&mut self, var: &str) -> Option<VVal> {
+        match self.env.get(var) {
+            Some(v) => Some(v.clone()),
             None    => None,
         }
     }
@@ -448,6 +462,7 @@ impl GlobalEnv {
             Some(Arc::new(Mutex::new(DefaultThreadCreator::new()))));
         g.borrow_mut().set_resolver(
             Rc::new(RefCell::new(LocalFileModuleResolver::new())));
+        g.borrow_mut().set_var("\\", &VVal::None);
         g
     }
 

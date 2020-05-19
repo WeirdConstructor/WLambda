@@ -4874,6 +4874,7 @@ use crate::nvec::*;
 use crate::util;
 use std::rc::Rc;
 use crate::threads::*;
+use crate::selector::*;
 
 macro_rules! func {
     ($g: ident, $name: expr, $cb: expr, $min: expr, $max: expr, $err_arg_ok: expr) => {
@@ -6468,6 +6469,24 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(env.arg(0))
             }
         }, Some(1), Some(2), true);
+
+    func!(st, "pattern",
+        |env: &mut Env, _argc: usize| {
+            let pat_src = env.arg_ref(0).cloned().unwrap_or_else(|| VVal::None);
+            let res_ref =
+                env.global.borrow_mut()
+                   .get_var_ref("\\")
+                   .unwrap_or_else(|| VVal::None);
+            pat_src.with_s_ref(|pat_src|
+                match create_regex_find_function(pat_src, res_ref) {
+                    Ok(fun) => Ok(fun),
+                    Err(e) => {
+                        Ok(env.new_err(
+                            format!("bad pattern: {}, pattern was: /{}/",
+                                    e, pat_src)))
+                    }
+                })
+        }, Some(1), Some(1), false);
 
 //    func!(st, "tree_select",
 //        |env: &mut Env, _argc: usize| {
