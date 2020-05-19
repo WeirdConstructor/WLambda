@@ -2215,6 +2215,31 @@ impl VVal {
         }
     }
 
+    /// Returns true if this vval is containing (multiple) other VVals.
+    /// Usually true for: Maps, Vectors, Pairs and Opt.
+    ///
+    /// Helpful if you want to iterate through a data structure by recursively
+    /// iterating over a vval. Without getting iterations over individual
+    /// string characters.
+    pub fn iter_over_vvals(&self) -> bool {
+        self.with_deref(
+            |v| {
+                match v {
+                    VVal::Lst(_) => true,
+                    VVal::Map(_) => true,
+                    VVal::Opt(_) => true,
+                    _            => false,
+                }
+            },
+            |v| {
+                match v {
+                    Some(VVal::Lst(_)) => true,
+                    Some(VVal::Map(_)) => true,
+                    Some(VVal::Opt(_)) => true,
+                    _                  => false,
+                }
+            })
+    }
 
     /// This function returns you an iterator over the VVal.
     /// It will iterate over data such as VVal::Str, VVal::Sym, VVal::Lst,
@@ -2299,13 +2324,6 @@ impl VVal {
                     r
                 }))
             },
-            VVal::DropFun(v) => v.v.iter(),
-            VVal::Ref(v)     => v.borrow().iter(),
-            VVal::CRef(v)    => v.borrow().iter(),
-            VVal::WWRef(v)   =>
-                if let Some(r) = v.upgrade() {
-                    r.borrow().iter()
-                } else { std::iter::from_fn(Box::new(|| { None })) },
             VVal::None => {
                 std::iter::from_fn(Box::new(move || { None }))
             },
@@ -2366,15 +2384,19 @@ impl VVal {
             VVal::Opt(None) => {
                 std::iter::from_fn(Box::new(move || { None }))
             },
-            _ => {
-                let x = self.clone();
-                let mut used = false;
-                std::iter::from_fn(Box::new(move || {
-                    if used { return None; }
-                    used = true;
-                    Some((x.clone(), None))
-                }))
-            }
+            _ => self.with_deref(
+                |v| { v.iter() },
+                |v| if let Some(v) = v {
+                    let x = v.clone();
+                    let mut used = false;
+                    std::iter::from_fn(Box::new(move || {
+                        if used { return None; }
+                        used = true;
+                        Some((x.clone(), None))
+                    }))
+                } else {
+                    std::iter::from_fn(Box::new(move || { None }))
+                })
         }
     }
 
@@ -3718,30 +3740,30 @@ impl VVal {
         match self { VVal::Err(_) => true, _ => false }
     }
 
-    pub fn type_name(&self) -> String {
+    pub fn type_name(&self) -> &str {
         match self {
-            VVal::Str(_)     => String::from("string"),
-            VVal::Byt(_)     => String::from("bytes"),
-            VVal::None       => String::from("none"),
-            VVal::Err(_)     => String::from("error"),
-            VVal::Bol(_)     => String::from("bool"),
-            VVal::Sym(_)     => String::from("symbol"),
-            VVal::Syn(_)     => String::from("syntax"),
-            VVal::Int(_)     => String::from("integer"),
-            VVal::Flt(_)     => String::from("float"),
-            VVal::Pair(_)    => String::from("pair"),
-            VVal::Iter(_)    => String::from("iter"),
-            VVal::Opt(_)     => String::from("optional"),
-            VVal::Lst(_)     => String::from("vector"),
-            VVal::Map(_)     => String::from("map"),
-            VVal::Usr(_)     => String::from("userdata"),
-            VVal::Fun(_)     => String::from("function"),
-            VVal::IVec(_)    => String::from("integer_vector"),
-            VVal::FVec(_)    => String::from("float_vector"),
-            VVal::DropFun(_) => String::from("drop_function"),
-            VVal::Ref(_)     => String::from("strong"),
-            VVal::CRef(_)    => String::from("weakable"),
-            VVal::WWRef(_)   => String::from("weak"),
+            VVal::Str(_)     => "string",
+            VVal::Byt(_)     => "bytes",
+            VVal::None       => "none",
+            VVal::Err(_)     => "error",
+            VVal::Bol(_)     => "bool",
+            VVal::Sym(_)     => "symbol",
+            VVal::Syn(_)     => "syntax",
+            VVal::Int(_)     => "integer",
+            VVal::Flt(_)     => "float",
+            VVal::Pair(_)    => "pair",
+            VVal::Iter(_)    => "iter",
+            VVal::Opt(_)     => "optional",
+            VVal::Lst(_)     => "vector",
+            VVal::Map(_)     => "map",
+            VVal::Usr(_)     => "userdata",
+            VVal::Fun(_)     => "function",
+            VVal::IVec(_)    => "integer_vector",
+            VVal::FVec(_)    => "float_vector",
+            VVal::DropFun(_) => "drop_function",
+            VVal::Ref(_)     => "strong",
+            VVal::CRef(_)    => "weakable",
+            VVal::WWRef(_)   => "weak",
         }
     }
 

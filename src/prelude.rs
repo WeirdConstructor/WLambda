@@ -5380,7 +5380,7 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "type",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::new_str_mv(env.arg(0).type_name()))
+            Ok(VVal::new_str(env.arg(0).type_name()))
         }, Some(1), Some(1), true);
 
     func!(st, "match",
