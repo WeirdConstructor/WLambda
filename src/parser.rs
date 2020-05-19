@@ -92,7 +92,7 @@ In the following grammar, white space and comments are omitted:
                     (* parses substring like 'q', but constructs a
                        selector_rs_syntax matcher at compile time *)
                   ;
-    pattern       = "X", ?any character as quote?, selector_rs_pattern_syntax, ?any character as quote?
+    pattern       = "r", ?any character as quote?, selector_rs_pattern_syntax, ?any character as quote?
                     (* parses substring like 'q', but constructs a
                        pattern matcher at compile time *)
                   ;
@@ -320,8 +320,25 @@ fn addchr(v: &mut Vec<u8>, s: &mut String, b: bool, c: char) {
     else { s.push(c); }
 }
 
-/// Parsers a WLambda special quote string or byte buffer.
+/// Parses a quoted byte vector or string.
 fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
+    let vec = ps.syn(Syntax::Str);
+
+    if bytes {
+        vec.push(VVal::new_byt(
+            parse_quoted(ps, Vec::new(), |v, c| add_c_to_vec(v, c))?));
+    } else {
+        vec.push(VVal::new_str_mv(
+            parse_quoted(ps, String::new(), |v, c| v.push(c))?));
+    }
+
+    Ok(vec)
+}
+
+/// Parsers a WLambda special quoted part of code.
+fn parse_quoted<F, V>(ps: &mut State, mut v: V, add_char: F) -> Result<V, ParseError>
+    where F: Fn(&mut V, char)
+{
     if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("string"))); }
 
     let quote_char = ps.expect_some(ps.peek())?;
@@ -335,10 +352,8 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
         _ => quote_char
     };
 
-    let vec = ps.syn(Syntax::Str);
-
-    let mut s = String::from("");
-    let mut v : Vec<u8> = Vec::new();
+//    let mut s = String::from("");
+//    let mut v : Vec<u8> = Vec::new();
 
     let mut quote_stack : Vec<char> = vec![quote_char];
 
@@ -349,7 +364,8 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
         while ps.peek().unwrap_or(next_quote) != next_quote {
             let c = ps.expect_some(ps.peek())?;
             ps.consume();
-            addchr(&mut v, &mut s, bytes, c);
+            add_char(&mut v, c);
+//            addchr(&mut v, &mut s, bytes, c);
 
             match c {
                 '[' => { quote_stack.push(']'); cont_next = true; break; },
@@ -367,20 +383,14 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 
             quote_stack.pop();
             if !quote_stack.is_empty() {
-                addchr(&mut v, &mut s, bytes, next_quote);
+                add_char(&mut v, next_quote);
             }
         }
     }
 
-    if bytes {
-        vec.push(VVal::new_byt(v));
-    } else {
-        vec.push(VVal::new_str(&s));
-    }
-
     ps.skip_ws_and_comments();
 
-    Ok(vec)
+    Ok(v)
 }
 
 enum NVecKind {
@@ -695,6 +705,13 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         'b' => { ps.consume(); parse_string(ps, true) },
         'q' => { ps.consume(); parse_q_string(ps, false) },
         'Q' => { ps.consume(); parse_q_string(ps, true) },
+        'r' => {
+            ps.consume();
+            let pattern_source = parse_quoted(ps, String::new(), |s, c| s.push(c))?;
+            let vec = ps.syn(Syntax::Pattern);
+            vec.push(VVal::new_str_mv(pattern_source));
+            Ok(vec)
+        },
         'c' => {
             if ps.consume_lookahead("code") {
                 ps.skip_ws_and_comments();

@@ -732,12 +732,12 @@ impl PatResult {
         }
     }
 
-    fn len(mut self, l: usize) -> Self {
+    pub fn len(mut self, l: usize) -> Self {
         self.match_len += l;
         self
     }
 
-    fn b(&self) -> bool { self.matched }
+    pub fn b(&self) -> bool { self.matched }
 
     fn add_len(&mut self, l: usize) -> &mut Self {
         self.match_len += l;
@@ -783,7 +783,7 @@ impl PatResult {
         }
     }
 
-    fn to_test_string(&self, input: &str) -> String {
+    pub fn to_test_string(&self, input: &str) -> String {
         if !self.matched { return "-nomatch-".to_string() }
 
         //d// println!("TOTEST {:?} [{}]", self, input);
@@ -1484,10 +1484,10 @@ fn compile_selector(sel: &VVal, no_capture: bool) -> SelNode {
     }
 }
 
-fn compile_single_pattern(v: &VVal) -> PatternNode {
+fn compile_find_pattern(v: &VVal) -> PatternNode {
     let pat = compile_pattern(v,
-        Box::new(move |s: RxBuf, st: &mut SelectorState| {
-            println!("*** BRANCH LEAF SINGLE PATTERN MATCH {}| {:?}", s, st.captures);
+        Box::new(move |_s: RxBuf, _st: &mut SelectorState| {
+            //d// println!("*** BRANCH LEAF SINGLE PATTERN MATCH {}| {:?}", s, st.captures);
             PatResult::matched()
         }));
 
@@ -1508,6 +1508,25 @@ fn compile_single_pattern(v: &VVal) -> PatternNode {
 
         PatResult::fail()
     })
+}
+
+/// Creates a function that takes a string slice and tries to
+/// find the compiled regular expression in it.
+/// The returned function then returns a `PatResult` which stores
+/// the captures and whether the pattern matched.
+pub fn create_regex_find_function(pat: &str)
+    -> Result<Box<dyn Fn(&str) -> PatResult>, ParseError>
+{
+    let mut ps = State::new(pat, "<pattern>");
+    ps.skip_ws();
+    let pattern = parse_pattern(&mut ps)?;
+    let comp_pat = compile_find_pattern(&pattern);
+
+    Ok(Box::new(move |s: &str| {
+        let mut ss = SelectorState::new();
+        ss.set_str(s);
+        (*comp_pat)(RxBuf::new(s), &mut ss)
+    }))
 }
 
 #[cfg(test)]
@@ -1616,7 +1635,7 @@ mod tests {
         ps.skip_ws();
         match parse_pattern(&mut ps) {
             Ok(v) => {
-                let pn = compile_single_pattern(&v);
+                let pn = compile_find_pattern(&v);
                 let mut ss = SelectorState::new();
                 ss.set_str(st);
                 let rb = RxBuf::new(st);
@@ -2028,489 +2047,6 @@ mod tests {
         assert_eq!(re2wlpat("a.b"), "a?b");
         assert_eq!(rep("a.b",                             "acb"),         "acb");
         assert_eq!(rep("a.*b",                            "acc\nccb"),    "acc\nccb");
-
-////assert_eq!(rep("(?P<foo_123>a)(?P=foo_123",  "aa"),                        "-nomatch-");
-////assert_eq!(rep("(?P<foo_123>a)(?P=1)",       "aa"),                        "-nomatch-");
-////assert_eq!(rep("(?P<foo_123>a)(?P=!)",       "aa"),                        "-nomatch-");
-////assert_eq!(rep("(?P<foo_123>a)(?P=foo_124",  "aa"),                        "-nomatch-");
-////assert_eq!(rep("(?P<foo_123>a)",             "a"),                         "a");
-////assert_eq!(rep("(?P<foo_123>a)(?P=foo_123)", "aa"),                        "a");
-////assert_eq!(rep("\\1",                        "a"),                         "-nomatch-");
-////assert_eq!(rep("[\\1]",                      "\x01"),                      "\x01");
-//assert_eq!(rep("\\x61",                      "a"),                         "a");
-//assert_eq!(rep("(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)(l)9","abcdefghijkl9"),            "abcdefghijkl9");
-//assert_eq!(rep(r"\0",                        "\0"),                        "\0");
-//assert_eq!(rep(r"[\0a]",                     "\0"),                        "\0");
-//assert_eq!(rep(r"[a\0]",                     "\0"),                        "\0");
-//assert_eq!(rep(r"[^a\0]",                    "\0"),                        "-nomatch-");
-////assert_eq!(rep(r"\a[\b]\f\n\r\t\v",          "\a\b\f\n\r\t\v"),            "\a\b\f\n\r\t\v");
-////assert_eq!(rep(r"[\a][\b][\f][\n][\r][\t][\v]","\a\b\f\n\r\t\v"),            "\a\b\f\n\r\t\v");
-//assert_eq!(rep(r"\c\e\g\h\i\j\k\m\o\p\q\y\z","ceghijkmopqyz"),             "ceghijkmopqyz");
-//assert_eq!(rep("a.b",                        "acb"),                       "acb");
-//assert_eq!(rep("a.b",                        "a\nb"),                      "-nomatch-");
-//assert_eq!(rep("a.*b",                       "acc\nccb"),                  "-nomatch-");
-//assert_eq!(rep("a.{4,5}b",                   "acc\nccb"),                  "-nomatch-");
-//assert_eq!(rep("a.b",                        "a\rb"),                      "a\rb");
-//assert_eq!(rep("a.b(?s)",                    "a\nb"),                      "a\nb");
-//assert_eq!(rep("a.*(?s)b",                   "acc\nccb"),                  "acc\nccb");
-//assert_eq!(rep("(?s)a.{4,5}b",               "acc\nccb"),                  "acc\nccb");
-//assert_eq!(rep("(?s)a.b",                    "a\nb"),                      "a\nb");
-//assert_eq!(rep("abc",                        "abc"),                       "abc");
-//assert_eq!(rep("abc",                        "xbc"),                       "-nomatch-");
-//assert_eq!(rep("abc",                        "axc"),                       "-nomatch-");
-//assert_eq!(rep("abc",                        "abx"),                       "-nomatch-");
-//assert_eq!(rep("abc",                        "xabcy"),                     "abc");
-//assert_eq!(rep("abc",                        "ababc"),                     "abc");
-//assert_eq!(rep("ab*c",                       "abc"),                       "abc");
-//assert_eq!(rep("ab*bc",                      "abc"),                       "abc");
-//assert_eq!(rep("ab*bc",                      "abbc"),                      "abbc");
-//assert_eq!(rep("ab*bc",                      "abbbbc"),                    "abbbbc");
-//assert_eq!(rep("ab+bc",                      "abbc"),                      "abbc");
-//assert_eq!(rep("ab+bc",                      "abc"),                       "-nomatch-");
-//assert_eq!(rep("ab+bc",                      "abq"),                       "-nomatch-");
-//assert_eq!(rep("ab+bc",                      "abbbbc"),                    "abbbbc");
-//assert_eq!(rep("ab?bc",                      "abbc"),                      "abbc");
-//assert_eq!(rep("ab?bc",                      "abc"),                       "abc");
-//assert_eq!(rep("ab?bc",                      "abbbbc"),                    "-nomatch-");
-//assert_eq!(rep("ab?c",                       "abc"),                       "abc");
-//assert_eq!(rep("^abc$",                      "abc"),                       "abc");
-//assert_eq!(rep("^abc$",                      "abcc"),                      "-nomatch-");
-//assert_eq!(rep("^abc",                       "abcc"),                      "abc");
-//assert_eq!(rep("^abc$",                      "aabc"),                      "-nomatch-");
-//assert_eq!(rep("abc$",                       "aabc"),                      "abc");
-//assert_eq!(rep("^",                          "abc"),                       "-");
-//assert_eq!(rep("$",                          "abc"),                       "-");
-//assert_eq!(rep("a.c",                        "abc"),                       "abc");
-//assert_eq!(rep("a.c",                        "axc"),                       "axc");
-//assert_eq!(rep("a.*c",                       "axyzc"),                     "axyzc");
-//assert_eq!(rep("a.*c",                       "axyzd"),                     "-nomatch-");
-//assert_eq!(rep("a[bc]d",                     "abc"),                       "-nomatch-");
-//assert_eq!(rep("a[bc]d",                     "abd"),                       "abd");
-//assert_eq!(rep("a[b-d]e",                    "abd"),                       "-nomatch-");
-//assert_eq!(rep("a[b-d]e",                    "ace"),                       "ace");
-//assert_eq!(rep("a[b-d]",                     "aac"),                       "ac");
-//assert_eq!(rep("a[-b]",                      "a-"),                        "a-");
-//assert_eq!(rep("a[\\-b]",                    "a-"),                        "a-");
-//assert_eq!(rep("a[b-]",                      "a-"),                        "-nomatch-");
-//assert_eq!(rep("a[]b",                       "-"),                         "-nomatch-");
-//assert_eq!(rep("a[",                         "-"),                         "-nomatch-");
-//assert_eq!(rep("a\\",                        "-"),                         "-nomatch-");
-//assert_eq!(rep("abc)",                       "-"),                         "-nomatch-");
-//assert_eq!(rep("(abc",                       "-"),                         "-nomatch-");
-//assert_eq!(rep("a]",                         "a]"),                        "a]");
-//assert_eq!(rep("a[]]b",                      "a]b"),                       "a]b");
-//assert_eq!(rep("a[\\]]b",                     "a]b"),                       "a]b");
-//assert_eq!(rep("a[^bc]d",                    "aed"),                       "aed");
-//assert_eq!(rep("a[^bc]d",                    "abd"),                       "-nomatch-");
-//assert_eq!(rep("a[^-b]c",                    "adc"),                       "adc");
-//assert_eq!(rep("a[^-b]c",                    "a-c"),                       "-nomatch-");
-//assert_eq!(rep("a[^]b]c",                    "a]c"),                       "-nomatch-");
-//assert_eq!(rep("a[^]b]c",                    "adc"),                       "adc");
-//assert_eq!(rep("\\ba\\b",                    "a-"),                        "-");
-//assert_eq!(rep("\\ba\\b",                    "-a"),                        "-");
-//assert_eq!(rep("\\ba\\b",                    "-a-"),                       "-");
-//assert_eq!(rep("\\by\\b",                    "xy"),                        "-nomatch-");
-//assert_eq!(rep("\\by\\b",                    "yz"),                        "-nomatch-");
-//assert_eq!(rep("\\by\\b",                    "xyz"),                       "-nomatch-");
-//assert_eq!(rep("x\\b",                       "xyz"),                       "-nomatch-");
-//assert_eq!(rep("x\\B",                       "xyz"),                       "-");
-//assert_eq!(rep("\\Bz",                       "xyz"),                       "-");
-//assert_eq!(rep("z\\B",                       "xyz"),                       "-nomatch-");
-//assert_eq!(rep("\\Bx",                       "xyz"),                       "-nomatch-");
-//assert_eq!(rep("\\Ba\\B",                    "a-"),                        "-nomatch-");
-//assert_eq!(rep("\\Ba\\B",                    "-a"),                        "-nomatch-");
-//assert_eq!(rep("\\Ba\\B",                    "-a-"),                       "-nomatch-");
-//assert_eq!(rep("\\By\\B",                    "xy"),                        "-nomatch-");
-//assert_eq!(rep("\\By\\B",                    "yz"),                        "-nomatch-");
-//assert_eq!(rep("\\By\\b",                    "xy"),                        "-");
-//assert_eq!(rep("\\by\\B",                    "yz"),                        "-");
-//assert_eq!(rep("\\By\\B",                    "xyz"),                       "-");
-//assert_eq!(rep("ab|cd",                      "abc"),                       "ab");
-//assert_eq!(rep("ab|cd",                      "abcd"),                      "ab");
-//assert_eq!(rep("()ef",                       "def"),                       "ef-");
-//assert_eq!(rep("$b",                         "b"),                         "-nomatch-");
-//assert_eq!(rep("a\\(b",                      "a(b"),                       "a(b-Error");
-//assert_eq!(rep("a\\(*b",                     "ab"),                        "ab");
-//assert_eq!(rep("a\\(*b",                     "a((b"),                      "a((b");
-//assert_eq!(rep("a\\\\b",                     "a\\b"),                      "a\\b");
-//assert_eq!(rep("((a))",                      "abc"),                       "a-a-a");
-//assert_eq!(rep("(a)b(c)",                    "abc"),                       "abc-a-c");
-//assert_eq!(rep("a+b+c",                      "aabbabc"),                   "abc");
-//assert_eq!(rep("(a+|b)*",                    "ab"),                        "ab-b");
-//assert_eq!(rep("(a+|b)+",                    "ab"),                        "ab-b");
-//assert_eq!(rep("(a+|b)?",                    "ab"),                        "a-a");
-//assert_eq!(rep(")(",                         "-"),                         "-nomatch-");
-//assert_eq!(rep("[^ab]*",                     "cde"),                       "cde");
-//assert_eq!(rep("a|b|c|d|e",                  "e"),                         "e");
-//assert_eq!(rep("(a|b|c|d|e)f",               "ef"),                        "ef-e");
-//assert_eq!(rep("abcd*efg",                   "abcdefg"),                   "abcdefg");
-//assert_eq!(rep("ab*",                        "xabyabbbz"),                 "ab");
-//assert_eq!(rep("ab*",                        "xayabbbz"),                  "a");
-//assert_eq!(rep("(ab|cd)e",                   "abcde"),                     "cde-cd");
-//assert_eq!(rep("[abhgefdc]ij",               "hij"),                       "hij");
-//assert_eq!(rep("^(ab|cd)e",                  "abcde"),                     "-nomatch-");
-//assert_eq!(rep("(abc|)ef",                   "abcdef"),                    "ef-");
-//assert_eq!(rep("(a|b)c*d",                   "abcd"),                      "bcd-b");
-//assert_eq!(rep("(ab|ab*)bc",                 "abc"),                       "abc-a");
-//assert_eq!(rep("a([bc]*)c*",                 "abc"),                       "abc-bc");
-//assert_eq!(rep("a([bc]*)(c*d)",              "abcd"),                      "abcd-bc-d");
-//assert_eq!(rep("a([bc]+)(c*d)",              "abcd"),                      "abcd-bc-d");
-//assert_eq!(rep("a([bc]*)(c+d)",              "abcd"),                      "abcd-b-cd");
-//assert_eq!(rep("a[bcd]*dcdcde",              "adcdcde"),                   "adcdcde");
-//assert_eq!(rep("a[bcd]+dcdcde",              "adcdcde"),                   "-nomatch-");
-//assert_eq!(rep("(ab|a)b*c",                  "abc"),                       "abc-ab");
-//assert_eq!(rep("((a)(b)c)(d)",               "abcd"),                      "abc-a-b-d");
-//assert_eq!(rep("[a-zA-Z_][a-zA-Z0-9_]*",     "alpha"),                     "alpha");
-//assert_eq!(rep("^a(bc+|b[eh])g|.h$",         "abh"),                       "bh-None");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "effgz"),                     "effgz-effgz-None");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "ij"),                        "ij-ij-j");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "effg"),                      "-nomatch-");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "bcdd"),                      "-nomatch-");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "reffgz"),                    "effgz-effgz-None");
-//assert_eq!(rep("(((((((((a)))))))))",        "a"),                         "a");
-//assert_eq!(rep("multiple words of text",     "uh-uh"),                     "-nomatch-");
-//assert_eq!(rep("multiple words",             "multiple words, yeah"),      "multiple words");
-//assert_eq!(rep("(.*)c(.*)",                  "abcde"),                     "abcde-ab-de");
-//assert_eq!(rep("\\((.*), (.*)\\)",           "(a, b)"),                    "b-a");
-//assert_eq!(rep("[k]",                        "ab"),                        "-nomatch-");
-//assert_eq!(rep("a[-]?c",                     "ac"),                        "ac");
-//assert_eq!(rep("(abc)\\1",                   "abcabc"),                    "abc");
-//assert_eq!(rep("([a-c]*)\\1",                "abcabc"),                    "abc");
-//assert_eq!(rep("^(.+)?B",                    "AB"),                        "A");
-//assert_eq!(rep("(a+).\\1$",                  "aaaaa"),                     "aaaaa-aa");
-//assert_eq!(rep("^(a+).\\1$",                 "aaaa"),                      "-nomatch-");
-//assert_eq!(rep("(abc)\\1",                   "abcabc"),                    "abcabc-abc");
-//assert_eq!(rep("([a-c]+)\\1",                "abcabc"),                    "abcabc-abc");
-//assert_eq!(rep("(a)\\1",                     "aa"),                        "aa-a");
-//assert_eq!(rep("(a+)\\1",                    "aa"),                        "aa-a");
-//assert_eq!(rep("(a+)+\\1",                   "aa"),                        "aa-a");
-//assert_eq!(rep("(a).+\\1",                   "aba"),                       "aba-a");
-//assert_eq!(rep("(a)ba*\\1",                  "aba"),                       "aba-a");
-//assert_eq!(rep("(aa|a)a\\1$",                "aaa"),                       "aaa-a");
-//assert_eq!(rep("(a|aa)a\\1$",                "aaa"),                       "aaa-a");
-//assert_eq!(rep("(a+)a\\1$",                  "aaa"),                       "aaa-a");
-//assert_eq!(rep("([abc]*)\\1",                "abcabc"),                    "abcabc-abc");
-//assert_eq!(rep("(a)(b)c|ab",                 "ab"),                        "ab-None-None");
-//assert_eq!(rep("(a)+x",                      "aaax"),                      "aaax-a");
-//assert_eq!(rep("([ac])+x",                   "aacx"),                      "aacx-c");
-//assert_eq!(rep("([^/]*/)*sub1/",             "d:msgs/tdir/sub1/trial/away.cpp"),"d:msgs/tdir/sub1/-tdir/");
-//assert_eq!(rep("([^.]*)\\.([^:]*):[T ]+(.*)","track1.title:TBlah blah blah"),"track1.title:TBlah blah blah-track1-title-Blah blah blah");
-//assert_eq!(rep("([^N]*N)+",                  "abNNxyzN"),                  "abNNxyzN-xyzN");
-//assert_eq!(rep("([^N]*N)+",                  "abNNxyz"),                   "abNN-N");
-//assert_eq!(rep("([abc]*)x",                  "abcx"),                      "abcx-abc");
-//assert_eq!(rep("([abc]*)x",                  "abc"),                       "-nomatch-");
-//assert_eq!(rep("([xyz]*)x",                  "abcx"),                      "x-");
-//assert_eq!(rep("(a)+b|aac",                  "aac"),                       "aac-None");
-//assert_eq!(rep("(?P<i d>aaa)a",              "aaaa"),                      "-nomatch-");
-//assert_eq!(rep("(?P<id>aaa)a",               "aaaa"),                      "aaaa-aaa");
-//assert_eq!(rep("(?P<id>aa)(?P=id)",          "aaaa"),                      "aaaa-aa");
-//assert_eq!(rep("(?P<id>aa)(?P=xd)",          "aaaa"),                      "-nomatch-");
-//assert_eq!(rep("\\1",                        "a"),                         "-nomatch-");
-//assert_eq!(rep("\\141",                      "a"),                         "a");
-//assert_eq!(rep("(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)(l)\\119","abcdefghijklk9"),            "abcdefghijklk9-k");
-//assert_eq!(rep("abc",                        "abc"),                       "abc");
-//assert_eq!(rep("abc",                        "xbc"),                       "-nomatch-");
-//assert_eq!(rep("abc",                        "axc"),                       "-nomatch-");
-//assert_eq!(rep("abc",                        "abx"),                       "-nomatch-");
-//assert_eq!(rep("abc",                        "xabcy"),                     "abc");
-//assert_eq!(rep("abc",                        "ababc"),                     "abc");
-//assert_eq!(rep("ab*c",                       "abc"),                       "abc");
-//assert_eq!(rep("ab*bc",                      "abc"),                       "abc");
-//assert_eq!(rep("ab*bc",                      "abbc"),                      "abbc");
-//assert_eq!(rep("ab*bc",                      "abbbbc"),                    "abbbbc");
-//assert_eq!(rep("ab{0,}bc",                   "abbbbc"),                    "abbbbc");
-//assert_eq!(rep("ab+bc",                      "abbc"),                      "abbc");
-//assert_eq!(rep("ab+bc",                      "abc"),                       "-nomatch-");
-//assert_eq!(rep("ab+bc",                      "abq"),                       "-nomatch-");
-//assert_eq!(rep("ab{1,}bc",                   "abq"),                       "-nomatch-");
-//assert_eq!(rep("ab+bc",                      "abbbbc"),                    "abbbbc");
-//assert_eq!(rep("ab{1,}bc",                   "abbbbc"),                    "abbbbc");
-//assert_eq!(rep("ab{1,3}bc",                  "abbbbc"),                    "abbbbc");
-//assert_eq!(rep("ab{3,4}bc",                  "abbbbc"),                    "abbbbc");
-//assert_eq!(rep("ab{4,5}bc",                  "abbbbc"),                    "-nomatch-");
-//assert_eq!(rep("ab?bc",                      "abbc"),                      "abbc");
-//assert_eq!(rep("ab?bc",                      "abc"),                       "abc");
-//assert_eq!(rep("ab{0,1}bc",                  "abc"),                       "abc");
-//assert_eq!(rep("ab?bc",                      "abbbbc"),                    "-nomatch-");
-//assert_eq!(rep("ab?c",                       "abc"),                       "abc");
-//assert_eq!(rep("ab{0,1}c",                   "abc"),                       "abc");
-//assert_eq!(rep("^abc$",                      "abc"),                       "abc");
-//assert_eq!(rep("^abc$",                      "abcc"),                      "-nomatch-");
-//assert_eq!(rep("^abc",                       "abcc"),                      "abc");
-//assert_eq!(rep("^abc$",                      "aabc"),                      "-nomatch-");
-//assert_eq!(rep("abc$",                       "aabc"),                      "abc");
-//assert_eq!(rep("^",                          "abc"),                       "");
-//assert_eq!(rep("$",                          "abc"),                       "");
-//assert_eq!(rep("a.c",                        "abc"),                       "abc");
-//assert_eq!(rep("a.c",                        "axc"),                       "axc");
-//assert_eq!(rep("a.*c",                       "axyzc"),                     "axyzc");
-//assert_eq!(rep("a.*c",                       "axyzd"),                     "-nomatch-");
-//assert_eq!(rep("a[bc]d",                     "abc"),                       "-nomatch-");
-//assert_eq!(rep("a[bc]d",                     "abd"),                       "abd");
-//assert_eq!(rep("a[b-d]e",                    "abd"),                       "-nomatch-");
-//assert_eq!(rep("a[b-d]e",                    "ace"),                       "ace");
-//assert_eq!(rep("a[b-d]",                     "aac"),                       "ac");
-//assert_eq!(rep("a[-b]",                      "a-"),                        "a-");
-//assert_eq!(rep("a[b-]",                      "a-"),                        "a-");
-//assert_eq!(rep("a[b-a]",                     "-"),                         "-nomatch-");
-//assert_eq!(rep("a[]b",                       "-"),                         "-nomatch-");
-//assert_eq!(rep("a[",                         "-"),                         "-nomatch-");
-//assert_eq!(rep("a]",                         "a]"),                        "a]");
-//assert_eq!(rep("a[]]b",                      "a]b"),                       "a]b");
-//assert_eq!(rep("a[^bc]d",                    "aed"),                       "aed");
-//assert_eq!(rep("a[^bc]d",                    "abd"),                       "-nomatch-");
-//assert_eq!(rep("a[^-b]c",                    "adc"),                       "adc");
-//assert_eq!(rep("a[^-b]c",                    "a-c"),                       "-nomatch-");
-//assert_eq!(rep("a[^]b]c",                    "a]c"),                       "-nomatch-");
-//assert_eq!(rep("a[^]b]c",                    "adc"),                       "adc");
-//assert_eq!(rep("ab|cd",                      "abc"),                       "ab");
-//assert_eq!(rep("ab|cd",                      "abcd"),                      "ab");
-//assert_eq!(rep("()ef",                       "def"),                       "ef-");
-//assert_eq!(rep("*a",                         "-"),                         "-nomatch-");
-//assert_eq!(rep("(*)b",                       "-"),                         "-nomatch-");
-//assert_eq!(rep("$b",                         "b"),                         "-nomatch-");
-//assert_eq!(rep("a\\",                        "-"),                         "-nomatch-");
-//assert_eq!(rep("a\\(b",                      "a(b"),                       "a(b-Error");
-//assert_eq!(rep("a\\(*b",                     "ab"),                        "ab");
-//assert_eq!(rep("a\\(*b",                     "a((b"),                      "a((b");
-//assert_eq!(rep("a\\\\b",                     "a\\b"),                      "a\\b");
-//assert_eq!(rep("abc)",                       "-"),                         "-nomatch-");
-//assert_eq!(rep("(abc",                       "-"),                         "-nomatch-");
-//assert_eq!(rep("((a))",                      "abc"),                       "a-a-a");
-//assert_eq!(rep("(a)b(c)",                    "abc"),                       "abc-a-c");
-//assert_eq!(rep("a+b+c",                      "aabbabc"),                   "abc");
-//assert_eq!(rep("a{1,}b{1,}c",                "aabbabc"),                   "abc");
-//assert_eq!(rep("a**",                        "-"),                         "-nomatch-");
-//assert_eq!(rep("a.+?c",                      "abcabc"),                    "abc");
-//assert_eq!(rep("(a+|b)*",                    "ab"),                        "ab-b");
-//assert_eq!(rep("(a+|b){0,}",                 "ab"),                        "ab-b");
-//assert_eq!(rep("(a+|b)+",                    "ab"),                        "ab-b");
-//assert_eq!(rep("(a+|b){1,}",                 "ab"),                        "ab-b");
-//assert_eq!(rep("(a+|b)?",                    "ab"),                        "a-a");
-//assert_eq!(rep("(a+|b){0,1}",                "ab"),                        "a-a");
-//assert_eq!(rep(")(",                         "-"),                         "-nomatch-");
-//assert_eq!(rep("[^ab]*",                     "cde"),                       "cde");
-//assert_eq!(rep("([abc])*d",                  "abbbcd"),                    "abbbcd-c");
-//assert_eq!(rep("([abc])*bcd",                "abcd"),                      "abcd-a");
-//assert_eq!(rep("a|b|c|d|e",                  "e"),                         "e");
-//assert_eq!(rep("(a|b|c|d|e)f",               "ef"),                        "ef-e");
-//assert_eq!(rep("abcd*efg",                   "abcdefg"),                   "abcdefg");
-//assert_eq!(rep("ab*",                        "xabyabbbz"),                 "ab");
-//assert_eq!(rep("ab*",                        "xayabbbz"),                  "a");
-//assert_eq!(rep("(ab|cd)e",                   "abcde"),                     "cde-cd");
-//assert_eq!(rep("[abhgefdc]ij",               "hij"),                       "hij");
-//assert_eq!(rep("^(ab|cd)e",                  "abcde"),                     "-nomatch-");
-//assert_eq!(rep("(abc|)ef",                   "abcdef"),                    "ef-");
-//assert_eq!(rep("(a|b)c*d",                   "abcd"),                      "bcd-b");
-//assert_eq!(rep("(ab|ab*)bc",                 "abc"),                       "abc-a");
-//assert_eq!(rep("a([bc]*)c*",                 "abc"),                       "abc-bc");
-//assert_eq!(rep("a([bc]*)(c*d)",              "abcd"),                      "abcd-bc-d");
-//assert_eq!(rep("a([bc]+)(c*d)",              "abcd"),                      "abcd-bc-d");
-//assert_eq!(rep("a([bc]*)(c+d)",              "abcd"),                      "abcd-b-cd");
-//assert_eq!(rep("a[bcd]*dcdcde",              "adcdcde"),                   "adcdcde");
-//assert_eq!(rep("a[bcd]+dcdcde",              "adcdcde"),                   "-nomatch-");
-//assert_eq!(rep("(ab|a)b*c",                  "abc"),                       "abc-ab");
-//assert_eq!(rep("((a)(b)c)(d)",               "abcd"),                      "abc-a-b-d");
-//assert_eq!(rep("[a-zA-Z_][a-zA-Z0-9_]*",     "alpha"),                     "alpha");
-//assert_eq!(rep("^a(bc+|b[eh])g|.h$",         "abh"),                       "bh-None");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "effgz"),                     "effgz-effgz-None");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "ij"),                        "ij-ij-j");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "effg"),                      "-nomatch-");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "bcdd"),                      "-nomatch-");
-//assert_eq!(rep("(bc+d$|ef*g.|h?i(j|k))",     "reffgz"),                    "effgz-effgz-None");
-//assert_eq!(rep("((((((((((a))))))))))",      "a"),                         "a");
-//assert_eq!(rep("((((((((((a))))))))))\\10",  "aa"),                        "aa");
-//assert_eq!(rep("((((((((((a))))))))))\\41",  "aa"),                        "-nomatch-");
-//assert_eq!(rep("((((((((((a))))))))))\\41",  "a!"),                        "a!");
-//assert_eq!(rep("(((((((((a)))))))))",        "a"),                         "a");
-//assert_eq!(rep("multiple words of text",     "uh-uh"),                     "-nomatch-");
-//assert_eq!(rep("multiple words",             "multiple words, yeah"),      "multiple words");
-//assert_eq!(rep("(.*)c(.*)",                  "abcde"),                     "abcde-ab-de");
-//assert_eq!(rep("\\((.*), (.*)\\)",           "(a, b)"),                    "b-a");
-//assert_eq!(rep("[k]",                        "ab"),                        "-nomatch-");
-//assert_eq!(rep("a[-]?c",                     "ac"),                        "ac");
-//assert_eq!(rep("(abc)\\1",                   "abcabc"),                    "abc");
-//assert_eq!(rep("([a-c]*)\\1",                "abcabc"),                    "abc");
-//assert_eq!(rep("(?i)abc",                    "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)abc",                    "XBC"),                       "-nomatch-");
-//assert_eq!(rep("(?i)abc",                    "AXC"),                       "-nomatch-");
-//assert_eq!(rep("(?i)abc",                    "ABX"),                       "-nomatch-");
-//assert_eq!(rep("(?i)abc",                    "XABCY"),                     "ABC");
-//assert_eq!(rep("(?i)abc",                    "ABABC"),                     "ABC");
-//assert_eq!(rep("(?i)ab*c",                   "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)ab*bc",                  "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)ab*bc",                  "ABBC"),                      "ABBC");
-//assert_eq!(rep("(?i)ab*?bc",                 "ABBBBC"),                    "ABBBBC");
-//assert_eq!(rep("(?i)ab{0,}?bc",              "ABBBBC"),                    "ABBBBC");
-//assert_eq!(rep("(?i)ab+?bc",                 "ABBC"),                      "ABBC");
-//assert_eq!(rep("(?i)ab+bc",                  "ABC"),                       "-nomatch-");
-//assert_eq!(rep("(?i)ab+bc",                  "ABQ"),                       "-nomatch-");
-//assert_eq!(rep("(?i)ab{1,}bc",               "ABQ"),                       "-nomatch-");
-//assert_eq!(rep("(?i)ab+bc",                  "ABBBBC"),                    "ABBBBC");
-//assert_eq!(rep("(?i)ab{1,}?bc",              "ABBBBC"),                    "ABBBBC");
-//assert_eq!(rep("(?i)ab{1,3}?bc",             "ABBBBC"),                    "ABBBBC");
-//assert_eq!(rep("(?i)ab{3,4}?bc",             "ABBBBC"),                    "ABBBBC");
-//assert_eq!(rep("(?i)ab{4,5}?bc",             "ABBBBC"),                    "-nomatch-");
-//assert_eq!(rep("(?i)ab??bc",                 "ABBC"),                      "ABBC");
-//assert_eq!(rep("(?i)ab??bc",                 "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)ab{0,1}?bc",             "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)ab??bc",                 "ABBBBC"),                    "-nomatch-");
-//assert_eq!(rep("(?i)ab??c",                  "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)ab{0,1}?c",              "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)^abc$",                  "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)^abc$",                  "ABCC"),                      "-nomatch-");
-//assert_eq!(rep("(?i)^abc",                   "ABCC"),                      "ABC");
-//assert_eq!(rep("(?i)^abc$",                  "AABC"),                      "-nomatch-");
-//assert_eq!(rep("(?i)abc$",                   "AABC"),                      "ABC");
-//assert_eq!(rep("(?i)^",                      "ABC"),                       "");
-//assert_eq!(rep("(?i)$",                      "ABC"),                       "");
-//assert_eq!(rep("(?i)a.c",                    "ABC"),                       "ABC");
-//assert_eq!(rep("(?i)a.c",                    "AXC"),                       "AXC");
-//assert_eq!(rep("(?i)a.*?c",                  "AXYZC"),                     "AXYZC");
-//assert_eq!(rep("(?i)a.*c",                   "AXYZD"),                     "-nomatch-");
-//assert_eq!(rep("(?i)a[bc]d",                 "ABC"),                       "-nomatch-");
-//assert_eq!(rep("(?i)a[bc]d",                 "ABD"),                       "ABD");
-//assert_eq!(rep("(?i)a[b-d]e",                "ABD"),                       "-nomatch-");
-//assert_eq!(rep("(?i)a[b-d]e",                "ACE"),                       "ACE");
-//assert_eq!(rep("(?i)a[b-d]",                 "AAC"),                       "AC");
-//assert_eq!(rep("(?i)a[-b]",                  "A-"),                        "A-");
-//assert_eq!(rep("(?i)a[b-]",                  "A-"),                        "A-");
-//assert_eq!(rep("(?i)a[b-a]",                 "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)a[]b",                   "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)a[",                     "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)a]",                     "A]"),                        "A]");
-//assert_eq!(rep("(?i)a[]]b",                  "A]B"),                       "A]B");
-//assert_eq!(rep("(?i)a[^bc]d",                "AED"),                       "AED");
-//assert_eq!(rep("(?i)a[^bc]d",                "ABD"),                       "-nomatch-");
-//assert_eq!(rep("(?i)a[^-b]c",                "ADC"),                       "ADC");
-//assert_eq!(rep("(?i)a[^-b]c",                "A-C"),                       "-nomatch-");
-//assert_eq!(rep("(?i)a[^]b]c",                "A]C"),                       "-nomatch-");
-//assert_eq!(rep("(?i)a[^]b]c",                "ADC"),                       "ADC");
-//assert_eq!(rep("(?i)ab|cd",                  "ABC"),                       "AB");
-//assert_eq!(rep("(?i)ab|cd",                  "ABCD"),                      "AB");
-//assert_eq!(rep("(?i)()ef",                   "DEF"),                       "EF-");
-//assert_eq!(rep("(?i)*a",                     "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)(*)b",                   "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)$b",                     "B"),                         "-nomatch-");
-//assert_eq!(rep("(?i)a\\",                    "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)a\\(b",                  "A(B"),                       "A(B-Error");
-//assert_eq!(rep("(?i)a\\(*b",                 "AB"),                        "AB");
-//assert_eq!(rep("(?i)a\\(*b",                 "A((B"),                      "A((B");
-//assert_eq!(rep("(?i)a\\\\b",                 "A\\B"),                      "A\\B");
-//assert_eq!(rep("(?i)abc)",                   "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)(abc",                   "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)((a))",                  "ABC"),                       "A-A-A");
-//assert_eq!(rep("(?i)(a)b(c)",                "ABC"),                       "ABC-A-C");
-//assert_eq!(rep("(?i)a+b+c",                  "AABBABC"),                   "ABC");
-//assert_eq!(rep("(?i)a{1,}b{1,}c",            "AABBABC"),                   "ABC");
-//assert_eq!(rep("(?i)a**",                    "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)a.+?c",                  "ABCABC"),                    "ABC");
-//assert_eq!(rep("(?i)a.*?c",                  "ABCABC"),                    "ABC");
-//assert_eq!(rep("(?i)a.{0,5}?c",              "ABCABC"),                    "ABC");
-//assert_eq!(rep("(?i)(a+|b)*",                "AB"),                        "AB-B");
-//assert_eq!(rep("(?i)(a+|b){0,}",             "AB"),                        "AB-B");
-//assert_eq!(rep("(?i)(a+|b)+",                "AB"),                        "AB-B");
-//assert_eq!(rep("(?i)(a+|b){1,}",             "AB"),                        "AB-B");
-//assert_eq!(rep("(?i)(a+|b)?",                "AB"),                        "A-A");
-//assert_eq!(rep("(?i)(a+|b){0,1}",            "AB"),                        "A-A");
-//assert_eq!(rep("(?i)(a+|b){0,1}?",           "AB"),                        "-None");
-//assert_eq!(rep("(?i))(",                     "-"),                         "-nomatch-");
-//assert_eq!(rep("(?i)[^ab]*",                 "CDE"),                       "CDE");
-//assert_eq!(rep("(?i)([abc])*d",              "ABBBCD"),                    "ABBBCD-C");
-//assert_eq!(rep("(?i)([abc])*bcd",            "ABCD"),                      "ABCD-A");
-//assert_eq!(rep("(?i)a|b|c|d|e",              "E"),                         "E");
-//assert_eq!(rep("(?i)(a|b|c|d|e)f",           "EF"),                        "EF-E");
-//assert_eq!(rep("(?i)abcd*efg",               "ABCDEFG"),                   "ABCDEFG");
-//assert_eq!(rep("(?i)ab*",                    "XABYABBBZ"),                 "AB");
-//assert_eq!(rep("(?i)ab*",                    "XAYABBBZ"),                  "A");
-//assert_eq!(rep("(?i)(ab|cd)e",               "ABCDE"),                     "CDE-CD");
-//assert_eq!(rep("(?i)[abhgefdc]ij",           "HIJ"),                       "HIJ");
-//assert_eq!(rep("(?i)^(ab|cd)e",              "ABCDE"),                     "-nomatch-");
-//assert_eq!(rep("(?i)(abc|)ef",               "ABCDEF"),                    "EF-");
-//assert_eq!(rep("(?i)(a|b)c*d",               "ABCD"),                      "BCD-B");
-//assert_eq!(rep("(?i)(ab|ab*)bc",             "ABC"),                       "ABC-A");
-//assert_eq!(rep("(?i)a([bc]*)c*",             "ABC"),                       "ABC-BC");
-//assert_eq!(rep("(?i)a([bc]*)(c*d)",          "ABCD"),                      "ABCD-BC-D");
-//assert_eq!(rep("(?i)a([bc]+)(c*d)",          "ABCD"),                      "ABCD-BC-D");
-//assert_eq!(rep("(?i)a([bc]*)(c+d)",          "ABCD"),                      "ABCD-B-CD");
-//assert_eq!(rep("(?i)a[bcd]*dcdcde",          "ADCDCDE"),                   "ADCDCDE");
-//assert_eq!(rep("(?i)a[bcd]+dcdcde",          "ADCDCDE"),                   "-nomatch-");
-//assert_eq!(rep("(?i)(ab|a)b*c",              "ABC"),                       "ABC-AB");
-//assert_eq!(rep("(?i)((a)(b)c)(d)",           "ABCD"),                      "ABC-A-B-D");
-//assert_eq!(rep("(?i)[a-zA-Z_][a-zA-Z0-9_]*", "ALPHA"),                     "ALPHA");
-//assert_eq!(rep("(?i)^a(bc+|b[eh])g|.h$",     "ABH"),                       "BH-None");
-//assert_eq!(rep("(?i)(bc+d$|ef*g.|h?i(j|k))", "EFFGZ"),                     "EFFGZ-EFFGZ-None");
-//assert_eq!(rep("(?i)(bc+d$|ef*g.|h?i(j|k))", "IJ"),                        "IJ-IJ-J");
-//assert_eq!(rep("(?i)(bc+d$|ef*g.|h?i(j|k))", "EFFG"),                      "-nomatch-");
-//assert_eq!(rep("(?i)(bc+d$|ef*g.|h?i(j|k))", "BCDD"),                      "-nomatch-");
-//assert_eq!(rep("(?i)(bc+d$|ef*g.|h?i(j|k))", "REFFGZ"),                    "EFFGZ-EFFGZ-None");
-//assert_eq!(rep("(?i)((((((((((a))))))))))",  "A"),                         "A");
-//assert_eq!(rep("(?i)((((((((((a))))))))))\\10","AA"),                        "AA");
-//assert_eq!(rep("(?i)((((((((((a))))))))))\\41","AA"),                        "-nomatch-");
-//assert_eq!(rep("(?i)((((((((((a))))))))))\\41","A!"),                        "A!");
-//assert_eq!(rep("(?i)(((((((((a)))))))))",    "A"),                         "A");
-//assert_eq!(rep("(?i)(?:(?:(?:(?:(?:(?:(?:(?:(?:(a))))))))))","A"),                         "A");
-//assert_eq!(rep("(?i)(?:(?:(?:(?:(?:(?:(?:(?:(?:(a|b|c))))))))))","C"),                         "C");
-//assert_eq!(rep("(?i)multiple words of text", "UH-UH"),                     "-nomatch-");
-//assert_eq!(rep("(?i)multiple words",         "MULTIPLE WORDS, YEAH"),      "MULTIPLE WORDS");
-//assert_eq!(rep("(?i)(.*)c(.*)",              "ABCDE"),                     "ABCDE-AB-DE");
-//assert_eq!(rep("(?i)\\((.*), (.*)\\)",       "(A, B)"),                    "B-A");
-//assert_eq!(rep("(?i)[k]",                    "AB"),                        "-nomatch-");
-//assert_eq!(rep("(?i)abcd",                   "ABCD"),                      "ABCD-$&-\\ABCD");
-//assert_eq!(rep("(?i)a(bc)d",                 "ABCD"),                      "BC-$1-\\BC");
-//assert_eq!(rep("(?i)a[-]?c",                 "AC"),                        "AC");
-//assert_eq!(rep("(?i)(abc)\\1",               "ABCABC"),                    "ABC");
-//assert_eq!(rep("(?i)([a-c]*)\\1",            "ABCABC"),                    "ABC");
-//assert_eq!(rep("a(?!b).",                    "abad"),                      "ad");
-//assert_eq!(rep("a(?=d).",                    "abad"),                      "ad");
-//assert_eq!(rep("a(?=c|d).",                  "abad"),                      "ad");
-//assert_eq!(rep("a(?:b|c|d)(.)",              "ace"),                       "e");
-//assert_eq!(rep("a(?:b|c|d)*(.)",             "ace"),                       "e");
-//assert_eq!(rep("a(?:b|c|d)+?(.)",            "ace"),                       "e");
-//assert_eq!(rep("a(?:b|(c|e){1,2}?|d)+?(.)",  "ace"),                       "ce");
-//assert_eq!(rep("^(.+)?B",                    "AB"),                        "A");
-//assert_eq!(rep("w(?# comment",               "w"),                         "-nomatch-");
-//assert_eq!(rep("w(?# comment 1)xy(?# comment 2)z","wxyz"),                      "wxyz");
-//assert_eq!(rep("w(?i)",                      "W"),                         "W");
-//assert_eq!(rep("w(?i)",                      "W"),                         "-nomatch-");
-//assert_eq!(rep("a.b",                        "a\nb"),                      "-nomatch-");
-//assert_eq!(rep("(?s)a.b",                    "a\nb"),                      "a\nb");
-//assert_eq!(rep("\\w+",                       "--ab_cd0123--"),             "ab_cd0123");
-//assert_eq!(rep("[\\w]+",                     "--ab_cd0123--"),             "ab_cd0123");
-//assert_eq!(rep("\\D+",                       "1234abc5678"),               "abc");
-//assert_eq!(rep("[\\D]+",                     "1234abc5678"),               "abc");
-//assert_eq!(rep("[\\da-fA-F]+",               "123abc"),                    "123abc");
-//assert_eq!(rep("[\\d-x]",                    "-"),                         "-nomatch-");
-//assert_eq!(rep(r"([\s]*)([\S]*)([\s]*)",     " testing!1972"),             "testing!1972 ");
-//assert_eq!(rep(r"(\s*)(\S*)(\s*)",           " testing!1972"),             "testing!1972 ");
-////assert_eq!(rep(r"\x00ff",                    "\377"),                      "-nomatch-");
-////assert_eq!(rep(r"\t\n\v\r\f\a\g",            "\t\n\v\r\f\ag"),             "\t\n\v\r\f\ag");
-////assert_eq!(rep("\t\n\v\r\f\a\g",             "\t\n\v\r\f\ag"),             "\t\n\v\r\f\ag");
-////assert_eq!(rep(r"[\t][\n][\v][\r][\f][\b]",  "\t\n\v\r\f\b"),              "\t\n\v\r\f\b");
-//assert_eq!(rep(r"(([a-z]+):)?([a-z]+)$",     "smil"),                      "None-None-smil");
-//assert_eq!(rep(r".*d",                       "abc\nabd"),                  "abd");
-//assert_eq!(rep(r"[\41]",                     "!"),                         "!");
-//assert_eq!(rep(r"(x?)?",                     "x"),                         "x");
-//assert_eq!(rep(r" (?x)foo ",                 "foo"),                       "foo");
-//assert_eq!(rep(r"(?<!abc)(d.f)",             "abcdefdof"),                 "dof");
-//assert_eq!(rep(r"[\w-]+",                    "laser_beam"),                "laser_beam");
-//assert_eq!(rep(r".*?\S *:",                  "xx:"),                       "xx:");
-//assert_eq!(rep(r"a[ ]*?\ (\d+).*",           "a   10"),                    "a   10");
-//assert_eq!(rep(r"a[ ]*?\ (\d+).*",           "a    10"),                   "a    10");
-//assert_eq!(rep(r"(?ms).*?x\s*\Z(.*)",        "xx\nx\n"),                   "");
-//assert_eq!(rep(r"(?i)M+",                    "MMM"),                       "MMM");
-//assert_eq!(rep(r"(?i)m+",                    "MMM"),                       "MMM");
-//assert_eq!(rep(r"(?i)[M]+",                  "MMM"),                       "MMM");
-//assert_eq!(rep(r"(?i)[m]+",                  "MMM"),                       "MMM");
-////assert_eq!(rep(r""(?:\\"|[^"])*?"",          r""\"""),                     r""\""");
-//assert_eq!(rep(r"^.*?$",                     "one\ntwo\nthree\n"),         "-nomatch-");
-//assert_eq!(rep(r"a[^>]*?b",                  "a>b"),                       "-nomatch-");
-//assert_eq!(rep(r"^a*?$",                     "foo"),                       "-nomatch-");
-//assert_eq!(rep(r"^((a)c)?(ab)$",             "ab"),                        "None-None-ab");
-//assert_eq!(rep("^([ab]*?)(?=(b)?)c",         "abc"),                       "ab-None");
-//assert_eq!(rep("^([ab]*?)(?!(b))c",          "abc"),                       "ab-None");
-//assert_eq!(rep("^([ab]*?)(?<!(a))c",         "abc"),                       "ab-None");
-//assert_eq!(rep(r"\b.\b",                     "a"),                         "a");
     }
 
     #[test]

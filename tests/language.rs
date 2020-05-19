@@ -3482,9 +3482,16 @@ fn check_color_functions() {
 }
 
 #[test]
+fn check_regex_patterns() {
+    assert_eq!(ve("type $r(a)"),   "\"function\"");
+    assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: bad pattern: error[1,3:<pattern>] EOF while parsing: Unexpected EOF at code \'\'");
+    assert_eq!(ve("$r((^$+a)) $q foobaaarba "), "");
+    assert_eq!(ve("$r($+a) $q foobaaarba "), "");
+}
+
+#[test]
 fn check_tree_match() {
     assert_eq!(ve("type $S(a/b)"), "\"function\"");
-    assert_eq!(ve("type $X(a/b)"), "\"function\"");
 
     assert_eq!(ve("$S(a/b) ${a = ${b = 20}}"),              "20");
     assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\1 }"), "\"bbbbb\"");

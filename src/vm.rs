@@ -2,6 +2,7 @@ use crate::parser::{self};
 use crate::compiler::*;
 use crate::vval::*;
 use crate::nvec::NVec;
+use crate::selector;
 use crate::ops::*;
 
 use std::rc::Rc;
@@ -2325,6 +2326,33 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         Err(ast.compile_err(
                             format!("Couldn't resolve module '{}'", name.s_raw())))
                     }
+                },
+                Syntax::Pattern => {
+                    ast.at(1).unwrap().with_s_ref(|pat_src| {
+                        match selector::create_regex_find_function(pat_src) {
+                            Ok(fun) => {
+                                let rx_fun =
+                                    VValFun::new_fun(
+                                        move |env: &mut Env, _argc: usize| {
+                                            if let Some(s) = env.arg_ref(0) {
+                                                Ok(s.with_s_ref(|s| {
+                                                    let pat_res = fun(s);
+                                                    VVal::new_str_mv(pat_res.to_test_string(s))
+                                                }))
+                                            } else {
+                                                Ok(VVal::None)
+                                            }
+                                        }, Some(1), Some(1), false);
+                                pw_provides_result_pos!(prog, {
+                                    prog.data_pos(rx_fun.clone())
+                                })
+                            },
+                            Err(e) => {
+                                Err(ast.compile_err(
+                                    format!("bad pattern: {}", e)))
+                            }
+                        }
+                    })
                 },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
