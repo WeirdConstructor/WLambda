@@ -693,6 +693,10 @@ impl CaptureNode {
         res.add_capture((idx, (self.idx, self.len)));
     }
 
+    fn to_string(&self, input: &str) -> String {
+        input[self.idx..(self.idx + self.len)].to_string()
+    }
+
     fn to_test_string(&self, input: &str) -> String {
         if let Some(n) = &self.next {
             input[self.idx..(self.idx + self.len)].to_string()
@@ -781,6 +785,26 @@ impl PatResult {
             offs:      0,
             captures:  None,
         }
+    }
+
+    pub fn to_vval(&self, input: &str) -> VVal {
+        if !self.matched { return VVal::None; }
+
+        let v = VVal::vec();
+        v.push(VVal::new_str_mv(
+            input[self.offs..(self.offs + self.match_len)].to_string()));
+
+        if let Some(c) = &self.captures {
+            for cap in c.iter() {
+                if let Some(cap) = cap {
+                    v.push(VVal::new_str_mv(cap.to_string(input)));
+                } else {
+                    v.push(VVal::None);
+                }
+            }
+        }
+
+        v
     }
 
     pub fn to_test_string(&self, input: &str) -> String {

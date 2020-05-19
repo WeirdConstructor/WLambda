@@ -3485,10 +3485,18 @@ fn check_color_functions() {
 fn check_regex_patterns() {
     assert_eq!(ve("type $r(a)"),   "\"function\"");
     assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: bad pattern: error[1,3:<pattern>] EOF while parsing: Unexpected EOF at code \'\'");
-    assert_eq!(ve("$r((^$+a)) $q foobaaarba "), "\"aaa-aaa\"");
-    assert_eq!(ve("$r($+a) $q foobaaarba "), "\"aaa\"");
-    assert_eq!(ve("$r($+a) $q foobaaarba ; `\\\\`"), "\"aaa\"");
-    assert_eq!(ve("$r($+a) $q foobaaarba ; $\\"), "\"aaa\"");
+
+    assert_eq!(ve("$r((^$+a)rba) $q foobaaarba "),             "$[\"aaarba\",\"aaa\"]");
+    assert_eq!(ve("$r($+a)       $q foobaaarba "),             "$[\"aaa\"]");
+    assert_eq!(ve("$r($+a)       $q foobaaarba ; `\\\\`"),     "$[\"aaa\"]");
+    assert_eq!(ve("$r($+a)       $q foobaaarba ; $\\"),        "$[\"aaa\"]");
+
+    assert_eq!(ve(r#"
+        !rx = $r/ (^$+[0123456789]) $*$s + $*$s (^$+[0123456789]) /;
+        ? rx["4943 + 32"] {
+            "got:" $\.1 "+" $\.2
+        };
+    "#), "\"got:4943+32\"");
 }
 
 #[test]

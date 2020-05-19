@@ -2340,9 +2340,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                             if let Some(s) = env.arg_ref(0) {
                                                 Ok(s.with_s_ref(|s| {
                                                     let pat_res = fun(s);
-                                                    let r =
-                                                        VVal::new_str_mv(
-                                                            pat_res.to_test_string(s));
+                                                    let r = pat_res.to_vval(s);
                                                     res_ref.set_ref(r.clone());
                                                     r
                                                 }))
