@@ -1339,7 +1339,11 @@ fn compile_node_cond(n: &VVal) -> SelNode {
         compile_kv_match(&n)
 
     } else if node_type == s2sym("LA") {
-        panic!("Unsupported node cond: {}", node_type);
+        let subsel = compile_selector(&n.at(1).expect("sub selector"), true);
+        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+            let nocaps = VVal::None;
+            (*subsel)(v, st, &nocaps)
+        })
 
     } else if node_type == s2sym("And") {
         let a = compile_node_cond(&n.at(1).expect("node condition a"));
@@ -1442,18 +1446,20 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
     }
 }
 
-fn compile_selector(sel: &VVal) -> SelNode {
+fn compile_selector(sel: &VVal, no_capture: bool) -> SelNode {
     println!("***** COM SELECTOR: {}", sel.s());
     if let VVal::Lst(_) = sel {
 
         let first = sel.at(0).unwrap_or_else(|| VVal::None);
         if first.to_sym() == s2sym("Path") {
             let mut next : Option<SelNode> = Some(Box::new(
-                |v: &VVal, st: &mut SelectorState, capts: &VVal| {
-                    if st.has_captures() {
-                        capts.push(st.get_sel_captures());
-                    } else {
-                        capts.push(v.clone());
+                move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+                    if !no_capture {
+                        if st.has_captures() {
+                            capts.push(st.get_sel_captures());
+                        } else {
+                            capts.push(v.clone());
+                        }
                     }
                     true
                 }));
@@ -1633,7 +1639,7 @@ mod tests {
                 Ok(v)  => v,
                 Err(e) => { return VVal::new_str_mv(format!("Error: {}", e)); },
             };
-        let sn = compile_selector(&sel_ast);
+        let sn = compile_selector(&sel_ast, false);
         let mut state = SelectorState::new();
         let capts = VVal::vec();
         (*sn)(v, &mut state, &capts);
@@ -1807,6 +1813,27 @@ mod tests {
             "$[11,12,23]");
 
         assert_eq!(pes("**/*:str=1[^0]", &v1), "$[11,12,12,12,12,15,16]");
+    }
+
+    #[test]
+    fn check_selector_la() {
+        let v1 = v(r#"
+            !i = $[10, 20, 30];
+            !j = $[40, 50];
+            !k = $[90, 80];
+            !d = ${ h = 10, w = 20, childs = $[ i, j ] };
+            !e = ${ h = 20, w = 24, childs = $[ j, k ] };
+            !f = ${ h = 12, w = 30, childs = $[ i, k ] };
+            $[
+                ${ a = :test, x = 10        , childs = $[d, e], },
+                ${ b = :test, x = 11        , childs = $[d, e, f], },
+                ${ a = :test, x = 12        , childs = $[f], },
+                ${ c = :test, y = 15, x = 22, childs = $[e], },
+                ${ a = :test, y = 16, x = 23, childs = $[f, e], },
+            ]
+        "#);
+
+        assert_eq!(pes("*:(childs/*:{h=12})/x", &v1), "$[11,12,23]");
     }
 
     #[test]
