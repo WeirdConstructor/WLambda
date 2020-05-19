@@ -2328,6 +2328,9 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                     }
                 },
                 Syntax::Pattern => {
+                    let res_ref = (VVal::None).to_ref();
+                    ce.borrow_mut().global.borrow_mut().set_var("\\", &res_ref);
+
                     ast.at(1).unwrap().with_s_ref(|pat_src| {
                         match selector::create_regex_find_function(pat_src) {
                             Ok(fun) => {
@@ -2337,7 +2340,11 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                                             if let Some(s) = env.arg_ref(0) {
                                                 Ok(s.with_s_ref(|s| {
                                                     let pat_res = fun(s);
-                                                    VVal::new_str_mv(pat_res.to_test_string(s))
+                                                    let r =
+                                                        VVal::new_str_mv(
+                                                            pat_res.to_test_string(s));
+                                                    res_ref.set_ref(r.clone());
+                                                    r
                                                 }))
                                             } else {
                                                 Ok(VVal::None)

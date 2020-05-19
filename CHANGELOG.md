@@ -48,6 +48,9 @@ between `$none` and really no value.
 directly of passed to `iter`.
 * Feature: Symbols are now fully interned strings (per thread).
 * Feature: Added color functions `std:v:hex2rgba_*`.
+* Feature: Implemented built in regex pattern matching using the `$r(...)` syntax.
+* Feature: The result vector of a regex pattern or selector can be accessed conveniently
+with the variable `$\`.
 * Documentation: More!
 
 0.4.4 (2020-03-06)

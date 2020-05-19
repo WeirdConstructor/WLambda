@@ -3485,8 +3485,10 @@ fn check_color_functions() {
 fn check_regex_patterns() {
     assert_eq!(ve("type $r(a)"),   "\"function\"");
     assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: bad pattern: error[1,3:<pattern>] EOF while parsing: Unexpected EOF at code \'\'");
-    assert_eq!(ve("$r((^$+a)) $q foobaaarba "), "");
-    assert_eq!(ve("$r($+a) $q foobaaarba "), "");
+    assert_eq!(ve("$r((^$+a)) $q foobaaarba "), "\"aaa-aaa\"");
+    assert_eq!(ve("$r($+a) $q foobaaarba "), "\"aaa\"");
+    assert_eq!(ve("$r($+a) $q foobaaarba ; `\\\\`"), "\"aaa\"");
+    assert_eq!(ve("$r($+a) $q foobaaarba ; $\\"), "\"aaa\"");
 }
 
 #[test]

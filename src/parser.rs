@@ -712,6 +712,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             vec.push(VVal::new_str_mv(pattern_source));
             Ok(vec)
         },
+        '\\' => { ps.consume_wsc(); Ok(make_var(ps, "\\")) },
         'c' => {
             if ps.consume_lookahead("code") {
                 ps.skip_ws_and_comments();
