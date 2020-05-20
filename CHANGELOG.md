@@ -1,4 +1,4 @@
-0.5.0 (unreleased)
+0.5.0 (2020-05-21)
 ==================
 
 * Incompatible Change: VVal::Nul was renamed to VVal::None because it
