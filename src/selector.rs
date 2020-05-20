@@ -1034,10 +1034,9 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                 compile_atom(&pair_val,
                     Box::new(move |s: RxBuf, st: &mut SelectorState| {
                         (*sub_match_offs.borrow_mut()) = Some(s.offs);
-                        let r = (*next)(s, st);
+                        (*next)(s, st)
                         //d// println!("Nx PATTERN SUB(offs {})/NEXT RET({:?}) [{}] {:?} (for {})",
                         //d//         s.offs, r, s, st.captures, sub_pat_str2);
-                        r
                     }));
 
             let n0 =
@@ -1306,20 +1305,19 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
             for (i, (v, k)) in v.iter().enumerate() {
                 if let Some(k) = k {
                     k.with_s_ref(|s| {
-                        if match_pattern(&pat, s, st) {
-                            if (*sn)(&v, st, capts) {
-                                found = true;
-                            }
+                        if    match_pattern(&pat, s, st)
+                           && (*sn)(&v, st, capts)
+                        {
+                            found = true;
                         }
                     });
 
                 } else {
                     let idx_str = format!("{}", i);
 
-                    if match_pattern(&pat, &idx_str[..], st) {
-                        if (*sn)(&v, st, capts) {
-                            found = true;
-                        }
+                    if    match_pattern(&pat, &idx_str[..], st)
+                       && (*sn)(&v, st, capts) {
+                        found = true;
                     }
                 }
             }
@@ -1560,10 +1558,11 @@ fn check_pattern_start_anchor(pattern: &VVal) -> bool {
                 let pair_val     = first.at(1).unwrap_or_else(|| VVal::None);
                 let branch_first = pair_val.at(0).unwrap_or_else(|| VVal::None);
 
-                if pair_type.to_sym() == s2sym("PatSub") {
-                    return branch_first.is_sym() && branch_first.to_sym() == s2sym("Start");
-                } else if pair_type.to_sym() == s2sym("PatCap") {
-                    return branch_first.is_sym() && branch_first.to_sym() == s2sym("Start");
+                if    pair_type.to_sym() == s2sym("PatSub")
+                   || pair_type.to_sym() == s2sym("PatCap")
+                {
+                    return branch_first.is_sym()
+                        && branch_first.to_sym() == s2sym("Start");
                 }
             }
         }

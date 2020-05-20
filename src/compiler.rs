@@ -1112,7 +1112,7 @@ impl CompileEnv {
                     VarPos::NoPos      => VarPos::NoPos
                 }
             }
-            _ => pos.clone(),
+            _ => pos,
         }
     }
 }

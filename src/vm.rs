@@ -386,6 +386,8 @@ macro_rules! get_key {
     }
 }
 
+#[allow(clippy::many_single_char_names)]
+#[allow(clippy::cognitive_complexity)]
 pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
     env.vm_nest += 1;
 
@@ -688,12 +690,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::ListSplice(a, b, r) => op_a_b_r!(env, ret, retv, data, a, b, r, {
                 if let VVal::Iter(i) = a {
                     let mut i = i.borrow_mut();
-                    loop {
-                        if let Some((v, _)) = i.next() {
-                            b.push(v);
-                        } else {
-                            break;
-                        }
+                    #[allow(clippy::while_let_on_iterator)]
+                    while let Some((v, _)) = i.next() {
+                        b.push(v);
                     }
                 } else {
                     for (e, _) in a.iter() {
@@ -756,29 +755,25 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 VVal::err(e, prog.debug[pc].clone().unwrap())
             }),
             Op::NewClos(f, r) => op_a_r!(env, ret, retv, data, f, r, {
-                let fun = f.clone_and_rebind_upvalues(|upvs, upvalues| {
+                f.clone_and_rebind_upvalues(|upvs, upvalues| {
                     copy_upvs(upvs, env, upvalues);
-                });
-                fun
+                })
             }),
             Op::MapSplice(s, m, r) => op_a_b_r!(env, ret, retv, data, s, m, r, {
                 if let VVal::Iter(i) = s {
                     let mut i = i.borrow_mut();
-                    loop {
-                        if let Some((e, k)) = i.next() {
-                            if let Some(k) = k {
-                                match m.set_key(&k, e) {
-                                    Ok(_) => (),
-                                    Err(e) => {
-                                        retv =
-                                            Err(StackAction::panic_str(
-                                                format!("map set key errro: {}", e),
-                                                prog.debug[pc].clone()));
-                                    }
+                    #[allow(clippy::while_let_on_iterator)]
+                    while let Some((e, k)) = i.next() {
+                        if let Some(k) = k {
+                            match m.set_key(&k, e) {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    retv =
+                                        Err(StackAction::panic_str(
+                                            format!("map set key errro: {}", e),
+                                            prog.debug[pc].clone()));
                                 }
                             }
-                        } else {
-                            break;
                         }
                     }
                 } else {
@@ -962,7 +957,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                      env.loop_info.pc,
                      env.loop_info.break_pc);
             env.dump_stack();
-            println!("");
+            println!();
         }
         pc += 1;
     }
@@ -1184,9 +1179,9 @@ fn vm_compile_assign2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool
                     },
                     VarPos::Global(r) => {
                         if is_ref {
-                            prog.global_ref_pos(r.clone())
+                            prog.global_ref_pos(r)
                         } else {
-                            prog.global_pos(r.clone())
+                            prog.global_pos(r)
                         }
                     },
                     VarPos::UpValue(vip) => {
@@ -1210,17 +1205,14 @@ fn vm_compile_stmts2(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv
 
     pw!(prog, store, {
         let expr_count = exprs.len();
-        let mut i      = 0;
         let mut res    = ResPos::Value(ResValue::None);
 
-        for e in exprs.iter() {
+        for (i, e) in exprs.iter().enumerate() {
             if i == expr_count - 1 {
                 res = e.eval_proxy(prog, store.clone());
             } else {
                 e.eval_nul(prog);
             }
-
-            i += 1;
         }
 
         res
@@ -1310,6 +1302,7 @@ fn vm_compile_binop2(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
     })
 }
 
+#[allow(clippy::many_single_char_names)]
 fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
     match val {
         VVal::Lst(l) => {
@@ -1415,7 +1408,7 @@ pub fn vm_compile_break2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     let spos = syn.get_syn_pos();
 
     if ast.len() > 3 {
-        return Err(ast.compile_err(format!("break takes 0 or 1 arguments")))
+        return Err(ast.compile_err("break takes 0 or 1 arguments".to_string()))
     }
 
     if let Some(expr) = ast.at(2) {
@@ -1439,7 +1432,7 @@ pub fn vm_compile_next2(ast: &VVal, _ce: &mut Rc<RefCell<CompileEnv>>)
     let spos = syn.get_syn_pos();
 
     if ast.len() > 2 {
-        return Err(ast.compile_err(format!("next takes no arguments")))
+        return Err(ast.compile_err("next takes no arguments".to_string()))
     }
 
     pw_null!(prog, {
@@ -1455,7 +1448,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     if ast.len() != 4 && ast.len() != 5 {
         return Err(ast.compile_err(
-            format!("? takes 1 or 2 arguments (condition and expression)")))
+            "? takes 1 or 2 arguments (condition and expression)".to_string()))
     }
 
     let cond =
@@ -1545,8 +1538,8 @@ pub fn vm_compile_while2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     if ast.len() != 4 {
         return Err(ast.compile_err(
-            format!("while takes exactly 2 arguments \
-                     (condition and expression)")));
+            "while takes exactly 2 arguments (condition and expression)"
+            .to_string()));
     }
 
     let cond =
@@ -1590,14 +1583,17 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     if ast.len() != 5 {
         return Err(ast.compile_err(
-            format!("iter takes exactly 3 arguments \
-                    (variable identifier, iterable expression and \
-                    iteration expression)")));
+            "iter takes exactly 3 arguments \
+             (variable identifier, iterable expression and \
+             iteration expression)".to_string()));
     }
 
-    if ast.at(2).unwrap_or_else(|| VVal::None).at(0).unwrap_or_else(|| VVal::None).get_syn() != Syntax::Var {
+    if ast.at(2).unwrap_or_else(|| VVal::None)
+          .at(0).unwrap_or_else(|| VVal::None)
+          .get_syn() != Syntax::Var
+    {
         return Err(ast.compile_err(
-            format!("iter takes an identifier as first argument")));
+            "iter takes an identifier as first argument".to_string()));
     }
 
     let varname =
@@ -1641,7 +1637,10 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     })
 }
 
-pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
+#[allow(clippy::cognitive_complexity)]
+pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
     match ast {
         VVal::Lst(_) => {
             let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
@@ -1872,7 +1871,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         VValFun::new_prog(
                             func_prog,
                             upvalues, env_size, min_args, max_args, false,
-                            Some(fun_spos.clone()),
+                            Some(fun_spos),
                             Rc::new(upvs),
                             label);
 

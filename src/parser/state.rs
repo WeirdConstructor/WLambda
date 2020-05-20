@@ -194,19 +194,14 @@ impl<'a, 'b> PartialEq<&'a str> for StrPart<'a> {
             }
         }
 
-        return true;
-    }
-    fn ne(&self, other: &&'a str) -> bool {
-        !self.eq(other)
+        true
     }
 }
 
+#[allow(clippy::inherent_to_string)]
 impl<'a> StrPart<'a> {
-    pub fn to_string(&self) -> String {
-        let s : String = self.slice.iter().collect();
-        s
-    }
-
+    pub fn to_string(&self) -> String { self.slice.iter().collect() }
+    pub fn is_empty(&self) -> bool { self.slice.is_empty() }
     pub fn len(&self) -> usize { self.slice.len() }
 }
 

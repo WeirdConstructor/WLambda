@@ -3,7 +3,7 @@ use crate::compiler::*;
 use crate::nvec::NVec;
 use crate::str_int::*;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Prog {
     pub debug:   std::vec::Vec<Option<SynPos>>,
     pub data:    std::vec::Vec<VVal>,
@@ -14,9 +14,9 @@ pub struct Prog {
 
 fn patch_respos_data(rp: &mut ResPos, idx: u16) {
     match rp {
-        ResPos::Data(i)         => { *i = *i + idx; },
-        ResPos::Global(i)       => { *i = *i + idx; },
-        ResPos::GlobalRef(i)    => { *i = *i + idx; },
+        ResPos::Data(i)         => { *i += idx; },
+        ResPos::Global(i)       => { *i += idx; },
+        ResPos::GlobalRef(i)    => { *i += idx; },
         ResPos::Local(_)
         | ResPos::LocalRef(_)
         | ResPos::Up(_)
@@ -458,6 +458,7 @@ impl Prog {
         self.push_op(Op::NewNVec(Box::new(NVecPos::IVec3(a, b, c)), r));
     }
 
+    #[allow(clippy::many_single_char_names)]
     pub fn op_new_ivec4(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, d: ResPos, r: ResPos) {
         self.set_dbg(sp.clone());
         self.push_op(Op::NewNVec(Box::new(NVecPos::IVec4(a, b, c, d)), r));
@@ -473,6 +474,7 @@ impl Prog {
         self.push_op(Op::NewNVec(Box::new(NVecPos::FVec3(a, b, c)), r));
     }
 
+    #[allow(clippy::many_single_char_names)]
     pub fn op_new_fvec4(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, d: ResPos, r: ResPos) {
         self.set_dbg(sp.clone());
         self.push_op(Op::NewNVec(Box::new(NVecPos::FVec4(a, b, c, d)), r));
@@ -605,6 +607,7 @@ macro_rules! set_at_varpos {
 }
 
 impl DestructureInfo {
+    #[allow(clippy::cognitive_complexity)]
     pub fn destructure(&self, env: &mut Env, val: VVal) {
         match val {
             VVal::Lst(l) => {
@@ -736,7 +739,7 @@ pub enum BinOp {
 }
 
 impl BinOp {
-    pub fn to_op(&self, a: ResPos, b: ResPos, out: ResPos) -> Op {
+    pub fn to_op(self, a: ResPos, b: ResPos, out: ResPos) -> Op {
         match self {
             BinOp::Add => Op::Add(a, b, out),
             BinOp::Sub => Op::Sub(a, b, out),

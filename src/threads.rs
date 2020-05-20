@@ -259,6 +259,10 @@ pub struct AtomicValSlot {
 #[derive(Clone, Debug)]
 pub struct AtomicAValSlot(Arc<AtomicValSlot>);
 
+impl Default for AtomicAValSlot {
+    fn default() -> Self { Self::new() }
+}
+
 impl AtomicAValSlot {
     pub fn new() -> Self {
         Self(Arc::new(AtomicValSlot {
@@ -477,10 +481,9 @@ impl VValUserData for AtomicAValSlot {
                 Ok(self.wait_empty(Some(argv[0].to_duration()?)))
             },
             _ => {
-                return
-                    Err(StackAction::panic_str(
-                        format!("unknown method called: {}", key),
-                        None))
+                Err(StackAction::panic_str(
+                    format!("unknown method called: {}", key),
+                    None))
             },
         }
     }
@@ -624,10 +627,9 @@ impl VValUserData for AValChannel {
                 Ok(self.send(&argv[0]))
             },
             _ => {
-                return
-                    Err(StackAction::panic_str(
-                        format!("unknown method called: {}", key),
-                        None))
+                Err(StackAction::panic_str(
+                    format!("unknown method called: {}", key),
+                    None))
             },
         }
     }
@@ -703,10 +705,9 @@ impl VValUserData for AtomicAVal {
                 Ok(v.clone())
             },
             _ => {
-                return
-                    Err(StackAction::panic_str(
-                        format!("Unknown method called: {}", key),
-                        None))
+                Err(StackAction::panic_str(
+                    format!("Unknown method called: {}", key),
+                    None))
             },
         }
     }
@@ -835,10 +836,9 @@ impl VValUserData for DefaultThreadHandle {
                 }
             },
             _ => {
-                return
-                    Err(StackAction::panic_str(
-                        format!("Unknown method called: {}", key),
-                        None))
+                Err(StackAction::panic_str(
+                    format!("Unknown method called: {}", key),
+                    None))
             },
         }
     }

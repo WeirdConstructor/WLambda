@@ -35,7 +35,6 @@ impl StringInterner {
         let mut free = vec![];
         for (k, v) in self.strmap.iter() {
             if let Some(_) = v.upgrade() {
-                ()
             } else {
                 free.push(k.to_string());
             }
@@ -63,7 +62,7 @@ impl StringInterner {
     }
 
     #[inline]
-    fn into_sym(&mut self, s: String) -> Symbol {
+    fn new_sym_mv(&mut self, s: String) -> Symbol {
         if let Some(wc) = self.strmap.get(&s) {
             if let Some(rc) = wc.upgrade() {
                 return Symbol(rc);
@@ -170,9 +169,9 @@ pub fn s2sym(s: &str) -> Symbol {
     })
 }
 
-pub fn into_sym(s: String) -> Symbol {
+pub fn new_sym_mv(s: String) -> Symbol {
     STR_INTERN.with(|si| {
-        si.borrow_mut().into_sym(s)
+        si.borrow_mut().new_sym_mv(s)
     })
 }
 

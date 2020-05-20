@@ -5139,7 +5139,7 @@ fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Res
         let fun_idx = arg_idx;
 
         if    env.arg(match_vals[0]).is_sym()
-            && env.arg(match_vals[0]).with_s_ref(|s: &str| s.chars().nth(0).unwrap_or('_') == '?') {
+            && env.arg(match_vals[0]).with_s_ref(|s: &str| s.chars().next().unwrap_or('_') == '?') {
 
             let res =
                 env.arg(match_vals[0]).with_s_ref(|pat: &str| {
@@ -5372,7 +5372,7 @@ pub fn core_symbol_table() -> SymbolTable {
                 },
                 VVal::Opt(None) => {
                     Err(StackAction::panic_str(
-                        format!("unwrap empty option!"), None))
+                        "unwrap empty option!".to_string(), None))
                 },
                 VVal::Opt(Some(v)) => Ok((*v).clone()),
                 v => Ok(v)
@@ -6680,7 +6680,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let val = env.arg(3);
 
             Ok(VVal::new_str_mv(csv::to_csv(
-                delim.chars().nth(0).unwrap_or(','),
+                delim.chars().next().unwrap_or(','),
                 &row_sep,
                 escape_all,
                 val)))
@@ -6704,7 +6704,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
             env.arg_ref(2).unwrap().with_s_ref(|data: &str| {
                 match csv::parse_csv(
-                        delim.chars().nth(0).unwrap_or(','),
+                        delim.chars().next().unwrap_or(','),
                         &row_sep,
                         data)
                 {

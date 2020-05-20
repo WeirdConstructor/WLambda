@@ -121,6 +121,7 @@ impl NVecNum for i64 {
     #[inline]
     fn from_fvec(f: NVec<f64>)       -> NVec<Self> { NVec::from_vval_tpl(f.into_vval_tpl()).unwrap() }
     #[inline]
+    #[allow(clippy::many_single_char_names)]
     fn from_fvec_round(f: NVec<f64>) -> NVec<Self> {
         let (x, y, z, w) = f.into_tpl();
         NVec::from_tpl((
@@ -268,11 +269,11 @@ impl<N: NVecNum> NVec<N> {
     /// A tuple of four elements representing the components of this vector.
     /// If a component wasn't available, a `0` takes its place.
     pub fn into_zero_tpl(self) -> (N, N, N, N) {
-        let o = N::zero();
+        let zero = N::zero();
         match self {
-            Vec2(x, y)       => (x, y, o, o),
-            Vec3(x, y, z)    => (x, y, z, o),
-            Vec4(x, y, z, w) => (x, y, z, w),
+            Vec2(x, y)       => (x, y, zero, zero),
+            Vec3(x, y, z)    => (x, y, z,    zero),
+            Vec4(x, y, z, w) => (x, y, z,    w),
         }
     }
 

@@ -173,21 +173,16 @@ pub fn rgb2hsv(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
     let c_max = r.max(g.max(b));
     let c_min = r.min(g.min(b));
     let delta = c_max - c_min;
-    let mut h =
-        if delta < 0.000001 { 0.0 } else {
-            if r == c_max {
-                60.0 * (((g - b) / delta) % 6.0)
-            } else if g == c_max {
-                60.0 * (((b - r) / delta) + 2.0)
-            } else {
-                60.0 * (((r - g) / delta) + 4.0)
-            }
-        };
-    if h < 0.0 { h += 360.0 }
-    if h > 360.0 { h -= 360.0 }
-    let s = if c_max < 0.000001 { 0.0 } else { delta / c_max };
-    let v = c_max;
-    (h, s, v)
+    let mut hue =
+        if delta < 0.000_001 { 0.0 }
+        else if r == c_max  { 60.0 * (((g - b) / delta) % 6.0) }
+        else if g == c_max  { 60.0 * (((b - r) / delta) + 2.0) }
+        else                { 60.0 * (((r - g) / delta) + 4.0) };
+    if hue < 0.0   { hue += 360.0 }
+    if hue > 360.0 { hue -= 360.0 }
+    let sat = if c_max < 0.000_001 { 0.0 } else { delta / c_max };
+    let val = c_max;
+    (hue, sat, val)
 }
 
 pub fn hsva2rgba(hsva: (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
@@ -195,25 +190,25 @@ pub fn hsva2rgba(hsva: (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
     (r, g, b, hsva.3)
 }
 
-pub fn hsv2rgb(h: f64, s: f64, v: f64) -> (f64, f64, f64) {
-    let c = v * s;
-    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
-    let m = v - c;
+pub fn hsv2rgb(hue: f64, sat: f64, val: f64) -> (f64, f64, f64) {
+    let c = val * sat;
+    let x = c * (1.0 - ((hue / 60.0) % 2.0 - 1.0).abs());
+    let m = val - c;
     let (r_, g_, b_) =
-        if        h >= 0.0   && h < 60.0 {
+        if        hue >= 0.0   && hue < 60.0 {
             (c, x, 0.0)
-        } else if h >= 60.0  && h < 120.0 {
+        } else if hue >= 60.0  && hue < 120.0 {
             (x, c, 0.0)
-        } else if h >= 120.0 && h < 180.0 {
+        } else if hue >= 120.0 && hue < 180.0 {
             (0.0, c, x)
-        } else if h >= 180.0 && h < 240.0 {
+        } else if hue >= 180.0 && hue < 240.0 {
             (0.0, x, c)
-        } else if h >= 240.0 && h < 300.0 {
+        } else if hue >= 240.0 && hue < 300.0 {
             (x, 0.0, c)
-        } else { // if h >= 300.0 && h < 360.0 {
+        } else { // if hue >= 300.0 && hue < 360.0 {
             (c, 0.0, x)
         };
-    println!("in: h={}, s={}, v={}, r:{}, g:{}, b: {}", h, s, v,
+    println!("in: h={}, s={}, v={}, r:{}, g:{}, b: {}", hue, sat, val,
         (r_ + m) * 255.0,
         (g_ + m) * 255.0,
         (b_ + m) * 255.0);
@@ -246,8 +241,8 @@ pub fn hsva2hexf(hsva: (f64, f64, f64, f64)) -> String {
         (hsva.3 * 255.0).round() as u8)
 }
 
-pub fn hex2rgbaf(s: &str) -> (f64, f64, f64, f64) {
-    let (r, g, b, a) = hex2rgba(s);
+pub fn hex2rgbaf(hex_str: &str) -> (f64, f64, f64, f64) {
+    let (r, g, b, a) = hex2rgba(hex_str);
     (r as f64 / 255.0,
      g as f64 / 255.0,
      b as f64 / 255.0,

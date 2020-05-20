@@ -205,7 +205,7 @@ impl std::fmt::Debug for Stdio {
 /// Currently hardcoded, but later the API user will be able to specify it.
 const STACK_SIZE : usize = 10240;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct LoopInfo {
     pub pc:       usize,
     pub uw_depth: usize,
@@ -801,10 +801,10 @@ impl Env {
         let uwa =
             UnwindAction::RestoreLoopInfo(
                 std::mem::replace(&mut self.loop_info, LoopInfo {
+                    pc:       current_pc,
+                    sp:       self.sp,
                     uw_depth,
-                    pc:         current_pc,
-                    sp:         self.sp,
-                    break_pc:   break_pc,
+                    break_pc,
                 }));
         self.push_unwind(uwa);
     }
@@ -830,17 +830,18 @@ impl Env {
                     UnwindAction::RestoreLoopInfo(li) =>
                         format!("loinf(uws:{},sp:{})", li.uw_depth, li.sp),
                     UnwindAction::RestoreAccum(_fun, _val) =>
-                        format!("raccm"),
+                        ("raccm".to_string()),
                     UnwindAction::RestoreSelf(_slf) =>
-                        format!("rslf"),
+                        ("rslf".to_string()),
                     UnwindAction::RestoreIter(_i) =>
-                        format!("ritr"),
+                        ("ritr".to_string()),
                     UnwindAction::FunctionCall(argc, old_bp, local_size) =>
                         format!("fcal({},{},{})", argc, old_bp, local_size),
                     UnwindAction::Null =>
-                        format!("nul"),
+                        ("nul".to_string()),
                 };
-            if s.len() > 0 {
+
+            if !s.is_empty() {
                 s += ";";
             }
             s += &add[..];
@@ -1145,6 +1146,7 @@ impl VValFun {
     }
 
     /// Internal utility function. Use at your own risk, API might change.
+    #[allow(clippy::too_many_arguments)]
     pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>,
                    env_size: usize, min_args: Option<usize>,
                    max_args: Option<usize>, err_arg_ok: bool, syn_pos: Option<SynPos>,
@@ -1163,6 +1165,7 @@ impl VValFun {
     }
 
     /// Internal utility function. Use at your own risk, API might change.
+    #[allow(clippy::too_many_arguments)]
     pub fn new_prog(prog: Rc<Prog>, upvalues: std::vec::Vec<VVal>,
                    env_size: usize, min_args: Option<usize>,
                    max_args: Option<usize>, err_arg_ok: bool, syn_pos: Option<SynPos>,
@@ -1569,9 +1572,8 @@ impl CycleCheck {
     }
 
     fn touch(&mut self, v: &VVal) -> Option<i64> {
-        let id =
-            if let Some(id) = v.ref_id() { id }
-            else { return None; };
+        let id = v.ref_id()?;
+
         if let Some(backref) = self.refs.get(&id) {
             if *backref == 0 {
                 let bkr_count = self.backref_counter;
@@ -1592,9 +1594,8 @@ impl CycleCheck {
         // anyways!
         if let VVal::Sym(_) = v { return None; }
 
-        let id =
-            if let Some(id) = v.ref_id() { id }
-            else { return None; };
+        let id = v.ref_id()?;
+
         if let Some(backref) = self.refs.get(&id) {
             match *backref {
                 br if br > 0 => {
@@ -1637,6 +1638,7 @@ macro_rules! swizzle_char2value {
     )
 }
 
+#[allow(clippy::many_single_char_names)]
 fn swizzle_i(s: &str, x: i64, y: i64, z: i64, w: i64) -> VVal {
     match s.len() {
         2 =>
@@ -1658,6 +1660,7 @@ fn swizzle_i(s: &str, x: i64, y: i64, z: i64, w: i64) -> VVal {
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 fn swizzle_f(s: &str, x: f64, y: f64, z: f64, w: f64) -> VVal {
     match s.len() {
         2 =>
@@ -1864,13 +1867,17 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                             }
                         }
 
-                        if last_split_i < i {
-                            out.push(
-                                VVal::new_byt(
-                                    inp[last_split_i..len]
-                                    .to_vec()));
-                        } else if last_split_i == i {
-                            out.push(VVal::new_byt(vec![]));
+                        match last_split_i {
+                            ls if ls < i  => {
+                                out.push(
+                                    VVal::new_byt(
+                                        inp[last_split_i..len]
+                                        .to_vec()));
+                            },
+                            ls if ls == i => {
+                                out.push(VVal::new_byt(vec![]));
+                            },
+                            _ => (),
                         }
                     }
 
@@ -1937,6 +1944,19 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
     }
 }
 
+fn vval_rc_ptr_eq(v: &VVal, l: &Rc<RefCell<VVal>>) -> bool {
+    match v {
+        VVal::Ref(r2) => Rc::ptr_eq(l, r2),
+        VVal::CRef(r2) => Rc::ptr_eq(l, r2),
+        VVal::WWRef(r2) =>
+            match r2.upgrade() {
+                Some(v2) => Rc::ptr_eq(l, &v2),
+                None => false,
+            },
+        _ => false,
+    }
+}
+
 #[allow(dead_code)]
 impl VVal {
     #[inline]
@@ -1955,8 +1975,8 @@ impl VVal {
     }
 
     #[inline]
-    pub fn into_sym(s: String) -> VVal {
-        VVal::Sym(into_sym(s))
+    pub fn new_sym_mv(s: String) -> VVal {
+        VVal::Sym(new_sym_mv(s))
     }
 
     #[inline]
@@ -2061,7 +2081,7 @@ impl VVal {
             VVal::Map(m) => {
                 let out = VVal::map();
                 for (k, v) in m.borrow_mut().iter() {
-                    if let Err(_) = out.set_key_sym(k.clone(), v.clone()) {
+                    if out.set_key_sym(k.clone(), v.clone()).is_err() {
                         continue;
                     }
                 }
@@ -2109,6 +2129,7 @@ impl VVal {
         }
     }
 
+    #[allow(clippy::while_let_on_iterator)]
     pub fn keys(&self) -> VVal {
         match self {
             VVal::Map(m) => {
@@ -2121,13 +2142,9 @@ impl VVal {
             VVal::Iter(i) => {
                 let out = VVal::vec();
                 let mut i = i.borrow_mut();
-                loop {
-                    if let Some((_, k)) = i.next() {
-                        if let Some(k) = k {
-                            out.push(k);
-                        }
-                    } else {
-                        break;
+                while let Some((_, k)) = i.next() {
+                    if let Some(k) = k {
+                        out.push(k);
                     }
                 }
                 out
@@ -2145,6 +2162,7 @@ impl VVal {
         }
     }
 
+    #[allow(clippy::while_let_on_iterator)]
     pub fn values(&self) -> VVal {
         match self {
             VVal::Map(m) => {
@@ -2164,12 +2182,8 @@ impl VVal {
             VVal::Iter(i) => {
                 let out = VVal::vec();
                 let mut i = i.borrow_mut();
-                loop {
-                    if let Some((v, _)) = i.next() {
-                        out.push(v);
-                    } else {
-                        break;
-                    }
+                while let Some((v, _)) = i.next() {
+                    out.push(v);
                 }
                 out
             },
@@ -2179,6 +2193,7 @@ impl VVal {
         }
     }
 
+    #[allow(clippy::while_let_on_iterator)]
     pub fn enumerate(&self) -> VVal {
         match self {
             VVal::Map(m) => {
@@ -2199,13 +2214,9 @@ impl VVal {
                 let out = VVal::vec();
                 let mut i = i.borrow_mut();
                 let mut c = 0;
-                loop {
-                    if let Some(_) = i.next() {
-                        out.push(VVal::Int(c));
-                        c += 1;
-                    } else {
-                        break;
-                    }
+                while let Some(_) = i.next() {
+                    out.push(VVal::Int(c));
+                    c += 1;
                 }
                 out
             },
@@ -2314,14 +2325,13 @@ impl VVal {
                 let s = s.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    let r = match s[idx..].chars().nth(0) {
+                    match s[idx..].chars().next() {
                         Some(chr) => {
                             idx += chr.len_utf8();
                             Some((VVal::new_str_mv(chr.to_string()), None))
                         },
                         None      => None,
-                    };
-                    r
+                    }
                 }))
             },
             VVal::None => {
@@ -2335,20 +2345,20 @@ impl VVal {
                 let b = *b;
                 std::iter::from_fn(Box::new(move || {
                     if i >= b { return None; }
-                    let r = Some((VVal::Int(i), None));
+                    let ret = Some((VVal::Int(i), None));
                     i += 1;
-                    r
+                    ret
                 }))
             },
-            VVal::IVec(NVec::Vec3(a, b, s)) => {
+            VVal::IVec(NVec::Vec3(a, b, skip)) => {
                 let mut i = *a;
                 let b = *b;
-                let s = *s;
+                let skip = *skip;
                 std::iter::from_fn(Box::new(move || {
                     if i >= b { return None; }
-                    let r = Some((VVal::Int(i), None));
-                    i += s;
-                    r
+                    let ret = Some((VVal::Int(i), None));
+                    i += skip;
+                    ret
                 }))
             },
             VVal::FVec(NVec::Vec2(a, b)) => {
@@ -2367,9 +2377,9 @@ impl VVal {
                 let s = *s;
                 std::iter::from_fn(Box::new(move || {
                     if i >= b { return None; }
-                    let r = Some((VVal::Flt(i), None));
+                    let ret = Some((VVal::Flt(i), None));
                     i += s;
-                    r
+                    ret
                 }))
             },
             VVal::Opt(Some(v)) => {
@@ -2614,12 +2624,10 @@ impl VVal {
                                             .skip(from).take(cnt).copied()
                                             .collect();
                                     Ok(VVal::new_byt(r))
+                                } else if arg_int as usize >= vval_bytes.len() {
+                                    Ok(VVal::None)
                                 } else {
-                                    if arg_int as usize >= vval_bytes.len() {
-                                        Ok(VVal::None)
-                                    } else {
-                                        Ok(VVal::new_byt(vec![vval_bytes[arg_int as usize]]))
-                                    }
+                                    Ok(VVal::new_byt(vec![vval_bytes[arg_int as usize]]))
                                 }
                             },
                             VVal::Fun(_) => {
@@ -2750,6 +2758,7 @@ impl VVal {
                         let f = e.arg(0);
 
                         let mut ret = VVal::None;
+                        #[allow(clippy::while_let_loop)]
                         loop {
                             let v =
                                 if let Some((v, k)) = i.borrow_mut().next() {
@@ -2981,42 +2990,11 @@ impl VVal {
                     false
                 }
             },
-            VVal::Ref(l)  => {
-                match v {
-                    VVal::Ref(r2) => Rc::ptr_eq(l, r2),
-                    VVal::CRef(r2) => Rc::ptr_eq(l, r2),
-                    VVal::WWRef(r2) =>
-                        match r2.upgrade() {
-                            Some(v2) => Rc::ptr_eq(l, &v2),
-                            None => false,
-                        },
-                    _ => false,
-                }
-            },
-            VVal::CRef(l)  => {
-                match v {
-                    VVal::Ref(r2) => Rc::ptr_eq(l, r2),
-                    VVal::CRef(r2) => Rc::ptr_eq(l, r2),
-                    VVal::WWRef(r2) =>
-                        match r2.upgrade() {
-                            Some(v2) => Rc::ptr_eq(l, &v2),
-                            None => false,
-                        },
-                    _ => false,
-                }
-            },
-            VVal::WWRef(lw)  => {
+            VVal::Ref(l)  => vval_rc_ptr_eq(v, l),
+            VVal::CRef(l) => vval_rc_ptr_eq(v, l),
+            VVal::WWRef(lw) => {
                 if let Some(l) = lw.upgrade() {
-                    match v {
-                        VVal::Ref(r2) => Rc::ptr_eq(&l, r2),
-                        VVal::CRef(r2) => Rc::ptr_eq(&l, r2),
-                        VVal::WWRef(r2) =>
-                            match r2.upgrade() {
-                                Some(v2) => Rc::ptr_eq(&l, &v2),
-                                None => false,
-                            },
-                        _ => false,
-                    }
+                    vval_rc_ptr_eq(v, &l)
                 } else {
                     false
                 }
@@ -3988,8 +3966,8 @@ impl VVal {
     pub fn nvec<N: crate::nvec::NVecNum>(&self) -> NVec<N> {
         use NVec::*;
         match self {
-            VVal::IVec(i) => N::from_ivec(i.clone()),
-            VVal::FVec(f) => N::from_fvec(f.clone()),
+            VVal::IVec(i) => N::from_ivec(*i),
+            VVal::FVec(f) => N::from_fvec(*f),
             VVal::Map(map)  => {
                 let m = map.borrow();
                 let o = N::zero().into_vval();
@@ -4013,14 +3991,16 @@ impl VVal {
             },
             VVal::Lst(lst) => {
                 let list = lst.borrow();
-                let mut l = list.iter();
-                let o = N::zero().into_vval();
-                let (x, y, z, w) = (l.next(), l.next(), l.next(), l.next());
+                let mut lst = list.iter();
+                let zero = N::zero().into_vval();
+                let (x, y, z, w) = (lst.next(), lst.next(), lst.next(), lst.next());
                 // The only way from_vval_tpl can fail is if the fourth
                 // parameter is Some(_) but the third is None.
                 // That means that the following will always succeed,
                 // because lists can't have holes.
-                NVec::from_vval_tpl((x.unwrap_or(&o), y.unwrap_or(&o), z, w)).unwrap()
+                NVec::from_vval_tpl(
+                    (x.unwrap_or(&zero), y.unwrap_or(&zero), z, w))
+                .unwrap()
             },
             VVal::Pair(p) => {
                 NVec::from_vval_tpl((p.0.clone(), p.1.clone(), None, None)).unwrap()
@@ -4053,7 +4033,7 @@ impl VVal {
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
             VVal::Pair(b)    => format!("$p({},{})", b.0.s_cy(c), b.1.s_cy(c)),
-            VVal::Iter(_)    => format!("$iter(&)"),
+            VVal::Iter(_)    => "$iter(&)".to_string(),
             VVal::Opt(b)     =>
                 if let Some(b) = b { format!("$o({})", b.s_cy(c)) }
                 else { "$o()".to_string() },
