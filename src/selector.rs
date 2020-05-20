@@ -335,14 +335,14 @@ fn parse_pat_branch(ps: &mut State) -> Result<VVal, ParseError> {
     let pat_branch = VVal::vec();
 
     while !ps.at_end() && !ps.lookahead_one_of("|:&=)]}/,") {
-        println!("GO {}", ps.rest().to_string());
+        //d// println!("GO {}", ps.rest().to_string());
         pat_branch.push(parse_glob_atom(ps)?);
     }
 
     Ok(pat_branch)
 }
 
-fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
+pub fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
     let mut pat = parse_pat_branch(ps)?;
 
     if ps.consume_if_eq_ws('|') {
@@ -536,7 +536,7 @@ fn parse_selector_pattern(ps: &mut State) -> Result<VVal, ParseError> {
     selector.push(node);
 
     while ps.consume_if_eq_ws('/') {
-        println!("PARSE NODE: {}", ps.rest().to_string());
+        //d// println!("PARSE NODE: {}", ps.rest().to_string());
         let node = parse_node(ps)?;
         selector.push(node);
     }
@@ -592,20 +592,20 @@ impl SelectorState {
     }
 
     fn push_capture_start(&mut self, s: &RxBuf) -> usize {
-        println!("###### PUSH CAP START [{}] => ({}, 0) ({:?})", s, s.offs, self.captures);
+        //d// println!("###### PUSH CAP START [{}] => ({}, 0) ({:?})", s, s.offs, self.captures);
         self.captures.push((s.offs, 0));
         self.captures.len() - 1
     }
 
     fn set_capture_end(&mut self, idx: usize, s: &RxBuf) -> (usize, (usize, usize)) {
-        println!("###### SET CAP END [{}] => ({:?})", s, self.captures);
+        //d// println!("###### SET CAP END [{}] => ({:?})", s, self.captures);
         let offs = self.captures[idx].0;
         self.captures[idx].1 = s.offs - offs;
         (idx, self.captures[idx].clone())
     }
 
     fn pop_capture(&mut self) {
-        println!("###### POP CAP ({:?})", self.captures);
+        //d// println!("###### POP CAP ({:?})", self.captures);
         self.captures.pop();
     }
 
@@ -868,7 +868,7 @@ macro_rules! while_shorten_str {
 }
 
 fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
-    println!("COMPILE ATOM {}", p.s());
+    //d// println!("COMPILE ATOM {}", p.s());
 
     if p.is_pair() {
         let pair_type = p.at(0).unwrap().to_sym();
@@ -879,7 +879,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
                 key_str.with_s_ref(|y| {
-                    println!("I: [{}]<=>[{}]", s, y);
+                    //d// println!("I: [{}]<=>[{}]", s, y);
                     let y_len = y.len();
 
                     if s.s.starts_with(y) {
@@ -1031,8 +1031,8 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                     Box::new(move |s: RxBuf, st: &mut SelectorState| {
                         (*sub_match_offs.borrow_mut()) = Some(s.offs);
                         let r = (*next)(s, st);
-                        println!("Nx PATTERN SUB(offs {})/NEXT RET({:?}) [{}] {:?} (for {})",
-                                 s.offs, r, s, st.captures, sub_pat_str2);
+                        //d// println!("Nx PATTERN SUB(offs {})/NEXT RET({:?}) [{}] {:?} (for {})",
+                        //d//         s.offs, r, s, st.captures, sub_pat_str2);
                         r
                     }));
 
@@ -1076,7 +1076,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
                     }
                 }
 
-                println!("EXIT n1({})", sub_pat_str);
+                //d// println!("EXIT n1({})", sub_pat_str);
                 res
             })
         } else {
@@ -1142,7 +1142,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     } else if p.to_sym() == s2sym("End") {
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
-            println!("MATCH END: [{}] atend={} [CAP {:?}]", s, s.is_at_end(), st.captures);
+            //d// println!("MATCH END: [{}] atend={} [CAP {:?}]", s, s.is_at_end(), st.captures);
             if s.is_at_end() {
                 (*next)(s, st)
             } else {
@@ -1185,13 +1185,13 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 }
 
 fn compile_pattern_branch(pat: &VVal, next: PatternNode) -> PatternNode {
-    println!("COMPILE PATTERN BRANCH [{}]", pat.s());
+    //d// println!("COMPILE PATTERN BRANCH [{}]", pat.s());
 
     let mut next : Option<PatternNode> = Some(next);
 
     for i in 0..pat.len() {
         let p = pat.at(pat.len() - (i + 1)).expect("pattern item");
-        println!("PAT COMP: {}", p.s());
+        //d// println!("PAT COMP: {}", p.s());
 
         let my_next = std::mem::replace(&mut next, None);
         next = Some(compile_atom(&p, my_next.unwrap()));
@@ -1201,7 +1201,7 @@ fn compile_pattern_branch(pat: &VVal, next: PatternNode) -> PatternNode {
 }
 
 fn compile_pattern(pat: &VVal, next: PatternNode) -> PatternNode {
-    println!("COMPILE PATTERN [{}]", pat.s());
+    //d// println!("COMPILE PATTERN [{}]", pat.s());
 
     let first = pat.at(0).unwrap_or_else(|| VVal::None);
     if first.is_sym() && first.to_sym() == s2sym("Alt") {
@@ -1290,7 +1290,7 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
 
         let pat = compile_pattern(k,
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
+                //d// println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
                 PatResult::matched()
             }));
 
@@ -1329,7 +1329,7 @@ fn compile_kv(kv: &VVal) -> SelNode {
     let pat =
         compile_pattern(&kv.at(1).expect("pattern in kv"),
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
+                //d// println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
                 PatResult::matched()
             }));
 
@@ -1389,7 +1389,7 @@ fn compile_node_cond(n: &VVal) -> SelNode {
     } else if node_type == s2sym("Type") {
         let pat = compile_pattern(&n.at(1).expect("node type pattern"),
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                println!("*** BRANCH LEAF TYPE PATTERN MATCH {}| {:?}", s, st.captures);
+                //d// println!("*** BRANCH LEAF TYPE PATTERN MATCH {}| {:?}", s, st.captures);
                 PatResult::matched()
             }));
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
@@ -1399,7 +1399,7 @@ fn compile_node_cond(n: &VVal) -> SelNode {
     } else if node_type == s2sym("Str") {
         let pat = compile_pattern(&n.at(1).expect("node type pattern"),
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
-                println!("*** BRANCH LEAF TYPE PATTERN MATCH {}| {:?}", s, st.captures);
+                //d// println!("*** BRANCH LEAF TYPE PATTERN MATCH {}| {:?}", s, st.captures);
                 PatResult::matched()
             }));
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
@@ -1441,7 +1441,7 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
 
             let mut stack = vec![v.clone()];
             while let Some(v) = stack.pop() {
-                println!("STACK POP: {}", v.s());
+                //d// println!("STACK POP: {}", v.s());
                 if (*sn)(&v, st, capts) {
                     found = true;
                 }
@@ -1471,7 +1471,7 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
 }
 
 fn compile_selector(sel: &VVal, no_capture: bool) -> SelNode {
-    println!("***** COM SELECTOR: {}", sel.s());
+    //d// println!("***** COM SELECTOR: {}", sel.s());
     if let VVal::Lst(_) = sel {
 
         let first = sel.at(0).unwrap_or_else(|| VVal::None);
@@ -1534,6 +1534,40 @@ fn compile_find_pattern(v: &VVal) -> PatternNode {
     })
 }
 
+
+fn compile_match_pattern(v: &VVal) -> PatternNode {
+    let pat = compile_pattern(v,
+        Box::new(move |_s: RxBuf, _st: &mut SelectorState| {
+            //d// println!("*** BRANCH LEAF SINGLE PATTERN MATCH {}| {:?}", s, st.captures);
+            PatResult::matched()
+        }));
+
+    Box::new(move |s: RxBuf, st: &mut SelectorState| {
+        (*pat)(s, st)
+    })
+}
+
+fn check_pattern_start_anchor(pattern: &VVal) -> bool {
+    if let Some(first) = pattern.at(0) {
+        if first.is_sym() && first.to_sym() == s2sym("Start") {
+            return true;
+        } else if first.is_pair() {
+            if let Some(pair_type) = first.at(0) {
+                let pair_val     = first.at(1).unwrap_or_else(|| VVal::None);
+                let branch_first = pair_val.at(0).unwrap_or_else(|| VVal::None);
+
+                if pair_type.to_sym() == s2sym("PatSub") {
+                    return branch_first.is_sym() && branch_first.to_sym() == s2sym("Start");
+                } else if pair_type.to_sym() == s2sym("PatCap") {
+                    return branch_first.is_sym() && branch_first.to_sym() == s2sym("Start");
+                }
+            }
+        }
+    }
+
+    false
+}
+
 /// Creates a function that takes a string slice and tries to
 /// find the compiled regular expression in it.
 /// The returned function then returns a `PatResult` which stores
@@ -1543,24 +1577,46 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal)
 {
     let mut ps = State::new(pat, "<pattern>");
     ps.skip_ws();
-    let pattern = parse_pattern(&mut ps)?;
-    let comp_pat = compile_find_pattern(&pattern);
+    let pattern  = parse_pattern(&mut ps)?;
+    let not_find = check_pattern_start_anchor(&pattern);
+    let comp_pat =
+        if not_find { compile_match_pattern(&pattern) }
+        else        { compile_find_pattern(&pattern) };
 
-    Ok(VValFun::new_fun(
-        move |env: &mut Env, _argc: usize| {
-            if let Some(s) = env.arg_ref(0) {
-                Ok(s.with_s_ref(|s| {
-                    let mut ss = SelectorState::new();
-                    ss.set_str(s);
-                    let pat_res = (*comp_pat)(RxBuf::new(s), &mut ss);
-                    let r = pat_res.to_vval(s);
-                    result_ref.set_ref(r.clone());
-                    r
-                }))
-            } else {
-                Ok(VVal::None)
-            }
-        }, Some(1), Some(1), false))
+    if not_find {
+        Ok(VValFun::new_fun(
+            move |env: &mut Env, _argc: usize| {
+                if let Some(s) = env.arg_ref(0) {
+                    Ok(s.with_s_ref(|s| {
+                        let mut ss = SelectorState::new();
+                        ss.set_str(s);
+                        let pat_res = (*comp_pat)(RxBuf::new(s), &mut ss);
+                        let r = pat_res.to_vval(s);
+                        result_ref.set_ref(r.clone());
+                        r
+                    }))
+                } else {
+                    Ok(VVal::None)
+                }
+            }, Some(1), Some(1), false))
+
+    } else {
+        Ok(VValFun::new_fun(
+            move |env: &mut Env, _argc: usize| {
+                if let Some(s) = env.arg_ref(0) {
+                    Ok(s.with_s_ref(|s| {
+                        let mut ss = SelectorState::new();
+                        ss.set_str(s);
+                        let pat_res = (*comp_pat)(RxBuf::new(s), &mut ss);
+                        let r = pat_res.to_vval(s);
+                        result_ref.set_ref(r.clone());
+                        r
+                    }))
+                } else {
+                    Ok(VVal::None)
+                }
+            }, Some(1), Some(1), false))
+    }
 }
 
 #[cfg(test)]

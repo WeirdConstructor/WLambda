@@ -3500,6 +3500,21 @@ fn check_regex_patterns() {
         !rx = std:pattern ~ $q/(^$+[0123456789]) $*$s +/ $q/$*$s (^$+[0123456789])/;
         ? rx["4943 + 32"] \"got:" $\.1 "+" $\.2;
     "#), "\"got:4943+32\"");
+
+    assert_eq!(ve(r#"
+        !rx = $r/$^foo/;
+        rx "foobar"
+    "#), "$[\"foo\"]");
+
+    assert_eq!(ve(r#"
+        !rx = $r/($^foo)/;
+        rx "foobar"
+    "#), "$[\"foo\"]");
+
+    assert_eq!(ve(r#"
+        !rx = $r/(^$^foo)bar/;
+        rx "foobarx"
+    "#), "$[\"foobar\",\"foo\"]");
 }
 
 #[test]
