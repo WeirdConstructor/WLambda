@@ -545,26 +545,24 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     env.push_iter(Rc::new(RefCell::new(iterable.iter())));
                 }
             },
-            Op::IterNext(ivar) => {
+            Op::IterNext(ivar, is_ref_var) => {
+                let i = env.iter.as_ref().unwrap();
                 let value =
-                    if let Some(i) = &env.iter {
-                        if let Some((v, k)) = i.borrow_mut().next() {
-                            if let Some(k) = k {
-                                Some(VVal::pair(v, k))
-                            } else {
-                                Some(v)
-                            }
+                    if let Some((v, k)) = i.borrow_mut().next() {
+                        let v =
+                            if let Some(k) = k { VVal::pair(v, k) }
+                            else               { v };
+                        if *is_ref_var {
+                            v.to_ref()
                         } else {
-                            None
+                            v
                         }
                     } else {
-                        None
+                        pc = env.loop_info.break_pc;
+                        VVal::None
                     };
-                if let Some(v) = value {
-                    out_reg!(env, ret, retv, data, ivar, v);
-                } else {
-                    pc = env.loop_info.break_pc;
-                }
+
+                out_reg!(env, ret, retv, data, ivar, value);
             },
             Op::PushLoopInfo(body_ops) => {
                 env.push_loop_info(pc, pc + *body_ops as usize, 0);
@@ -1588,17 +1586,19 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
              iteration expression)".to_string()));
     }
 
-    if ast.at(2).unwrap_or_else(|| VVal::None)
-          .at(0).unwrap_or_else(|| VVal::None)
-          .get_syn() != Syntax::Var
-    {
-        return Err(ast.compile_err(
-            "iter takes an identifier as first argument".to_string()));
-    }
+    let var = ast.at(2).unwrap_or_else(|| VVal::None);
 
-    let varname =
-        ast.at(2).unwrap_or_else(|| VVal::None)
-           .at(1).unwrap_or(VVal::None).s_raw();
+    let (is_ref_var, varname) =
+        match var.at(0).unwrap().get_syn() {
+            Syntax::Var =>
+                (false, var.at(1).unwrap_or_else(|| VVal::None).s_raw()),
+            Syntax::Ref if var.at(1).unwrap().at(0).unwrap().get_syn() == Syntax::Var =>
+                (true, var.at(1).unwrap().at(1).unwrap().s_raw()),
+            _ => {
+                return Err(ast.compile_err(
+                    "iter takes an identifier as first argument".to_string()));
+            }
+        };
 
     ce.borrow_mut().push_block_env();
     let iter_var = ce.borrow_mut().next_local();
@@ -1627,7 +1627,7 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
             // + 1 for the op_iter_next:
             prog.op_iter_init(&spos, ip, (body.op_count() + 1) as i32);
-            prog.op_iter_next(&spos, iter_var);
+            prog.op_iter_next(&spos, iter_var, is_ref_var);
 
             prog.append(body);
 

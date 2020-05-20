@@ -3553,3 +3553,28 @@ fn check_tree_match() {
         $\
     "#), "$n");
 }
+
+#[test]
+fn check_iter_var_closure() {
+    assert_eq!(ve(r#"
+        !sum = 0;
+        !v = $[];
+        iter i $i(0, 10) {
+            std:push v { i };
+        };
+        v { .sum = sum + _[]; };
+        sum
+    "#), "0");
+
+    assert_eq!(ve(r#"
+        !sum = 0;
+        !v = $[];
+        !sum2 = $@i
+            iter $&&i $i(0, 10) {
+                $+ $*i;
+                std:push v { i };
+            };
+        v { .sum = sum + _[]; };
+        $p(sum, sum2)
+    "#), "$p(45,45)");
+}

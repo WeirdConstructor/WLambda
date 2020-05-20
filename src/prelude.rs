@@ -3616,6 +3616,10 @@ value that was generated for the current iteration.
 And _iterable_ is everything that `$iter` can make an iterator from.
 Please refer to the section `Iterator Kinds` for a listing of this.
 
+If _var_ is given with a `$&&` prefix as in: `iter $&&i $i(0, 10) ...`
+the variable `i` will contain a fresh reference for each loop iteration.
+See further below for an example.
+
 Like usual, the control flow manipulators `next` and `break` also work
 for this kind of loop.
 
@@ -3720,6 +3724,21 @@ iter k $p(:keys, m) {
 };
 
 std:assert_eq sum 30;
+```
+
+If you need a new variable for capturing it in a closure on each
+iteration you can use the special `iter $&&i ...` syntax:
+
+```wlambda
+!closures = $[];
+
+# Without $&& the variable `i` would only be captured weakly, and
+# only resolve to `$none` inside the closure after the iter loop is done!
+iter $&&i $i(0, 10) {
+    std:push closures { i * 10 };
+};
+
+std:assert_eq ($@i closures \$+ _[]) 450;
 ```
 
 #### <a name="713-range-start-end-step-fun"></a>7.1.3 - range _start_ _end_ _step_ _fun_

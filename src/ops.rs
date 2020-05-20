@@ -232,7 +232,7 @@ impl Prog {
                 Op::IterInit(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::IterNext(p1) => {
+                Op::IterNext(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
 //                Op::UnwindMov(p1, p2) => {
@@ -515,9 +515,9 @@ impl Prog {
         self.push_op(Op::IterInit(a, end_offs));
     }
 
-    pub fn op_iter_next(&mut self, sp: &SynPos, r: ResPos) {
+    pub fn op_iter_next(&mut self, sp: &SynPos, r: ResPos, is_ref_var: bool) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::IterNext(r));
+        self.push_op(Op::IterNext(r, is_ref_var));
     }
 
     pub fn op_apply(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
@@ -851,7 +851,7 @@ pub enum Op {
     CtrlFlow(CtrlFlow),
     Builtin(Builtin),
     IterInit(ResPos, i32),
-    IterNext(ResPos),
+    IterNext(ResPos, bool),
 //    UnwindMov(ResPos, ResPos),
     Unwind,
     End,

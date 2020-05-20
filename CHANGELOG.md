@@ -1,3 +1,9 @@
+0.5.1 (unreleased)
+==================
+
+* Feature: `iter $&&i ...` syntax implemented, for creating new references
+for each iteration for easier closure generation.
+
 0.5.0 (2020-05-21)
 ==================
 
