@@ -18,6 +18,7 @@ Here are some of its properties:
   you do any heavy lifting in Rust.
 - No garbage collector. Memory and resource management relies only on reference counting and RAII.
 You can create your own drop functions.
+- Preserving Rust safety by not using `unsafe`.
 - Main data structures are Lists and Maps.
 - No exceptions, except panics. Error handling is accomplished
 by a specialized data type. It can be thought of as dynamic counterpart
