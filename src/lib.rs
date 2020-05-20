@@ -29,6 +29,7 @@ of Rust's Result type.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 - Threading support with shared atoms and message queues.
 - Register based VM evaluator and code generator.
+- Builtin pattern matching and structure selector [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html).
 - Has a testable wasm32 version: [WASM WLambda Evaluator](http://wlambda.m8geil.de/#!/main).
 
 The embedding API and all internal operations rely on a data structure

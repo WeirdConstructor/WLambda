@@ -3517,11 +3517,11 @@ fn check_regex_patterns() {
     "#), "$[\"foobar\",\"foo\"]");
 }
 
-#[test]
-fn check_tree_match() {
-    assert_eq!(ve("type $S(a/b)"), "\"function\"");
-
-    assert_eq!(ve("$S(a/b) ${a = ${b = 20}}"),              "20");
-    assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\1 }"), "\"bbbbb\"");
-    assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\_ }"), "$[\"abbbbbc\",\"bbbbb\"]");
-}
+//#[test]
+//fn check_tree_match() {
+//    assert_eq!(ve("type $S(a/b)"), "\"function\"");
+//
+//    assert_eq!(ve("$S(a/b) ${a = ${b = 20}}"),              "20");
+//    assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\1 }"), "\"bbbbb\"");
+//    assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\_ }"), "$[\"abbbbbc\",\"bbbbb\"]");
+//}

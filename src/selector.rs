@@ -49,6 +49,7 @@ Selector and WLambda-Regex Syntax:
                 | "^"              (* matches (zero width) start of string *)
                 | "$"              (* matches (zero width) end of string *)
                 | "s"              (* matches one whitespace character *)
+                | "S"              (* matches one non-whitespace character *)
                 | "&", rx_match_mod
                 ;
 
@@ -56,8 +57,11 @@ Selector and WLambda-Regex Syntax:
                 | "(", pattern, ")"         (* sub group *)
                 ;
 
-    glob_cclass = "[", { class_char }, "]"  (* character class match for 1 char *)
-                | "[^", { class_char }, "]" (* negated character class match for 1 char *)
+    class_range = class_char, "-", class_char (* contains a range of chars, eg. [a-z] *)
+                ;
+
+    glob_cclass = "[",  { class_char | class_range }, "]" (* character class match for 1 char *)
+                | "[^", { class_char | class_range }, "]" (* negated character class match for 1 char *)
                 ;
 
     pat_glob    = "*"                       (* 0 or N any characters *)
@@ -113,9 +117,9 @@ Selector and WLambda-Regex Syntax:
 
 use crate::vval::{VVal, Env, VValFun};
 
-pub use crate::parser::state::State;
-pub use crate::parser::state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
-pub use crate::parser::{parse_str_backslash, EscSeqValue};
+use crate::parser::state::State;
+use crate::parser::state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
+use crate::parser::{parse_str_backslash, EscSeqValue};
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -192,19 +196,51 @@ fn parse_glob_cclass(ps: &mut State) -> Result<VVal, ParseError> {
     let mut chars = String::new();
 
     let mut c = ps.expect_some(ps.peek())?;
+    let mut last : Option<char> = None;
+    let mut find_range_end = false;
+
     while c != ']' {
         ps.consume();
-        if c == '\\' {
-            let c =
+
+        if last.is_some() && c == '-' {
+            find_range_end = true;
+            c = ps.expect_some(ps.peek())?;
+            continue;
+        }
+
+        c =
+            if c == '\\' {
                 match parse_str_backslash(ps)? {
                     EscSeqValue::Char(c) => c,
                     EscSeqValue::Byte(b) => b as char,
-                };
+                }
+            } else {
+                c
+            };
+
+        if find_range_end {
+            use std::convert::TryFrom;
+            let start = last.unwrap() as u32 + 1;
+            let end   = c as u32;
+            for c_idx in start..end {
+                if let Ok(c) = char::try_from(c_idx) {
+                    chars.push(c);
+                }
+            }
             chars.push(c);
+
+            last           = None;
+            find_range_end = false;
         } else {
             chars.push(c);
+            last = Some(c);
         }
+
         c = ps.expect_some(ps.peek())?;
+    }
+
+    if find_range_end {
+        chars.push('-');
     }
 
     if !ps.consume_if_eq_ws(']') {
@@ -342,6 +378,8 @@ fn parse_pat_branch(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(pat_branch)
 }
 
+/// Parses a regex pattern from a parser State and returns
+/// the VVal data structure describing the parsed pattern.
 pub fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
     let mut pat = parse_pat_branch(ps)?;
 
@@ -561,6 +599,7 @@ fn parse_selector(s: &str) -> Result<VVal, ParseError> {
     Ok(ret)
 }
 
+/// State for evaluating patterns and selectors.
 #[derive(Debug, Clone)]
 pub struct SelectorState {
     orig_string_len: usize,
@@ -622,6 +661,7 @@ impl SelectorState {
     }
 }
 
+/// A parse buffer, storing the current offset into the input string.
 #[derive(Debug, Clone, Copy)]
 pub struct RxBuf<'a> {
     s:          &'a str,
@@ -677,6 +717,7 @@ impl<'a> RxBuf<'a> {
     }
 }
 
+/// Stores the position of a captured part of the input string of a pattern.
 #[derive(Debug, Clone)]
 pub struct CaptureNode {
     idx:  usize,
@@ -718,6 +759,8 @@ fn append_capture(cap_idx: usize, v: &mut Vec<Option<Box<CaptureNode>>>, cap: &(
     }));
 }
 
+/// Stores the result of a pattern match, including the captured parts of the
+/// input string.
 #[derive(Debug, Clone)]
 pub struct PatResult {
     matched:        bool,
@@ -829,7 +872,9 @@ impl PatResult {
     }
 }
 
+/// A function type for the evaluation node of a regex pattern.
 pub type PatternNode = Box<dyn Fn(RxBuf, &mut SelectorState) -> PatResult>;
+/// A function type for the evaluation node of a data structure selector.
 pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal) -> bool>;
 
 //macro_rules! while_lengthen_str {
@@ -1725,6 +1770,7 @@ mod tests {
         ps.skip_ws();
         match parse_pattern(&mut ps) {
             Ok(v) => {
+                println!("PAT: {}", v.s());
                 let pn = compile_find_pattern(&v);
                 let mut ss = SelectorState::new();
                 ss.set_str(st);
@@ -2125,6 +2171,17 @@ mod tests {
         assert_eq!(pat("AB $&L $+b $&U C",  " ABbbBbc "),               "ABbbBbc");
         assert_eq!(pat("$&U A$+BC",         " abbbbbc "),               "abbbbbc");
         assert_eq!(pat("$&L a$+bc",         " ABBBBBC "),               "ABBBBBC");
+
+        assert_eq!(pat("$+[a-z]",             "ABabzXXZ"),                "abz");
+        assert_eq!(pat("$+[^a-z]",            "ABabzXXZ"),                "AB");
+        assert_eq!(pat("$+[-z]",              "ABab-z-XXZ"),              "-z-");
+        assert_eq!(pat("$+[z-]",              "ABab-z-XXZ"),              "-z-");
+
+        assert_eq!(pat("$+\\f",               "ABfffFO"),                 "fff");
+        assert_eq!(pat("$+\\x41",             "BAAAO"),                   "AAA");
+        assert_eq!(pat("$+ \\$",              "ABx$$$xxFO"),              "$$$");
+        assert_eq!(pat("x$* \\$",             "ABx$$$xxFO"),              "x$$$");
+        assert_eq!(pat("\\u{2211}",           "∑"),                       "∑");
     }
 
     #[test]

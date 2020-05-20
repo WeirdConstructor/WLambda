@@ -4344,6 +4344,131 @@ std:assert (0b1100 >> 2)      == 0b11;
 std:assert (`>>` 0b1011000 3) == 0b1011
 ```
 
+## - Data Structure Selectors and String Patterns/Regex
+
+WLambda comes with a builtin DSL (domain specific language) for
+deep data structure selection and regular expression (regex) pattern
+matching on strings. A _selector_ (structure selection) gives you the
+ability to search deep into WLambda data structures like
+[CSS Selectors](https://www.w3.org/TR/selectors-3/) into HTML DOM trees
+or [XPath](https://www.w3.org/TR/xpath-31/) into XML.
+
+A subset of the _selectors_ are the _patterns_, which are able to
+match strings like regular expressions. The syntax of _patterns_
+is a bit different from normal regular expressions like Perl,
+Python or JavaScript has. This is partly due to the fact that
+these patterns aim to be easily used to match parts of a specific
+string like filename globs `photo_???_*.jpg`.
+
+For an in depth description of the _selector_ and _pattern_ syntax
+please refer to the [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
+in the wlambda::selector module.
+
+### - Data Structure Selectors
+
+This section shows how data structure selectors can be used.
+
+TODO
+
+### - String Patterns (Regex)
+
+This section shows how to use the builtin pattern regex engine
+in WLambda. You can embed patterns directly in your WLambda source
+with `$rQ...Q`. Where `Q` stands for the usual string quoting mechanism
+in WLambda (like `$q/foo/`, `$q(foo bar)`, ...). This has the advantage
+that the pattern syntax is checked on compile time of your WLambda program.
+
+The result of the expression `$r/foo/` is a function, which takes as first
+arguments a string and returns a vector of substrings of that input
+string. First element of that vector is always the matched sub string
+of the input string. All elements after that correspond to a pattern
+capture `(^...)` like in `$r/foo(^bar)/`.
+The function returns `$none` if the pattern could not be found in the input string.
+
+Lets start off with a simple example:
+
+```wlambda
+# Please note: Whitespace inside the pattern is allowed and will not be matched!
+
+!res = $r/a (^*) b/ "fooaxxxxbber";
+
+std:assert_eq res.0 "axxxxbb";
+std:assert_eq res.1 "xxxxb";
+```
+
+To match a whole string you can anchor using `$^` and `$$`:
+
+```wlambda
+!res = $r/$^ a (^*) b $$/ "axxxxbb";
+
+std:assert_eq res.0 "axxxxbb";
+std:assert_eq res.1 "xxxxb";
+```
+
+To match special the characters `$` you can use the backslash escaping `\$`:
+
+```wlambda
+std:assert_eq ($r/$+ \$/ "FF$$$FF").0   "$$$";
+```
+
+#### - Pattern Syntax Overview
+
+While
+[Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
+describes the pattern syntax in detail,
+here is the WLambda pattern syntax in a nutshell:
+
+| Pattern Syntax | Semantics |
+|-|-|
+| _whitespace_  | Please note, that whitespace to be matched must be escaped using '\' or inside a character calss `[ ]`. |
+| `\.`          | Backslash escapes work the same as in regular WLambda strings. `\` escapes the following character to have no special syntactic meaning in a pattern except matching itself. While escape sequences like `\x41` match the character `A` or `\u{2211}` matches `∑`. These also work inside of character classes. |
+| `*`           | Match 0 to N occurences of any character. |
+| `?`           | Match 1 occurences of any character. |
+| `(...)`       | A match group (does not capture). |
+| `(^...)`      | A capturing match group. |
+| `[abcA-Z]`    | A character class, matching the listed characters or ranges. |
+| `[^abcA-Z]`   | A negative character class, matching all character except the listed characters or ranges. |
+| `$^`          | String start anchor. Matches only the start of the string. Useful for specifying patterns that match the complete string (in combination with `$$`). |
+| `$$`          | String end anchor. Matches only the end of the string. Useful for specifying patterns that must match the complete string. |
+| `$*X`         | Greedly matches the pattern part `X` 0 or N times. For grouping pattern parts use `(...)` like in `$*(abc)`. |
+| `$<*X`        | Non-greedly matches the pattern part `X` 0 or N times. |
+| `$+X`         | Greedly matches the pattern part `X` 1 or N times. For grouping pattern parts use `(...)` like in `$+(abc)`. |
+| `$<+X`        | Non-greedly matches the pattern part `X` 1 or N times. |
+| `$?X`         | Greedly matches 0 or 1 occurences of the pattern part `X`. Like usual, you can group using `(...)`. |
+| `$<?X`        | Non-greedly matches 0 or 1 occurences of the pattern part `X`. |
+| `$!X`         | Zero-width negative look-ahead. `($^$!a*)` matches any string not starting with an `a`.  |
+| `$=X`         | Zero-width positive look-ahead. `($^$=a*)` matches any string starting with an `a`. |
+| `$s`          | Matches one (Unicode) whitespace character. |
+| `$S`          | Matches one (Unicode) non-whitespace character. |
+| `$&L`         | Transforms the input string for the following pattern matching parts to lowercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
+| `$&U`         | Transforms the input string for the following pattern matching parts to uppercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
+
+#### - Standard Regular Expressions
+
+Please note that WLambda can optionally be compiled with the `regex` crate,
+which implements a more common syntax for regular expressions.
+Please refer to the functions `std:re:match` in the WLambda standard library
+for this.
+
+#### - std:pattern _string_
+
+Compiles the regex pattern _string_ to a function just like `$r/.../` would do.
+Useful for composing WLambda patterns at runtime:
+
+```wlambda
+!rx = std:pattern ~ std:str:cat "(^" "$+" "[a-z]" ")";
+
+std:assert_eq (rx "foo").1 "foo";
+```
+
+Returns an error if the syntax failes to parse as pattern:
+
+```wlambda
+!err = unwrap_err ~ std:pattern "($+[a-z]";
+
+std:assert_eq $i(0, 11)[err] "bad pattern";
+```
+
 ## <a name="9-modules"></a>9 - Modules
 
 ### <a name="91-export"></a>9.1 - export
