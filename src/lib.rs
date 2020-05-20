@@ -5,10 +5,8 @@
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
-This crate provides a small and simple embeddable scripting language.
-Its syntax gravitates around functions and argument composition for functions.
-A core concept is that everything is callable. It could be regarded as LISP
-without parenthesis, or as a mixture of Perl, Lua, JavaScript and LISP/Scheme/Clojure.
+WLambda is an embeddable dynamic scripting language for Rust, where every value
+can be called and the syntax is a blend of Perl, Lua, JavaScript and LISP/Scheme/Clojure.
 
 Here are some of its properties:
 

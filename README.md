@@ -3,10 +3,8 @@
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
-This crate provides a small and simple embeddable scripting language.
-Its syntax gravitates around functions and argument composition for functions.
-A core concept is that everything is callable. It could be regarded as LISP
-without parenthesis, or as a mixture of Perl, Lua, JavaScript and LISP/Scheme/Clojure.
+WLambda is an embeddable dynamic scripting language for Rust, where every value
+can be called and the syntax is a blend of Perl, Lua, JavaScript and LISP/Scheme/Clojure.
 
 Here are some of its properties:
 
@@ -27,6 +25,7 @@ of Rust's Result type.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
 - Threading support with shared atoms and message queues.
 - Register based VM evaluator and code generator.
+- Builtin pattern matching and structure selector [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html).
 - Has a testable wasm32 version: [WASM WLambda Evaluator](http://wlambda.m8geil.de/#!/main).
 
 The embedding API and all internal operations rely on a data structure
@@ -259,6 +258,23 @@ std:assert_eq stuff.0 "日";         # Unicode support
 std:assert_eq 人 "jin";
 ```
 
+### Builtin (Regex) Pattern Matching
+
+```wlambda
+!some_url = "http://crates.io/crates/wlambda";
+
+!crate  = $none;
+!domain = $none;
+
+? ($r{$^ (^$+[^:]) \:\/\/ (^$*[^/]) \/crates\/ (^$+[a-z]) } some_url) {
+    .domain = $\.2;
+    .crate = $\.3;
+};
+
+std:assert_eq domain "crates.io";
+std:assert_eq crate  "wlambda";
+```
+
 ### Object Oriented Programming with prototypes
 
 ```wlambda
@@ -302,7 +318,7 @@ account1.deposit 50;
 std:assert_eq account1.balance 150;
 ```
 
-### Modules
+### WLambda Modules
 
 ```txt
 # util.wl:
