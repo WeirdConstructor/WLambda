@@ -3,3 +3,4 @@ target/
 *.history
 prelude_test.txt
 tmp_scripts/
+old_bins/
