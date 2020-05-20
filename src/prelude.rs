@@ -7290,7 +7290,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "sync:mpsc:new",
         |_env: &mut Env, _argc: usize| {
-            Ok(AValChannel::new())
+            Ok(AValChannel::new_vval())
         }, Some(0), Some(0), false);
 
     func!(st, "sync:slot:new",

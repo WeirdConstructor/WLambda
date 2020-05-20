@@ -34,8 +34,7 @@ impl StringInterner {
         let mut count = 0;
         let mut free = vec![];
         for (k, v) in self.strmap.iter() {
-            if let Some(_) = v.upgrade() {
-            } else {
+            if v.upgrade().is_none() {
                 free.push(k.to_string());
             }
         }

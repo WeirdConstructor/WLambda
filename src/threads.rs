@@ -452,7 +452,7 @@ impl VValUserData for AtomicAValSlot {
                 if argv.len() != 1 {
                     return
                         Err(StackAction::panic_str(
-                            format!("recv_timeout method expects 1 argument"),
+                            "recv_timeout method expects 1 argument".to_string(),
                             None))
                 }
 
@@ -462,7 +462,7 @@ impl VValUserData for AtomicAValSlot {
                 if argv.len() != 1 {
                     return
                         Err(StackAction::panic_str(
-                            format!("send method expects 1 argument"),
+                            "send method expects 1 argument".to_string(),
                             None))
                 }
 
@@ -474,7 +474,7 @@ impl VValUserData for AtomicAValSlot {
                 if argv.len() != 1 {
                     return
                         Err(StackAction::panic_str(
-                            format!("wait_empty_timeout method expects 1 argument"),
+                            "wait_empty_timeout method expects 1 argument".to_string(),
                             None))
                 }
 
@@ -510,7 +510,7 @@ impl AValChannel {
         }
     }
 
-    pub fn new() -> VVal {
+    pub fn new_vval() -> VVal {
         VVal::Usr(Box::new(Self::new_direct()))
     }
 
@@ -560,7 +560,7 @@ impl AValChannel {
                         match guard.recv() {
                             Ok(av) => av.to_vval(),
                             Err(_) =>
-                                VVal::err_msg(&format!("recv disconnected")),
+                                VVal::err_msg("recv disconnected"),
                         }
                     },
                     Some(dur) => {
@@ -568,7 +568,7 @@ impl AValChannel {
                             Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
                             Err(RecvTimeoutError::Timeout)      => VVal::Opt(None),
                             Err(RecvTimeoutError::Disconnected) =>
-                                VVal::err_msg(&format!("recv_timeout disconnected")),
+                                VVal::err_msg("recv_timeout disconnected"),
                         }
                     }
                 }
@@ -610,7 +610,7 @@ impl VValUserData for AValChannel {
                 if argv.len() != 1 {
                     return
                         Err(StackAction::panic_str(
-                            format!("recv_timeout method expects 1 argument"),
+                            "recv_timeout method expects 1 argument".to_string(),
                             None))
                 }
 
@@ -620,7 +620,7 @@ impl VValUserData for AValChannel {
                 if argv.len() != 1 {
                     return
                         Err(StackAction::panic_str(
-                            format!("send method expects 1 argument"),
+                            "send method expects 1 argument".to_string(),
                             None))
                 }
 

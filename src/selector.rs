@@ -173,7 +173,7 @@ fn parse_ident(ps: &mut State, one_char: bool) -> Result<VVal, ParseError> {
         }
     }
 
-    if uh.len() == 0 {
+    if uh.is_empty() {
         return Err(ps.err(
             ParseErrorKind::UnexpectedToken(
                 ps.peek().unwrap_or(' '),
@@ -640,7 +640,7 @@ impl SelectorState {
         //d// println!("###### SET CAP END [{}] => ({:?})", s, self.captures);
         let offs = self.captures[idx].0;
         self.captures[idx].1 = s.offs - offs;
-        (idx, self.captures[idx].clone())
+        (idx, self.captures[idx])
     }
 
     fn pop_capture(&mut self) {
@@ -731,7 +731,7 @@ impl CaptureNode {
 
 fn append_capture(cap_idx: usize, v: &mut Vec<Option<Box<CaptureNode>>>, cap: &(usize, usize)) {
     let pos = v.get_mut(cap_idx).unwrap();
-    let tail = std::mem::replace(pos, None);
+    let tail = pos.take();
     *pos = Some(Box::new(CaptureNode {
         idx: cap.0,
         len: cap.1,
@@ -899,7 +899,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
                 chars.with_s_ref(|chrs| {
-                    if let Some(c) = s.s.chars().nth(0) {
+                    if let Some(c) = s.s.chars().next() {
                         let c_len = c.len_utf8();
 
                         for mc in chrs.chars() {
@@ -918,7 +918,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
                 chars.with_s_ref(|chrs| {
-                    if let Some(c) = s.s.chars().nth(0) {
+                    if let Some(c) = s.s.chars().next() {
                         for mc in chrs.chars() {
                             if c == mc {
                                 return PatResult::fail();
@@ -1088,7 +1088,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     } else if p.to_sym() == s2sym("WsChar") {
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
-            if let Some(c) = s.s.chars().nth(0) {
+            if let Some(c) = s.s.chars().next() {
                 let c_len = c.len_utf8();
                 if c.is_whitespace() {
                     return (*next)(s.offs(c_len), st).len(c_len);
@@ -1100,7 +1100,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     } else if p.to_sym() == s2sym("NWsChar") {
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
-            if let Some(c) = s.s.chars().nth(0) {
+            if let Some(c) = s.s.chars().next() {
                 let c_len = c.len_utf8();
 
                 if !c.is_whitespace() {
@@ -1113,7 +1113,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     } else if p.to_sym() == s2sym("Any") {
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
-            if let Some(c) = s.s.chars().nth(0) {
+            if let Some(c) = s.s.chars().next() {
                 let c_len = c.len_utf8();
 
                 (*next)(s.offs(c_len), st).len(c_len)
@@ -1176,7 +1176,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
         })
 
     } else if p.is_vec() {
-        if p.len() == 0 {
+        if p.is_empty() {
             Box::new(move |_s: RxBuf, _st: &mut SelectorState| { PatResult::matched() })
         } else {
             panic!("UNKNOWN ATOM: {}", p.s());
@@ -1196,7 +1196,7 @@ fn compile_pattern_branch(pat: &VVal, next: PatternNode) -> PatternNode {
         let p = pat.at(pat.len() - (i + 1)).expect("pattern item");
         //d// println!("PAT COMP: {}", p.s());
 
-        let my_next = std::mem::replace(&mut next, None);
+        let my_next = next.take();
         next = Some(compile_atom(&p, my_next.unwrap()));
     }
 
@@ -1492,7 +1492,7 @@ fn compile_selector(sel: &VVal, no_capture: bool) -> SelNode {
 
             for i in 1..sel.len() {
                 let nod = sel.at(sel.len() - i).expect("proper path");
-                let n = std::mem::replace(&mut next, None).unwrap();
+                let n = next.take().unwrap();
                 next = Some(compile_node(&nod, n));
             }
 
@@ -1588,7 +1588,7 @@ pub fn create_selector_function(sel: &str, result_ref: VVal)
                 let capts = VVal::vec();
                 (*comp_sel)(v, &mut state, &capts);
 
-                if capts.len() > 0 {
+                if !capts.is_empty() {
                     result_ref.set_ref(capts.clone());
                     Ok(capts)
                 } else {
@@ -1669,7 +1669,7 @@ mod tests {
     use regex_syntax::ast::Ast;
 //    use regex_syntax::ast::Literal;
     use regex_syntax::ast::LiteralKind;
-//    use regex_syntax::ast::SpecialLiteralKind;
+    use regex_syntax::ast::SpecialLiteralKind;
     use regex_syntax::ast::RepetitionKind;
 
     pub fn re_ast2wlpat(a: &Ast) -> String {
@@ -1683,17 +1683,17 @@ mod tests {
                     LiteralKind::Verbatim                    => l.c.to_string(),
                     LiteralKind::Punctuation                 => l.c.to_string(),
                     LiteralKind::Octal                       => l.c.to_string(),
-                    LiteralKind::HexFixed(HexLiteralKind)    => l.c.to_string(),
-                    LiteralKind::HexBrace(HexLiteralKind)    => l.c.to_string(),
+                    LiteralKind::HexFixed(_)                 => l.c.to_string(),
+                    LiteralKind::HexBrace(_)                 => l.c.to_string(),
                     LiteralKind::Special(slk) => {
                         match &slk {
-                            Bell                => "\\b".to_string(),
-                            FormFeed            => "\\f".to_string(),
-                            Tab                 => "\\t".to_string(),
-                            LineFeed            => "\\n".to_string(),
-                            CarriageReturn      => "\\r".to_string(),
-                            VerticalTab         => "\\v".to_string(),
-                            Space               => "[ ]".to_string(),
+                            SpecialLiteralKind::Bell           => "\\b".to_string(),
+                            SpecialLiteralKind::FormFeed       => "\\f".to_string(),
+                            SpecialLiteralKind::Tab            => "\\t".to_string(),
+                            SpecialLiteralKind::LineFeed       => "\\n".to_string(),
+                            SpecialLiteralKind::CarriageReturn => "\\r".to_string(),
+                            SpecialLiteralKind::VerticalTab    => "\\v".to_string(),
+                            SpecialLiteralKind::Space          => "[ ]".to_string(),
                         }
                     },
                 }
@@ -1738,9 +1738,10 @@ mod tests {
                 panic!("alt: {:?}", alt);
             },
             Ast::Concat(cat) => {
-                let mut ret : String =
-                    cat.asts.iter().map(|a| re_ast2wlpat(a)).collect::<Vec<String>>().join("");
-                ret
+                cat.asts.iter()
+                    .map(|a| re_ast2wlpat(a))
+                    .collect::<Vec<String>>()
+                    .join("")
             },
         }
     }

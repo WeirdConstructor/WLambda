@@ -7,10 +7,15 @@ const RPC_MSG_SEND : i64 = 2;
 
 #[derive(Clone)]
 pub struct RPCHandle {
-    free_queue: AValChannel,
-    error_channel: AValChannel,
+    free_queue:     AValChannel,
+    error_channel:  AValChannel,
     request_queue:  AValChannel,
 }
+
+impl Default for RPCHandle {
+    fn default() -> Self { Self::new() }
+}
+
 
 impl RPCHandle {
     pub fn new() -> Self {
@@ -130,12 +135,12 @@ pub fn rpc_handler(
         }, Some(0), Some(0), false));
 
     loop {
-        match rpc_handler_step(ctx, handle, interval_timeout) {
-            Err(RPCHandlerError::Disconnected) => {
-                break;
-            },
-            _ => (),
+        if let Err(RPCHandlerError::Disconnected) =
+            rpc_handler_step(ctx, handle, interval_timeout)
+        {
+            break;
         }
+
         if *quit.borrow() { break; }
     }
 }

@@ -175,9 +175,9 @@ pub fn rgb2hsv(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
     let delta = c_max - c_min;
     let mut hue =
         if delta < 0.000_001 { 0.0 }
-        else if r == c_max  { 60.0 * (((g - b) / delta) % 6.0) }
-        else if g == c_max  { 60.0 * (((b - r) / delta) + 2.0) }
-        else                { 60.0 * (((r - g) / delta) + 4.0) };
+        else if (r - c_max).abs() < 0.000_001  { 60.0 * (((g - b) / delta) % 6.0) }
+        else if (g - c_max).abs() < 0.000_001  { 60.0 * (((b - r) / delta) + 2.0) }
+        else                                   { 60.0 * (((r - g) / delta) + 4.0) };
     if hue < 0.0   { hue += 360.0 }
     if hue > 360.0 { hue -= 360.0 }
     let sat = if c_max < 0.000_001 { 0.0 } else { delta / c_max };

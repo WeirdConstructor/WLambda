@@ -14,13 +14,14 @@ pub enum NVec<N: NVecNum> {
 }
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum NVecDim {
-    Two = 2,
+    Two   = 2,
     Three = 3,
-    Four = 4,
+    Four  = 4,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl NVecDim {
-    pub fn len(&self) -> usize {
+    pub fn len(self) -> usize {
         match self {
             NVecDim::Two   => 2,
             NVecDim::Three => 3,
