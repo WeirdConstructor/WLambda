@@ -305,7 +305,7 @@ account1.deposit 50;
 std:assert_eq account1.balance 150;
 ```
 
-## Modules
+## WLambda Modules
 
 ```txt
 # util.wl:

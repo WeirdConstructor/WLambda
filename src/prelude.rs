@@ -246,53 +246,60 @@ Smalltalk, LISP and Perl.
     - [8.3.3](#833--op-a-op-b) - &| _op-a_ _op-b_
     - [8.3.4](#834--op-a-op-b) - << _op-a_ _op-b_
     - [8.3.5](#835--op-a-op-b) - >> _op-a_ _op-b_
-- [9](#9-modules) - Modules
-  - [9.1](#91-export) - export
-  - [9.2](#92-import) - import
-- [10](#10-core-library) - Core Library
-    - [10.0.1](#1001-type-value) - type _value_
-    - [10.0.2](#1002-len-value) - len _value_
-    - [10.0.3](#1003-panic-message) - panic _message_
-- [11](#11-standard-library) - Standard Library
-    - [11.0.1](#1101-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
-    - [11.0.2](#1102-stddelete-vector-or-map-index-or-key) - std:delete _vector-or-map_ _index-or-key_
-    - [11.0.3](#1103-stdcopy-vecormap) - std:copy _vec_or_map_
-    - [11.0.4](#1104-stdsort-comparefun-vec) - std:sort [_compare_fun_] _vec_
-    - [11.0.5](#1105-stdcmpnumasc-a-b) - std:cmp:num:asc _a_ _b_
-    - [11.0.6](#1106-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
-    - [11.0.7](#1107-stddisplayln-arg1-) - std:displayln _arg1_ ...
-    - [11.0.8](#1108-stdwriteln-arg1-) - std:writeln _arg1_ ...
-    - [11.0.9](#1109-stdeval-code-string) - std:eval _code-string_
-    - [11.0.10](#11010-stdassert-bool-message) - std:assert _bool_ \[_message_]
-    - [11.0.11](#11011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
-  - [11.1](#111-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
-    - [11.1.1](#1111-stdwlambdaversion) - std:wlambda:version
-  - [11.2](#112-io) - I/O
-    - [11.2.1](#1121-stdiofilereadtext-filename) - std:io:file:read_text _filename_
-    - [11.2.2](#1122-stdiofileread-filename) - std:io:file:read _filename_
-    - [11.2.3](#1123-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
-    - [11.2.4](#1124-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
-- [12](#12-optional-standard-library) - Optional Standard Library
-  - [12.1](#121-serialization) - serialization
-    - [12.1.1](#1211-stdserwlambda-arg) - std:ser:wlambda _arg_
-    - [12.1.2](#1212-stdserjson-data-nopretty) - std:ser:json _data_ \[_no_pretty_]
-    - [12.1.3](#1213-stddeserjson-string) - std:deser:json _string_
-    - [12.1.4](#1214-stdsercsv-fielddelim-rowseparator-escapeall-table) - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
-    - [12.1.5](#1215-stddesercsv-fielddelim-rowseparator-data) - std:deser:csv _field_delim_ _row_separator_ _data_
-    - [12.1.6](#1216-stdsermsgpack-data) - std:ser:msgpack _data_
-    - [12.1.7](#1217-stddesermsgpack-bytes) - std:deser:msgpack _bytes_
-  - [12.2](#122-regex) - regex
-  - [12.3](#123-chrono) - chrono
-    - [12.3.1](#1231-stdchronotimestamp-format) - std:chrono:timestamp \[_format_]
-  - [12.4](#124-hash) - hash
-    - [12.4.1](#1241-stdhashfnv1a-arg1-) - std:hash:fnv1a _arg1_ ...
-  - [12.5](#125-rand) - rand
-    - [12.5.1](#1251-stdrandsplitmix64new) - std:rand:split_mix64_new
-    - [12.5.2](#1252-stdrandsplitmix64newfrom-seed) - std:rand:split_mix64_new_from _seed_
-    - [12.5.3](#1253-stdrandsplitmix64next-smstate-count) - std:rand:split_mix64_next _sm_state_ \[_count_]
-    - [12.5.4](#1254-stdrandsplitmix64nextopen01-smstate-count) - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
-  - [12.6](#126-utility-functions) - Utility Functions
-    - [12.6.1](#1261-stddumpupvals-function) - std:dump_upvals _function_
+- [9](#9-data-structure-selectors-and-string-patternsregex) - Data Structure Selectors and String Patterns/Regex
+  - [9.1](#91-data-structure-selectors) - Data Structure Selectors
+  - [9.2](#92-string-patterns-regex) - String Patterns (Regex)
+    - [9.2.1](#921-pattern-syntax-overview) - Pattern Syntax Overview
+    - [9.2.2](#922-standard-regular-expressions) - Standard Regular Expressions
+    - [9.2.3](#923-stdpattern-string) - std:pattern _string_
+- [10](#10-modules) - Modules
+  - [10.1](#101-export) - export
+  - [10.2](#102-import) - import
+- [11](#11-core-library) - Core Library
+    - [11.0.1](#1101-type-value) - type _value_
+    - [11.0.2](#1102-len-value) - len _value_
+    - [11.0.3](#1103-panic-message) - panic _message_
+- [12](#12-standard-library) - Standard Library
+    - [12.0.1](#1201-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
+    - [12.0.2](#1202-stddelete-vector-or-map-index-or-key) - std:delete _vector-or-map_ _index-or-key_
+    - [12.0.3](#1203-stdcopy-vecormap) - std:copy _vec_or_map_
+    - [12.0.4](#1204-stdsort-comparefun-vec) - std:sort [_compare_fun_] _vec_
+    - [12.0.5](#1205-stdcmpnumasc-a-b) - std:cmp:num:asc _a_ _b_
+    - [12.0.6](#1206-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
+    - [12.0.7](#1207-stddisplayln-arg1-) - std:displayln _arg1_ ...
+    - [12.0.8](#1208-stdwriteln-arg1-) - std:writeln _arg1_ ...
+    - [12.0.9](#1209-stdeval-code-string) - std:eval _code-string_
+    - [12.0.10](#12010-stdassert-bool-message) - std:assert _bool_ \[_message_]
+    - [12.0.11](#12011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
+  - [12.1](#121-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+    - [12.1.1](#1211-stdwlambdaversion) - std:wlambda:version
+  - [12.2](#122-io) - I/O
+    - [12.2.1](#1221-stdiofilereadtext-filename) - std:io:file:read_text _filename_
+    - [12.2.2](#1222-stdiofileread-filename) - std:io:file:read _filename_
+    - [12.2.3](#1223-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
+    - [12.2.4](#1224-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
+  - [12.3](#123-threading) - Threading
+- [13](#13-optional-standard-library) - Optional Standard Library
+  - [13.1](#131-serialization) - serialization
+    - [13.1.1](#1311-stdserwlambda-arg) - std:ser:wlambda _arg_
+    - [13.1.2](#1312-stdserjson-data-nopretty) - std:ser:json _data_ \[_no_pretty_]
+    - [13.1.3](#1313-stddeserjson-string) - std:deser:json _string_
+    - [13.1.4](#1314-stdsercsv-fielddelim-rowseparator-escapeall-table) - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
+    - [13.1.5](#1315-stddesercsv-fielddelim-rowseparator-data) - std:deser:csv _field_delim_ _row_separator_ _data_
+    - [13.1.6](#1316-stdsermsgpack-data) - std:ser:msgpack _data_
+    - [13.1.7](#1317-stddesermsgpack-bytes) - std:deser:msgpack _bytes_
+  - [13.2](#132-regex) - regex
+  - [13.3](#133-chrono) - chrono
+    - [13.3.1](#1331-stdchronotimestamp-format) - std:chrono:timestamp \[_format_]
+  - [13.4](#134-hash) - hash
+    - [13.4.1](#1341-stdhashfnv1a-arg1-) - std:hash:fnv1a _arg1_ ...
+  - [13.5](#135-rand) - rand
+    - [13.5.1](#1351-stdrandsplitmix64new) - std:rand:split_mix64_new
+    - [13.5.2](#1352-stdrandsplitmix64newfrom-seed) - std:rand:split_mix64_new_from _seed_
+    - [13.5.3](#1353-stdrandsplitmix64next-smstate-count) - std:rand:split_mix64_next _sm_state_ \[_count_]
+    - [13.5.4](#1354-stdrandsplitmix64nextopen01-smstate-count) - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
+  - [13.6](#136-utility-functions) - Utility Functions
+    - [13.6.1](#1361-stddumpupvals-function) - std:dump_upvals _function_
 
 -----
 
@@ -4344,7 +4351,7 @@ std:assert (0b1100 >> 2)      == 0b11;
 std:assert (`>>` 0b1011000 3) == 0b1011
 ```
 
-## - Data Structure Selectors and String Patterns/Regex
+## <a name="9-data-structure-selectors-and-string-patternsregex"></a>9 - Data Structure Selectors and String Patterns/Regex
 
 WLambda comes with a builtin DSL (domain specific language) for
 deep data structure selection and regular expression (regex) pattern
@@ -4364,13 +4371,13 @@ For an in depth description of the _selector_ and _pattern_ syntax
 please refer to the [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
 in the wlambda::selector module.
 
-### - Data Structure Selectors
+### <a name="91-data-structure-selectors"></a>9.1 - Data Structure Selectors
 
 This section shows how data structure selectors can be used.
 
 TODO
 
-### - String Patterns (Regex)
+### <a name="92-string-patterns-regex"></a>9.2 - String Patterns (Regex)
 
 This section shows how to use the builtin pattern regex engine
 in WLambda. You can embed patterns directly in your WLambda source
@@ -4411,7 +4418,7 @@ To match special the characters `$` you can use the backslash escaping `\$`:
 std:assert_eq ($r/$+ \$/ "FF$$$FF").0   "$$$";
 ```
 
-#### - Pattern Syntax Overview
+#### <a name="921-pattern-syntax-overview"></a>9.2.1 - Pattern Syntax Overview
 
 While
 [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
@@ -4443,14 +4450,14 @@ here is the WLambda pattern syntax in a nutshell:
 | `$&L`         | Transforms the input string for the following pattern matching parts to lowercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
 | `$&U`         | Transforms the input string for the following pattern matching parts to uppercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
 
-#### - Standard Regular Expressions
+#### <a name="922-standard-regular-expressions"></a>9.2.2 - Standard Regular Expressions
 
 Please note that WLambda can optionally be compiled with the `regex` crate,
 which implements a more common syntax for regular expressions.
 Please refer to the functions `std:re:match` in the WLambda standard library
 for this.
 
-#### - std:pattern _string_
+#### <a name="923-stdpattern-string"></a>9.2.3 - std:pattern _string_
 
 Compiles the regex pattern _string_ to a function just like `$r/.../` would do.
 Useful for composing WLambda patterns at runtime:
@@ -4469,9 +4476,9 @@ Returns an error if the syntax failes to parse as pattern:
 std:assert_eq $i(0, 11)[err] "bad pattern";
 ```
 
-## <a name="9-modules"></a>9 - Modules
+## <a name="10-modules"></a>10 - Modules
 
-### <a name="91-export"></a>9.1 - export
+### <a name="101-export"></a>10.1 - export
 
 ```wlambda
 
@@ -4500,7 +4507,7 @@ Alternatively make the helper a strong reference:
 !@export doit = { helper 10 };
 ```
 
-### <a name="92-import"></a>9.2 - import
+### <a name="102-import"></a>10.2 - import
 
 ```wlambda
 
@@ -4523,13 +4530,13 @@ std:push v 20;
 std:assert_eq (str v) "$[10,20]";
 ```
 
-## <a name="10-core-library"></a>10 - Core Library
+## <a name="11-core-library"></a>11 - Core Library
 
 This library contains all the core functions which belong to the
 core of the WLambda Programming Language. These functions can be seen
 as keywords of WLambda. Some functions are also available as operators.
 
-#### <a name="1001-type-value"></a>10.0.1 - type _value_
+#### <a name="1101-type-value"></a>11.0.1 - type _value_
 
 Returns the name of the data type of _value_ as string.
 
@@ -4553,7 +4560,7 @@ std:assert_eq (type $&10)       "weakable";
 std:assert_eq (type ~ std:weaken x) "weak";
 ```
 
-#### <a name="1002-len-value"></a>10.0.2 - len _value_
+#### <a name="1102-len-value"></a>11.0.2 - len _value_
 
 Returns the length of _value_. Depending on the data type you will get
 different semantics.
@@ -4573,14 +4580,14 @@ std:assert_eq (len ${a=1, b=2})     2;
 std:assert_eq (len ${a=1, b=2})     2;
 ```
 
-#### <a name="1003-panic-message"></a>10.0.3 - panic _message_
+#### <a name="1103-panic-message"></a>11.0.3 - panic _message_
 
 If your program runs into something that deserves a slap on the fingers
 of the developer you can use `panic` to do that.
 
-## <a name="11-standard-library"></a>11 - Standard Library
+## <a name="12-standard-library"></a>12 - Standard Library
 
-#### <a name="1101-stdshuffle-randfunc-vec"></a>11.0.1 - std:shuffle _rand_func_ _vec_
+#### <a name="1201-stdshuffle-randfunc-vec"></a>12.0.1 - std:shuffle _rand_func_ _vec_
 
 Shuffles the _vec_ in place. The function _rand_func_ needs to return
 a random 64 bit integer on each call. Here is an example:
@@ -4593,7 +4600,7 @@ std:shuffle { std:rand:split_mix64_next sm } vec;
 std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
 ```
 
-#### <a name="1102-stddelete-vector-or-map-index-or-key"></a>11.0.2 - std:delete _vector-or-map_ _index-or-key_
+#### <a name="1202-stddelete-vector-or-map-index-or-key"></a>12.0.2 - std:delete _vector-or-map_ _index-or-key_
 
 This removes the designated element from the collection (either vector or map).
 This works for:
@@ -4615,7 +4622,7 @@ std:assert_eq (str m) (str ${b = 20});
 
 Please note that this operation is potentially O(n) on vectors.
 
-#### <a name="1103-stdcopy-vecormap"></a>11.0.3 - std:copy _vec_or_map_
+#### <a name="1203-stdcopy-vecormap"></a>12.0.3 - std:copy _vec_or_map_
 
 Makes a shallow copy of the given vector or map.
 
@@ -4628,7 +4635,7 @@ std:assert_eq a.0 1;
 std:assert_eq b.0 10;
 ```
 
-#### <a name="1104-stdsort-comparefun-vec"></a>11.0.4 - std:sort [_compare_fun_] _vec_
+#### <a name="1204-stdsort-comparefun-vec"></a>12.0.4 - std:sort [_compare_fun_] _vec_
 
 Sorts the given _vec_ in place. The comparison function _compare_fun_ gets the
 two values a and b and needs to return -1 if a < b, 0 if a = b and 1 if a > b.
@@ -4653,7 +4660,7 @@ std:assert_eq v.1.0 1;
 std:assert_eq v.2.0 -1;
 ```
 
-#### <a name="1105-stdcmpnumasc-a-b"></a>11.0.5 - std:cmp:num:asc _a_ _b_
+#### <a name="1205-stdcmpnumasc-a-b"></a>12.0.5 - std:cmp:num:asc _a_ _b_
 
 Compares _a_ and _b_ numerically and returns:
 
@@ -4669,7 +4676,7 @@ std:assert_eq (std:cmp:num:asc "20" "20")    0;
 std:assert_eq (std:cmp:num:asc 20 21)        1;
 ```
 
-#### <a name="1106-stdcmpnumdesc-a-b"></a>11.0.6 - std:cmp:num:desc _a_ _b_
+#### <a name="1206-stdcmpnumdesc-a-b"></a>12.0.6 - std:cmp:num:desc _a_ _b_
 
 Compares _a_ and _b_ numerically descending and returns:
 
@@ -4685,7 +4692,7 @@ std:assert_eq (std:cmp:num:desc "20" "20")    0;
 std:assert_eq (std:cmp:num:desc 20 21)       -1;
 ```
 
-#### <a name="1107-stddisplayln-arg1-"></a>11.0.7 - std:displayln _arg1_ ...
+#### <a name="1207-stddisplayln-arg1-"></a>12.0.7 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -4699,7 +4706,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
-#### <a name="1108-stdwriteln-arg1-"></a>11.0.8 - std:writeln _arg1_ ...
+#### <a name="1208-stdwriteln-arg1-"></a>12.0.8 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
@@ -4714,7 +4721,7 @@ See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="1109-stdeval-code-string"></a>11.0.9 - std:eval _code-string_
+#### <a name="1209-stdeval-code-string"></a>12.0.9 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -4726,7 +4733,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="11010-stdassert-bool-message"></a>11.0.10 - std:assert _bool_ \[_message_]
+#### <a name="12010-stdassert-bool-message"></a>12.0.10 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -4737,7 +4744,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="11011-stdasserteq-actual-expected-message"></a>11.0.11 - std:assert_eq _actual_ _expected_ \[_message_]
+#### <a name="12011-stdasserteq-actual-expected-message"></a>12.0.11 - std:assert_eq _actual_ _expected_ \[_message_]
 
 This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -4748,7 +4755,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-### <a name="111-stdassertreleq-l-r-epsilon-message"></a>11.1 - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+### <a name="121-stdassertreleq-l-r-epsilon-message"></a>12.1 - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -4764,13 +4771,13 @@ std:assert_rel_eq x y 1;
 # std:assert_eq x y 0.5;
 ```
 
-#### <a name="1111-stdwlambdaversion"></a>11.1.1 - std:wlambda:version
+#### <a name="1211-stdwlambdaversion"></a>12.1.1 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
-### <a name="112-io"></a>11.2 - I/O
+### <a name="122-io"></a>12.2 - I/O
 
-#### <a name="1121-stdiofilereadtext-filename"></a>11.2.1 - std:io:file:read_text _filename_
+#### <a name="1221-stdiofilereadtext-filename"></a>12.2.1 - std:io:file:read_text _filename_
 
 Opens the file _filename_ and returns its contents interpreted as UTF8
 text as string.
@@ -4782,7 +4789,7 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading text from file works";
 ```
 
-#### <a name="1122-stdiofileread-filename"></a>11.2.2 - std:io:file:read _filename_
+#### <a name="1222-stdiofileread-filename"></a>12.2.2 - std:io:file:read _filename_
 
 Opens the file _filename_ and returns its contents as byte buffer.
 
@@ -4794,18 +4801,18 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading binary from file works";
 ```
 
-#### <a name="1123-stdiofilewritesafe-filename-bytes-or-string"></a>11.2.3 - std:io:file:write_safe _filename_ _bytes-or-string_
+#### <a name="1223-stdiofilewritesafe-filename-bytes-or-string"></a>12.2.3 - std:io:file:write_safe _filename_ _bytes-or-string_
 
 Creates a new file with the given filename but with a "~" appended
 and writes the contents into it. After successful write, it renames
 the file to the given filename.
 
-#### <a name="1124-stdiofileappend-filename-bytes-or-string"></a>11.2.4 - std:io:file:append _filename_ _bytes-or-string_
+#### <a name="1224-stdiofileappend-filename-bytes-or-string"></a>12.2.4 - std:io:file:append _filename_ _bytes-or-string_
 
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
-### - Threading
+### <a name="123-threading"></a>12.3 - Threading
 
 WLambda leverages the `std::thread` implementation of Rust's standard library
 to provide safe threading. Threading works by spawning new threads that
@@ -4821,11 +4828,11 @@ into a thread safe shareable represenation called _AVal_. An AVal is a
 deep copy of the original VVal and can additionally contain atoms (see `std:sync:atom:new`),
 MPSC queues (see `std:sync:mpsc:new`) and value slots (see `std:sync:slot:new`).
 
-## <a name="12-optional-standard-library"></a>12 - Optional Standard Library
+## <a name="13-optional-standard-library"></a>13 - Optional Standard Library
 
-### <a name="121-serialization"></a>12.1 - serialization
+### <a name="131-serialization"></a>13.1 - serialization
 
-#### <a name="1211-stdserwlambda-arg"></a>12.1.1 - std:ser:wlambda _arg_
+#### <a name="1311-stdserwlambda-arg"></a>13.1.1 - std:ser:wlambda _arg_
 
 Returns the serialized WLambda representation of the value _arg_ as string.
 
@@ -4841,7 +4848,7 @@ std:assert_eq (std:ser:wlambda $none) $q|$n|;
 std:assert_eq (std:ser:wlambda $[1,:a]) $q|$[1,:a]|;
 ```
 
-#### <a name="1212-stdserjson-data-nopretty"></a>12.1.2 - std:ser:json _data_ \[_no_pretty_]
+#### <a name="1312-stdserjson-data-nopretty"></a>13.1.2 - std:ser:json _data_ \[_no_pretty_]
 
 Serializes the _data_ and returns a JSON formatted (and pretty printed) string.
 Optionally not pretty printed if _no_pretty_ is a true value.
@@ -4851,7 +4858,7 @@ Optionally not pretty printed if _no_pretty_ is a true value.
 std:assert_eq str "[1,2.3,{\"a\":4}]";
 ```
 
-#### <a name="1213-stddeserjson-string"></a>12.1.3 - std:deser:json _string_
+#### <a name="1313-stddeserjson-string"></a>13.1.3 - std:deser:json _string_
 
 Deserializes the JSON formatted _string_ into a data structure.
 
@@ -4862,7 +4869,7 @@ std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
 ```
 
-#### <a name="1214-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.4 - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
+#### <a name="1314-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>13.1.4 - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
 
 This serializes the _table_ as CSV with the given _field_delim_
 and _row_separator_. If _escape_all_ is `$true` all fields will be
@@ -4884,7 +4891,7 @@ std:assert_eq
     "a;\";\";\"|\";\" \"|";
 ```
 
-#### <a name="1215-stddesercsv-fielddelim-rowseparator-data"></a>12.1.5 - std:deser:csv _field_delim_ _row_separator_ _data_
+#### <a name="1315-stddesercsv-fielddelim-rowseparator-data"></a>13.1.5 - std:deser:csv _field_delim_ _row_separator_ _data_
 
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
@@ -4896,7 +4903,7 @@ std:assert_eq table.0.1 "bar";
 std:assert_eq table.1.1 "y";
 ```
 
-#### <a name="1216-stdsermsgpack-data"></a>12.1.6 - std:ser:msgpack _data_
+#### <a name="1316-stdsermsgpack-data"></a>13.1.6 - std:ser:msgpack _data_
 
 Serializes the _data_ and returns a msgpack bytes value.
 
@@ -4904,7 +4911,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
-#### <a name="1217-stddesermsgpack-bytes"></a>12.1.7 - std:deser:msgpack _bytes_
+#### <a name="1317-stddesermsgpack-bytes"></a>13.1.7 - std:deser:msgpack _bytes_
 
 Deserializes the msgpack bytes value into a data structure.
 
@@ -4912,12 +4919,12 @@ Deserializes the msgpack bytes value into a data structure.
 std:assert_eq (std:deser:msgpack $b"\xC4\x03abc") $b"abc";
 ```
 
-### <a name="122-regex"></a>12.2 - regex
+### <a name="132-regex"></a>13.2 - regex
 
 
-### <a name="123-chrono"></a>12.3 - chrono
+### <a name="133-chrono"></a>13.3 - chrono
 
-#### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]
+#### <a name="1331-stdchronotimestamp-format"></a>13.3.1 - std:chrono:timestamp \[_format_]
 
 For the documentation of _format_ please consule the
 chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
@@ -4930,15 +4937,15 @@ std:assert ~ (year_str | int) == 2020;
 !now_str = std:chrono:timestamp[];
 ```
 
-### <a name="124-hash"></a>12.4 - hash
+### <a name="134-hash"></a>13.4 - hash
 
-#### <a name="1241-stdhashfnv1a-arg1-"></a>12.4.1 - std:hash:fnv1a _arg1_ ...
+#### <a name="1341-stdhashfnv1a-arg1-"></a>13.4.1 - std:hash:fnv1a _arg1_ ...
 
 Hashes all the arguments as FNV1a and returns an integer.
 
-### <a name="125-rand"></a>12.5 - rand
+### <a name="135-rand"></a>13.5 - rand
 
-#### <a name="1251-stdrandsplitmix64new"></a>12.5.1 - std:rand:split_mix64_new
+#### <a name="1351-stdrandsplitmix64new"></a>13.5.1 - std:rand:split_mix64_new
 
 Initializes the _sm_state_ from the current time (seconds) and returns it.
 The time is retrieved in seconds, so don't expect different seed states
@@ -4946,25 +4953,25 @@ if you call this multiple times in the same wall clock second.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1252-stdrandsplitmix64newfrom-seed"></a>12.5.2 - std:rand:split_mix64_new_from _seed_
+#### <a name="1352-stdrandsplitmix64newfrom-seed"></a>13.5.2 - std:rand:split_mix64_new_from _seed_
 
 Initializes the _sm_state_ from the given _seed_ and returns it.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1253-stdrandsplitmix64next-smstate-count"></a>12.5.3 - std:rand:split_mix64_next _sm_state_ \[_count_]
+#### <a name="1353-stdrandsplitmix64next-smstate-count"></a>13.5.3 - std:rand:split_mix64_next _sm_state_ \[_count_]
 
 Returns the _count_ next integer values generated from the given
 _sm_state_.
 
-#### <a name="1254-stdrandsplitmix64nextopen01-smstate-count"></a>12.5.4 - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
+#### <a name="1354-stdrandsplitmix64nextopen01-smstate-count"></a>13.5.4 - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
 
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
 
-### <a name="126-utility-functions"></a>12.6 - Utility Functions
+### <a name="136-utility-functions"></a>13.6 - Utility Functions
 
-#### <a name="1261-stddumpupvals-function"></a>12.6.1 - std:dump_upvals _function_
+#### <a name="1361-stddumpupvals-function"></a>13.6.1 - std:dump_upvals _function_
 
 Returns a vector of all the upvalues of the _function_.
 Please use this function for debugging purposes only, as the order of the
