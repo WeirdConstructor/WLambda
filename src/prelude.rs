@@ -6781,7 +6781,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let rx = rx.unwrap();
 
             Ok(VValFun::new_fun(
-                move |env: &mut Env, argc: usize| {
+                move |env: &mut Env, _argc: usize| {
                     let text = env.arg(0);
                     let f    = env.arg(1);
 
@@ -7110,7 +7110,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "sort",
         |env: &mut Env, argc: usize| {
             if argc == 1 {
-                let mut list = env.arg(0);
+                let list = env.arg(0);
                 list.sort(|a: &VVal, b: &VVal| {
                     if a.is_int() || a.is_float() {
                         a.compare_num(b)
@@ -7121,7 +7121,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(list)
             } else {
                 let fun = env.arg(0);
-                let mut list = env.arg(1);
+                let list = env.arg(1);
                 let mut ret = Ok(VVal::None);
                 list.sort(|a: &VVal, b: &VVal| {
                     env.push(b.clone());

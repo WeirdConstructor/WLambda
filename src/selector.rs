@@ -118,7 +118,7 @@ Selector and WLambda-Regex Syntax:
 use crate::vval::{VVal, Env, VValFun};
 
 use crate::parser::state::State;
-use crate::parser::state::{ParseValueError, ParseNumberError, ParseError, ParseErrorKind};
+use crate::parser::state::{ParseError, ParseErrorKind};
 use crate::parser::{parse_str_backslash, EscSeqValue};
 
 use std::rc::Rc;
@@ -461,7 +461,7 @@ fn parse_node_match(ps: &mut State) -> Result<VVal, ParseError> {
         match ps.expect_some(ps.peek())? {
             '(' => {
                 ps.consume_ws();
-                let mut ret =
+                let ret =
                     VVal::vec2(
                         VVal::new_sym("LA"),
                         parse_selector_pattern(ps)?);
@@ -648,10 +648,6 @@ impl SelectorState {
         self.captures.pop();
     }
 
-    fn is_str_start(&self, s: &str) -> bool {
-        self.orig_string_len == s.len()
-    }
-
     fn set_str(&mut self, s: &str) -> usize {
         std::mem::replace(&mut self.orig_string_len, s.len())
     }
@@ -699,22 +695,6 @@ impl<'a> RxBuf<'a> {
             orig_len: self.orig_len,
         }
     }
-
-    fn limit_len(&self, len: usize) -> Self {
-        Self {
-            s:        &self.s[..len],
-            offs:     self.offs,
-            orig_len: self.orig_len,
-        }
-    }
-
-    fn sub(&self, offs: usize, len: usize) -> Self {
-        Self {
-            s:        &self.s[offs..(len + offs)],
-            offs:     self.offs + offs,
-            orig_len: self.orig_len,
-        }
-    }
 }
 
 /// Stores the position of a captured part of the input string of a pattern.
@@ -726,13 +706,13 @@ pub struct CaptureNode {
 }
 
 impl CaptureNode {
-    fn add_capture_to(&self, idx: usize, res: &mut PatResult) {
-        if let Some(n) = &self.next {
-            n.add_capture_to(idx, res);
-        }
-
-        res.add_capture((idx, (self.idx, self.len)));
-    }
+    // fn add_capture_to(&self, idx: usize, res: &mut PatResult) {
+    //     if let Some(n) = &self.next {
+    //         n.add_capture_to(idx, res);
+    //     }
+    //
+    //     res.add_capture((idx, (self.idx, self.len)));
+    // }
 
     fn to_string(&self, input: &str) -> String {
         input[self.idx..(self.idx + self.len)].to_string()
@@ -786,21 +766,16 @@ impl PatResult {
 
     pub fn b(&self) -> bool { self.matched }
 
-    fn add_len(&mut self, l: usize) -> &mut Self {
-        self.match_len += l;
-        self
-    }
-
-    fn merge_captures(mut self, res: &PatResult) -> Self {
-        if let Some(c) = &res.captures {
-            for (idx, cap) in c.iter().enumerate() {
-                if let Some(cap) = cap {
-                    cap.add_capture_to(idx, &mut self);
-                }
-            }
-        }
-        self
-    }
+    // fn merge_captures(mut self, res: &PatResult) -> Self {
+    //     if let Some(c) = &res.captures {
+    //         for (idx, cap) in c.iter().enumerate() {
+    //             if let Some(cap) = cap {
+    //                 cap.add_capture_to(idx, &mut self);
+    //             }
+    //         }
+    //     }
+    //     self
+    // }
 
     fn add_capture(&mut self, cap: (usize, (usize, usize))) {
         if self.captures.is_none() {
@@ -876,22 +851,6 @@ impl PatResult {
 pub type PatternNode = Box<dyn Fn(RxBuf, &mut SelectorState) -> PatResult>;
 /// A function type for the evaluation node of a data structure selector.
 pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal) -> bool>;
-
-//macro_rules! while_lengthen_str {
-//    ($s: ident, $try_len: ident, $b: block) => {
-//        let mut $try_len = 0;
-//
-//        while $try_len <= $s.s.len() {
-//            println!("WLS-TRY {} [{}]", $try_len, &$s.limit_len($try_len).s);
-//            $b;
-//
-//            $try_len += 1;
-//            while $try_len <= $s.s.len() && !$s.s.is_char_boundary($try_len) {
-//                $try_len += 1;
-//            }
-//        }
-//    }
-//}
 
 macro_rules! while_shorten_str {
     ($s: ident, $try_len: ident, $b: block) => {
@@ -996,9 +955,9 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             })
 
         } else if pair_type == s2sym("ZwNegLA") {
-            let mut sub_pat =
+            let sub_pat =
                 compile_atom(&pair_val,
-                    Box::new(move |s: RxBuf, st: &mut SelectorState|
+                    Box::new(move |_s: RxBuf, _st: &mut SelectorState|
                         PatResult::matched()));
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
@@ -1011,9 +970,9 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             })
 
         } else if pair_type == s2sym("ZwLA") {
-            let mut sub_pat =
+            let sub_pat =
                 compile_atom(&pair_val,
-                    Box::new(move |s: RxBuf, st: &mut SelectorState|
+                    Box::new(move |_s: RxBuf, _st: &mut SelectorState|
                         PatResult::matched()));
 
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
@@ -1068,8 +1027,8 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
             let sub_match_offs   = Rc::new(RefCell::new(None));
             let sub_match_offs_n = sub_match_offs.clone();
-            let sub_pat_str      = pair_val.s();
-            let sub_pat_str2     = sub_pat_str.clone();
+            //d// let sub_pat_str      = pair_val.s();
+            //d// let sub_pat_str2     = sub_pat_str.clone();
 
             let sub_pat =
                 compile_atom(&pair_val,
@@ -1091,7 +1050,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
             Box::new(move |s: RxBuf, st: &mut SelectorState| {
                 let mut res =
                     if n0 {
-                        let mut res = (*next_n0)(s, st);
+                        let res = (*next_n0)(s, st);
                         if !greedy && res.b() {
                             return res;
                         }
@@ -1219,7 +1178,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     } else if p.is_vec() {
         if p.len() == 0 {
-            Box::new(move |s: RxBuf, st: &mut SelectorState| { PatResult::matched() })
+            Box::new(move |_s: RxBuf, _st: &mut SelectorState| { PatResult::matched() })
         } else {
             panic!("UNKNOWN ATOM: {}", p.s());
         }
@@ -1334,7 +1293,7 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
         }
 
         let pat = compile_pattern(k,
-            Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            Box::new(move |_s: RxBuf, _st: &mut SelectorState| {
                 //d// println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
                 PatResult::matched()
             }));
@@ -1373,7 +1332,7 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
 fn compile_kv(kv: &VVal) -> SelNode {
     let pat =
         compile_pattern(&kv.at(1).expect("pattern in kv"),
-            Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            Box::new(move |_s: RxBuf, _st: &mut SelectorState| {
                 //d// println!("*** BRANCH LEAF PATTERN MATCH {}| {:?}", s, st.captures);
                 PatResult::matched()
             }));
@@ -1409,7 +1368,7 @@ fn compile_node_cond(n: &VVal) -> SelNode {
 
     } else if node_type == s2sym("LA") {
         let subsel = compile_selector(&n.at(1).expect("sub selector"), true);
-        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+        Box::new(move |v: &VVal, st: &mut SelectorState, _capts: &VVal| {
             let nocaps = VVal::None;
             (*subsel)(v, st, &nocaps)
         })
@@ -1433,21 +1392,21 @@ fn compile_node_cond(n: &VVal) -> SelNode {
 
     } else if node_type == s2sym("Type") {
         let pat = compile_pattern(&n.at(1).expect("node type pattern"),
-            Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            Box::new(move |_s: RxBuf, _st: &mut SelectorState| {
                 //d// println!("*** BRANCH LEAF TYPE PATTERN MATCH {}| {:?}", s, st.captures);
                 PatResult::matched()
             }));
-        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+        Box::new(move |v: &VVal, st: &mut SelectorState, _capts: &VVal| {
             match_pattern(&pat, v.type_name(), st)
         })
 
     } else if node_type == s2sym("Str") {
         let pat = compile_pattern(&n.at(1).expect("node type pattern"),
-            Box::new(move |s: RxBuf, st: &mut SelectorState| {
+            Box::new(move |_s: RxBuf, _st: &mut SelectorState| {
                 //d// println!("*** BRANCH LEAF TYPE PATTERN MATCH {}| {:?}", s, st.captures);
                 PatResult::matched()
             }));
-        Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+        Box::new(move |v: &VVal, st: &mut SelectorState, _capts: &VVal| {
             v.with_s_ref(|s| match_pattern(&pat, s, st))
         })
 
