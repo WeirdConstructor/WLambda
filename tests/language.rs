@@ -3526,11 +3526,30 @@ fn check_regex_patterns() {
     "#), "\"//\\\\/\"");
 }
 
-//#[test]
-//fn check_tree_match() {
-//    assert_eq!(ve("type $S(a/b)"), "\"function\"");
-//
-//    assert_eq!(ve("$S(a/b) ${a = ${b = 20}}"),              "20");
-//    assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\1 }"), "\"bbbbb\"");
-//    assert_eq!(ve("? ($X(a(({*}b))c) $q abbbbbc ) { $\\_ }"), "$[\"abbbbbc\",\"bbbbb\"]");
-//}
+#[test]
+fn check_tree_match() {
+    assert_eq!(ve("type $S(a/b)"), "\"function\"");
+
+    assert_eq!(ve("$S(a/b)  ${a = ${b = 20}}"),               "$[20]");
+    assert_eq!(ve("$S(a/b]) ${a = ${b = 20}}"),               "COMPILE ERROR: [1,10:<compiler:s_eval>] Compilation Error: bad selector: error[1,4:<selector>] Unexpected token \']\'. At end of selector at code \']\'");
+    assert_eq!(ve("unwrap_err ~ std:selector $q a/b] "),      "\"bad selector: error[1,4:<selector>] Unexpected token \\\']\\\'. At end of selector at code \\\']\\\', selector was: /a/b]/\"");
+    assert_eq!(ve("(std:selector $q a/b ) ${a = ${b = 20}}"), "$[20]");
+    assert_eq!(ve(r#"
+        $S(*/a/^*/^c) $[
+            ${ a = $[ ${ c = 10 }, ${ c = 20 }, ${ c = 30 } ] },
+            ${ a = $[ ${ c = 11 }, ${ c = 22 }, ${ c = 34 } ] },
+            ${ a = $[ ${ c = 12 }, ${ c = 23 }, ${ c = 35 } ] },
+            ${ a = $[ ${ c = 13 }, ${ c = 24 }, ${ c = 36 } ] },
+        ];
+        $\
+    "#), "$[$[${c=10},10],$[${c=20},20],$[${c=30},30],$[${c=11},11],$[${c=22},22],$[${c=34},34],$[${c=12},12],$[${c=23},23],$[${c=35},35],$[${c=13},13],$[${c=24},24],$[${c=36},36]]");
+    assert_eq!(ve(r#"
+        $S(*/a/^*/^d) $[
+            ${ a = $[ ${ c = 10 }, ${ c = 20 }, ${ c = 30 } ] },
+            ${ a = $[ ${ c = 11 }, ${ c = 22 }, ${ c = 34 } ] },
+            ${ a = $[ ${ c = 12 }, ${ c = 23 }, ${ c = 35 } ] },
+            ${ a = $[ ${ c = 13 }, ${ c = 24 }, ${ c = 36 } ] },
+        ];
+        $\
+    "#), "$n");
+}

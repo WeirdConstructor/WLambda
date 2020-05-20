@@ -2347,6 +2347,26 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgW
                         }
                     })
                 },
+                Syntax::Selector => {
+                    let res_ref =
+                        ce.borrow_mut().global.borrow_mut()
+                          .get_var_ref("\\")
+                          .unwrap_or_else(|| VVal::None);
+
+                    ast.at(1).unwrap().with_s_ref(|sel_src| {
+                        match selector::create_selector_function(sel_src, res_ref) {
+                            Ok(fun) => {
+                                pw_provides_result_pos!(prog, {
+                                    prog.data_pos(fun.clone())
+                                })
+                            },
+                            Err(e) => {
+                                Err(ast.compile_err(
+                                    format!("bad selector: {}", e)))
+                            }
+                        }
+                    })
+                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },

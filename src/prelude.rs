@@ -6636,6 +6636,24 @@ pub fn std_symbol_table() -> SymbolTable {
                 })
         }, Some(1), Some(1), false);
 
+    func!(st, "selector",
+        |env: &mut Env, _argc: usize| {
+            let pat_src = env.arg_ref(0).cloned().unwrap_or_else(|| VVal::None);
+            let res_ref =
+                env.global.borrow_mut()
+                   .get_var_ref("\\")
+                   .unwrap_or_else(|| VVal::None);
+            pat_src.with_s_ref(|sel_src|
+                match create_selector_function(sel_src, res_ref) {
+                    Ok(fun) => Ok(fun),
+                    Err(e) => {
+                        Ok(env.new_err(
+                            format!("bad selector: {}, selector was: /{}/",
+                                    e, sel_src)))
+                    }
+                })
+        }, Some(1), Some(1), false);
+
 //    func!(st, "tree_select",
 //        |env: &mut Env, _argc: usize| {
 //            let slct = env.arg(0);

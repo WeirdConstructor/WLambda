@@ -1,4 +1,4 @@
-0.4.5 (unreleased)
+0.5.0 (unreleased)
 ==================
 
 * Incompatible Change: VVal::Nul was renamed to VVal::None because it
@@ -16,7 +16,7 @@ to the end of the argument list now.
 * Incompatible Change: Strings and byte vectors are immutable data types now.
 * Incompatible Change: VValUserData::call takes an Env now instead of the
 argument vector directly.
-* Incompatible Change: Replaced MsgHandle by wlambda::rpc_helper::RPCHandle.
+* Incompatible Change: Replaced MsgHandle by wlambda::rpc\_helper::RPCHandle.
 * Potentially Incompatible Change: The compiler and evaluator was completely replaced
 by a VM and code generator for it.
 * Change: Function arguments are stored in right order (function, arg1, arg2, ...) on the
@@ -49,8 +49,9 @@ directly of passed to `iter`.
 * Feature: Symbols are now fully interned strings (per thread).
 * Feature: Added color functions `std:v:hex2rgba_*`.
 * Feature: Implemented built in regex pattern matching using the `$r(...)` syntax.
-* Feature: The result vector of a regex pattern or selector can be accessed conveniently
-with the variable `$\`.
+* Feature: Implemented built in data structure selector using the `$S(...)` syntax.
+* Feature: The result vector of a regex pattern or data selector can be
+accessed conveniently with the variable `$\`.
 * Documentation: More!
 
 0.4.4 (2020-03-06)

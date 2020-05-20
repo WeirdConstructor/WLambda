@@ -712,6 +712,13 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             vec.push(VVal::new_str_mv(pattern_source));
             Ok(vec)
         },
+        'S' => {
+            ps.consume();
+            let selector_source = parse_quoted(ps, String::new(), |s, c| s.push(c))?;
+            let vec = ps.syn(Syntax::Selector);
+            vec.push(VVal::new_str_mv(selector_source));
+            Ok(vec)
+        },
         '\\' => { ps.consume_wsc(); Ok(make_var(ps, "\\")) },
         'c' => {
             if ps.consume_lookahead("code") {

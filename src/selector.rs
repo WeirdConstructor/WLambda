@@ -1613,6 +1613,36 @@ fn check_pattern_start_anchor(pattern: &VVal) -> bool {
     false
 }
 
+/// Creates a function that takes a VVal data structure
+/// and runs the given selector expression on it.
+/// The returned function then returns a list of captured nodes
+/// or `$none` if nothing was found.
+pub fn create_selector_function(sel: &str, result_ref: VVal)
+    -> Result<VVal, ParseError>
+{
+    let selector = parse_selector(sel)?;
+    let comp_sel = compile_selector(&selector, false);
+
+    Ok(VValFun::new_fun(
+        move |env: &mut Env, _argc: usize| {
+            if let Some(v) = env.arg_ref(0) {
+                let mut state = SelectorState::new();
+                let capts = VVal::vec();
+                (*comp_sel)(v, &mut state, &capts);
+
+                if capts.len() > 0 {
+                    result_ref.set_ref(capts.clone());
+                    Ok(capts)
+                } else {
+                    result_ref.set_ref(VVal::None);
+                    Ok(VVal::None)
+                }
+            } else {
+                Ok(VVal::None)
+            }
+        }, Some(1), Some(1), false))
+}
+
 /// Creates a function that takes a string slice and tries to
 /// find the compiled regular expression in it.
 /// The returned function then returns a `PatResult` which stores
@@ -1623,6 +1653,15 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal)
     let mut ps = State::new(pat, "<pattern>");
     ps.skip_ws();
     let pattern  = parse_pattern(&mut ps)?;
+
+    ps.skip_ws();
+
+    if !ps.at_end() {
+        return Err(ps.err(
+            ParseErrorKind::UnexpectedToken(
+                ps.peek().unwrap(), "end of pattern")));
+    }
+
     let not_find = check_pattern_start_anchor(&pattern);
     let comp_pat =
         if not_find { compile_match_pattern(&pattern) }
@@ -1641,6 +1680,7 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal)
                         r
                     }))
                 } else {
+                    result_ref.set_ref(VVal::None);
                     Ok(VVal::None)
                 }
             }, Some(1), Some(1), false))
@@ -1658,6 +1698,7 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal)
                         r
                     }))
                 } else {
+                    result_ref.set_ref(VVal::None);
                     Ok(VVal::None)
                 }
             }, Some(1), Some(1), false))
