@@ -4418,6 +4418,21 @@ To match special the characters `$` you can use the backslash escaping `\$`:
 std:assert_eq ($r/$+ \$/ "FF$$$FF").0   "$$$";
 ```
 
+To access captured groups you can either use the return value of the
+matcher function, or use the global variable `$\` which will contain
+the results of the latest match that was exectuted:
+
+```wlambda
+!res =
+    ? ($r/ $<*? (^$+[\\/]) * / "foo//\\/foo") {
+        std:assert_eq $\.0 "foo//\\/foo";
+
+        $\.1
+    };
+
+std:assert_eq res "//\\/";
+```
+
 #### <a name="921-pattern-syntax-overview"></a>9.2.1 - Pattern Syntax Overview
 
 While
@@ -4427,6 +4442,7 @@ here is the WLambda pattern syntax in a nutshell:
 
 | Pattern Syntax | Semantics |
 |-|-|
+| `!?\|^,'&:;$(){}[]*=/\\` | Many special chars are reserved in WLambda patterns. Please escape then using `\\/` or `[/]`.|
 | _whitespace_  | Please note, that whitespace to be matched must be escaped using '\' or inside a character calss `[ ]`. |
 | `\.`          | Backslash escapes work the same as in regular WLambda strings. `\` escapes the following character to have no special syntactic meaning in a pattern except matching itself. While escape sequences like `\x41` match the character `A` or `\u{2211}` matches `∑`. These also work inside of character classes. |
 | `*`           | Match 0 to N occurences of any character. |

@@ -3515,6 +3515,15 @@ fn check_regex_patterns() {
         !rx = $r/(^$^foo)bar/;
         rx "foobarx"
     "#), "$[\"foobar\",\"foo\"]");
+
+    assert_eq!(ve(r#"
+        !res =
+            ? ($r< $<*? (^$+[\\/]) * > "foo//\\/foo") {
+                std:assert_eq $\.0 "foo//\\/foo";
+                $\.1
+            };
+        res
+    "#), "\"//\\\\/\"");
 }
 
 //#[test]

@@ -262,6 +262,23 @@ std:assert_eq stuff.0 "日";         # Unicode support
 std:assert_eq 人 "jin";
 ```
 
+## Builtin (Regex) Pattern Matching
+
+```wlambda
+!some_url = "http://crates.io/crates/wlambda";
+
+!crate  = $none;
+!domain = $none;
+
+? ($r{$^ (^$+[^:]) \:\/\/ (^$*[^/]) \/crates\/ (^$+[a-z]) } some_url) {
+    .domain = $\.2;
+    .crate = $\.3;
+};
+
+std:assert_eq domain "crates.io";
+std:assert_eq crate  "wlambda";
+```
+
 ## Object Oriented Programming with prototypes
 
 ```wlambda
