@@ -1160,13 +1160,13 @@ pub fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
             Some((Syntax::GetKey, ast.v_(1), ast.v_(2)))
         },
         Syntax::GetKey2 => {
-            let mut get_obj = ast.shallow_clone();
+            let get_obj = ast.shallow_clone();
             get_obj.set_syn_at(0, Syntax::GetKey);
             let key = get_obj.pop();
             Some((Syntax::GetKey, get_obj, key))
         },
         Syntax::GetKey3 => {
-            let mut get_obj = ast.shallow_clone();
+            let get_obj = ast.shallow_clone();
             get_obj.set_syn_at(0, Syntax::GetKey2);
             let key = get_obj.pop();
             Some((Syntax::GetKey, get_obj, key))
@@ -1175,13 +1175,13 @@ pub fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
             Some((Syntax::GetSym, ast.v_(1), ast.v_(2)))
         },
         Syntax::GetSym2 => {
-            let mut get_obj = ast.shallow_clone();
+            let get_obj = ast.shallow_clone();
             get_obj.set_syn_at(0, Syntax::GetSym);
             let key = get_obj.pop();
             Some((Syntax::GetSym, get_obj, key))
         },
         Syntax::GetSym3 => {
-            let mut get_obj = ast.shallow_clone();
+            let get_obj = ast.shallow_clone();
             get_obj.set_syn_at(0, Syntax::GetSym2);
             let key = get_obj.pop();
             Some((Syntax::GetSym, get_obj, key))

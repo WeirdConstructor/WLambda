@@ -3012,6 +3012,18 @@ fn check_iter() {
 
     assert_eq!(v(r"
         !r = $[];
+        iter i $p(1, 10) { std:push r i; };
+        r
+    "), "$[1,2,3,4,5,6,7,8,9]");
+
+    assert_eq!(v(r"
+        !r = $[];
+        iter i 1 => 10 { std:push r i; };
+        r
+    "), "$[1,2,3,4,5,6,7,8,9]");
+
+    assert_eq!(v(r"
+        !r = $[];
         iter i $i(1, 10, 2) { std:push r i; };
         r
     "), "$[1,3,5,7,9]");

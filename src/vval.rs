@@ -132,6 +132,8 @@ pub enum Syntax {
     BinOpGt,
     BinOpEq,
     OpNewPair,
+    OpCallLwR,
+    OpCallRwL,
     Str,
     Lst,
     IVec,
@@ -1703,6 +1705,20 @@ macro_rules! iter_next_value {
     }
 }
 
+macro_rules! iter_int_a_to_b {
+    ($a: expr, $b: expr) => {
+        {
+            let mut i = $a;
+            let b = $b;
+            std::iter::from_fn(Box::new(move || {
+                if i >= b { return None; }
+                let ret = Some((VVal::Int(i), None));
+                i += 1;
+                ret
+            }))
+        }
+    }
+}
 
 macro_rules! pair_key_to_iter {
     ($p: ident) => {
@@ -1768,6 +1784,9 @@ macro_rules! pair_key_to_iter {
                     }
                 }))
             }
+        } else if $p.0.is_int() {
+            iter_int_a_to_b!($p.0.i(), $p.1.i())
+
         } else {
             $p.0.with_s_ref(|key: &str| -> VValIter {
                 let l =
@@ -2342,14 +2361,7 @@ impl VVal {
                 pair_key_to_iter!(p)
             },
             VVal::IVec(NVec::Vec2(a, b)) => {
-                let mut i = *a;
-                let b = *b;
-                std::iter::from_fn(Box::new(move || {
-                    if i >= b { return None; }
-                    let ret = Some((VVal::Int(i), None));
-                    i += 1;
-                    ret
-                }))
+                iter_int_a_to_b!(*a, *b)
             },
             VVal::IVec(NVec::Vec3(a, b, skip)) => {
                 let mut i = *a;
@@ -3610,7 +3622,7 @@ impl VVal {
         }
     }
 
-    pub fn set_syn_at(&mut self, idx: usize, syn: Syntax) {
+    pub fn set_syn_at(&self, idx: usize, syn: Syntax) {
         let mut v = self.v_(idx);
         v.set_syn(syn);
         self.set(idx, v);

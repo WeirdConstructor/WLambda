@@ -221,6 +221,8 @@ In the following grammar, white space and comments are omitted:
                   | "&and"            (* logical and, short circuit *)
                   | "&or"             (* logical or, short circuit *)
                   | "=>"              (* pair constructor *)
+                  | "&>"              (* call rhs with lhs operator *)
+                  | "<&"              (* call lhs with rhs operator *)
                   ;
     bin_op        = call_no_ops, { op, bin_op } (* precedence parsing is done
                                                    in a Pratt parser style *)
@@ -243,7 +245,7 @@ In the following grammar, white space and comments are omitted:
                      BUT: There is a special case, when you specify
                      an `indent` it is quoted and interpreted as symbol. *)
                   ;
-    call_no_ops   = value, { arg_list | field_access }, [ "~", expr ]
+    call_no_ops   = value, { arg_list | field_access }
                   ;
     call          = value,
                     { arg_list | field_access | bin_op | value },
@@ -1005,6 +1007,12 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
     } else if op == "=>" {
         ps.syn(Syntax::OpNewPair)
 
+    } else if op == "&>" {
+        ps.syn(Syntax::OpCallRwL)
+
+    } else if op == "<&" {
+        ps.syn(Syntax::OpCallLwR)
+
     } else {
         make_to_call(ps, make_var(ps, &op.to_string()))
     }
@@ -1308,7 +1316,9 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
 }
 
 fn get_op_binding_power(op: StrPart) -> (i32, i32) {
-    if       op == "^"    { (25, 26) }
+    if       op == "&>"   { (32, 33) }
+    else if  op == "<&"   { (31, 30) }
+    else if  op == "^"    { (25, 26) }
     else if  op == "*"
           || op == "/"
           || op == "%"    { (23, 24) }
@@ -1332,12 +1342,25 @@ fn get_op_binding_power(op: StrPart) -> (i32, i32) {
 }
 
 fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
-    if let Syntax::OpNewPair = binop.at(0).unwrap().get_syn() {
-        VVal::pair(left, right)
-    } else {
-        binop.push(left);
-        binop.push(right);
-        binop
+    match binop.at(0).unwrap().get_syn() {
+        Syntax::OpNewPair => VVal::pair(left, right),
+        Syntax::OpCallLwR => {
+            binop.set_syn_at(0, Syntax::Call);
+            binop.push(left);
+            binop.push(right);
+            binop
+        },
+        Syntax::OpCallRwL => {
+            binop.set_syn_at(0, Syntax::Call);
+            binop.push(right);
+            binop.push(left);
+            binop
+        },
+        _ => {
+            binop.push(left);
+            binop.push(right);
+            binop
+        }
     }
 }
 
@@ -1394,6 +1417,8 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                 value = parse_field_access(value, ps)?;
             },
             '~' => {
+                if binop_mode { break; }
+
                 ps.consume_wsc();
                 if let VVal::None = res_call { res_call = make_to_call(ps, value); }
                 else { res_call.push(value); }
@@ -1870,7 +1895,7 @@ mod tests {
         assert_eq!(parse("foo.a = 10"),               "$[&Block,$[&SetKey,$[&Var,:foo],$[&Key,:a],10]]");
         assert_eq!(parse("foo.a = 10 | 20"),          "$[&Block,$[&SetKey,$[&Var,:foo],$[&Key,:a],$[&Call,20,10]]]");
         assert_eq!(parse("foo.a = 10 ~ 20"),          "$[&Block,$[&SetKey,$[&Var,:foo],$[&Key,:a],$[&Call,10,20]]]");
-        assert_eq!(parse("4 == 5 ~ 10"),              "$[&Block,$[&BinOpEq,4,$[&Call,5,10]]]");
+        assert_eq!(parse("4 == 5 ~ 10"),              "$[&Block,$[&Call,$[&BinOpEq,4,5],10]]");
         assert_eq!(parse("foo.(i) = 10"),             "$[&Block,$[&SetKey,$[&Var,:foo],$[&Var,:i],10]]");
         assert_eq!(parse("foo :x :y 10"),             "$[&Block,$[&Call,$[&Var,:foo],$[&Key,:x],$[&Key,:y],10]]");
     }
@@ -2116,5 +2141,19 @@ mod tests {
     #[test]
     fn check_pair_op() {
         assert_eq!(parse("match x a => b x => d 5"), "$[&Block,$[&Call,$[&Var,:match],$[&Var,:x],$p($[&Var,:a],$[&Var,:b]),$p($[&Var,:x],$[&Var,:d]),5]]");
+        assert_eq!(parse("iter i 0 => 10 ~ 20"),     "$[&Block,$[&Call,$[&Var,:iter],$[&Var,:i],$p(0,10),20]]");
+        assert_eq!(parse("iter i 0 => 10 \\20"),     "$[&Block,$[&Call,$[&Var,:iter],$[&Var,:i],$p(0,10),$[&Func,$n,$n,20]]]");
+        assert_eq!(parse("iter i 0 => 10 { 20 }"),   "$[&Block,$[&Call,$[&Var,:iter],$[&Var,:i],$p(0,10),$[&Func,$n,$n,20]]]");
+    }
+
+    #[test]
+    fn check_call_op() {
+        assert_eq!(parse("a &> b x"),        "$[&Block,$[&Call,$[&Call,$[&Var,:b],$[&Var,:a]],$[&Var,:x]]]");
+        assert_eq!(parse("x a &> b"),        "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Var,:b],$[&Var,:a]]]]");
+        assert_eq!(parse("x a &> b &> c"),   "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Var,:c],$[&Call,$[&Var,:b],$[&Var,:a]]]]]");
+        assert_eq!(parse("x a &> b <& c"),   "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Call,$[&Var,:b],$[&Var,:a]],$[&Var,:c]]]]");
+        assert_eq!(parse("x a <& b"),        "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Var,:a],$[&Var,:b]]]]");
+        assert_eq!(parse("x a <& b <& c"),   "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Var,:a],$[&Call,$[&Var,:b],$[&Var,:c]]]]]");
+        assert_eq!(parse("x a <& b &> c"),   "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Var,:a],$[&Call,$[&Var,:c],$[&Var,:b]]]]]");
     }
 }
