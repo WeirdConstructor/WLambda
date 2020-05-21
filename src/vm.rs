@@ -1638,6 +1638,19 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     })
 }
 
+// 0. Write op that takes a jump table. Stores at idx 0 the "end",
+//    starting at idx 1 the offsets to the blocks. The op_jmp_tbl
+//    pops off an index from a location and sets the pc.
+// 0b. Write a vm_compile_jmp_tbl that takes a list of code blocks and
+//     arranges them. and uses the op_jmp_tbl then on the given value.
+// 0c. Write an op_direct_call(A, R, DCall) that calls boxed DCall directly
+//     in the op and writes the single return value out. and takes 1 argument
+//     value.
+// 1. compile struct patterns into single function, that returns the
+//    code block index. and use the op_direct_call()
+// 2. use op_jmp_tbl next to jump to the destinations
+// 3. benchmark the VM speed changes (if any, still fear it might slow down
+//    OP dispatch).
 pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
