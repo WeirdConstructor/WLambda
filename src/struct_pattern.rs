@@ -17,16 +17,18 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal)
     }))
 }
 
-pub fn create_struct_pattern_function(ast: &VVal) -> Result<VVal, CompileError> {
-    let struct_pat = compile_struct_pattern(ast)?;
+pub fn create_struct_pattern_function(ast: &VVal, var_map: &VVal) -> Result<VVal, CompileError> {
+    let struct_pat = compile_struct_pattern(ast, var_map)?;
 
     Ok(VValFun::new_fun(
         move |env: &mut Env, _argc: usize| {
             let m = VVal::map();
+            let m2 = m.clone();
             if (*struct_pat)(
-                env.arg_ref(0),
-                |key, val|
-                    m.set_key_sym(key.clone(), val.clone()))
+                env.arg_ref(0).unwrap(),
+                &move |key: &Symbol, val: &VVal| {
+                    m2.set_key_sym(key.clone(), val.clone()).unwrap();
+                })
             {
                 Ok(m)
             }

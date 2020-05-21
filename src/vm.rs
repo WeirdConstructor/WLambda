@@ -2371,7 +2371,8 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let variable_map = VVal::map();
 
                     let fun =
-                        struct_pattern::create_struct_pattern_function(ast.at(1).unwrap())?;
+                        struct_pattern::create_struct_pattern_function(
+                            &ast.at(1).unwrap(), &variable_map)?;
                     pw_provides_result_pos!(prog, {
                         prog.data_pos(fun.clone())
                     })
