@@ -33,9 +33,9 @@ Smalltalk, LISP and Perl.
 
 - [1](#1-syntax) - Syntax
 - [2](#2-variable-definition-and-assignment) - Variable Definition and Assignment
-    - [2.0.1](#201-destructuring-to-variables) - Destructuring to Variables
-  - [2.1](#21-global-variables) - Global Variables
-  - [2.2](#22-constants) - Constants
+  - [2.1](#21-destructuring-to-variables) - Destructuring to Variables
+  - [2.2](#22-global-variables) - Global Variables
+  - [2.3](#23-constants) - Constants
 - [3](#3-functions-part-12) - Functions (part 1/2)
   - [3.1](#31-closures) - Closures
     - [3.1.1](#311-object-oriented-programming-with-closures) - Object Oriented Programming with Closures
@@ -162,9 +162,10 @@ Smalltalk, LISP and Perl.
       - [4.12.3.2](#41232-ppattern-replacement-string-or-byte-vec) - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
       - [4.12.3.3](#41233-psplit-pattern-max-string-or-byte-vec) - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
     - [4.12.4](#4124-pair-to-iterator) - Pair to Iterator
-      - [4.12.4.1](#41241-iter---enumerate) - Iter - Enumerate
-      - [4.12.4.2](#41242-iter---values) - Iter - Values
-      - [4.12.4.3](#41243-iter---keys) - Iter - Keys
+      - [4.12.4.1](#41241-iter---range) - Iter - Range
+      - [4.12.4.2](#41242-iter---enumerate) - Iter - Enumerate
+      - [4.12.4.3](#41243-iter---values) - Iter - Values
+      - [4.12.4.4](#41244-iter---keys) - Iter - Keys
     - [4.12.5](#4125-ispair-value) - is_pair _value_
   - [4.13](#413-vectors-or-lists) - Vectors (or Lists)
     - [4.13.1](#4131-stdpush-vector-item) - std:push _vector_ _item_
@@ -280,14 +281,14 @@ Smalltalk, LISP and Perl.
     - [12.0.9](#1209-stdeval-code-string) - std:eval _code-string_
     - [12.0.10](#12010-stdassert-bool-message) - std:assert _bool_ \[_message_]
     - [12.0.11](#12011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
-  - [12.1](#121-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
-    - [12.1.1](#1211-stdwlambdaversion) - std:wlambda:version
-  - [12.2](#122-io) - I/O
-    - [12.2.1](#1221-stdiofilereadtext-filename) - std:io:file:read_text _filename_
-    - [12.2.2](#1222-stdiofileread-filename) - std:io:file:read _filename_
-    - [12.2.3](#1223-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
-    - [12.2.4](#1224-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
-  - [12.3](#123-threading) - Threading
+    - [12.0.12](#12012-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+    - [12.0.13](#12013-stdwlambdaversion) - std:wlambda:version
+  - [12.1](#121-io) - I/O
+    - [12.1.1](#1211-stdiofilereadtext-filename) - std:io:file:read_text _filename_
+    - [12.1.2](#1212-stdiofileread-filename) - std:io:file:read _filename_
+    - [12.1.3](#1213-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
+    - [12.1.4](#1214-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
+  - [12.2](#122-threading) - Threading
 - [13](#13-optional-standard-library) - Optional Standard Library
   - [13.1](#131-serialization) - serialization
     - [13.1.1](#1311-stdserwlambda-arg) - std:ser:wlambda _arg_
@@ -364,7 +365,7 @@ std:assert_eq a 10;
 std:assert_eq b 20;
 ```
 
-#### <a name="201-destructuring-to-variables"></a>2.0.1 - Destructuring to Variables
+### <a name="21-destructuring-to-variables"></a>2.1 - Destructuring to Variables
 
 Like highlighted in the previous section you can define and assign to
 multiple variables at once. Following data types support destructuring:
@@ -408,7 +409,7 @@ std:assert_eq b 0.4;
 std:assert_eq a 1.0;
 ```
 
-### <a name="21-global-variables"></a>2.1 - Global Variables
+### <a name="22-global-variables"></a>2.2 - Global Variables
 
 You can define global variables that are not bound to
 a lexical scope as follows:
@@ -423,7 +424,7 @@ std:assert_eq a 13;
 
 Global variables however do not live beyond file or module boundaries.
 
-### <a name="22-constants"></a>2.2 - Constants
+### <a name="23-constants"></a>2.3 - Constants
 
 WLambda supports constant _variables_. These are global variables you can't
 assign to. They are resolved at compile time and offer a slight performance
@@ -2633,7 +2634,7 @@ It can be used to create a specialized iterator that only
 iterates over keys or values of a map. Or that enumerates
 a vector or map.
 
-##### - Iter - Range
+##### <a name="41241-iter---range"></a>4.12.4.1 - Iter - Range
 
 `$iter $p(0, 10)` is the same as `$iter $i(0, 10)` and will construct an
 iterator that iterates from `0` to `9` (inclusive).
@@ -2647,7 +2648,7 @@ Because of the pair operator `a => b` we can nicely write a counting loop like t
 std:assert_eq sum 45;
 ```
 
-##### <a name="41241-iter---enumerate"></a>4.12.4.1 - Iter - Enumerate
+##### <a name="41242-iter---enumerate"></a>4.12.4.2 - Iter - Enumerate
 
 If the first value of the pair is `:enumerate`
 it will enumerate entries in a map or values in a vector.
@@ -2674,7 +2675,7 @@ iter i $p(:enumerate, ${a = 10, b = 20})
 std:assert_eq (str v) (str $[0, 1]);
 ```
 
-##### <a name="41242-iter---values"></a>4.12.4.2 - Iter - Values
+##### <a name="41243-iter---values"></a>4.12.4.3 - Iter - Values
 
 This is useful for iterating over the values in a map in an undefined order:
 
@@ -2686,7 +2687,7 @@ This is useful for iterating over the values in a map in an undefined order:
 std:assert_eq sum 63;
 ```
 
-##### <a name="41243-iter---keys"></a>4.12.4.3 - Iter - Keys
+##### <a name="41244-iter---keys"></a>4.12.4.4 - Iter - Keys
 
 You can also iterate over map keys in an undefined order:
 
@@ -4903,7 +4904,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-### <a name="121-stdassertreleq-l-r-epsilon-message"></a>12.1 - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+#### <a name="12012-stdassertreleq-l-r-epsilon-message"></a>12.0.12 - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -4919,13 +4920,13 @@ std:assert_rel_eq x y 1;
 # std:assert_eq x y 0.5;
 ```
 
-#### <a name="1211-stdwlambdaversion"></a>12.1.1 - std:wlambda:version
+#### <a name="12013-stdwlambdaversion"></a>12.0.13 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
-### <a name="122-io"></a>12.2 - I/O
+### <a name="121-io"></a>12.1 - I/O
 
-#### <a name="1221-stdiofilereadtext-filename"></a>12.2.1 - std:io:file:read_text _filename_
+#### <a name="1211-stdiofilereadtext-filename"></a>12.1.1 - std:io:file:read_text _filename_
 
 Opens the file _filename_ and returns its contents interpreted as UTF8
 text as string.
@@ -4937,7 +4938,7 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading text from file works";
 ```
 
-#### <a name="1222-stdiofileread-filename"></a>12.2.2 - std:io:file:read _filename_
+#### <a name="1212-stdiofileread-filename"></a>12.1.2 - std:io:file:read _filename_
 
 Opens the file _filename_ and returns its contents as byte buffer.
 
@@ -4949,18 +4950,18 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading binary from file works";
 ```
 
-#### <a name="1223-stdiofilewritesafe-filename-bytes-or-string"></a>12.2.3 - std:io:file:write_safe _filename_ _bytes-or-string_
+#### <a name="1213-stdiofilewritesafe-filename-bytes-or-string"></a>12.1.3 - std:io:file:write_safe _filename_ _bytes-or-string_
 
 Creates a new file with the given filename but with a "~" appended
 and writes the contents into it. After successful write, it renames
 the file to the given filename.
 
-#### <a name="1224-stdiofileappend-filename-bytes-or-string"></a>12.2.4 - std:io:file:append _filename_ _bytes-or-string_
+#### <a name="1214-stdiofileappend-filename-bytes-or-string"></a>12.1.4 - std:io:file:append _filename_ _bytes-or-string_
 
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
-### <a name="123-threading"></a>12.3 - Threading
+### <a name="122-threading"></a>12.2 - Threading
 
 WLambda leverages the `std::thread` implementation of Rust's standard library
 to provide safe threading. Threading works by spawning new threads that
