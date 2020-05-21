@@ -1638,6 +1638,71 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     })
 }
 
+pub fn vm_compile_jump2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let syn  = ast.v_(0);
+    let spos = syn.get_syn_pos();
+
+    if ast.len() < 4 {
+        return Err(ast.compile_err(
+            "jump takes at least 2 arguments".to_string()));
+    }
+
+    let value = vm_compile2(&ast.v_(2), ce)?;
+
+    let mut blocks = Vec::new();
+    for (i, (block, _)) in ast.iter().enumerate().skip(3) {
+        blocks.push(vm_compile_direct_block2(&block, ce)?);
+    }
+
+
+
+//                    let variable_map = VVal::map();
+//
+//                    let fun =
+//                        struct_pattern::create_struct_pattern_function(
+//                            &ast.at(1).unwrap(), &variable_map)?;
+//
+//    if ast.len() != 4 {
+//        return Err(ast.compile_err(
+//            "while takes exactly 2 arguments (condition and expression)"
+//            .to_string()));
+//    }
+//
+//    let cond =
+//        vm_compile_direct_block2(
+//            &ast.at(2).unwrap_or_else(|| VVal::None), ce)?;
+//
+//    let body =
+//        vm_compile_direct_block2(
+//            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
+
+    return pw!(prog, store, {
+        let needs_store = store.if_null(|_| {
+//            let mut then_body_prog = Prog::new();
+//            then_body.eval_nul(&mut then_body_prog);
+
+//            then_body_prog.op_jmp(&spos, else_body_prog.op_count() as i32);
+
+//            let condval = cond.eval(prog);
+//            prog.op_jmp_ifn(
+//                &spos, condval, then_body_prog.op_count() as i32);
+//            prog.append(then_body_prog);
+        });
+
+        if needs_store {
+            store.if_must_store(|store_pos| {
+//                let mut then_body_prog = Prog::new();
+//                let tbp = then_body.eval(&mut then_body_prog);
+//                else_body_prog.op_mov(&spos, tbp, store_pos);
+            })
+        } else {
+            ResPos::Value(ResValue::None)
+        }
+    });
+}
+
 // 0. Write op that takes a jump table. Stores at idx 0 the "end",
 //    starting at idx 1 the offsets to the blocks. The op_jmp_tbl
 //    pops off an index from a location and sets the pc.
@@ -2039,6 +2104,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                 "next"  => return vm_compile_next2(ast, ce),
                                 "break" => return vm_compile_break2(ast, ce),
                                 "match" => return vm_compile_match2(ast, ce),
+                                "jump"  => return vm_compile_jump2(ast, ce),
                                 _ => (),
                             }
                         }
