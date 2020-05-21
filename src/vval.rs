@@ -3772,7 +3772,7 @@ impl VVal {
     /// assert_eq!(v.v_(1).i(), 11);
     /// assert_eq!(v.v_i(1),    11);
     ///```
-    pub fn v_(&self, idx: usize) -> VVal { self.at(idx).unwrap_or(VVal::None) }
+    pub fn v_(&self, idx: usize) -> VVal { self.at(idx).unwrap_or_else(|| VVal::None) }
 
     /// Quick access method for retrieving the VVal at key `idx`.
     /// Returns VVal::None if the VVal is not a VVal::Map or no such index exists.
