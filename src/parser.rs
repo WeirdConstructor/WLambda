@@ -294,12 +294,12 @@ structure patterns that are used by `$P ...` and `match`.
 
 | WLambda Value | Semantics |
 |-|-|
-| `$p(_*, $P)`           | Matches 0 or N appearances of the pattern $P. |
-| `$P => x`              | Shorthand for `$p($P, x)`, listed here for demonstration purposes. |
-| `_+ => $P`             | Matches 1 or N appearances of the pattern $P. |
-| `_? => $P`             | Matches 0 or 1 appearances of the pattern $P. |
-| `_% => $p($P1, $P2)`   | Matches either $P1 or $P2. |
-| `$p($P, x)`            | If pattern $P matches, the value it matches is assigned to the variable `x`. |
+| `x $P`                 | Assign the value that matched $P to the variable `x`. |
+| `_* $P`                | Matches 0 or N appearances of the pattern $P. |
+| `_+ $P`                | Matches 1 or N appearances of the pattern $P. |
+| `_? $P`                | Matches 0 or 1 appearances of the pattern $P. |
+| `$P1 &or $P2`          | Matches if $P1 or $P2 matches. |
+| `$P1 &and $P2`         | Matches if $P1 and $P2 matches. |
 | `$[$P1, $P2, ...]`     | Matches a vector. |
 | `${ key = $P1, ...}`   | Matches a map. |
 | `$p($P1, $P2)`         | Matches a pair. |
