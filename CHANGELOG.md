@@ -3,6 +3,7 @@
 
 * Feature: `iter $&&i ...` syntax implemented, for creating new references
 for each iteration for easier closure generation.
+* Feature: Implemented pair operator `a => b` which does the same as `$p(a, b)`.
 
 0.5.0 (2020-05-21)
 ==================

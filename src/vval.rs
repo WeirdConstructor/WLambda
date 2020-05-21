@@ -131,6 +131,7 @@ pub enum Syntax {
     BinOpGe,
     BinOpGt,
     BinOpEq,
+    OpNewPair,
     Str,
     Lst,
     IVec,

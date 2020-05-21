@@ -220,6 +220,7 @@ In the following grammar, white space and comments are omitted:
                   | "&|"              (* binary or *)
                   | "&and"            (* logical and, short circuit *)
                   | "&or"             (* logical or, short circuit *)
+                  | "=>"              (* pair constructor *)
                   ;
     bin_op        = call_no_ops, { op, bin_op } (* precedence parsing is done
                                                    in a Pratt parser style *)
@@ -840,9 +841,9 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             let ret =
                 if ps.consume_if_eq_wsc(',') {
                     let b = parse_expr(ps)?;
-                    VVal::Pair(std::rc::Rc::new((a, b)))
+                    VVal::pair(a, b)
                 } else {
-                    VVal::Pair(std::rc::Rc::new((a, VVal::None)))
+                    VVal::pair(a, VVal::None)
                 };
 
             if ps.consume_if_eq_wsc(')') {
@@ -1000,6 +1001,9 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
 
     } else if op == "==" {
         ps.syn(Syntax::BinOpEq)
+
+    } else if op == "=>" {
+        ps.syn(Syntax::OpNewPair)
 
     } else {
         make_to_call(ps, make_var(ps, &op.to_string()))
@@ -1303,54 +1307,61 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
     Ok(call)
 }
 
-fn get_op_prec(op: StrPart) -> i32 {
-    if       op == "^"    { 15 }
+fn get_op_binding_power(op: StrPart) -> (i32, i32) {
+    if       op == "^"    { (25, 26) }
     else if  op == "*"
           || op == "/"
-          || op == "%"    { 14 }
+          || op == "%"    { (23, 24) }
     else if  op == "+"
-          || op == "-"    { 13 }
+          || op == "-"    { (21, 22) }
     else if  op == "<<"
-          || op == ">>"   { 12 }
+          || op == ">>"   { (19, 20) }
     else if  op == "<"
           || op == ">"
-          || op == "=>"
-          || op == "<="   { 11 }
+          || op == ">="
+          || op == "<="   { (17, 18) }
     else if  op == "=="
-          || op == "!="   { 10 }
-    else if  op == "&"    { 9 }
-    else if  op == "&^"   { 8 }
-    else if  op == "&|"   { 7 }
-    else if  op == "&and" { 6 }
-    else if  op == "&or"  { 5 }
-    else { 0 }
+          || op == "!="   { (15, 16) }
+    else if  op == "&"    { (13, 14) }
+    else if  op == "&^"   { (11, 12) }
+    else if  op == "&|"   { ( 9, 10) }
+    else if  op == "&and" { ( 7,  8) }
+    else if  op == "&or"  { ( 5,  6) }
+    else if  op == "=>"   { ( 2,  1) }
+    else { panic!("Bad op: {}", op.to_string()) }
 }
 
-fn parse_binop(mut left: VVal, ps: &mut State, prec: i32, binop: VVal)
+fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
+    if let Syntax::OpNewPair = binop.at(0).unwrap().get_syn() {
+        VVal::pair(left, right)
+    } else {
+        binop.push(left);
+        binop.push(right);
+        binop
+    }
+}
+
+fn parse_binop(mut left: VVal, ps: &mut State, bind_pow: i32, binop: VVal)
     -> Result<VVal, ParseError>
 {
     let mut right = parse_call(ps, true)?;
 
     while let Some(next_op) = ps.peek_op() {
-        let next_prec = get_op_prec(next_op);
+        let (l_bp, r_bp) = get_op_binding_power(next_op);
         let next_binop = make_binop(ps, next_op);
 
         let op_len = next_op.len();
         ps.consume_wsc_n(op_len);
 
-        if prec < next_prec {
-            right = parse_binop(right, ps, next_prec, next_binop)?;
+        if l_bp < bind_pow {
+            left = construct_op(binop, left, right);
+            return parse_binop(left, ps, r_bp, next_binop);
         } else {
-            binop.push(left);
-            binop.push(right);
-            left = binop;
-            return parse_binop(left, ps, next_prec, next_binop);
+            right = parse_binop(right, ps, r_bp, next_binop)?;
         }
     }
 
-    binop.push(left);
-    binop.push(right);
-    Ok(binop)
+    Ok(construct_op(binop, left, right))
 }
 
 fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
@@ -1397,12 +1408,15 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
             },
             _ if op.is_some() => {
                 if binop_mode { break; }
-                let op = op.unwrap();
-                let binop = make_binop(ps, op);
+
+                let op        = op.unwrap();
+                let binop     = make_binop(ps, op);
+                let (_, r_bp) = get_op_binding_power(op);
+
                 let op_len = op.len();
-                let op_prec = get_op_prec(op);
                 ps.consume_wsc_n(op_len);
-                value = parse_binop(value, ps, op_prec, binop)?;
+
+                value = parse_binop(value, ps, r_bp, binop)?;
             },
             '=' => { break; }, // '=' from parsing map keys
             _ => {
@@ -2097,5 +2111,10 @@ mod tests {
             parse("$f(1/2, 1/3, 1/4, 1/5)"),
             "$[&Block,$[&FVec,$[&BinOpDiv,1,2],$[&BinOpDiv,1,3],$[&BinOpDiv,1,4],$[&BinOpDiv,1,5]]]"
         );
+    }
+
+    #[test]
+    fn check_pair_op() {
+        assert_eq!(parse("match x a => b x => d 5"), "$[&Block,$[&Call,$[&Var,:match],$[&Var,:x],$p($[&Var,:a],$[&Var,:b]),$p($[&Var,:x],$[&Var,:d]),5]]");
     }
 }

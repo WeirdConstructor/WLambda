@@ -2472,6 +2472,11 @@ values from a function as it is a slight bit slimmer than a vector with two
 values. Unlike a vector pairs are compared by `==` according to their contents
 and not by referencial equality.
 
+There are two ways to form a pair:
+
+- Pair value syntax: `$p(a, b)`
+- Pair right associative operator: `a => b`
+
 You can access the pair values by the following keys:
 
 ```wlambda
@@ -2526,8 +2531,8 @@ std:assert_eq (str l) (str $[33, 44, 33, 44]);
 A pair is a referencial data type, that means you can use `std:ref_id` on it:
 
 ```wlambda
-!a = $p(1,2);
-!b = $p(2,3);
+!a = $p(1, 2);
+!b = $p(2, 3);
 !id_a = std:ref_id a;
 !id_b = std:ref_id b;
 
@@ -2536,6 +2541,18 @@ std:assert std:ref_id[a] == id_a;
 
 !v = $[a];
 std:assert std:ref_id[v.0] == id_a;
+```
+
+You can construct pairs also using the `=>` operator, which
+has the lowest precedence and is right associative:
+
+```wlambda
+!a = 1 => 2;
+!b = 2 => 3 => 4;
+
+std:assert_eq a $p(1, 2);
+std:assert_eq b $p(2, $p(3, 4));
+std:assert_eq b 2 => 3 => 4;
 ```
 
 #### <a name="4121-cons-a-b"></a>4.12.1 - cons _a_ _b_

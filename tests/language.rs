@@ -648,6 +648,10 @@ fn check_ops() {
         while { x > 0 } { .c = c + 1; .x = x - 1; };
         c
     "#), "30");
+
+    assert_eq!(ve(r"(7 & 15) >= 10"),   "$false");
+    assert_eq!(ve(r"7 & (15 >= 10)"),   "1");
+    assert_eq!(ve(r"7 & 15 >= 10"),     "1");
 }
 
 #[test]
@@ -2897,6 +2901,8 @@ fn check_pairs() {
 
     assert_eq!(ve("$q ABCDEF  $i(2,3)"), "\"CDE\"");
     assert_eq!(ve("$Q ABCDEF  $i(2,3)"), "$b\"CDE\"");
+
+    assert_eq!(ve("1 => 2 => 3 => 4"), "$p(1,$p(2,$p(3,4)))");
 }
 
 #[test]
