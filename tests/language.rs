@@ -3613,3 +3613,14 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P $i(:x, y, z, w)) $i(1,2,3,4)"),  "$n");
     assert_eq!(ve("($P $i(1, 2, z, w))  $i(1,2,3,4)"),  "${w=4,z=3}");
 }
+
+#[test]
+fn check_struct_match() {
+    assert_eq!(ve("match $i(1,2,3,4)"),                             "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match takes at least 2 arguments");
+    assert_eq!(ve("match $i(1,2,3,4) 20 30"),                       "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match argument 2 is not a pair: 20");
+    assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) { $[z,w] };"),     "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match argument 2 is not a pair: $[&IVec,1,2,$[&Var,:z],$[&Var,:w]]");
+
+    assert_eq!(ve("match $i(1,2,3,4) 30"),                          "$n");
+    assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) => { $[z,w] };"),  "");
+    assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 42;"),       "");
+}
