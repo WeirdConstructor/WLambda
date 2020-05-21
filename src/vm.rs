@@ -3,6 +3,7 @@ use crate::compiler::*;
 use crate::vval::*;
 use crate::nvec::NVec;
 use crate::selector;
+use crate::struct_pattern;
 use crate::ops::*;
 
 use std::rc::Rc;
@@ -2364,6 +2365,15 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                     format!("bad selector: {}", e)))
                             }
                         }
+                    })
+                },
+                Syntax::StructPattern => {
+                    let variable_map = VVal::map();
+
+                    let fun =
+                        struct_pattern::create_struct_pattern_function(ast.at(1).unwrap())?;
+                    pw_provides_result_pos!(prog, {
+                        prog.data_pos(fun.clone())
                     })
                 },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },

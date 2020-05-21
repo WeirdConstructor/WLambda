@@ -3596,3 +3596,8 @@ fn check_iter_var_closure() {
         $p(sum, sum2)
     "#), "$p(45,45)");
 }
+
+#[test]
+fn check_struct_patterns() {
+    assert_eq!(ve("($P x) 10"),     "${x=10}");
+}

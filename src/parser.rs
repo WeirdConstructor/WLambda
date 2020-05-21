@@ -741,7 +741,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             Ok(vec)
         },
         'P' => {
-            ps.consume();
+            ps.consume_wsc();
             let pat_expr = parse_expr(ps)?;
             let vec = ps.syn(Syntax::StructPattern);
             vec.push(pat_expr);
