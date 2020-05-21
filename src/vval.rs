@@ -170,6 +170,7 @@ pub enum Syntax {
     GlobVar,
     Selector,
     Pattern,
+    StructPattern,
 }
 
 #[derive(Clone)]

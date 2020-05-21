@@ -144,14 +144,6 @@ In the following grammar, white space and comments are omitted:
                     (* returns the current accumulator value *)
                   | "+" (* resolves to the current accumulator function *)
                   ;
-    capture_variable = (? 1 or N digits ?)      (* index of capture, 0 is the
-                                                   matched string/path *)
-                     | "_"                      (* list of all captures *)
-                     (* a capture variable is a regular global variable that
-                        can even be assigned to. it's just also written by
-                        the selectors and pattern match functions!
-                        You could also access them using `\\_` or `\\1`. *)
-                     ;
     import        = "@import", ident, [ ident ]
                   ;
     export        = "@export", ident, [ "=" ], expr
@@ -180,7 +172,7 @@ In the following grammar, white space and comments are omitted:
                   | selector
                   | pattern
                   | struct_match
-                  | "\", capture_variable
+                  | "\"             (* The global variable with the name "\" *)
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
@@ -290,7 +282,33 @@ There are certain calls that are handled by the compiler differently.
 - `iter _var_ _value-expr_ _block-or-expr_`
 - `next _x_`
 - `break`
-- `match _value-expr_ _struct-match-expr-a_ _expr-a_ { _struct-match-expr-b _expr-b_ } _else-expr_`
+- `match _value-expr_ $p(structure_pattern, branch_block) ... [ branch_block ]
+
+## Structure Pattern Syntax
+
+This the the compiletime syntax that is understood by the
+structure patterns that are used by `$P ...` and `match`.
+
+- `$P`, `$P1`, `$P2`, ... in the following table stands for a structure pattern expression.
+- All other tokens or values stand for themself.
+
+| WLambda Value | Semantics |
+|-|-|
+| `$p(_*, $P)`           | Matches 0 or N appearances of the pattern $P. |
+| `$P => x`              | Shorthand for `$p($P, x)`, listed here for demonstration purposes. |
+| `_+ => $P`             | Matches 1 or N appearances of the pattern $P. |
+| `_? => $P`             | Matches 0 or 1 appearances of the pattern $P. |
+| `_% => $p($P1, $P2)`   | Matches either $P1 or $P2. |
+| `$p($P, x)`            | If pattern $P matches, the value it matches is assigned to the variable `x`. |
+| `$[$P1, $P2, ...]`     | Matches a vector. |
+| `${ key = $P1, ...}`   | Matches a map. |
+| `$p($P1, $P2)`         | Matches a pair. |
+| `$i($P1, ...)`         | Matches an integer vector. |
+| `$f($P1, ...)`         | Matches a float vector. |
+| `$o($P)`               | Matches an optional where the value matches $P. |
+| `$e $P`                | Matches an error value that matches $P. |
+| `x`                    | Matches any value and assigns it to the variable `x`. |
+| literal values         | Literal values like booleans, strings, symbols and numbers match their value. |
 
 */
 
@@ -720,6 +738,13 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             let selector_source = parse_quoted(ps, String::new(), |s, c| s.push(c))?;
             let vec = ps.syn(Syntax::Selector);
             vec.push(VVal::new_str_mv(selector_source));
+            Ok(vec)
+        },
+        'P' => {
+            ps.consume();
+            let pat_expr = parse_expr(ps)?;
+            let vec = ps.syn(Syntax::StructPattern);
+            vec.push(pat_expr);
             Ok(vec)
         },
         '\\' => { ps.consume_wsc(); Ok(make_var(ps, "\\")) },
