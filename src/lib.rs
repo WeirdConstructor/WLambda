@@ -124,7 +124,7 @@ std:assert_eq x 5;
 ```wlambda
 !sum = 0;
 
-iter i $i(0, 10) {
+iter i 0 => 10 {
     .sum = sum + i;
 };
 
