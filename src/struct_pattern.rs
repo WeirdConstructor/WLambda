@@ -1,7 +1,9 @@
 use crate::vval::*;
 use crate::str_int::*;
+use crate::ops::DirectFun;
 
 pub type FnVarAssign = dyn Fn(&Symbol, &VVal);
+pub type FnVarReset  = dyn Fn();
 pub type StructNode  = Box<dyn Fn(&VVal, &FnVarAssign) -> bool>;
 
 pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal)
@@ -122,24 +124,48 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal)
     }
 }
 
+pub fn create_struct_patterns_direct_fun(patterns: &Vec<VVal>, var_map: &VVal)
+    -> Result<Box<dyn Fn(Box<FnVarAssign>, Box<FnVarReset>) -> DirectFun>, CompileError>
+{
+    let mut pat_funs = Vec::new();
+    for p in patterns.iter() {
+        pat_funs.push(compile_struct_pattern(p, var_map)?);
+    }
+
+    let pat_funs = std::rc::Rc::new(pat_funs);
+
+    Ok(Box::new(move |var_assign: Box<FnVarAssign>, var_reset: Box<FnVarReset>| {
+        let pat_funs = pat_funs.clone();
+        DirectFun { fun: std::rc::Rc::new(move |v: VVal, env: &mut Env| {
+            for (i, p) in pat_funs.iter().enumerate() {
+                (var_reset)();
+                if p(&v, &*var_assign) {
+                    return VVal::Int(i as i64);
+                }
+            }
+
+            VVal::Int(-1)
+        }) }
+    }))
+}
+
 pub fn create_struct_pattern_function(ast: &VVal, var_map: &VVal) -> Result<VVal, CompileError> {
-    let struct_pat = compile_struct_pattern(ast, var_map)?;
+    let struct_pat = vec![ast.clone()];
+    let fun_constructor =
+        create_struct_patterns_direct_fun(&struct_pat, var_map)?;
 
     Ok(VValFun::new_fun(
         move |env: &mut Env, _argc: usize| {
             let m = VVal::map();
             let m2 = m.clone();
-            if (*struct_pat)(
-                env.arg_ref(0).unwrap(),
-                &move |key: &Symbol, val: &VVal| {
+            let dfun =
+                fun_constructor(Box::new(move |key: &Symbol, val: &VVal| {
                     m2.set_key_sym(key.clone(), val.clone()).unwrap();
-                })
-            {
-                Ok(m)
-            }
-            else
-            {
-                Ok(VVal::None)
-            }
+                }), Box::new(|| ()));
+
+            let res = (dfun.fun)(env.arg(0), env);
+
+            if res.i() >= 0 { Ok(m) }
+            else { Ok(VVal::None) }
         }, Some(1), Some(1), false))
 }

@@ -847,6 +847,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     out_reg!(env, ret, retv, data, r, v);
                 });
             },
+            Op::CallDirect(a, fun, r) => op_a_r!(env, ret, retv, data, a, r, {
+                (fun.fun)(a, env)
+            }),
             Op::Apply(argv, func, r) => {
                 in_reg!(env, ret, data, argv);
                 in_reg!(env, ret, data, func);
@@ -1649,25 +1652,10 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     })
 }
 
-pub fn vm_compile_jump2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+pub fn generate_jump_table(spos: SynPos, value: ProgWriter, blocks: Vec<ProgWriter>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.v_(0);
-    let spos = syn.get_syn_pos();
-
-    if ast.len() < 4 {
-        return Err(ast.compile_err(
-            "jump takes at least 2 arguments".to_string()));
-    }
-
-    let value = vm_compile2(&ast.v_(2), ce)?;
-
-    let mut blocks = Vec::new();
-    for (i, (block, _)) in ast.iter().enumerate().skip(3) {
-        blocks.push(vm_compile_direct_block2(&block, ce)?);
-    }
-
-    return pw!(prog, store, {
+    pw!(prog, store, {
         let mut block_progs = Vec::new();
         let mut end_offs : i32 = 0;
 
@@ -1726,7 +1714,28 @@ pub fn vm_compile_jump2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         }
 
         res
-    });
+    })
+}
+
+pub fn vm_compile_jump2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+    -> Result<ProgWriter, CompileError>
+{
+    let syn  = ast.v_(0);
+    let spos = syn.get_syn_pos();
+
+    if ast.len() < 4 {
+        return Err(ast.compile_err(
+            "jump takes at least 2 arguments".to_string()));
+    }
+
+    let value = vm_compile2(&ast.v_(2), ce)?;
+
+    let mut blocks = Vec::new();
+    for (block, _) in ast.iter().skip(3) {
+        blocks.push(vm_compile_direct_block2(&block, ce)?);
+    }
+
+    generate_jump_table(spos, value, blocks)
 }
 
 // 0. Write op that takes a jump table. Stores at idx 0 the "end",
@@ -1734,11 +1743,11 @@ pub fn vm_compile_jump2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 //    pops off an index from a location and sets the pc.
 // 0b. Write a vm_compile_jmp_tbl that takes a list of code blocks and
 //     arranges them. and uses the op_jmp_tbl then on the given value.
-// 0c. Write an op_direct_call(A, R, DCall) that calls boxed DCall directly
+// 0c. Write an op_call_direct(A, R, DCall) that calls boxed DCall directly
 //     in the op and writes the single return value out. and takes 1 argument
 //     value.
 // 1. compile struct patterns into single function, that returns the
-//    code block index. and use the op_direct_call()
+//    code block index. and use the op_call_direct()
 // 2. use op_jmp_tbl next to jump to the destinations
 // 3. benchmark the VM speed changes (if any, still fear it might slow down
 //    OP dispatch).
@@ -1755,6 +1764,9 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     let value = vm_compile2(&ast.v_(2), ce)?;
 
+    let mut patterns = Vec::new();
+    let mut blocks = Vec::new();
+
     let len = ast.len();
     for (i, (struct_pat, _)) in ast.iter().enumerate().skip(3) {
         if (i + 1) < len {
@@ -1763,11 +1775,57 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     format!("match argument {} is not a pair: {}",
                             i - 1, struct_pat.s())));
             }
+
+            patterns.push(struct_pat.v_(0));
+            blocks.push(vm_compile_direct_block2(&struct_pat.v_(1), ce)?);
+
         } else {
-            println!("FINAL STMT: {}", struct_pat.s());
+            if struct_pat.is_pair() {
+                patterns.push(struct_pat.v_(0));
+                blocks.push(vm_compile_direct_block2(&struct_pat.v_(1), ce)?);
+            } else {
+                blocks.push(vm_compile_direct_block2(&struct_pat, ce)?);
+            }
         }
     }
 
+    let map = VVal::map();
+
+    let dfun_constr =
+        struct_pattern::create_struct_patterns_direct_fun(
+            &patterns, &map)?;
+
+    let res_ref =
+        ce.borrow_mut().global.borrow_mut()
+          .get_var_ref("\\")
+          .unwrap_or_else(|| VVal::None);
+
+    let dfun =
+        if map.len() <= 0 {
+            (dfun_constr)(
+                Box::new(|_sym, _val| ()),
+                Box::new(|| ()))
+        } else {
+            let set_res_ref = res_ref.clone();
+            (dfun_constr)(
+                Box::new(move |sym, val| set_res_ref.set_key_sym(sym.clone(), val.clone()).unwrap()),
+                Box::new(move ||
+                    if let VVal::Map(m) = res_ref.deref() {
+                        m.borrow_mut().clear();
+                    } else {
+                        res_ref.set_ref(VVal::map());
+                    }))
+        };
+
+    let spos_jmp = spos.clone();
+    let jump_value =
+        pw_provides_result_pos!(prog, {
+            let v = value.eval(prog);
+            prog.op_call_direct(&spos_jmp, v, dfun.clone(), ResPos::Stack(0));
+            ResPos::Stack(0)
+        })?;
+
+    generate_jump_table(spos, jump_value, blocks)
 //                    let variable_map = VVal::map();
 //
 //                    let fun =
@@ -1788,7 +1846,7 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 //        vm_compile_direct_block2(
 //            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
 
-    return pw_null!(prog, {
+//    return pw_null!(prog, {
 //        // Create the OPs for the body:
 //        let mut body_prog = Prog::new();
 //        body.eval_nul(&mut body_prog);
@@ -1810,7 +1868,7 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 //        body_prog.op_jmp(&spos, -(cond_offs as i32 + 1));
 //        prog.append(body_prog);
 //        prog.op_unwind(&spos);
-    });
+//    });
 }
 
 

@@ -3620,9 +3620,10 @@ fn check_struct_match() {
     assert_eq!(ve("match $i(1,2,3,4) 20 30"),                       "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match argument 2 is not a pair: 20");
     assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) { $[z,w] };"),     "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match argument 2 is not a pair: $[&IVec,1,2,$[&Var,:z],$[&Var,:w]]");
 
-    assert_eq!(ve("match $i(1,2,3,4) 30"),                          "$n");
-    assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) => { $[z,w] };"),  "");
-    assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 42;"),       "");
+    assert_eq!(ve("match $i(1,2,3,4) 30"),                                  "30");
+    assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) => { $[$\\.z,$\\.w] };"),  "$[3,4]");
+    assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 42;"),               "42");
+    assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 0 => 42;"),          "$n");
 }
 
 #[test]

@@ -2,6 +2,8 @@ use crate::vval::*;
 use crate::compiler::*;
 use crate::nvec::NVec;
 use crate::str_int::*;
+use std::fmt;
+use std::fmt::{Debug};
 
 #[derive(Clone, Default)]
 pub struct Prog {
@@ -211,6 +213,10 @@ impl Prog {
                 },
                 Op::Call(_, p1) => {
                     patch_respos_data(p1, self_data_next_idx);
+                },
+                Op::CallDirect(p1, _, p2) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
                 },
                 Op::CallMethodKey(p1, p2, _, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
@@ -449,6 +455,11 @@ impl Prog {
     pub fn op_call_method_sym(&mut self, sp: &SynPos, a: ResPos, sym: String, argc: u16, r: ResPos) {
         self.set_dbg(sp.clone());
         self.push_op(Op::CallMethodSym(a, Box::new(sym), argc, r));
+    }
+
+    pub fn op_call_direct(&mut self, sp: &SynPos, a: ResPos, fun: DirectFun, r: ResPos) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::CallDirect(a, fun, r));
     }
 
     pub fn op_call(&mut self, sp: &SynPos, argc: u16, r: ResPos) {
@@ -809,6 +820,17 @@ pub enum NVecPos {
     FVec4(ResPos, ResPos, ResPos, ResPos),
 }
 
+#[derive(Clone)]
+pub struct DirectFun {
+    pub fun: std::rc::Rc<dyn Fn(VVal, &mut Env) -> VVal>,
+}
+
+impl Debug for DirectFun {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Rc<DirectFun:?>")
+    }
+}
+
 #[derive(Debug,Clone)]
 #[repr(u8)]
 pub enum Op {
@@ -849,6 +871,7 @@ pub enum Op {
     GetKey(ResPos, ResPos, ResPos),
     Destr(ResPos, Box<DestructureInfo>),
     Call(u16, ResPos),
+    CallDirect(ResPos, DirectFun, ResPos),
     CallMethodKey(ResPos, ResPos, u16, ResPos),
     CallMethodSym(ResPos, Box<String>, u16, ResPos),
     Apply(ResPos, ResPos, ResPos),
