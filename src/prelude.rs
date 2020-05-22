@@ -201,7 +201,7 @@ Smalltalk, LISP and Perl.
     - [5.2.2](#522-block-label-function) - block [label] _function_
     - [5.2.3](#523-stdtodrop-value-function-or-raii-destructors-or-drop-functions) - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
 - [6](#6-conditional-execution---if--then--else) - Conditional Execution - if / then / else
-  - [6.1](#61--condition-then-expr-else-expr) - ? _condition_ _then-expr_ [_else-expr_]
+  - [6.1](#61--condition-then-expr-else-expr) - ?/if _condition_ _then-expr_ [_else-expr_]
   - [6.2](#62-using-booleans-for-conditional-execution) - Using Booleans for Conditional Execution
     - [6.2.1](#621-pick-bool-a--b-) - pick _bool_ _a_ -b-
     - [6.2.2](#622-indexing-by-booleans) - Indexing by Booleans
@@ -3487,9 +3487,10 @@ std:assert dropped;
 
 ## <a name="6-conditional-execution---if--then--else"></a>6 - Conditional Execution - if / then / else
 
-### <a name="61--condition-then-expr-else-expr"></a>6.1 - ? _condition_ _then-expr_ [_else-expr_]
+### <a name="61--condition-then-expr-else-expr"></a>6.1 - ?/if _condition_ _then-expr_ [_else-expr_]
 
-The keyword for conditional execution is just the question mark `?`:
+The keyword for conditional execution is either `if` or just the question mark `?`.
+Both are possible to use, while `?` is a bit more WLambda idiomatic.
 It takes 3 arguments: The first is an expression that will be evaluated
 and cast to a boolean. If the boolean is `$true`, the second argument is
 evaluated. If the boolean is `$false` the thrid argument is evaluated.
@@ -3506,6 +3507,13 @@ The third argument is optional.
 };
 
 std:assert_eq msg "x is bigger than 4";
+
+# You may also use `if` in case it suits your coding style better:
+if x == 10 {
+    std:assert $true;
+} {
+    std:assert $false;
+};
 ```
 
 The _condition_ can also be a function block, which will be evaluated:

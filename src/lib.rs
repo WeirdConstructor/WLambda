@@ -16,13 +16,17 @@ Here are some of its properties:
   Current performance is roughly in the ball park of (C)Python or Perl, which means
   the language is quite possibly too slow where speed is the focus, but fast enough if
   you do any heavy lifting in Rust.
+- Main data structures are Vectors and Maps.
 - No garbage collector. Memory and resource management relies only on reference counting and RAII.
-You can create your own drop functions.
+  You can create your own drop functions.
 - Preserving Rust safety by not using `unsafe`.
-- Main data structures are Lists and Maps.
-- No exceptions, except panics. Error handling is accomplished
-by a specialized data type. It can be thought of as dynamic counterpart
-of Rust's Result type.
+- WLambda makes no guarantees that it will not panic and crash your application
+  if bad code is executed. More hardening is required for running untrusted
+  code on the application side (resource limits (ram/cpu), catching panic
+  unwinding, limit file system access, ...).
+- No exceptions, except WLambda level panics. Error handling is accomplished by
+  a specialized data type. It can be thought of as dynamic counterpart of
+  Rust's Result type.
 - Prototyped object orientation.
 - Easy maintenance and hackability of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).

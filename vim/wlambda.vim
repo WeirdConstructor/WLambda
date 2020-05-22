@@ -16,12 +16,13 @@ syn match wlMapKeyId    /[a-zA-Z_@]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ contai
 
 syn match wlComment /#.*$/
 
-syn keyword wlRepeat    for while range return break next match
+syn keyword wlRepeat    iter jump if for while range return break next match
 syn keyword wlKeyword   panic not block unwrap unwrap_err error_to_str
 syn keyword wlKeyword   sym is_some is_none is_err is_map is_vec is_fun is_str is_sym
 syn keyword wlKeyword   is_ref is_wref is_bool is_bytes is_float is_int len type to_drop
 syn keyword wlKeyword   float bool int on_error
 syn match wlKeyword "_?"
+syn match wlRepeat "?"
 
 syn match wlKeyword "std:append"
 syn match wlKeyword "std:assert"

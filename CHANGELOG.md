@@ -3,6 +3,7 @@
 
 * Incompatible Change: `a + b ~ c` is no longer `a + (b ~ c)` but `(a + b) ~ c`
 to let `iter i 0 => 10 ~ std:displayln i` work properly.
+* Feature: Allowing to use `if` instead of just `?`.
 * Feature: `iter $&&i ...` syntax implemented, for creating new references
 for each iteration for easier closure generation.
 * Feature: Implemented pair operator `a => b` which does the same as `$p(a, b)`.

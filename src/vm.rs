@@ -1461,7 +1461,7 @@ pub fn vm_compile_if2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     if ast.len() != 4 && ast.len() != 5 {
         return Err(ast.compile_err(
-            "? takes 1 or 2 arguments (condition and expression)".to_string()))
+            "?/if takes 1 or 2 arguments (condition and expression)".to_string()))
     }
 
     let cond =
@@ -2183,6 +2183,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         if let Some(sym) = symbol {
                             match &sym[..] {
                                 "?"     => return vm_compile_if2(ast, ce),
+                                "if"    => return vm_compile_if2(ast, ce),
                                 "while" => return vm_compile_while2(ast, ce),
                                 "iter"  => return vm_compile_iter2(ast, ce),
                                 "next"  => return vm_compile_next2(ast, ce),

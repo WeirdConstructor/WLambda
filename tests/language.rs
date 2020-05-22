@@ -2914,11 +2914,15 @@ fn check_if() {
 //std:assert_eq res 39;
 //"), "");
     assert_eq!(v("? { !x = 10; x > 1 } 99 49"), "99");
+    assert_eq!(v("if { !x = 10; x > 1 } 99 49"), "99");
     assert_eq!(v("? { !x = 10; x > 1 } 99"),    "99");
+    assert_eq!(v("if { !x = 10; x > 1 } 99"),    "99");
     assert_eq!(v("!res = ? { !x = 10; x > 1 } 99 49; res"), "99");
     assert_eq!(v("!res = ? { !x = 10; x > 1 } 99; res"),    "99");
     assert_eq!(ve("? 2 > 3 { 1 } { 2 }"), "2");
     assert_eq!(ve("? 2 < 3 { 1 } { 2 }"), "1");
+    assert_eq!(ve("if 2 > 3 { 1 } { 2 }"), "2");
+    assert_eq!(ve("if 2 < 3 { 1 } { 2 }"), "1");
     assert_eq!(ve(r"
         !y = ? 2 < 3 { !x = 11; 1 } { 2 };
         y
@@ -2961,9 +2965,9 @@ fn check_if() {
         $[x, y, k[]]
     "), "$[10,1,$n]");
     assert_eq!(ve("? 1"),
-        "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ? takes 1 or 2 arguments (condition and expression)");
+        "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
     assert_eq!(ve("? 1 2 3 4"),
-        "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ? takes 1 or 2 arguments (condition and expression)");
+        "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
 }
 
 #[test]
