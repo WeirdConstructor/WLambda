@@ -885,37 +885,37 @@ fn check_string() {
 
 #[test]
 fn check_match() {
-    assert_eq!(ve("match 10 :?t :integer {|| 13 } {|| 14 }"), "13");
-    assert_eq!(ve("match 10 :?t :string {|| 13 } {|| 14 }"), "14");
-    assert_eq!(ve("match 10 :?t :string {|| 13 }"),        "$n");
-    assert_eq!(ve("match $q xx :?s :xx      {|| 15 }"),    "15");
-    assert_eq!(ve("match $q xx :?s :yx :xx  {|| 16 }"),    "16");
-    assert_eq!(ve("match $q zx :?s :yx :xx  {|| 16 } {|| 17 }"), "17");
-    assert_eq!(ve("match $q xx :?p { _ == $q|xx| } {|| 18 }"),    "18");
-    assert_eq!(ve("match $q x9 :?p { _ == $q|xx| } {|| 181 } {|| 19 }"), "19");
-    assert_eq!(ve("match 10"),                           "$n");
-    assert_eq!(ve("
-        match ($e $[:foo, 1, 2, 3])
-            :?e :foo {|| 19 }
-            :?e :bar {|| 19.2 }
-            :?e :sna :snu {|| 19.4 }
-            { :nothin }
-    "), "19");
-    assert_eq!(ve("
-        match (
-            $e $[:bar, 1, 2, 3] )
-            :?e :foo {|| 19 }
-            :?e :bar {|4| $[(2 _) + 19.2, _1] }
-            :?e :sna :snu {|| 19.4 }
-            { :nothin }
-    "), "$[21,3]");
-    assert_eq!(ve("
-        match ($e $[:snu, 1, 2, 3])
-            :?e :foo {|| 19 }
-            :?e :bar {|| 19.2 }
-            :?e :sna :snu {|| 19.4 + _.3 }
-            { :nothin }
-    "), "22.4");
+//    assert_eq!(ve("match 10 :?t :integer {|| 13 } {|| 14 }"), "13");
+//    assert_eq!(ve("match 10 :?t :string {|| 13 } {|| 14 }"), "14");
+//    assert_eq!(ve("match 10 :?t :string {|| 13 }"),        "$n");
+//    assert_eq!(ve("match $q xx :?s :xx      {|| 15 }"),    "15");
+//    assert_eq!(ve("match $q xx :?s :yx :xx  {|| 16 }"),    "16");
+//    assert_eq!(ve("match $q zx :?s :yx :xx  {|| 16 } {|| 17 }"), "17");
+//    assert_eq!(ve("match $q xx :?p { _ == $q|xx| } {|| 18 }"),    "18");
+//    assert_eq!(ve("match $q x9 :?p { _ == $q|xx| } {|| 181 } {|| 19 }"), "19");
+//    assert_eq!(ve("match 10"),                           "$n");
+//    assert_eq!(ve("
+//        match ($e $[:foo, 1, 2, 3])
+//            :?e :foo {|| 19 }
+//            :?e :bar {|| 19.2 }
+//            :?e :sna :snu {|| 19.4 }
+//            { :nothin }
+//    "), "19");
+//    assert_eq!(ve("
+//        match (
+//            $e $[:bar, 1, 2, 3] )
+//            :?e :foo {|| 19 }
+//            :?e :bar {|4| $[(2 _) + 19.2, _1] }
+//            :?e :sna :snu {|| 19.4 }
+//            { :nothin }
+//    "), "$[21,3]");
+//    assert_eq!(ve("
+//        match ($e $[:snu, 1, 2, 3])
+//            :?e :foo {|| 19 }
+//            :?e :bar {|| 19.2 }
+//            :?e :sna :snu {|| 19.4 + _.3 }
+//            { :nothin }
+//    "), "22.4");
 }
 
 #[test]
@@ -3623,7 +3623,7 @@ fn check_struct_match() {
     assert_eq!(ve("match $i(1,2,3,4) 30"),                                  "30");
     assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) => { $[$\\.z,$\\.w] };"),  "$[3,4]");
     assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 42;"),               "42");
-    assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 0 => 42;"),          "$n");
+//    assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 0 => 42;"),          "$n");
 }
 
 #[test]

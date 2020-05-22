@@ -2434,13 +2434,13 @@ std:assert_eq ((x == "ON") { 10 } { 20 }) 20;
 
 !state = "";
 match x
-    :ON  {|| .state = "is on" }
-    :OFF {|| .state = "is off" };
+    :ON  => { .state = "is on" }
+    :OFF => { .state = "is off" };
 std:assert_eq state "is on";
 
 match y
-    :ON  {|| .state = "is on" }
-    :OFF {|| .state = "is off" };
+    :ON  => { .state = "is on" }
+    :OFF => { .state = "is off" };
 std:assert_eq state "is off";
 ```
 
@@ -3878,6 +3878,46 @@ std:assert_eq sum 7;
     $+ _;
 };
 std:assert_eq sum 25;
+```
+
+#### - jump _index-val_ _branch1_ ... _last-branch_
+
+This is a jump table operation, it's a building block for the more
+sophisticated `match` operation. The first argument is an index into the table.
+If the index is outside the table the _last-branch_ is jumped to.  The branches
+are compiled like the bodies of `while`, `iter`, `match` and `?` into a runtime
+evaluated block.
+
+```wlambda
+!x   = 10;
+!idx = 2;
+
+!res =
+    jump idx
+        { x + 3 }
+        { x + 4 }
+        { x + 5 };
+
+std:assert_eq res 15;
+```
+
+The arms don't have to be in `{ ... }` because they are blocks
+and the above could be written like this:
+
+```wlambda
+!x   = 10;
+!idx = 2;
+
+!res =
+    jump idx
+        x + 3
+        x + 4
+        x + 5;
+std:assert_eq res 15;
+
+# or even this:
+!res = x + (jump idx 3 4 5);
+std:assert_eq res 15;
 ```
 
 ### <a name="72-collection-iteration"></a>7.2 - Collection Iteration

@@ -1,6 +1,8 @@
 0.5.1 (unreleased)
 ==================
 
+* Incompatible Change: `a + b ~ c` is no longer `a + (b ~ c)` but `(a + b) ~ c`
+to let `iter i 0 => 10 ~ std:displayln i` work properly.
 * Feature: `iter $&&i ...` syntax implemented, for creating new references
 for each iteration for easier closure generation.
 * Feature: Implemented pair operator `a => b` which does the same as `$p(a, b)`.
@@ -9,8 +11,8 @@ nice composition with the pair operator: `$iter 0 => 10`.
 * Feature: Implemented argument function call operators `a &> f` and `f <& a`,
 so you can write regular expressions like `? "foo" &> $r/a*b/ { ... }`
 without parenthesis.
-* Incompatible Change: `a + b ~ c` is no longer `a + (b ~ c)` but `(a + b) ~ c`
-to let `iter i 0 => 10 ~ std:displayln i` work properly.
+* Feature: Added a jump table operation `jump idx branch-a branch-b branch-c`
+as supporting operation for `match`.
 
 0.5.0 (2020-05-21)
 ==================
