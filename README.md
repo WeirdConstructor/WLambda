@@ -122,7 +122,7 @@ std:assert_eq x 5;
 ```wlambda
 !sum = 0;
 
-iter i $i(0, 10, 1) {
+iter i 0 => 10 {
     .sum = sum + i;
 };
 
@@ -431,23 +431,13 @@ and more or less clever code generator.
 This project is licensed under the GNU General Public License Version 3 or
 later.
 
-### Conversion to MIT / Apache-2.0
-
-I (WeirdConstructor) herby promise to release WLambda under MIT / Apache-2.0
-license if you use it in an open source / free software game (licensed under
-MIT and/or Apache-2.0) written in Rust (and WLambda) with a playable beta
-release, non trivial amount of content and enough gameplay to keep me occupied
-for at least 2 hours. You may use WLambda for your release as if it was
-released under MIT and/or Apache-2.0. Proper attribution as required by MIT
-and/or Apache-2.0.
-
 ### Why GPL?
 
 Picking a license for my code bothered me for a long time. I read many
 discussions about this topic. Read the license explanations. And discussed
 this matter with other developers.
 
-First about _why I write code for free_ at all:
+First about _why I write code for free_ at all, the reasons are:
 
 - It's my passion to write computer programs. In my free time I can
 write the code I want, when I want and the way I want. I can freely
@@ -465,34 +455,44 @@ _why I publish the code_, when I could as well keep it to myself:
 
 Most of those reasons don't yet justify GPL. The main point of the GPL, as far
 as I understand: The GPL makes sure the software stays free software until
-eternity. That the user of the software always stays in control. That the users
-have _at least the means_ to adapt the software to new platforms or use cases.
+eternity. That the _end user_ of the software always stays in control. That the users
+have the means to adapt the software to new platforms or use cases.
 Even if the original authors don't maintain the software anymore.
 It ultimately prevents _"vendor lock in"_. I really dislike vendor lock in,
 especially as developer. Especially as developer I want and need to stay
-in control of the computers I use.
+in control of the computers and software I use.
 
-Another point is, that my work has a value. If I give away my work without
-_any_ strings attached, I effectively work for free. Work for free for
-companies. I would compromise the price I can demand for my skill, workforce
-and time.
+Another point is, that my work (and the work of any other developer) has a
+value. If I give away my work without _any_ strings attached, I effectively
+work for free. This compromises the price I (and potentially other developers)
+can demand for the skill, workforce and time.
 
 This makes two reasons for me to choose the GPL:
 
-1. I do not want to support vendor lock in scenarios. At least not for free.
-   I want to prevent those when I have a choice.
-   And before you ask, yes I work for a company that sells closed source
-   software. I am not happy about the closed source fact.
-   But it pays my bills and gives me the freedom to write free software
-   in my free time.
-2. I don't want to low ball my own wage and prices by giving away free software
-   with no strings attached (for companies).
+1. I do not want to support vendor lock in scenarios for free.
+   I want to prevent those when I have a choice, when I invest my private
+   time to bring value to the end users.
+2. I don't want to low ball my own wage and prices by giving away the work
+   I spent my scarce private time on with no strings attached. So that companies
+   are able to use it in closed source projects.
 
-### If you need a permissive or private license (MIT)
+### Conversion to MIT / Apache-2.0
 
-Please contact me if you need a different license and really want to use
-my code. As long as I am the only author, I can change the license.
-We might find an agreement.
+I (WeirdConstructor) herby promise to release WLambda under MIT / Apache-2.0
+license if you use it in an open source / free software game (licensed under
+MIT and/or Apache-2.0) written in Rust (and WLambda) with a playable beta
+release, non trivial amount of content and enough gameplay to keep me occupied
+for at least 2 hours. You may use WLambda for your release as if it was
+released under MIT and/or Apache-2.0. Proper attribution as required by MIT
+and/or Apache-2.0.
+
+### If you need a permissive or private license (MIT) right now
+
+Please contact me if you need a different license and want to use my code. As
+long as I am the only author, I can change the license the for code that was
+written by me. We might find an agreement that involves money or something
+else.  For your price estimations: At this point in time (May 2020) I invested
+about 6 months of my private time into this project.
 
 ## Contribution
 
