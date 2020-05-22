@@ -906,6 +906,17 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     out_reg!(env, ret, retv, data, r, a);
                 }
             },
+            Op::JmpTbl(a, tbl) => {
+                in_reg!(env, ret, data, a);
+                let i = a.i();
+                let idx : usize =
+                    if i >= tbl.len() as i64 || i < 0 {
+                        tbl.len() - 1
+                    } else {
+                        i as usize
+                    };
+                pc = (pc as i32 + tbl[idx]) as usize;
+            },
             Op::CtrlFlow(flw) => {
                 match flw {
                     CtrlFlow::Next => {
@@ -1656,50 +1667,65 @@ pub fn vm_compile_jump2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         blocks.push(vm_compile_direct_block2(&block, ce)?);
     }
 
-
-
-//                    let variable_map = VVal::map();
-//
-//                    let fun =
-//                        struct_pattern::create_struct_pattern_function(
-//                            &ast.at(1).unwrap(), &variable_map)?;
-//
-//    if ast.len() != 4 {
-//        return Err(ast.compile_err(
-//            "while takes exactly 2 arguments (condition and expression)"
-//            .to_string()));
-//    }
-//
-//    let cond =
-//        vm_compile_direct_block2(
-//            &ast.at(2).unwrap_or_else(|| VVal::None), ce)?;
-//
-//    let body =
-//        vm_compile_direct_block2(
-//            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
-
     return pw!(prog, store, {
+        let mut block_progs = Vec::new();
+        let mut end_offs : i32 = 0;
+
         let needs_store = store.if_null(|_| {
-//            let mut then_body_prog = Prog::new();
-//            then_body.eval_nul(&mut then_body_prog);
+            end_offs = 0;
+            for b in blocks.iter().rev() {
+                let mut b_prog = Prog::new();
 
-//            then_body_prog.op_jmp(&spos, else_body_prog.op_count() as i32);
+                b.eval_nul(&mut b_prog);
 
-//            let condval = cond.eval(prog);
-//            prog.op_jmp_ifn(
-//                &spos, condval, then_body_prog.op_count() as i32);
-//            prog.append(then_body_prog);
+                if end_offs > 0 {
+                    b_prog.op_jmp(&spos, end_offs);
+                }
+                end_offs += b_prog.op_count() as i32;
+
+                block_progs.push(b_prog);
+            }
         });
 
-        if needs_store {
-            store.if_must_store(|store_pos| {
-//                let mut then_body_prog = Prog::new();
-//                let tbp = then_body.eval(&mut then_body_prog);
-//                else_body_prog.op_mov(&spos, tbp, store_pos);
-            })
-        } else {
-            ResPos::Value(ResValue::None)
+        let res =
+            if needs_store {
+                store.if_must_store(|store_pos| {
+                    end_offs = 0;
+                    for b in blocks.iter().rev() {
+                        let mut b_prog = Prog::new();
+
+                        let block_val = b.eval(&mut b_prog);
+                        b_prog.op_mov(&spos, block_val, store_pos);
+                        if end_offs > 0 {
+                            b_prog.op_jmp(&spos, end_offs);
+                        }
+                        end_offs += b_prog.op_count() as i32;
+
+                        block_progs.push(b_prog);
+                    }
+                })
+            } else {
+                ResPos::Value(ResValue::None)
+            };
+
+        let mut val_prog = Prog::new();
+        let mut val = value.eval(&mut val_prog);
+
+        let mut tbl : Vec<i32> = vec![];
+        let mut offs = 0;
+        for b in block_progs.iter().rev() {
+            tbl.push(offs);
+            offs += b.op_count() as i32;
         }
+
+        val_prog.op_jmp_tbl(&spos, val, tbl);
+
+        prog.append(val_prog);
+        for b in block_progs.into_iter().rev() {
+            prog.append(b);
+        }
+
+        res
     });
 }
 

@@ -3624,3 +3624,14 @@ fn check_struct_match() {
     assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) => { $[z,w] };"),  "");
     assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 42;"),       "");
 }
+
+#[test]
+fn check_jump_table() {
+    assert_eq!(ve("jump -1 10 30"), "30");
+    assert_eq!(ve("jump 2  10 30"), "30");
+    assert_eq!(ve("jump 0  10 30"), "10");
+    assert_eq!(ve("jump 1  10 30"), "30");
+    assert_eq!(ve("(jump 1  10 20 30) + 11"), "31");
+    assert_eq!(ve("$@v iter i -1 => 4 { $+ ~ jump i { !x = 10; str x } { 20 } 30 }"),
+               "$[30,\"10\",20,30,30]");
+}

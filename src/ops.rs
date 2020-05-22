@@ -181,6 +181,9 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
+                Op::JmpTbl(p1, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                },
                 Op::GetIdx(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
@@ -321,6 +324,11 @@ impl Prog {
     pub fn op_or_jmp(&mut self, sp: &SynPos, a: ResPos, jmp: i32, r: ResPos) {
         self.set_dbg(sp.clone());
         self.push_op(Op::OrJmp(a, jmp, r));
+    }
+
+    pub fn op_jmp_tbl(&mut self, sp: &SynPos, a: ResPos, tbl: Vec<i32>) {
+        self.set_dbg(sp.clone());
+        self.push_op(Op::JmpTbl(a, Box::new(tbl)));
     }
 
     pub fn op_destr(&mut self, sp: &SynPos, a: ResPos, destr_info: DestructureInfo) {
@@ -848,6 +856,7 @@ pub enum Op {
     JmpIfN(ResPos, i32),
     OrJmp(ResPos, i32, ResPos),
     AndJmp(ResPos, i32, ResPos),
+    JmpTbl(ResPos, Box<Vec<i32>>),
     CtrlFlow(CtrlFlow),
     Builtin(Builtin),
     IterInit(ResPos, i32),
