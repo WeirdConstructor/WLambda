@@ -1,6 +1,10 @@
 0.5.1 (unreleased)
 ==================
 
+* Incompatible Change: The nested parenthesis matching for quoted strings
+was a bad design because you can't properly quote strings
+with non matching parenthesis anymore - which is sometimes desired if a
+regex pattern or selector pattern is to be quoted.
 * Incompatible Change: `a + b ~ c` is no longer `a + (b ~ c)` but `(a + b) ~ c`
 to let `iter i 0 => 10 ~ std:displayln i` work properly.
 * Feature: Allowing to use `if` instead of just `?`.
@@ -14,6 +18,7 @@ so you can write regular expressions like `? "foo" &> $r/a*b/ { ... }`
 without parenthesis.
 * Feature: Added a jump table operation `jump idx branch-a branch-b branch-c`
 as supporting operation for `match`.
+* Feature: Updates VIM syntax file `vim/wlambda.vim`.
 
 0.5.0 (2020-05-21)
 ==================

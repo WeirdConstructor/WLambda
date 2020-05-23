@@ -373,40 +373,16 @@ fn parse_quoted<F, V>(ps: &mut State, mut v: V, add_char: F) -> Result<V, ParseE
         _ => quote_char
     };
 
-//    let mut s = String::from("");
-//    let mut v : Vec<u8> = Vec::new();
+    let mut cont_next = false;
+    while ps.peek().unwrap_or(quote_char) != quote_char {
+        let c = ps.expect_some(ps.peek())?;
+        ps.consume();
+        add_char(&mut v, c);
+    }
 
-    let mut quote_stack : Vec<char> = vec![quote_char];
-
-    while !quote_stack.is_empty() {
-        let next_quote = *quote_stack.last().unwrap();
-
-        let mut cont_next = false;
-        while ps.peek().unwrap_or(next_quote) != next_quote {
-            let c = ps.expect_some(ps.peek())?;
-            ps.consume();
-            add_char(&mut v, c);
-//            addchr(&mut v, &mut s, bytes, c);
-
-            match c {
-                '[' => { quote_stack.push(']'); cont_next = true; break; },
-                '(' => { quote_stack.push(')'); cont_next = true; break; },
-                '{' => { quote_stack.push('}'); cont_next = true; break; },
-                _ => (),
-            }
-        }
-
-        if !cont_next {
-            if !ps.consume_if_eq(next_quote) {
-                return Err(ps.err(
-                    ParseErrorKind::ExpectedToken(next_quote, "quote string end")));
-            }
-
-            quote_stack.pop();
-            if !quote_stack.is_empty() {
-                add_char(&mut v, next_quote);
-            }
-        }
+    if !ps.consume_if_eq(quote_char) {
+        return Err(ps.err(
+            ParseErrorKind::ExpectedToken(next_quote, "quote string end")));
     }
 
     ps.skip_ws_and_comments();
