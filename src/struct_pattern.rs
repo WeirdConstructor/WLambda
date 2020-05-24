@@ -15,6 +15,28 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal)
     println!("COMP STRUCT PAT: {}", ast.s());
 
     match syn.get_syn() {
+        Syntax::Call => {
+            if ast.v_(1).v_(0).get_syn() != Syntax::Var {
+                return Err(ast.compile_err(
+                    format!("invalid variable binding in structure pattern: {}",
+                            ast.v_(1).s())))
+            }
+            let var_bind = compile_struct_pattern(&ast.v_(1), var_map)?;
+
+            let mut or_terms = vec![];
+            for i in 2..ast.len() {
+                or_terms.push(compile_struct_pattern(&ast.v_(i), var_map)?);
+            }
+
+            Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                for o in or_terms.iter() {
+                    if o(v, f) {
+                        return var_bind(v, f);
+                    }
+                }
+                return false;
+            }))
+        },
         Syntax::Var => {
             let sym = ast.v_(1);
             var_map.set_key(&sym, VVal::Bol(true));
@@ -160,7 +182,13 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal)
                         format!("invalid structure pattern: {}", ast.s())))
                 }
             }
-        }
+        },
+        Syntax::Str => {
+            let s = ast.v_(1).clone();
+            Ok(Box::new(move |v: &VVal, _f: &FnVarAssign| {
+                s.eqv(&v.deref())
+            }))
+        },
         _ => {
             if ast.is_pair() {
                 let p1 = compile_struct_pattern(&ast.at(0).unwrap(), var_map)?;

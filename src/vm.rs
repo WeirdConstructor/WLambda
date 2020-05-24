@@ -1783,6 +1783,7 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             if struct_pat.is_pair() {
                 patterns.push(struct_pat.v_(0));
                 blocks.push(vm_compile_direct_block2(&struct_pat.v_(1), ce)?);
+                blocks.push(vm_compile2(&VVal::None, ce)?);
             } else {
                 blocks.push(vm_compile_direct_block2(&struct_pat, ce)?);
             }

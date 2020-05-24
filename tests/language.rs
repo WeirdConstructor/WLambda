@@ -3608,6 +3608,12 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P 1)               1"),            "${}");
     assert_eq!(ve("($P 1)               1.0"),          "$n");
     assert_eq!(ve("($P 1.0)             1.0"),          "${}");
+
+    assert_eq!(ve("($P 3 4)             4"),            "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: invalid variable binding in structure pattern: 3");
+    assert_eq!(ve("($P x 4)             4"),            "${x=4}");
+    assert_eq!(ve("($P x 4 5 6)         5"),            "${x=5}");
+    assert_eq!(ve("($P x 4 5 :x => 6)   :x => 6"),      "${x=$p(:x,6)}");
+
     assert_eq!(ve("($P $p(x, y))        20 => 30"),     "${x=20,y=30}");
     assert_eq!(ve("($P $p(x, 30))       20 => 30"),     "${x=20}");
     assert_eq!(ve("($P $p(x, 40))       20 => 30"),     "$n");
@@ -3626,6 +3632,13 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P $f(1.1, 2, z))       $f(1.1,2,3)"),    "$n");
     assert_eq!(ve("($P $f(1.1, 2.0, z))     $f(1.1,2,3,4)"),  "$n");
     assert_eq!(ve("($P $f(1.1, 2.0, z, w))  $f(1.1,2,3,4)"),  "${w=4,z=3}");
+
+    assert_eq!(ve("($P $q foo )    $q/foo/"),                                   "${}");
+    assert_eq!(ve("($P x $q foo )  $q/foo/"),                                   "${x=\"foo\"}");
+    assert_eq!(ve("($P x $Q foo )  $q/foo/"),                                   "$n");
+    assert_eq!(ve("($P x $Q foo )  $b\"foo\""),                                 "${x=$b\"foo\"}");
+    assert_eq!(ve("($P x $r/f(^$*o)*(^$+(bar))/)  \"fooooXXXbarbarbar\""),      "${}");
+    assert_eq!(ve("($P x $[:a, $S& */a &])  $[:a, $[${a=2},${a=3},${a=4}]]"),   "${}");
 }
 
 #[test]
@@ -3634,10 +3647,34 @@ fn check_struct_match() {
     assert_eq!(ve("match $i(1,2,3,4) 20 30"),                       "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match argument 2 is not a pair: 20");
     assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) { $[z,w] };"),     "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match argument 2 is not a pair: $[&IVec,1,2,$[&Var,:z],$[&Var,:w]]");
 
+    assert_eq!(ve("match $i(1,2) $i(1,:s) => 11 0 => 42;"),          "$n");
+    assert_eq!(ve("match $i(1,2) $i(1,:s) => 11 0 => 42 55;"),       "55");
+
     assert_eq!(ve("match $i(1,2,3,4) 30"),                                  "30");
     assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) => { $[$\\.z,$\\.w] };"),  "$[3,4]");
     assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 42;"),               "42");
-//    assert_eq!(ve("match $i(1,2)     $i(1,:s)    => 11 0 => 42;"),          "$n");
+    assert_eq!(ve(r#"
+        match $i(1,2,3)
+            $i(x,1,y)   => (:a => $\)
+            $i(x,2,y)   => (:b => $\)
+            $i(x,3,y)   => (:c => $\)
+            40;
+    "#), "$p(:b,${x=1,y=3})");
+    assert_eq!(ve(r#"
+        !m = {
+            match _
+                $i(x,  1, y) => (:a => $\.x)
+                $i(x,  2, y) => (:b => $\.x)
+                $i(x,  3, y) => (:c => $\.x)
+                $i(x, 99, y) => { !(x, y) = $\; x + y }
+                :nothing
+        };
+        $[
+            m[$i(3,2,5)],
+            m[$i(3,9,5)],
+            m[$i(3,99,5)],
+        ]
+    "#), "$[$p(:b,3),:nothing,8]");
 }
 
 #[test]

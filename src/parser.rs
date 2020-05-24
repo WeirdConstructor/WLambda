@@ -294,7 +294,7 @@ structure patterns that are used by `$P ...` and `match`.
 
 | WLambda Value | Semantics |
 |-|-|
-| `x $P`                 | Assign the value that matched $P to the variable `x`. |
+| `x $P $P1 ... $Pn`     | Assign the value that matched $P, $P1 or $Pn to the variable `x`. |
 | `_* $P`                | Matches 0 or N appearances of the pattern $P. |
 | `_+ $P`                | Matches 1 or N appearances of the pattern $P. |
 | `_? $P`                | Matches 0 or 1 appearances of the pattern $P. |
