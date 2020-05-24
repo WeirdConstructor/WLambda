@@ -382,7 +382,7 @@ fn parse_quoted<F, V>(ps: &mut State, mut v: V, add_char: F) -> Result<V, ParseE
 
     if !ps.consume_if_eq(quote_char) {
         return Err(ps.err(
-            ParseErrorKind::ExpectedToken(next_quote, "quote string end")));
+            ParseErrorKind::ExpectedToken(quote_char, "quote string end")));
     }
 
     ps.skip_ws_and_comments();

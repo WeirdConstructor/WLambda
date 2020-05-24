@@ -4605,7 +4605,7 @@ the results of the latest match that was exectuted:
 
 ```wlambda
 !res =
-    ? ($r/ $<*? (^$+[\\/]) * / "foo//\\/foo") {
+    ? ($r| $<*? (^$+[\\/]) * | "foo//\\/foo") {
         std:assert_eq $\.0 "foo//\\/foo";
 
         $\.1
