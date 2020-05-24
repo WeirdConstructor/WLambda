@@ -3666,14 +3666,20 @@ fn check_struct_match() {
             40;
     "#), "$p(:b,${x=1,y=3})");
     assert_eq!(ve(r#"
-        !m = {
-            match _
-                $i(x,  1, y) => (:a => $\.x)
-                $i(x,  2, y) => (:b => $\.x)
-                $i(x,  3, y) => (:c => $\.x)
-                $i(x, 99, y) => { !(x, y) = $\; x + y }
-                :nothing
-        };
+        !m = \match _
+            $S(*/x)      => (:sel => $\)
+            $i(x,  1, y) => (:a => $\.x)
+            $i(x,  2, y) => (:b => $\.x)
+            $i(x,  3, y) => (:c => $\.x)
+            $i(x, 99, y) => { !(x, y) = $\; x + y }
+            :nothing;
+
+        std:assert_eq m[$[${f=10},${l=30}]]         :nothing;
+        std:assert_eq str[m[$[${x=10},${l=30}]]]    (str $p(:sel,${_=$[10]}));
+        std:assert_eq str[m[$[${x=10},${x=30}]]]    (str $p(:sel,${_=$[10, 30]}));
+        std:assert_eq m[$i(3,2,5)]           $p(:b, 3);
+        std:assert_eq m[$i(3,9,5)]           :nothing;
+        std:assert_eq m[$i(3,99,5)]          8;
         $[
             m[$i(3,2,5)],
             m[$i(3,9,5)],
