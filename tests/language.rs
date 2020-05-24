@@ -3637,6 +3637,8 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P $f(1.1, 2.0, z))     $f(1.1,2,3,4)"),  "$n");
     assert_eq!(ve("($P $f(1.1, 2.0, z, w))  $f(1.1,2,3,4)"),  "${w=4,z=3}");
 
+    assert_eq!(ve("($P $f(1.1, 2.0, z, w))  $f(1.1,2,3,4); $\\"), "${w=4,z=3}");
+
     assert_eq!(ve("($P $q foo )    $q/foo/"),                                   "${}");
     assert_eq!(ve("($P x $q foo )  $q/foo/"),                                   "${x=\"foo\"}");
     assert_eq!(ve("($P x $Q foo )  $q/foo/"),                                   "$n");

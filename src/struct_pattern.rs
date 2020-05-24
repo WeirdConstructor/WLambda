@@ -295,7 +295,7 @@ pub fn create_struct_patterns_direct_fun(patterns: &Vec<VVal>, var_map: &VVal)
     }))
 }
 
-pub fn create_struct_pattern_function(ast: &VVal, var_map: &VVal) -> Result<VVal, CompileError> {
+pub fn create_struct_pattern_function(ast: &VVal, var_map: &VVal, result_ref: VVal) -> Result<VVal, CompileError> {
     let struct_pat = vec![ast.clone()];
     let fun_constructor =
         create_struct_patterns_direct_fun(&struct_pat, var_map)?;
@@ -311,7 +311,9 @@ pub fn create_struct_pattern_function(ast: &VVal, var_map: &VVal) -> Result<VVal
 
             let res = (dfun.fun)(env.arg(0), env);
 
-            if res.i() >= 0 { Ok(m) }
-            else { Ok(VVal::None) }
+            if res.i() >= 0 {
+                result_ref.set_ref(m.clone());
+                Ok(m)
+            } else { Ok(VVal::None) }
         }, Some(1), Some(1), false))
 }

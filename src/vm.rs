@@ -2606,11 +2606,16 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     })
                 },
                 Syntax::StructPattern => {
+                    let res_ref =
+                        ce.borrow_mut().global.borrow_mut()
+                          .get_var_ref("\\")
+                          .unwrap_or_else(|| VVal::None);
+
                     let variable_map = VVal::map();
 
                     let fun =
                         struct_pattern::create_struct_pattern_function(
-                            &ast.at(1).unwrap(), &variable_map)?;
+                            &ast.at(1).unwrap(), &variable_map, res_ref)?;
                     pw_provides_result_pos!(prog, {
                         prog.data_pos(fun.clone())
                     })

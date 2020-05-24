@@ -250,7 +250,7 @@ syn match wlArity     '|\s*|'                   contained
 
 syn match wlSplice      '*'           contained nextgroup=@wlExpr
 
-syn cluster wlExpr  contains=wlComment,wlRefData,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlArgList,wlFunc,wlFuncCombinators,wlList,wlMap,wlNumVec,wlPair,wlStructMatch,wlQuote,wlShortFunc
+syn cluster wlExpr  contains=wlComment,wlRefData,wlValue,wlIdentifier,wlKeyword,wlKeyword2,wlRepeat,wlSymbol,wlQSymbol,wlString,wlArgList,wlFunc,wlFuncCombinators,wlList,wlMap,wlNumVec,wlPair,wlStructMatch,wlQuote,wlShortFunc,wlSelector,wlRxPattern
 
 syn region wlMap       matchgroup=wlRefData start="\${" end="}"     transparent contains=@wlExpr,wlMapKeyId,wlSplice
 syn region wlList      matchgroup=wlRefData start="\$\[" end="\]"   transparent contains=@wlExpr,wlSplice
