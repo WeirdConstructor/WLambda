@@ -3604,6 +3604,10 @@ fn check_iter_var_closure() {
 #[test]
 fn check_struct_patterns() {
     assert_eq!(ve("($P x)               10"),           "${x=10}");
+    assert_eq!(ve("($P 1.0)             1"),            "$n");
+    assert_eq!(ve("($P 1)               1"),            "${}");
+    assert_eq!(ve("($P 1)               1.0"),          "$n");
+    assert_eq!(ve("($P 1.0)             1.0"),          "${}");
     assert_eq!(ve("($P $p(x, y))        20 => 30"),     "${x=20,y=30}");
     assert_eq!(ve("($P $p(x, 30))       20 => 30"),     "${x=20}");
     assert_eq!(ve("($P $p(x, 40))       20 => 30"),     "$n");
