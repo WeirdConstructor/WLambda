@@ -219,6 +219,29 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal)
                 }
             }
         },
+        Syntax::Selector => {
+            let res_ref = (VVal::None).to_ref();
+            let rvar = s2sym("_");
+
+            match ast.at(1).unwrap().with_s_ref(|sel_src|
+                    selector::create_selector(sel_src, res_ref))
+            {
+                Ok(fun) => {
+                    Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                        let r = fun(&v.deref());
+                        if r.is_some() {
+                            f(&rvar, &r);
+                            true
+                        } else {
+                            false
+                        }
+                    }))
+                },
+                Err(e) => {
+                    return Err(ast.compile_err(format!("bad pattern: {}", e)))
+                }
+            }
+        },
         _ => {
             if ast.is_pair() {
                 let p1 = compile_struct_pattern(&ast.at(0).unwrap(), var_map)?;

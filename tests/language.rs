@@ -3642,6 +3642,7 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P x $Q foo )  $q/foo/"),                                   "$n");
     assert_eq!(ve("($P x $Q foo )  $b\"foo\""),                                 "${x=$b\"foo\"}");
     assert_eq!(ve("($P x $r/f(^$*o)*(^$+(bar))/)  \"fooooXXXbarbarbar\""),      "${_=$[\"fooooXXXbarbarbar\",\"oooo\",\"bar\"],x=\"fooooXXXbarbarbar\"}");
+    assert_eq!(ve("($P x $S& */a &)  $[${a=2},${a=3},${a=4}]"),                 "${_=$[2,3,4],x=$[${a=2},${a=3},${a=4}]}");
     assert_eq!(ve("($P x $[:a, $S& */a &])  $[:a, $[${a=2},${a=3},${a=4}]]"),   "${}");
 }
 

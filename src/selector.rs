@@ -1575,27 +1575,44 @@ fn check_pattern_start_anchor(pattern: &VVal) -> bool {
 /// and runs the given selector expression on it.
 /// The returned function then returns a list of captured nodes
 /// or `$none` if nothing was found.
-pub fn create_selector_function(sel: &str, result_ref: VVal)
-    -> Result<VVal, ParseError>
+pub fn create_selector(sel: &str, result_ref: VVal)
+    -> Result<Box<dyn Fn(&VVal) -> VVal>, ParseError>
 {
     let selector = parse_selector(sel)?;
     let comp_sel = compile_selector(&selector, false);
 
+    Ok(Box::new(move |v: &VVal| {
+        let mut state = SelectorState::new();
+        let capts = VVal::vec();
+        (*comp_sel)(v, &mut state, &capts);
+
+        if !capts.is_empty() {
+            result_ref.set_ref(capts.clone());
+            capts
+        } else {
+            result_ref.set_ref(VVal::None);
+            VVal::None
+        }
+    }))
+}
+
+
+/// Creates a WLambda function that takes a VVal data structure
+/// and runs the given selector expression on it.
+/// The returned function then returns a list of captured nodes
+/// or `$none` if nothing was found.
+pub fn create_selector_function(sel: &str, result_ref: VVal)
+    -> Result<VVal, ParseError>
+{
+    let rref2 = result_ref.clone();
+    let sel_fun = create_selector(sel, result_ref)?;
+
     Ok(VValFun::new_fun(
         move |env: &mut Env, _argc: usize| {
             if let Some(v) = env.arg_ref(0) {
-                let mut state = SelectorState::new();
-                let capts = VVal::vec();
-                (*comp_sel)(v, &mut state, &capts);
-
-                if !capts.is_empty() {
-                    result_ref.set_ref(capts.clone());
-                    Ok(capts)
-                } else {
-                    result_ref.set_ref(VVal::None);
-                    Ok(VVal::None)
-                }
+                Ok(sel_fun(v))
             } else {
+                rref2.set_ref(VVal::None);
                 Ok(VVal::None)
             }
         }, Some(1), Some(1), false))
