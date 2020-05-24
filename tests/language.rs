@@ -3620,6 +3620,10 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P $p(20, y))       20 => 30"),     "${y=30}");
     assert_eq!(ve("($P $p(:x, y))       :x => 30"),     "${y=30}");
 
+    assert_eq!(ve("($P $p(?, y))        :o => 30"),     "${y=30}");
+    assert_eq!(ve("($P $p(? 1 2 :o, y)) :o => 30"),     "${y=30}");
+    assert_eq!(ve("($P $p(? 1 2 :x, y)) :o => 30"),     "$n");
+
     assert_eq!(ve("($P $i(x, y))        $i(1,2)"),      "${x=1,y=2}");
     assert_eq!(ve("($P $i(x, y, z))     $i(1,2,3)"),    "${x=1,y=2,z=3}");
     assert_eq!(ve("($P $i(x, y, z, w))  $i(1,2,3,4)"),  "${w=4,x=1,y=2,z=3}");

@@ -43,10 +43,16 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal)
             var_map.set_key(&sym, VVal::Bol(true));
             let sym = sym.to_sym();
 
-            Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
-                f(&sym, v);
-                true
-            }))
+            if sym.to_string() == "?" {
+                Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                    true
+                }))
+            } else {
+                Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                    f(&sym, v);
+                    true
+                }))
+            }
         },
         Syntax::Key => {
             let sym = ast.v_(1);
