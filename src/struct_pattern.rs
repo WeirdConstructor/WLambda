@@ -1,6 +1,7 @@
 use crate::vval::*;
 use crate::str_int::*;
 use crate::ops::DirectFun;
+use crate::selector;
 
 pub type FnVarAssign = dyn Fn(&Symbol, &VVal);
 pub type FnVarReset  = dyn Fn();
@@ -188,6 +189,29 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal)
             Ok(Box::new(move |v: &VVal, _f: &FnVarAssign| {
                 s.eqv(&v.deref())
             }))
+        },
+        Syntax::Pattern => {
+            let res_ref = (VVal::None).to_ref();
+            let rvar = s2sym("_");
+
+            match ast.at(1).unwrap().with_s_ref(|pat_src|
+                    selector::create_regex_find(pat_src, res_ref))
+            {
+                Ok(fun) => {
+                    Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                        let r = fun(&v.deref());
+                        if r.is_some() {
+                            f(&rvar, &r);
+                            true
+                        } else {
+                            false
+                        }
+                    }))
+                },
+                Err(e) => {
+                    return Err(ast.compile_err(format!("bad pattern: {}", e)))
+                }
+            }
         },
         _ => {
             if ast.is_pair() {

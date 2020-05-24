@@ -1605,6 +1605,43 @@ pub fn create_selector_function(sel: &str, result_ref: VVal)
 /// find the compiled regular expression in it.
 /// The returned function then returns a `PatResult` which stores
 /// the captures and whether the pattern matched.
+pub fn create_regex_find(pat: &str, result_ref: VVal)
+    -> Result<Box<dyn Fn(&VVal) -> VVal>, ParseError>
+{
+    let mut ps = State::new(pat, "<pattern>");
+    ps.skip_ws();
+    let pattern  = parse_pattern(&mut ps)?;
+
+    ps.skip_ws();
+
+    if !ps.at_end() {
+        return Err(ps.err(
+            ParseErrorKind::UnexpectedToken(
+                ps.peek().unwrap(), "end of pattern")));
+    }
+
+    let not_find = check_pattern_start_anchor(&pattern);
+    let comp_pat =
+        if not_find { compile_match_pattern(&pattern) }
+        else        { compile_find_pattern(&pattern) };
+
+    Ok(Box::new(move |v: &VVal| {
+        v.with_s_ref(|s| {
+            let mut ss = SelectorState::new();
+            ss.set_str(s);
+            let pat_res = (*comp_pat)(RxBuf::new(s), &mut ss);
+            let r = pat_res.to_vval(s);
+            result_ref.set_ref(r.clone());
+            r
+        })
+    }))
+}
+
+
+/// Creates a WLambda function that takes a string slice and tries to
+/// find the compiled regular expression in it.
+/// The returned function then returns a `PatResult` which stores
+/// the captures and whether the pattern matched.
 pub fn create_regex_find_function(pat: &str, result_ref: VVal)
     -> Result<VVal, ParseError>
 {
@@ -1625,42 +1662,17 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal)
         if not_find { compile_match_pattern(&pattern) }
         else        { compile_find_pattern(&pattern) };
 
-    if not_find {
-        Ok(VValFun::new_fun(
-            move |env: &mut Env, _argc: usize| {
-                if let Some(s) = env.arg_ref(0) {
-                    Ok(s.with_s_ref(|s| {
-                        let mut ss = SelectorState::new();
-                        ss.set_str(s);
-                        let pat_res = (*comp_pat)(RxBuf::new(s), &mut ss);
-                        let r = pat_res.to_vval(s);
-                        result_ref.set_ref(r.clone());
-                        r
-                    }))
-                } else {
-                    result_ref.set_ref(VVal::None);
-                    Ok(VVal::None)
-                }
-            }, Some(1), Some(1), false))
-
-    } else {
-        Ok(VValFun::new_fun(
-            move |env: &mut Env, _argc: usize| {
-                if let Some(s) = env.arg_ref(0) {
-                    Ok(s.with_s_ref(|s| {
-                        let mut ss = SelectorState::new();
-                        ss.set_str(s);
-                        let pat_res = (*comp_pat)(RxBuf::new(s), &mut ss);
-                        let r = pat_res.to_vval(s);
-                        result_ref.set_ref(r.clone());
-                        r
-                    }))
-                } else {
-                    result_ref.set_ref(VVal::None);
-                    Ok(VVal::None)
-                }
-            }, Some(1), Some(1), false))
-    }
+    let rref2 = result_ref.clone();
+    let match_fun = create_regex_find(pat, result_ref)?;
+    Ok(VValFun::new_fun(
+        move |env: &mut Env, _argc: usize| {
+            if let Some(s) = env.arg_ref(0) {
+                Ok(match_fun(&s))
+            } else {
+                rref2.set_ref(VVal::None);
+                Ok(VVal::None)
+            }
+        }, Some(1), Some(1), false))
 }
 
 #[cfg(test)]

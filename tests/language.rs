@@ -3508,7 +3508,7 @@ fn check_regex_patterns() {
     assert_eq!(ve("type $r(a)"),   "\"function\"");
     assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: bad pattern: error[1,3:<pattern>] EOF while parsing: Unexpected EOF at code \'\'");
 
-    assert_eq!(ve("$r((^$+a)rba) $q foobaaarba "),             "$[\"aaarba\",\"aaa\"]");
+    assert_eq!(ve("$r{(^$+a)rba} $q foobaaarba "),             "$[\"aaarba\",\"aaa\"]");
     assert_eq!(ve("$r($+a)       $q foobaaarba "),             "$[\"aaa\"]");
     assert_eq!(ve("$r($+a)       $q foobaaarba ; `\\\\`"),     "$[\"aaa\"]");
     assert_eq!(ve("$r($+a)       $q foobaaarba ; $\\"),        "$[\"aaa\"]");
@@ -3637,7 +3637,7 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P x $q foo )  $q/foo/"),                                   "${x=\"foo\"}");
     assert_eq!(ve("($P x $Q foo )  $q/foo/"),                                   "$n");
     assert_eq!(ve("($P x $Q foo )  $b\"foo\""),                                 "${x=$b\"foo\"}");
-    assert_eq!(ve("($P x $r/f(^$*o)*(^$+(bar))/)  \"fooooXXXbarbarbar\""),      "${}");
+    assert_eq!(ve("($P x $r/f(^$*o)*(^$+(bar))/)  \"fooooXXXbarbarbar\""),      "${_=$[\"fooooXXXbarbarbar\",\"oooo\",\"bar\"],x=\"fooooXXXbarbarbar\"}");
     assert_eq!(ve("($P x $[:a, $S& */a &])  $[:a, $[${a=2},${a=3},${a=4}]]"),   "${}");
 }
 
