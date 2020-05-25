@@ -20,25 +20,25 @@ fn store_var(v: &VVal, var: &Option<Symbol>, f: &FnVarAssign) {
 }
 
 pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>, next: StructListNode)
-    -> Result<StructNode, CompileError>
+    -> Result<StructListNode, CompileError>
 {
     let syn  = ast.v_(0);
     let spos = syn.get_syn_pos();
 
     match syn.get_syn() {
         _ => {
-            let pat = compile_struct_pattern(ast, var_map, None),
-            Some(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
+            let pat = compile_struct_pattern(ast, var_map, None)?;
+            Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
                 if idx >= lst.len() { return false; }
                 let v = lst.v_(idx);
 
-                if pat(v, f) && next(lst, idx + 1, f) {
-                    store_var(v, var, f);
+                if pat(&v, f) && next(lst, idx + 1, f) {
+                    store_var(&v, &var, f);
                     return true;
                 }
 
                 false
-            }));
+            }))
         },
     }
 }
@@ -245,23 +245,24 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
             }
         },
         Syntax::Lst => {
-            let next : Option<StructListNode> =
+            let mut next : Option<StructListNode> =
                 Some(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
                     if idx != lst.len() { return false; }
                     true
                 }));
+
             for i in 1..ast.len() {
                 let n = next.take();
                 next = Some(
                     compile_struct_list_pattern(
-                        &ast.v_(ast.len() - i), var_map, None, n));
+                        &ast.v_(ast.len() - i), var_map, None, n.unwrap())?);
             }
 
-            let n = next.take();
+            let n = next.take().unwrap();
             Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                 let v = v.deref();
-                if !v.is_list() { return false; }
-                store_var_if(n(&v, 0, f), v, &var, f)
+                if !v.is_vec() { return false; }
+                store_var_if(n(&v, 0, f), &v, &var, f)
             }))
         },
         Syntax::Str => {
