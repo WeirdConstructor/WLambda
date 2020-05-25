@@ -59,6 +59,39 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
                 panic!("FOO");
             }))
         },
+        Syntax::Call if ast.v_(1).v_(0).get_syn() == Syntax::Var {
+            let var_sym = ast.v_(1).v_(1).to_sym();
+            let var_sym_store =
+                if var_sym.to_string() != "?" {
+                    var_map.set_key_sym(var_sym.clone(), VVal::Bol(true));
+                    Some(var_sym)
+                } else {
+                    None
+                };
+
+            let mut or_terms = vec![];
+            let next_rc = Rc::new(next);
+            for i in 2..ast.len() {
+                let n_next_rc = next_rc.clone();
+                let n_next =
+                    Box::new(move |v: &VVal, idx: usize, f: &FnVarAssign| [
+                        (*n_next_rc)(v, idx, f)
+                    });
+                or_terms.push(
+                    compile_struct_list_pattern(
+                        &ast.v_(i), var_map, var_sym_store.clone(), n_next)?);
+            }
+
+            Ok(Box::new(move |v: &VVal, idx: usize, f: &FnVarAssign| {
+                for o in or_terms.iter() {
+                    if o(v, f) {
+                        store_var(v, &var, f);
+                        return true;
+                    }
+                }
+                return false;
+            }))
+        },
         _ => {
             let pat = compile_struct_pattern(ast, var_map, None)?;
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
