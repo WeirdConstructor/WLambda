@@ -31,7 +31,21 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
         Syntax::Var
             if ast.v_(1).to_sym().to_string() == "_*" => {
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
-                panic!("FOOBAR");
+                let mut remaining = lst.len() - idx;
+                for i in idx..lst.len() {
+                    if next(lst, lst.len() - (i + 1), f) {
+                        if let Some(_) = var {
+                            let sublist = VVal::vec();
+                            for j in idx..i {
+                                sublist.push(lst.v_(j));
+                            }
+                            store_var(&sublist, &var, f);
+                            return true;
+                        }
+                    }
+                }
+
+                false
             }))
         },
         Syntax::Call
