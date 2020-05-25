@@ -298,8 +298,9 @@ structure patterns that are used by `$P ...` and `match`.
 | `?`                    | Matches any value, but does not assign it. |
 | `x $P $P1 ... $Pn`     | Assign the value that matched $P, $P1 or $Pn to the variable `x`. |
 | `? $P $P1 ... $Pn`     | Matches if $P, $P1 or $Pn matches. |
-| `_*`                   | Placeholder for 0 or N items until the next match in the vector. |
-| `_?`                   | Placeholder for 0 or 1 items until the next match in the vector. |
+| `_* $P`                | Placeholder for 0 or N items that match $P in the vector. |
+| `_+ $P`                | Placeholder for 1 or N items that match $P in the vector. |
+| `_? $P`                | Placeholder for 0 or 1 items that match $P in the vector. |
 | `$P1 &or $P2`          | Matches if $P1 or $P2 matches. |
 | `$P1 &and $P2`         | Matches if $P1 and $P2 matches. |
 | `$[$P1, $P2, ...]`     | Matches a vector. |

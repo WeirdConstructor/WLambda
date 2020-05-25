@@ -3643,8 +3643,10 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P x $q foo )  $q/foo/"),                                   "${x=\"foo\"}");
     assert_eq!(ve("($P x $Q foo )  $q/foo/"),                                   "$n");
     assert_eq!(ve("($P x $Q foo )  $b\"foo\""),                                 "${x=$b\"foo\"}");
-    assert_eq!(ve("($P x $r/f(^$*o)*(^$+(bar))/)  \"fooooXXXbarbarbar\""),      "${_=$[\"fooooXXXbarbarbar\",\"oooo\",\"bar\"],x=\"fooooXXXbarbarbar\"}");
-    assert_eq!(ve("($P x $S& */a &)  $[${a=2},${a=3},${a=4}]"),                 "${_=$[2,3,4],x=$[${a=2},${a=3},${a=4}]}");
+    assert_eq!(ve("($P x $r/f(^$*o)*(^$+(bar))/)  \"fooooXXXbarbarbar\""),      "${x=$[\"fooooXXXbarbarbar\",\"oooo\",\"bar\"]}");
+    assert_eq!(ve("($P s (x $r/f(^$*o)*(^$+(bar))/))  \"fooXbar\""),            "${s=\"fooXbar\",x=$[\"fooXbar\",\"oo\",\"bar\"]}");
+    assert_eq!(ve("($P s (? $r/f(^$*o)*(^$+(bar))/))  \"fooXbar\""),            "${s=\"fooXbar\"}");
+    assert_eq!(ve("($P x $S& */a &)  $[${a=2},${a=3},${a=4}]"),                 "${x=$[2,3,4]}");
     assert_eq!(ve("($P x $[:a, $S& */a &])  $[:a, $[${a=2},${a=3},${a=4}]]"),   "${}");
 }
 
@@ -3669,16 +3671,16 @@ fn check_struct_match() {
     "#), "$p(:b,${x=1,y=3})");
     assert_eq!(ve(r#"
         !m = \match _
-            $S(*/x)      => (:sel => $\)
-            $i(x,  1, y) => (:a => $\.x)
-            $i(x,  2, y) => (:b => $\.x)
-            $i(x,  3, y) => (:c => $\.x)
-            $i(x, 99, y) => { !(x, y) = $\; x + y }
+            (i (o $S(*/x)))  => (:sel => $\)
+            $i(x,  1, y)     => (:a => $\.x)
+            $i(x,  2, y)     => (:b => $\.x)
+            $i(x,  3, y)     => (:c => $\.x)
+            $i(x, 99, y)     => { !(x, y) = $\; x + y }
             :nothing;
 
         std:assert_eq m[$[${f=10},${l=30}]]         :nothing;
-        std:assert_eq str[m[$[${x=10},${l=30}]]]    (str $p(:sel,${_=$[10]}));
-        std:assert_eq str[m[$[${x=10},${x=30}]]]    (str $p(:sel,${_=$[10, 30]}));
+        std:assert_eq str[m[$[${x=10},${l=30}]]]    (str $p(:sel,${i=$[${x=10},${l=30}],o=$[10]}));
+        std:assert_eq str[m[$[${x=10},${x=30}]]]    (str $p(:sel,${i=$[${x=10},${x=30}],o=$[10,30]}));
         std:assert_eq m[$i(3,2,5)]           $p(:b, 3);
         std:assert_eq m[$i(3,9,5)]           :nothing;
         std:assert_eq m[$i(3,99,5)]          8;
