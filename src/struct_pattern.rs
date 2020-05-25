@@ -25,7 +25,24 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
     let syn  = ast.v_(0);
     let spos = syn.get_syn_pos();
 
+    println!("LIST PAT: {}", ast.s());
+
     match syn.get_syn() {
+        Syntax::Var
+            if ast.v_(1).to_sym().to_string() == "_*" => {
+            Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
+                panic!("FOOBAR");
+            }))
+        },
+        Syntax::Call
+            if    ast.v_(1).v_(0).get_syn() == Syntax::Var
+               && ast.v_(1).v_(1).to_sym().to_string() == "_*" => {
+            Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
+                // walk from 0 to LEN offset, if P does not match, take
+                // the most recent offset that matched (or 0 if _*).
+                panic!("FOO");
+            }))
+        },
         _ => {
             let pat = compile_struct_pattern(ast, var_map, None)?;
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
@@ -252,17 +269,20 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                 }));
 
             for i in 1..ast.len() {
-                let n = next.take();
+                let list_match_cont = next.take();
                 next = Some(
                     compile_struct_list_pattern(
-                        &ast.v_(ast.len() - i), var_map, None, n.unwrap())?);
+                        &ast.v_(ast.len() - i),
+                        var_map,
+                        None,
+                        list_match_cont.unwrap())?);
             }
 
-            let n = next.take().unwrap();
+            let list_matcher = next.take().unwrap();
             Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                 let v = v.deref();
                 if !v.is_vec() { return false; }
-                store_var_if(n(&v, 0, f), &v, &var, f)
+                store_var_if(list_matcher(&v, 0, f), &v, &var, f)
             }))
         },
         Syntax::Str => {
