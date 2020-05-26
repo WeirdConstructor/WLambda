@@ -20,6 +20,31 @@ fn store_var(v: &VVal, var: &Option<Symbol>, f: &FnVarAssign) {
     }
 }
 
+macro_rules! gen_glob {
+    ($var: ident, $next: ident, $f: ident, $lst: ident, $idx: ident, $remaining: ident) => {
+        {
+            for i in 0..$remaining {
+
+                let n_idx = $lst.len() - i;
+                if $next($lst, n_idx, $f) {
+
+                    if let Some(_) = $var {
+                        let sublist = VVal::vec();
+                        for j in $idx..n_idx {
+                            sublist.push($lst.v_(j));
+                        }
+                        store_var(&sublist, &$var, $f);
+                    }
+
+                    return true;
+                }
+            }
+
+            false
+        }
+    }
+}
+
 pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>, next: StructListNode)
     -> Result<StructListNode, CompileError>
 {
@@ -29,28 +54,18 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
     println!("LIST PAT: {}", ast.s());
 
     match syn.get_syn() {
-        Syntax::Var
-            if ast.v_(1).to_sym().to_string() == "_*" => {
+        Syntax::Var if ast.v_(1).to_sym().to_string() == "_*" => {
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
+                if idx >= lst.len() { return true; }
                 let mut remaining = (lst.len() - idx) + 1;
-                for i in 0..remaining {
-
-                    let n_idx = lst.len() - i;
-                    if next(lst, n_idx, f) {
-
-                        if let Some(_) = var {
-                            let sublist = VVal::vec();
-                            for j in idx..n_idx {
-                                sublist.push(lst.v_(j));
-                            }
-                            store_var(&sublist, &var, f);
-                        }
-
-                        return true;
-                    }
-                }
-
-                false
+                gen_glob!(var, next, f, lst, idx, remaining)
+            }))
+        },
+        Syntax::Var if ast.v_(1).to_sym().to_string() == "_+" => {
+            Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
+                if idx >= lst.len() { return false; }
+                let mut remaining = (lst.len() - (idx + 1)) + 1;
+                gen_glob!(var, next, f, lst, idx, remaining)
             }))
         },
         Syntax::Call
