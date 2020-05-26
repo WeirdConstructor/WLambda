@@ -314,6 +314,7 @@ structure patterns that are used by `$P ...` and `match`.
 | `$f($P1, ...)`         | Matches a float vector. |
 | `$o($P)`               | Matches an optional where the value matches $P. |
 | `$e $P`                | Matches an error value that matches $P. |
+| `$n`                   | Matches $none. |
 | literal values         | Literal values like booleans, strings, symbols and numbers match their value. |
 
 */

@@ -3652,6 +3652,19 @@ fn check_struct_patterns() {
 
     assert_eq!(ve("($P $f(1.1, 2.0, z, w))  $f(1.1,2,3,4); $\\"), "${w=4,z=3}");
 
+    assert_eq!(ve("($P $error 20)        $error 20"),   "${}");
+    assert_eq!(ve("($P $error 20)        $error 21"),   "$n");
+    assert_eq!(ve("($P $error ?)         $error 22"),   "${}");
+    assert_eq!(ve("($P x $error ?)       $error 23"),   "${x=$e[1,20:<compiler:s_eval>(Err)] 23}");
+    assert_eq!(ve("($P x $error (y ?))   $error 24"),   "${x=$e[1,20:<compiler:s_eval>(Err)] 24,y=24}");
+
+    assert_eq!(ve("($P x 10)        $o(10)"),     "${x=$o(10)}");
+    assert_eq!(ve("($P x 10)        $o(11)"),     "$n");
+    assert_eq!(ve("($P x $n)        $o()"),       "${x=$o()}");
+
+    assert_eq!(ve("($P x $n)        $n"),         "${x=$n}");
+    assert_eq!(ve("($P x $n)        10"),         "$n");
+
     assert_eq!(ve("($P $o())        $o(10)"),   "$n");
     assert_eq!(ve("($P $o())        10"),       "$n");
     assert_eq!(ve("($P $o())        $n"),       "$n");

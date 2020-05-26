@@ -413,6 +413,16 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                 }))
             }
         },
+        Syntax::Err => {
+            let cond = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+            Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                let v = v.deref();
+                let matched =
+                    if let VVal::Err(ov) = &v { cond(&ov.borrow().0, f) }
+                    else                      { false };
+                store_var_if(matched, &v, &var, f)
+            }))
+        },
         Syntax::Str => {
             let s = ast.v_(1).clone();
             Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
@@ -480,7 +490,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                         && p2(&v.v_(1), f),
                         &v, &var, f)
                 }))
-            } else if ast.is_int() || ast.is_float() {
+            } else if ast.is_int() || ast.is_float() || ast.is_none() {
                 let ast = ast.clone();
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                     store_var_if(ast.eqv(&v.deref()), v, &var, f)
@@ -539,5 +549,5 @@ pub fn create_struct_pattern_function(ast: &VVal, var_map: &VVal, result_ref: VV
                 result_ref.set_ref(m.clone());
                 Ok(m)
             } else { Ok(VVal::None) }
-        }, Some(1), Some(1), false))
+        }, Some(1), Some(1), true))
 }
