@@ -3495,6 +3495,12 @@ fn check_quote() {
             fwe { feofwef [ XX }(]})]w}
         #
     "#), "\"fewof wefewop\\n            fwe { feofwef [ XX }(]})]w}\\n        \"");
+    assert_eq!(ve(r#"
+$q
+fooooob b fewif wifw
+"#), "\"fooooob b fewif wifw\"");
+    assert_eq!(ve("$q\tfeiifjweo few \n feiowf wef w \n    fewf oiwejfw \n\t"),
+               "\"feiifjweo few \\n feiowf wef w \\n    fewf oiwejfw \\n\"");
 }
 
 #[test]
