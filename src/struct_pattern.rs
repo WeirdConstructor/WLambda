@@ -2,6 +2,7 @@ use crate::vval::*;
 use crate::str_int::*;
 use crate::ops::DirectFun;
 use crate::selector;
+use std::rc::Rc;
 
 pub type FnVarAssign    = dyn Fn(&Symbol, &VVal);
 pub type FnVarReset     = dyn Fn();
@@ -33,16 +34,18 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
                 let mut remaining = (lst.len() - idx) + 1;
                 for i in 0..remaining {
+
                     let n_idx = lst.len() - i;
-                    println!("CHECK@ n_idx={}, v={}", n_idx, lst.v_(n_idx).s());
                     if next(lst, n_idx, f) {
+
                         if let Some(_) = var {
                             let sublist = VVal::vec();
-                            for j in idx..i {
+                            for j in idx..n_idx {
                                 sublist.push(lst.v_(j));
                             }
                             store_var(&sublist, &var, f);
                         }
+
                         return true;
                     }
                 }
@@ -59,7 +62,7 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
                 panic!("FOO");
             }))
         },
-        Syntax::Call if ast.v_(1).v_(0).get_syn() == Syntax::Var {
+        Syntax::Call if ast.v_(1).v_(0).get_syn() == Syntax::Var => {
             let var_sym = ast.v_(1).v_(1).to_sym();
             let var_sym_store =
                 if var_sym.to_string() != "?" {
@@ -74,7 +77,7 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
             for i in 2..ast.len() {
                 let n_next_rc = next_rc.clone();
                 let n_next =
-                    Box::new(move |v: &VVal, idx: usize, f: &FnVarAssign| [
+                    Box::new(move |v: &VVal, idx: usize, f: &FnVarAssign| {
                         (*n_next_rc)(v, idx, f)
                     });
                 or_terms.push(
@@ -84,13 +87,17 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
 
             Ok(Box::new(move |v: &VVal, idx: usize, f: &FnVarAssign| {
                 for o in or_terms.iter() {
-                    if o(v, f) {
+                    if o(v, idx, f) {
                         store_var(v, &var, f);
                         return true;
                     }
                 }
                 return false;
             }))
+        },
+        Syntax::Call => {
+            return Err(ast.compile_err(
+                format!("invalid call in structure pattern: {}", ast.s())))
         },
         _ => {
             let pat = compile_struct_pattern(ast, var_map, None)?;
