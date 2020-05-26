@@ -3615,6 +3615,13 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P 1)               1.0"),          "$n");
     assert_eq!(ve("($P 1.0)             1.0"),          "${}");
 
+    assert_eq!(ve("($P _type :integer)              10"),       "COMPILE ERROR: [1,11:<compiler:s_eval>] Compilation Error: invalid test function in structure pattern: _type");
+    assert_eq!(ve("($P _type? :integer)             10"),       "${}");
+    assert_eq!(ve("($P _type? :integer :string)     10"),       "${}");
+    assert_eq!(ve("($P _type? :integer :string)     (str 10)"), "${}");
+    assert_eq!(ve("($P x ~ _type? :integer)         10"),       "${x=10}");
+    assert_eq!(ve("($P x ~ _type? :integer :string) 10 &> str"),"${x=\"10\"}");
+
     assert_eq!(ve("($P 3 4)             4"),            "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: invalid variable binding in structure pattern: 3");
     assert_eq!(ve("($P x 4)             4"),            "${x=4}");
     assert_eq!(ve("($P x 4 5 6)         5"),            "${x=5}");
@@ -3660,7 +3667,7 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P x $S& */a &)  $[${a=2},${a=3},${a=4}]"),                 "${x=$[2,3,4]}");
 
     assert_eq!(ve("($P $[_type? :string :integer, _type? :symbol :string])         $[1, :f]"),     "${}");
-    assert_eq!(ve("($P $[a ~ _type? :string :integer, b ~ _type? :symbol :string]) $[\"x\", :f]"), "${a=1,b=:f}");
+    assert_eq!(ve("($P $[a ~ _type? :string :integer, b ~ _type? :symbol :string]) $[\"x\", :f]"), "${a=\"x\",b=:f}");
     assert_eq!(ve("($P x $[1, 2, 3, 4])    $[1, 2, 3, 4]"),                     "${x=$[1,2,3,4]}");
     assert_eq!(ve("($P x $[1, y, z 3, 4])  $[1, 2, 3, 4]"),                     "${x=$[1,2,3,4],y=2,z=3}");
 
