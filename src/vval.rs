@@ -3753,9 +3753,9 @@ impl VVal {
             VVal::IVec(_)    => "integer_vector",
             VVal::FVec(_)    => "float_vector",
             VVal::DropFun(_) => "drop_function",
-            VVal::Ref(_)     => "strong",
-            VVal::CRef(_)    => "weakable",
-            VVal::WWRef(_)   => "weak",
+            VVal::Ref(_)     => "ref_strong",
+            VVal::CRef(_)    => "ref_weakable",
+            VVal::WWRef(_)   => "ref_weak",
         }
     }
 

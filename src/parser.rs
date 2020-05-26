@@ -308,7 +308,7 @@ structure patterns that are used by `$P ...` and `match`.
 | `$P1 &or $P2`          | Matches if $P1 or $P2 matches. |
 | `$P1 &and $P2`         | Matches if $P1 and $P2 matches. |
 | `$[$P1, $P2, ...]`     | Matches a vector. |
-| `${ key = $P1, ...}`   | Matches a map. |
+| `${ $Pkey1 = $Pval1, ...}`| Matches a map. $Pkey1 can also be a $P match, but keep in mind that maps can only have symbols as keys. You can however match symbols using regex patterns for instance. If you only use symbols as keys in this match, the map access is optimized a bit, because there is no need to iterate over all keys then. |
 | `$p($P1, $P2)`         | Matches a pair. |
 | `$i($P1, ...)`         | Matches an integer vector. |
 | `$f($P1, ...)`         | Matches a float vector. |

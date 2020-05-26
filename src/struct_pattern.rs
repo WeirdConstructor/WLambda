@@ -393,6 +393,59 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                 store_var_if(list_matcher(&v, 0, f), &v, &var, f)
             }))
         },
+        Syntax::Map => {
+            let mut all_matches_are_gets = true;
+            for (kv, _) in ast.iter().skip(1) {
+                if !kv.v_(0).is_sym() {
+                    all_matches_are_gets = false;
+                }
+            }
+
+            if all_matches_are_gets {
+                let mut key_matches : Vec<(Symbol, StructNode)> = vec![];
+                for (kv, _) in ast.iter().skip(1) {
+                    let kvmatch = (
+                        kv.v_(0).to_sym(),
+                        compile_struct_pattern(&kv.v_(1), var_map, None)?
+                    );
+                    key_matches.push(kvmatch);
+                }
+
+                Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                    let v = v.deref();
+                    if !v.is_map() { return false; }
+
+                    for kv_match in key_matches.iter() {
+                        let v = v.get_key_sym(&kv_match.0);
+                        if let Some(v) = v {
+                            if !(kv_match.1)(&v, f) {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    }
+
+                    store_var(&v, &var, f);
+                    true
+                }))
+
+            } else {
+                panic!("NOT IMPLEMENTED");
+
+//                let mut key_matches : Vec<StructNode> = vec![];
+//                for (kv, _) in ast.iter().skip(1) {
+//                    if !kv.v_(0).is_symbol() {
+//                        all_matches_are_gets = false;
+//                    }
+//                }
+//                Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+//                    let v = v.deref();
+//                    if !v.is_vec() { return false; }
+//                    store_var_if(list_matcher(&v, 0, f), &v, &var, f)
+//                }))
+            }
+        },
         Syntax::Opt => {
             if ast.len() == 1 {
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
