@@ -4751,10 +4751,10 @@ std:assert_eq (type $b"")       "bytes";
 std:assert_eq (type $n)         "none";
 std:assert_eq (type $t)         "bool";
 std:assert_eq (type $e $n)      "error";
-std:assert_eq (type $&&10)      "strong";
-std:assert_eq (type $&10)       "weakable";
+std:assert_eq (type $&&10)      "ref_strong";
+std:assert_eq (type $&10)       "ref_weakable";
 !x = $&&10;
-std:assert_eq (type ~ std:weaken x) "weak";
+std:assert_eq (type ~ std:weaken x) "ref_weak";
 ```
 
 #### <a name="1102-len-value"></a>11.0.2 - len _value_

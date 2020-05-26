@@ -265,6 +265,30 @@ std:assert_eq stuff.0 "日";         # Unicode support
 std:assert_eq 人 "jin";
 ```
 
+## Handling Errors
+
+```wlambda
+!some_fun = {
+    ? _ == :fail {
+        $error :FAIL_HAVING_FUN
+    } {
+        :ok
+    }
+};
+
+!res1 =
+    match some_fun[:ok]
+        ($error :FAIL_HAVING_FUN) => :failed
+        ?                         => :ok;
+std:assert_eq res1 :ok;
+
+!res1 =
+    match some_fun[:fail]
+        ($error :FAIL_HAVING_FUN) => :failed
+        ?                         => :ok;
+std:assert_eq res1 :failed;
+```
+
 ## Builtin (Regex) Pattern Matching
 
 ```wlambda
