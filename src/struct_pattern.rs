@@ -393,6 +393,26 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                 store_var_if(list_matcher(&v, 0, f), &v, &var, f)
             }))
         },
+        Syntax::Opt => {
+            if ast.len() == 1 {
+                Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                    if let VVal::Opt(None) = v {
+                        store_var(&v, &var, f);
+                        true
+                    } else {
+                        false
+                    }
+                }))
+            } else {
+                let cond = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+                Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                    let matched =
+                        if let VVal::Opt(Some(ov)) = &v { cond(&*ov, f) }
+                        else                            { false };
+                    store_var_if(matched, &v, &var, f)
+                }))
+            }
+        },
         Syntax::Str => {
             let s = ast.v_(1).clone();
             Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {

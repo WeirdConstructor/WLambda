@@ -3652,10 +3652,15 @@ fn check_struct_patterns() {
 
     assert_eq!(ve("($P $f(1.1, 2.0, z, w))  $f(1.1,2,3,4); $\\"), "${w=4,z=3}");
 
-//    assert_eq!(ve("($P $o())        $o(10)"),   "${w=4,z=3}");
-//    assert_eq!(ve("($P $o())        $o()"),     "${w=4,z=3}");
-//    assert_eq!(ve("($P $o(20))      $o(20)"),   "${w=4,z=3}");
-//    assert_eq!(ve("($P a $o(b 20))  $o(20)"),   "${w=4,z=3}");
+    assert_eq!(ve("($P $o())        $o(10)"),   "$n");
+    assert_eq!(ve("($P $o())        10"),       "$n");
+    assert_eq!(ve("($P $o())        $n"),       "$n");
+    assert_eq!(ve("($P $o())        $o()"),     "${}");
+    assert_eq!(ve("($P $o(20))      $o(20)"),   "${}");
+    assert_eq!(ve("($P $o(20))      20"),       "$n");
+    assert_eq!(ve("($P x $o())      $o()"),     "${x=$o()}");
+    assert_eq!(ve("($P x $o(20))    $o(20)"),   "${x=$o(20)}");
+    assert_eq!(ve("($P a $o(b 20))  $o(20)"),   "${a=$o(20),b=20}");
 
     assert_eq!(ve("($P $q foo )    $q/foo/"),                                   "${}");
     assert_eq!(ve("($P x $q foo )  $q/foo/"),                                   "${x=\"foo\"}");
