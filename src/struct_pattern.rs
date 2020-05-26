@@ -56,7 +56,10 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
     match syn.get_syn() {
         Syntax::Var if ast.v_(1).to_sym().to_string() == "_*" => {
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
-                if idx >= lst.len() { return true; }
+                if idx >= lst.len() {
+                    store_var(&VVal::vec(), &var, f);
+                    return true;
+                }
                 let mut remaining = (lst.len() - idx) + 1;
                 gen_glob!(var, next, f, lst, idx, remaining)
             }))
@@ -66,6 +69,16 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
                 if idx >= lst.len() { return false; }
                 let mut remaining = (lst.len() - (idx + 1)) + 1;
                 gen_glob!(var, next, f, lst, idx, remaining)
+            }))
+        },
+        Syntax::Var if ast.v_(1).to_sym().to_string() == "_?" => {
+            Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
+                if next(lst, idx + 1, f) {
+                    store_var(&VVal::opt(lst.v_(idx)), &var, f);
+                    return true;
+                } else {
+                    store_var_if(next(lst, idx, f), &VVal::opt_none(), &var, f)
+                }
             }))
         },
         Syntax::Call
