@@ -304,6 +304,7 @@ structure patterns that are used by `$P ...` and `match`.
 | `_* $P`                | Placeholder for 0 or N items that match $P in the vector. |
 | `_+ $P`                | Placeholder for 1 or N items that match $P in the vector. |
 | `_? $P`                | Placeholder for 0 or 1 items that match $P in the vector. |
+| `_type? :integer ...`  | Matches an element of one of the given types.  Symbol names should have the same name as the type names returned by the `type` function. |
 | `$P1 &or $P2`          | Matches if $P1 or $P2 matches. |
 | `$P1 &and $P2`         | Matches if $P1 and $P2 matches. |
 | `$[$P1, $P2, ...]`     | Matches a vector. |

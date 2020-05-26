@@ -62,7 +62,9 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
                 panic!("FOO");
             }))
         },
-        Syntax::Call if ast.v_(1).v_(0).get_syn() == Syntax::Var => {
+        Syntax::Call
+            if    ast.v_(1).v_(0).get_syn() == Syntax::Var
+               && ast.v_(1).v_(1).to_sym().to_string() != "_type?" => {
             let var_sym = ast.v_(1).v_(1).to_sym();
             let var_sym_store =
                 if var_sym.to_string() != "?" {
@@ -95,10 +97,10 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
                 return false;
             }))
         },
-        Syntax::Call => {
-            return Err(ast.compile_err(
-                format!("invalid call in structure pattern: {}", ast.s())))
-        },
+//        Syntax::Call => {
+//            return Err(ast.compile_err(
+//                format!("invalid call in structure pattern: {}", ast.s())))
+//        },
         _ => {
             let pat = compile_struct_pattern(ast, var_map, None)?;
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
@@ -135,16 +137,32 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
             let var_sym_store =
                 if var_sym.to_string() != "?" {
                     var_map.set_key_sym(var_sym.clone(), VVal::Bol(true));
-                    Some(var_sym)
+                    Some(var_sym.clone())
                 } else {
                     None
                 };
 
-            let mut or_terms = vec![];
+            let mut or_terms : Vec<StructNode> = vec![];
+
             for i in 2..ast.len() {
-                or_terms.push(
-                    compile_struct_pattern(
-                        &ast.v_(i), var_map, var_sym_store.clone())?);
+                println!("ORTERM {}", var_sym.to_string());
+                if var_sym.to_string() == "_type?" {
+                    if ast.v_(i).v_(0).get_syn() != Syntax::Key {
+                        return Err(ast.compile_err(
+                            format!("invalid type test in structure pattern, must be a symbol: {}",
+                                    ast.v_(i).s())));
+                    }
+                    let sym = ast.v_(i).v_(1);
+                    or_terms.push(Box::new(move |v: &VVal, _f: &FnVarAssign| {
+                        println!("TEST {}:{}", sym.s(), v.s());
+                        sym.with_s_ref(|s| s[..] == v.type_name()[..])
+                    }));
+
+                } else {
+                    or_terms.push(
+                        compile_struct_pattern(
+                            &ast.v_(i), var_map, var_sym_store.clone())?);
+                }
             }
 
             Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {

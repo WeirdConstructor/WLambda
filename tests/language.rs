@@ -3653,7 +3653,9 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P s (? $r/f(^$*o)*(^$+(bar))/))  \"fooXbar\""),            "${s=\"fooXbar\"}");
     assert_eq!(ve("($P x $S& */a &)  $[${a=2},${a=3},${a=4}]"),                 "${x=$[2,3,4]}");
 
-    assert_eq!(ve("($P x $[1, 2, 3, 4])    $[1, 2, 3, 4]"),                       "${x=$[1,2,3,4]}");
+    assert_eq!(ve("($P $[_type? :string :integer, _type? :symbol :string])         $[1, :f]"),     "${}");
+    assert_eq!(ve("($P $[a ~ _type? :string :integer, b ~ _type? :symbol :string]) $[\"x\", :f]"), "${a=1,b=:f}");
+    assert_eq!(ve("($P x $[1, 2, 3, 4])    $[1, 2, 3, 4]"),                     "${x=$[1,2,3,4]}");
     assert_eq!(ve("($P x $[1, y, z 3, 4])  $[1, 2, 3, 4]"),                     "${x=$[1,2,3,4],y=2,z=3}");
 
     assert_eq!(ve("($P x $[1, _*, 4])               $[1, 2, 3, 4]"),            "${x=$[1,2,3,4]}");
