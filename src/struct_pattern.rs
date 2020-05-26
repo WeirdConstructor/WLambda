@@ -431,19 +431,40 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                 }))
 
             } else {
-                panic!("NOT IMPLEMENTED");
+                let mut key_matches : Vec<(StructNode, StructNode)> = vec![];
+                for (kv, _) in ast.iter().skip(1) {
+                    let kvmatch = (
+                        compile_struct_pattern(&kv.v_(0), var_map, None)?,
+                        compile_struct_pattern(&kv.v_(1), var_map, None)?
+                    );
+                    key_matches.push(kvmatch);
+                }
 
-//                let mut key_matches : Vec<StructNode> = vec![];
-//                for (kv, _) in ast.iter().skip(1) {
-//                    if !kv.v_(0).is_symbol() {
-//                        all_matches_are_gets = false;
-//                    }
-//                }
-//                Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
-//                    let v = v.deref();
-//                    if !v.is_vec() { return false; }
-//                    store_var_if(list_matcher(&v, 0, f), &v, &var, f)
-//                }))
+                Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                    let v = v.deref();
+                    if let VVal::Map(m) = &v {
+                        for kv_match in key_matches.iter() {
+                            let mut matched_kv = false;
+                            for (k, v) in m.borrow().iter() {
+                                let k = VVal::Sym(k.clone());
+                                if (kv_match.0)(&k, f) {
+                                    if (kv_match.1)(&v, f) {
+                                        matched_kv = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if !matched_kv {
+                                return false;
+                            }
+                        }
+                    } else {
+                        return false;
+                    }
+
+                    store_var(&v, &var, f);
+                    true
+                }))
             }
         },
         Syntax::Opt => {
@@ -543,7 +564,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                         && p2(&v.v_(1), f),
                         &v, &var, f)
                 }))
-            } else if ast.is_int() || ast.is_float() || ast.is_none() {
+            } else if ast.is_int() || ast.is_float() || ast.is_none() || ast.is_sym() {
                 let ast = ast.clone();
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                     store_var_if(ast.eqv(&v.deref()), v, &var, f)

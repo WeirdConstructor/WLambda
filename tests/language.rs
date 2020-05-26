@@ -3686,8 +3686,14 @@ fn check_struct_patterns() {
 
     assert_eq!(ve("($P m ${ a = 3, b = 20 })        ${a=3, b=20, c=10}"),       "${m=${a=3,b=20,c=10}}");
     assert_eq!(ve("($P m ${ a = x, b = y 10 20 })   ${a=3, b=20, c=10}"),       "${m=${a=3,b=20,c=10},x=3,y=20}");
-    assert_eq!(ve("($P m ${ $r/a*b/ = 20, a = 3, b = 20 }) ${a=3, b=20, c=10}"),              "");
-    assert_eq!(ve("($P m ${ $r/a*b/ = 20, a = 3, b = 20 }) ${a=3, b=20, c=10}"),              "");
+    assert_eq!(ve("($P m ${ a = x, b = y 10 20 })   ${a=3, b=40, c=10}"),       "$n");
+    assert_eq!(ve("($P m ${ a = x, d = 10 })        ${a=3, b=40, c=10}"),       "$n");
+    assert_eq!(ve("($P m ${ $r/a*b/ = 20, a = 3, b = 20 })  ${a=3, b=20, c=10}"),       "$n");
+    assert_eq!(ve("($P m ${ (?) = 20 })                     ${axb=3, axxb=20, b=20}"),  "${m=${axb=3,axxb=20,b=20}}");
+    assert_eq!(ve("($P m ${ (x) = 20 })                     ${axb=3, axxb=20, b=21}"),  "${m=${axb=3,axxb=20,b=21},x=:axxb}");
+    assert_eq!(ve("($P m ${ (x) = y 20 })                   ${axb=3, axxb=20, b=21}"),  "${m=${axb=3,axxb=20,b=21},x=:axxb,y=20}");
+    assert_eq!(ve("($P m ${ $r/a*b/ = 20, axb = 3, b = 20 }) ${axb=3, axxb=20, b=20}"), "${m=${axb=3,axxb=20,b=20}}");
+    assert_eq!(ve("($P m ${ $r/a*b/ = 20, a = 3, b = 20 }) ${a=3, b=20, c=10}"),        "$n");
 
     assert_eq!(ve("($P $[_type? :string :integer, _type? :symbol :string])         $[1, :f]"),     "${}");
     assert_eq!(ve("($P $[a ~ _type? :string :integer, b ~ _type? :symbol :string]) $[\"x\", :f]"), "${a=\"x\",b=:f}");
