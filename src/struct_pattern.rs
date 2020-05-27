@@ -83,11 +83,98 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
         },
         Syntax::Call
             if    ast.v_(1).v_(0).get_syn() == Syntax::Var
-               && ast.v_(1).v_(1).to_sym().to_string() == "_*" => {
+               && (   ast.v_(1).v_(1).to_sym().to_string() == "_*"
+                   || ast.v_(1).v_(1).to_sym().to_string() == "_+") => {
+
+            if ast.len() > 3 {
+                return Err(ast.compile_err(
+                    format!("_* takes only 1 argument in list structure pattern: {}",
+                            ast.s())));
+            }
+
+            let pat = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+
+            let n0 = ast.v_(1).v_(1).to_sym().to_string() == "_*";
+
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
-                // walk from 0 to LEN offset, if P does not match, take
-                // the most recent offset that matched (or 0 if _*).
-                panic!("FOO");
+                let mut valid_idx : Option<usize> = None;
+                let mut capture_matches = false;
+
+                let match_start_idx =
+                    if n0 {
+                        if next(lst, idx, f) {
+                            valid_idx = Some(idx);
+                        }
+                        idx
+                    } else {
+//                        if idx >= lst.len() {
+//                            return false;
+//                        }
+
+                        if pat(&lst.v_(idx), f) {
+                            capture_matches = true;
+                            if next(lst, idx + 1, f) {
+                                valid_idx = Some(idx);
+                            }
+
+                            idx + 1
+                        } else {
+                            return false;
+                        }
+                    };
+
+                for i in match_start_idx..lst.len() {
+                    if pat(&lst.v_(i), f) {
+                        capture_matches = true;
+
+                        if next(lst, i + 1, f) {
+                            valid_idx = Some(i);
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                if let Some(valid_idx) = valid_idx {
+                    let v = VVal::vec();
+                    if capture_matches {
+                        for i in idx..(valid_idx + 1) {
+                            v.push(lst.v_(i));
+                        }
+                    }
+
+                    store_var(&v, &var, f);
+
+                    true
+                } else {
+                    false
+                }
+            }))
+        },
+        Syntax::Call
+            if    ast.v_(1).v_(0).get_syn() == Syntax::Var
+               && ast.v_(1).v_(1).to_sym().to_string() == "_?" => {
+
+            if ast.len() > 3 {
+                return Err(ast.compile_err(
+                    format!("_* takes only 1 argument in list structure pattern: {}",
+                            ast.s())));
+            }
+
+            let pat = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+
+            Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
+                if idx >= lst.len() {
+                    return next(lst, idx, f);
+                }
+                if pat(&lst.v_(idx), f) && next(lst, idx + 1, f) {
+                    store_var(&lst.v_(idx), &var, f);
+                    true
+                } else if next(lst, idx, f) {
+                    true
+                } else {
+                    false
+                }
             }))
         },
         Syntax::Call

@@ -1,4 +1,4 @@
-0.5.1 (unreleased)
+0.6.0 (unreleased)
 ==================
 
 * Incompatible Change: The nested parenthesis matching for quoted strings
@@ -7,6 +7,9 @@ with non matching parenthesis anymore - which is sometimes desired if a
 regex pattern or selector pattern is to be quoted.
 * Incompatible Change: `a + b ~ c` is no longer `a + (b ~ c)` but `(a + b) ~ c`
 to let `iter i 0 => 10 ~ std:displayln i` work properly.
+* Incompatible Change: Removed old `match` function and replaced it with a
+structure pattern match function, which is even faster than the match
+before.
 * Feature: Allowing to use `if` instead of just `?`.
 * Feature: `iter $&&i ...` syntax implemented, for creating new references
 for each iteration for easier closure generation.
@@ -16,6 +19,8 @@ nice composition with the pair operator: `$iter 0 => 10`.
 * Feature: Implemented argument function call operators `a &> f` and `f <& a`,
 so you can write regular expressions like `? "foo" &> $r/a*b/ { ... }`
 without parenthesis.
+* Feature: Implementes structure patterns as complement to the selector patterns
+and regex patterns: `$P _expr_`.
 * Feature: Added a jump table operation `jump idx branch-a branch-b branch-c`
 as supporting operation for `match`.
 * Feature: Updates VIM syntax file `vim/wlambda.vim`.

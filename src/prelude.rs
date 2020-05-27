@@ -4952,6 +4952,18 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
+#### - std:assert_str_eq _actual_ _expected_
+
+This function stringifies _actual_ and _expected_ using the `str` function
+and compares the resulting strings.
+
+This is very useful to compare data structures, as map keys are sorted
+if the maps are stringified using `str`:
+
+```wlambda
+std:assert_str_eq $[1, 2, 3]        $[1, 2, 3];
+```
+
 #### <a name="12012-stdassertreleq-l-r-epsilon-message"></a>12.0.12 - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
@@ -6728,6 +6740,28 @@ pub fn std_symbol_table() -> SymbolTable {
                         format!(
                             "assertion '{}' failed: expected: '{}', got: '{}'",
                             env.arg(2).s_raw(), b.s(), a.s())))
+                }
+            } else {
+                Ok(VVal::Bol(true))
+            }
+        }, Some(2), Some(3), true);
+
+    func!(st, "assert_str_eq",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0).s();
+            let b = env.arg(1).s();
+
+            if a != b {
+                if env.arg(2).is_none() {
+                    Err(StackAction::panic_msg(
+                        format!(
+                            "assertion failed: expected: '{}', got: '{}'",
+                            b, a)))
+                } else {
+                    Err(StackAction::panic_msg(
+                        format!(
+                            "assertion '{}' failed: expected: '{}', got: '{}'",
+                            env.arg(2).s_raw(), b, a)))
                 }
             } else {
                 Ok(VVal::Bol(true))
