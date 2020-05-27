@@ -3615,6 +3615,15 @@ fn check_struct_patterns() {
     assert_eq!(ve("($P 1)               1.0"),          "$n");
     assert_eq!(ve("($P 1.0)             1.0"),          "${}");
 
+    assert_eq!(ve("($P $true)           $&&$true"),       "${}");
+    assert_eq!(ve("($P $true)           $&&$false"),      "$n");
+    assert_eq!(ve("($P $false)          $&&$true"),       "$n");
+    assert_eq!(ve("($P $false)          $&&$false"),      "${}");
+    assert_eq!(ve("($P $true)           $true"),          "${}");
+    assert_eq!(ve("($P $true)           $false"),         "$n");
+    assert_eq!(ve("($P $false)          $true"),          "$n");
+    assert_eq!(ve("($P $false)          $false"),         "${}");
+
     assert_eq!(ve("($P _type :integer)              10"),       "COMPILE ERROR: [1,11:<compiler:s_eval>] Compilation Error: invalid test function in structure pattern: _type");
     assert_eq!(ve("($P _type? :integer)             10"),       "${}");
     assert_eq!(ve("($P _type? :integer :string)     10"),       "${}");
@@ -3745,8 +3754,8 @@ fn check_struct_patterns() {
 //    assert_eq!(ve("($P x $[1, _* (? 2 3), 4])       $[1, 2, 3, 4]"),            "");
 //    assert_eq!(ve("($P x $[1, x (_* 2), 4])         $[1, 2, 2, 4]"),            "");
 
-//    assert_eq!(ve("($P x $[:a, $S& */a &])    $[:a, $[${a=2},${a=3},${a=4}]]"),   "${x=$[:a,$[${a=2},${a=3},${a=4}]]}");
-//    assert_eq!(ve("($P x $[:a, o $S& */a &])  $[:a, $[${a=2},${a=3},${a=4}]]"),   "${o=$[2,3,4],x=$[:a,$[${a=2},${a=3},${a=4}]]}");
+    assert_eq!(ve("($P x $[:a, $S& */a &])    $[:a, $[${a=2},${a=3},${a=4}]]"),   "${x=$[:a,$[${a=2},${a=3},${a=4}]]}");
+    assert_eq!(ve("($P x $[:a, o $S& */a &])  $[:a, $[${a=2},${a=3},${a=4}]]"),   "${o=$[2,3,4],x=$[:a,$[${a=2},${a=3},${a=4}]]}");
 }
 
 #[test]

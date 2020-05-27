@@ -127,13 +127,12 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
             }))
         },
         _ => {
-            let pat = compile_struct_pattern(ast, var_map, None)?;
+            let pat = compile_struct_pattern(ast, var_map, var)?;
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
                 if idx >= lst.len() { return false; }
                 let v = lst.v_(idx);
 
                 if pat(&v, f) && next(lst, idx + 1, f) {
-                    store_var(&v, &var, f);
                     return true;
                 }
 
@@ -564,7 +563,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                         && p2(&v.v_(1), f),
                         &v, &var, f)
                 }))
-            } else if ast.is_int() || ast.is_float() || ast.is_none() || ast.is_sym() {
+            } else if ast.is_int() || ast.is_float() || ast.is_none() || ast.is_sym() || ast.is_bool() {
                 let ast = ast.clone();
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                     store_var_if(ast.eqv(&v.deref()), v, &var, f)
