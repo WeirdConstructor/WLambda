@@ -453,6 +453,8 @@ complete for real world use. So my current goals are:
 - Improve reference documentation.
 - DONE: Add proper module support (via !@import and !@export).
 - DONE: Add prototyped inheritance for OOP paradigm.
+- DONE: Add data structure matching/destructuring/selection primitives
+to the language.
 - DONE: Replace compiler and closure based evaluator with a VM
 and more or less clever code generator.
 
