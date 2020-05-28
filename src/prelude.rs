@@ -201,7 +201,7 @@ Smalltalk, LISP and Perl.
     - [5.2.2](#522-block-label-function) - block [label] _function_
     - [5.2.3](#523-stdtodrop-value-function-or-raii-destructors-or-drop-functions) - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
 - [6](#6-conditional-execution---if--then--else) - Conditional Execution - if / then / else
-  - [6.1](#61--condition-then-expr-else-expr) - ?/if _condition_ _then-expr_ [_else-expr_]
+  - [6.1](#61-if-condition-then-expr-else-expr) - ?/if _condition_ _then-expr_ [_else-expr_]
   - [6.2](#62-using-booleans-for-conditional-execution) - Using Booleans for Conditional Execution
     - [6.2.1](#621-pick-bool-a--b-) - pick _bool_ _a_ -b-
     - [6.2.2](#622-indexing-by-booleans) - Indexing by Booleans
@@ -216,6 +216,7 @@ Smalltalk, LISP and Perl.
     - [7.1.3](#713-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
     - [7.1.4](#714-break-value) - break _value_
     - [7.1.5](#715-next) - next
+    - [7.1.6](#716-jump-index-val-branch1--last-branch) - jump _index-val_ _branch1_ ... _last-branch_
   - [7.2](#72-collection-iteration) - Collection Iteration
     - [7.2.1](#721-iteration-over-vectors) - Iteration over vectors
     - [7.2.2](#722-iteration-over-maps) - Iteration over maps
@@ -256,12 +257,15 @@ Smalltalk, LISP and Perl.
     - [8.4.1](#841-pair-constructor-a--b) - Pair Constructor `a => b`
     - [8.4.2](#842-forward-argument-pipe-arg--fun) - Forward Argument Pipe `arg &> fun`
     - [8.4.3](#843-reverse-argument-pipe-fun--arg) - Reverse Argument Pipe `fun <& arg`
-- [9](#9-data-structure-selectors-and-string-patternsregex) - Data Structure Selectors and String Patterns/Regex
-  - [9.1](#91-data-structure-selectors) - Data Structure Selectors
-  - [9.2](#92-string-patterns-regex) - String Patterns (Regex)
-    - [9.2.1](#921-pattern-syntax-overview) - Pattern Syntax Overview
-    - [9.2.2](#922-standard-regular-expressions) - Standard Regular Expressions
-    - [9.2.3](#923-stdpattern-string) - std:pattern _string_
+- [9](#9-data-structure-matchers-selectors-and-string-patternsregex) - Data Structure Matchers, Selectors and String Patterns/Regex
+  - [9.1](#91-data-structure-matcher) - Data Structure Matcher
+    - [9.1.1](#911-data-structure-matcher-syntax) - Data Structure Matcher Syntax
+  - [9.2](#92-data-structure-selectors) - Data Structure Selectors
+    - [9.2.1](#921-selector-and-wlambda-regex-syntax) - Selector and WLambda Regex Syntax:
+  - [9.3](#93-string-patterns-regex) - String Patterns (Regex)
+    - [9.3.1](#931-pattern-syntax-overview) - Pattern Syntax Overview
+    - [9.3.2](#932-standard-regular-expressions) - Standard Regular Expressions
+    - [9.3.3](#933-stdpattern-string) - std:pattern _string_
 - [10](#10-modules) - Modules
   - [10.1](#101-export) - export
   - [10.2](#102-import) - import
@@ -281,8 +285,9 @@ Smalltalk, LISP and Perl.
     - [12.0.9](#1209-stdeval-code-string) - std:eval _code-string_
     - [12.0.10](#12010-stdassert-bool-message) - std:assert _bool_ \[_message_]
     - [12.0.11](#12011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
-    - [12.0.12](#12012-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
-    - [12.0.13](#12013-stdwlambdaversion) - std:wlambda:version
+    - [12.0.12](#12012-stdassertstreq-actual-expected) - std:assert_str_eq _actual_ _expected_
+    - [12.0.13](#12013-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+    - [12.0.14](#12014-stdwlambdaversion) - std:wlambda:version
   - [12.1](#121-io) - I/O
     - [12.1.1](#1211-stdiofilereadtext-filename) - std:io:file:read_text _filename_
     - [12.1.2](#1212-stdiofileread-filename) - std:io:file:read _filename_
@@ -589,14 +594,19 @@ std:assert_eq my_cat.get_name[] "Spotty";
 
 ### <a name="32-function-calling"></a>3.2 - Function calling
 
-To call functions, you have at least 3 alternatives. First is the bare
+To call functions, you have at least 4 alternatives. First is the bare
 `_expr_ arg1 arg2 arg3 arg4` syntax. And the second is the fully delimited
 variant: `_expr_[arg1, arg2, arg3, ...]`. You can always delimit the first
 variant using the `( ... )` parenthesis around the whole call,
 i.e. `(_expr_ arg1 arg2 arg3 arg4)`.
+
 Third you can call a function with a vector as argument with `_expr_[[_expr_]]`,
 where the second expression should return a vector (if it doesn't it will use the
 value as first argument).
+
+The fourth alterantive is the `&>` and `<&` argument pipe operators which
+can be conveniently used in conjunction with the first variant to prevent
+some parenthesis.
 
 Here are examples:
 
@@ -610,6 +620,10 @@ std:assert_eq (std:str:cat 1 2 3) "123";
 # As the third variant:
 !some_args = $[1, 2, 3];
 std:assert_eq std:str:cat[[some_args]] "123";
+
+# The fourth variant:
+std:assert_eq str <& $[1, 2, 3]     "$[1,2,3]";
+std:assert_eq $[1, 2, 3] &> str     "$[1,2,3]";
 ```
 
 The arguments passed to the function are accessible using the `_`, `_1`, `_2`, ..., `_9`
@@ -3487,7 +3501,7 @@ std:assert dropped;
 
 ## <a name="6-conditional-execution---if--then--else"></a>6 - Conditional Execution - if / then / else
 
-### <a name="61--condition-then-expr-else-expr"></a>6.1 - ?/if _condition_ _then-expr_ [_else-expr_]
+### <a name="61-if-condition-then-expr-else-expr"></a>6.1 - ?/if _condition_ _then-expr_ [_else-expr_]
 
 The keyword for conditional execution is either `if` or just the question mark `?`.
 Both are possible to use, while `?` is a bit more WLambda idiomatic.
@@ -3888,7 +3902,7 @@ std:assert_eq sum 7;
 std:assert_eq sum 25;
 ```
 
-#### - jump _index-val_ _branch1_ ... _last-branch_
+#### <a name="716-jump-index-val-branch1--last-branch"></a>7.1.6 - jump _index-val_ _branch1_ ... _last-branch_
 
 This is a jump table operation, it's a building block for the more
 sophisticated `match` operation. The first argument is an index into the table.
@@ -4532,7 +4546,7 @@ std:assert_eq r "0000000abc";
 
 That means, writing `f <& a <& x` becomes `f[a[x]]` or `(f (a x))`.
 
-## <a name="9-data-structure-selectors-and-string-patternsregex"></a>9 - Data Structure Matchers, Selectors and String Patterns/Regex
+## <a name="9-data-structure-matchers-selectors-and-string-patternsregex"></a>9 - Data Structure Matchers, Selectors and String Patterns/Regex
 
 WLambda comes with a builtin DSL (domain specific language) for
 shallow data structure matches and deep data structure selection and regular expression (regex) pattern
@@ -4554,9 +4568,9 @@ For an in depth description of the _selector_ and _pattern_ syntax
 please refer to the [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
 in the wlambda::selector module.
 
-### - Data Structure Matcher
+### <a name="91-data-structure-matcher"></a>9.1 - Data Structure Matcher
 
-#### - Data Structure Matcher Syntax
+#### <a name="911-data-structure-matcher-syntax"></a>9.1.1 - Data Structure Matcher Syntax
 
 This the the compiletime syntax that is understood by the
 structure matchers that are used by `$P ...` and `match`.
@@ -4589,13 +4603,13 @@ structure matchers that are used by `$P ...` and `match`.
 | `$n`                   | Matches $none. |
 | literal values         | Literal values like booleans, strings, symbols and numbers match their value. |
 
-### <a name="91-data-structure-selectors"></a>9.1 - Data Structure Selectors
+### <a name="92-data-structure-selectors"></a>9.2 - Data Structure Selectors
 
 This section shows how data structure selectors can be used.
 
 TODO
 
-#### Selector and WLambda Regex Syntax:
+#### <a name="921-selector-and-wlambda-regex-syntax"></a>9.2.1 - Selector and WLambda Regex Syntax:
 
 ```ebnf
     (* NOTE: Whitespace is not part of a pattern in most places. This means
@@ -4709,7 +4723,7 @@ TODO
                 ;
 ```
 
-### <a name="92-string-patterns-regex"></a>9.2 - String Patterns (Regex)
+### <a name="93-string-patterns-regex"></a>9.3 - String Patterns (Regex)
 
 This section shows how to use the builtin pattern regex engine
 in WLambda. You can embed patterns directly in your WLambda source
@@ -4755,8 +4769,9 @@ matcher function, or use the global variable `$\` which will contain
 the results of the latest match that was exectuted:
 
 ```wlambda
+# Notice the usage of the `<&` function call operator:
 !res =
-    ? ($r| $<*? (^$+[\\/]) * | "foo//\\/foo") {
+    ? "foo//\\/foo" <& $r| $<*? (^$+[\\/]) * | {
         std:assert_eq $\.0 "foo//\\/foo";
 
         $\.1
@@ -4765,7 +4780,7 @@ the results of the latest match that was exectuted:
 std:assert_eq res "//\\/";
 ```
 
-#### <a name="921-pattern-syntax-overview"></a>9.2.1 - Pattern Syntax Overview
+#### <a name="931-pattern-syntax-overview"></a>9.3.1 - Pattern Syntax Overview
 
 While
 [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
@@ -4798,14 +4813,14 @@ here is the WLambda pattern syntax in a nutshell:
 | `$&L`         | Transforms the input string for the following pattern matching parts to lowercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
 | `$&U`         | Transforms the input string for the following pattern matching parts to uppercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
 
-#### <a name="922-standard-regular-expressions"></a>9.2.2 - Standard Regular Expressions
+#### <a name="932-standard-regular-expressions"></a>9.3.2 - Standard Regular Expressions
 
 Please note that WLambda can optionally be compiled with the `regex` crate,
 which implements a more common syntax for regular expressions.
 Please refer to the functions `std:re:match` in the WLambda standard library
 for this.
 
-#### <a name="923-stdpattern-string"></a>9.2.3 - std:pattern _string_
+#### <a name="933-stdpattern-string"></a>9.3.3 - std:pattern _string_
 
 Compiles the regex pattern _string_ to a function just like `$r/.../` would do.
 Useful for composing WLambda patterns at runtime:
@@ -5103,7 +5118,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### - std:assert_str_eq _actual_ _expected_
+#### <a name="12012-stdassertstreq-actual-expected"></a>12.0.12 - std:assert_str_eq _actual_ _expected_
 
 This function stringifies _actual_ and _expected_ using the `str` function
 and compares the resulting strings.
@@ -5115,7 +5130,7 @@ if the maps are stringified using `str`:
 std:assert_str_eq $[1, 2, 3]        $[1, 2, 3];
 ```
 
-#### <a name="12012-stdassertreleq-l-r-epsilon-message"></a>12.0.12 - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+#### <a name="12013-stdassertreleq-l-r-epsilon-message"></a>12.0.13 - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -5131,7 +5146,7 @@ std:assert_rel_eq x y 1;
 # std:assert_eq x y 0.5;
 ```
 
-#### <a name="12013-stdwlambdaversion"></a>12.0.13 - std:wlambda:version
+#### <a name="12014-stdwlambdaversion"></a>12.0.14 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
