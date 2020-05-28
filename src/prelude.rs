@@ -44,8 +44,17 @@ Smalltalk, LISP and Perl.
     - [3.3.1](#331-stdtonoarity-function) - std:to_no_arity _function_
   - [3.4](#34-calling-fields--method-calling) - Calling fields / Method calling
     - [3.4.1](#341-object-oriented-programming-with-prototypes) - Object Oriented Programming with Prototypes
-  - [3.5](#35-function-utilities) - Function utilities
-    - [3.5.1](#351-isfun-value) - is_fun _value_
+  - [3.5](#35-function-call-composition) - Function call composition
+    - [3.5.1](#351--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
+    - [3.5.2](#352--left-hand-function-chaining) - '|>' Left Hand Function Chaining
+    - [3.5.3](#353-forward-argument-pipe-arg--fun) - Forward Argument Pipe `arg &> fun`
+    - [3.5.4](#354-reverse-argument-pipe-fun--arg) - Reverse Argument Pipe `fun <& arg`
+  - [3.6](#36-control-flow---returning) - Control Flow - Returning
+    - [3.6.1](#361-return-label-value) - return [_label_] _value_
+    - [3.6.2](#362-block-label-function) - block [label] _function_
+    - [3.6.3](#363-stdtodrop-value-function-or-raii-destructors-or-drop-functions) - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
+  - [3.7](#37-function-utilities) - Function utilities
+    - [3.7.1](#371-isfun-value) - is_fun _value_
 - [4](#4-data-types) - Data Types
   - [4.1](#41-none-sentinel-value-n-or-none) - None sentinel value: `$n` or `$none`
     - [4.1.1](#411-isnone-value) - is_none _value_
@@ -156,17 +165,18 @@ Smalltalk, LISP and Perl.
     - [4.11.1](#4111-stdsymbolscollect) - std:symbols:collect
   - [4.12](#412-pairs-pa-b) - Pairs `$p(a, b)`
     - [4.12.1](#4121-pair-operator-a--b) - Pair Operator `a => b`
-    - [4.12.2](#4122-cons-a-b) - cons _a_ _b_
-    - [4.12.3](#4123-pair-stringbyte-vector-operations) - Pair string/byte vector operations
-      - [4.12.3.1](#41231-pfrom-count-string-or-byte-vec) - `$p(_from_, _count_) _string-or-byte-vec_`
-      - [4.12.3.2](#41232-ppattern-replacement-string-or-byte-vec) - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
-      - [4.12.3.3](#41233-psplit-pattern-max-string-or-byte-vec) - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
-    - [4.12.4](#4124-pair-to-iterator) - Pair to Iterator
-      - [4.12.4.1](#41241-iter---range) - Iter - Range
-      - [4.12.4.2](#41242-iter---enumerate) - Iter - Enumerate
-      - [4.12.4.3](#41243-iter---values) - Iter - Values
-      - [4.12.4.4](#41244-iter---keys) - Iter - Keys
-    - [4.12.5](#4125-ispair-value) - is_pair _value_
+    - [4.12.2](#4122-pair-constructor-a--b) - Pair Constructor `a => b`
+    - [4.12.3](#4123-cons-a-b) - cons _a_ _b_
+    - [4.12.4](#4124-pair-stringbyte-vector-operations) - Pair string/byte vector operations
+      - [4.12.4.1](#41241-pfrom-count-string-or-byte-vec) - `$p(_from_, _count_) _string-or-byte-vec_`
+      - [4.12.4.2](#41242-ppattern-replacement-string-or-byte-vec) - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
+      - [4.12.4.3](#41243-psplit-pattern-max-string-or-byte-vec) - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
+    - [4.12.5](#4125-pair-to-iterator) - Pair to Iterator
+      - [4.12.5.1](#41251-iter---range) - Iter - Range
+      - [4.12.5.2](#41252-iter---enumerate) - Iter - Enumerate
+      - [4.12.5.3](#41253-iter---values) - Iter - Values
+      - [4.12.5.4](#41254-iter---keys) - Iter - Keys
+    - [4.12.6](#4126-ispair-value) - is_pair _value_
   - [4.13](#413-vectors-or-lists) - Vectors (or Lists)
     - [4.13.1](#4131-stdpush-vector-item) - std:push _vector_ _item_
     - [4.13.2](#4132-stdpop-vector) - std:pop _vector_
@@ -193,13 +203,6 @@ Smalltalk, LISP and Perl.
     - [4.16.5](#4165-zip-iterators) - Zip Iterators
   - [4.17](#417-calling-semantics-of-data-types) - Calling Semantics of Data Types
 - [5](#5-functions-part-22) - Functions (part 2/2)
-  - [5.1](#51-function-call-composition) - Function call composition
-    - [5.1.1](#511--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
-    - [5.1.2](#512--left-hand-function-chaining) - '|>' Left Hand Function Chaining
-  - [5.2](#52-control-flow---returning) - Control Flow - Returning
-    - [5.2.1](#521-return-label-value) - return [_label_] _value_
-    - [5.2.2](#522-block-label-function) - block [label] _function_
-    - [5.2.3](#523-stdtodrop-value-function-or-raii-destructors-or-drop-functions) - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
 - [6](#6-conditional-execution---if--then--else) - Conditional Execution - if / then / else
   - [6.1](#61-if-condition-then-expr-else-expr) - ?/if _condition_ _then-expr_ [_else-expr_]
   - [6.2](#62-using-booleans-for-conditional-execution) - Using Booleans for Conditional Execution
@@ -254,10 +257,6 @@ Smalltalk, LISP and Perl.
     - [8.3.3](#833--op-a-op-b) - &| _op-a_ _op-b_
     - [8.3.4](#834--op-a-op-b) - << _op-a_ _op-b_
     - [8.3.5](#835--op-a-op-b) - >> _op-a_ _op-b_
-  - [8.4](#84-syntactic-operators) - Syntactic Operators
-    - [8.4.1](#841-pair-constructor-a--b) - Pair Constructor `a => b`
-    - [8.4.2](#842-forward-argument-pipe-arg--fun) - Forward Argument Pipe `arg &> fun`
-    - [8.4.3](#843-reverse-argument-pipe-fun--arg) - Reverse Argument Pipe `fun <& arg`
 - [9](#9-data-structure-matchers-selectors-and-string-patternsregex) - Data Structure Matchers, Selectors and String Patterns/Regex
   - [9.1](#91-data-structure-matcher) - Data Structure Matcher
     - [9.1.1](#911-match-value-expr-match-pair1--default-expr) - match _value-expr_ _match-pair1_ ... [_default-expr_]
@@ -800,9 +799,255 @@ std:assert_eq inst.gen[3] 30;
 std:assert_eq inst.gen2[4] 40;
 ```
 
-### <a name="35-function-utilities"></a>3.5 - Function utilities
+### <a name="35-function-call-composition"></a>3.5 - Function call composition
 
-#### <a name="351-isfun-value"></a>3.5.1 - is_fun _value_
+- chaining
+- traditional () call syntax
+- ~ syntax
+- || syntax
+
+>> $[] || push 10
+> $[10]
+>> $[] || push 10 || push 20
+> $[10,20]
+>> !x = { push _1 _ };
+> $n
+>> $[] | x 10 | x 20
+> $[10,20]
+>>
+
+- [...] syntax
+
+#### <a name="351--tail-argument-function-chaninig"></a>3.5.1 - '|' Tail Argument Function Chaninig
+
+This syntax is useful if you have following function call composition:
+
+```text
+(fn arg1 arg2 (fn2 arg_b1 arg_b2 (fn3 arg_c1 arg_c2 ...)))
+```
+
+These can be written more comfortably like this:
+
+```text
+fn3 arg1 arg2 | fn2 arg_b1 arg_b2 | fn arg1 arg2
+```
+
+An example with actual values:
+
+```wlambda
+!x = 10 | { _ * 4 } | { _ + 2 };
+
+std:assert_eq x 42;
+```
+
+Think of it as if the value `10` was _piped_ through the
+functions on the right.
+
+The call reordering of the `|` operator looks like this:
+
+```text
+    fn1 a1 a2 | fn2 b1 b2 (   )   =>   fn2 b1 b2 (fn1 a1 a2)
+    """""""""               ^
+        v                   |
+        --------------------|
+```
+
+#### <a name="352--left-hand-function-chaining"></a>3.5.2 - '|>' Left Hand Function Chaining
+
+This syntax is useful if you want to make deep call chains like these:
+
+```text
+(((fn arg1 arg2 ...) arg_b1 arg_b2 ...) arg_c1 arg_c2 ...)
+```
+
+These can be written more comfortably like this:
+
+```text
+fn arg1 arg2 |> arg_b1 arg_b2 |> arg_c1 arg_c2
+```
+
+or nicer formatted:
+
+```text
+fn arg1 arg2
+    |> arg_b1 arg_b2
+    |> arg_c1 arg_c2
+```
+
+Here an actual example:
+
+```wlambda
+!res = $@v
+    1 + 1
+    |> $["abc", "def", "ceg"]
+    |> { $+ ~ std:str:cat "|" _ "|" };
+
+std:assert_eq res.0 "|c|";
+std:assert_eq res.1 "|e|";
+std:assert_eq res.2 "|g|";
+```
+
+The call reordering of the `|>` operator looks like this:
+
+```text
+    fn1 a1 a2 |> b1 b2    =>   ((   )   )
+    """""""""    """""            ^   ^
+        v          v              |   |
+        -----------|--------------|   |
+                   -------------------|
+```
+
+#### <a name="353-forward-argument-pipe-arg--fun"></a>3.5.3 - Forward Argument Pipe `arg &> fun`
+
+This operator has the highest precedence over all other operators
+and is used to be able to write this:
+
+```wlambda
+? "foob" &> $r/f(^*)b/ {
+    std:assert_eq $\.1 "oo";
+} {
+    std:assert $false;
+}
+```
+
+That means `f a &> b` is equivalent to writing `f[b[a]]` or `(f (b a))`.
+Chaining multiple is also possible and left associative: `a &> b &> c` is `(c (b a))`.
+You can see it as piping operation:
+
+```wlambda
+!r = "ABC" &> std:str:to_lowercase &> \std:str:pad_start 10 "0" _;
+
+std:assert_eq r "0000000abc";
+```
+
+#### <a name="354-reverse-argument-pipe-fun--arg"></a>3.5.4 - Reverse Argument Pipe `fun <& arg`
+
+Like the `&>` operator this operator, but it has a lower precedence (does not bind
+as strongly as `&>`) and is right associative. That means you can write this:
+
+```wlambda
+!r = (\std:str:pad_start 10 "0" _) <& std:str:to_lowercase <& "ABC";
+
+std:assert_eq r "0000000abc";
+```
+
+That means, writing `f <& a <& x` becomes `f[a[x]]` or `(f (a x))`.
+
+### <a name="36-control-flow---returning"></a>3.6 - Control Flow - Returning
+
+WLambda uses labelled blocks for control flow, as returning from the current function would not be
+very helpful for the control flow in wlambda in case of conditional execution using the
+boolean calling semantics.
+
+```wlambda
+!some_func = \:outer {
+    !x = 10;
+
+    # does stuff...
+
+    (x == 10) {
+        return :outer 20
+    };
+
+    # more stuff that is not executed if x == 10.
+}
+```
+
+#### <a name="361-return-label-value"></a>3.6.1 - return [_label_] _value_
+
+Returns _value_ from the current function if no _label_ is given.
+If _label_ is given, the call stack will unwind until either a `block`
+or a function with the given _label_ is encountered.
+
+```wlambda
+!f = {
+    10;
+    return 20;
+    30
+};
+
+std:assert_eq f[] 20;
+```
+
+Here an example for unwinding two call frames:
+
+```wlambda
+!f = \:x {
+    10;
+    { return :x 20 }[];
+    30;
+};
+
+std:assert_eq f[] 20;
+```
+
+The labels do not adhere to lexical scoping and are dynamically scoped:
+
+```wlambda
+!g = { return :x 30 };
+
+!f = \:x { 20; g[]; 40 };
+
+std:assert_eq f[] 30;
+```
+
+#### <a name="362-block-label-function"></a>3.6.2 - block [label] _function_
+
+Calls the _function_ with the given _label_ for `return`to jump to.
+
+If you just want to setup a point inside a function to jump to
+with `return` the `block` function is more convenient to use:
+
+```wlambda
+!y = 1;
+
+!res = block :x {
+    .y = y + 1;
+    (y >= 2) \return :x 20;
+    .y = y + 1;
+    .y = y + 1;
+};
+
+std:assert_eq res 20;
+```
+
+The alternative is the less clear syntax would be in this case:
+
+```wlambda
+!y = 1;
+
+!res = \:x {
+    .y = y + 1;
+    (y >= 2) \return :x 20;
+    .y = y + 1;
+    .y = y + 1;
+}[];
+
+std:assert_eq res 20;
+```
+
+#### <a name="363-stdtodrop-value-function-or-raii-destructors-or-drop-functions"></a>3.6.3 - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
+
+You can create a function that is called when the associated value is
+dropped or its reference count goes to 0.
+
+```wlambda
+!dropped = $false;
+
+!x = std:to_drop 20 { .dropped = $true; };
+
+std:assert not[dropped];
+std:assert_eq $*x 20;
+
+.x = $none;
+
+std:assert dropped;
+```
+
+
+### <a name="37-function-utilities"></a>3.7 - Function utilities
+
+#### <a name="371-isfun-value"></a>3.7.1 - is_fun _value_
 
 Returns `$true` if _value_ is a function.
 
@@ -2572,8 +2817,17 @@ std:assert std:ref_id[v.0] == id_a;
 
 #### <a name="4121-pair-operator-a--b"></a>4.12.1 - Pair Operator `a => b`
 
-You can construct pairs also using the `=>` operator, which
-has the lowest precedence and is right associative:
+Writing `a => b` operator is the same as writing `$p(a, b)`.  However, the
+precedence of the `=>` operator is the lowest and right associative, so writing
+this is possible:
+
+```wlambda
+!p = 1 + 2 => 3 + 4;
+
+std:assert_eq p $p(3, 7);
+```
+
+The following example shows off the associativity of the operator:
 
 ```wlambda
 !a = 1 => 2;
@@ -2584,7 +2838,10 @@ std:assert_eq b $p(2, $p(3, 4));
 std:assert_eq b 2 => 3 => 4;
 ```
 
-#### <a name="4122-cons-a-b"></a>4.12.2 - cons _a_ _b_
+#### <a name="4122-pair-constructor-a--b"></a>4.12.2 - Pair Constructor `a => b`
+
+
+#### <a name="4123-cons-a-b"></a>4.12.3 - cons _a_ _b_
 
 Creates a new pair from the values _a_ and _b_.
 
@@ -2594,12 +2851,12 @@ Creates a new pair from the values _a_ and _b_.
 std:assert_eq p $p(3, 4);
 ```
 
-#### <a name="4123-pair-stringbyte-vector-operations"></a>4.12.3 - Pair string/byte vector operations
+#### <a name="4124-pair-stringbyte-vector-operations"></a>4.12.4 - Pair string/byte vector operations
 
 If you call a pair with a string or byte vector as argument, there are some
 operations that can be done:
 
-##### <a name="41231-pfrom-count-string-or-byte-vec"></a>4.12.3.1 - `$p(_from_, _count_) _string-or-byte-vec_`
+##### <a name="41241-pfrom-count-string-or-byte-vec"></a>4.12.4.1 - `$p(_from_, _count_) _string-or-byte-vec_`
 
 Returns a substring starting at _from_ with the length _count_.
 
@@ -2613,7 +2870,7 @@ The same works for byte vectors:
 std:assert_eq ($p(2, 4) $b"abcdefgh") $b"cdef";
 ```
 
-##### <a name="41232-ppattern-replacement-string-or-byte-vec"></a>4.12.3.2 - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
+##### <a name="41242-ppattern-replacement-string-or-byte-vec"></a>4.12.4.2 - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
 
 Replaces all _pattern_ occurences in _string_ by _replacement_.
 
@@ -2627,7 +2884,7 @@ The same works for byte vectors:
 std:assert_eq ($p($b";", $b"_") $b"A;B;D;EFG;HI") $b"A_B_D_EFG_HI";
 ```
 
-##### <a name="41233-psplit-pattern-max-string-or-byte-vec"></a>4.12.3.3 - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
+##### <a name="41243-psplit-pattern-max-string-or-byte-vec"></a>4.12.4.3 - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
 
 Splits _string_ at _split-pattern_ a _max_ number of times.
 If _max_ is 0, it is split completely.
@@ -2644,14 +2901,14 @@ The same works for byte vectors:
 std:assert_eq str[$p($b";", 0) $b"A;B;D;EFG;HI"] ~ str $[$b"A", $b"B", $b"D", $b"EFG", $b"HI"];
 ```
 
-#### <a name="4124-pair-to-iterator"></a>4.12.4 - Pair to Iterator
+#### <a name="4125-pair-to-iterator"></a>4.12.5 - Pair to Iterator
 
 Pairs play a special role if you make an iterator from it.
 It can be used to create a specialized iterator that only
 iterates over keys or values of a map. Or that enumerates
 a vector or map.
 
-##### <a name="41241-iter---range"></a>4.12.4.1 - Iter - Range
+##### <a name="41251-iter---range"></a>4.12.5.1 - Iter - Range
 
 `$iter $p(0, 10)` is the same as `$iter $i(0, 10)` and will construct an
 iterator that iterates from `0` to `9` (inclusive).
@@ -2665,7 +2922,7 @@ Because of the pair operator `a => b` we can nicely write a counting loop like t
 std:assert_eq sum 45;
 ```
 
-##### <a name="41242-iter---enumerate"></a>4.12.4.2 - Iter - Enumerate
+##### <a name="41252-iter---enumerate"></a>4.12.5.2 - Iter - Enumerate
 
 If the first value of the pair is `:enumerate`
 it will enumerate entries in a map or values in a vector.
@@ -2692,7 +2949,7 @@ iter i $p(:enumerate, ${a = 10, b = 20})
 std:assert_eq (str v) (str $[0, 1]);
 ```
 
-##### <a name="41243-iter---values"></a>4.12.4.3 - Iter - Values
+##### <a name="41253-iter---values"></a>4.12.5.3 - Iter - Values
 
 This is useful for iterating over the values in a map in an undefined order:
 
@@ -2704,7 +2961,7 @@ This is useful for iterating over the values in a map in an undefined order:
 std:assert_eq sum 63;
 ```
 
-##### <a name="41244-iter---keys"></a>4.12.4.4 - Iter - Keys
+##### <a name="41254-iter---keys"></a>4.12.5.4 - Iter - Keys
 
 You can also iterate over map keys in an undefined order:
 
@@ -2716,7 +2973,7 @@ You can also iterate over map keys in an undefined order:
 std:assert_eq sum 60;
 ```
 
-#### <a name="4125-ispair-value"></a>4.12.5 - is_pair _value_
+#### <a name="4126-ispair-value"></a>4.12.6 - is_pair _value_
 
 Checks if _value_ is a pair.
 
@@ -3078,7 +3335,7 @@ std:assert ~ is_none $*y;
 
 .x = $&&10;
 .y = std:weaken x;
-!y2 = std:strengthen y;
+!y2 = std:strengthen y; # Here we take a second strong reference from a weak one
 
 .x = $none;
 std:assert ~ is_some $*y;
@@ -3310,214 +3567,6 @@ Here is an overview of the data type calling semantics:
 |           |                   | |
 
 ## <a name="5-functions-part-22"></a>5 - Functions (part 2/2)
-
-### <a name="51-function-call-composition"></a>5.1 - Function call composition
-
-- chaining
-- traditional () call syntax
-- ~ syntax
-- || syntax
-
->> $[] || push 10
-> $[10]
->> $[] || push 10 || push 20
-> $[10,20]
->> !x = { push _1 _ };
-> $n
->> $[] | x 10 | x 20
-> $[10,20]
->>
-
-- [...] syntax
-
-#### <a name="511--tail-argument-function-chaninig"></a>5.1.1 - '|' Tail Argument Function Chaninig
-
-This syntax is useful if you have following function call composition:
-
-```text
-(fn arg1 arg2 (fn2 arg_b1 arg_b2 (fn3 arg_c1 arg_c2 ...)))
-```
-
-These can be written more comfortably like this:
-
-```text
-fn3 arg1 arg2 | fn2 arg_b1 arg_b2 | fn arg1 arg2
-```
-
-An example with actual values:
-
-```wlambda
-!x = 10 | { _ * 4 } | { _ + 2 };
-
-std:assert_eq x 42;
-```
-
-Think of it as if the value `10` was _piped_ through the
-functions on the right.
-
-The call reordering of the `|` operator looks like this:
-
-```text
-    fn1 a1 a2 | fn2 b1 b2 (   )   =>   fn2 b1 b2 (fn1 a1 a2)
-    """""""""               ^
-        v                   |
-        --------------------|
-```
-
-#### <a name="512--left-hand-function-chaining"></a>5.1.2 - '|>' Left Hand Function Chaining
-
-This syntax is useful if you want to make deep call chains like these:
-
-```text
-(((fn arg1 arg2 ...) arg_b1 arg_b2 ...) arg_c1 arg_c2 ...)
-```
-
-These can be written more comfortably like this:
-
-```text
-fn arg1 arg2 |> arg_b1 arg_b2 |> arg_c1 arg_c2
-```
-
-or nicer formatted:
-
-```text
-fn arg1 arg2
-    |> arg_b1 arg_b2
-    |> arg_c1 arg_c2
-```
-
-Here an actual example:
-
-```wlambda
-!res = $@v
-    1 + 1
-    |> $["abc", "def", "ceg"]
-    |> { $+ ~ std:str:cat "|" _ "|" };
-
-std:assert_eq res.0 "|c|";
-std:assert_eq res.1 "|e|";
-std:assert_eq res.2 "|g|";
-```
-
-The call reordering of the `|>` operator looks like this:
-
-```text
-    fn1 a1 a2 |> b1 b2    =>   ((   )   )
-    """""""""    """""            ^   ^
-        v          v              |   |
-        -----------|--------------|   |
-                   -------------------|
-```
-### <a name="52-control-flow---returning"></a>5.2 - Control Flow - Returning
-
-WLambda uses labelled blocks for control flow, as returning from the current function would not be
-very helpful for the control flow in wlambda in case of conditional execution using the
-boolean calling semantics.
-
-```wlambda
-!some_func = \:outer {
-    !x = 10;
-
-    # does stuff...
-
-    (x == 10) {
-        return :outer 20
-    };
-
-    # more stuff that is not executed if x == 10.
-}
-```
-
-#### <a name="521-return-label-value"></a>5.2.1 - return [_label_] _value_
-
-Returns _value_ from the current function if no _label_ is given.
-If _label_ is given, the call stack will unwind until either a `block`
-or a function with the given _label_ is encountered.
-
-```wlambda
-!f = {
-    10;
-    return 20;
-    30
-};
-
-std:assert_eq f[] 20;
-```
-
-Here an example for unwinding two call frames:
-
-```wlambda
-!f = \:x {
-    10;
-    { return :x 20 }[];
-    30;
-};
-
-std:assert_eq f[] 20;
-```
-
-The labels do not adhere to lexical scoping and are dynamically scoped:
-
-```wlambda
-!g = { return :x 30 };
-
-!f = \:x { 20; g[]; 40 };
-
-std:assert_eq f[] 30;
-```
-
-#### <a name="522-block-label-function"></a>5.2.2 - block [label] _function_
-
-Calls the _function_ with the given _label_ for `return`to jump to.
-
-If you just want to setup a point inside a function to jump to
-with `return` the `block` function is more convenient to use:
-
-```wlambda
-!y = 1;
-
-!res = block :x {
-    .y = y + 1;
-    (y >= 2) \return :x 20;
-    .y = y + 1;
-    .y = y + 1;
-};
-
-std:assert_eq res 20;
-```
-
-The alternative is the less clear syntax would be in this case:
-
-```wlambda
-!y = 1;
-
-!res = \:x {
-    .y = y + 1;
-    (y >= 2) \return :x 20;
-    .y = y + 1;
-    .y = y + 1;
-}[];
-
-std:assert_eq res 20;
-```
-
-#### <a name="523-stdtodrop-value-function-or-raii-destructors-or-drop-functions"></a>5.2.3 - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
-
-You can create a function that is called when the associated value is
-dropped or its reference count goes to 0.
-
-```wlambda
-!dropped = $false;
-
-!x = std:to_drop 20 { .dropped = $true; };
-
-std:assert not[dropped];
-std:assert_eq $*x 20;
-
-.x = $none;
-
-std:assert dropped;
-```
 
 ## <a name="6-conditional-execution---if--then--else"></a>6 - Conditional Execution - if / then / else
 
@@ -4552,59 +4601,6 @@ std:assert (0b0011 >> 2)      == 0b0;
 std:assert (0b1100 >> 2)      == 0b11;
 std:assert (`>>` 0b1011000 3) == 0b1011
 ```
-
-### <a name="84-syntactic-operators"></a>8.4 - Syntactic Operators
-
-This section has some very special syntactic operators which are handled by the
-parser. They are for constructing pairs and calling functions.
-
-#### <a name="841-pair-constructor-a--b"></a>8.4.1 - Pair Constructor `a => b`
-
-Writing `a => b` operator is the same as writing `$p(a, b)`.
-However, the precedence of the `=>` operator is the lowest, so writing this
-is possible:
-
-```wlambda
-!p = 1 + 2 => 3 + 4;
-
-std:assert_eq p $p(3, 7);
-```
-
-#### <a name="842-forward-argument-pipe-arg--fun"></a>8.4.2 - Forward Argument Pipe `arg &> fun`
-
-This operator has the highest precedence over all other operators
-and is used to be able to write this:
-
-```wlambda
-? "foob" &> $r/f(^*)b/ {
-    std:assert_eq $\.1 "oo";
-} {
-    std:assert $false;
-}
-```
-
-That means `f a &> b` is equivalent to writing `f[b[a]]` or `(f (b a))`.
-Chaining multiple is also possible and left associative: `a &> b &> c` is `(c (b a))`.
-You can see it as piping operation:
-
-```wlambda
-!r = "ABC" &> std:str:to_lowercase &> \std:str:pad_start 10 "0" _;
-
-std:assert_eq r "0000000abc";
-```
-
-#### <a name="843-reverse-argument-pipe-fun--arg"></a>8.4.3 - Reverse Argument Pipe `fun <& arg`
-
-Like the `&>` operator this operator, but it has a lower precedence (does not bind
-as strongly as `&>`) and is right associative. That means you can write this:
-
-```wlambda
-!r = (\std:str:pad_start 10 "0" _) <& std:str:to_lowercase <& "ABC";
-
-std:assert_eq r "0000000abc";
-```
-
-That means, writing `f <& a <& x` becomes `f[a[x]]` or `(f (a x))`.
 
 ## <a name="9-data-structure-matchers-selectors-and-string-patternsregex"></a>9 - Data Structure Matchers, Selectors and String Patterns/Regex
 

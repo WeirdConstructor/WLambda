@@ -140,9 +140,8 @@ In the following grammar, white space and comments are omitted:
                          |"v" | "vec"
                          |"m" | "map" ), expr
                     (* defines a new accumulator context *)
-                  | "@", ("a" | "accum")
-                    (* returns the current accumulator value *)
-                  | "+" (* resolves to the current accumulator function *)
+                  | "@@" (* returns the current accumulator value *)
+                  | "+"  (* resolves to the current accumulator function *)
                   ;
     import        = "@import", ident, [ ident ]
                   ;
