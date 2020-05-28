@@ -4532,14 +4532,16 @@ std:assert_eq r "0000000abc";
 
 That means, writing `f <& a <& x` becomes `f[a[x]]` or `(f (a x))`.
 
-## <a name="9-data-structure-selectors-and-string-patternsregex"></a>9 - Data Structure Selectors and String Patterns/Regex
+## <a name="9-data-structure-selectors-and-string-patternsregex"></a>9 - Data Structure Matchers, Selectors and String Patterns/Regex
 
 WLambda comes with a builtin DSL (domain specific language) for
-deep data structure selection and regular expression (regex) pattern
+shallow data structure matches and deep data structure selection and regular expression (regex) pattern
 matching on strings. A _selector_ (structure selection) gives you the
 ability to search deep into WLambda data structures like
 [CSS Selectors](https://www.w3.org/TR/selectors-3/) into HTML DOM trees
 or [XPath](https://www.w3.org/TR/xpath-31/) into XML.
+While a _structure matcher_, as used by the `match` operation,
+allows you to directly match a certain WLambda piece of data.
 
 A subset of the _selectors_ are the _patterns_, which are able to
 match strings like regular expressions. The syntax of _patterns_
@@ -4552,11 +4554,160 @@ For an in depth description of the _selector_ and _pattern_ syntax
 please refer to the [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
 in the wlambda::selector module.
 
+### - Data Structure Matcher
+
+#### - Data Structure Matcher Syntax
+
+This the the compiletime syntax that is understood by the
+structure matchers that are used by `$P ...` and `match`.
+
+- `$P`, `$P1`, `$P2`, ... in the following table stands for a structure matcher expression.
+- All other tokens or values stand for themself.
+
+| WLambda Value | Semantics |
+|-|-|
+| `x`                    | Matches any value and assigns it to the variable `x`. |
+| `?`                    | Matches any value, but does not assign it. |
+| `x $P $P1 ... $Pn`     | Assign the value that matched $P, $P1 or $Pn to the variable `x`. |
+| `? $P $P1 ... $Pn`     | Matches if $P, $P1 or $Pn matches. |
+| `_*`                   | Placeholder for 0 or N items that match any items in the vector. |
+| `_+`                   | Placeholder for 1 or N items that match any items in the vector. |
+| `_?`                   | Placeholder for 0 or 1 items that match any items in the vector. |
+| `_* $P`                | Placeholder for 0 or N items that match $P in the vector. |
+| `_+ $P`                | Placeholder for 1 or N items that match $P in the vector. |
+| `_? $P`                | Placeholder for 0 or 1 items that match $P in the vector. |
+| `_type? :integer ...`  | Matches an element of one of the given types.  Symbol names should have the same name as the type names returned by the `type` function. |
+| `$P1 &or $P2`          | Matches if $P1 or $P2 matches. |
+| `$P1 &and $P2`         | Matches if $P1 and $P2 matches. |
+| `$[$P1, $P2, ...]`     | Matches a vector. |
+| `${ $Pkey1 = $Pval1, ...}`| Matches a map. $Pkey1 can also be a $P match, but keep in mind that maps can only have symbols as keys. You can however match symbols using regex patterns for instance. If you only use symbols as keys in this match, the map access is optimized a bit, because there is no need to iterate over all keys then. |
+| `$p($P1, $P2)`         | Matches a pair. |
+| `$i($P1, ...)`         | Matches an integer vector. |
+| `$f($P1, ...)`         | Matches a float vector. |
+| `$o($P)`               | Matches an optional where the value matches $P. |
+| `$e $P`                | Matches an error value that matches $P. |
+| `$n`                   | Matches $none. |
+| literal values         | Literal values like booleans, strings, symbols and numbers match their value. |
+
 ### <a name="91-data-structure-selectors"></a>9.1 - Data Structure Selectors
 
 This section shows how data structure selectors can be used.
 
 TODO
+
+#### Selector and WLambda Regex Syntax:
+
+```ebnf
+    (* NOTE: Whitespace is not part of a pattern in most places. This means
+             if you want to match whitespace, you will have to escape
+             it either with a '\', with a [ ] character class or match
+             one whitespace char with $s. *)
+
+    class_char  = { ?any character except "]"? }
+                  (* special sequence: "\^" => "^" and "\\" => "\"
+                     and "\]" => "]" *)
+                ;
+
+    ident_char  = { ?any character except whitespace,
+                    "!", "?", "/", "\", "|", "^", ",",
+                    "'", "&", ":", ";", "$", "(", ")",
+                    "{", "}", "[", "]", "*" or "="? }
+                  (* allows the usual backslash escaping! *)
+                ;
+
+    ident       = ident_char, { ident_char }
+                ;
+
+    index       = digit, { digit }
+                ;
+
+    rx_atom     = pat_glob
+                | ident_char
+                ;
+
+    glob_atom   = pat_glob
+                | ident
+                ;
+
+    rx_match_mod = "L"             (* transforms the input string from the match
+                                      position on to lower case. *)
+                 | "U"             (* transforms the input string from the match
+                                      position on to upper case. *)
+                 ;
+
+    pat_regex   = "*", rx_atom     (* matches sub pattern 0 or N times *)
+                | "+", rx_atom     (* matches sub pattern 1 or N times *)
+                | "<", [ ("*" | "+" | "?") ], rx_atom
+                                   (* non greedy version of the above *)
+                | "?", rx_atom     (* matches sub pattern 0 or 1 times *)
+                | "!", rx_atom     (* matches (zero width) if next pattern does not match *)
+                | "=", rx_atom     (* matches (zero width) if next pattern does match *)
+                | "^"              (* matches (zero width) start of string *)
+                | "$"              (* matches (zero width) end of string *)
+                | "s"              (* matches one whitespace character *)
+                | "S"              (* matches one non-whitespace character *)
+                | "&", rx_match_mod
+                ;
+
+    glob_group  = "(", "^", pattern, ")"    (* capturing sub group *)
+                | "(", pattern, ")"         (* sub group *)
+                ;
+
+    class_range = class_char, "-", class_char (* contains a range of chars, eg. [a-z] *)
+                ;
+
+    glob_cclass = "[",  { class_char | class_range }, "]" (* character class match for 1 char *)
+                | "[^", { class_char | class_range }, "]" (* negated character class match for 1 char *)
+                ;
+
+    pat_glob    = "*"                       (* 0 or N any characters *)
+                | "?"                       (* any character *)
+                | "$", pat_regex
+                | glob_cclass
+                | glob_group
+                ;
+
+    pat_branch  = { glob_atom }
+                ;
+
+    pattern     = pat_branch, [ "|", pattern ]
+                ;
+
+    key         = index | pattern
+                ;
+
+    kv          = key, "=", pattern
+                ;
+
+    kv_item     = "{", kv, { ",", kv }, "}"
+                ;
+
+    node_match  = ":", ["!"], "(", selector, ")"
+                | ":", ["!"], kv_item
+                | ":", ["!"], "type", "=", pattern
+                  (* pattern is matched against
+                     vval type as returned by `type` *)
+                | ":", ["!"], "str",  "=", pattern
+                  (* pattern is matched against
+                     the string contents or stringified
+                     representation of the value *)
+                ;
+
+    node_cond   = node_match
+                | node_match, "&", node_cond
+                | node_match, "|", node_cond
+                ;
+
+    node        = key, { node_cond }
+                  (* marks it for referencing it in the result set *)
+                | "**", { node_cond }
+                  (* deep expensive recursion *)
+                | "^", node
+                ;
+
+    selector    = node, { "/", node }
+                ;
+```
 
 ### <a name="92-string-patterns-regex"></a>9.2 - String Patterns (Regex)
 

@@ -284,39 +284,6 @@ There are certain calls that are handled by the compiler differently.
 - `break`
 - `match _value-expr_ $p(structure_pattern, branch_block) ... [ branch_block ]
 
-## Structure Pattern Syntax
-
-This the the compiletime syntax that is understood by the
-structure patterns that are used by `$P ...` and `match`.
-
-- `$P`, `$P1`, `$P2`, ... in the following table stands for a structure pattern expression.
-- All other tokens or values stand for themself.
-
-| WLambda Value | Semantics |
-|-|-|
-| `x`                    | Matches any value and assigns it to the variable `x`. |
-| `?`                    | Matches any value, but does not assign it. |
-| `x $P $P1 ... $Pn`     | Assign the value that matched $P, $P1 or $Pn to the variable `x`. |
-| `? $P $P1 ... $Pn`     | Matches if $P, $P1 or $Pn matches. |
-| `_*`                   | Placeholder for 0 or N items that match any items in the vector. |
-| `_+`                   | Placeholder for 1 or N items that match any items in the vector. |
-| `_?`                   | Placeholder for 0 or 1 items that match any items in the vector. |
-| `_* $P`                | Placeholder for 0 or N items that match $P in the vector. |
-| `_+ $P`                | Placeholder for 1 or N items that match $P in the vector. |
-| `_? $P`                | Placeholder for 0 or 1 items that match $P in the vector. |
-| `_type? :integer ...`  | Matches an element of one of the given types.  Symbol names should have the same name as the type names returned by the `type` function. |
-| `$P1 &or $P2`          | Matches if $P1 or $P2 matches. |
-| `$P1 &and $P2`         | Matches if $P1 and $P2 matches. |
-| `$[$P1, $P2, ...]`     | Matches a vector. |
-| `${ $Pkey1 = $Pval1, ...}`| Matches a map. $Pkey1 can also be a $P match, but keep in mind that maps can only have symbols as keys. You can however match symbols using regex patterns for instance. If you only use symbols as keys in this match, the map access is optimized a bit, because there is no need to iterate over all keys then. |
-| `$p($P1, $P2)`         | Matches a pair. |
-| `$i($P1, ...)`         | Matches an integer vector. |
-| `$f($P1, ...)`         | Matches a float vector. |
-| `$o($P)`               | Matches an optional where the value matches $P. |
-| `$e $P`                | Matches an error value that matches $P. |
-| `$n`                   | Matches $none. |
-| literal values         | Literal values like booleans, strings, symbols and numbers match their value. |
-
 */
 
 

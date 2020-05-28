@@ -317,10 +317,10 @@ captured.
 };
 ```
 
-## Builting Structure Patterns
+## Builtin Structure Matchers
 
 A bit different but similar to the structure selectors `$S ...` are the `$P
-...` or `match` structure patterns:
+...` or `match` structure matchers:
 
 ```wlambda
 !struct = $[
