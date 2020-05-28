@@ -96,7 +96,7 @@ In the following grammar, white space and comments are omitted:
                     (* parses substring like 'q', but constructs a
                        pattern matcher at compile time *)
                   ;
-    struct_match  = "P", expr   (* compiles expr as structure matcher function.
+    struct_match  = "M", expr   (* compiles expr as structure matcher function.
                                    If called, it matches the first argument against
                                    the literal structure and returns a map of
                                    matched variables. If nothing matches $none
@@ -690,7 +690,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             vec.push(VVal::new_str_mv(selector_source));
             Ok(vec)
         },
-        'P' => {
+        'M' => {
             ps.consume_wsc();
             let pat_expr = parse_expr(ps)?;
             let vec = ps.syn(Syntax::StructPattern);

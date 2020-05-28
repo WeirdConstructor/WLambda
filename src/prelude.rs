@@ -4570,36 +4570,61 @@ in the wlambda::selector module.
 
 ### <a name="91-data-structure-matcher"></a>9.1 - Data Structure Matcher
 
+
+
+#### - match _value-expr_ _match-pair1_ ... [_default-expr_]
+
+
+#### - `$M _expr_`
+
+This is a structure matcher expression. It will compile _expr_ into a structure
+matcher function. The reslting function will match it's first argument agianst
+the match and return a map containing the capture variables (or just an empty map).
+
+It will also bind the result map to `$\`. This makes it possible to easily match
+a data structure in an if statement:
+
+```wlambda
+!some_struct = $[:TEST, ${ a = 10, b = 1442 }];
+
+? some_struct &> ($M $[sym, ${ a = 10, b = x }]) {
+    std:assert_eq $\.sym :TEST;
+    std:assert_eq $\.x   1442;
+} {
+    panic "It should've matched!";
+};
+```
+
 #### <a name="911-data-structure-matcher-syntax"></a>9.1.1 - Data Structure Matcher Syntax
 
 This the the compiletime syntax that is understood by the
-structure matchers that are used by `$P ...` and `match`.
+structure matchers that are used by `$M ...` and `match`.
 
-- `$P`, `$P1`, `$P2`, ... in the following table stands for a structure matcher expression.
+- `$M`, `$M1`, `$M2`, ... in the following table stands for a structure matcher expression.
 - All other tokens or values stand for themself.
 
 | WLambda Value | Semantics |
 |-|-|
 | `x`                    | Matches any value and assigns it to the variable `x`. |
 | `?`                    | Matches any value, but does not assign it. |
-| `x $P $P1 ... $Pn`     | Assign the value that matched $P, $P1 or $Pn to the variable `x`. |
-| `? $P $P1 ... $Pn`     | Matches if $P, $P1 or $Pn matches. |
+| `x $M $M1 ... $Mn`     | Assign the value that matched $M, $M1 or $Mn to the variable `x`. |
+| `? $M $M1 ... $Mn`     | Matches if $M, $M1 or $Mn matches. |
 | `_*`                   | Placeholder for 0 or N items that match any items in the vector. |
 | `_+`                   | Placeholder for 1 or N items that match any items in the vector. |
 | `_?`                   | Placeholder for 0 or 1 items that match any items in the vector. |
-| `_* $P`                | Placeholder for 0 or N items that match $P in the vector. |
-| `_+ $P`                | Placeholder for 1 or N items that match $P in the vector. |
-| `_? $P`                | Placeholder for 0 or 1 items that match $P in the vector. |
+| `_* $M`                | Placeholder for 0 or N items that match $M in the vector. |
+| `_+ $M`                | Placeholder for 1 or N items that match $M in the vector. |
+| `_? $M`                | Placeholder for 0 or 1 items that match $M in the vector. |
 | `_type? :integer ...`  | Matches an element of one of the given types.  Symbol names should have the same name as the type names returned by the `type` function. |
-| `$P1 &or $P2`          | Matches if $P1 or $P2 matches. |
-| `$P1 &and $P2`         | Matches if $P1 and $P2 matches. |
-| `$[$P1, $P2, ...]`     | Matches a vector. |
-| `${ $Pkey1 = $Pval1, ...}`| Matches a map. $Pkey1 can also be a $P match, but keep in mind that maps can only have symbols as keys. You can however match symbols using regex patterns for instance. If you only use symbols as keys in this match, the map access is optimized a bit, because there is no need to iterate over all keys then. |
-| `$p($P1, $P2)`         | Matches a pair. |
-| `$i($P1, ...)`         | Matches an integer vector. |
-| `$f($P1, ...)`         | Matches a float vector. |
-| `$o($P)`               | Matches an optional where the value matches $P. |
-| `$e $P`                | Matches an error value that matches $P. |
+| `$M1 &or $M2`          | Matches if $M1 or $M2 matches. |
+| `$M1 &and $M2`         | Matches if $M1 and $M2 matches. |
+| `$[$M1, $M2, ...]`     | Matches a vector. |
+| `${ $Mkey1 = $Mval1, ...}`| Matches a map. $Mkey1 can also be a $M match, but keep in mind that maps can only have symbols as keys. You can however match symbols using regex patterns for instance. If you only use symbols as keys in this match, the map access is optimized a bit, because there is no need to iterate over all keys then. |
+| `$p($M1, $M2)`         | Matches a pair. |
+| `$i($M1, ...)`         | Matches an integer vector. |
+| `$f($M1, ...)`         | Matches a float vector. |
+| `$o($M)`               | Matches an optional where the value matches $M. |
+| `$e $M`                | Matches an error value that matches $M. |
 | `$n`                   | Matches $none. |
 | literal values         | Literal values like booleans, strings, symbols and numbers match their value. |
 
@@ -4771,7 +4796,7 @@ the results of the latest match that was exectuted:
 ```wlambda
 # Notice the usage of the `<&` function call operator:
 !res =
-    ? "foo//\\/foo" <& $r| $<*? (^$+[\\/]) * | {
+    ? "foo//\\/foo" &> $r| $<*? (^$+[\\/]) * | {
         std:assert_eq $\.0 "foo//\\/foo";
 
         $\.1
@@ -5476,113 +5501,6 @@ macro_rules! add_num_fun_flt2 {
     }
 }
 
-fn match_next(env: &mut Env, val: &VVal, mut arg_idx: usize, argc: usize) -> Result<VVal, StackAction> {
-    while arg_idx < argc {
-        if env.arg(arg_idx).is_fun() {
-            return
-                env.with_restore_sp(|e: &mut Env| {
-                    e.push(val.clone());
-                    e.arg(arg_idx).call_internal(e, 1)
-                });
-        }
-
-        let mut match_vals = vec![arg_idx];
-        arg_idx += 1;
-        while arg_idx < argc && !env.arg(arg_idx).is_fun() {
-            match_vals.push(arg_idx);
-            arg_idx += 1;
-        }
-
-        if arg_idx >= argc { return Ok(val.clone()); }
-
-        let fun_idx = arg_idx;
-
-        if    env.arg(match_vals[0]).is_sym()
-            && env.arg(match_vals[0]).with_s_ref(|s: &str| s.chars().next().unwrap_or('_') == '?') {
-
-            let res =
-                env.arg(match_vals[0]).with_s_ref(|pat: &str| {
-                    match pat {
-                        "?t" => {
-                            let val_type_name = val.type_name();
-                            for i in match_vals.iter().skip(1) {
-                                if env.arg_ref(*i).unwrap().with_s_ref(
-                                    |sp: &str| sp == val_type_name)
-                                {
-                                    return Some(env.arg(fun_idx).call(env, &[val.clone()]));
-                                }
-                            }
-                            None
-                        },
-                        "?s" => {
-                            val.with_s_ref(|val_s: &str| -> Option<Result<VVal, StackAction>> {
-                                for i in match_vals.iter().skip(1) {
-                                    if env.arg_ref(*i).unwrap().with_s_ref(
-                                        |sp: &str| sp == val_s)
-                                    {
-                                        return Some(env.arg(fun_idx).call(env, &[val.clone()]));
-                                    }
-                                }
-
-                                None
-                            })
-                        },
-                        "?e" => {
-                            if let VVal::Err(e) = val {
-                                let err_val = e.borrow().0.at(0).unwrap_or_else(|| e.borrow().0.clone());
-
-                                for i in match_vals.iter().skip(1) {
-                                    if env.arg(*i).eqv(&err_val) {
-                                        let args = vec![
-                                            e.borrow().0.clone(),
-                                            VVal::Int(i64::from(e.borrow().1.line)),
-                                            VVal::Int(i64::from(e.borrow().1.col)),
-                                            VVal::new_str(e.borrow().1.file.s()),
-                                        ];
-                                        return Some(env.arg(fun_idx).call(env, &args));
-                                    }
-                                }
-                            }
-                            None
-                        },
-                        "?p" => {
-                            if fun_idx + 1 >= argc { return Some(Ok(VVal::None)); }
-                            let fun_idx = fun_idx + 1;
-
-                            let pred_res = env.arg(arg_idx).call(env, &[val.clone()]);
-                            match pred_res {
-                                Ok(v) => {
-                                    arg_idx += 1;
-                                    if v.b() {
-                                        return Some(env.arg(fun_idx).call(env, &[val.clone()]));
-                                    }
-                                },
-                                Err(sa) => { return Some(Err(sa)); }
-                            }
-                            None
-                        },
-                        // TODO: Usually we should bail out with an error here.
-                        _ => None,
-                    }
-                });
-
-            if let Some(res) = res {
-                return res;
-            }
-        } else {
-            for i in match_vals.iter() {
-                if env.arg(*i).eqv(val) {
-                    return env.arg(fun_idx).call(env, &[val.clone()]);
-                }
-            }
-        }
-
-        arg_idx += 1;
-    }
-
-    Ok(VVal::None)
-}
-
 /// Returns a SymbolTable with all WLambda core language symbols.
 #[allow(clippy::cast_lossless,clippy::assign_op_pattern)]
 pub fn core_symbol_table() -> SymbolTable {
@@ -5890,13 +5808,6 @@ pub fn core_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             Ok(VVal::new_str(env.arg(0).type_name()))
         }, Some(1), Some(1), true);
-
-    func!(st, "match",
-        |env: &mut Env, argc: usize| {
-            if argc < 1 { return Ok(VVal::None); }
-            if argc == 1 { return Ok(VVal::None) }
-            match_next(env, &env.arg(0), 1, argc)
-        }, Some(1), None, true);
 
     func!(st, "cons",
         |env: &mut Env, _argc: usize| {

@@ -20,7 +20,7 @@ nice composition with the pair operator: `$iter 0 => 10`.
 so you can write regular expressions like `? "foo" &> $r/a*b/ { ... }`
 without parenthesis.
 * Feature: Implementes structure patterns as complement to the selector patterns
-and regex patterns: `$P _expr_`.
+and regex patterns: `$M _expr_`.
 * Feature: Added a jump table operation `jump idx branch-a branch-b branch-c`
 as supporting operation for `match`.
 * Feature: Updates VIM syntax file `vim/wlambda.vim`.
