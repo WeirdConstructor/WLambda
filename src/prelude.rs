@@ -3069,7 +3069,24 @@ std:assert ~ not ~ is_wref x;
 You can convert a weak reference (weakened by `std:weaken`) or a captured weak
 reference `$&` to strong with `std:strengthen`.
 
-TODO: Example
+```wlambda
+!x = $&&10;
+!y = std:weaken x;
+
+.x = $none;
+std:assert ~ is_none $*y;
+
+.x = $&&10;
+.y = std:weaken x;
+!y2 = std:strengthen y;
+
+.x = $none;
+std:assert ~ is_some $*y;
+std:assert ~ is_some $*y2;
+
+.y2 = $none;
+std:assert ~ is_none $*y;
+```
 
 #### <a name="4156-stdsetref-ref-value"></a>4.15.6 - std:set_ref _ref_ _value_
 
