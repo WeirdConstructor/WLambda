@@ -205,6 +205,7 @@ Smalltalk, LISP and Perl.
   - [6.2](#62-using-booleans-for-conditional-execution) - Using Booleans for Conditional Execution
     - [6.2.1](#621-pick-bool-a--b-) - pick _bool_ _a_ -b-
     - [6.2.2](#622-indexing-by-booleans) - Indexing by Booleans
+  - [6.3](#63-value-matching-with-match-value-expr-) - Value matching with `match _value-expr_ ...`
 - [7](#7-loops-and-iteration) - Loops And Iteration
   - [7.1](#71-control-flow) - Control Flow
     - [7.1.1](#711-while-predicate-body) - while _predicate_ _body_
@@ -259,7 +260,9 @@ Smalltalk, LISP and Perl.
     - [8.4.3](#843-reverse-argument-pipe-fun--arg) - Reverse Argument Pipe `fun <& arg`
 - [9](#9-data-structure-matchers-selectors-and-string-patternsregex) - Data Structure Matchers, Selectors and String Patterns/Regex
   - [9.1](#91-data-structure-matcher) - Data Structure Matcher
-    - [9.1.1](#911-data-structure-matcher-syntax) - Data Structure Matcher Syntax
+    - [9.1.1](#911-match-value-expr-match-pair1--default-expr) - match _value-expr_ _match-pair1_ ... [_default-expr_]
+    - [9.1.2](#912-m-expr) - `$M _expr_`
+    - [9.1.3](#913-data-structure-matcher-syntax) - Data Structure Matcher Syntax
   - [9.2](#92-data-structure-selectors) - Data Structure Selectors
     - [9.2.1](#921-selector-and-wlambda-regex-syntax) - Selector and WLambda Regex Syntax:
   - [9.3](#93-string-patterns-regex) - String Patterns (Regex)
@@ -3614,6 +3617,46 @@ std:assert_eq res "x is 20";
 With `pick`, the value to return in the `$t` case comes first, followed by the `$f` case's value,
 whereas with indexing approach, the opposite is true.
 
+### <a name="63-value-matching-with-match-value-expr-"></a>6.3 - Value matching with `match _value-expr_ ...`
+
+See also [9.1.1](#911-match-value-expr-match-pair1--default-expr) for a more
+comprehensive discussion of `match` and structure matchers.
+
+`match` allows for easily select from a set of values:
+
+```wlambda
+!check_fun = {
+    match _
+        20 =>   "It's 20"
+        30 =>   "It's 20"
+        "No idea?"
+};
+
+std:assert_eq check_fun[20] "It's 20";
+std:assert_eq check_fun[34] "No idea?";
+```
+
+Also works for deeper data structures:
+
+```wlambda
+!val = $[1, ${a = 10}, ${a = 10}, ${a = 10}, ${a = 10}, 2, 2, 2, 10];
+
+!res =
+    match val
+        $[1, _*, 3, 10] =>  :a
+        $[1, a ~ _* ${ a = y }, b ~ _+ 2, 10] => {
+            ${
+                a_elems = $\.a,
+                a_value = $\.y,
+                b_vals  = $\.b,
+            }
+        };
+
+std:assert_str_eq res.a_elems $[${ a = 10 }, ${ a = 10 }, ${ a = 10 }, ${ a = 10 }];
+std:assert_str_eq res.a_value 10;
+std:assert_str_eq res.b_vals  $[2,2,2];
+```
+
 ## <a name="7-loops-and-iteration"></a>7 - Loops And Iteration
 
 WLambda has many ways to loop and iterate:
@@ -4570,12 +4613,21 @@ in the wlambda::selector module.
 
 ### <a name="91-data-structure-matcher"></a>9.1 - Data Structure Matcher
 
+This is probably one of the most convenient matching features of WLambda.
+While selectors (`$S[a / * / b]`) allow searching deep into data structures,
+the matches allow to efficient precise shallow selection and matching.
+The `match` operation allows to match a value against multiple matchers,
+while the `$M ...` syntax allows to define a matcher function for a single
+match (commonly used in an if expression).
+
+For a reference of the matcher syntax see below.
+
+#### <a name="911-match-value-expr-match-pair1--default-expr"></a>9.1.1 - match _value-expr_ _match-pair1_ ... [_default-expr_]
+
+The match operation is a very versatile control flow operation.
 
 
-#### - match _value-expr_ _match-pair1_ ... [_default-expr_]
-
-
-#### - `$M _expr_`
+#### <a name="912-m-expr"></a>9.1.2 - `$M _expr_`
 
 This is a structure matcher expression. It will compile _expr_ into a structure
 matcher function. The reslting function will match it's first argument agianst
@@ -4595,7 +4647,7 @@ a data structure in an if statement:
 };
 ```
 
-#### <a name="911-data-structure-matcher-syntax"></a>9.1.1 - Data Structure Matcher Syntax
+#### <a name="913-data-structure-matcher-syntax"></a>9.1.3 - Data Structure Matcher Syntax
 
 This the the compiletime syntax that is understood by the
 structure matchers that are used by `$M ...` and `match`.
