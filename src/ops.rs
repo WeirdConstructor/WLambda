@@ -662,82 +662,90 @@ impl DestructureInfo {
                     set_at_varpos!(self, env, pos, &rv);
                 }
             },
-            VVal::IVec(NVec::Vec2(a, b)) => {
-                if let Some(pos) = self.poses.get(0) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(a));
-                }
+            VVal::IVec(vb) => {
+                match vb.as_ref() {
+                    NVec::Vec2(a, b) => {
+                        if let Some(pos) = self.poses.get(0) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*a));
+                        }
 
-                if let Some(pos) = self.poses.get(1) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(b));
+                        if let Some(pos) = self.poses.get(1) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*b));
+                        }
+                    },
+                    NVec::Vec3(a, b, c) => {
+                        if let Some(pos) = self.poses.get(0) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*a));
+                        }
+
+                        if let Some(pos) = self.poses.get(1) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*b));
+                        }
+
+                        if let Some(pos) = self.poses.get(2) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*c));
+                        }
+                    },
+                    NVec::Vec4(a, b, c, d) => {
+                        if let Some(pos) = self.poses.get(0) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*a));
+                        }
+
+                        if let Some(pos) = self.poses.get(1) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*b));
+                        }
+
+                        if let Some(pos) = self.poses.get(2) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*c));
+                        }
+
+                        if let Some(pos) = self.poses.get(3) {
+                            set_at_varpos!(self, env, pos, &VVal::Int(*d));
+                        }
+                    },
                 }
             },
-            VVal::IVec(NVec::Vec3(a, b, c)) => {
-                if let Some(pos) = self.poses.get(0) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(a));
-                }
+            VVal::FVec(vb) => {
+                match vb.as_ref() {
+                    NVec::Vec2(a, b) => {
+                        if let Some(pos) = self.poses.get(0) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*a));
+                        }
 
-                if let Some(pos) = self.poses.get(1) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(b));
-                }
+                        if let Some(pos) = self.poses.get(1) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*b));
+                        }
+                    },
+                    NVec::Vec3(a, b, c) => {
+                        if let Some(pos) = self.poses.get(0) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*a));
+                        }
 
-                if let Some(pos) = self.poses.get(2) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(c));
-                }
-            },
-            VVal::IVec(NVec::Vec4(a, b, c, d)) => {
-                if let Some(pos) = self.poses.get(0) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(a));
-                }
+                        if let Some(pos) = self.poses.get(1) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*b));
+                        }
 
-                if let Some(pos) = self.poses.get(1) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(b));
-                }
+                        if let Some(pos) = self.poses.get(2) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*c));
+                        }
+                    },
+                    NVec::Vec4(a, b, c, d) => {
+                        if let Some(pos) = self.poses.get(0) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*a));
+                        }
 
-                if let Some(pos) = self.poses.get(2) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(c));
-                }
+                        if let Some(pos) = self.poses.get(1) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*b));
+                        }
 
-                if let Some(pos) = self.poses.get(3) {
-                    set_at_varpos!(self, env, pos, &VVal::Int(d));
-                }
-            },
-            VVal::FVec(NVec::Vec2(a, b)) => {
-                if let Some(pos) = self.poses.get(0) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(a));
-                }
+                        if let Some(pos) = self.poses.get(2) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*c));
+                        }
 
-                if let Some(pos) = self.poses.get(1) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(b));
-                }
-            },
-            VVal::FVec(NVec::Vec3(a, b, c)) => {
-                if let Some(pos) = self.poses.get(0) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(a));
-                }
-
-                if let Some(pos) = self.poses.get(1) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(b));
-                }
-
-                if let Some(pos) = self.poses.get(2) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(c));
-                }
-            },
-            VVal::FVec(NVec::Vec4(a, b, c, d)) => {
-                if let Some(pos) = self.poses.get(0) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(a));
-                }
-
-                if let Some(pos) = self.poses.get(1) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(b));
-                }
-
-                if let Some(pos) = self.poses.get(2) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(c));
-                }
-
-                if let Some(pos) = self.poses.get(3) {
-                    set_at_varpos!(self, env, pos, &VVal::Flt(d));
+                        if let Some(pos) = self.poses.get(3) {
+                            set_at_varpos!(self, env, pos, &VVal::Flt(*d));
+                        }
+                    },
                 }
             },
             _ => {

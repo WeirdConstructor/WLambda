@@ -1454,9 +1454,9 @@ pub enum VVal {
     /// A (strong) reference to a VVal.
     Ref(Rc<RefCell<VVal>>),
     /// A numerical (mathematical) vector storing integers. See NVec for more information.
-    FVec(NVec<f64>),
+    FVec(Box<NVec<f64>>),
     /// A numerical (mathematical) vector storing floats. See NVec for more information.
-    IVec(NVec<i64>),
+    IVec(Box<NVec<i64>>),
     /// A (still strong) reference to a VVal, which becomes a weak reference if
     /// captured by a closure.
     CRef(Rc<RefCell<VVal>>),
@@ -1646,20 +1646,20 @@ macro_rules! swizzle_char2value {
 fn swizzle_i(s: &str, x: i64, y: i64, z: i64, w: i64) -> VVal {
     match s.len() {
         2 =>
-            VVal::IVec(NVec::Vec2(
+            VVal::IVec(Box::new(NVec::Vec2(
                 swizzle_char2value!(s, 0, x, y, z, w),
-                swizzle_char2value!(s, 1, x, y, z, w))),
+                swizzle_char2value!(s, 1, x, y, z, w)))),
         3 =>
-            VVal::IVec(NVec::Vec3(
+            VVal::IVec(Box::new(NVec::Vec3(
                 swizzle_char2value!(s, 0, x, y, z, w),
                 swizzle_char2value!(s, 1, x, y, z, w),
-                swizzle_char2value!(s, 2, x, y, z, w))),
+                swizzle_char2value!(s, 2, x, y, z, w)))),
         4 =>
-            VVal::IVec(NVec::Vec4(
+            VVal::IVec(Box::new(NVec::Vec4(
                 swizzle_char2value!(s, 0, x, y, z, w),
                 swizzle_char2value!(s, 1, x, y, z, w),
                 swizzle_char2value!(s, 2, x, y, z, w),
-                swizzle_char2value!(s, 3, x, y, z, w))),
+                swizzle_char2value!(s, 3, x, y, z, w)))),
         _ => VVal::None,
     }
 }
@@ -1668,20 +1668,20 @@ fn swizzle_i(s: &str, x: i64, y: i64, z: i64, w: i64) -> VVal {
 fn swizzle_f(s: &str, x: f64, y: f64, z: f64, w: f64) -> VVal {
     match s.len() {
         2 =>
-            VVal::FVec(NVec::Vec2(
+            VVal::FVec(Box::new(NVec::Vec2(
                 swizzle_char2value!(s, 0, x, y, z, w),
-                swizzle_char2value!(s, 1, x, y, z, w))),
+                swizzle_char2value!(s, 1, x, y, z, w)))),
         3 =>
-            VVal::FVec(NVec::Vec3(
+            VVal::FVec(Box::new(NVec::Vec3(
                 swizzle_char2value!(s, 0, x, y, z, w),
                 swizzle_char2value!(s, 1, x, y, z, w),
-                swizzle_char2value!(s, 2, x, y, z, w))),
+                swizzle_char2value!(s, 2, x, y, z, w)))),
         4 =>
-            VVal::FVec(NVec::Vec4(
+            VVal::FVec(Box::new(NVec::Vec4(
                 swizzle_char2value!(s, 0, x, y, z, w),
                 swizzle_char2value!(s, 1, x, y, z, w),
                 swizzle_char2value!(s, 2, x, y, z, w),
-                swizzle_char2value!(s, 3, x, y, z, w))),
+                swizzle_char2value!(s, 3, x, y, z, w)))),
         _ => VVal::None,
     }
 }
@@ -2361,40 +2361,50 @@ impl VVal {
             VVal::Pair(p) => {
                 pair_key_to_iter!(p)
             },
-            VVal::IVec(NVec::Vec2(a, b)) => {
-                iter_int_a_to_b!(*a, *b)
+            VVal::IVec(b) => {
+                match b.as_ref() {
+                    NVec::Vec2(a, b) => {
+                        iter_int_a_to_b!(*a, *b)
+                    },
+                    NVec::Vec3(a, b, skip) => {
+                        let mut i = *a;
+                        let b = *b;
+                        let skip = *skip;
+                        std::iter::from_fn(Box::new(move || {
+                            if i >= b { return None; }
+                            let ret = Some((VVal::Int(i), None));
+                            i += skip;
+                            ret
+                        }))
+                    },
+                    _ => { std::iter::from_fn(Box::new(move || { None })) },
+                }
             },
-            VVal::IVec(NVec::Vec3(a, b, skip)) => {
-                let mut i = *a;
-                let b = *b;
-                let skip = *skip;
-                std::iter::from_fn(Box::new(move || {
-                    if i >= b { return None; }
-                    let ret = Some((VVal::Int(i), None));
-                    i += skip;
-                    ret
-                }))
-            },
-            VVal::FVec(NVec::Vec2(a, b)) => {
-                let mut i = *a;
-                let b = *b;
-                std::iter::from_fn(Box::new(move || {
-                    if i >= b { return None; }
-                    let r = Some((VVal::Flt(i), None));
-                    i += 1.0;
-                    r
-                }))
-            },
-            VVal::FVec(NVec::Vec3(a, b, s)) => {
-                let mut i = *a;
-                let b = *b;
-                let s = *s;
-                std::iter::from_fn(Box::new(move || {
-                    if i >= b { return None; }
-                    let ret = Some((VVal::Flt(i), None));
-                    i += s;
-                    ret
-                }))
+            VVal::FVec(b) => {
+                match b.as_ref() {
+                    NVec::Vec2(a, b) => {
+                        let mut i = *a;
+                        let b = *b;
+                        std::iter::from_fn(Box::new(move || {
+                            if i >= b { return None; }
+                            let r = Some((VVal::Flt(i), None));
+                            i += 1.0;
+                            r
+                        }))
+                    },
+                    NVec::Vec3(a, b, s) => {
+                        let mut i = *a;
+                        let b = *b;
+                        let s = *s;
+                        std::iter::from_fn(Box::new(move || {
+                            if i >= b { return None; }
+                            let ret = Some((VVal::Flt(i), None));
+                            i += s;
+                            ret
+                        }))
+                    },
+                    _ => { std::iter::from_fn(Box::new(move || { None })) },
+                }
             },
             VVal::Opt(Some(v)) => {
                 let x = v.as_ref().clone();
@@ -3980,8 +3990,8 @@ impl VVal {
     pub fn nvec<N: crate::nvec::NVecNum>(&self) -> NVec<N> {
         use NVec::*;
         match self {
-            VVal::IVec(i) => N::from_ivec(*i),
-            VVal::FVec(f) => N::from_fvec(*f),
+            VVal::IVec(i) => N::from_ivec(**i),
+            VVal::FVec(f) => N::from_fvec(**f),
             VVal::Map(map)  => {
                 let m = map.borrow();
                 let o = N::zero().into_vval();

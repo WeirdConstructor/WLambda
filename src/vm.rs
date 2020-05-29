@@ -447,7 +447,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         out_reg!(env, ret, retv, data, r,
-                            VVal::IVec(NVec::Vec2(a.i(), b.i())));
+                            VVal::IVec(Box::new(NVec::Vec2(a.i(), b.i()))));
                     },
                     NVecPos::IVec3(a, b, c) => {
                         in_reg!(env, ret, data, a);
@@ -457,7 +457,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
                         out_reg!(env, ret, retv, data, r,
-                            VVal::IVec(NVec::Vec3(a.i(), b.i(), c.i())));
+                            VVal::IVec(Box::new(NVec::Vec3(a.i(), b.i(), c.i()))));
                     },
                     NVecPos::IVec4(a, b, c, d) => {
                         in_reg!(env, ret, data, a);
@@ -469,7 +469,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         let c = handle_err!(c, "z nvector component", retv);
                         let d = handle_err!(d, "w nvector component", retv);
                         out_reg!(env, ret, retv, data, r,
-                            VVal::IVec(NVec::Vec4(a.i(), b.i(), c.i(), d.i())));
+                            VVal::IVec(Box::new(NVec::Vec4(a.i(), b.i(), c.i(), d.i()))));
                     },
                     NVecPos::FVec2(a, b) => {
                         in_reg!(env, ret, data, a);
@@ -477,7 +477,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         out_reg!(env, ret, retv, data, r,
-                            VVal::FVec(NVec::Vec2(a.f(), b.f())));
+                            VVal::FVec(Box::new(NVec::Vec2(a.f(), b.f()))));
                     },
                     NVecPos::FVec3(a, b, c) => {
                         in_reg!(env, ret, data, a);
@@ -487,7 +487,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
                         out_reg!(env, ret, retv, data, r,
-                            VVal::FVec(NVec::Vec3(a.f(), b.f(), c.f())));
+                            VVal::FVec(Box::new(NVec::Vec3(a.f(), b.f(), c.f()))));
                     },
                     NVecPos::FVec4(a, b, c, d) => {
                         in_reg!(env, ret, data, a);
@@ -499,7 +499,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         let c = handle_err!(c, "z nvector component", retv);
                         let d = handle_err!(d, "w nvector component", retv);
                         out_reg!(env, ret, retv, data, r,
-                            VVal::FVec(NVec::Vec4(a.f(), b.f(), c.f(), d.f())));
+                            VVal::FVec(Box::new(NVec::Vec4(a.f(), b.f(), c.f(), d.f()))));
                     },
                 }
             },
@@ -590,8 +590,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     VVal::Flt(f + b.f())
                 } else {
                     match (a, b) {
-                        (VVal::IVec(ln), re) => VVal::IVec(ln + re.nvec()),
-                        (VVal::FVec(ln), re) => VVal::FVec(ln + re.nvec()),
+                        (VVal::IVec(ln), re) => VVal::IVec(Box::new(*ln + re.nvec())),
+                        (VVal::FVec(ln), re) => VVal::FVec(Box::new(*ln + re.nvec())),
                         (le, re)             => VVal::Int(le.i().wrapping_add(re.i()))
                     }
                 }
@@ -603,8 +603,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     VVal::Flt(f - b.f())
                 } else {
                     match (a, b) {
-                        (VVal::IVec(ln), re) => VVal::IVec(ln - re.nvec()),
-                        (VVal::FVec(ln), re) => VVal::FVec(ln - re.nvec()),
+                        (VVal::IVec(ln), re) => VVal::IVec(Box::new(*ln - re.nvec())),
+                        (VVal::FVec(ln), re) => VVal::FVec(Box::new(*ln - re.nvec())),
                         (le, re)             => VVal::Int(le.i().wrapping_sub(re.i()))
                     }
                 }
@@ -625,8 +625,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     VVal::Flt(f / b.f())
                 } else {
                     match (a, b) {
-                        (VVal::IVec(ln), re) => VVal::IVec(ln / re.i()),
-                        (VVal::FVec(ln), re) => VVal::FVec(ln / re.f()),
+                        (VVal::IVec(ln), re) => VVal::IVec(Box::new(*ln / re.i())),
+                        (VVal::FVec(ln), re) => VVal::FVec(Box::new(*ln / re.f())),
                         (le, re)             => {
                             let re = re.i();
                             if re == 0 {
@@ -649,8 +649,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     VVal::Flt(f * b.f())
                 } else {
                     match (a, b) {
-                        (VVal::IVec(ln), re) => VVal::IVec(ln * re.i()),
-                        (VVal::FVec(ln), re) => VVal::FVec(ln * re.f()),
+                        (VVal::IVec(ln), re) => VVal::IVec(Box::new(*ln * re.i())),
+                        (VVal::FVec(ln), re) => VVal::FVec(Box::new(*ln * re.f())),
                         (le, re)             => VVal::Int(le.i().wrapping_mul(re.i()))
                     }
                 }
@@ -1352,12 +1352,12 @@ fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                         let c = vm_compile_const_value(&l[3])?;
                         if l.len() == 5 {
                             let d = vm_compile_const_value(&l[4])?;
-                            Ok(VVal::IVec(NVec::Vec4(a.i(), b.i(), c.i(), d.i())))
+                            Ok(VVal::IVec(Box::new(NVec::Vec4(a.i(), b.i(), c.i(), d.i()))))
                         } else {
-                            Ok(VVal::IVec(NVec::Vec3(a.i(), b.i(), c.i())))
+                            Ok(VVal::IVec(Box::new(NVec::Vec3(a.i(), b.i(), c.i()))))
                         }
                     } else {
-                        Ok(VVal::IVec(NVec::Vec2(a.i(), b.i())))
+                        Ok(VVal::IVec(Box::new(NVec::Vec2(a.i(), b.i()))))
                     }
                 },
                 Syntax::FVec => {
@@ -1367,12 +1367,12 @@ fn vm_compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                         let c = vm_compile_const_value(&l[3])?;
                         if l.len() == 5 {
                             let d = vm_compile_const_value(&l[4])?;
-                            Ok(VVal::FVec(NVec::Vec4(a.f(), b.f(), c.f(), d.f())))
+                            Ok(VVal::FVec(Box::new(NVec::Vec4(a.f(), b.f(), c.f(), d.f()))))
                         } else {
-                            Ok(VVal::FVec(NVec::Vec3(a.f(), b.f(), c.f())))
+                            Ok(VVal::FVec(Box::new(NVec::Vec3(a.f(), b.f(), c.f()))))
                         }
                     } else {
-                        Ok(VVal::FVec(NVec::Vec2(a.f(), b.f())))
+                        Ok(VVal::FVec(Box::new(NVec::Vec2(a.f(), b.f()))))
                     }
                 },
                 _ => Err(val.to_compile_err(

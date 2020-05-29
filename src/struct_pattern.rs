@@ -327,7 +327,8 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
-                        if let VVal::IVec(nv) = v {
+                        if let VVal::IVec(nv) = &v {
+                            let nv = nv.as_ref();
                             if nv.dims().len() == 2 {
                                 return store_var_if(
                                        x_pat(&VVal::Int(nv.x_raw()), f)
@@ -346,7 +347,8 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
-                        if let VVal::IVec(nv) = v {
+                        if let VVal::IVec(nv) = &v {
+                            let nv = nv.as_ref();
                             if nv.dims().len() == 3 {
                                 return store_var_if(
                                        x_pat(&VVal::Int(nv.x_raw()), f)
@@ -367,7 +369,8 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
-                        if let VVal::IVec(nv) = v {
+                        if let VVal::IVec(nv) = &v {
+                            let nv = nv.as_ref();
                             if nv.dims().len() == 4 {
                                 return store_var_if(
                                        x_pat(&VVal::Int(nv.x_raw()), f)
@@ -395,7 +398,8 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
-                        if let VVal::FVec(nv) = v {
+                        if let VVal::FVec(nv) = &v {
+                            let nv = nv.as_ref();
                             if nv.dims().len() == 2 {
                                 return store_var_if(
                                        x_pat(&VVal::Flt(nv.x_raw()), f)
@@ -414,7 +418,8 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
-                        if let VVal::FVec(nv) = v {
+                        if let VVal::FVec(nv) = &v {
+                            let nv = nv.as_ref();
                             if nv.dims().len() == 3 {
                                 return store_var_if(
                                        x_pat(&VVal::Flt(nv.x_raw()), f)
@@ -435,7 +440,8 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
-                        if let VVal::FVec(nv) = v {
+                        if let VVal::FVec(nv) = &v {
+                            let nv = nv.as_ref();
                             if nv.dims().len() == 4 {
                                 return store_var_if(
                                        x_pat(&VVal::Flt(nv.x_raw()), f)

@@ -5606,8 +5606,8 @@ pub fn core_symbol_table() -> SymbolTable {
             (0, _) => VVal::None,
             (1, VVal::Int(i))   => VVal::Int(-i),
             (1, VVal::Flt(f))   => VVal::Flt(-f),
-            (1, VVal::FVec(fv)) => VVal::FVec(-fv),
-            (1, VVal::IVec(iv)) => VVal::IVec(-iv),
+            (1, VVal::FVec(fv)) => VVal::FVec(Box::new(-*fv)),
+            (1, VVal::IVec(iv)) => VVal::IVec(Box::new(-*iv)),
             (a, VVal::Flt(f))   => {
                 let mut accum = f;
                 for i in 1..a { accum = accum - env.arg(i).f() }
@@ -5769,28 +5769,28 @@ pub fn core_symbol_table() -> SymbolTable {
         Some(3), Some(3), false);
 
     func!(st, "ivec",
-        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec())),
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(Box::new(env.arg(0).nvec()))),
         Some(1), Some(1), false);
     func!(st, "ivec2",
-        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec2())),
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(Box::new(env.arg(0).nvec().vec2()))),
         Some(1), Some(1), false);
     func!(st, "ivec3",
-        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec3())),
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(Box::new(env.arg(0).nvec().vec3()))),
         Some(1), Some(1), false);
     func!(st, "ivec4",
-        |env: &mut Env, _argc: usize| Ok(VVal::IVec(env.arg(0).nvec().vec4())),
+        |env: &mut Env, _argc: usize| Ok(VVal::IVec(Box::new(env.arg(0).nvec().vec4()))),
         Some(1), Some(1), false);
     func!(st, "fvec",
-        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec())),
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(Box::new(env.arg(0).nvec()))),
         Some(1), Some(1), false);
     func!(st, "fvec2",
-        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec2())),
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(Box::new(env.arg(0).nvec().vec2()))),
         Some(1), Some(1), false);
     func!(st, "fvec3",
-        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec3())),
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(Box::new(env.arg(0).nvec().vec3()))),
         Some(1), Some(1), false);
     func!(st, "fvec4",
-        |env: &mut Env, _argc: usize| Ok(VVal::FVec(env.arg(0).nvec().vec4())),
+        |env: &mut Env, _argc: usize| Ok(VVal::FVec(Box::new(env.arg(0).nvec().vec4()))),
         Some(1), Some(1), false);
     func!(st, "is_nvec",
         |env: &mut Env, _argc: usize| Ok(VVal::Bol(env.arg(0).is_nvec())),
@@ -6869,6 +6869,8 @@ pub fn std_symbol_table() -> SymbolTable {
             sizeof_writeln!(write, (DirectFun, ResPos, ResPos));
             sizeof_writeln!(write, (Box<String>, ResPos, ResPos, u16));
             sizeof_writeln!(write, SynPos);
+            sizeof_writeln!(write, Symbol);
+            sizeof_writeln!(write, Option<Rc<VVal>>);
             sizeof_writeln!(write, crate::nvec::NVec<f64>);
             sizeof_writeln!(write, Result<VVal, StackAction>);
             sizeof_writeln!(write, StackAction);
@@ -7419,8 +7421,8 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "v:norm",
         |env: &mut Env, _argc: usize| {
             Ok(match env.arg(0) {
-                VVal::FVec(fv) => VVal::FVec(fv.norm()),
-                v => VVal::IVec(v.nvec::<i64>().norm()),
+                VVal::FVec(fv) => VVal::FVec(Box::new(fv.norm())),
+                v => VVal::IVec(Box::new(v.nvec::<i64>().norm())),
             })
         }, Some(1), Some(1), false);
 
@@ -7435,24 +7437,24 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "v:cross",
         |env: &mut Env, _argc: usize| {
             Ok(match env.arg(0) {
-                VVal::FVec(fv) => VVal::FVec(fv.cross(env.arg(1).nvec())),
-                v => VVal::IVec(v.nvec::<i64>().cross(env.arg(1).nvec())),
+                VVal::FVec(fv) => VVal::FVec(Box::new(fv.cross(env.arg(1).nvec()))),
+                v => VVal::IVec(Box::new(v.nvec::<i64>().cross(env.arg(1).nvec()))),
             })
         }, Some(2), Some(2), false);
 
     func!(st, "v:lerp",
         |env: &mut Env, _argc: usize| {
             Ok(match env.arg(0) {
-                VVal::FVec(fv) => VVal::FVec(fv.lerp(env.arg(1).nvec(), env.arg(2).f())),
-                v => VVal::IVec(v.nvec::<i64>().lerp(env.arg(1).nvec(), env.arg(2).f())),
+                VVal::FVec(fv) => VVal::FVec(Box::new(fv.lerp(env.arg(1).nvec(), env.arg(2).f()))),
+                v => VVal::IVec(Box::new(v.nvec::<i64>().lerp(env.arg(1).nvec(), env.arg(2).f()))),
             })
         }, Some(3), Some(3), false);
 
     func!(st, "v:slerp",
         |env: &mut Env, _argc: usize| {
             Ok(match env.arg(0) {
-                VVal::FVec(fv) => VVal::FVec(fv.slerp(env.arg(1).nvec(), env.arg(2).f())),
-                v => VVal::IVec(v.nvec::<i64>().slerp(env.arg(1).nvec(), env.arg(2).f())),
+                VVal::FVec(fv) => VVal::FVec(Box::new(fv.slerp(env.arg(1).nvec(), env.arg(2).f()))),
+                v => VVal::IVec(Box::new(v.nvec::<i64>().slerp(env.arg(1).nvec(), env.arg(2).f()))),
             })
         }, Some(3), Some(3), false);
 
@@ -7466,7 +7468,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "v:rad2vec",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::FVec(crate::nvec::NVec::rad2vec(env.arg(0).f())))
+            Ok(VVal::FVec(Box::new(crate::nvec::NVec::rad2vec(env.arg(0).f()))))
         }, Some(1), Some(1), false);
 
 //    func!(st, "v:hex2hsva_i",
@@ -7481,15 +7483,15 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let (r, g, b, a) =
                 env.arg(0).with_s_ref(|s| util::hex2rgba(s));
-            Ok(VVal::IVec(NVec::from_tpl(
-                (r as i64, g as i64, Some(b as i64), Some(a as i64))).unwrap()))
+            Ok(VVal::IVec(Box::new(NVec::from_tpl(
+                (r as i64, g as i64, Some(b as i64), Some(a as i64))).unwrap())))
         }, Some(1), Some(1), false);
 
     func!(st, "v:hex2rgba_f",
         |env: &mut Env, _argc: usize| {
             let (r, g, b, a) =
                 env.arg(0).with_s_ref(|s| util::hex2rgbaf(s));
-            Ok(VVal::FVec(NVec::from_tpl((r, g, Some(b), Some(a))).unwrap()))
+            Ok(VVal::FVec(Box::new(NVec::from_tpl((r, g, Some(b), Some(a))).unwrap())))
         }, Some(1), Some(1), false);
 
 //    func!(st, "v:rgba2hex",
