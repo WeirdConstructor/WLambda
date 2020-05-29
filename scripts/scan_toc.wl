@@ -71,7 +71,7 @@ c._data.toc {
 !new_toc = std:str:join "\n" ~ $@v c._data.toc {
     !pad = "";
     range 3 (len _.0) 1 {|| .pad = pad "  "; };
-    $+ ~ std:str:cat pad "- [" _.1 "](#" _.4 ") - " _.2
+    $+ ~ std:str:cat pad "- [" _.1 "](#" _.4 ") " _.2
 };
 
 .orig = orig | std:re:replace_all $q_(?s)\*\*Table Of Contents:\*\*.*?-----_ {||

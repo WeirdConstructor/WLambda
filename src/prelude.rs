@@ -31,292 +31,292 @@ Smalltalk, LISP and Perl.
 -----
 **Table Of Contents:**
 
-- [1](#1-syntax) - Syntax
-- [2](#2-variable-definition-and-assignment) - Variable Definition and Assignment
-  - [2.1](#21-destructuring-to-variables) - Destructuring to Variables
-  - [2.2](#22-global-variables) - Global Variables
-  - [2.3](#23-constants) - Constants
-- [3](#3-functions-part-12) - Functions (part 1/2)
-  - [3.1](#31-closures) - Closures
-    - [3.1.1](#311-object-oriented-programming-with-closures) - Object Oriented Programming with Closures
-  - [3.2](#32-function-calling) - Function calling
-  - [3.3](#33-function-arity-checks) - Function arity checks
-    - [3.3.1](#331-stdtonoarity-function) - std:to_no_arity _function_
-  - [3.4](#34-calling-fields--method-calling) - Calling fields / Method calling
-    - [3.4.1](#341-object-oriented-programming-with-prototypes) - Object Oriented Programming with Prototypes
-  - [3.5](#35-function-call-composition) - Function call composition
-    - [3.5.1](#351--tail-argument-function-chaninig) - '|' Tail Argument Function Chaninig
-    - [3.5.2](#352--left-hand-function-chaining) - '|>' Left Hand Function Chaining
-    - [3.5.3](#353-forward-argument-pipe-arg--fun) - Forward Argument Pipe `arg &> fun`
-    - [3.5.4](#354-reverse-argument-pipe-fun--arg) - Reverse Argument Pipe `fun <& arg`
-  - [3.6](#36-control-flow---returning) - Control Flow - Returning
-    - [3.6.1](#361-return-label-value) - return [_label_] _value_
-    - [3.6.2](#362-block-label-function) - block [label] _function_
-    - [3.6.3](#363-stdtodrop-value-function-or-raii-destructors-or-drop-functions) - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
-  - [3.7](#37-function-utilities) - Function utilities
-    - [3.7.1](#371-isfun-value) - is_fun _value_
-- [4](#4-data-types) - Data Types
-  - [4.1](#41-none-sentinel-value-n-or-none) - None sentinel value: `$n` or `$none`
-    - [4.1.1](#411-isnone-value) - is_none _value_
-    - [4.1.2](#412-issome-value) - is_some _value_
-  - [4.2](#42-optional-values-o-and-o) - Optional values `$o()` and `$o(...)`
-    - [4.2.1](#421-isoptional-value) - is_optional _value_
-    - [4.2.2](#422-unwrapping-optionals) - Unwrapping optionals
-  - [4.3](#43-error-values-e-expr-or-error-expr) - Error values: `$e expr` or `$error expr`
-    - [4.3.1](#431--label-value) - _? [_label_] _value_
-    - [4.3.2](#432-onerror-handler-maybe-error-value) - on_error _handler_ _maybe-error-value_
-    - [4.3.3](#433-iserr-value) - is_err _value_
-    - [4.3.4](#434-errortostr-value) - error_to_str _value_
-  - [4.4](#44-booleans) - Booleans
-    - [4.4.1](#441-isbool-any-value) - is_bool _any-value_
-    - [4.4.2](#442-bool-any-value) - bool _any-value_
-    - [4.4.3](#443-not-value) - not _value_
-    - [4.4.4](#444-boolean-list-indexing) - Boolean List Indexing
-  - [4.5](#45-64-bit-integers) - 64-Bit Integers
-    - [4.5.1](#451-int-value) - int _value_
-    - [4.5.2](#452-isint-value) - is_int _value_
-    - [4.5.3](#453-stdnegi64-integer) - std:neg_i64 _integer_
-    - [4.5.4](#454-stdnoti64-integer) - std:not_i64 _integer_
-    - [4.5.5](#455-stdnegu32-integer) - std:neg_u32 _integer_
-    - [4.5.6](#456-stdnotu32-integer) - std:not_u32 _integer_
-  - [4.6](#46-64-bit-floats) - 64-Bit Floats
-    - [4.6.1](#461-float-value) - float _value_
-    - [4.6.2](#462-isfloat-value) - is_float _value_
-    - [4.6.3](#463-stdnumacos-float) - std:num:acos _float_
-    - [4.6.4](#464-stdnumacosh-float) - std:num:acosh _float_
-    - [4.6.5](#465-stdnumasin-float) - std:num:asin _float_
-    - [4.6.6](#466-stdnumasinh-float) - std:num:asinh _float_
-    - [4.6.7](#467-stdnumatan-float) - std:num:atan _float_
-    - [4.6.8](#468-stdnumatan2-y-x) - std:num:atan2 _y_ _x_
-    - [4.6.9](#469-stdnumatanh-float) - std:num:atanh _float_
-    - [4.6.10](#4610-stdnumcbrt-float) - std:num:cbrt _float_
-    - [4.6.11](#4611-stdnumceil-float) - std:num:ceil _float_
-    - [4.6.12](#4612-stdnumcos-float) - std:num:cos _float_
-    - [4.6.13](#4613-stdnumcosh-float) - std:num:cosh _float_
-    - [4.6.14](#4614-stdnumexp-float) - std:num:exp _float_
-    - [4.6.15](#4615-stdnumexp2-float) - std:num:exp2 _float_
-    - [4.6.16](#4616-stdnumexpm1-float) - std:num:exp_m1 _float_
-    - [4.6.17](#4617-stdnumfloor-float) - std:num:floor _float_
-    - [4.6.18](#4618-stdnumhypot-y-x) - std:num:hypot _y_ _x_
-    - [4.6.19](#4619-stdnumln-float) - std:num:ln _float_
-    - [4.6.20](#4620-stdnumlog-float) - std:num:log _float_
-    - [4.6.21](#4621-stdnumlog10-float) - std:num:log10 _float_
-    - [4.6.22](#4622-stdnumlog2-float) - std:num:log2 _float_
-    - [4.6.23](#4623-stdnumpow-float) - std:num:pow _float_
-    - [4.6.24](#4624-stdnumrecip-float) - std:num:recip _float_
-    - [4.6.25](#4625-stdnumround-float) - std:num:round _float_
-    - [4.6.26](#4626-stdnumsin-float) - std:num:sin _float_
-    - [4.6.27](#4627-stdnumsinh-float) - std:num:sinh _float_
-    - [4.6.28](#4628-stdnumsqrt-float) - std:num:sqrt _float_
-    - [4.6.29](#4629-stdnumtan-float) - std:num:tan _float_
-    - [4.6.30](#4630-stdnumtanh-float) - std:num:tanh _float_
-    - [4.6.31](#4631-stdnumtodegrees-float) - std:num:to_degrees _float_
-    - [4.6.32](#4632-stdnumtoradians-float) - std:num:to_radians _float_
-    - [4.6.33](#4633-stdnumtrunc-float) - std:num:trunc _float_
-    - [4.6.34](#4634-stdnumlerp-a-b-x) - std:num:lerp _a_ _b_ _x_
-    - [4.6.35](#4635-stdnumsmoothstep-a-b-x) - std:num:smoothstep _a_ _b_ _x_
-  - [4.7](#47-numeric-functions) - Numeric Functions
-    - [4.7.1](#471-stdnumabs-number) - std:num:abs _number_
-  - [4.8](#48-numerical-mathematical-vectors) - Numerical Mathematical Vectors
-    - [4.8.1](#481-vector-conversions) - Vector Conversions
-    - [4.8.2](#482-vector-component-access) - Vector Component Access
-    - [4.8.3](#483-named-field-access-and-swizzling) - Named Field Access and Swizzling
-    - [4.8.4](#484-euler-additionsubtraction) - Euler Addition/Subtraction
-    - [4.8.5](#485-scalar-multiplicationdivision) - Scalar Multiplication/Division
-    - [4.8.6](#486-unary-vector-operations) - Unary Vector Operations
-    - [4.8.7](#487-stdvdims-vec) - std:v:dims _vec_
-    - [4.8.8](#488-stdvmag2-vec) - std:v:mag2 _vec_
-    - [4.8.9](#489-stdvmag-vec) - std:v:mag _vec_
-    - [4.8.10](#4810-stdvnorm-vec) - std:v:norm _vec_
-    - [4.8.11](#4811-stdvdot-vec1-vec2) - std:v:dot _vec1_ _vec2_
-    - [4.8.12](#4812-stdvcross-vec1-vec2) - std:v:cross _vec1_ _vec2_
-    - [4.8.13](#4813-stdvlerp-vec1-vec2-t) - std:v:lerp _vec1_ _vec2_ _t_
-    - [4.8.14](#4814-stdvslerp-vec1-vec2-t) - std:v:slerp _vec1_ _vec2_ _t_
-    - [4.8.15](#4815-stdvvec2rad-vec) - std:v:vec2rad _vec_
-    - [4.8.16](#4816-stdvrad2vec-radians) - std:v:rad2vec _radians_
-    - [4.8.17](#4817-stdvhex2rgbaf-string) - std:v:hex2rgba_f _string_
-    - [4.8.18](#4818-stdvhex2rgbai-string) - std:v:hex2rgba_i _string_
-  - [4.9](#49-strings) - Strings
-    - [4.9.1](#491-string-literal-syntaxes) - String Literal Syntaxes
-    - [4.9.2](#492-str-value) - str _value_
-    - [4.9.3](#493-isstr-value) - is_str _value_
-    - [4.9.4](#494-stdstrcat-a-b-) - std:str:cat _a_ _b_ ...
-    - [4.9.5](#495-stdstrjoin-sep-vector) - std:str:join _sep_ _vector_
-    - [4.9.6](#496-stdstrlen-value) - std:str:len _value_
-    - [4.9.7](#497-stdstrreplace-pattern-replacement-string) - std:str:replace _pattern_ _replacement_ _string_
-    - [4.9.8](#498-stdstrreplacen-pattern-replacement-count-string) - std:str:replace_n _pattern_ _replacement_ _count_ _string_
-    - [4.9.9](#499-stdstrtrim-value) - std:str:trim _value_
-    - [4.9.10](#4910-stdstrtrimstart-value) - std:str:trim_start _value_
-    - [4.9.11](#4911-stdstrtrimend-value) - std:str:trim_end _value_
-    - [4.9.12](#4912-stdstrpadstart-len-pad-str-value) - std:str:pad_start _len_ _pad-str_ _value_
-    - [4.9.13](#4913-stdstrpadend-len-pad-str-value) - std:str:pad_end _len_ _pad-str_ _value_
-    - [4.9.14](#4914-stdstrtobytes-string) - std:str:to_bytes _string_
-    - [4.9.15](#4915-stdstrfromutf8-byte-vector) - std:str:from_utf8 _byte-vector_
-    - [4.9.16](#4916-stdstrfromutf8lossy-byte-vector) - std:str:from_utf8_lossy _byte-vector_
-    - [4.9.17](#4917-stdstrtocharvec-string) - std:str:to_char_vec _string_
-    - [4.9.18](#4918-stdstrfromcharvec-vector) - std:str:from_char_vec _vector_
-    - [4.9.19](#4919-stdstrtolowercase-string) - std:str:to_lowercase _string_
-    - [4.9.20](#4920-stdstrtouppercase-string) - std:str:to_uppercase _string_
-  - [4.10](#410-bytes-or-byte-vectors) - Bytes (or Byte Vectors)
-    - [4.10.1](#4101-call-properties-of-bytes) - Call Properties of Bytes
-    - [4.10.2](#4102-byte-conversion-functions) - Byte Conversion Functions
-    - [4.10.3](#4103-isbytes-value) - is_bytes _value_
-  - [4.11](#411-symbols) - Symbols
-    - [4.11.1](#4111-stdsymbolscollect) - std:symbols:collect
-  - [4.12](#412-pairs-pa-b) - Pairs `$p(a, b)`
-    - [4.12.1](#4121-pair-operator-a--b) - Pair Operator `a => b`
-    - [4.12.2](#4122-pair-constructor-a--b) - Pair Constructor `a => b`
-    - [4.12.3](#4123-cons-a-b) - cons _a_ _b_
-    - [4.12.4](#4124-pair-stringbyte-vector-operations) - Pair string/byte vector operations
-      - [4.12.4.1](#41241-pfrom-count-string-or-byte-vec) - `$p(_from_, _count_) _string-or-byte-vec_`
-      - [4.12.4.2](#41242-ppattern-replacement-string-or-byte-vec) - `$p(_pattern_, _replacement_) _string-or-byte-vec_`
-      - [4.12.4.3](#41243-psplit-pattern-max-string-or-byte-vec) - `$p(_split-pattern_, _max_) _string-or-byte-vec_`
-    - [4.12.5](#4125-pair-to-iterator) - Pair to Iterator
-      - [4.12.5.1](#41251-iter---range) - Iter - Range
-      - [4.12.5.2](#41252-iter---enumerate) - Iter - Enumerate
-      - [4.12.5.3](#41253-iter---values) - Iter - Values
-      - [4.12.5.4](#41254-iter---keys) - Iter - Keys
-    - [4.12.6](#4126-ispair-value) - is_pair _value_
-  - [4.13](#413-vectors-or-lists) - Vectors (or Lists)
-    - [4.13.1](#4131-stdpush-vector-item) - std:push _vector_ _item_
-    - [4.13.2](#4132-stdpop-vector) - std:pop _vector_
-    - [4.13.3](#4133-stdunshift-vector-item) - std:unshift _vector_ _item_
-    - [4.13.4](#4134-vector-splicing) - Vector Splicing
-    - [4.13.5](#4135-stdappend-vec-a-value-or-vec-) - std:append _vec-a_ _value-or-vec_ ...
-    - [4.13.6](#4136-stdprepend-vec-a-value-or-vec-) - std:prepend _vec-a_ _value-or-vec_ ...
-    - [4.13.7](#4137-stdtake-count-vector) - std:take _count_ _vector_
-    - [4.13.8](#4138-stddrop-count-vector) - std:drop _count_ _vector_
-  - [4.14](#414-associative-maps-or-string-to-value-mappings) - Associative Maps (or String to Value mappings)
-    - [4.14.1](#4141-map-splicing) - Map Splicing
-  - [4.15](#415-references) - References
-    - [4.15.1](#4151-stdtoref-value) - std:to_ref _value_
-    - [4.15.2](#4152-stdweaken-ref) - std:weaken _ref_
-    - [4.15.3](#4153-isref-value) - is_ref _value_
-    - [4.15.4](#4154-iswref-value) - is_wref _value_
-    - [4.15.5](#4155-stdstrengthen-ref) - std:strengthen _ref_
-    - [4.15.6](#4156-stdsetref-ref-value) - std:set_ref _ref_ _value_
-  - [4.16](#416-iterators-iter-expression) - Iterators `$iter _expression_`
-    - [4.16.1](#4161-iterator-kinds) - Iterator Kinds
-    - [4.16.2](#4162-iterators-on-mutated-data) - Iterators on mutated data
-    - [4.16.3](#4163-splicing-an-iterator) - Splicing an Iterator
-    - [4.16.4](#4164-calling-an-iterator-with-a-function) - Calling an Iterator with a Function
-    - [4.16.5](#4165-zip-iterators) - Zip Iterators
-  - [4.17](#417-calling-semantics-of-data-types) - Calling Semantics of Data Types
-- [5](#5-functions-part-22) - Functions (part 2/2)
-- [6](#6-conditional-execution---if--then--else) - Conditional Execution - if / then / else
-  - [6.1](#61-if-condition-then-expr-else-expr) - ?/if _condition_ _then-expr_ [_else-expr_]
-  - [6.2](#62-using-booleans-for-conditional-execution) - Using Booleans for Conditional Execution
-    - [6.2.1](#621-pick-bool-a--b-) - pick _bool_ _a_ -b-
-    - [6.2.2](#622-indexing-by-booleans) - Indexing by Booleans
-  - [6.3](#63-value-matching-with-match-value-expr-) - Value matching with `match _value-expr_ ...`
-- [7](#7-loops-and-iteration) - Loops And Iteration
-  - [7.1](#71-control-flow) - Control Flow
-    - [7.1.1](#711-while-predicate-body) - while _predicate_ _body_
-    - [7.1.2](#712-iter-var-iterable-body) - iter _var_ _iterable_ _body_
-      - [7.1.2.1](#7121-counting-loop-with-iter) - Counting loop with _iter_
-      - [7.1.2.2](#7122-vector-iteration-with-iter) - Vector iteration with _iter_
-      - [7.1.2.3](#7123-map-iteration-with-iter) - Map iteration with _iter_
-      - [7.1.2.4](#7124-closures-and-iter-iter-i-) - Closures and _iter_ `iter $&&i ...`
-    - [7.1.3](#713-range-start-end-step-fun) - range _start_ _end_ _step_ _fun_
-    - [7.1.4](#714-break-value) - break _value_
-    - [7.1.5](#715-next) - next
-    - [7.1.6](#716-jump-index-val-branch1--last-branch) - jump _index-val_ _branch1_ ... _last-branch_
-  - [7.2](#72-collection-iteration) - Collection Iteration
-    - [7.2.1](#721-iteration-over-vectors) - Iteration over vectors
-    - [7.2.2](#722-iteration-over-maps) - Iteration over maps
-    - [7.2.3](#723-for-iteratable-value-function) - for _iteratable-value_ _function_
-  - [7.3](#73-accumulation-and-collection) - Accumulation and Collection
-    - [7.3.1](#731-transforming-a-vector) - Transforming a vector
-    - [7.3.2](#732-example-of-) - Example of `$@@`
-    - [7.3.3](#733-transforming-a-vector-to-a-map) - Transforming a vector to a map
-    - [7.3.4](#734-iteratively-concatenating-strings) - Iteratively concatenating strings
-    - [7.3.5](#735-accumulating-sums) - Accumulating sums
-  - [7.4](#74-utilities) - Utilities
-    - [7.4.1](#741-stdaccum-collection-a-b-) - std:accum _collection_ _a_ _b_ ...
-    - [7.4.2](#742-stdzip-vector-map-fn) - std:zip _vector_ _map-fn_
-    - [7.4.3](#743-stdfold-accumulator-func-iteratable) - std:fold _accumulator_ _func_ _iteratable_
-    - [7.4.4](#744-stdenumerate-map-fn) - std:enumerate _map-fn_
-- [8](#8-operators) - Operators
-  - [8.1](#81-arithmetic) - Arithmetic
-    - [8.1.1](#811--operand-1-operand-2-) - + _operand-1_ _operand-2_ ...
-    - [8.1.2](#812---operand-1-operand-2-) - - _operand-1_ _operand-2_ ...
-    - [8.1.3](#813--op-a-op-b) - * _op-a_ _op-b_
-    - [8.1.4](#814--op-a-op-b) - / _op-a_ _op-b_
-    - [8.1.5](#815--op-a-op-b) - % _op-a_ _op-b_
-    - [8.1.6](#816--op-a-op-b) - ^ _op-a_ _op-b_
-  - [8.2](#82-comparison) - Comparison
-    - [8.2.1](#821--op-a-op-b) - == _op-a_ _op-b_
-    - [8.2.2](#822--op-a-op-b) - != _op-a_ _op-b_
-    - [8.2.3](#823--op-a-op-b) - < _op-a_ _op-b_
-    - [8.2.4](#824--op-a-op-b) - <= _op-a_ _op-b_
-    - [8.2.5](#825--op-a-op-b) - > _op-a_ _op-b_
-    - [8.2.6](#826--op-a-op-b) - >= _op-a_ _op-b_
-  - [8.3](#83-bit-operations) - Bit Operations
-    - [8.3.1](#831--op-a-op-b) - & _op-a_ _op-b_
-    - [8.3.2](#832--op-a-op-b) - &^ _op-a_ _op-b_
-    - [8.3.3](#833--op-a-op-b) - &| _op-a_ _op-b_
-    - [8.3.4](#834--op-a-op-b) - << _op-a_ _op-b_
-    - [8.3.5](#835--op-a-op-b) - >> _op-a_ _op-b_
-- [9](#9-data-structure-matchers-selectors-and-string-patternsregex) - Data Structure Matchers, Selectors and String Patterns/Regex
-  - [9.1](#91-data-structure-matcher) - Data Structure Matcher
-    - [9.1.1](#911-match-value-expr-match-pair1--default-expr) - match _value-expr_ _match-pair1_ ... [_default-expr_]
-    - [9.1.2](#912-m-expr) - `$M _expr_`
-    - [9.1.3](#913-data-structure-matcher-syntax) - Data Structure Matcher Syntax
-  - [9.2](#92-data-structure-selectors) - Data Structure Selectors
-    - [9.2.1](#921-selector-and-wlambda-regex-syntax) - Selector and WLambda Regex Syntax:
-  - [9.3](#93-string-patterns-regex) - String Patterns (Regex)
-    - [9.3.1](#931-pattern-syntax-overview) - Pattern Syntax Overview
-    - [9.3.2](#932-standard-regular-expressions) - Standard Regular Expressions
-    - [9.3.3](#933-stdpattern-string) - std:pattern _string_
-- [10](#10-modules) - Modules
-  - [10.1](#101-export) - export
-  - [10.2](#102-import) - import
-- [11](#11-core-library) - Core Library
-    - [11.0.1](#1101-type-value) - type _value_
-    - [11.0.2](#1102-len-value) - len _value_
-    - [11.0.3](#1103-panic-message) - panic _message_
-- [12](#12-standard-library) - Standard Library
-    - [12.0.1](#1201-stdshuffle-randfunc-vec) - std:shuffle _rand_func_ _vec_
-    - [12.0.2](#1202-stddelete-vector-or-map-index-or-key) - std:delete _vector-or-map_ _index-or-key_
-    - [12.0.3](#1203-stdcopy-vecormap) - std:copy _vec_or_map_
-    - [12.0.4](#1204-stdsort-comparefun-vec) - std:sort [_compare_fun_] _vec_
-    - [12.0.5](#1205-stdcmpnumasc-a-b) - std:cmp:num:asc _a_ _b_
-    - [12.0.6](#1206-stdcmpnumdesc-a-b) - std:cmp:num:desc _a_ _b_
-    - [12.0.7](#1207-stddisplayln-arg1-) - std:displayln _arg1_ ...
-    - [12.0.8](#1208-stdwriteln-arg1-) - std:writeln _arg1_ ...
-    - [12.0.9](#1209-stdeval-code-string) - std:eval _code-string_
-    - [12.0.10](#12010-stdassert-bool-message) - std:assert _bool_ \[_message_]
-    - [12.0.11](#12011-stdasserteq-actual-expected-message) - std:assert_eq _actual_ _expected_ \[_message_]
-    - [12.0.12](#12012-stdassertstreq-actual-expected) - std:assert_str_eq _actual_ _expected_
-    - [12.0.13](#12013-stdassertreleq-l-r-epsilon-message) - std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
-    - [12.0.14](#12014-stdwlambdaversion) - std:wlambda:version
-  - [12.1](#121-io) - I/O
-    - [12.1.1](#1211-stdiofilereadtext-filename) - std:io:file:read_text _filename_
-    - [12.1.2](#1212-stdiofileread-filename) - std:io:file:read _filename_
-    - [12.1.3](#1213-stdiofilewritesafe-filename-bytes-or-string) - std:io:file:write_safe _filename_ _bytes-or-string_
-    - [12.1.4](#1214-stdiofileappend-filename-bytes-or-string) - std:io:file:append _filename_ _bytes-or-string_
-  - [12.2](#122-threading) - Threading
-- [13](#13-optional-standard-library) - Optional Standard Library
-  - [13.1](#131-serialization) - serialization
-    - [13.1.1](#1311-stdserwlambda-arg) - std:ser:wlambda _arg_
-    - [13.1.2](#1312-stdserjson-data-nopretty) - std:ser:json _data_ \[_no_pretty_]
-    - [13.1.3](#1313-stddeserjson-string) - std:deser:json _string_
-    - [13.1.4](#1314-stdsercsv-fielddelim-rowseparator-escapeall-table) - std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
-    - [13.1.5](#1315-stddesercsv-fielddelim-rowseparator-data) - std:deser:csv _field_delim_ _row_separator_ _data_
-    - [13.1.6](#1316-stdsermsgpack-data) - std:ser:msgpack _data_
-    - [13.1.7](#1317-stddesermsgpack-bytes) - std:deser:msgpack _bytes_
-  - [13.2](#132-regex) - regex
-  - [13.3](#133-chrono) - chrono
-    - [13.3.1](#1331-stdchronotimestamp-format) - std:chrono:timestamp \[_format_]
-  - [13.4](#134-hash) - hash
-    - [13.4.1](#1341-stdhashfnv1a-arg1-) - std:hash:fnv1a _arg1_ ...
-  - [13.5](#135-rand) - rand
-    - [13.5.1](#1351-stdrandsplitmix64new) - std:rand:split_mix64_new
-    - [13.5.2](#1352-stdrandsplitmix64newfrom-seed) - std:rand:split_mix64_new_from _seed_
-    - [13.5.3](#1353-stdrandsplitmix64next-smstate-count) - std:rand:split_mix64_next _sm_state_ \[_count_]
-    - [13.5.4](#1354-stdrandsplitmix64nextopen01-smstate-count) - std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
-  - [13.6](#136-utility-functions) - Utility Functions
-    - [13.6.1](#1361-stddumpupvals-function) - std:dump_upvals _function_
+- [1](#1-syntax) Syntax
+- [2](#2-variable-definition-and-assignment) Variable Definition and Assignment
+  - [2.1](#21-destructuring-to-variables) Destructuring to Variables
+  - [2.2](#22-global-variables) Global Variables
+  - [2.3](#23-constants) Constants
+- [3](#3-functions-part-12) Functions (part 1/2)
+  - [3.1](#31-closures) Closures
+    - [3.1.1](#311-object-oriented-programming-with-closures) Object Oriented Programming with Closures
+  - [3.2](#32-function-calling) Function calling
+  - [3.3](#33-function-arity-checks) Function arity checks
+    - [3.3.1](#331-stdtonoarity-function) std:to_no_arity _function_
+  - [3.4](#34-calling-fields--method-calling) Calling fields / Method calling
+    - [3.4.1](#341-object-oriented-programming-with-prototypes) Object Oriented Programming with Prototypes
+  - [3.5](#35-function-call-composition) Function call composition
+    - [3.5.1](#351--tail-argument-function-chaninig) '|' Tail Argument Function Chaninig
+    - [3.5.2](#352--left-hand-function-chaining) '|>' Left Hand Function Chaining
+    - [3.5.3](#353-forward-argument-pipe-arg--fun) Forward Argument Pipe `arg &> fun`
+    - [3.5.4](#354-reverse-argument-pipe-fun--arg) Reverse Argument Pipe `fun <& arg`
+  - [3.6](#36-control-flow---returning) Control Flow - Returning
+    - [3.6.1](#361-return-label-value) return [_label_] _value_
+    - [3.6.2](#362-block-label-function) block [label] _function_
+    - [3.6.3](#363-stdtodrop-value-function-or-raii-destructors-or-drop-functions) std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
+  - [3.7](#37-function-utilities) Function utilities
+    - [3.7.1](#371-isfun-value) is_fun _value_
+- [4](#4-data-types) Data Types
+  - [4.1](#41-none-sentinel-value-n-or-none) None sentinel value: `$n` or `$none`
+    - [4.1.1](#411-isnone-value) is_none _value_
+    - [4.1.2](#412-issome-value) is_some _value_
+  - [4.2](#42-optional-values-o-and-o) Optional values `$o()` and `$o(...)`
+    - [4.2.1](#421-isoptional-value) is_optional _value_
+    - [4.2.2](#422-unwrapping-optionals) Unwrapping optionals
+  - [4.3](#43-error-values-e-expr-or-error-expr) Error values: `$e expr` or `$error expr`
+    - [4.3.1](#431--label-value) _? [_label_] _value_
+    - [4.3.2](#432-onerror-handler-maybe-error-value) on_error _handler_ _maybe-error-value_
+    - [4.3.3](#433-iserr-value) is_err _value_
+    - [4.3.4](#434-errortostr-value) error_to_str _value_
+  - [4.4](#44-booleans) Booleans
+    - [4.4.1](#441-isbool-any-value) is_bool _any-value_
+    - [4.4.2](#442-bool-any-value) bool _any-value_
+    - [4.4.3](#443-not-value) not _value_
+    - [4.4.4](#444-boolean-list-indexing) Boolean List Indexing
+  - [4.5](#45-64-bit-integers) 64-Bit Integers
+    - [4.5.1](#451-int-value) int _value_
+    - [4.5.2](#452-isint-value) is_int _value_
+    - [4.5.3](#453-stdnegi64-integer) std:neg_i64 _integer_
+    - [4.5.4](#454-stdnoti64-integer) std:not_i64 _integer_
+    - [4.5.5](#455-stdnegu32-integer) std:neg_u32 _integer_
+    - [4.5.6](#456-stdnotu32-integer) std:not_u32 _integer_
+  - [4.6](#46-64-bit-floats) 64-Bit Floats
+    - [4.6.1](#461-float-value) float _value_
+    - [4.6.2](#462-isfloat-value) is_float _value_
+    - [4.6.3](#463-stdnumacos-float) std:num:acos _float_
+    - [4.6.4](#464-stdnumacosh-float) std:num:acosh _float_
+    - [4.6.5](#465-stdnumasin-float) std:num:asin _float_
+    - [4.6.6](#466-stdnumasinh-float) std:num:asinh _float_
+    - [4.6.7](#467-stdnumatan-float) std:num:atan _float_
+    - [4.6.8](#468-stdnumatan2-y-x) std:num:atan2 _y_ _x_
+    - [4.6.9](#469-stdnumatanh-float) std:num:atanh _float_
+    - [4.6.10](#4610-stdnumcbrt-float) std:num:cbrt _float_
+    - [4.6.11](#4611-stdnumceil-float) std:num:ceil _float_
+    - [4.6.12](#4612-stdnumcos-float) std:num:cos _float_
+    - [4.6.13](#4613-stdnumcosh-float) std:num:cosh _float_
+    - [4.6.14](#4614-stdnumexp-float) std:num:exp _float_
+    - [4.6.15](#4615-stdnumexp2-float) std:num:exp2 _float_
+    - [4.6.16](#4616-stdnumexpm1-float) std:num:exp_m1 _float_
+    - [4.6.17](#4617-stdnumfloor-float) std:num:floor _float_
+    - [4.6.18](#4618-stdnumhypot-y-x) std:num:hypot _y_ _x_
+    - [4.6.19](#4619-stdnumln-float) std:num:ln _float_
+    - [4.6.20](#4620-stdnumlog-float) std:num:log _float_
+    - [4.6.21](#4621-stdnumlog10-float) std:num:log10 _float_
+    - [4.6.22](#4622-stdnumlog2-float) std:num:log2 _float_
+    - [4.6.23](#4623-stdnumpow-float) std:num:pow _float_
+    - [4.6.24](#4624-stdnumrecip-float) std:num:recip _float_
+    - [4.6.25](#4625-stdnumround-float) std:num:round _float_
+    - [4.6.26](#4626-stdnumsin-float) std:num:sin _float_
+    - [4.6.27](#4627-stdnumsinh-float) std:num:sinh _float_
+    - [4.6.28](#4628-stdnumsqrt-float) std:num:sqrt _float_
+    - [4.6.29](#4629-stdnumtan-float) std:num:tan _float_
+    - [4.6.30](#4630-stdnumtanh-float) std:num:tanh _float_
+    - [4.6.31](#4631-stdnumtodegrees-float) std:num:to_degrees _float_
+    - [4.6.32](#4632-stdnumtoradians-float) std:num:to_radians _float_
+    - [4.6.33](#4633-stdnumtrunc-float) std:num:trunc _float_
+    - [4.6.34](#4634-stdnumlerp-a-b-x) std:num:lerp _a_ _b_ _x_
+    - [4.6.35](#4635-stdnumsmoothstep-a-b-x) std:num:smoothstep _a_ _b_ _x_
+  - [4.7](#47-numeric-functions) Numeric Functions
+    - [4.7.1](#471-stdnumabs-number) std:num:abs _number_
+  - [4.8](#48-numerical-mathematical-vectors) Numerical Mathematical Vectors
+    - [4.8.1](#481-vector-conversions) Vector Conversions
+    - [4.8.2](#482-vector-component-access) Vector Component Access
+    - [4.8.3](#483-named-field-access-and-swizzling) Named Field Access and Swizzling
+    - [4.8.4](#484-euler-additionsubtraction) Euler Addition/Subtraction
+    - [4.8.5](#485-scalar-multiplicationdivision) Scalar Multiplication/Division
+    - [4.8.6](#486-unary-vector-operations) Unary Vector Operations
+    - [4.8.7](#487-stdvdims-vec) std:v:dims _vec_
+    - [4.8.8](#488-stdvmag2-vec) std:v:mag2 _vec_
+    - [4.8.9](#489-stdvmag-vec) std:v:mag _vec_
+    - [4.8.10](#4810-stdvnorm-vec) std:v:norm _vec_
+    - [4.8.11](#4811-stdvdot-vec1-vec2) std:v:dot _vec1_ _vec2_
+    - [4.8.12](#4812-stdvcross-vec1-vec2) std:v:cross _vec1_ _vec2_
+    - [4.8.13](#4813-stdvlerp-vec1-vec2-t) std:v:lerp _vec1_ _vec2_ _t_
+    - [4.8.14](#4814-stdvslerp-vec1-vec2-t) std:v:slerp _vec1_ _vec2_ _t_
+    - [4.8.15](#4815-stdvvec2rad-vec) std:v:vec2rad _vec_
+    - [4.8.16](#4816-stdvrad2vec-radians) std:v:rad2vec _radians_
+    - [4.8.17](#4817-stdvhex2rgbaf-string) std:v:hex2rgba_f _string_
+    - [4.8.18](#4818-stdvhex2rgbai-string) std:v:hex2rgba_i _string_
+  - [4.9](#49-strings) Strings
+    - [4.9.1](#491-string-literal-syntaxes) String Literal Syntaxes
+    - [4.9.2](#492-str-value) str _value_
+    - [4.9.3](#493-isstr-value) is_str _value_
+    - [4.9.4](#494-stdstrcat-a-b-) std:str:cat _a_ _b_ ...
+    - [4.9.5](#495-stdstrjoin-sep-vector) std:str:join _sep_ _vector_
+    - [4.9.6](#496-stdstrlen-value) std:str:len _value_
+    - [4.9.7](#497-stdstrreplace-pattern-replacement-string) std:str:replace _pattern_ _replacement_ _string_
+    - [4.9.8](#498-stdstrreplacen-pattern-replacement-count-string) std:str:replace_n _pattern_ _replacement_ _count_ _string_
+    - [4.9.9](#499-stdstrtrim-value) std:str:trim _value_
+    - [4.9.10](#4910-stdstrtrimstart-value) std:str:trim_start _value_
+    - [4.9.11](#4911-stdstrtrimend-value) std:str:trim_end _value_
+    - [4.9.12](#4912-stdstrpadstart-len-pad-str-value) std:str:pad_start _len_ _pad-str_ _value_
+    - [4.9.13](#4913-stdstrpadend-len-pad-str-value) std:str:pad_end _len_ _pad-str_ _value_
+    - [4.9.14](#4914-stdstrtobytes-string) std:str:to_bytes _string_
+    - [4.9.15](#4915-stdstrfromutf8-byte-vector) std:str:from_utf8 _byte-vector_
+    - [4.9.16](#4916-stdstrfromutf8lossy-byte-vector) std:str:from_utf8_lossy _byte-vector_
+    - [4.9.17](#4917-stdstrtocharvec-string) std:str:to_char_vec _string_
+    - [4.9.18](#4918-stdstrfromcharvec-vector) std:str:from_char_vec _vector_
+    - [4.9.19](#4919-stdstrtolowercase-string) std:str:to_lowercase _string_
+    - [4.9.20](#4920-stdstrtouppercase-string) std:str:to_uppercase _string_
+  - [4.10](#410-bytes-or-byte-vectors) Bytes (or Byte Vectors)
+    - [4.10.1](#4101-call-properties-of-bytes) Call Properties of Bytes
+    - [4.10.2](#4102-byte-conversion-functions) Byte Conversion Functions
+    - [4.10.3](#4103-isbytes-value) is_bytes _value_
+  - [4.11](#411-symbols) Symbols
+    - [4.11.1](#4111-stdsymbolscollect) std:symbols:collect
+  - [4.12](#412-pairs-pa-b) Pairs `$p(a, b)`
+    - [4.12.1](#4121-pair-operator-a--b) Pair Operator `a => b`
+    - [4.12.2](#4122-pair-constructor-a--b) Pair Constructor `a => b`
+    - [4.12.3](#4123-cons-a-b) cons _a_ _b_
+    - [4.12.4](#4124-pair-stringbyte-vector-operations) Pair string/byte vector operations
+      - [4.12.4.1](#41241-pfrom-count-string-or-byte-vec) `$p(_from_, _count_) _string-or-byte-vec_`
+      - [4.12.4.2](#41242-ppattern-replacement-string-or-byte-vec) `$p(_pattern_, _replacement_) _string-or-byte-vec_`
+      - [4.12.4.3](#41243-psplit-pattern-max-string-or-byte-vec) `$p(_split-pattern_, _max_) _string-or-byte-vec_`
+    - [4.12.5](#4125-pair-to-iterator) Pair to Iterator
+      - [4.12.5.1](#41251-iter---range) Iter - Range
+      - [4.12.5.2](#41252-iter---enumerate) Iter - Enumerate
+      - [4.12.5.3](#41253-iter---values) Iter - Values
+      - [4.12.5.4](#41254-iter---keys) Iter - Keys
+    - [4.12.6](#4126-ispair-value) is_pair _value_
+  - [4.13](#413-vectors-or-lists) Vectors (or Lists)
+    - [4.13.1](#4131-stdpush-vector-item) std:push _vector_ _item_
+    - [4.13.2](#4132-stdpop-vector) std:pop _vector_
+    - [4.13.3](#4133-stdunshift-vector-item) std:unshift _vector_ _item_
+    - [4.13.4](#4134-vector-splicing) Vector Splicing
+    - [4.13.5](#4135-stdappend-vec-a-value-or-vec-) std:append _vec-a_ _value-or-vec_ ...
+    - [4.13.6](#4136-stdprepend-vec-a-value-or-vec-) std:prepend _vec-a_ _value-or-vec_ ...
+    - [4.13.7](#4137-stdtake-count-vector) std:take _count_ _vector_
+    - [4.13.8](#4138-stddrop-count-vector) std:drop _count_ _vector_
+  - [4.14](#414-associative-maps-or-string-to-value-mappings) Associative Maps (or String to Value mappings)
+    - [4.14.1](#4141-map-splicing) Map Splicing
+  - [4.15](#415-references) References
+    - [4.15.1](#4151-stdtoref-value) std:to_ref _value_
+    - [4.15.2](#4152-stdweaken-ref) std:weaken _ref_
+    - [4.15.3](#4153-isref-value) is_ref _value_
+    - [4.15.4](#4154-iswref-value) is_wref _value_
+    - [4.15.5](#4155-stdstrengthen-ref) std:strengthen _ref_
+    - [4.15.6](#4156-stdsetref-ref-value) std:set_ref _ref_ _value_
+  - [4.16](#416-iterators-iter-expression) Iterators `$iter _expression_`
+    - [4.16.1](#4161-iterator-kinds) Iterator Kinds
+    - [4.16.2](#4162-iterators-on-mutated-data) Iterators on mutated data
+    - [4.16.3](#4163-splicing-an-iterator) Splicing an Iterator
+    - [4.16.4](#4164-calling-an-iterator-with-a-function) Calling an Iterator with a Function
+    - [4.16.5](#4165-zip-iterators) Zip Iterators
+  - [4.17](#417-calling-semantics-of-data-types) Calling Semantics of Data Types
+- [5](#5-functions-part-22) Functions (part 2/2)
+- [6](#6-conditional-execution---if--then--else) Conditional Execution - if / then / else
+  - [6.1](#61-if-condition-then-expr-else-expr) ?/if _condition_ _then-expr_ [_else-expr_]
+  - [6.2](#62-using-booleans-for-conditional-execution) Using Booleans for Conditional Execution
+    - [6.2.1](#621-pick-bool-a--b-) pick _bool_ _a_ -b-
+    - [6.2.2](#622-indexing-by-booleans) Indexing by Booleans
+  - [6.3](#63-value-matching-with-match-value-expr-) Value matching with `match _value-expr_ ...`
+- [7](#7-loops-and-iteration) Loops And Iteration
+  - [7.1](#71-control-flow) Control Flow
+    - [7.1.1](#711-while-predicate-body) while _predicate_ _body_
+    - [7.1.2](#712-iter-var-iterable-body) iter _var_ _iterable_ _body_
+      - [7.1.2.1](#7121-counting-loop-with-iter) Counting loop with _iter_
+      - [7.1.2.2](#7122-vector-iteration-with-iter) Vector iteration with _iter_
+      - [7.1.2.3](#7123-map-iteration-with-iter) Map iteration with _iter_
+      - [7.1.2.4](#7124-closures-and-iter-iter-i-) Closures and _iter_ `iter $&&i ...`
+    - [7.1.3](#713-range-start-end-step-fun) range _start_ _end_ _step_ _fun_
+    - [7.1.4](#714-break-value) break _value_
+    - [7.1.5](#715-next) next
+    - [7.1.6](#716-jump-index-val-branch1--last-branch) jump _index-val_ _branch1_ ... _last-branch_
+  - [7.2](#72-collection-iteration) Collection Iteration
+    - [7.2.1](#721-iteration-over-vectors) Iteration over vectors
+    - [7.2.2](#722-iteration-over-maps) Iteration over maps
+    - [7.2.3](#723-for-iteratable-value-function) for _iteratable-value_ _function_
+  - [7.3](#73-accumulation-and-collection) Accumulation and Collection
+    - [7.3.1](#731-transforming-a-vector) Transforming a vector
+    - [7.3.2](#732-example-of-) Example of `$@@`
+    - [7.3.3](#733-transforming-a-vector-to-a-map) Transforming a vector to a map
+    - [7.3.4](#734-iteratively-concatenating-strings) Iteratively concatenating strings
+    - [7.3.5](#735-accumulating-sums) Accumulating sums
+  - [7.4](#74-utilities) Utilities
+    - [7.4.1](#741-stdaccum-collection-a-b-) std:accum _collection_ _a_ _b_ ...
+    - [7.4.2](#742-stdzip-vector-map-fn) std:zip _vector_ _map-fn_
+    - [7.4.3](#743-stdfold-accumulator-func-iteratable) std:fold _accumulator_ _func_ _iteratable_
+    - [7.4.4](#744-stdenumerate-map-fn) std:enumerate _map-fn_
+- [8](#8-operators) Operators
+  - [8.1](#81-arithmetic) Arithmetic
+    - [8.1.1](#811--operand-1-operand-2-) + _operand-1_ _operand-2_ ...
+    - [8.1.2](#812---operand-1-operand-2-) - _operand-1_ _operand-2_ ...
+    - [8.1.3](#813--op-a-op-b) * _op-a_ _op-b_
+    - [8.1.4](#814--op-a-op-b) / _op-a_ _op-b_
+    - [8.1.5](#815--op-a-op-b) % _op-a_ _op-b_
+    - [8.1.6](#816--op-a-op-b) ^ _op-a_ _op-b_
+  - [8.2](#82-comparison) Comparison
+    - [8.2.1](#821--op-a-op-b) == _op-a_ _op-b_
+    - [8.2.2](#822--op-a-op-b) != _op-a_ _op-b_
+    - [8.2.3](#823--op-a-op-b) < _op-a_ _op-b_
+    - [8.2.4](#824--op-a-op-b) <= _op-a_ _op-b_
+    - [8.2.5](#825--op-a-op-b) > _op-a_ _op-b_
+    - [8.2.6](#826--op-a-op-b) >= _op-a_ _op-b_
+  - [8.3](#83-bit-operations) Bit Operations
+    - [8.3.1](#831--op-a-op-b) & _op-a_ _op-b_
+    - [8.3.2](#832--op-a-op-b) &^ _op-a_ _op-b_
+    - [8.3.3](#833--op-a-op-b) &| _op-a_ _op-b_
+    - [8.3.4](#834--op-a-op-b) << _op-a_ _op-b_
+    - [8.3.5](#835--op-a-op-b) >> _op-a_ _op-b_
+- [9](#9-data-structure-matchers-selectors-and-string-patternsregex) Data Structure Matchers, Selectors and String Patterns/Regex
+  - [9.1](#91-data-structure-matcher) Data Structure Matcher
+    - [9.1.1](#911-match-value-expr-match-pair1--default-expr) match _value-expr_ _match-pair1_ ... [_default-expr_]
+    - [9.1.2](#912-m-expr) `$M _expr_`
+    - [9.1.3](#913-data-structure-matcher-syntax) Data Structure Matcher Syntax
+  - [9.2](#92-data-structure-selectors) Data Structure Selectors
+    - [9.2.1](#921-selector-and-wlambda-regex-syntax) Selector and WLambda Regex Syntax:
+  - [9.3](#93-string-patterns-regex) String Patterns (Regex)
+    - [9.3.1](#931-pattern-syntax-overview) Pattern Syntax Overview
+    - [9.3.2](#932-standard-regular-expressions) Standard Regular Expressions
+    - [9.3.3](#933-stdpattern-string) std:pattern _string_
+- [10](#10-modules) Modules
+  - [10.1](#101-export) export
+  - [10.2](#102-import) import
+- [11](#11-core-library) Core Library
+    - [11.0.1](#1101-type-value) type _value_
+    - [11.0.2](#1102-len-value) len _value_
+    - [11.0.3](#1103-panic-message) panic _message_
+- [12](#12-standard-library) Standard Library
+    - [12.0.1](#1201-stdshuffle-randfunc-vec) std:shuffle _rand_func_ _vec_
+    - [12.0.2](#1202-stddelete-vector-or-map-index-or-key) std:delete _vector-or-map_ _index-or-key_
+    - [12.0.3](#1203-stdcopy-vecormap) std:copy _vec_or_map_
+    - [12.0.4](#1204-stdsort-comparefun-vec) std:sort [_compare_fun_] _vec_
+    - [12.0.5](#1205-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
+    - [12.0.6](#1206-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
+    - [12.0.7](#1207-stddisplayln-arg1-) std:displayln _arg1_ ...
+    - [12.0.8](#1208-stdwriteln-arg1-) std:writeln _arg1_ ...
+    - [12.0.9](#1209-stdeval-code-string) std:eval _code-string_
+    - [12.0.10](#12010-stdassert-bool-message) std:assert _bool_ \[_message_]
+    - [12.0.11](#12011-stdasserteq-actual-expected-message) std:assert_eq _actual_ _expected_ \[_message_]
+    - [12.0.12](#12012-stdassertstreq-actual-expected) std:assert_str_eq _actual_ _expected_
+    - [12.0.13](#12013-stdassertreleq-l-r-epsilon-message) std:assert_rel_eq _l_ _r_ _epsilon_ \[_message_]
+    - [12.0.14](#12014-stdwlambdaversion) std:wlambda:version
+  - [12.1](#121-io) I/O
+    - [12.1.1](#1211-stdiofilereadtext-filename) std:io:file:read_text _filename_
+    - [12.1.2](#1212-stdiofileread-filename) std:io:file:read _filename_
+    - [12.1.3](#1213-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write_safe _filename_ _bytes-or-string_
+    - [12.1.4](#1214-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
+  - [12.2](#122-threading) Threading
+- [13](#13-optional-standard-library) Optional Standard Library
+  - [13.1](#131-serialization) serialization
+    - [13.1.1](#1311-stdserwlambda-arg) std:ser:wlambda _arg_
+    - [13.1.2](#1312-stdserjson-data-nopretty) std:ser:json _data_ \[_no_pretty_]
+    - [13.1.3](#1313-stddeserjson-string) std:deser:json _string_
+    - [13.1.4](#1314-stdsercsv-fielddelim-rowseparator-escapeall-table) std:ser:csv _field_delim_ _row_separator_ _escape_all_ _table_
+    - [13.1.5](#1315-stddesercsv-fielddelim-rowseparator-data) std:deser:csv _field_delim_ _row_separator_ _data_
+    - [13.1.6](#1316-stdsermsgpack-data) std:ser:msgpack _data_
+    - [13.1.7](#1317-stddesermsgpack-bytes) std:deser:msgpack _bytes_
+  - [13.2](#132-regex) regex
+  - [13.3](#133-chrono) chrono
+    - [13.3.1](#1331-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
+  - [13.4](#134-hash) hash
+    - [13.4.1](#1341-stdhashfnv1a-arg1-) std:hash:fnv1a _arg1_ ...
+  - [13.5](#135-rand) rand
+    - [13.5.1](#1351-stdrandsplitmix64new) std:rand:split_mix64_new
+    - [13.5.2](#1352-stdrandsplitmix64newfrom-seed) std:rand:split_mix64_new_from _seed_
+    - [13.5.3](#1353-stdrandsplitmix64next-smstate-count) std:rand:split_mix64_next _sm_state_ \[_count_]
+    - [13.5.4](#1354-stdrandsplitmix64nextopen01-smstate-count) std:rand:split_mix64_next_open01 _sm_state_ \[_count_]
+  - [13.6](#136-utility-functions) Utility Functions
+    - [13.6.1](#1361-stddumpupvals-function) std:dump_upvals _function_
 
 -----
 
