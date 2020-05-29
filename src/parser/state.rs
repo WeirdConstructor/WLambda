@@ -220,13 +220,13 @@ impl State {
 
     /// Creates a `VVal::Syn` annotated with the current parse head position.
     pub fn syn_raw(&self, s: Syntax) -> VVal {
-        VVal::Syn(SynPos {
+        VVal::Syn(Box::new(SynPos {
             syn:  s,
             line: self.line_no,
             col:  self.col_no,
             file: self.file.clone(),
             name: None,
-        })
+        }))
     }
 
     /// Creates an syntactic AST node.

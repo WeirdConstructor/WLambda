@@ -1931,9 +1931,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let mut pws : std::vec::Vec<(bool, ProgWriter)> = vec![];
                     for (a, _) in ast.iter().skip(1) {
                         if a.is_vec() {
-                            if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
-                                a.at(0).unwrap_or_else(|| VVal::None)
-                            {
+                            if a.at(0).unwrap_or_else(|| VVal::None).get_syn() == Syntax::VecSplice {
                                 let splice_pw = vm_compile2(&a.at(1).unwrap(), ce)?;
                                 pws.push((true, splice_pw));
                                 continue;
@@ -2000,7 +1998,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let k = e.at(0).unwrap();
                         let v = e.at(1).unwrap();
 
-                        if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
+                        if k.get_syn() == Syntax::MapSplice {
                             let sc_pw = vm_compile2(&v, ce)?;
                             pws.push((sc_pw, None));
                             continue;

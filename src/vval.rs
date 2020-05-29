@@ -1430,7 +1430,7 @@ pub enum VVal {
     /// Float value
     Flt(f64),
     /// A syntax node in the AST, records the position too.
-    Syn(SynPos),
+    Syn(Box<SynPos>),
     /// A pair
     Pair(Rc<(VVal, VVal)>),
     /// An optional value. While VVal::None basically has the same meaning
@@ -3616,7 +3616,7 @@ impl VVal {
 
     pub fn get_syn_pos(&self) -> SynPos {
         if let VVal::Syn(s) = self {
-            s.clone()
+            s.as_ref().clone()
         } else {
             SynPos {
                 syn: Syntax::Block,
