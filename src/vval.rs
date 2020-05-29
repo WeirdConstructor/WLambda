@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
+
 // This is a part of WLambda. See README.md and COPYING for details.
 
 /*!
@@ -207,7 +207,7 @@ impl std::fmt::Debug for Stdio {
 /// The maximum stack size.
 ///
 /// Currently hardcoded, but later the API user will be able to specify it.
-const STACK_SIZE : usize = 10240;
+const START_STACK_SIZE : usize = 512;
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct LoopInfo {
@@ -241,7 +241,7 @@ pub enum UnwindAction {
 /// The runtime environment of the evaluator.
 #[derive(Debug)]
 pub struct Env {
-    /// The argument stack, limited to `STACK_SIZE`.
+    /// The argument stack, initialized to a size of `START_STACK_SIZE`.
     pub args: std::vec::Vec<VVal>,
     /// A stack of the currently called functions.
     ///
@@ -250,8 +250,6 @@ pub struct Env {
     pub call_stack: std::vec::Vec<Rc<VValFun>>,
     /// A stack that holds cleanup routines that need to be handled:
     pub unwind_stack: std::vec::Vec<UnwindAction>,
-    /// A stack pointer for unwind_stack,
-    pub unwind_sp: usize,
     /// Holds the object of the currently called method:
     pub current_self: VVal,
     /// The basepointer to reference arguments and
@@ -296,7 +294,7 @@ pub struct Env {
 impl Env {
     pub fn new(global: GlobalEnvRef) -> Env {
         let mut e = Env {
-            args:               Vec::with_capacity(STACK_SIZE),
+            args:               Vec::with_capacity(START_STACK_SIZE),
             current_self:       VVal::None,
             bp:                 0,
             sp:                 0,
@@ -308,20 +306,18 @@ impl Env {
             accum_val:          VVal::None,
             call_stack:         vec![],
             unwind_stack:       vec![],
-            unwind_sp:          0,
             loop_info:          LoopInfo::new(),
             iter:               None,
             vm_nest:            0,
             global
         };
-        e.args.resize(STACK_SIZE, VVal::None);
-        e.unwind_stack.resize(STACK_SIZE, UnwindAction::Null);
+        e.args.resize(START_STACK_SIZE, VVal::None);
         e
     }
 
     pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> Env {
         let mut e = Env {
-            args:               Vec::with_capacity(STACK_SIZE),
+            args:               Vec::with_capacity(START_STACK_SIZE),
             current_self:       VVal::None,
             bp:                 0,
             sp:                 0,
@@ -332,15 +328,13 @@ impl Env {
             accum_val:          VVal::None,
             call_stack:         vec![],
             unwind_stack:       std::vec::Vec::with_capacity(1000),
-            unwind_sp:          0,
             loop_info:          LoopInfo::new(),
             iter:               None,
             vm_nest:            0,
             user,
             global,
         };
-        e.args.resize(STACK_SIZE, VVal::None);
-        e.unwind_stack.resize(STACK_SIZE, UnwindAction::Null);
+        e.args.resize(START_STACK_SIZE, VVal::None);
         e
     }
 
@@ -430,6 +424,9 @@ impl Env {
     pub fn set_bp(&mut self, env_size: usize) -> usize {
         let new_bp = self.sp;
         self.sp += env_size;
+        if self.sp >= self.args.len() {
+            self.args.resize(self.sp * 2, VVal::None);
+        }
         std::mem::replace(&mut self.bp, new_bp)
     }
 
@@ -506,11 +503,17 @@ impl Env {
     #[inline]
     pub fn push_sp(&mut self, n: usize) {
         self.sp += n;
+        if self.sp >= self.args.len() {
+            self.args.resize(self.sp * 2, VVal::None);
+        }
         //d// println!("PUSH_SP {} => {}", n, self.sp);
     }
 
     #[inline]
     pub fn push(&mut self, v: VVal) -> usize {
+        if self.sp >= self.args.len() {
+            self.args.resize(self.sp * 2, VVal::None);
+        }
         self.args[self.sp] = v;
         self.sp += 1;
         self.sp - 1
@@ -736,7 +739,11 @@ impl Env {
 
     #[inline]
     pub fn set_consume(&mut self, i: usize, value: VVal) {
-        match &mut self.args[self.bp + i] {
+        let idx = self.bp + i;
+        if idx >= self.args.len() {
+            self.args.resize(idx * 2, VVal::None);
+        }
+        match &mut self.args[idx] {
             VVal::CRef(r)  => { r.replace(value); }
             v              => { *v = value }
         }
@@ -744,18 +751,17 @@ impl Env {
 
     #[inline]
     pub fn unwind_depth(&self) -> usize {
-        self.unwind_sp
+        self.unwind_stack.len()
     }
 
     #[inline]
     pub fn push_unwind(&mut self, uwa: UnwindAction) {
-        self.unwind_stack[self.unwind_sp] = uwa;
-        self.unwind_sp += 1;
+        self.unwind_stack.push(uwa);
     }
 
     #[inline]
     pub fn unwind_to_depth(&mut self, depth: usize) {
-        while self.unwind_sp > depth {
+        while self.unwind_stack.len() > depth {
             self.unwind_one();
         }
     }
@@ -771,11 +777,6 @@ impl Env {
                 local_size);
         self.push_unwind(uwa);
         self.call_stack.push(fu);
-    }
-
-    #[inline]
-    pub fn push_unwind_sp(&mut self) {
-        self.push_unwind(UnwindAction::RestoreSP(self.sp));
     }
 
     #[inline]
@@ -824,9 +825,9 @@ impl Env {
 
     pub fn dump_unwind_stack(&self) -> String {
         let mut s = String::new();
-        for i in 0..self.unwind_sp {
+        for i in 0..self.unwind_stack.len() {
             let add =
-                match &self.unwind_stack[self.unwind_sp - (i + 1)] {
+                match &self.unwind_stack[self.unwind_stack.len() - (i + 1)] {
                     UnwindAction::RestoreSP(sp) =>
                         format!("rsp({})", *sp),
                     UnwindAction::ClearLocals(from, to) =>
@@ -888,12 +889,8 @@ impl Env {
 
     #[inline]
     pub fn unwind_one(&mut self) {
-        self.unwind_sp -= 1;
-        let ua =
-            std::mem::replace(
-                &mut self.unwind_stack[self.unwind_sp],
-                UnwindAction::Null);
-        self.unwind(ua);
+        let uwa = self.unwind_stack.pop().unwrap();
+        self.unwind(uwa);
     }
 
     pub fn setup_accumulator(&mut self, v: VVal) {

@@ -24,6 +24,8 @@ and regex patterns: `$M _expr_`.
 * Feature: Added a jump table operation `jump idx branch-a branch-b branch-c`
 as supporting operation for `match`.
 * Feature: Updates VIM syntax file `vim/wlambda.vim`.
+* Bugfix: The stack size is no longer fixed and is dynamically grown if
+required.
 
 0.5.0 (2020-05-21)
 ==================
