@@ -818,10 +818,11 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     });
                 }
             },
-            Op::CallMethodSym(o, k, argc, r) => {
+            Op::CallMethodSym(o, k_argc, r) => {
                 in_reg!(env, ret, data, o);
                 let o = handle_err!(o, "field idx/key", retv);
-                let argc = *argc as usize;
+                let k    = &k_argc.0;
+                let argc = k_argc.1 as usize;
 
                 if let VVal::Usr(u) = o {
                     let k = &*k;
@@ -847,9 +848,13 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     out_reg!(env, ret, retv, data, r, v);
                 });
             },
-            Op::CallDirect(a, fun, r) => op_a_r!(env, ret, retv, data, a, r, {
-                (fun.fun)(a, env)
-            }),
+            Op::CallDirect(fun) => {
+                let a = &fun.arg;
+                let r = &fun.res;
+                op_a_r!(env, ret, retv, data, a, r, {
+                    (fun.fun)(a, env)
+                })
+            },
             Op::Apply(argv, func, r) => {
                 in_reg!(env, ret, data, argv);
                 in_reg!(env, ret, data, func);
@@ -1697,7 +1702,7 @@ pub fn generate_jump_table(spos: SynPos, value: ProgWriter, blocks: Vec<ProgWrit
             };
 
         let mut val_prog = Prog::new();
-        let mut val = value.eval(&mut val_prog);
+        let val = value.eval(&mut val_prog);
 
         let mut tbl : Vec<i32> = vec![];
         let mut offs = 0;
@@ -1779,14 +1784,13 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             patterns.push(struct_pat.v_(0));
             blocks.push(vm_compile_direct_block2(&struct_pat.v_(1), ce)?);
 
+        } else if struct_pat.is_pair() {
+            patterns.push(struct_pat.v_(0));
+            blocks.push(vm_compile_direct_block2(&struct_pat.v_(1), ce)?);
+            blocks.push(vm_compile2(&VVal::None, ce)?);
+
         } else {
-            if struct_pat.is_pair() {
-                patterns.push(struct_pat.v_(0));
-                blocks.push(vm_compile_direct_block2(&struct_pat.v_(1), ce)?);
-                blocks.push(vm_compile2(&VVal::None, ce)?);
-            } else {
-                blocks.push(vm_compile_direct_block2(&struct_pat, ce)?);
-            }
+            blocks.push(vm_compile_direct_block2(&struct_pat, ce)?);
         }
     }
 
@@ -1802,7 +1806,7 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
           .unwrap_or_else(|| VVal::None);
 
     let dfun =
-        if map.len() <= 0 {
+        if map.len() == 0 {
             (dfun_constr)(
                 Box::new(|_sym, _val| ()),
                 Box::new(|| ()))

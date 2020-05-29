@@ -28,7 +28,7 @@ macro_rules! gen_glob {
                 let n_idx = $lst.len() - i;
                 if $next($lst, n_idx, $f) {
 
-                    if let Some(_) = $var {
+                    if $var.is_some() {
                         let sublist = VVal::vec();
                         for j in $idx..n_idx {
                             sublist.push($lst.v_(j));
@@ -49,7 +49,6 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
     -> Result<StructListNode, CompileError>
 {
     let syn  = ast.v_(0);
-    let spos = syn.get_syn_pos();
 
     println!("LIST PAT: {}", ast.s());
 
@@ -60,14 +59,14 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
                     store_var(&VVal::vec(), &var, f);
                     return true;
                 }
-                let mut remaining = (lst.len() - idx) + 1;
+                let remaining = (lst.len() - idx) + 1;
                 gen_glob!(var, next, f, lst, idx, remaining)
             }))
         },
         Syntax::Var if ast.v_(1).to_sym().to_string() == "_+" => {
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
                 if idx >= lst.len() { return false; }
-                let mut remaining = (lst.len() - (idx + 1)) + 1;
+                let remaining = (lst.len() - (idx + 1)) + 1;
                 gen_glob!(var, next, f, lst, idx, remaining)
             }))
         },
@@ -75,7 +74,7 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
             Ok(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
                 if next(lst, idx + 1, f) {
                     store_var(&VVal::opt(lst.v_(idx)), &var, f);
-                    return true;
+                    true
                 } else {
                     store_var_if(next(lst, idx, f), &VVal::opt_none(), &var, f)
                 }
@@ -184,7 +183,8 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
             let var_str = var_sym.to_string();
             let var_sym_store =
                 if var_str != "?" {
-                    var_map.set_key_sym(var_sym.clone(), VVal::Bol(true));
+                    var_map.set_key_sym(var_sym.clone(), VVal::Bol(true))
+                           .expect("no double mut");
                     Some(var_sym)
                 } else {
                     None
@@ -210,7 +210,7 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
                         return true;
                     }
                 }
-                return false;
+                false
             }))
         },
         _ => {
@@ -233,9 +233,8 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
     -> Result<StructNode, CompileError>
 {
     let syn  = ast.v_(0);
-    let spos = syn.get_syn_pos();
 
-    println!("COMP STRUCT PAT: {}", ast.s());
+    //d// println!("COMP STRUCT PAT: {}", ast.s());
 
     match syn.get_syn() {
         Syntax::Call => {
@@ -248,7 +247,8 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
             let var_str = var_sym.to_string();
             let var_sym_store =
                 if var_sym.to_string() != "?" {
-                    var_map.set_key_sym(var_sym.clone(), VVal::Bol(true));
+                    var_map.set_key_sym(var_sym.clone(), VVal::Bol(true))
+                           .expect("no double mut");
                     Some(var_sym.clone())
                 } else {
                     None
@@ -292,12 +292,12 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                         return true;
                     }
                 }
-                return false;
+                false
             }))
         },
         Syntax::Var => {
             let sym = ast.v_(1);
-            var_map.set_key(&sym, VVal::Bol(true));
+            var_map.set_key(&sym, VVal::Bol(true)).expect("no double mut");
             let sym = sym.to_sym();
 
             if sym.to_string() == "?" {
@@ -322,16 +322,16 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
         Syntax::IVec => {
             match ast.len() {
                 3 => {
-                    let x = compile_struct_pattern(&ast.v_(1), var_map, None)?;
-                    let y = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+                    let x_pat = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+                    let y_pat = compile_struct_pattern(&ast.v_(2), var_map, None)?;
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
                         if let VVal::IVec(nv) = v {
                             if nv.dims().len() == 2 {
                                 return store_var_if(
-                                       x(&VVal::Int(nv.x_raw()), f)
-                                    && y(&VVal::Int(nv.y_raw()), f),
+                                       x_pat(&VVal::Int(nv.x_raw()), f)
+                                    && y_pat(&VVal::Int(nv.y_raw()), f),
                                     &v, &var, f);
                             }
                         }
@@ -340,18 +340,18 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                     }))
                 },
                 4 => {
-                    let x = compile_struct_pattern(&ast.v_(1), var_map, None)?;
-                    let y = compile_struct_pattern(&ast.v_(2), var_map, None)?;
-                    let z = compile_struct_pattern(&ast.v_(3), var_map, None)?;
+                    let x_pat = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+                    let y_pat = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+                    let z_pat = compile_struct_pattern(&ast.v_(3), var_map, None)?;
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
                         if let VVal::IVec(nv) = v {
                             if nv.dims().len() == 3 {
                                 return store_var_if(
-                                       x(&VVal::Int(nv.x_raw()), f)
-                                    && y(&VVal::Int(nv.y_raw()), f)
-                                    && z(&VVal::Int(nv.z_raw().unwrap()), f),
+                                       x_pat(&VVal::Int(nv.x_raw()), f)
+                                    && y_pat(&VVal::Int(nv.y_raw()), f)
+                                    && z_pat(&VVal::Int(nv.z_raw().unwrap()), f),
                                     &v, &var, f);
                             }
                         }
@@ -360,20 +360,20 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                     }))
                 },
                 5 => {
-                    let x = compile_struct_pattern(&ast.v_(1), var_map, None)?;
-                    let y = compile_struct_pattern(&ast.v_(2), var_map, None)?;
-                    let z = compile_struct_pattern(&ast.v_(3), var_map, None)?;
-                    let w = compile_struct_pattern(&ast.v_(4), var_map, None)?;
+                    let x_pat = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+                    let y_pat = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+                    let z_pat = compile_struct_pattern(&ast.v_(3), var_map, None)?;
+                    let w_pat = compile_struct_pattern(&ast.v_(4), var_map, None)?;
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
                         if let VVal::IVec(nv) = v {
                             if nv.dims().len() == 4 {
                                 return store_var_if(
-                                       x(&VVal::Int(nv.x_raw()), f)
-                                    && y(&VVal::Int(nv.y_raw()), f)
-                                    && z(&VVal::Int(nv.z_raw().unwrap()), f)
-                                    && w(&VVal::Int(nv.w_raw().unwrap()), f),
+                                       x_pat(&VVal::Int(nv.x_raw()), f)
+                                    && y_pat(&VVal::Int(nv.y_raw()), f)
+                                    && z_pat(&VVal::Int(nv.z_raw().unwrap()), f)
+                                    && w_pat(&VVal::Int(nv.w_raw().unwrap()), f),
                                     &v, &var, f);
                             }
                         }
@@ -390,16 +390,16 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
         Syntax::FVec => {
             match ast.len() {
                 3 => {
-                    let x = compile_struct_pattern(&ast.v_(1), var_map, None)?;
-                    let y = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+                    let x_pat = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+                    let y_pat = compile_struct_pattern(&ast.v_(2), var_map, None)?;
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
                         if let VVal::FVec(nv) = v {
                             if nv.dims().len() == 2 {
                                 return store_var_if(
-                                       x(&VVal::Flt(nv.x_raw()), f)
-                                    && y(&VVal::Flt(nv.y_raw()), f),
+                                       x_pat(&VVal::Flt(nv.x_raw()), f)
+                                    && y_pat(&VVal::Flt(nv.y_raw()), f),
                                     &v, &var, f);
                             }
                         }
@@ -408,18 +408,18 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                     }))
                 },
                 4 => {
-                    let x = compile_struct_pattern(&ast.v_(1), var_map, None)?;
-                    let y = compile_struct_pattern(&ast.v_(2), var_map, None)?;
-                    let z = compile_struct_pattern(&ast.v_(3), var_map, None)?;
+                    let x_pat = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+                    let y_pat = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+                    let z_pat = compile_struct_pattern(&ast.v_(3), var_map, None)?;
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
                         if let VVal::FVec(nv) = v {
                             if nv.dims().len() == 3 {
                                 return store_var_if(
-                                       x(&VVal::Flt(nv.x_raw()), f)
-                                    && y(&VVal::Flt(nv.y_raw()), f)
-                                    && z(&VVal::Flt(nv.z_raw().unwrap()), f),
+                                       x_pat(&VVal::Flt(nv.x_raw()), f)
+                                    && y_pat(&VVal::Flt(nv.y_raw()), f)
+                                    && z_pat(&VVal::Flt(nv.z_raw().unwrap()), f),
                                     &v, &var, f);
                             }
                         }
@@ -428,20 +428,20 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                     }))
                 },
                 5 => {
-                    let x = compile_struct_pattern(&ast.v_(1), var_map, None)?;
-                    let y = compile_struct_pattern(&ast.v_(2), var_map, None)?;
-                    let z = compile_struct_pattern(&ast.v_(3), var_map, None)?;
-                    let w = compile_struct_pattern(&ast.v_(4), var_map, None)?;
+                    let x_pat = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+                    let y_pat = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+                    let z_pat = compile_struct_pattern(&ast.v_(3), var_map, None)?;
+                    let w_pat = compile_struct_pattern(&ast.v_(4), var_map, None)?;
 
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let v = v.deref();
                         if let VVal::FVec(nv) = v {
                             if nv.dims().len() == 4 {
                                 return store_var_if(
-                                       x(&VVal::Flt(nv.x_raw()), f)
-                                    && y(&VVal::Flt(nv.y_raw()), f)
-                                    && z(&VVal::Flt(nv.z_raw().unwrap()), f)
-                                    && w(&VVal::Flt(nv.w_raw().unwrap()), f),
+                                       x_pat(&VVal::Flt(nv.x_raw()), f)
+                                    && y_pat(&VVal::Flt(nv.y_raw()), f)
+                                    && z_pat(&VVal::Flt(nv.z_raw().unwrap()), f)
+                                    && w_pat(&VVal::Flt(nv.w_raw().unwrap()), f),
                                     &v, &var, f);
                             }
                         }
@@ -457,7 +457,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
         },
         Syntax::Lst => {
             let mut next : Option<StructListNode> =
-                Some(Box::new(move |lst: &VVal, idx: usize, f: &FnVarAssign| -> bool {
+                Some(Box::new(move |lst: &VVal, idx: usize, _f: &FnVarAssign| -> bool {
                     if idx != lst.len() { return false; }
                     true
                 }));
@@ -533,13 +533,14 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                             let mut matched_kv = false;
                             for (k, v) in m.borrow().iter() {
                                 let k = VVal::Sym(k.clone());
-                                if (kv_match.0)(&k, f) {
-                                    if (kv_match.1)(&v, f) {
-                                        matched_kv = true;
-                                        break;
-                                    }
+                                if    (kv_match.0)(&k, f)
+                                   && (kv_match.1)(&v, f)
+                                {
+                                    matched_kv = true;
+                                    break;
                                 }
                             }
+
                             if !matched_kv {
                                 return false;
                             }
@@ -607,7 +608,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                     }))
                 },
                 Err(e) => {
-                    return Err(ast.compile_err(format!("bad pattern: {}", e)))
+                    Err(ast.compile_err(format!("bad pattern: {}", e)))
                 }
             }
         },
@@ -630,7 +631,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                     }))
                 },
                 Err(e) => {
-                    return Err(ast.compile_err(format!("bad pattern: {}", e)))
+                    Err(ast.compile_err(format!("bad pattern: {}", e)))
                 }
             }
         },
@@ -676,7 +677,7 @@ pub fn create_struct_patterns_direct_fun(patterns: &Vec<VVal>, var_map: &VVal)
 
     Ok(Box::new(move |var_assign: Box<FnVarAssign>, var_reset: Box<FnVarReset>| {
         let pat_funs = pat_funs.clone();
-        DirectFun { fun: std::rc::Rc::new(move |v: VVal, env: &mut Env| {
+        DirectFun::new(Rc::new(move |v: VVal, _env: &mut Env| {
             for (i, p) in pat_funs.iter().enumerate() {
                 (var_reset)();
                 if p(&v, &*var_assign) {
@@ -685,7 +686,7 @@ pub fn create_struct_patterns_direct_fun(patterns: &Vec<VVal>, var_map: &VVal)
             }
 
             VVal::Int(-1)
-        }) }
+        }))
     }))
 }
 
@@ -700,7 +701,8 @@ pub fn create_struct_pattern_function(ast: &VVal, var_map: &VVal, result_ref: VV
             let m2 = m.clone();
             let dfun =
                 fun_constructor(Box::new(move |key: &Symbol, val: &VVal| {
-                    m2.set_key_sym(key.clone(), val.clone()).unwrap();
+                    m2.set_key_sym(key.clone(), val.clone())
+                      .expect("no double mut");
                 }), Box::new(|| ()));
 
             let res = (dfun.fun)(env.arg(0), env);

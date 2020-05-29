@@ -1548,23 +1548,6 @@ pub fn create_regex_find(pat: &str, result_ref: VVal)
 pub fn create_regex_find_function(pat: &str, result_ref: VVal)
     -> Result<VVal, ParseError>
 {
-    let mut ps = State::new(pat, "<pattern>");
-    ps.skip_ws();
-    let pattern  = parse_pattern(&mut ps)?;
-
-    ps.skip_ws();
-
-    if !ps.at_end() {
-        return Err(ps.err(
-            ParseErrorKind::UnexpectedToken(
-                ps.peek().unwrap(), "end of pattern")));
-    }
-
-    let not_find = check_pattern_start_anchor(&pattern);
-    let comp_pat =
-        if not_find { compile_match_pattern(&pattern) }
-        else        { compile_find_pattern(&pattern) };
-
     let rref2 = result_ref.clone();
     let match_fun = create_regex_find(pat, result_ref)?;
     Ok(VValFun::new_fun(

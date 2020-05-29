@@ -5566,6 +5566,14 @@ macro_rules! add_num_fun_flt2 {
     }
 }
 
+macro_rules! sizeof_writeln {
+    ($write: ident, $type: ty) => {
+        writeln!($write, "sizeof {:40}:  {:2} bytes",
+                 stringify!($type),
+                 std::mem::size_of::<$type>()).expect("stdout access works");
+    }
+}
+
 /// Returns a SymbolTable with all WLambda core language symbols.
 #[allow(clippy::cast_lossless,clippy::assign_op_pattern)]
 pub fn core_symbol_table() -> SymbolTable {
@@ -6839,6 +6847,38 @@ pub fn std_symbol_table() -> SymbolTable {
             }
             Ok(VVal::None)
         }, Some(1), Some(1), false);
+
+    func!(st, "wlambda:sizes",
+        |env: &mut Env, _argc: usize| {
+            let mut write = env.stdio.write.borrow_mut();
+            use crate::compiler::*;
+            use crate::ops::*;
+            use crate::vval::*;
+            use crate::str_int::*;
+            sizeof_writeln!(write, VVal);
+            sizeof_writeln!(write, Op);
+            sizeof_writeln!(write, Builtin);
+            sizeof_writeln!(write, NVecPos);
+            sizeof_writeln!(write, Prog);
+            sizeof_writeln!(write, ResPos);
+            sizeof_writeln!(write, (ResPos, Box<Symbol>, ResPos));
+            sizeof_writeln!(write, (ResPos, Box<String>, u16, ResPos));
+            sizeof_writeln!(write, (ResPos, ResPos, u16, ResPos));
+            sizeof_writeln!(write, (ResPos, ResPos, ResPos, ResPos));
+            sizeof_writeln!(write, (ResPos, DirectFun, ResPos));
+            sizeof_writeln!(write, (DirectFun, ResPos, ResPos));
+            sizeof_writeln!(write, (Box<String>, ResPos, ResPos, u16));
+            sizeof_writeln!(write, SynPos);
+            sizeof_writeln!(write, crate::nvec::NVec<f64>);
+            sizeof_writeln!(write, Result<VVal, StackAction>);
+            sizeof_writeln!(write, StackAction);
+            sizeof_writeln!(write, Box<String>);
+            sizeof_writeln!(write, Box<Vec<VVal>>);
+            sizeof_writeln!(write, Vec<VVal>);
+            Ok(VVal::None)
+        }, Some(0), Some(0), false);
+
+////    println!("sizeof OP:{} bytes", std::mem::size_of::<(ResPos, Box<String>, Box<String>, Box<String>, ResPos)>());
 
     func!(st, "wlambda:version",
         |_env: &mut Env, _argc: usize| {

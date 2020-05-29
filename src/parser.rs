@@ -346,7 +346,6 @@ fn parse_quoted<F, V>(ps: &mut State, mut v: V, add_char: F) -> Result<V, ParseE
         _ => quote_char
     };
 
-    let mut cont_next = false;
     while ps.peek().unwrap_or(quote_char) != quote_char {
         let c = ps.expect_some(ps.peek())?;
         ps.consume();

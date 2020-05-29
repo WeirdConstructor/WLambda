@@ -4,6 +4,7 @@ use crate::nvec::NVec;
 use crate::str_int::*;
 use std::fmt;
 use std::fmt::{Debug};
+use std::rc::Rc;
 
 #[derive(Clone, Default)]
 pub struct Prog {
@@ -214,16 +215,20 @@ impl Prog {
                 Op::Call(_, p1) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::CallDirect(p1, _, p2) => {
-                    patch_respos_data(p1, self_data_next_idx);
-                    patch_respos_data(p2, self_data_next_idx);
+                Op::CallDirect(fun) => {
+                    patch_respos_data(
+                        &mut Rc::get_mut(fun).expect("only rc").arg,
+                        self_data_next_idx);
+                    patch_respos_data(
+                        &mut Rc::get_mut(fun).expect("only rc").res,
+                        self_data_next_idx);
                 },
                 Op::CallMethodKey(p1, p2, _, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::CallMethodSym(p1, _, _, p2) => {
+                Op::CallMethodSym(p1, _, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
@@ -454,12 +459,14 @@ impl Prog {
 
     pub fn op_call_method_sym(&mut self, sp: &SynPos, a: ResPos, sym: String, argc: u16, r: ResPos) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::CallMethodSym(a, Box::new(sym), argc, r));
+        self.push_op(Op::CallMethodSym(a, Box::new((sym, argc)), r));
     }
 
-    pub fn op_call_direct(&mut self, sp: &SynPos, a: ResPos, fun: DirectFun, r: ResPos) {
+    pub fn op_call_direct(&mut self, sp: &SynPos, a: ResPos, mut fun: DirectFun, r: ResPos) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::CallDirect(a, fun, r));
+        fun.arg = a;
+        fun.res = r;
+        self.push_op(Op::CallDirect(Rc::new(fun)));
     }
 
     pub fn op_call(&mut self, sp: &SynPos, argc: u16, r: ResPos) {
@@ -546,12 +553,12 @@ impl Prog {
 
     pub fn op_dump_vm(&mut self, sp: &SynPos) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::Builtin(Builtin::DumpVM(sp.clone())));
+        self.push_op(Op::Builtin(Builtin::DumpVM(Box::new(sp.clone()))));
     }
 
     pub fn op_dump_stack(&mut self, sp: &SynPos) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::Builtin(Builtin::DumpStack(sp.clone())));
+        self.push_op(Op::Builtin(Builtin::DumpStack(Box::new(sp.clone()))));
     }
 
     pub fn op_export(&mut self, sp: &SynPos, a: ResPos, name: String) {
@@ -743,7 +750,7 @@ impl DestructureInfo {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[repr(u8)]
+//#[repr(u8)]
 pub enum BinOp {
     Add,
     Sub,
@@ -775,7 +782,7 @@ impl BinOp {
 }
 
 #[derive(Debug,Clone,Copy)]
-#[repr(u8)]
+//#[repr(u8)]
 pub enum AccumType {
     String,
     Bytes,
@@ -786,7 +793,7 @@ pub enum AccumType {
 }
 
 #[derive(Debug,Clone)]
-#[repr(u8)]
+//#[repr(u8)]
 pub enum ToRefType {
     CaptureRef,
     ToRef,
@@ -795,22 +802,22 @@ pub enum ToRefType {
 }
 
 #[derive(Debug,Clone)]
-#[repr(u8)]
+//#[repr(u8)]
 pub enum Builtin {
     Export(Box<String>, ResPos),
-    DumpStack(SynPos),
-    DumpVM(SynPos),
+    DumpStack(Box<SynPos>),
+    DumpVM(Box<SynPos>),
 }
 
 #[derive(Debug,Clone)]
-#[repr(u8)]
+//#[repr(u8)]
 pub enum CtrlFlow {
     Next,
     Break(ResPos),
 }
 
 #[derive(Debug,Clone)]
-#[repr(u8)]
+//#[repr(u8)]
 pub enum NVecPos {
     IVec2(ResPos, ResPos),
     IVec3(ResPos, ResPos, ResPos),
@@ -822,17 +829,29 @@ pub enum NVecPos {
 
 #[derive(Clone)]
 pub struct DirectFun {
-    pub fun: std::rc::Rc<dyn Fn(VVal, &mut Env) -> VVal>,
+    pub arg: ResPos,
+    pub res: ResPos,
+    pub fun: Rc<dyn Fn(VVal, &mut Env) -> VVal>,
+}
+
+impl DirectFun {
+    pub fn new(fun: Rc<dyn Fn(VVal, &mut Env) -> VVal>) -> Self {
+        Self {
+            arg: ResPos::Stack(0),
+            res: ResPos::Stack(0),
+            fun,
+        }
+    }
 }
 
 impl Debug for DirectFun {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Rc<DirectFun:?>")
+        write!(f, "Box<DirectFun:?;arg={:?},res={:?}>", self.arg, self.res)
     }
 }
 
 #[derive(Debug,Clone)]
-#[repr(u8)]
+//#[repr(u8)]
 pub enum Op {
     Mov(ResPos, ResPos),
     NewOpt(ResPos, ResPos),
@@ -871,9 +890,9 @@ pub enum Op {
     GetKey(ResPos, ResPos, ResPos),
     Destr(ResPos, Box<DestructureInfo>),
     Call(u16, ResPos),
-    CallDirect(ResPos, DirectFun, ResPos),
+    CallDirect(Rc<DirectFun>),
     CallMethodKey(ResPos, ResPos, u16, ResPos),
-    CallMethodSym(ResPos, Box<String>, u16, ResPos),
+    CallMethodSym(ResPos, Box<(String, u16)>, ResPos),
     Apply(ResPos, ResPos, ResPos),
     Jmp(i32),
     JmpIfN(ResPos, i32),
