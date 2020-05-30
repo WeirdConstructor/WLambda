@@ -50,7 +50,7 @@ fn main() {
         return;
     }
 
-    #[cfg(feature="rustline")]
+    #[cfg(feature="rustyline")]
     {
         let mut rl = rustyline::Editor::<()>::new();
         if rl.load_history("wlambda.history").is_ok() {
@@ -64,7 +64,10 @@ fn main() {
                 Ok(line) => {
                     rl.add_history_entry(line.as_str());
                     match ctx.eval(&line) {
-                        Ok(v)  => { println!("> {}", v.s()); },
+                        Ok(v)  => {
+                            println!("> {}", v.s());
+                            ctx.set_global_var("@@", &v);
+                        },
                         Err(e) => { println!("*** {}", e); }
                     }
                 },
@@ -76,7 +79,7 @@ fn main() {
         }
     }
 
-    #[cfg(not (feature="rustline"))]
+    #[cfg(not (feature="rustyline"))]
     {
         eprintln!("WLambda Version {}", VERSION);
         loop {
@@ -85,7 +88,10 @@ fn main() {
                 let l = line.unwrap();
 
                 match ctx.eval(&l) {
-                    Ok(v)  => { println!("> {}", v.s()); },
+                    Ok(v)  => {
+                        println!("> {}", v.s());
+                        ctx.set_global_var("@@", &v);
+                    },
                     Err(e) => { println!("*** {}", e); }
                 }
             }

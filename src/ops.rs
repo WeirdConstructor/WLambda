@@ -758,7 +758,6 @@ impl DestructureInfo {
 }
 
 #[derive(Debug, Clone, Copy)]
-//#[repr(u8)]
 pub enum BinOp {
     Add,
     Sub,
@@ -790,7 +789,6 @@ impl BinOp {
 }
 
 #[derive(Debug,Clone,Copy)]
-//#[repr(u8)]
 pub enum AccumType {
     String,
     Bytes,
@@ -801,7 +799,6 @@ pub enum AccumType {
 }
 
 #[derive(Debug,Clone)]
-//#[repr(u8)]
 pub enum ToRefType {
     CaptureRef,
     ToRef,
@@ -810,7 +807,6 @@ pub enum ToRefType {
 }
 
 #[derive(Debug,Clone)]
-//#[repr(u8)]
 pub enum Builtin {
     Export(Box<String>, ResPos),
     DumpStack(Box<SynPos>),
@@ -818,14 +814,12 @@ pub enum Builtin {
 }
 
 #[derive(Debug,Clone)]
-//#[repr(u8)]
 pub enum CtrlFlow {
     Next,
     Break(ResPos),
 }
 
 #[derive(Debug,Clone)]
-//#[repr(u8)]
 pub enum NVecPos {
     IVec2(ResPos, ResPos),
     IVec3(ResPos, ResPos, ResPos),
@@ -858,8 +852,8 @@ impl Debug for DirectFun {
     }
 }
 
+#[allow(clippy::box_vec)]
 #[derive(Debug,Clone)]
-//#[repr(u8)]
 pub enum Op {
     Mov(ResPos, ResPos),
     NewOpt(ResPos, ResPos),

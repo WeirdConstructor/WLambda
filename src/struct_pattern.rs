@@ -169,10 +169,8 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
                 if pat(&lst.v_(idx), f) && next(lst, idx + 1, f) {
                     store_var(&lst.v_(idx), &var, f);
                     true
-                } else if next(lst, idx, f) {
-                    true
                 } else {
-                    false
+                    next(lst, idx, f)
                 }
             }))
         },
@@ -249,14 +247,14 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                 if var_sym.to_string() != "?" {
                     var_map.set_key_sym(var_sym.clone(), VVal::Bol(true))
                            .expect("no double mut");
-                    Some(var_sym.clone())
+                    Some(var_sym)
                 } else {
                     None
                 };
 
             let mut terms : Vec<StructNode> = vec![];
 
-            if var_str.len() >= 2 && var_str.chars().next().unwrap() == '_' {
+            if var_str.len() >= 2 && var_str.starts_with('_') {
                 match &var_str[..] {
                     "_type?" => {
                         for i in 2..ast.len() {
@@ -591,7 +589,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
             }))
         },
         Syntax::Str => {
-            let s = ast.v_(1).clone();
+            let s = ast.v_(1);
             Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                 store_var_if(s.eqv(&v.deref()), v, &var, f)
             }))
@@ -671,8 +669,10 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
     }
 }
 
-pub fn create_struct_patterns_direct_fun(patterns: &Vec<VVal>, var_map: &VVal)
-    -> Result<Box<dyn Fn(Box<FnVarAssign>, Box<FnVarReset>) -> DirectFun>, CompileError>
+pub type StructPatBuildFun = Box<dyn Fn(Box<FnVarAssign>, Box<FnVarReset>) -> DirectFun>;
+
+pub fn create_struct_patterns_direct_fun(patterns: &[VVal], var_map: &VVal)
+    -> Result<StructPatBuildFun, CompileError>
 {
     let mut pat_funs = Vec::new();
     for p in patterns.iter() {
@@ -699,7 +699,7 @@ pub fn create_struct_patterns_direct_fun(patterns: &Vec<VVal>, var_map: &VVal)
 pub fn create_struct_pattern_function(ast: &VVal, var_map: &VVal, result_ref: VVal) -> Result<VVal, CompileError> {
     let struct_pat = vec![ast.clone()];
     let fun_constructor =
-        create_struct_patterns_direct_fun(&struct_pat, var_map)?;
+        create_struct_patterns_direct_fun(&struct_pat[..], var_map)?;
 
     Ok(VValFun::new_fun(
         move |env: &mut Env, _argc: usize| {

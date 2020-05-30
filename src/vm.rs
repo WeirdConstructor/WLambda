@@ -1806,7 +1806,7 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
           .unwrap_or_else(|| VVal::None);
 
     let dfun =
-        if map.len() == 0 {
+        if map.is_empty() {
             (dfun_constr)(
                 Box::new(|_sym, _val| ()),
                 Box::new(|| ()))
