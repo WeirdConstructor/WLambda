@@ -8,19 +8,25 @@ can be called and the syntax is a blend of Perl, Lua, JavaScript and LISP/Scheme
 
 Here are some of its properties:
 
-- Simple but unique syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) and the [parser](https://docs.rs/wlambda/newest/wlambda/parser/index.html).
+- Simple but unique syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 - Easily embeddable into Rust programs due to a simple API.
 - The language is about getting things done quickly, so performance is not a main priority.
   Current performance is roughly in the ball park of (C)Python or Perl, which means
   the language is quite possibly too slow where speed is the focus, but fast enough if
   you do any heavy lifting in Rust.
+- Main data structures are Vectors and Maps.
+- Builtin data structure pattern matchers and selectors which lead to a
+very powerful `match` operation.
 - No garbage collector. Memory and resource management relies only on reference counting and RAII.
-You can create your own drop functions.
+  You can create your own drop functions.
 - Preserving Rust safety by not using `unsafe`.
-- Main data structures are Lists and Maps.
-- No exceptions, except panics. Error handling is accomplished
-by a specialized data type. It can be thought of as dynamic counterpart
-of Rust's Result type.
+- WLambda makes no guarantees that it will not panic and crash your application
+  if bad code is executed. More hardening is required for running untrusted
+  code on the application side (resource limits (ram/cpu), catching panic
+  unwinding, limit file system access, ...).
+- No exceptions, except WLambda level panics. Error handling is accomplished by
+  a specialized data type. It can be thought of as dynamic counterpart of
+  Rust's Result type.
 - Prototyped object orientation.
 - Easy maintenance and hackability of the implementation.
 - Custom user data implementation using [VValUserData](https://docs.rs/wlambda/newest/wlambda/vval/trait.VValUserData.html).
@@ -259,6 +265,89 @@ std:assert_eq stuff.0 "日";         # Unicode support
 std:assert_eq 人 "jin";
 ```
 
+### Handling Errors
+
+```wlambda
+!some_fun = {
+    ? _ == :fail {
+        $error :FAIL_HAVING_FUN
+    } {
+        :ok
+    }
+};
+
+!res1 =
+    match some_fun[:ok]
+        ($error :FAIL_HAVING_FUN) => :failed
+        ?                         => :ok;
+std:assert_eq res1 :ok;
+
+!res1 =
+    match some_fun[:fail]
+        ($error :FAIL_HAVING_FUN) => :failed
+        ?                         => :ok;
+std:assert_eq res1 :failed;
+```
+
+### Builtin Structure Selectors
+
+Selectors work similar to XPath:
+`$S( *:{a=10} /b/1 )` first selects all maps from a vector,
+checks if they got a key-value pair that matches key=`a` and value=`10`.
+The selector path is walked for the matching maps and the `b` key
+is selected. Next the element at index `1` is selected and
+captured.
+
+```wlambda
+!struct = $[
+    ${ a = 10, b = $[ 1, 2, 3 ] },
+    ${ a = 10, b = $[ 4, 5, 6 ] },
+    ${ a = 20, b = $[ 8, 9,  20 ] },
+    ${ a = 20, b = $[ 8, 10, 30 ] },
+    ${ x = 99 },
+    ${ y = 99 },
+];
+
+? struct &> $S( *:{a=10} /b/1 ) {
+    std:assert_str_eq $\    $[2,5];
+} {
+    panic "Should've matched!";
+};
+```
+
+### Builtin Structure Matchers
+
+A bit different but similar to the structure selectors `$S ...` are the `$M
+...` or `match` structure matchers:
+
+```wlambda
+!struct = $[
+    ${ a = 10, b = $[ 1, 2, 3 ] },
+    ${ a = 10, b = $[ 4, 5, 6 ] },
+    ${ a = 20, b = $[ 8, 9,  20 ] },
+    ${ a = 20, b = $[ 8, 10, 30 ] },
+    ${ x = 99 },
+    ${ y = 99 },
+];
+
+!res = $@vec iter elem struct {
+    $+ ~
+        match elem
+            ${ a = 10, b = childs }     => $[:childs_10, $\.childs]
+            ${ a = 20, b = childs }     => $[:childs_20, $\.childs]
+            :other;
+};
+
+std:assert_str_eq res $[
+    $[:childs_10,$[1, 2,   3]],
+    $[:childs_10,$[4, 5,   6]],
+    $[:childs_20,$[8, 9,  20]],
+    $[:childs_20,$[8, 10, 30]],
+    :other,
+    :other,
+];
+```
+
 ### Builtin (Regex) Pattern Matching
 
 ```wlambda
@@ -267,7 +356,7 @@ std:assert_eq 人 "jin";
 !crate  = $none;
 !domain = $none;
 
-? ($r{$^ (^$+[^:]) \:\/\/ (^$*[^/]) \/crates\/ (^$+[a-z]) } some_url) {
+? some_url &> $r{$^ (^$+[^:]) \:\/\/ (^$*[^/]) \/crates\/ (^$+[a-z]) } {
     .domain = $\.2;
     .crate = $\.3;
 };
@@ -415,14 +504,17 @@ assert_eq!(r.s(), "42");
 
 ## Possible Roadmap
 
-There are several things that can be added more or less easily to
-WLambda. But I am currently working on making the language more
-complete for real world use. So my current goals are:
+Current remaining goals for WLambda are:
 
+- Fix remaining bugs.
+- Add missing standard library functions without dragging in more
+dependencies.
 - Improve and further document the VVal API for interacting with WLambda.
-- Improve reference documentation.
-- DONE: Add proper module support (via !@import and !@export).
+- Improve [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) documentation.
+- DONE: Add proper module support (via `!@import` and `!@export`).
 - DONE: Add prototyped inheritance for OOP paradigm.
+- DONE: Add data structure matching/destructuring/selection primitives
+to the language.
 - DONE: Replace compiler and closure based evaluator with a VM
 and more or less clever code generator.
 
