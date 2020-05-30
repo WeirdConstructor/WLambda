@@ -12,6 +12,8 @@ f+-@$%&/_-:*!"'f
 @fooo
 _foo
 _?foo
+fo0234bar
+_3323
 ?F
 FOOF*X
 ?FOF?
@@ -165,7 +167,7 @@ $@b $@bytes
 $@v $@vec
 $@m $@map
 $@s $@string
-$@a $@accum
+$@@ $@@
 $+
 
 
@@ -222,3 +224,9 @@ x y &> f e e o
 \:foo {
     \:fo { }
 }
+
+# Match:
+match xxx
+    x           =>      { !x = 100; .x = 200; }
+    $[y ~ _* x] =>      { !:global foo = 10; .x = 200; }
+    100;
