@@ -79,6 +79,17 @@ c._data.toc {
 };
 #std:io:stdout:print orig;
 
+# Checking internal links:
+std:re:map $q_\[[^\]]+\]\((#\d+-[^\)]+)\)_ {
+    !found = $@i iter t c._data.toc {
+        ? _.1 == ("#" t.4)
+            \$+ 1;
+    };
+    ? not[found] {
+        std:displayln "Link not found: " _.0;
+    };
+} orig;
+
 std:io:file:write_safe "src/prelude.rs" orig;
 
 #std:io:stdout:print new_toc;
