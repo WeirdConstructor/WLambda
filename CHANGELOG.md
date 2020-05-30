@@ -1,4 +1,4 @@
-0.6.0 (unreleased)
+0.6.0 (2020-05-31)
 ==================
 
 * Incompatible Change: The nested parenthesis matching for quoted strings
@@ -10,7 +10,7 @@ to let `iter i 0 => 10 ~ std:displayln i` work properly.
 * Incompatible Change: Removed old `match` function and replaced it with a
 structure pattern match function, which is even faster than the match
 before.
-* Feature: Allowing to use `if` instead of just `?`.
+* Feature: Allowing to use `if` instead of `?`.
 * Feature: `iter $&&i ...` syntax implemented, for creating new references
 for each iteration for easier closure generation.
 * Feature: Implemented pair operator `a => b` which does the same as `$p(a, b)`.
@@ -24,6 +24,8 @@ and regex patterns: `$M _expr_`.
 * Feature: Added a jump table operation `jump idx branch-a branch-b branch-c`
 as supporting operation for `match`.
 * Feature: Updates VIM syntax file `vim/wlambda.vim`.
+* Optimization: VVal size is down from 48 bytes to 32 bytes.
+* Optimization: VM Op size is down from 40 bytes to 24 bytes.
 * Bugfix: The stack size is no longer fixed and is dynamically grown if
 required.
 
