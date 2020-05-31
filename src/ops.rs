@@ -803,7 +803,7 @@ pub enum ToRefType {
     CaptureRef,
     ToRef,
     Deref,
-    Weakable,
+    Hidden,
 }
 
 #[derive(Debug,Clone)]

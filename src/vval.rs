@@ -619,16 +619,16 @@ impl Env {
 
     #[inline]
     pub fn get_up(&self, i: usize) -> VVal {
-        self.call_stack.last().unwrap().upvalues[i].deref()
-//        match self.fun.upvalues[i].deref() {
-//            VVal::WWRef(l) => { 
-//                match l.upgrade() {
-//                    Some(v) => v.borrow().clone(),
-//                    None => VVal::None,
-//                }
-//            },
-//            v => v,
-//        }
+        match &self.call_stack.last().unwrap().upvalues[i] {
+            VVal::HRef(hr)  => hr.borrow().clone(),
+            VVal::WWRef(r) => {
+                match r.upgrade() {
+                    Some(v) => v.borrow().clone(),
+                    None    => VVal::None,
+                }
+            },
+            v => v.clone(),
+        }
     }
 
     #[inline]
@@ -658,13 +658,13 @@ impl Env {
     pub fn get_local_up_promotion(&mut self, i: usize) -> VVal {
         let idx = self.bp + i;
         match &self.args[idx] {
-            VVal::CRef(r) => VVal::WWRef(Rc::downgrade(&r)),
-            VVal::Ref(r)  => VVal::Ref(r.clone()),
+            VVal::HRef(r)  => VVal::HRef(r.clone()),
+            VVal::Ref(r)   => VVal::Ref(r.clone()),
             VVal::WWRef(r) => VVal::WWRef(r.clone()),
             v => {
-                let new_v = v.to_weakened_upvalue_ref();
+                let new_v = v.to_hidden_upvalue_ref();
                 self.args[idx] = new_v.clone();
-                new_v.downgrade()
+                new_v
             }
         }
     }
@@ -686,7 +686,7 @@ impl Env {
     #[inline]
     pub fn get_local(&self, i: usize) -> VVal {
         match &self.args[self.bp + i] {
-            VVal::CRef(r)  => r.borrow().clone(),
+            VVal::HRef(r)  => r.borrow().clone(),
             v              => v.clone(),
         }
     }
@@ -697,7 +697,7 @@ impl Env {
 
         match upv {
             VVal::Ref(r)     => { r.replace(value); }
-            VVal::CRef(r)    => { r.replace(value); }
+            VVal::HRef(r)    => { r.replace(value); }
             VVal::WWRef(l)   => {
                 if let Some(r) = l.upgrade() {
                     r.replace(value);
@@ -711,7 +711,7 @@ impl Env {
         let idx = self.bp + i;
         match &mut self.args[idx] {
             VVal::Ref(r)     => { r.replace(value); }
-            VVal::CRef(r)    => { r.replace(value); }
+            VVal::HRef(r)    => { r.replace(value); }
             VVal::WWRef(l)   => {
                 if let Some(r) = l.upgrade() {
                     r.replace(value);
@@ -727,7 +727,7 @@ impl Env {
 
         match upv {
             VVal::Ref(r)   => { r.replace(value); }
-            VVal::CRef(r)  => { r.replace(value); }
+            VVal::HRef(r)  => { r.replace(value); }
             VVal::WWRef(r) => {
                 if let Some(r) = Weak::upgrade(r) {
                     r.replace(value);
@@ -744,7 +744,7 @@ impl Env {
             self.args.resize(idx * 2, VVal::None);
         }
         match &mut self.args[idx] {
-            VVal::CRef(r)  => { r.replace(value); }
+            VVal::HRef(r)  => { r.replace(value); }
             v              => { *v = value }
         }
     }
@@ -1384,18 +1384,16 @@ impl std::clone::Clone for Box<dyn VValUserData> {
 
 /// Handles calling of destructor functions.
 #[derive(Debug, Clone)]
-pub struct DropVVal {
-    pub v:      VVal,
-    pub fun:    VVal,
+pub struct DropFun {
+    pub fun: VVal,
 }
 
-impl Drop for DropVVal {
+impl Drop for DropFun {
     #[allow(unused_must_use)]
     fn drop(&mut self) {
         let global = GlobalEnv::new_default();
         let mut e = Env::new(global);
-        e.push(self.v.clone());
-        if let Err(e) = self.fun.call_internal(&mut e, 1) {
+        if let Err(e) = self.fun.call_internal(&mut e, 0) {
             eprintln!("Error in drop function: {}", e);
         }
     }
@@ -1447,16 +1445,16 @@ pub enum VVal {
     Fun(Rc<VValFun>),
     /// A guarded VVal, that executes a given function when it is
     /// no longer referenced.
-    DropFun(Rc<DropVVal>),
-    /// A (strong) reference to a VVal.
-    Ref(Rc<RefCell<VVal>>),
+    DropFun(Rc<DropFun>),
     /// A numerical (mathematical) vector storing integers. See NVec for more information.
     FVec(Box<NVec<f64>>),
     /// A numerical (mathematical) vector storing floats. See NVec for more information.
     IVec(Box<NVec<i64>>),
-    /// A (still strong) reference to a VVal, which becomes a weak reference if
-    /// captured by a closure.
-    CRef(Rc<RefCell<VVal>>),
+    /// A (strong) reference to a VVal.
+    Ref(Rc<RefCell<VVal>>),
+    /// A hidden strong reference to a VVal. Generated either explicitly by `$&`
+    /// or if a variable is captured by a closure.
+    HRef(Rc<RefCell<VVal>>),
     /// A (weak) reference to a VVal. Might turn VVal::None anytime.
     WWRef(Weak<RefCell<VVal>>),
     /// A vval that can box some user data which can later be accessed
@@ -1544,14 +1542,20 @@ impl CycleCheck {
             VVal::Map(l) => {
                 for (_k, v) in l.borrow().iter() { self.touch_walk(&v); }
             },
-            VVal::DropFun(f) => { self.touch_walk(&f.v); },
+            VVal::DropFun(f) => {
+                if let VVal::Fun(f) = &f.fun {
+                    for v in f.upvalues.iter() {
+                        self.touch_walk(v);
+                    }
+                }
+            },
             VVal::Fun(f) => {
                 for v in f.upvalues.iter() {
                     self.touch_walk(v);
                 }
             },
-            VVal::Ref(l) => { self.touch_walk(&(*l).borrow()); },
-            VVal::CRef(l) => { self.touch_walk(&(*l).borrow()); },
+            VVal::Ref(l)   => { self.touch_walk(&(*l).borrow()); },
+            VVal::HRef(l)  => { self.touch_walk(&(*l).borrow()); },
             VVal::WWRef(l) => {
                 if let Some(v) = l.upgrade() {
                     self.touch_walk(&(*v).borrow());
@@ -1964,8 +1968,8 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
 
 fn vval_rc_ptr_eq(v: &VVal, l: &Rc<RefCell<VVal>>) -> bool {
     match v {
-        VVal::Ref(r2) => Rc::ptr_eq(l, r2),
-        VVal::CRef(r2) => Rc::ptr_eq(l, r2),
+        VVal::Ref(r2)   => Rc::ptr_eq(l, r2),
+        VVal::HRef(r2)  => Rc::ptr_eq(l, r2),
         VVal::WWRef(r2) =>
             match r2.upgrade() {
                 Some(v2) => Rc::ptr_eq(l, &v2),
@@ -2827,9 +2831,8 @@ impl VVal {
             VVal::Usr(ud) => {
                 env.with_local_call_info(argc, |e: &mut Env| ud.call(e))
             },
-            VVal::DropFun(v) => v.v.call_internal(env, argc),
             VVal::Ref(v)     => v.borrow().call_internal(env, argc),
-            VVal::CRef(v)    => v.borrow().call_internal(env, argc),
+            VVal::HRef(v)    => v.borrow().call_internal(env, argc),
             VVal::WWRef(v)   =>
                 if let Some(r) = v.upgrade() {
                     r.borrow().call_internal(env, argc)
@@ -2840,7 +2843,7 @@ impl VVal {
 
     pub fn to_ref(&self) -> VVal {
         match self {
-            VVal::CRef(r)    => VVal::Ref(r.clone()),
+            VVal::HRef(r)    => VVal::Ref(r.clone()),
             VVal::Ref(r)     => VVal::Ref(r.clone()),
             VVal::WWRef(v)   =>
                 if let Some(r) = v.upgrade() {
@@ -2852,14 +2855,14 @@ impl VVal {
         }
     }
 
-    pub fn to_weakened_upvalue_ref(&self) -> VVal {
-        VVal::CRef(Rc::new(RefCell::new(self.clone())))
+    pub fn to_hidden_upvalue_ref(&self) -> VVal {
+        VVal::HRef(Rc::new(RefCell::new(self.clone())))
     }
 
     pub fn set_ref(&self, v: VVal) -> VVal {
         match self {
             VVal::Ref(r)     => r.replace(v),
-            VVal::CRef(r)    => r.replace(v),
+            VVal::HRef(r)    => r.replace(v),
             VVal::WWRef(l)   => {
                 if let Some(r) = l.upgrade() {
                     r.replace(v)
@@ -2871,9 +2874,24 @@ impl VVal {
         }
     }
 
+    pub fn hide_ref(self) -> VVal {
+        match self {
+            VVal::HRef(f) => VVal::HRef(f),
+            VVal::Ref(f)  => VVal::HRef(f),
+            VVal::WWRef(f) => {
+                if let Some(r) = f.upgrade() {
+                    VVal::HRef(r)
+                } else {
+                    VVal::None
+                }
+            },
+            _ => self,
+        }
+    }
+
     pub fn upgrade(self) -> VVal {
         match self {
-            VVal::CRef(f) => VVal::Ref(f),
+            VVal::HRef(f) => VVal::Ref(f),
             VVal::WWRef(f) => {
                 if let Some(r) = f.upgrade() {
                     VVal::Ref(r)
@@ -2888,7 +2906,7 @@ impl VVal {
     pub fn downgrade(self) -> VVal {
         match self {
             VVal::Ref(f)  => VVal::WWRef(Rc::downgrade(&f)),
-            VVal::CRef(f) => VVal::WWRef(Rc::downgrade(&f)),
+            VVal::HRef(f) => VVal::WWRef(Rc::downgrade(&f)),
             _ => self,
         }
     }
@@ -2942,10 +2960,10 @@ impl VVal {
             VVal::Iter(v)    => { &*v.borrow() as *const VValIter as i64 },
             VVal::Opt(p)     => { if let Some(p) = p { &*p.as_ref() as *const VVal as i64 } else { 0 } },
             VVal::Fun(f)     => { &**f as *const VValFun as i64 },
-            VVal::DropFun(f) => { &**f as *const DropVVal as i64 },
+            VVal::DropFun(f) => { &**f as *const DropFun as i64 },
             VVal::Pair(v)    => { &**v as *const (VVal, VVal) as i64 },
             VVal::Ref(v)     => { &*v.borrow() as *const VVal as i64 },
-            VVal::CRef(v)    => { &*v.borrow() as *const VVal as i64 },
+            VVal::HRef(v)    => { &*v.borrow() as *const VVal as i64 },
             VVal::Usr(b)     => { &**b as *const dyn VValUserData as *const usize as i64 },
             VVal::WWRef(r)   => {
                 if let Some(l) = r.upgrade() {
@@ -3012,7 +3030,7 @@ impl VVal {
                 }
             },
             VVal::Ref(l)  => vval_rc_ptr_eq(v, l),
-            VVal::CRef(l) => vval_rc_ptr_eq(v, l),
+            VVal::HRef(l) => vval_rc_ptr_eq(v, l),
             VVal::WWRef(lw) => {
                 if let Some(l) = lw.upgrade() {
                     vval_rc_ptr_eq(v, &l)
@@ -3333,11 +3351,10 @@ impl VVal {
         where O: FnOnce(&VVal) -> R, D: FnOnce(Option<&VVal>) -> R
     {
         match self {
-            VVal::DropFun(r)    => op(&r.v),
             VVal::Opt(Some(v))  => op(v.as_ref()),
             VVal::Opt(None)     => op(&VVal::None),
             VVal::Ref(l)        => op(&(*l).borrow()),
-            VVal::CRef(l)       => op(&(*l).borrow()),
+            VVal::HRef(l)       => op(&(*l).borrow()),
             VVal::WWRef(l)      => {
                 match l.upgrade() {
                     Some(v) => op(&v.borrow()),
@@ -3668,7 +3685,7 @@ impl VVal {
     }
 
     pub fn is_ref(&self) -> bool {
-        match self { VVal::Ref(_) => true, VVal::CRef(_) => true, VVal::WWRef(_) => true, _ => false }
+        match self { VVal::Ref(_) => true, VVal::HRef(_) => true, VVal::WWRef(_) => true, _ => false }
     }
 
     pub fn is_wref(&self) -> bool {
@@ -3761,7 +3778,7 @@ impl VVal {
             VVal::FVec(_)    => "float_vector",
             VVal::DropFun(_) => "drop_function",
             VVal::Ref(_)     => "ref_strong",
-            VVal::CRef(_)    => "ref_weakable",
+            VVal::HRef(_)    => "ref_hidden",
             VVal::WWRef(_)   => "ref_weak",
         }
     }
@@ -4080,9 +4097,9 @@ impl VVal {
                             min, max, f.local_size, upvalues)
                 }
             },
-            VVal::DropFun(f) => format!("std:to_drop[{}]", f.v.s_cy(c)),
+            VVal::DropFun(f) => format!("std:to_drop[{}]", f.fun.s_cy(c)),
             VVal::Ref(l)     => format!("$&&{}", (*l).borrow().s_cy(c)),
-            VVal::CRef(l)    => format!("$&{}", (*l).borrow().s_cy(c)),
+            VVal::HRef(l)    => format!("$&{}", (*l).borrow().s_cy(c)),
             VVal::FVec(nvec) => nvec.s(),
             VVal::IVec(nvec) => nvec.s(),
             VVal::WWRef(l)   => {
@@ -4247,7 +4264,7 @@ impl serde::ser::Serialize for VVal {
             VVal::IVec(iv)   => iv.serialize(serializer),
             VVal::DropFun(_) => serializer.serialize_str(&self.s()),
             VVal::Ref(_)     => self.deref().serialize(serializer),
-            VVal::CRef(_)    => self.deref().serialize(serializer),
+            VVal::HRef(_)    => self.deref().serialize(serializer),
             VVal::WWRef(_)   => self.deref().serialize(serializer),
         }
     }

@@ -51,7 +51,7 @@ Smalltalk, LISP and Perl.
   - [2.6](#26-control-flow---returning) Control Flow - Returning
     - [2.6.1](#261-return-label-value) return [_label_] _value_
     - [2.6.2](#262-block-label-function) block [label] _function_
-    - [2.6.3](#263-stdtodrop-value-function-or-raii-destructors-or-drop-functions) std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
+    - [2.6.3](#263-stdtodrop-value-function-or-raii-destructors-or-drop-functions) std:to_drop _function_ (or RAII, Destructors or Drop Functions)
   - [2.7](#27-function-utilities) Function utilities
     - [2.7.1](#271-isfun-value) is_fun _value_
 - [3](#3-data-types) Data Types
@@ -189,11 +189,11 @@ Smalltalk, LISP and Perl.
     - [3.14.1](#3141-map-splicing) Map Splicing
   - [3.15](#315-references) References
     - [3.15.1](#3151-stdtoref-value) std:to_ref _value_
-    - [3.15.2](#3152-stdweaken-ref) std:weaken _ref_
+    - [3.15.2](#3152-stdweaken-ref) std:ref:weaken _ref_
     - [3.15.3](#3153-isref-value) is_ref _value_
     - [3.15.4](#3154-iswref-value) is_wref _value_
-    - [3.15.5](#3155-stdstrengthen-ref) std:strengthen _ref_
-    - [3.15.6](#3156-stdsetref-ref-value) std:set_ref _ref_ _value_
+    - [3.15.5](#3155-stdstrengthen-ref) std:ref:strengthen _ref_
+    - [3.15.6](#3156-stdsetref-ref-value) std:ref:set _ref_ _value_
   - [3.16](#316-iterators-iter-expression) Iterators `$iter _expression_`
     - [3.16.1](#3161-iterator-kinds) Iterator Kinds
     - [3.16.2](#3162-iterators-on-mutated-data) Iterators on mutated data
@@ -484,49 +484,23 @@ the `!_name_ = _expr_` syntax.
 
 ### <a name="21-closures"></a>2.1 - Closures
 
-Functions take values from the outer scope by copying their value:
+Functions take values from the outer scope by promoting the variable
+at runtime to a hidden reference to their previous value:
 
 ```wlambda
 !a = 10;
 !b = 20;
 
-!add_a_and_b = { a + b }; # function copies the values 10 and 20
+!add_a_and_b = { a + b }; # function transforms a and b to references
 
-!result = add_a_and_b[];
+!result  = add_a_and_b[];
 
-std:assert_eq result 30;
+std:assert_eq (type $:a)  "ref_hidden";
+!result2 = a + b;         # a and b are dereferenced on local variable access.
+
+std:assert_eq result  30;
+std:assert_eq result2 30;
 ```
-
-This also means, that functions can not modify the values of
-the scope they were created in. To do that, you need a referential
-data type, that is described further down this document.
-
-Here is an example how we would write the above example by mutating
-the value in the `result` variable:
-
-```wlambda
-!a = 10;
-!b = 20;
-!result = $& $none; # Create a weakly captured reference
-
-# function copies the values 10 and 20
-# but result is captured by reference. As the weakable reference
-# type `$&` is used, it's only weakly captured.
-!add_a_and_b = { .result = a + b; };
-
-add_a_and_b[];
-
-std:assert_eq $*result 30; # $* dereferences referential types
-```
-
-About the weakly capturing of `result`:
-It means, that if the outer reference value in `result` goes
-out of scope, the reference in the closure does
-not keep it alive. This is important to prevent cyclic refences
-where closures keep captured values unneccessarily alive.
-
-You will also need this to make referential types such as maps `${ }`
-and vectors `$[ ]` weakly referenced by closures for OOP.
 
 #### <a name="211-object-oriented-programming-with-closures"></a>2.1.1 - Object Oriented Programming with Closures
 
@@ -1022,24 +996,26 @@ The alternative is the less clear syntax would be in this case:
 std:assert_eq res 20;
 ```
 
-#### <a name="263-stdtodrop-value-function-or-raii-destructors-or-drop-functions"></a>2.6.3 - std:to_drop _value_ _function_ (or RAII, Destructors or Drop Functions)
+#### <a name="263-stdtodrop-value-function-or-raii-destructors-or-drop-functions"></a>2.6.3 - std:to_drop _function_ (or RAII, Destructors or Drop Functions)
 
-You can create a function that is called when the associated value is
-dropped or its reference count goes to 0.
+You can create a function that is called when it is
+dropped/its reference count goes to 0.
 
 ```wlambda
 !dropped = $false;
 
-!x = std:to_drop 20 { .dropped = $true; };
+!x = std:to_drop { .dropped = $true; };
 
 std:assert not[dropped];
-std:assert_eq $*x 20;
 
 .x = $none;
 
 std:assert dropped;
 ```
 
+Please note, that the drop function will be executed in a newly constructed
+default EvalContext, this means there is some overhead and that the EvalContext
+dependent results of `std:eval` might be different.
 
 ### <a name="27-function-utilities"></a>2.7 - Function utilities
 
@@ -2299,7 +2275,7 @@ std:assert_eq (str $o(42))     "42";
 std:assert_eq (str $o())       "";
 
 !x = $&&10;
-std:assert_eq (str ~ std:weaken x)   "10";
+std:assert_eq (str ~ std:ref:weaken x)   "10";
 ```
 
 #### <a name="393-isstr-value"></a>3.9.3 - is_str _value_
@@ -3215,9 +3191,9 @@ cyclic references when closures from a scope are leaked.
 
 These types of references exist:
 
-- `$&` - A _weakable_ reference, that is captured weakly by closures.
+- `$&` - A _hidden_ reference, that is captured by closures or constructed using `$&`.
 - `$(&)` - A _weak_ reference, can't be constructed literally, only indirectly
-as upvalue of a closure or by `std:weaken`.
+as upvalue of a closure or by `std:ref:weaken`.
 - `$&&` - A _strong_ reference, that is captured stongly by closures.
 Inside closures they are also implicitly dereferenced by assignment
 and access by variable name.
@@ -3262,20 +3238,20 @@ std:assert_eq (std:ser:wlambda x) "$&&10";
 std:assert_eq $*x 10;
 ```
 
-#### <a name="3152-stdweaken-ref"></a>3.15.2 - std:weaken _ref_
+#### <a name="3152-stdweaken-ref"></a>3.15.2 - std:ref:weaken _ref_
 
 You can weaken any of those two types of references manually using the
-`std:weaken` function.
+`std:ref:weaken` function.
 
 ```wlambda
 !drop_check = $& $f;
 
 # Make a reference to the value 10 and set `drop_check` to $true
 # when all (non weak) references to it are gone.
-!x = $&& (std:to_drop 10 {|| .drop_check = $true });
+!x = $&& (std:to_drop {|| .drop_check = $true });
 
 # Create a weakened reference to the value referred to by x:
-!y = std:weaken x;
+!y = std:ref:weaken x;
 
 # Deref y gives you 10:
 std:assert_eq $*$*y 10; # twice deref to get the value in the drop fun
@@ -3296,7 +3272,7 @@ Returns `$true` if _value_ is a reference (strong, weakable or weak).
 
 ```wlambda
 !x = $&&10;
-std:assert ~ is_ref ~ std:weaken x;
+std:assert ~ is_ref ~ std:ref:weaken x;
 std:assert ~ is_ref $&10;
 std:assert ~ is_ref $&&10;
 
@@ -3312,26 +3288,26 @@ Returns `$true` if _value_ is a weak reference.
 
 ```wlambda
 !x = $&& 10;
-!y = std:weaken x;
+!y = std:ref:weaken x;
 std:assert ~ is_wref y;
 std:assert ~ not ~ is_wref x;
 ```
 
-#### <a name="3155-stdstrengthen-ref"></a>3.15.5 - std:strengthen _ref_
+#### <a name="3155-stdstrengthen-ref"></a>3.15.5 - std:ref:strengthen _ref_
 
-You can convert a weak reference (weakened by `std:weaken`) or a captured weak
-reference `$&` to strong with `std:strengthen`.
+You can convert a weak reference (weakened by `std:ref:weaken`) or a captured weak
+reference `$&` to strong with `std:ref:strengthen
 
 ```wlambda
 !x = $&&10;
-!y = std:weaken x;
+!y = std:ref:weaken x;
 
 .x = $none;
 std:assert ~ is_none $*y;
 
 .x = $&&10;
-.y = std:weaken x;
-!y2 = std:strengthen y; # Here we take a second strong reference from a weak one
+.y = std:ref:weaken x;
+!y2 = std:ref:strengthen y; # Here we take a second strong reference from a weak one
 
 .x = $none;
 std:assert ~ is_some $*y;
@@ -3341,7 +3317,7 @@ std:assert ~ is_some $*y2;
 std:assert ~ is_none $*y;
 ```
 
-#### <a name="3156-stdsetref-ref-value"></a>3.15.6 - std:set_ref _ref_ _value_
+#### <a name="3156-stdsetref-ref-value"></a>3.15.6 - std:ref:set _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -3350,19 +3326,19 @@ Returns _value_ or `$none`.
 
 ```wlambda
 !r1 = $&&1;
-std:set_ref r1 10;
+std:ref:set r1 10;
 std:assert_eq $*r1 10;
 
 # Note that $& references in local variables are
 # automatically derefernced. Because of that we need to wrap it into
 # an extra reference.
 !r2 = $& $& 1;
-std:set_ref r2 11;
+std:ref:set r2 11;
 std:assert_eq $*r2 11;
 
 !r3 = $& $& 1;
-!w3 = std:weaken r3;
-std:set_ref w3 14;      # Set reference via the weak reference in w3 to r3.
+!w3 = std:ref:weaken r3;
+std:ref:set w3 14;      # Set reference via the weak reference in w3 to r3.
 std:assert_eq $*r3 14;
 ```
 
@@ -4991,7 +4967,7 @@ Returns the name of the data type of _value_ as string.
 std:assert_eq (type 10)         "integer";
 std:assert_eq (type 10.0)       "float";
 std:assert_eq (type {})         "function";
-!y = $&&std:to_drop 10 { };
+!y = $&&std:to_drop { };
 std:assert_eq (type y)          "drop_function";
 std:assert_eq (type :s)         "symbol";
 std:assert_eq (type "s")        "string";
@@ -5004,7 +4980,7 @@ std:assert_eq (type $e $n)      "error";
 std:assert_eq (type $&&10)      "ref_strong";
 std:assert_eq (type $&10)       "ref_weakable";
 !x = $&&10;
-std:assert_eq (type ~ std:weaken x) "ref_weak";
+std:assert_eq (type ~ std:ref:weaken x) "ref_weak";
 ```
 
 #### <a name="902-len-value"></a>9.0.2 - len _value_
@@ -5447,9 +5423,9 @@ std:assert_eq fun[3]   6;
 std:assert_eq fun[3]   8;
 
 !upvs = std:dump_upvals fun;
-std:assert_eq (str upvs) "$[$(&)3,$(&)2]";
+std:assert_eq (str upvs) "$[$&3,$&2]";
 .y = 4;
-std:assert_eq (str upvs) "$[$(&)3,$(&)4]";
+std:assert_eq (str upvs) "$[$&3,$&4]";
 
 std:assert_eq $*(upvs.0) 3;
 std:assert_eq $*(upvs.1) 4;
@@ -6718,11 +6694,10 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "to_drop",
         |env: &mut Env, _argc: usize| {
-            let fun = env.arg(1).disable_function_arity();
-            let v   = env.arg(0);
+            let fun = env.arg(0).disable_function_arity();
 
-            Ok(VVal::DropFun(Rc::new(DropVVal { v, fun })))
-        }, Some(2), Some(2), false);
+            Ok(VVal::DropFun(Rc::new(DropFun { fun })))
+        }, Some(1), Some(1), false);
 
     func!(st, "fold",
         |env: &mut Env, _argc: usize| {
@@ -7245,11 +7220,6 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(3), Some(4), true);
 
-    func!(st, "set_ref",
-        |env: &mut Env, _argc: usize| {
-            Ok(env.arg(0).set_ref(env.arg(1)))
-        }, Some(2), Some(2), false);
-
     func!(st, "to_ref",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).to_ref())
@@ -7264,12 +7234,22 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(1), Some(1), true);
 
-    func!(st, "strengthen",
+    func!(st, "ref:set",
+        |env: &mut Env, _argc: usize| {
+            Ok(env.arg(0).set_ref(env.arg(1)))
+        }, Some(2), Some(2), false);
+
+    func!(st, "ref:strengthen",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).upgrade())
         }, Some(1), Some(1), false);
 
-    func!(st, "weaken",
+    func!(st, "ref:hide",
+        |env: &mut Env, _argc: usize| {
+            Ok(env.arg(0).hide_ref())
+        }, Some(1), Some(1), false);
+
+    func!(st, "ref:weaken",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).downgrade())
         }, Some(1), Some(1), false);

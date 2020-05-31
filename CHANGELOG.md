@@ -1,3 +1,17 @@
+0.6.1 (unreleased)
+==================
+
+* Incompatible Change: Reverted the weakable reference semantics with regard
+to capturing. It's too unintuitive. You will have to invest the overhead
+about which closures capture what and why. The other semantics are too
+unpredictable.
+* Incompatible Change: Removed the extra value of drop function. They can
+just as easily passed as upvalue.
+* Change: Previous _weakable_ references are now _hidden_ references, because
+they are automatically dereferenced on variable access.
+* Incompatible Change: Strong references are not implicitly dereferenced
+on variable access anymore.
+
 0.6.0 (2020-05-31)
 ==================
 

@@ -52,11 +52,11 @@ pub fn ve(s: &str) -> String {
 #[test]
 fn check_function_string_rep() {
     assert_eq!(ve("!upv1 = \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
-               "\"&F{@[1,21:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$(&)\\\"lol!\\\"]}\"");
+               "\"&F{@[1,21:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&\\\"lol!\\\"]}\"");
     assert_eq!(ve("!upv1 = $&& \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
                "\"&F{@[1,23:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&&\\\"lol!\\\"]}\"");
     assert_eq!(ve("!upv1 = \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
-               "&F{@[1,17:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$n]}");
+               "&F{@[1,17:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&\"lol!\"]}");
     assert_eq!(ve("!upv1 = $&& \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
                "&F{@[1,19:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&&\"lol!\"]}");
 }
@@ -141,17 +141,17 @@ fn check_trivial() {
 
 #[test]
 fn check_ref_closures() {
-    assert_eq!(ve("!c1 = { !a = $&& 1.2; { $*a } }; c1[][]"),            "1.2");
-    assert_eq!(ve("!c1 = { !a = $& 1.2; { a } }; c1[][]"),           "$n");
+    assert_eq!(ve("!c1 = { !a = $&& 1.2; { $*a } }; c1[][]"),        "1.2");
+    assert_eq!(ve("!c1 = { !a = $& 1.2; { a } }; c1[][]"),           "1.2");
     assert_eq!(ve("!c1 = { !a = $& 1.2; { a }[] }; c1[]"),           "1.2");
     assert_eq!(ve("!c1 = { !a = $& 1.2; !a = $n; { a }[] }; c1[]"),  "$n");
     assert_eq!(ve("!outer_a = $&2.3; !c1 = { !a = $&&1.2; { $*a + outer_a } }; c1[][]"), "3.5");
-    assert_eq!(ve("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; c1[][]"), "2.3");
-    assert_eq!(ve("!outer_a = $&2.3; !c1 = { !a = $&1.2; { outer_a + a } }; .outer_a = $n; c1[][]"), "0");
+    assert_eq!(ve("!outer_a = $&2.3; !c1 = { !a = $&1.2; !a_weak = std:ref:weaken $:a; { outer_a + a_weak } }; c1[][]"), "2.3");
+    assert_eq!(ve("!o_a = $&2.3; !outer_a = std:ref:weaken $:o_a; !c1 = { !a = $&1.2; !a_weak = std:ref:weaken $:a; { outer_a + a_weak } }; .o_a = $n; c1[][]"), "0");
     assert_eq!(ve(r"
         !x = $&$[1,2,3];
         !y = $&&$[1,2,3];
-        !z = std:weaken y;
+        !z = std:ref:weaken y;
         $[$@v x \$+ _ * 2, $@i y \$+ _ * 2, z \_ * 2]
     "), "$[$[2,4,6],12,6]");
 }
@@ -308,7 +308,7 @@ fn check_while() {
     assert_eq!(ve(r#"
         !x = $&0;
         while { x < 2 } {
-            !k = std:to_drop 10 {|| .x = 99; };
+            !k = std:to_drop {|| .x = 99; };
             .x = x + 1;
             next[];
         };
@@ -319,7 +319,7 @@ fn check_while() {
     assert_eq!(ve(r#"
         !x = $&0;
         while { x < 2 } {
-            !k = std:to_drop 10 {|| .x = 89; };
+            !k = std:to_drop {|| .x = 89; };
             .x = x + 1;
         };
         $*x
@@ -383,7 +383,7 @@ fn check_to_drop() {
     assert_eq!(ve("!x = $&1; { !d = { .x = 2; }; d }[][]; $*x"), "2");
     assert_eq!(ve(r#"
         !x = $&0;
-        { !d = std:to_drop 10 {|| .x = 17; } }[];
+        { !d = std:to_drop {|| .x = 17; } }[];
         $*x
     "#),
     "17");
@@ -391,31 +391,28 @@ fn check_to_drop() {
         !k = 10;
         !j = 20;
         !x = $&0;
-        !f = std:to_drop 33 {|| .x = 18; };
-        f + 20;
+        !f = std:to_drop {|| .x = 18; };
         .f = $n;
         $*x
     "#),
     "18");
     assert_eq!(ve(r"
         !l = $&0;
-        !x = std:to_drop $[1,2,3] {|| .l = 18; };
-        .x = $@v x { $+ _ * 2 };
-        $[$*l, x]
-    "), "$[18,$[2,4,6]]");
-    assert_eq!(ve("!x = std:to_drop $[1,2] {||}; x.1 = 3; x"),
-               "std:to_drop[$[1,3]]");
-    assert_eq!(ve("!x = std:to_drop ${a=2} {||}; x.a = 3; x"),
-               "std:to_drop[${a=3}]");
+        !x = std:to_drop {|| .l = 18; };
+        .x = $n;
+        $*l
+    "), "18");
     assert_eq!(ve("
-        { !k = $&0;
-          { .k = 20; }[];
-          std:to_drop $[] {
-            # XXX: only works, because to_drop disables arity checks!
-            .k = 10;
-            std:displayln :foo;
-          };
-          $*k }[]
+        {
+            !k = $&0;
+            { .k = 20; }[];
+            std:to_drop {
+              # XXX: only works, because to_drop disables arity checks!
+              .k = 10;
+              std:displayln :foo;
+            };
+            $*k
+        }[]
     "), "10");
 }
 
@@ -431,7 +428,7 @@ fn check_strengthen() {
     assert_eq!(
         ve(r#"
             !dropper = 0;
-            !k = ${ del = std:to_drop 1 { .dropper = 1; } };
+            !k = ${ del = std:to_drop { .dropper = 1; } };
             !f = { .k = $n; };
             .k = $n;
             dropper
@@ -440,7 +437,7 @@ fn check_strengthen() {
         ve(r#"
             !dropper = 0;
             !k = ${};
-            k.d = ${ k = { k }, del = std:to_drop 1 { .dropper = 1; } };
+            k.d = ${ k = { k }, del = std:to_drop { .dropper = 1; } };
             .k = $n;
             dropper
         "#), "1");
@@ -448,15 +445,15 @@ fn check_strengthen() {
         ve(r#"
             !dropper = 0;
             !k = $&${};
-            k.d = ${ k = { k }, del = std:to_drop 1 { .dropper = 1; } };
+            k.d = ${ k = { k }, del = std:to_drop { .dropper = 1; } };
             .k = $n;
             dropper
         "#), "1");
     assert_eq!(
         ve(r#"
             !dropper = 0;
-            !k = std:strengthen $&${};
-            k.d = ${ k = { k }, del = std:to_drop 1 { .dropper = 1; } };
+            !k = std:ref:strengthen $&${};
+            k.d = ${ k = { k }, del = std:to_drop { .dropper = 1; } };
             .k = $n;
             dropper
         "#), "0");
@@ -464,15 +461,15 @@ fn check_strengthen() {
         ve(r#"
             !dropper = 0;
             !k = $&&${};
-            k.d = ${ k = $*k, del = std:to_drop 1 { .dropper = 1; } };
+            k.d = ${ k = $*k, del = std:to_drop { .dropper = 1; } };
             .k = $n;
             dropper
         "#), "0");
     assert_eq!(
         ve(r#"
             !dropper = 0;
-            !k = std:strengthen $&${};
-            k.d = ${ k = k, del = std:to_drop 1 { .dropper = 1; } };
+            !k = std:ref:strengthen $&${};
+            k.d = ${ k = k, del = std:to_drop { .dropper = 1; } };
             k.d.k = $n;
             .k = $n;
             dropper
@@ -480,7 +477,7 @@ fn check_strengthen() {
     assert_eq!(
         ve(r#"
             !dropper = 0;
-            !k = std:strengthen $&${ del = std:to_drop 1 { .dropper = 1; } };
+            !k = std:ref:strengthen $&${ del = std:to_drop { .dropper = 1; } };
             !f = { .k = $n; };
             !r = dropper;
             f[];
@@ -662,42 +659,49 @@ fn check_destructure_pair() {
     assert_eq!(ve("!(e, m) = $p($n,1); $p(e, m)"),        "$p($n,1)");
     assert_eq!(ve("!(a, b) = $p($&10, $&20); { .a = 33; }[]; $p(a, b)"), "$p(33,20)");
     assert_eq!(ve(r#"
+        !x = $&&10;
         !fun = {
-            !(a, b) = $p($&&10, $&&20);
-            $p({a}, { .a = 33; });
+            !(a, b) = $p(x, $&&20);
+            !ret = $p({ a }, {
+                .a = a + $*b;
+                std:assert_eq type <& a "ref_strong";
+                std:assert_eq type <& b "ref_strong";
+            });
+            std:assert_eq (type <& a) "ref_strong";
+            ret
         }[];
         (1 fun)[];
-        (0 fun)[]
+        x => (0 fun)[]
     "#),
-    "33");
+    "$p($<1=>$&&30,$<1>)");
     assert_eq!(ve(r#"
         !fun = {
             !(a, b) = $p($&10, $&20);
-            $p({$p(a, b)}, { .a = 33; });
-        }[];
-        (1 fun)[];
-        (0 fun)[]
-    "#),
-    "$p($n,$n)");
-    assert_eq!(ve(r#"
-        !fun = {
-            !(a, b) = $p($&10, $&20);
-            !(wa, wb) = $p(std:weaken a, std:weaken b);
-            $p({$p(wa, wb)}, { .wa = 33; });
-        }[];
-        (1 fun)[];
-        (0 fun)[]
-    "#),
-    "$p($n,$n)");
-    assert_eq!(ve(r#"
-        !fun = {
-            !(a, b) = $p($&&10, $&&20);
-            $p({$p(a, b)}, { .a = 33; });
+            $p({ $p(a, b) }, { .a = 33; });
         }[];
         (1 fun)[];
         (0 fun)[]
     "#),
     "$p(33,20)");
+    assert_eq!(ve(r#"
+        !fun = {
+            !(a, b) = $p($&10, $&20);
+            !(wa, wb) = $p(std:ref:weaken a, std:ref:weaken b);
+            $p({$p(wa, wb)}, { .wa = 33; });
+        }[];
+        (1 fun)[];
+        (0 fun)[]
+    "#),
+    "$p(33,20)");
+    assert_eq!(ve(r#"
+        !fun = {
+            !(a, b) = $p($&&10, $&&20);
+            $p({$p(a, b)}, { .a = 33; });
+        }[];
+        (1 fun)[];
+        (0 fun)[]
+    "#),
+    "$p($&&33,$&&20)");
 
     assert_eq!(
         ve("!a = 0; !b = 0; .(a, b) = $p(10, 20); $p(a, b)"),
@@ -727,10 +731,12 @@ fn check_destructure() {
     assert_eq!(ve(r#"
         !fun = {
             !(a, b) = $[$&&10, $&&20];
-            $[{a}, { .a = 33; }];
+            $[{ a }, { .a = 33; }];
         }[];
         (1 fun)[];
-        (0 fun)[]
+        !r = (0 fun)[];
+        std:assert_eq r &> type "ref_strong";
+        $*r
     "#),
     "33");
     assert_eq!(ve(r#"
@@ -741,24 +747,24 @@ fn check_destructure() {
         (1 fun)[];
         (0 fun)[]
     "#),
-    "$[$n,$n]");
+    "$[33,20]");
     assert_eq!(ve(r#"
         !fun = {
             !(a, b) = $[$&10, $&20];
-            !(wa, wb) = $[std:weaken a, std:weaken b];
-            $[{$[wa, wb]}, { .wa = 33; }];
+            !(wa, wb) = $[std:ref:weaken a, std:ref:weaken b];
+            $[{ $[wa, wb] }, { .wa = 33; }];
         }[];
         (1 fun)[];
         (0 fun)[]
     "#),
-    "$[$n,$n]");
+    "$[33,20]");
     assert_eq!(ve(r#"
         !fun = {
             !(a, b) = $[$&&10, $&&20];
             $[{$[a, b]}, { .a = 33; }];
         }[];
         (1 fun)[];
-        (0 fun)[]
+        $@v (0 fun)[] \$+ $* _;
     "#),
     "$[33,20]");
 
@@ -836,7 +842,7 @@ fn check_eqv() {
         !b  = $&& $&&0;
         !c  = $&& $&&$*r;
         !r2 = $&& r;
-        $[r == b, r == c, r2 == r, std:weaken[r] == r, r == std:weaken[r]]
+        $[r == b, r == c, r2 == r, std:ref:weaken[r] == r, r == std:ref:weaken[r]]
     "#),
     "$[$false,$false,$true,$true,$true]");
     assert_eq!(ve(r#"
@@ -856,7 +862,7 @@ fn check_eqv() {
         !b  = $& $&0;
         !c  = $& $&r;
         !r2 = $&& r;
-        $[r == b, r == c, r2 == r, std:weaken[r] == r, r == std:weaken[r]]
+        $[r == b, r == c, r2 == r, std:ref:weaken[r] == r, r == std:ref:weaken[r]]
     "#),
     "$[$false,$false,$true,$true,$true]");
 }
@@ -1156,7 +1162,7 @@ fn check_oop() {
             !self = ${};
             self.x = { self.y[] };
             self.y = { 10 };
-            self.k = std:to_drop 20 {|| .oo = 20; }; 
+            self.k = std:to_drop {|| .oo = 20; }; 
             $:self
         };
 
@@ -1170,6 +1176,54 @@ fn check_oop() {
 
         k
     "#), "22");
+    assert_eq!(ve(r#"
+        !new = {
+            !obj = $&${};
+            !self = std:ref:weaken $:obj;
+            obj.add = { self.b + 10 };
+            obj.get = { type self };
+            obj.set = { self.b = _; };
+            $:obj
+        };
+        !v = $[];
+        !o = new[];
+        !ext_add = o.add;
+        !ext_get = o.get;
+        o.set 10;
+        std:push v o.add[];
+        std:push v o.get[];
+        std:push v ext_add[];
+        std:push v ext_get[];
+        .o = $n;
+        std:push v ext_add[];
+        std:push v ext_get[];
+        v
+    "#),
+    "$[20,\"map\",20,\"map\",10,\"none\"]");
+    assert_eq!(ve(r#"
+        !new = {
+            !obj = $&&${};
+            !self = std:ref:weaken obj;
+            obj.add = { self.b + 10 };
+            obj.get = { type self };
+            obj.set = { self.b = _; };
+            obj
+        };
+        !v = $[];
+        !o = new[];
+        !ext_add = o.add;
+        !ext_get = o.get;
+        o.set 10;
+        std:push v o.add[];
+        std:push v o.get[];
+        std:push v ext_add[];
+        std:push v ext_get[];
+        .o = $n;
+        std:push v ext_add[];
+        std:push v ext_get[];
+        v
+    "#),
+    "$[20,\"map\",20,\"map\",10,\"none\"]");
     assert_eq!(ve(r#"
         !new = {
             !obj = $&${};
@@ -1192,7 +1246,7 @@ fn check_oop() {
         std:push v ext_get[];
         v
     "#),
-    "$[20,\"map\",20,\"map\",10,\"none\"]");
+    "$[20,\"map\",20,\"map\",20,\"map\"]");
     assert_eq!(ve(r#"
         !obj = ${};
         !x = $&&0;
@@ -1483,7 +1537,7 @@ fn check_ref() {
         "#), "$[$&&33,$&&34]");
     assert_eq!(ve(r#"
             !(x, y) = $[$&&1, $&&2];
-            !z = std:weaken y;
+            !z = std:ref:weaken y;
             !f = { .x = x + 1; .z = z + 2; $[$:x, $:z] };
             !r = $[];
             std:push r ~ str f[];
@@ -1494,7 +1548,7 @@ fn check_ref() {
         "#), "$[$[\"$[$&&2,$&&4]\",\"$[$&&3,$&&$n]\"],$n]");
     assert_eq!(ve(r#"
         !self = $&&${};
-        !wself = std:weaken self;
+        !wself = std:ref:weaken self;
         self.x = { wself.g = 10; wself.g };
         self.y = { wself.g * 10 };
         !r = $[];
@@ -1579,9 +1633,9 @@ fn check_call_order() {
 
 #[test]
 fn check_cyclic_str_write() {
-    assert_eq!(ve(r#"!x = $&&0; .*x = x; x"#), "$<1=>$&&$<1>");
+    assert_eq!(ve(r#"!x = $&&0; .*x = x; x"#),  "$<1=>$&&$<1>");
     assert_eq!(ve(r#"!x = $&1;  .x = $:x; x"#), "$<1=>$&&$<1>");
-    assert_eq!(ve(r#"!x = $&0;  .*x = $:x; !y = std:weaken x; y"#), "$<1=>$(&)$<1>");
+    assert_eq!(ve(r#"!x = $&0;  .*x = $:x; !y = std:ref:weaken x; y"#), "$<1=>$(&)$<1>");
     assert_eq!(ve(r#"
         !x = $[1,2];
         !y = ${};
@@ -1606,11 +1660,12 @@ fn check_cyclic_str_write() {
 
     assert_eq!(ve(r#"!x = $[]; std:push x $&&x; $[x.0, x]"#), "$[$<1=>$&&$<2=>$[$<1>],$<2>]");
     assert_eq!(ve(r#"
-        !x = ${};
-        x.f = { x.b };
+        !x  = $& ${};
+        !x_ = std:ref:weaken $:x;
+        x.f = { x_.b };
         $[x.f, $:x]
     "#),
-    "$[$<1=>&F{@[3,15:<compiler:s_eval>(Func)@f],amin=0,amax=0,locals=0,upvalues=$[$<2=>$(&)${f=$<1>}]},$<2>]");
+    "$[$<1=>&F{@[4,15:<compiler:s_eval>(Func)@f],amin=0,amax=0,locals=0,upvalues=$[$<2=>$(&)${f=$<1>}]},$<2>]");
 
     assert_eq!(ve(r#"
         !x = $[];
@@ -1817,7 +1872,7 @@ fn check_for() {
         ve("!o = $&$q 1 ; for :XYZ \\.o = _ o; $*o"),
         "\"ZYX1\"");
     assert_eq!(
-        ve("!r = $&:XYZ; !o = $&$q 1 ; for (std:weaken r) \\.o = _ o; $*o"),
+        ve("!r = $&:XYZ; !o = $&$q 1 ; for (std:ref:weaken r) \\.o = _ o; $*o"),
         "\"ZYX1\"");
     assert_eq!(
         ve("!o = $&$q 1 ; for $&:XYZ \\.o = _ o; $*o"),
@@ -1826,8 +1881,8 @@ fn check_for() {
         ve("!o = $&$q 1 ; for $&&:XYZ \\.o = _ o; $*o"),
         "\"ZYX1\"");
     assert_eq!(
-        ve("!o = $&$q 1 ; for (std:to_drop :XYZ {||}) \\.o = _ o; $*o"),
-        "\"ZYX1\"");
+        ve("!o = $&$q 1 ; for (std:to_drop {||}) \\.o = _ o; $*o"),
+        "std:to_drop[&F{@[1,32:<compiler:s_eval>(Func)@o],amin=any,amax=any,locals=0,upvalues=$[]}]");
     assert_eq!(
         ve("!o = $&$q 1 ; for \"XYZ\" \\.o = _ o; $*o"),
         "\"ZYX1\"");
@@ -2171,34 +2226,35 @@ fn capture_ref_semantics() {
     assert_eq!(ve(r" !x = $& 10;  !y = { x }[]; $[x,  y] "),         "$[10,10]");
     assert_eq!(ve(r" !x = $& 10;  !y = { x }[]; $[$*x, y] "),        "$[10,10]");
     assert_eq!(ve(r" !x = $& 10;  !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
-    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[x, y] "),          "$[$&&10,10]");
-    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[$*x, y] "),        "$[10,10]");
-    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[$:x, y] "),        "$[$&&10,10]");
+    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[x, y] "),          "$[$<1=>$&&10,$<1>]");
+    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[$*x, y] "),        "$[10,$&&10]");
+    assert_eq!(ve(r" !x = $&& 10; !y = { x }[]; $[$:x, y] "),        "$[$<1=>$&&10,$<1>]");
 
-    assert_eq!(ve(r" !x = $& 10;  !y = std:weaken $:x;   y "),       "$n");
-    assert_eq!(ve(r" !x = $& 10;  !y = std:weaken $:x; $*y "),       "10");
-    assert_eq!(ve(r" !x = $& 10;  !y = std:weaken $:x; $:y "),       "$&&10");
-    assert_eq!(ve(r" !x = $&& 10; !y = std:weaken $:x;   y "),       "$n");
-    assert_eq!(ve(r" !x = $&& 10; !y = std:weaken $:x; $*y "),       "10");
-    assert_eq!(ve(r" !x = $&& 10; !y = std:weaken $:x; $:y "),       "$&&10");
+    assert_eq!(ve(r" !x = $& 10;  !y = std:ref:weaken $:x;   y "),       "$n");
+    assert_eq!(ve(r" !x = $& 10;  !y = std:ref:weaken $:x; $*y "),       "10");
+    assert_eq!(ve(r" !x = $& 10;  !y = std:ref:weaken $:x; $:y "),       "$&&10");
+    assert_eq!(ve(r" !x = $&& 10; !y = std:ref:weaken $:x;   y "),       "$n");
+    assert_eq!(ve(r" !x = $&& 10; !y = std:ref:weaken $:x; $*y "),       "10");
+    assert_eq!(ve(r" !x = $&& 10; !y = std:ref:weaken $:x; $:y "),       "$&&10");
 
-    assert_eq!(ve("!x = 10; !y = { $:x }[]; .x = 20; y"), "$&&20");
-    assert_eq!(ve("!x = 10; !y = { $:x }[]; .x = 20; .y = 11; $[x, y]"),        "$[20,11]");
-    assert_eq!(ve("!x = 10; !y = { $:x }[]; .x = 20; .*y = 11; $[x, $*y, y]"),  "$[11,11,$&&11]");
+    assert_eq!(ve("!x = 10; !y = { $:x }[]; .x = 20; y => type <& y"),                          "$p($&&20,\"ref_strong\")");
+    assert_eq!(ve("!x = 10; !y = { std:ref:hide $:x }[];       .x = 20; y => type <& y"),           "$p(20,\"integer\")");
+    assert_eq!(ve("!x = 10; !y = { std:ref:strengthen $:x }[]; .x = 20; .y = 11; $[x, y]"),         "$[20,11]");
+    assert_eq!(ve("!x = 10; !y = { std:ref:strengthen $:x }[]; .x = 20; .*y = 11; $[x, $*y, y]"),   "$[11,11,$&&11]");
 
-    assert_eq!(ve("!x =     10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&10]");
-    assert_eq!(ve("!x = $&  10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&11]");
-    assert_eq!(ve("!x = $&& 10; !y = $:x; .x  = 11; $[x,y]"), "$[11,$&&10]");
-    assert_eq!(ve("!x =     10; !y = $:x; .*x = 11; $[x,y]"), "$[11,$&&10]");
-    assert_eq!(ve("!x = $&  10; !y = $:x; .*x = 11; $[x,y]"), "$[11,$&&11]");
-    assert_eq!(ve("!x = $&& 10; !y = $:x; .*x = 11; $[x,y]"), "$[$<1=>$&&11,$<1>]");
+    assert_eq!(ve("!x =     10; !y = $:x; .x  = 11; $[x,y,$:y]"), "$[11,$<1=>$&&10,$<1>]");
+    assert_eq!(ve("!x = $&  10; !y = $:x; .x  = 11; $[x,y,$:y]"), "$[11,$<1=>$&&11,$<1>]");
+    assert_eq!(ve("!x = $&& 10; !y = $:x; .x  = 11; $[x,y,$:y]"), "$[11,$<1=>$&&10,$<1>]");
+    assert_eq!(ve("!x =     10; !y = $:x; .*x = 11; $[x,y,$:y]"), "$[11,$<1=>$&&10,$<1>]");
+    assert_eq!(ve("!x = $&  10; !y = $:x; .*x = 11; $[x,y,$:y]"), "$[11,$<1=>$&&11,$<1>]");
+    assert_eq!(ve("!x = $&& 10; !y = $:x; .*x = 11; $[x,y,$:y]"), "$[$<1=>$&&11,$<1>,$<1>]");
 
-    assert_eq!(ve("!x =     10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(ve("!x = $&  10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(ve("!x = $&& 10; { !y = $:x; .x  = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(ve("!x =     10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(ve("!x = $&  10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]");
-    assert_eq!(ve("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y] }[]"), "$[11,$&&11]"); // yes, upvalue refs are implicit
+    assert_eq!(ve("!x =     10; { !y = $:x; .x  = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]");
+    assert_eq!(ve("!x = $&  10; { !y = $:x; .x  = 11; $[x,y,$:y] }[]"), "$[11,11,$&11]");
+    assert_eq!(ve("!x = $&& 10; { !y = $:x; .x  = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]");
+    assert_eq!(ve("!x =     10; { !y = $:x; .*x = 11; $[x,y,$:y] }[]"), "$[11,11,$&11]");
+    assert_eq!(ve("!x = $&  10; { !y = $:x; .*x = 11; $[x,y,$:y] }[]"), "$[11,11,$&11]");
+    assert_eq!(ve("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]"); // yes, upvalue strong refs are implicit
 
     assert_eq!(ve("!x =     10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
     assert_eq!(ve("!x = $&  10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
@@ -2212,19 +2268,30 @@ fn capture_ref_semantics() {
 fn closure_generator() {
     assert_eq!(ve(r"
         !mk_gen = {
-            !x = $& 0; # weakly captured does not keep alive!
+            !x = $& 0; # strongly captured does keep it alive!
             { .x = x + 1; x }
         };
 
         !g1 = mk_gen[];
         !g2 = mk_gen[];
         $[g1[], g2[]]
-    "), "$[$n,$n]");
+    "), "$[1,1]");
+
+    assert_eq!(ve(r"
+        !mk_gen = {
+            !x = 0; # strongly captured does keep it alive!
+            { .x = x + 1; x }
+        };
+
+        !g1 = mk_gen[];
+        !g2 = mk_gen[];
+        $[g1[], g2[]]
+    "), "$[1,1]");
 
     assert_eq!(ve(r"
         !mk_gen = {
             !x = $&& 0; # strongly captured keeps alive!
-            { .x = x + 1; x }
+            { .*x = $*x + 1; $*x }
         };
 
         !g1 = mk_gen[];
@@ -2243,7 +2310,7 @@ fn ref_semantics() {
     assert_eq!(ve(r"
         !dropped = $false;
         !self = ${};
-        self.drop = std:to_drop $n {|| .dropped = $true; };
+        self.drop = std:to_drop {|| .dropped = $true; };
         self.foo = { self.x = self.x + 1; self.x };
         self.x = 10;
         !ret = self.foo[];
@@ -2256,7 +2323,7 @@ fn ref_semantics() {
         !dropped = $false;
         !self = $n;
         .self = ${
-            drop = std:to_drop $n {|| .dropped = $true; },
+            drop = std:to_drop {|| .dropped = $true; },
             foo  = { self.x = self.x + 1; self.x },
             x    = 10,
         };
@@ -2330,7 +2397,7 @@ fn ref_semantics() {
 
     assert_eq!(ve(r"
         !x = $&& 19;
-        !y = std:weaken x;
+        !y = std:ref:weaken x;
         !f = { y }; # weak refs are captured and stay weak
         !a = str f[];
         .x = $n;
@@ -2932,7 +2999,7 @@ fn check_if() {
         !k = $n;
         !y = ? 2 < 3 {
             !x = $&& 21;
-            .k = { x };
+            .k = { $*x };
             1
         } {
             2
@@ -2945,7 +3012,7 @@ fn check_if() {
         !y = ? 2 < 3 {
             !x = $&& 20;
             ? $t {
-                .k = { x };
+                .k = { $*x };
             };
             1
         };
@@ -2963,7 +3030,7 @@ fn check_if() {
             1
         };
         $[x, y, k[]]
-    "), "$[10,1,$n]");
+    "), "$[10,1,30]");
     assert_eq!(ve("? 1"),
         "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
     assert_eq!(ve("? 1 2 3 4"),

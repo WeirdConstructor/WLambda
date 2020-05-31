@@ -644,16 +644,16 @@ impl EvalContext {
         EvalContext {
             global: global.clone(),
             local_compile: Rc::new(RefCell::new(CompileEnv {
-                parent:    None,
-                global: global.clone(),
-                block_env: BlockEnv::new(),
-                upvals:    Vec::new(),
-                locals_space: 0,
-                recent_var: String::new(),
-                recent_sym: String::new(),
+                parent:         None,
+                global:         global.clone(),
+                block_env:      BlockEnv::new(),
+                upvals:         Vec::new(),
+                locals_space:   0,
+                recent_var:     String::new(),
+                recent_sym:     String::new(),
                 implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
                 explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-                quote_func: false,
+                quote_func:     false,
             })),
             local: Rc::new(RefCell::new(Env::new_with_user(global, user))),
         }
@@ -888,8 +888,7 @@ impl BlockEnv {
     fn set_upvalue(&mut self, var: &str, idx: usize) -> VarPos {
         let last_idx = self.local_map_stack.len() - 1;
         self.local_map_stack[last_idx].1
-            .insert(String::from(var),
-                    VarPos::UpValue(idx));
+            .insert(String::from(var), VarPos::UpValue(idx));
         VarPos::UpValue(idx)
     }
 
@@ -965,14 +964,14 @@ type CompileEnvRef = Rc<RefCell<CompileEnv>>;
 impl CompileEnv {
     pub fn new(g: GlobalEnvRef) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(CompileEnv {
-            parent:    None,
-            global:    g,
-            block_env: BlockEnv::new(),
-            upvals:    Vec::new(),
-            locals_space: 0,
-            quote_func: false,
-            recent_var: String::new(),
-            recent_sym: String::new(),
+            parent:         None,
+            global:         g,
+            block_env:      BlockEnv::new(),
+            upvals:         Vec::new(),
+            locals_space:   0,
+            quote_func:     false,
+            recent_var:     String::new(),
+            recent_sym:     String::new(),
             implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
         }))
@@ -987,14 +986,14 @@ impl CompileEnv {
         Rc::new(RefCell::new(CompileEnv {
             parent,
             global,
-            block_env: BlockEnv::new(),
-            upvals:    Vec::new(),
-            locals_space: 0,
-            recent_var: String::new(),
-            recent_sym: String::new(),
+            block_env:      BlockEnv::new(),
+            upvals:         Vec::new(),
+            locals_space:   0,
+            recent_var:     String::new(),
+            recent_sym:     String::new(),
             implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-            quote_func: false,
+            quote_func:     false,
         }))
     }
 

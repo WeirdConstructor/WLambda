@@ -520,9 +520,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         },
                     ToRefType::ToRef =>
                         op_a_r!(env, ret, retv, data, a, r, { a.to_ref() }),
-                    ToRefType::Weakable =>
+                    ToRefType::Hidden =>
                         op_a_r!(env, ret, retv, data, a, r, {
-                            a.to_weakened_upvalue_ref()
+                            a.to_hidden_upvalue_ref()
                         }),
                     ToRefType::Deref =>
                         op_a_r!(env, ret, retv, data, a, r, {
@@ -1917,7 +1917,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
-                        prog.op_to_ref(&spos, ref_rp, store, ToRefType::Weakable);
+                        prog.op_to_ref(&spos, ref_rp, store, ToRefType::Hidden);
                     })
                 },
                 Syntax::Deref => {
@@ -2782,7 +2782,7 @@ mod tests {
 
     #[test]
     fn vm_func() {
-        assert_eq!(gen("!x = 10; { x; 20 }"), "&F{@[1,10:<compiler:s_eval>(Func)@x],amin=0,amax=0,locals=0,upvalues=$[$n]}");
+        assert_eq!(gen("!x = 10; { x; 20 }"), "&F{@[1,10:<compiler:s_eval>(Func)@x],amin=0,amax=0,locals=0,upvalues=$[$&10]}");
         assert_eq!(gen("!x = 10; { x }[]"), "10");
         assert_eq!(gen("!x = 10; { !y = 4; !k = 5; y + k + x }[]"), "19");
         assert_eq!(gen(r"
