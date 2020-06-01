@@ -504,26 +504,37 @@ std:assert_eq result2 30;
 
 #### <a name="211-object-oriented-programming-with-closures"></a>2.1.1 - Object Oriented Programming with Closures
 
-This is how you can use a map data type as object which stores
-methods:
+This section explains how to create objects and hide state using closures.
+Keep in mind, that there are also `$self` and `$data` available, which
+allow a different approach for refering to the object state/data than to
+capture the object as reference in a closure.
+
+Keep in mind, that care must be taken (references need to be captures weakly)
+with the references as shown below, because otherwise you will get reference
+cycles and memory leaks.
 
 ```wlambda
 !new_Cat = {!(name) = @;
-    !self = ${
+    # Captures by closures upgrade the outer `self` variable to a _hidden_
+    # reference, which is then captured. As the closure is stored in
+    # `self`, this would create a ref cycle. This is why we needed
+    # to make a weak reference to self.
+
+    # Make an explicit hidden reference:
+    !self_ = $& ${
         name = name,
     };
 
-    # Captures refer to the value in the `self` reference
-    # weakly now. `self` has been converted implicit to a _weakable_
-    # `$&` reference.
+    # Create a weak reference form the hidden reference:
+    !self = $weak& $:self_;
+
     self.meow     = { std:displayln self.name " meows!"; };
     self.get_name = { self.name };
 
-    # Because access to _weakable_ references is always implicitly
-    # dereferenced we need the `$:` capture reference operator to
-    # prevent the reference to the map in `self` from being freed
-    # once the `new_Cat` function returns:
-    $:self
+    # To access the contents of the weak reference, we need to derefernce it:
+    $*self
+    # An alternative would've been to get a strong reference from the
+    # hidden reference `self_` by `$:self_`.
 };
 
 !my_cat = new_Cat "Spot";
@@ -537,9 +548,9 @@ Alternatively you can just make the cat name private:
 
 ```wlambda
 !new_Cat = {!(name) = @;
-    # Make a strong reference, so the closures DO keep cat_name alive!
-    # This does not make cycles, because name does not store a closure.
-    !cat_name = $&& name;
+    # This does not make cycles, because `name` does not contain
+    # the closures in the end.
+    !cat_name = name;
 
     !meow     = { std:displayln cat_name " meows!"; };
     !get_name = { $*cat_name };
@@ -3172,6 +3183,22 @@ std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 
 ### <a name="315-references"></a>3.15 - References
 
+TODO
+    - 3 types: strong, hidden, weak
+        - strong:
+            - `$&&`
+            - mention DWIM'ery
+        - hidden:
+            - `$&`
+            - mention usage for closures
+            - how to "Unhide" a reference using `$:`
+        - weak:
+            - std:ref:weaken and `$w&`
+            - how to break reference cycles
+            - how weak references are also caught weakly
+              by closures and not strongly.
+            - how to get a strong reference using `$:`
+
 Some data structures already have reference characteristics, such as strings,
 vectors and maps. There are 3 types of references in WLambda that handle
 different usecases. These referential types are neccessary to mutate lexical
@@ -3264,6 +3291,16 @@ std:assert_eq $*$*y 10; # twice deref to get the value in the drop fun
 std:assert_eq $*y $n;
 
 std:assert drop_check;
+```
+
+Please note that you can use `$w&`/`$weak&` as a shortcut to calling the library function:
+
+```
+!x      = $&& 10;
+!x_weak = $w& x;
+
+std:assert_eq x      &> type "ref_strong";
+std:assert_eq x_weak &> type "ref_weak";
 ```
 
 #### <a name="3153-isref-value"></a>3.15.3 - is_ref _value_
@@ -3761,10 +3798,6 @@ value that was generated for the current iteration.
 And _iterable_ is everything that `$iter` can make an iterator from.
 Please refer to the section `Iterator Kinds` for a listing of this.
 
-If _var_ is given with a `$&&` prefix as in: `iter $&&i $i(0, 10) ...`
-the variable `i` will contain a fresh reference for each loop iteration.
-See further below for an example.
-
 Like usual, the control flow manipulators `next` and `break` also work
 for this kind of loop.
 
@@ -3886,17 +3919,18 @@ iter k $p(:keys, m) {
 std:assert_eq sum 30;
 ```
 
-##### <a name="5124-closures-and-iter-iter-i-"></a>5.1.2.4 - Closures and _iter_ `iter $&&i ...`
+##### <a name="5124-closures-and-iter-iter-i-"></a>5.1.2.4 - Closures and _iter_ `iter i ...`
 
 If you need a new variable for capturing it in a closure on each
-iteration you can use the special `iter $&&i ...` syntax:
+iteration you need to make a new variable binding for each iteration:
 
 ```wlambda
 !closures = $[];
 
-# Without $&& the variable `i` would only be captured weakly, and
-# only resolve to `$none` inside the closure after the iter loop is done!
-iter $&&i $i(0, 10) {
+# Without the rebinding of the variable `i`, `i` would be captured as hidden
+# reference and each iteration would update the contents of that reference.
+iter i $i(0, 10) {
+    !i = i;
     std:push closures { i * 10 };
 };
 
@@ -5554,7 +5588,9 @@ In the following grammar, white space and comments are omitted:
                   ;
     ref           = "&&", value
                   ;
-    wref          = "&", value
+    ref_hidden    = "&", value
+                  ;
+    ref_weak      = ("w&" | "weak&"), value
                   ;
     accumulator   = "@", ("i" | "int"
                          |"s" | "string"
@@ -5587,7 +5623,8 @@ In the following grammar, white space and comments are omitted:
                   | nvec
                   | pair
                   | ref
-                  | wref
+                  | ref_hidden
+                  | ref_weak
                   | deref
                   | capture_ref
                   | accumulator

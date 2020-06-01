@@ -11,6 +11,7 @@ just as easily passed as upvalue.
 they are automatically dereferenced on variable access.
 * Incompatible Change: Strong references are not implicitly dereferenced
 on variable access anymore.
+* Incompatible Change: `iter $&&i`, which was a bad idea, was reverted.
 
 0.6.0 (2020-05-31)
 ==================

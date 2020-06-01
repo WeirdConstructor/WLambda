@@ -152,6 +152,7 @@ pub enum Syntax {
     Assign,
     Def,
     Ref,
+    HRef,
     WRef,
     Deref,
     CaptureRef,
@@ -659,10 +660,10 @@ impl Env {
         let idx = self.bp + i;
         match &self.args[idx] {
             VVal::HRef(r)  => VVal::HRef(r.clone()),
-            VVal::Ref(r)   => VVal::Ref(r.clone()),
+//            VVal::Ref(r)   => VVal::Ref(r.clone()),
             VVal::WWRef(r) => VVal::WWRef(r.clone()),
             v => {
-                let new_v = v.to_hidden_upvalue_ref();
+                let new_v = v.to_hidden_boxed_ref();
                 self.args[idx] = new_v.clone();
                 new_v
             }
@@ -696,11 +697,11 @@ impl Env {
         let upv = &fun.upvalues[i];
 
         match upv {
-            VVal::Ref(r)     => { r.replace(value); }
-            VVal::HRef(r)    => { r.replace(value); }
+//            VVal::Ref(r)     => { r.replace(value); }
+            VVal::HRef(r)    => { r.borrow().set_ref(value); }
             VVal::WWRef(l)   => {
                 if let Some(r) = l.upgrade() {
-                    r.replace(value);
+                    r.borrow().set_ref(value);
                 }
             },
             _ => (),
@@ -726,7 +727,7 @@ impl Env {
         let upv = &fun.upvalues[index];
 
         match upv {
-            VVal::Ref(r)   => { r.replace(value); }
+//            VVal::Ref(r)   => { r.replace(value); }
             VVal::HRef(r)  => { r.replace(value); }
             VVal::WWRef(r) => {
                 if let Some(r) = Weak::upgrade(r) {
@@ -2855,7 +2856,7 @@ impl VVal {
         }
     }
 
-    pub fn to_hidden_upvalue_ref(&self) -> VVal {
+    pub fn to_hidden_boxed_ref(&self) -> VVal {
         VVal::HRef(Rc::new(RefCell::new(self.clone())))
     }
 
@@ -4104,7 +4105,7 @@ impl VVal {
             VVal::IVec(nvec) => nvec.s(),
             VVal::WWRef(l)   => {
                 match l.upgrade() {
-                    Some(v) => format!("$(&){}", v.borrow().s_cy(c)),
+                    Some(v) => format!("$w&{}", v.borrow().s_cy(c)),
                     None => "$n".to_string(),
                 }
             },

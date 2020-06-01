@@ -522,8 +522,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         op_a_r!(env, ret, retv, data, a, r, { a.to_ref() }),
                     ToRefType::Hidden =>
                         op_a_r!(env, ret, retv, data, a, r, {
-                            a.to_hidden_upvalue_ref()
+                            a.to_hidden_boxed_ref()
                         }),
+                    ToRefType::Weak =>
+                        op_a_r!(env, ret, retv, data, a, r, { a.downgrade() }),
                     ToRefType::Deref =>
                         op_a_r!(env, ret, retv, data, a, r, {
                             a.deref()
@@ -546,18 +548,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     env.push_iter(Rc::new(RefCell::new(iterable.iter())));
                 }
             },
-            Op::IterNext(ivar, is_ref_var) => {
+            Op::IterNext(ivar) => {
                 let i = env.iter.as_ref().unwrap();
                 let value =
                     if let Some((v, k)) = i.borrow_mut().next() {
-                        let v =
-                            if let Some(k) = k { VVal::pair(v, k) }
-                            else               { v };
-                        if *is_ref_var {
-                            v.to_ref()
-                        } else {
-                            v
-                        }
+                        if let Some(k) = k { VVal::pair(v, k) }
+                        else               { v }
                     } else {
                         pc = env.loop_info.break_pc;
                         VVal::None
@@ -1608,12 +1604,9 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     let var = ast.at(2).unwrap_or_else(|| VVal::None);
 
-    let (is_ref_var, varname) =
+    let varname =
         match var.at(0).unwrap().get_syn() {
-            Syntax::Var =>
-                (false, var.at(1).unwrap_or_else(|| VVal::None).s_raw()),
-            Syntax::Ref if var.at(1).unwrap().at(0).unwrap().get_syn() == Syntax::Var =>
-                (true, var.at(1).unwrap().at(1).unwrap().s_raw()),
+            Syntax::Var => var.at(1).unwrap_or_else(|| VVal::None).s_raw(),
             _ => {
                 return Err(ast.compile_err(
                     "iter takes an identifier as first argument".to_string()));
@@ -1647,7 +1640,7 @@ pub fn vm_compile_iter2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
             // + 1 for the op_iter_next:
             prog.op_iter_init(&spos, ip, (body.op_count() + 1) as i32);
-            prog.op_iter_next(&spos, iter_var, is_ref_var);
+            prog.op_iter_next(&spos, iter_var);
 
             prog.append(body);
 
@@ -1913,11 +1906,18 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         prog.op_to_ref(&spos, ref_rp, store, ToRefType::ToRef);
                     })
                 },
-                Syntax::WRef => {
+                Syntax::HRef => {
                     let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
                         prog.op_to_ref(&spos, ref_rp, store, ToRefType::Hidden);
+                    })
+                },
+                Syntax::WRef => {
+                    let ref_pw = vm_compile2(&ast.at(1).unwrap(), ce)?;
+                    pw_needs_storage!(prog, store, {
+                        let ref_rp = ref_pw.eval(prog);
+                        prog.op_to_ref(&spos, ref_rp, store, ToRefType::Weak);
                     })
                 },
                 Syntax::Deref => {

@@ -452,11 +452,19 @@ fn check_strengthen() {
     assert_eq!(
         ve(r#"
             !dropper = 0;
+            !k = $&&${};
+            k.d = ${ k = { k }, del = std:to_drop { .dropper = 1; } };
+            .k = $n;
+            dropper
+        "#), "1");
+    assert_eq!(
+        ve(r#"
+            !dropper = 0;
             !k = std:ref:strengthen $&${};
             k.d = ${ k = { k }, del = std:to_drop { .dropper = 1; } };
             .k = $n;
             dropper
-        "#), "0");
+        "#), "1");
     assert_eq!(
         ve(r#"
             !dropper = 0;
@@ -686,7 +694,7 @@ fn check_destructure_pair() {
     assert_eq!(ve(r#"
         !fun = {
             !(a, b) = $p($&10, $&20);
-            !(wa, wb) = $p(std:ref:weaken a, std:ref:weaken b);
+            !(wa, wb) = $p($w& a, $w& b);
             $p({$p(wa, wb)}, { .wa = 33; });
         }[];
         (1 fun)[];
@@ -751,7 +759,7 @@ fn check_destructure() {
     assert_eq!(ve(r#"
         !fun = {
             !(a, b) = $[$&10, $&20];
-            !(wa, wb) = $[std:ref:weaken a, std:ref:weaken b];
+            !(wa, wb) = $[$w& a, $w& b];
             $[{ $[wa, wb] }, { .wa = 33; }];
         }[];
         (1 fun)[];
@@ -1179,7 +1187,7 @@ fn check_oop() {
     assert_eq!(ve(r#"
         !new = {
             !obj = $&${};
-            !self = std:ref:weaken $:obj;
+            !self = $w& $:obj;
             obj.add = { self.b + 10 };
             obj.get = { type self };
             obj.set = { self.b = _; };
@@ -1203,7 +1211,7 @@ fn check_oop() {
     assert_eq!(ve(r#"
         !new = {
             !obj = $&&${};
-            !self = std:ref:weaken obj;
+            !self = $w& obj;
             obj.add = { self.b + 10 };
             obj.get = { type self };
             obj.set = { self.b = _; };
@@ -1537,18 +1545,23 @@ fn check_ref() {
         "#), "$[$&&33,$&&34]");
     assert_eq!(ve(r#"
             !(x, y) = $[$&&1, $&&2];
-            !z = std:ref:weaken y;
-            !f = { .x = x + 1; .z = z + 2; $[$:x, $:z] };
+            std:assert_eq x &> type "ref_strong";
+            !z = $w& y;
+            !f = {
+                .*x = $*x + 1;
+                .z = z + 2;
+                $[x, $:z]
+            };
             !r = $[];
             std:push r ~ str f[];
             .x = $n;
             .y = $n;
             std:push r ~ str f[];
             $[r, z]
-        "#), "$[$[\"$[$&&2,$&&4]\",\"$[$&&3,$&&$n]\"],$n]");
+        "#), "$[$[\"$[$&&2,$&&4]\",\"$[$n,$&&$n]\"],$n]");
     assert_eq!(ve(r#"
         !self = $&&${};
-        !wself = std:ref:weaken self;
+        !wself = $w& self;
         self.x = { wself.g = 10; wself.g };
         self.y = { wself.g * 10 };
         !r = $[];
@@ -1635,7 +1648,7 @@ fn check_call_order() {
 fn check_cyclic_str_write() {
     assert_eq!(ve(r#"!x = $&&0; .*x = x; x"#),  "$<1=>$&&$<1>");
     assert_eq!(ve(r#"!x = $&1;  .x = $:x; x"#), "$<1=>$&&$<1>");
-    assert_eq!(ve(r#"!x = $&0;  .*x = $:x; !y = std:ref:weaken x; y"#), "$<1=>$(&)$<1>");
+    assert_eq!(ve(r#"!x = $&0;  .*x = $:x; !y = $w& x; y"#), "$<1=>$(&)$<1>");
     assert_eq!(ve(r#"
         !x = $[1,2];
         !y = ${};
@@ -1661,7 +1674,7 @@ fn check_cyclic_str_write() {
     assert_eq!(ve(r#"!x = $[]; std:push x $&&x; $[x.0, x]"#), "$[$<1=>$&&$<2=>$[$<1>],$<2>]");
     assert_eq!(ve(r#"
         !x  = $& ${};
-        !x_ = std:ref:weaken $:x;
+        !x_ = $w& $:x;
         x.f = { x_.b };
         $[x.f, $:x]
     "#),
@@ -1872,7 +1885,7 @@ fn check_for() {
         ve("!o = $&$q 1 ; for :XYZ \\.o = _ o; $*o"),
         "\"ZYX1\"");
     assert_eq!(
-        ve("!r = $&:XYZ; !o = $&$q 1 ; for (std:ref:weaken r) \\.o = _ o; $*o"),
+        ve("!r = $&:XYZ; !o = $&$q 1 ; for ($w& r) \\.o = _ o; $*o"),
         "\"ZYX1\"");
     assert_eq!(
         ve("!o = $&$q 1 ; for $&:XYZ \\.o = _ o; $*o"),
@@ -2248,20 +2261,30 @@ fn capture_ref_semantics() {
     assert_eq!(ve("!x =     10; !y = $:x; .*x = 11; $[x,y,$:y]"), "$[11,$<1=>$&&10,$<1>]");
     assert_eq!(ve("!x = $&  10; !y = $:x; .*x = 11; $[x,y,$:y]"), "$[11,$<1=>$&&11,$<1>]");
     assert_eq!(ve("!x = $&& 10; !y = $:x; .*x = 11; $[x,y,$:y]"), "$[$<1=>$&&11,$<1>,$<1>]");
+    assert_eq!(ve(r"!x_ = $&& 10; !x = $w& x_;
+                                !y = $:x; .*x = 11; $[x,y,$:y]"), "$[$<1=>$&&11,$<1>,$<1>]");
 
     assert_eq!(ve("!x =     10; { !y = $:x; .x  = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]");
-    assert_eq!(ve("!x = $&  10; { !y = $:x; .x  = 11; $[x,y,$:y] }[]"), "$[11,11,$&11]");
+    assert_eq!(ve("!x = $&  10; { !y = $:x; .x  = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]");
     assert_eq!(ve("!x = $&& 10; { !y = $:x; .x  = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]");
+    assert_eq!(ve(r"!x_ = $&& 10; !x = $w& x_;
+                                { !y = $:x; .x  = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]");
     assert_eq!(ve("!x =     10; { !y = $:x; .*x = 11; $[x,y,$:y] }[]"), "$[11,11,$&11]");
     assert_eq!(ve("!x = $&  10; { !y = $:x; .*x = 11; $[x,y,$:y] }[]"), "$[11,11,$&11]");
-    assert_eq!(ve("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]"); // yes, upvalue strong refs are implicit
+    assert_eq!(ve("!x = $&& 10; { !y = $:x; .*x = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]");
+    assert_eq!(ve(r"!x_ = $&& 10; !x = $w& x_;
+                                { !y = $:x; .*x = 11; $[x,y,$:y] }[]"), "$[11,$<1=>$&&11,$<1>]");
 
     assert_eq!(ve("!x =     10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
     assert_eq!(ve("!x = $&  10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
     assert_eq!(ve("!x = $&& 10; { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+    assert_eq!(ve(r"!x = $&& 10; !x = $w& x_;
+                                { .x = 13; { !y = $:x; .x  = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
     assert_eq!(ve("!x =     10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
     assert_eq!(ve("!x = $&  10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
-    assert_eq!(ve("!x = $&& 10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]"); // yes, upvalue refs are implicit
+    assert_eq!(ve("!x = $&& 10; { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
+    assert_eq!(ve(r"!x = $&& 10; !x = $w& x_;
+                                { .x = 13; { !y = $:x; .*x = 11; $[x,y] }[] }[]"), "$[11,$&&11]");
 }
 
 #[test]
@@ -3665,8 +3688,9 @@ fn check_iter_var_closure() {
         !sum = 0;
         !v = $[];
         !sum2 = $@i
-            iter $&&i $i(0, 10) {
-                $+ $*i;
+            iter i $i(0, 10) {
+                !i = i;
+                $+ i;
                 std:push v { i };
             };
         v { .sum = sum + _[]; };

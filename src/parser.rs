@@ -566,6 +566,14 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             capture.push(VVal::new_sym_mv(parse_identifier(ps)?));
             Ok(capture)
         },
+        'w' if ps.consume_lookahead("weak&")
+            || ps.consume_lookahead("w&") => {
+
+            ps.consume_wsc();
+            let r = ps.syn(Syntax::WRef);
+            r.push(parse_value(ps)?);
+            Ok(r)
+        },
         '&' => {
             if ps.consume_lookahead("&&") {
                 ps.skip_ws_and_comments();
@@ -574,7 +582,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(r)
             } else {
                 ps.consume_wsc();
-                let r = ps.syn(Syntax::WRef);
+                let r = ps.syn(Syntax::HRef);
                 r.push(parse_value(ps)?);
                 Ok(r)
             }
@@ -1746,9 +1754,9 @@ mod tests {
 
     #[test]
     fn check_parse_ref_deref() {
-        assert_eq!(parse("$& 1"),         "$[&Block,$[&WRef,1]]");
-        assert_eq!(parse("$&$[1,2]"),     "$[&Block,$[&WRef,$[&Lst,1,2]]]");
-        assert_eq!(parse("$&${z=1}"),     "$[&Block,$[&WRef,$[&Map,$[:z,1]]]]");
+        assert_eq!(parse("$& 1"),         "$[&Block,$[&HRef,1]]");
+        assert_eq!(parse("$&$[1,2]"),     "$[&Block,$[&HRef,$[&Lst,1,2]]]");
+        assert_eq!(parse("$&${z=1}"),     "$[&Block,$[&HRef,$[&Map,$[:z,1]]]]");
         assert_eq!(parse("$&& 1"),        "$[&Block,$[&Ref,1]]");
         assert_eq!(parse("$&&$[1,2]"),    "$[&Block,$[&Ref,$[&Lst,1,2]]]");
         assert_eq!(parse("$&&${z=1}"),    "$[&Block,$[&Ref,$[&Map,$[:z,1]]]]");
