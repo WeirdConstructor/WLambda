@@ -569,7 +569,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         'w' if ps.consume_lookahead("weak&")
             || ps.consume_lookahead("w&") => {
 
-            ps.consume_wsc();
+            ps.skip_ws_and_comments();
             let r = ps.syn(Syntax::WRef);
             r.push(parse_value(ps)?);
             Ok(r)

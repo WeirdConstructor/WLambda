@@ -698,10 +698,10 @@ impl Env {
 
         match upv {
 //            VVal::Ref(r)     => { r.replace(value); }
-            VVal::HRef(r)    => { r.borrow().set_ref(value); }
+            VVal::HRef(r)    => { r.borrow_mut().assign_ref(value); }
             VVal::WWRef(l)   => {
                 if let Some(r) = l.upgrade() {
-                    r.borrow().set_ref(value);
+                    r.borrow_mut().assign_ref(value);
                 }
             },
             _ => (),
@@ -710,16 +710,7 @@ impl Env {
 
     pub fn assign_ref_local(&mut self, i: usize, value: VVal) {
         let idx = self.bp + i;
-        match &mut self.args[idx] {
-            VVal::Ref(r)     => { r.replace(value); }
-            VVal::HRef(r)    => { r.replace(value); }
-            VVal::WWRef(l)   => {
-                if let Some(r) = l.upgrade() {
-                    r.replace(value);
-                }
-            },
-            v => { *v = value },
-        }
+        self.args[idx].assign_ref(value);
     }
 
     pub fn set_up(&mut self, index: usize, value: VVal) {
@@ -2860,6 +2851,15 @@ impl VVal {
         VVal::HRef(Rc::new(RefCell::new(self.clone())))
     }
 
+    pub fn assign_ref(&mut self, value: VVal) {
+        match self {
+            VVal::Ref(_)   => { self.set_ref(value); },
+            VVal::HRef(_)  => { self.set_ref(value); },
+            VVal::WWRef(_) => { self.set_ref(value); },
+            v              => { *v = value; },
+        }
+    }
+
     pub fn set_ref(&self, v: VVal) -> VVal {
         match self {
             VVal::Ref(r)     => r.replace(v),
@@ -2883,10 +2883,10 @@ impl VVal {
                 if let Some(r) = f.upgrade() {
                     VVal::HRef(r)
                 } else {
-                    VVal::None
+                    VVal::None.to_ref().hide_ref()
                 }
             },
-            _ => self,
+            _ => self.to_ref().hide_ref(),
         }
     }
 
@@ -2897,10 +2897,10 @@ impl VVal {
                 if let Some(r) = f.upgrade() {
                     VVal::Ref(r)
                 } else {
-                    VVal::None
+                    VVal::None.to_ref()
                 }
             },
-            _ => self,
+            _ => self.to_ref(),
         }
     }
 

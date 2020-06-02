@@ -51,7 +51,7 @@ Smalltalk, LISP and Perl.
   - [2.6](#26-control-flow---returning) Control Flow - Returning
     - [2.6.1](#261-return-label-value) return [_label_] _value_
     - [2.6.2](#262-block-label-function) block [label] _function_
-    - [2.6.3](#263-stdtodrop-value-function-or-raii-destructors-or-drop-functions) std:to_drop _function_ (or RAII, Destructors or Drop Functions)
+    - [2.6.3](#263-stdtodrop-function-or-raii-destructors-or-drop-functions) std:to_drop _function_ (or RAII, Destructors or Drop Functions)
   - [2.7](#27-function-utilities) Function utilities
     - [2.7.1](#271-isfun-value) is_fun _value_
 - [3](#3-data-types) Data Types
@@ -189,11 +189,11 @@ Smalltalk, LISP and Perl.
     - [3.14.1](#3141-map-splicing) Map Splicing
   - [3.15](#315-references) References
     - [3.15.1](#3151-stdtoref-value) std:to_ref _value_
-    - [3.15.2](#3152-stdweaken-ref) std:ref:weaken _ref_
+    - [3.15.2](#3152-stdrefweaken-ref) std:ref:weaken _ref_
     - [3.15.3](#3153-isref-value) is_ref _value_
     - [3.15.4](#3154-iswref-value) is_wref _value_
-    - [3.15.5](#3155-stdstrengthen-ref) std:ref:strengthen _ref_
-    - [3.15.6](#3156-stdsetref-ref-value) std:ref:set _ref_ _value_
+    - [3.15.5](#3155-stdrefstrengthen-ref) std:ref:strengthen _ref_
+    - [3.15.6](#3156-stdrefset-ref-value) std:ref:set _ref_ _value_
   - [3.16](#316-iterators-iter-expression) Iterators `$iter _expression_`
     - [3.16.1](#3161-iterator-kinds) Iterator Kinds
     - [3.16.2](#3162-iterators-on-mutated-data) Iterators on mutated data
@@ -214,7 +214,7 @@ Smalltalk, LISP and Perl.
       - [5.1.2.1](#5121-counting-loop-with-iter) Counting loop with _iter_
       - [5.1.2.2](#5122-vector-iteration-with-iter) Vector iteration with _iter_
       - [5.1.2.3](#5123-map-iteration-with-iter) Map iteration with _iter_
-      - [5.1.2.4](#5124-closures-and-iter-iter-i-) Closures and _iter_ `iter $&&i ...`
+      - [5.1.2.4](#5124-closures-and-iter-iter-i-) Closures and _iter_ `iter i ...`
     - [5.1.3](#513-range-start-end-step-fun) range _start_ _end_ _step_ _fun_
     - [5.1.4](#514-break-value) break _value_
     - [5.1.5](#515-next) next
@@ -491,15 +491,19 @@ at runtime to a hidden reference to their previous value:
 !a = 10;
 !b = 20;
 
-!add_a_and_b = { a + b }; # function transforms a and b to references
+# function transforms a and b to hidden references
+!add_a_and_b = { a + b };
 
-!result  = add_a_and_b[];
+std:assert_eq add_a_and_b[] 30;
 
-std:assert_eq (type $:a)  "ref_hidden";
-!result2 = a + b;         # a and b are dereferenced on local variable access.
+# The assignment assigns to the hidden reference, so the closure add_a_and_b
+# also receives the new value:
+.a = 33;
 
-std:assert_eq result  30;
-std:assert_eq result2 30;
+std:assert_eq add_a_and_b[] 53;
+
+# a and b are dereferenced on local variable access.
+std:assert_eq a + b         53;
 ```
 
 #### <a name="211-object-oriented-programming-with-closures"></a>2.1.1 - Object Oriented Programming with Closures
@@ -531,10 +535,9 @@ cycles and memory leaks.
     self.meow     = { std:displayln self.name " meows!"; };
     self.get_name = { self.name };
 
-    # To access the contents of the weak reference, we need to derefernce it:
-    $*self
-    # An alternative would've been to get a strong reference from the
-    # hidden reference `self_` by `$:self_`.
+    # To keep the object alive, we retrieve a strong reference
+    # from the hidden reference:
+    $:self
 };
 
 !my_cat = new_Cat "Spot";
@@ -1007,7 +1010,7 @@ The alternative is the less clear syntax would be in this case:
 std:assert_eq res 20;
 ```
 
-#### <a name="263-stdtodrop-value-function-or-raii-destructors-or-drop-functions"></a>2.6.3 - std:to_drop _function_ (or RAII, Destructors or Drop Functions)
+#### <a name="263-stdtodrop-function-or-raii-destructors-or-drop-functions"></a>2.6.3 - std:to_drop _function_ (or RAII, Destructors or Drop Functions)
 
 You can create a function that is called when it is
 dropped/its reference count goes to 0.
@@ -3265,7 +3268,7 @@ std:assert_eq (std:ser:wlambda x) "$&&10";
 std:assert_eq $*x 10;
 ```
 
-#### <a name="3152-stdweaken-ref"></a>3.15.2 - std:ref:weaken _ref_
+#### <a name="3152-stdrefweaken-ref"></a>3.15.2 - std:ref:weaken _ref_
 
 You can weaken any of those two types of references manually using the
 `std:ref:weaken` function.
@@ -3273,18 +3276,14 @@ You can weaken any of those two types of references manually using the
 ```wlambda
 !drop_check = $& $f;
 
-# Make a reference to the value 10 and set `drop_check` to $true
-# when all (non weak) references to it are gone.
+# Set `drop_check` to $true when all (non weak) references to it are gone.
 !x = $&& (std:to_drop {|| .drop_check = $true });
 
 # Create a weakened reference to the value referred to by x:
 !y = std:ref:weaken x;
 
-# Deref y gives you 10:
-std:assert_eq $*$*y 10; # twice deref to get the value in the drop fun
-
-# The reference to 10 is removed and this means that the weak reference
-# in y is invalidated and returns $n in future.
+# The reference to the drop function is removed and this means
+# that the weak reference in y is invalidated and returns $n in future.
 .x = $n;
 
 # Deref y now gives you $n:
@@ -3295,7 +3294,7 @@ std:assert drop_check;
 
 Please note that you can use `$w&`/`$weak&` as a shortcut to calling the library function:
 
-```
+```wlambda
 !x      = $&& 10;
 !x_weak = $w& x;
 
@@ -3330,7 +3329,7 @@ std:assert ~ is_wref y;
 std:assert ~ not ~ is_wref x;
 ```
 
-#### <a name="3155-stdstrengthen-ref"></a>3.15.5 - std:ref:strengthen _ref_
+#### <a name="3155-stdrefstrengthen-ref"></a>3.15.5 - std:ref:strengthen _ref_
 
 You can convert a weak reference (weakened by `std:ref:weaken`) or a captured weak
 reference `$&` to strong with `std:ref:strengthen
@@ -3354,7 +3353,7 @@ std:assert ~ is_some $*y2;
 std:assert ~ is_none $*y;
 ```
 
-#### <a name="3156-stdsetref-ref-value"></a>3.15.6 - std:ref:set _ref_ _value_
+#### <a name="3156-stdrefset-ref-value"></a>3.15.6 - std:ref:set _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, weakable or weak reference nothing happens.
@@ -5012,9 +5011,9 @@ std:assert_eq (type $n)         "none";
 std:assert_eq (type $t)         "bool";
 std:assert_eq (type $e $n)      "error";
 std:assert_eq (type $&&10)      "ref_strong";
-std:assert_eq (type $&10)       "ref_weakable";
+std:assert_eq (type $&10)       "ref_hidden";
 !x = $&&10;
-std:assert_eq (type ~ std:ref:weaken x) "ref_weak";
+std:assert_eq (type ~ $w&x)     "ref_weak";
 ```
 
 #### <a name="902-len-value"></a>9.0.2 - len _value_
