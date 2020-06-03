@@ -1,5 +1,5 @@
-std:io:file:copy "src/prelude.rs" "src/prelude.bak";
-!prel = std:io:file:read_text "src/prelude.rs";
+std:io:file:copy "doc/wlambda_reference.md" "doc/wlambda_reference.bak";
+!ref_doc_md = std:io:file:read_text "doc/wlambda_reference.md";
 
 !make_new_section_str = { std:str:cat _.1 " - " _.2 };
 
@@ -19,7 +19,7 @@ std:io:file:copy "src/prelude.rs" "src/prelude.bak";
             stack         = $[],
         }
     },
-    feed = \:feed{!(depth_marker, title, line) = @;
+    feed_section_header = \:feed{!(depth_marker, title, line) = @;
         ((len depth_marker) == 1) {
             return :feed $n;
         };
@@ -52,32 +52,36 @@ std:io:file:copy "src/prelude.rs" "src/prelude.bak";
 
 !c = collector.new[];
 
-!orig = prel;
+!orig = ref_doc_md;
 # remove code fragments, or else we get all the # comments
 # from the WLambda code examples:
-.prel = prel | std:re:replace_all $q_(?s)```.*?```_ {|| "" };
+.ref_doc_md = ref_doc_md | std:re:replace_all $q_(?s)```.*?```_ {|| "" };
 
 std:re:map $q_(#+)\s*(?:<a name=.*?</a>\s*)?(?:[1-9][0-9]*(?:\.[0-9]+)*\s*)?\s*-\s+(.*)_ {
-    c.feed _.1 _.2 _.0;
-} prel;
+    c.feed_section_header _.1 _.2 _.0;
+} ref_doc_md;
 
+# Replace section headers by anchored section headers:
 c._data.toc {
     .orig = orig
         | std:str:replace _.3
               ~ std:str:cat _.0 " <a name=\"" _.4 "\"></a>"
-              ~ make_new_section_str[_];
+              ~ std:str:replace["_", "\\_", make_new_section_str[_]];
 };
 
+# Create new TOC:
 !new_toc = std:str:join "\n" ~ $@v c._data.toc {
     !pad = "";
     range 3 (len _.0) 1 {|| .pad = pad "  "; };
-    $+ ~ std:str:cat pad "- [" _.1 "](#" _.4 ") " _.2
+    $+ ~
+        std:str:cat
+            pad "- [" _.1 "](#" _.4 ") "
+            std:str:replace["_", "\\_", _.2];
 };
 
 .orig = orig | std:re:replace_all $q_(?s)\*\*Table Of Contents:\*\*.*?-----_ {||
     std:str:cat "**Table Of Contents:**\n\n" new_toc "\n\n-----"
 };
-#std:io:stdout:print orig;
 
 # Checking internal links:
 std:re:map $q_\[[^\]]+\]\((#\d+-[^\)]+)\)_ {
@@ -90,6 +94,16 @@ std:re:map $q_\[[^\]]+\]\((#\d+-[^\)]+)\)_ {
     };
 } orig;
 
-std:io:file:write_safe "src/prelude.rs" orig;
+std:io:file:write_safe "doc/wlambda_reference.md" orig;
 
-#std:io:stdout:print new_toc;
+# Now load prelude.rs and replace the REFERENCE DOC START  ... END with
+# the generated documentation in the variable `orig`:
+
+std:io:file:copy "src/prelude.rs" "src/prelude.bak";
+!ref_doc_md = std:io:file:read_text "src/prelude.rs";
+
+.ref_doc_md = ref_doc_md | std:re:replace_all $q_(?s)[]: ---- REFERENCE DOC START ----.*?[]: ---- REFERENCE DOC END ----_ {||
+    std:str:cat "[]: ---- REFERENCE DOC START ----\n\n" new_toc "\n\n[]: ---- REFERENCE DOC END ----"
+};
+
+std:io:file:write_safe "doc/prelude.rs" orig;

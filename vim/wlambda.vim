@@ -10,7 +10,7 @@
 
 syntax clear
 
-setlocal iskeyword=@,@-@,48-57,a-z,A-Z,$,:,?,_,-,&,/,+,-,%,\",',*,<,>,192-255,`
+setlocal iskeyword=@,@-@,48-57,a-z,A-Z,$,:,?,_,-,&,+,-,%,*,<,>,192-255,`
 
 syn match wlSymbol      ':[^[:space:]\.,;{}\[\]()~|="]\+'
 
