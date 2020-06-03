@@ -4,3 +4,5 @@ target/
 prelude_test.txt
 tmp_scripts/
 old_bins/
+src/prelude.bak
+doc/wlambda_reference.bak
