@@ -38,7 +38,7 @@ Smalltalk, LISP and Perl.
     - [2.5.4](#254-reverse-argument-pipe-fun--arg) Reverse Argument Pipe `fun <& arg`
   - [2.6](#26-control-flow---returning) Control Flow - Returning
     - [2.6.1](#261-return-label-value) return [_label_] _value_
-    - [2.6.2](#262-block-label-function) block [_label_] _function_
+    - [2.6.2](#262-block-label-function) block [label] _function_
     - [2.6.3](#263-stdtodrop-function-or-raii-destructors-or-drop-functions) std:to\_drop _function_ (or RAII, Destructors or Drop Functions)
   - [2.7](#27-function-utilities) Function utilities
     - [2.7.1](#271-isfun-value) is\_fun _value_

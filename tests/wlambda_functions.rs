@@ -21,7 +21,7 @@ fn get_functions_from_file(filename: &str) -> Vec<String> {
         if let Some(c) = rx.captures(&line) {
             for cap in c.iter() {
                 if let Some(c) = cap {
-                    functions.push(c.as_str().to_string());
+                    functions.push(c.as_str().to_string().replace("\\_", "_"));
                 }
             }
         }
