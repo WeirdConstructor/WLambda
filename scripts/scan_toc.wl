@@ -4,7 +4,7 @@ std:io:file:copy "doc/wlambda_reference.md" "doc/wlambda_reference.bak";
 !make_new_section_str = { std:str:cat _.1 " - " _.2 };
 
 !escape_underscore = {
-    std:re:replace_all $q/(\S)_(\S)/ { _.1 "_" _.2 } ~
+    std:re:replace_all $q/([a-zA-Z0-9])_([a-zA-Z0-9])/ { _.1 "\\_" _.2 } ~
         (std:str:replace "\\_" "_" _)
 };
 
