@@ -1,4 +1,4 @@
-0.6.1 (unreleased)
+0.6.1 (2020-06-04)
 ==================
 
 * Incompatible Change: Reverted the weakable reference semantics with regard
@@ -7,9 +7,9 @@ about which closures capture what and why. The other semantics are too
 unpredictable.
 * Incompatible Change: Removed the extra value of drop function. They can
 just as easily passed as upvalue.
-* Change: Previous _weakable_ references are now _hidden_ references, because
-they are automatically dereferenced on variable access.
-* Incompatible Change: Strong references are not implicitly dereferenced
+* Change: Previous _weakable_ references are now called _hidden_ references,
+because they are automatically dereferenced on variable access.
+* Incompatible Change: Strong references are _not_ implicitly dereferenced
 on variable access anymore.
 * Incompatible Change: `iter $&&i`, which was a bad idea, was reverted.
 

@@ -3204,13 +3204,13 @@ std:assert_eq x 20;
 The example works rather intuitively. There is however lots of implicit
 referential stuff going on. Once `x` is captured by a closure its contents is implicitly
 changed in to a _hidden_ `$&` reference. The closure then stores this hidden
-reference too. You have to be aware of this, because in some usecases this can lead
+reference too. You have to be aware of this, because in some use cases this can lead
 to cyclic reference structures, which are not automatically freed. Please use
 weak references `$w&` for mitigating this.
 
 Hidden references and weak references captured by a closure are dereferenced
 implicitly if you access the variables. Weak references in the local scope are
-not implicitly dereferenced. However, sometimes it's desireable to have a more
+not implicitly dereferenced. However, sometimes it's desirable to have a more
 explicit reference data types. For this the strong references `$&&` are
 available. Use `$*` for accessing the value of a strong reference or a weak reference
 in the local scope.
@@ -3220,17 +3220,11 @@ TODO
 These types of references exist:
 
 - `$&` - A _hidden_ reference, that is captured by closures or constructed using `$&`.
-- `$(&)` - A _weak_ reference, can't be constructed literally, only indirectly
+- `$w&` - A _weak_ reference, can't be constructed literally, only indirectly
 as upvalue of a closure or by `std:ref:weaken`.
-- `$&&` - A _strong_ reference, that is captured stongly by closures.
+- `$&&` - A _strong_ reference, that is captured strongly by closures.
 Inside closures they are also implicitly dereferenced by assignment
 and access by variable name.
-
-The weakable reference is captured weakly by closures and does not keep the
-referenced value alive if the value reference count drops to zero.
-The strong references will stay strong and need explicit care to handle in the
-function where they are stored directly in a local variable. But if strong
-references are caught, they are also implicitly handled.
 
 ```wlambda
 !x = $& 10;
@@ -3247,12 +3241,13 @@ And the same with strong references:
 
 .*x = 11;
 
-{ .x = 20; }[]; # Closures implicitly handle strong references too
+{ .*x = 20; }[]; # Closures need explicit handling of strong references
 
 std:assert_eq $*x 20;
 ```
 
-Strong references can also be created using the `std:to_ref` function.
+Strong references can also be created using the `std:to_ref` function and
+the `$:` operation.
 
 #### <a name="3151-stdtoref-value"></a>3.15.1 - std:to\_ref _value_
 
@@ -3364,7 +3359,7 @@ std:ref:set r1 10;
 std:assert_eq $*r1 10;
 
 # Note that $& references in local variables are
-# automatically derefernced. Because of that we need to wrap it into
+# automatically dereferenced. Because of that we need to wrap it into
 # an extra reference.
 !r2 = $& $& 1;
 std:ref:set r2 11;
