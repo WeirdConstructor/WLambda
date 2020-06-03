@@ -3,6 +3,11 @@ std:io:file:copy "doc/wlambda_reference.md" "doc/wlambda_reference.bak";
 
 !make_new_section_str = { std:str:cat _.1 " - " _.2 };
 
+!escape_underscore = {
+    std:re:replace_all $q/(\S)_(\S)/ { _.1 "_" _.2 } ~
+        (std:str:replace "\\_" "_" _)
+};
+
 !strip_for_anchor_name = {
     std:str:to_lowercase
         ~ std:re:replace_all $q$ $ {|| "-" }
@@ -66,7 +71,7 @@ c._data.toc {
     .orig = orig
         | std:str:replace _.3
               ~ std:str:cat _.0 " <a name=\"" _.4 "\"></a>"
-              ~ std:str:replace["_", "\\_", make_new_section_str[_]];
+              ~ escape_underscore[make_new_section_str[_]];
 };
 
 # Create new TOC:
@@ -76,7 +81,7 @@ c._data.toc {
     $+ ~
         std:str:cat
             pad "- [" _.1 "](#" _.4 ") "
-            std:str:replace["_", "\\_", _.2];
+            escape_underscore[_.2];
 };
 
 .orig = orig | std:re:replace_all $q_(?s)\*\*Table Of Contents:\*\*.*?-----_ {||
@@ -100,10 +105,10 @@ std:io:file:write_safe "doc/wlambda_reference.md" orig;
 # the generated documentation in the variable `orig`:
 
 std:io:file:copy "src/prelude.rs" "src/prelude.bak";
-!ref_doc_md = std:io:file:read_text "src/prelude.rs";
+!prelude_rs = std:io:file:read_text "src/prelude.rs";
 
-.ref_doc_md = ref_doc_md | std:re:replace_all $q_(?s)[]: ---- REFERENCE DOC START ----.*?[]: ---- REFERENCE DOC END ----_ {||
-    std:str:cat "[]: ---- REFERENCE DOC START ----\n\n" new_toc "\n\n[]: ---- REFERENCE DOC END ----"
+.prelude_rs = prelude_rs | std:re:replace_all $q_(?s)\[\]: ---- REFERENCE DOC START ----.*?\[\]: ---- REFERENCE DOC END ----_ {||
+    std:str:cat "[]: ---- REFERENCE DOC START ----\n\n" orig "\n\n[]: ---- REFERENCE DOC END ----"
 };
 
-std:io:file:write_safe "doc/prelude.rs" orig;
+std:io:file:write_safe "src/prelude.rs" prelude_rs;
