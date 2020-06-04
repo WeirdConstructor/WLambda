@@ -4869,9 +4869,9 @@ std:assert_eq res "//\\/";
 #### <a name="731-pattern-syntax-overview"></a>7.3.1 - Pattern Syntax Overview
 
 While
-[Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
+[Selector and WLambda Regex Syntax](#721-selector-and-wlambda-regex-syntax)
 describes the pattern syntax in detail,
-here is the WLambda pattern syntax in a nutshell:
+here is the WLambda pattern regex syntax in a nutshell:
 
 | Pattern Syntax | Semantics |
 |-|-|
