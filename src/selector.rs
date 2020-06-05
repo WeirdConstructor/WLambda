@@ -422,17 +422,58 @@ fn parse_node_cond(ps: &mut State) -> Result<VVal, ParseError> {
     }
 }
 
+fn parse_rec_cond(ps: &mut State) -> Result<VVal, ParseError> {
+    if ps.consume_lookahead("key") {
+        ps.skip_ws();
+        if ps.consume_if_eq_ws('=') {
+            ps.skip_ws();
+            Ok(VVal::vec2(VVal::new_sym("NotKey"), parse_pattern(ps)?))
+
+        } else {
+            Err(ps.err(
+                ParseErrorKind::ExpectedToken(
+                    '=', "`key =` in recursion condition")))
+        }
+    } else {
+        Err(ps.err(
+            ParseErrorKind::UnexpectedToken(
+                ps.peek().unwrap(), "recursion condition")))
+    }
+}
+
 fn parse_node(ps: &mut State) -> Result<VVal, ParseError> {
     let c = ps.expect_some(ps.peek())?;
 
     match c {
         '*' if ps.consume_lookahead("**") => {
             ps.skip_ws();
-            if ps.peek().unwrap_or('\0') == ':' {
-                Ok(VVal::vec2(VVal::new_sym("RecGlob"), parse_node_cond(ps)?))
-            } else {
-                Ok(VVal::vec1(VVal::new_sym("RecGlob")))
-            }
+
+            let rec_cond =
+                if ps.peek().unwrap_or('\0') == '!' {
+                    ps.consume_ws();
+                    parse_rec_cond(ps)?
+                } else {
+                    VVal::None
+                };
+
+            let recval_cond =
+                if ps.peek().unwrap_or('\0') == '=' {
+                    ps.consume_ws();
+                    parse_node_cond(ps)?
+                } else {
+                    VVal::None
+                };
+
+            let rg =
+                if ps.peek().unwrap_or('\0') == ':' {
+                    VVal::vec3(VVal::new_sym("RecGlob"), rec_cond, parse_node_cond(ps)?)
+                } else {
+                    VVal::vec3(VVal::new_sym("RecGlob"), rec_cond, VVal::None)
+                };
+
+            rg.push(recval_cond);
+
+            Ok(rg)
         },
         '^' => {
             ps.consume_ws();
@@ -488,8 +529,8 @@ fn parse_selector(s: &str) -> Result<VVal, ParseError> {
 /// State for evaluating patterns and selectors.
 #[derive(Debug, Clone)]
 pub struct SelectorState {
-    orig_string_len: usize,
-    captures:        Vec<(usize, usize)>,
+    orig_string_len:   usize,
+    captures:          Vec<(usize, usize)>,
     selector_captures: Vec<VVal>,
 }
 
@@ -1303,15 +1344,19 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
     let node_type = n.at(0).expect("proper node").to_sym();
 
     let sn =
-        if let Some(node_cond) = n.at(2) {
-            let cond = compile_node_cond(&node_cond);
-            Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
-                if (*cond)(v, st, capts) {
-                    (*sn)(v, st, capts)
-                } else {
-                    false
-                }
-            })
+        if let Some(node_cond) = n.at(2) { // Fixed 2, for RecGlob and NK
+            if node_cond.is_none() {
+                sn
+            } else {
+                let cond = compile_node_cond(&node_cond);
+                Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
+                    if (*cond)(v, st, capts) {
+                        (*sn)(v, st, capts)
+                    } else {
+                        false
+                    }
+                })
+            }
 
         } else {
             sn
@@ -1322,6 +1367,34 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
             &n.at(1).unwrap_or_else(|| VVal::None), sn)
 
     } else if node_type == s2sym("RecGlob") {
+        let rec_cond    = n.at(1).unwrap_or_else(|| VVal::None);
+        let recval_cond = n.at(3).unwrap_or_else(|| VVal::None);
+
+        let key_cond =
+            if let Some(cond) = rec_cond.at(0) {
+                if cond.to_sym() == s2sym("NotKey") {
+                    let pat = compile_pattern(&rec_cond.at(1).expect("pattern"),
+                        Box::new(move |_s: RxBuf, _st: &mut SelectorState| {
+                            PatResult::matched()
+                        }));
+
+                    Some(Box::new(move |k: &VVal, st: &mut SelectorState| -> bool {
+                        !k.with_s_ref(|s| match_pattern(&pat, s, st))
+                    }))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+        let val_cond =
+            if recval_cond.is_some() {
+                Some(compile_node_cond(&recval_cond))
+            } else {
+                None
+            };
+
         Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
             if !v.iter_over_vvals() { return false; }
 
@@ -1334,7 +1407,21 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
                     found = true;
                 }
 
-                for (v, _) in v.iter() {
+                for (v, k) in v.iter() {
+                    if let Some(k) = k {
+                        if let Some(key_cond) = &key_cond {
+                            if !(*key_cond)(&k, st) {
+                                continue;
+                            }
+                        }
+                    }
+
+                    if let Some(val_cond) = &val_cond {
+                        if !(*val_cond)(&v, st, &VVal::None) {
+                            continue;
+                        }
+                    }
+
                     if v.iter_over_vvals() {
                         stack.push(v);
                     }
@@ -1696,13 +1783,7 @@ mod tests {
         let mut state = SelectorState::new();
         let capts = VVal::vec();
         (*sn)(v, &mut state, &capts);
-        capts.sort(|a: &VVal, b: &VVal| {
-            if a.is_int() || a.is_float() {
-                a.compare_num(b)
-            } else {
-                a.compare_str(b)
-            }
-        });
+        capts.sort(|a: &VVal, b: &VVal| { a.compare_str(b) });
         capts
     }
 
@@ -1764,7 +1845,7 @@ mod tests {
 
         assert_eq!(pes("$+[xy]ab/0",        &v1), "$[8]");
         assert_eq!(pes("a$+b/0",            &v1), "$[33]");
-        assert_eq!(pes("$*[xy]ab/0",        &v1), "$[8,33]");
+        assert_eq!(pes("$*[xy]ab/0",        &v1), "$[33,8]");
         assert_eq!(pes("$?[xy][xy]ab/0",    &v1), "$[8]");
 
         let v2 = VVal::map1("\t", VVal::Int(12));
@@ -1890,6 +1971,30 @@ mod tests {
     }
 
     #[test]
+    fn check_selector_rec_cond() {
+        let v1 = v(r#"
+            $[
+                ${ a = :test, x = 10        , childs = $[${ i = 90 }], },
+                ${ b = :test, x = 11        , childs = $[${ i = 91 }], },
+                ${ a = :test, x = 12        , childs = $[${ i = 92 }], },
+                ${ c = :test, y = 15, x = 22, childs = $[${ i = 93 }], },
+                ${ a = :test, y = 16, x = 23, childs = $[
+                    ${ a = :test, x = 13, childs = $[${ i = 94 }] },
+                ] }
+            ]
+        "#);
+
+        assert_eq!(pes("**:{ x = 1* }/childs/*/i", &v1),                    "$[90,91,92,94]");
+        assert_eq!(pes("** ! key = childs/childs/*/i", &v1),                "$[90,91,92,93]");
+        assert_eq!(pes("** ! key = childs :{ x = 1* }/childs/*/i", &v1),    "$[90,91,92]");
+
+        assert_eq!(pes("** =:{ a = test } /x", &v1),                            "$[10,12,23]");
+        assert_eq!(pes("** =:{ a = test } | :type=vector /x", &v1),             "$[10,12,13,23]");
+        assert_eq!(pes("** =:{ a = test } | :type=vector :{y=16}/x|y|a", &v1),  "$[16,23,:test]");
+        assert_eq!(pes("** !key=childs =:{ a = test } | :type=vector /x", &v1), "$[10,12,23]");
+    }
+
+    #[test]
     fn check_selector_node_path() {
         assert_eq!(p("a"),     "$[:Path,$[:NK,$[$p(:I,:a)]]]");
         assert_eq!(p("a/0/2"), "$[:Path,$[:NK,$[$p(:I,:a)]],$[:NK,0],$[:NK,2]]");
@@ -1903,8 +2008,8 @@ mod tests {
     #[test]
     fn check_selector_globs() {
         assert_eq!(p("*"),      "$[:Path,$[:NK,$[:Glob]]]");
-        assert_eq!(p("**"),     "$[:Path,$[:RecGlob]]");
-        assert_eq!(p("^**"),    "$[:Path,$[:NCap,$[:RecGlob]]]");
+        assert_eq!(p("**"),     "$[:Path,$[:RecGlob,$n,$n,$n]]");
+        assert_eq!(p("^**"),    "$[:Path,$[:NCap,$[:RecGlob,$n,$n,$n]]]");
         assert_eq!(p("^*"),     "$[:Path,$[:NCap,$[:NK,$[:Glob]]]]");
 
         assert_eq!(p("(a)"),    "$[:Path,$[:NK,$[$p(:PatSub,$[$p(:I,:a)])]]]");
@@ -1915,7 +2020,7 @@ mod tests {
 
         assert_eq!(p("*/*/a"),   "$[:Path,$[:NK,$[:Glob]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:a)]]]");
         assert_eq!(p("*  /  *  /   a   "),   "$[:Path,$[:NK,$[:Glob]],$[:NK,$[:Glob]],$[:NK,$[$p(:I,:a)]]]");
-        assert_eq!(p("**/^a/**"), "$[:Path,$[:RecGlob],$[:NCap,$[:NK,$[$p(:I,:a)]]],$[:RecGlob]]");
+        assert_eq!(p("**/^a/**"), "$[:Path,$[:RecGlob,$n,$n,$n],$[:NCap,$[:NK,$[$p(:I,:a)]]],$[:RecGlob,$n,$n,$n]]");
 
         assert_eq!(p("?a"),    "$[:Path,$[:NK,$[:Any,$p(:I,:a)]]]");
     }

@@ -4798,9 +4798,18 @@ TODO
                 | node_match, "|", node_cond
                 ;
 
+    reckey_cond = "!", "key", "=", pattern
+                  (* recurse only into values if they are not referred
+                     to by a key matching the given pattern. *)
+                ;
+    recval_cond = "=", node_cond
+                  (* recurse only into values if they match the given
+                     condition *)
+                ;
+
     node        = key, { node_cond }
                   (* marks it for referencing it in the result set *)
-                | "**", { node_cond }
+                | "**", [ reckey_cond ], [ recval_cond ], { node_cond }
                   (* deep expensive recursion *)
                 | "^", node
                 ;

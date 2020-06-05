@@ -1,3 +1,13 @@
+0.6.2 (unreleased)
+==================
+
+* Bugfix: Selectors for recursive `$S(**/..)` did not process node conditions
+right.
+* Feature: Added negative key match to recursive selectors `$S(**!key=childs)`
+to prohibit it to recurse into certain keys.
+* Feature: Added positive value condition to recursive selectors `$S(**=:{x=10})`
+to select only specific values to recurse into.
+
 0.6.1 (2020-06-04)
 ==================
 
