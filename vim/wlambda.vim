@@ -173,7 +173,7 @@ syn region wlRxPattern     matchgroup=wlString start="\$r<"            matchgrou
 
 syn cluster wlPattern contains=wlPatternFun,wlPatternRx,wlPatternRxAtom,wlPatternRxErr,wlStringSpec,wlPatternRxEsc,wlPatternGroup
 
-syn match wlPatternRxAtom '[^\s()\[\]{}!?\\|^,'&:;$*=/]'        contained
+syn match wlPatternRxAtom '[^()\[\]{}!?\\|^,'&:;$*=/]'          contained
 syn match wlPatternRxErr  '[{}?\\|^,'&:;$*=]'                   contained
 syn match wlPatternRxEsc  '\\.'                                 contained
 syn match wlPatternFun    '|'                                   contained
