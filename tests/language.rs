@@ -2043,6 +2043,18 @@ fn check_test_import() {
 }
 
 #[test]
+fn check_test_module_imp_wlambda() {
+    assert_eq!(ve(r"
+        !@import x tests:test_mod_r2;
+        x:s 1.4 => $[:x];
+    "), "\"$p(1.4,$[:x])\"");
+    assert_eq!(ve(r"
+        !@import x tests:test_mod_r3;
+        $[x:s 1.4 => $[:x], x:s2 1.4 => $[:x]]
+    "), "$[\"$p(1.4,$[:x])\",\"$p(1.4,$[:x])\"]");
+}
+
+#[test]
 fn check_field_access() {
     assert_eq!(ve("$[1,$[1,2,$[1,2,3]]].1"),                                 "$[1,2,$[1,2,3]]");
     assert_eq!(ve("$[1,$[1,2,$[1,2,3]]].1.2"),                               "$[1,2,3]");

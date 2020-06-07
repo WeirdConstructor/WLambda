@@ -360,8 +360,10 @@ impl GlobalEnv {
     /// Returns true if the module was found.
     pub fn import_module_as(&mut self, mod_name: &str, prefix: &str) -> bool {
         let prefix =
-            if !prefix.is_empty() { prefix.to_string() + ":" }
+            if mod_name == "wlambda" && prefix == "wlambda" { String::from("") }
+            else if !prefix.is_empty() { prefix.to_string() + ":" }
             else { String::from("") };
+
         if let Some(st) = self.mem_modules.borrow_mut().get(mod_name) {
             for (k, v) in &st.symbols {
                 self.env.insert(prefix.clone() + &k, v.clone());

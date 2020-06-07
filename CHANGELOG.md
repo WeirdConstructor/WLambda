@@ -3,6 +3,8 @@
 
 * Bugfix: Selectors for recursive `$S(**/..)` did not process node conditions
 right.
+* Bugfix: `!@import wlambda` did not work as expected, it should have the same
+meaning as `!@wlambda`.
 * Feature: Added negative key match to recursive selectors `$S(**!key=childs)`
 to prohibit it to recurse into certain keys.
 * Feature: Added positive value condition to recursive selectors `$S(**=:{x=10})`
