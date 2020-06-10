@@ -5765,8 +5765,8 @@ The syntax for formatting is very similar to Rust's string formatting:
                   ;
     format        = '{' [ argument ], [ ':' format_spec ] '}'
                   ;
-    argument      = integer
-                  | identifier
+    argument      = integer    (* index into argument vector *)
+                  | identifier (* requires a map as parameter *)
                   ;
 
     format_spec   = [[fill]align][sign]['#']['0'][width]['.' precision][type]
@@ -5781,7 +5781,19 @@ The syntax for formatting is very similar to Rust's string formatting:
                   ;
     precision     = count | '*'
                   ;
-    type          = identifier | '?' | ''
+    type          =
+                  | 'x'             (* hex lower case *)
+                  | 'X'             (* hex upper case *)
+                  | 'b'             (* binary *)
+                  | 'o'             (* octal *)
+                  | 'j', character  (* a string join of a vector,
+                                       separated by 'character' *)
+                  | 'C', character  (* A CSV row, separated by 'character'.
+                                       This also supports proper
+                                       escaping using '"' *)
+                  | 'J', ['p']      (* JSON, optional pretty printed *)
+                  | '?'             (* print written WLambda representation *)
+                  | ''
                   ;
     count         = parameter | integer
                   ;
