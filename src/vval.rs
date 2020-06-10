@@ -172,6 +172,7 @@ pub enum Syntax {
     Selector,
     Pattern,
     StructPattern,
+    Formatter,
 }
 
 #[derive(Clone)]

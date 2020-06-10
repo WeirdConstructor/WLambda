@@ -5531,6 +5531,11 @@ In the following grammar, white space and comments are omitted:
                   | "\'"
                   | "\\"
                   ;
+    string_lit    = string
+                  | "$", quote_string
+                  | "$", byte_string
+                  | "$", code_string
+                  ;
     string        = "\"", { "\\", string_escape | ?any character? - "\\" },"\""
                   ;
     byte_string   = "b", string
@@ -5559,6 +5564,10 @@ In the following grammar, white space and comments are omitted:
                                    the literal structure and returns a map of
                                    matched variables. If nothing matches $none
                                    is returned. *)
+    formatter     = "F", string_lit (* compiles the string into a formatter, that
+                                       takes as many arguments as there are format
+                                       specifiers in the string. See also: String
+                                       formatting syntax in the next section. *)
     list_expr     = "*", expr   (* splices the vector result of 'expr'
                                    into the currently parsed list *)
                   | expr
@@ -5611,10 +5620,7 @@ In the following grammar, white space and comments are omitted:
                   ;
     deref         = "*", value
                   ;
-    special_value = byte_string
-                  | quote_string
-                  | code_string
-                  | list
+    special_value = list
                   | map
                   | none
                   | true
@@ -5652,7 +5658,7 @@ In the following grammar, white space and comments are omitted:
                   *)
                   ;
     value         = number
-                  | string
+                  | string_lit
                   | "$", special_value
                   | "(", expr, ")"
                   | function
@@ -5745,3 +5751,40 @@ There are certain calls that are handled by the compiler differently.
 - `match _value-expr_ $p(structure_pattern, branch_block) ... [ branch_block ]
 - `jump _idx-expr_ _block1_ ...`
 
+### - String Formatting Syntax
+
+The `$F` special value takes a string and creates a formatting function.
+The syntax for formatting is very similar to Rust's string formatting:
+
+```ebnf
+    format_string = <text>, { maybe-format, <text> }
+                  ;
+    maybe-format  = '{', '{'
+                  | '}', '}'
+                  | <format>
+                  ;
+    format        = '{' [ argument ], [ ':' format_spec ] '}'
+                  ;
+    argument      = integer
+                  | identifier
+                  ;
+
+    format_spec   = [[fill]align][sign]['#']['0'][width]['.' precision][type]
+                  ;
+    fill          = character
+                  ;
+    align         = '<' | '^' | '>'
+                  ;
+    sign          = '+' | '-'
+                  ;
+    width         = count
+                  ;
+    precision     = count | '*'
+                  ;
+    type          = identifier | '?' | ''
+                  ;
+    count         = parameter | integer
+                  ;
+    parameter     = argument, '$'
+                  ;
+```

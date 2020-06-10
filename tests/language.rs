@@ -4029,3 +4029,13 @@ fn check_jump_table() {
     assert_eq!(ve("$@v iter i -1 => 4 { $+ ~ jump i { !x = 10; str x } { 20 } 30 }"),
                "$[30,\"10\",20,30,30]");
 }
+
+#[test]
+fn check_formatter() {
+    assert_eq!(ve("$F\"a{<5}x\"  399"),     "a399  x");
+    assert_eq!(ve("$F\"a{>5}x\"  399"),     "a  399x");
+    assert_eq!(ve("$F\"a{^5}x\"  399"),     "a 399 x");
+    assert_eq!(ve("$F\"a{^05}x\"  399"),    "a00399x");
+    assert_eq!(ve("$F\"a{^05}x\"  399"),    "a00399x");
+    assert_eq!(ve("$F\"a{:#x}x\" 399"),     "a0xffffx");
+}

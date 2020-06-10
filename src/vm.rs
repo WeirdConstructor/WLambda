@@ -2624,6 +2624,9 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         prog.data_pos(fun.clone())
                     })
                 },
+//                Syntax::Formatter => {
+//                    
+//                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },

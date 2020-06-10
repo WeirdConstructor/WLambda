@@ -404,9 +404,6 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
     let c = ps.expect_some(ps.peek())?;
 
     match c {
-        'b' => { ps.consume(); parse_string(ps, true) },
-        'q' => { ps.consume(); parse_q_string(ps, false) },
-        'Q' => { ps.consume(); parse_q_string(ps, true) },
         'r' => {
             ps.consume();
             let pattern_source = parse_quoted(ps, String::new(), |s, c| s.push(c))?;
@@ -428,23 +425,14 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             vec.push(pat_expr);
             Ok(vec)
         },
-        '\\' => { ps.consume_wsc(); Ok(make_var(ps, "\\")) },
-        'c' => {
-            if ps.consume_lookahead("code") {
-                ps.skip_ws_and_comments();
-            } else {
-                ps.consume_wsc();
-            }
-
-            let code_start_pos = ps.remember();
-            parse_expr(ps)?;
-            let code_end_pos = ps.remember();
-            let code = ps.collect(code_start_pos, code_end_pos).to_string();
-
-            let vec = ps.syn(Syntax::Str);
-            vec.push(VVal::new_str_mv(code));
+        'F' => {
+            ps.consume_wsc();
+            let str_lit = parse_string_lit(ps)?;
+            let vec = ps.syn(Syntax::Formatter);
+            vec.push(str_lit);
             Ok(vec)
         },
+        '\\' => { ps.consume_wsc(); Ok(make_var(ps, "\\")) },
         '[' => parse_list(ps),
         '{' => parse_map(ps),
         'n' => {
@@ -780,79 +768,110 @@ fn is_ident_start(c: char) -> bool {
     c.is_alphabetic() || c == '_' || c == '@' || c == '`' || c == '?'
 }
 
+fn parse_string_lit(ps: &mut State) -> Result<VVal, ParseError> {
+    match ps.expect_some(ps.peek())? {
+        '"' => parse_string(ps, false),
+        '$' => { ps.consume();
+            match ps.expect_some(ps.peek())? {
+                'b' => { ps.consume(); parse_string(ps, true) },
+                'q' => { ps.consume(); parse_q_string(ps, false) },
+                'Q' => { ps.consume(); parse_q_string(ps, true) },
+                'c' => {
+                    if ps.consume_lookahead("code") {
+                        ps.skip_ws_and_comments();
+                    } else {
+                        ps.consume_wsc();
+                    }
+
+                    let code_start_pos = ps.remember();
+                    parse_expr(ps)?;
+                    let code_end_pos = ps.remember();
+                    let code = ps.collect(code_start_pos, code_end_pos).to_string();
+
+                    let vec = ps.syn(Syntax::Str);
+                    vec.push(VVal::new_str_mv(code));
+                    Ok(vec)
+                },
+                _ => Err(ps.err(ParseValueError::Expected("literal string"))),
+            }
+        },
+        _ => Err(ps.err(ParseValueError::Expected("literal string"))),
+    }
+}
+
 fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
     //println!("parse_value [{}]", ps.rest());
-    if let Some(c) = ps.peek() {
-        match c {
-            '0' ..= '9' | '+' | '-' => parse_num(ps),
-            '"' => parse_string(ps, false),
-            '$' => { ps.consume_wsc(); parse_special_value(ps) },
-            '(' => {
-                ps.consume_wsc();
-                let expr = parse_expr(ps)?;
-                if !ps.consume_if_eq_wsc(')') {
-                    return Err(ps.err(
-                        ParseErrorKind::ExpectedToken(
-                            ')', "sub expression end")));
-                }
-                Ok(expr)
-            },
-            '{' => {
-                let syn = ps.syn_raw(Syntax::Func);
-                let block = parse_block(ps, true)?;
-                block.set_at(0, syn);
-                block.insert_at(1, VVal::None);
-                Ok(block)
-            },
-            '\\' => {
-                ps.consume_wsc();
-
-                if ps.consume_if_eq_wsc(':') {
-                    let syn = ps.syn_raw(Syntax::Func);
-
-                    let block_name = parse_identifier(ps)?;
-                    ps.skip_ws_and_comments();
-                    let block = parse_block(ps, true)?;
-
-                    block.set_at(0, syn);
-                    block.insert_at(1, VVal::new_sym_mv(block_name));
-                    Ok(block)
-                } else {
-                    let block = ps.syn(Syntax::Func);
-
-                    let arity =
-                        if ps.lookahead("|") { parse_arity(ps)? }
-                        else { VVal::None };
-
-                    let next_stmt = parse_stmt(ps)?;
-                    block.push(VVal::None);
-                    block.push(arity);
-                    block.push(next_stmt);
-                    Ok(block)
-                }
-            },
-            ':' => {
-                ps.consume_wsc();
-                if ps.lookahead("\"") {
-                    let s = parse_string(ps, false)?;
-                    s.at(1).unwrap().with_s_ref(|s: &str|
-                        Ok(make_sym(ps, s)))
-                } else {
-                    let id = parse_identifier(ps)?;
-                    Ok(make_sym(ps, &id))
-                }
-            },
-            _ if is_ident_start(c) => {
-                let id = parse_identifier(ps)?;
-                Ok(make_var(ps, &id))
-            },
-            _ => {
-                Err(ps.err(ParseValueError::Expected("literal value, sub \
-                                 expression, block, key or identifier")))
+    match ps.expect_some(ps.peek())? {
+        '0' ..= '9' | '+' | '-' => parse_num(ps),
+        _ if ps.lookahead("$q")
+          || ps.lookahead("$Q")
+          || ps.lookahead("$b")
+          || ps.lookahead("$c")
+          || ps.lookahead("\"") => parse_string_lit(ps),
+        '$' => { ps.consume_wsc(); parse_special_value(ps) },
+        '(' => {
+            ps.consume_wsc();
+            let expr = parse_expr(ps)?;
+            if !ps.consume_if_eq_wsc(')') {
+                return Err(ps.err(
+                    ParseErrorKind::ExpectedToken(
+                        ')', "sub expression end")));
             }
+            Ok(expr)
+        },
+        '{' => {
+            let syn = ps.syn_raw(Syntax::Func);
+            let block = parse_block(ps, true)?;
+            block.set_at(0, syn);
+            block.insert_at(1, VVal::None);
+            Ok(block)
+        },
+        '\\' => {
+            ps.consume_wsc();
+
+            if ps.consume_if_eq_wsc(':') {
+                let syn = ps.syn_raw(Syntax::Func);
+
+                let block_name = parse_identifier(ps)?;
+                ps.skip_ws_and_comments();
+                let block = parse_block(ps, true)?;
+
+                block.set_at(0, syn);
+                block.insert_at(1, VVal::new_sym_mv(block_name));
+                Ok(block)
+            } else {
+                let block = ps.syn(Syntax::Func);
+
+                let arity =
+                    if ps.lookahead("|") { parse_arity(ps)? }
+                    else { VVal::None };
+
+                let next_stmt = parse_stmt(ps)?;
+                block.push(VVal::None);
+                block.push(arity);
+                block.push(next_stmt);
+                Ok(block)
+            }
+        },
+        ':' => {
+            ps.consume_wsc();
+            if ps.lookahead("\"") {
+                let s = parse_string(ps, false)?;
+                s.at(1).unwrap().with_s_ref(|s: &str|
+                    Ok(make_sym(ps, s)))
+            } else {
+                let id = parse_identifier(ps)?;
+                Ok(make_sym(ps, &id))
+            }
+        },
+        c if is_ident_start(c) => {
+            let id = parse_identifier(ps)?;
+            Ok(make_var(ps, &id))
+        },
+        _ => {
+            Err(ps.err(ParseValueError::Expected("literal value, sub \
+                             expression, block, key or identifier")))
         }
-    } else {
-        Err(ps.err(ParseErrorKind::EOF("value")))
     }
 }
 
