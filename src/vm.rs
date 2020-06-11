@@ -4,6 +4,7 @@ use crate::vval::*;
 use crate::nvec::NVec;
 use crate::selector;
 use crate::struct_pattern;
+use crate::formatter;
 use crate::ops::*;
 
 use std::rc::Rc;
@@ -2624,9 +2625,22 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         prog.data_pos(fun.clone())
                     })
                 },
-//                Syntax::Formatter => {
-//                    
-//                },
+                Syntax::Formatter => {
+                    let fun =
+                        match formatter::create_formatter_fun(
+                                &ast.at(1).unwrap())
+                        {
+                            Ok(fun) => fun,
+                            Err(e) => {
+                                return Err(ast.compile_err(
+                                    format!("bad formatter: {}", e)))
+                            },
+                        };
+
+                    pw_provides_result_pos!(prog, {
+                        prog.data_pos(fun.clone())
+                    })
+                },
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },

@@ -97,7 +97,7 @@ fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
 
                 }
             },
-            c => { cur_text.push(c); },
+            c => { ps.consume(); cur_text.push(c); },
         }
     }
 
@@ -108,18 +108,40 @@ fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
     Ok(fmt)
 }
 
-pub type FormatPush = dyn Fn(char, Option<&mut String>, Option<&mut Vec<u8>>);
-pub type FormatNode = Box<dyn Fn(&FormatPush, Option<&mut String>, Option<&mut Vec<u8>>)>;
-
-pub fn compile_formatter(fmt: &VVal) -> FormatNode {
-    Box::new(|add: &FormatPush, rs: Option<&mut String>, rb: Option<&mut Vec<u8>>| {
-        add('X', rs, rb);
-    })
+#[derive(Debug, Clone)]
+pub struct FormatState {
+    str_data:  Option<String>,
+    byte_data: Option<Vec<u8>>,
 }
 
-pub fn create_formatter_direct_fun(fmt: &VVal)
-    -> Result<DirectFun, ParseError>
-{
+impl FormatState {
+    fn add_char(&mut self, c: char) {
+        if let Some(sd) = &mut self.str_data.as_mut() {
+            sd.push(c);
+        } else if let Some(bd) = &mut self.byte_data.as_mut() {
+            let mut b = [0; 4];
+            for cb in c.encode_utf8(&mut b).as_bytes().iter() {
+                bd.push(*cb);
+            }
+        }
+    }
+
+    fn add_byte(&mut self, u: u8) {
+        if let Some(sd) = &mut self.str_data.as_mut() {
+            sd.push(std::char::from_u32(u as u32).unwrap());
+        } else if let Some(bd) = &mut self.byte_data.as_mut() {
+            bd.push(u);
+        }
+    }
+}
+
+pub type FormatNode = Box<dyn Fn(&mut FormatState)>;
+
+pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
+    (Box::new(|fs: &mut FormatState| { fs.add_char('X'); }), 0)
+}
+
+pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
     let (is_bytes, fmt_str) =
         if fmt.is_bytes() {
             let mut s = String::new();
@@ -132,19 +154,29 @@ pub fn create_formatter_direct_fun(fmt: &VVal)
         };
 
     let fmt = parse_formatter(&fmt_str)?;
-    let fun = compile_formatter(&fmt);
+    let (fun, argc) = compile_formatter(&fmt);
 
     Ok(if is_bytes {
-        DirectFun::new(Rc::new(move |v: VVal, _env: &mut Env| {
-            let mut out : Vec<u8> = Vec::new();
-            (fun)(&|c, _rs, rb| { (*rb.as_ref().unwrap()).push(c as u32 as u8); }, None, Some(&mut out));
-            VVal::new_byt(out)
-        }))
+        VValFun::new_fun(
+            move |env: &mut Env, _argc: usize| {
+                let mut out : Vec<u8> = Vec::new();
+                let mut fs = FormatState {
+                    str_data:   None,
+                    byte_data:  Some(out),
+                };
+                (fun)(&mut fs);
+                Ok(VVal::new_byt(fs.byte_data.take().unwrap()))
+            }, Some(argc), Some(argc), false)
     } else {
-        DirectFun::new(Rc::new(move |v: VVal, _env: &mut Env| {
-            let mut out = String::new();
-            (fun)(&|c, rs, _rb| { (*rs.as_ref().unwrap()).push(c); }, Some(&mut out), None);
-            VVal::new_str_mv(out)
-        }))
+        VValFun::new_fun(
+            move |env: &mut Env, _argc: usize| {
+                let mut out = String::new();
+                let mut fs = FormatState {
+                    str_data:   Some(out),
+                    byte_data:  None,
+                };
+                (fun)(&mut fs);
+                Ok(VVal::new_str_mv(fs.str_data.take().unwrap()))
+            }, Some(argc), Some(argc), false)
     })
 }
