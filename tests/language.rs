@@ -13,6 +13,14 @@ pub fn v(s: &str) -> String {
     }
 }
 
+pub fn v2s(s: &str) -> String {
+    let mut ctx = EvalContext::new_default();
+    match ctx.eval(s) {
+        Ok(v) => v.with_s_ref(|s| String::from(s)),
+        Err(e) => format!("{}", e),
+    }
+}
+
 pub fn ve(s: &str) -> String {
     let global = GlobalEnv::new_default();
     match parser::parse(s, "<compiler:s_eval>") {
@@ -4032,10 +4040,19 @@ fn check_jump_table() {
 
 #[test]
 fn check_formatter() {
-    assert_eq!(ve("$F\"a{<5}x\"  399"),     "a399  x");
-    assert_eq!(ve("$F\"a{>5}x\"  399"),     "a  399x");
-    assert_eq!(ve("$F\"a{^5}x\"  399"),     "a 399 x");
-    assert_eq!(ve("$F\"a{^05}x\"  399"),    "a00399x");
-    assert_eq!(ve("$F\"a{^05}x\"  399"),    "a00399x");
-    assert_eq!(ve("$F\"a{:#x}x\" 399"),     "a0xffffx");
+    assert_eq!(v2s("$F\"\" []"),                 "");
+    assert_eq!(v2s("$F\"ax\" []"),               "ax");
+    assert_eq!(v2s("$F\"a{{}}x\" []"),           "a{}x");
+    assert_eq!(v2s("$F\"a}}x\" []"),             "a}x");
+    assert_eq!(v2s("$F\"a{}x\" 10"),             "a10x");
+    assert_eq!(v2s("$F\"a{1}{0}x\" 10 22"),      "a2210x");
+    assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22 33"), format!("{1}{0}{}", 10, 22, 33));
+
+    assert_eq!(v2s("$F\"a{<5}x\"  399"),     "a399  x");
+    assert_eq!(v2s("$F\"a{<5}x\"  399"),     "a399  x");
+    assert_eq!(v2s("$F\"a{>5}x\"  399"),     "a  399x");
+    assert_eq!(v2s("$F\"a{^5}x\"  399"),     "a 399 x");
+    assert_eq!(v2s("$F\"a{^05}x\"  399"),    "a00399x");
+    assert_eq!(v2s("$F\"a{^05}x\"  399"),    "a00399x");
+    assert_eq!(v2s("$F\"a{:#x}x\" 399"),     "a0xffffx");
 }
