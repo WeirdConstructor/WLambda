@@ -4047,6 +4047,13 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{}x\" 10"),             "a10x");
     assert_eq!(v2s("$F\"a{1}{0}x\" 10 22"),      "a2210x");
     assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22 33"), format!("{1}{0}{}", 10, 22));
+    assert_eq!(v2s("$F$b\"\" []"),                 "");
+    assert_eq!(v2s("$F$b\"ax\" []"),               "ax");
+    assert_eq!(v2s("$F$b\"a{{}}x\" []"),           "a{}x");
+    assert_eq!(v2s("$F$b\"a}}x\" []"),             "a}x");
+    assert_eq!(v2s("$F$b\"a{}x\" 10"),             "a10x");
+    assert_eq!(v2s("$F$b\"a{1}{0}x\" 10 22"),      "a2210x");
+    assert_eq!(v2s("$F$b\"a{1}{0}{}x\" 10 22 33"), format!("{1}{0}{}", 10, 22));
 
     assert_eq!(v2s("$F\"a{<5}x\"  399"),     "a399  x");
     assert_eq!(v2s("$F\"a{<5}x\"  399"),     "a399  x");

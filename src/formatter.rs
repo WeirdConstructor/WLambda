@@ -138,10 +138,23 @@ impl FormatState {
 pub type FormatNode = Box<dyn Fn(&mut FormatState)>;
 
 pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
-    (Box::new(|fs: &mut FormatState| { fs.add_char('X'); }), 0)
+    println!("COMPILE {:?}", fmt);
+    let mut fmts = vec![];
+    for (items, _) in fmt.iter() {
+        fmts.push(Box::new(|fs: &mut FormatState| {
+            fs.add_char('X');
+        }));
+    }
+    (Box::new(move |fs: &mut FormatState| {
+        for f in fmts.iter() {
+            (*f)(fs);
+        }
+    }), 0)
 }
 
 pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
+    let fmt = fmt.at(1).unwrap();
+
     let (is_bytes, fmt_str) =
         if fmt.is_bytes() {
             let mut s = String::new();
