@@ -9,6 +9,8 @@ use std::cell::RefCell;
 
 use crate::str_int::s2sym;
 
+use std::fmt::Write;
+
 fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
     let mut is_integer = true;
     let mut identifier = String::new();
@@ -114,6 +116,20 @@ pub struct FormatState {
     byte_data: Option<Vec<u8>>,
 }
 
+impl core::fmt::Write for FormatState {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        if let Some(sd) = &mut self.str_data.as_mut() {
+            sd.push_str(s);
+        } else if let Some(bd) = &mut self.byte_data.as_mut() {
+            let r : &[u8] = s.as_ref();
+            for b in r.iter() {
+                bd.push(*b);
+            }
+        }
+        Ok(())
+    }
+}
+
 impl FormatState {
     fn add_char(&mut self, c: char) {
         if let Some(sd) = &mut self.str_data.as_mut() {
@@ -138,12 +154,23 @@ impl FormatState {
 pub type FormatNode = Box<dyn Fn(&mut FormatState)>;
 
 pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
-    println!("COMPILE {:?}", fmt);
-    let mut fmts = vec![];
-    for (items, _) in fmt.iter() {
-        fmts.push(Box::new(|fs: &mut FormatState| {
-            fs.add_char('X');
-        }));
+    let mut fmts : Vec<FormatNode> = vec![];
+    for (item, _) in fmt.iter() {
+        let arg = item.at(1).unwrap_or_else(|| VVal::None);
+        item.at(0).unwrap().with_s_ref(|syn| {
+            match &syn[..] {
+                "text" => {
+                    fmts.push(Box::new(move |fs: &mut FormatState| {
+                        arg.with_s_ref(|s| fs.write_str(s).unwrap());
+                    }));
+                },
+                _ => {
+                    fmts.push(Box::new(|fs: &mut FormatState| {
+                        fs.add_char('?');
+                    }));
+                }
+            }
+        })
     }
     (Box::new(move |fs: &mut FormatState| {
         for f in fmts.iter() {
@@ -156,14 +183,15 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
     let fmt = fmt.at(1).unwrap();
 
     let (is_bytes, fmt_str) =
-        if fmt.is_bytes() {
+        if let VVal::Byt(bytes) = fmt {
             let mut s = String::new();
-            for c in fmt.s().chars().map(|u| std::char::from_u32(u as u32).unwrap()) {
+            for b in bytes.iter() {
+                let c = std::char::from_u32(*b as u32).unwrap();
                 s.push(c);
             }
             (true, s)
         } else {
-            (false, fmt.s())
+            (false, fmt.s_raw())
         };
 
     let fmt = parse_formatter(&fmt_str)?;
@@ -189,6 +217,7 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                     byte_data:  None,
                 };
                 (fun)(&mut fs);
+                println!("STR: {:?}", fs);
                 Ok(VVal::new_str_mv(fs.str_data.take().unwrap()))
             }, Some(argc), Some(argc), false)
     })
