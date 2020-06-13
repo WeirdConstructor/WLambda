@@ -19,6 +19,7 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
     while !ps.lookahead_one_of(":}") {
         match ps.expect_some(ps.peek())? {
             c if c.is_digit(10) => {
+                ps.consume();
                 if is_integer { index.push(c); }
                 else          { identifier.push(c); }
             },
@@ -27,6 +28,7 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
                     identifier = index.clone();
                     is_integer = false;
                 }
+                ps.consume();
 
                 identifier.push(c);
             }
@@ -44,19 +46,28 @@ fn parse_format_spec(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(VVal::None)
 }
 
-fn parse_format(ps: &mut State, implicit_index: usize) -> Result<VVal, ParseError> {
+fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, ParseError> {
     let mut arg = VVal::None;
     let mut fmt = VVal::None;
 
     let c = ps.expect_some(ps.peek())?;
-    if c != ':' {
+    if c != ':' && c != '}' {
         arg = parse_argument(ps)?;
+    } else {
+        arg = VVal::vec2(VVal::new_sym("index"),
+                         VVal::Int(*implicit_index as i64));
+        *implicit_index = *implicit_index + 1;
     }
 
     let c = ps.expect_some(ps.peek())?;
     if c == ':' {
         ps.consume();
         fmt = parse_format_spec(ps)?;
+    }
+
+    if !ps.consume_if_eq('}') {
+        return Err(ps.err(
+            ParseErrorKind::ExpectedToken('}', "format end")));
     }
 
     Ok(VVal::vec3(VVal::new_sym("format"), arg, fmt))
@@ -68,6 +79,8 @@ fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
     let mut fmt = VVal::vec();
 
     let mut cur_text = String::new();
+
+    let mut impl_idx = 0;
 
     while !ps.at_end() {
         match ps.peek().unwrap() {
@@ -83,20 +96,15 @@ fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
                         cur_text = String::new();
                     }
 
+                    fmt.push(parse_format(&mut ps, &mut impl_idx)?);
                 }
             },
             '}' => {
                 if ps.consume_lookahead("}}") {
                     cur_text.push('}');
                 } else {
-                    ps.consume();
-
-                    if cur_text.len() > 0 {
-                        fmt.push(VVal::vec2(VVal::new_sym("text"),
-                                            VVal::new_str(&cur_text)));
-                        cur_text = String::new();
-                    }
-
+                    return Err(ps.err(
+                        ParseErrorKind::UnexpectedToken('}', "format end")));
                 }
             },
             c => { ps.consume(); cur_text.push(c); },
@@ -154,7 +162,10 @@ impl FormatState {
 pub type FormatNode = Box<dyn Fn(&mut FormatState)>;
 
 pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
+    println!("COMPFMT[ {:?} ]", fmt);
+
     let mut fmts : Vec<FormatNode> = vec![];
+
     for (item, _) in fmt.iter() {
         let arg = item.at(1).unwrap_or_else(|| VVal::None);
         item.at(0).unwrap().with_s_ref(|syn| {
@@ -165,9 +176,10 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
                     }));
                 },
                 _ => {
-                    fmts.push(Box::new(|fs: &mut FormatState| {
-                        fs.add_char('?');
-                    }));
+                    panic!(format!("Unknown format spec: {}", item.s()));
+//                    fmts.push(Box::new(|fs: &mut FormatState| {
+//                        fs.add_char('?');
+//                    }));
                 }
             }
         })
@@ -207,7 +219,8 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                 };
                 (fun)(&mut fs);
                 Ok(VVal::new_byt(fs.byte_data.take().unwrap()))
-            }, Some(argc), Some(argc), false)
+            }, None, None, false)
+//            }, Some(argc), Some(argc), false)
     } else {
         VValFun::new_fun(
             move |env: &mut Env, _argc: usize| {
@@ -219,6 +232,7 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                 (fun)(&mut fs);
                 println!("STR: {:?}", fs);
                 Ok(VVal::new_str_mv(fs.str_data.take().unwrap()))
-            }, Some(argc), Some(argc), false)
+            }, None, None, false)
+//            }, Some(argc), Some(argc), false)
     })
 }
