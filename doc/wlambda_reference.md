@@ -5781,8 +5781,7 @@ The syntax for formatting is very similar to Rust's string formatting:
                   ;
     precision     = count | '*'
                   ;
-    type          =
-                  | 'x'             (* hex lower case *)
+    type          = 'x'             (* hex lower case *)
                   | 'X'             (* hex upper case *)
                   | 'b'             (* binary *)
                   | 'o'             (* octal *)
@@ -5792,7 +5791,8 @@ The syntax for formatting is very similar to Rust's string formatting:
                                        This also supports proper
                                        escaping using '"' *)
                   | 'J', ['p']      (* JSON, optional pretty printed *)
-                  | '?'             (* print written WLambda representation *)
+                  | '?', ['p']      (* print written WLambda representation,
+                                       optional pretty printed *)
                   | ''
                   ;
     count         = parameter | integer
