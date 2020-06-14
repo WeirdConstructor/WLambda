@@ -26,11 +26,12 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
             c => {
                 if !index.is_empty() {
                     identifier = index.clone();
-                    is_integer = false;
                 }
                 ps.consume();
 
                 identifier.push(c);
+
+                is_integer = false;
             }
         }
     }
@@ -124,6 +125,11 @@ pub struct FormatState {
     byte_data: Option<Vec<u8>>,
 }
 
+pub enum FormatArg {
+    Index(usize),
+    Key(VVal),
+}
+
 impl core::fmt::Write for FormatState {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         if let Some(sd) = &mut self.str_data.as_mut() {
@@ -159,10 +165,30 @@ impl FormatState {
     }
 }
 
-pub type FormatNode = Box<dyn Fn(&mut FormatState)>;
+pub type FormatNode = Box<dyn Fn(&mut FormatState, &[VVal])>;
+
+pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
+    Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+        match &arg {
+            FormatArg::Index(i) => {
+                args[*i].with_s_ref(|s| fs.write_str(s));
+            },
+            FormatArg::Key(k) => {
+                let val =
+                    k.with_s_ref(|ks|
+                        args[0].get_key(ks).unwrap_or_else(|| VVal::None));
+                val.with_s_ref(|s| fs.write_str(s));
+            },
+        }
+        // For any align: let the lower node write, and check
+        // how the buffer changed.
+        // then do something like: fs.pad_from_idx_with(last_idx, field_width)
+//        fs.write_str(s).unwrap()
+    })
+}
 
 pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
-    println!("COMPFMT[ {:?} ]", fmt);
+    println!("COMPFMT[ {} ]", fmt.s());
 
     let mut fmts : Vec<FormatNode> = vec![];
 
@@ -171,12 +197,23 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
         item.at(0).unwrap().with_s_ref(|syn| {
             match &syn[..] {
                 "text" => {
-                    fmts.push(Box::new(move |fs: &mut FormatState| {
+                    fmts.push(Box::new(move |fs: &mut FormatState, _args: &[VVal]| {
                         arg.with_s_ref(|s| fs.write_str(s).unwrap());
                     }));
                 },
                 _ => {
-                    panic!(format!("Unknown format spec: {}", item.s()));
+                    let arg =
+                        arg.at(0).unwrap().with_s_ref(|arg_syn| {
+                            match &arg_syn[..] {
+                                "index" => FormatArg::Index(arg.v_i(1) as usize),
+                                _       => FormatArg::Key(arg.v_(1)),
+                            }
+                        });
+                    fmts.push(
+                        compile_format(
+                            arg,
+                            &item.at(2).unwrap_or_else(|| VVal::None)));
+//                    panic!(format!("Unknown format spec: {}", item.s()));
 //                    fmts.push(Box::new(|fs: &mut FormatState| {
 //                        fs.add_char('?');
 //                    }));
@@ -184,9 +221,9 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
             }
         })
     }
-    (Box::new(move |fs: &mut FormatState| {
+    (Box::new(move |fs: &mut FormatState, args: &[VVal]| {
         for f in fmts.iter() {
-            (*f)(fs);
+            (*f)(fs, args);
         }
     }), 0)
 }
@@ -217,7 +254,7 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                     str_data:   None,
                     byte_data:  Some(out),
                 };
-                (fun)(&mut fs);
+                (fun)(&mut fs, env.argv_ref());
                 Ok(VVal::new_byt(fs.byte_data.take().unwrap()))
             }, None, None, false)
 //            }, Some(argc), Some(argc), false)
@@ -229,7 +266,7 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                     str_data:   Some(out),
                     byte_data:  None,
                 };
-                (fun)(&mut fs);
+                (fun)(&mut fs, env.argv_ref());
                 println!("STR: {:?}", fs);
                 Ok(VVal::new_str_mv(fs.str_data.take().unwrap()))
             }, None, None, false)
