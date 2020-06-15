@@ -43,8 +43,64 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
     }
 }
 
-fn parse_format_spec(ps: &mut State) -> Result<VVal, ParseError> {
+fn parse_count(ps: &mut State) -> Result<VVal, ParseError> {
+    if let Some(idx) = ps.find_char('$') {
+        // TODO
+    }
     Ok(VVal::None)
+}
+
+fn parse_format_spec(ps: &mut State) -> Result<VVal, ParseError> {
+    let mut fill       : Option<char> = None;
+    let mut align_char : Option<char> = None;
+
+    let align = ps.peek2();
+    if let Some(align) = align {
+        match align.at(1) {
+              c @ '<'
+            | c @ '^'
+            | c @ '>' => {
+                fill       = Some(align.at(0));
+                align_char = Some(c);
+                ps.consume();
+                ps.consume();
+            },
+            _ => { },
+        }
+    }
+
+    if align_char.is_none() {
+        match ps.expect_some(ps.peek())? {
+              c @ '<'
+            | c @ '^'
+            | c @ '>' => {
+                align_char = Some(c);
+                ps.consume();
+            },
+            _ => { },
+        }
+    }
+
+    let mut sign : Option<char> = None;
+    match ps.expect_some(ps.peek())? {
+          c @ '-'
+        | c @ '+' => {
+            sign = Some(c);
+            ps.consume();
+        },
+        _ => { },
+    }
+
+    let alternate = ps.consume_if_eq('#');
+    let int_pad0  = ps.consume_if_eq('0');
+
+    let width = parse_count(ps)?;
+
+    let m = VVal::map();
+    m.set_key_str("alternate", VVal::Bol(alternate));
+    m.set_key_str("int_pad0",  VVal::Bol(int_pad0));
+
+    Ok(m)
 }
 
 fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, ParseError> {

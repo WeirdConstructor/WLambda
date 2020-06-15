@@ -205,6 +205,7 @@ impl<'a> StrPart<'a> {
     pub fn to_string(&self) -> String { self.slice.iter().collect() }
     pub fn is_empty(&self) -> bool { self.slice.is_empty() }
     pub fn len(&self) -> usize { self.slice.len() }
+    pub fn at(&self, i: usize) -> char { self.slice[i] }
 }
 
 #[allow(dead_code)]
@@ -419,6 +420,17 @@ impl State {
 
     pub fn last_token_char(&self) -> char {
         self.last_tok_char
+    }
+
+    pub fn find_char(&self, c: char) -> Option<usize> {
+        let len = self.input.len();
+        for i in self.ch_ptr..len {
+            if self.input[i] == c {
+                return Some(i);
+            }
+        }
+
+        None
     }
 
     pub fn consume_lookahead(&mut self, s: &str) -> bool {
