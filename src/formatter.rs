@@ -50,7 +50,7 @@ fn parse_count(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(VVal::None)
 }
 
-fn parse_format_spec(ps: &mut State) -> Result<VVal, ParseError> {
+fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
     let mut fill       : Option<char> = None;
     let mut align_char : Option<char> = None;
 
@@ -96,9 +96,31 @@ fn parse_format_spec(ps: &mut State) -> Result<VVal, ParseError> {
 
     let width = parse_count(ps)?;
 
+    let precision =
+        if ps.consume_if_eq('.') {
+            if ps.consume_if_eq('*') {
+                if arg.at(0).unwrap().with_s_ref(|s| s == "index") {
+                    let idx = arg.at(1).unwrap();
+                    arg.set(1, VVal::Int(idx.i() + 1));
+
+                    VVal::vec2(VVal::new_sym("index"), idx)
+                } else {
+                    return Err(ps.err(
+                        ParseErrorKind::BadFormat(
+                            "can't use * in combination with named arg".to_string())));
+                }
+            } else {
+                parse_count(ps)?
+            }
+        } else {
+            VVal::None
+        };
+
     let m = VVal::map();
     m.set_key_str("alternate", VVal::Bol(alternate));
     m.set_key_str("int_pad0",  VVal::Bol(int_pad0));
+    m.set_key_str("precision", precision);
+    m.set_key_str("width",     width);
 
     Ok(m)
 }
@@ -107,6 +129,7 @@ fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, Pars
     let mut arg = VVal::None;
     let mut fmt = VVal::None;
 
+    let mut was_implicit_idx = false;
     let c = ps.expect_some(ps.peek())?;
     if c != ':' && c != '}' {
         arg = parse_argument(ps)?;
@@ -114,12 +137,21 @@ fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, Pars
         arg = VVal::vec2(VVal::new_sym("index"),
                          VVal::Int(*implicit_index as i64));
         *implicit_index = *implicit_index + 1;
+        was_implicit_idx = true;
     }
+
 
     let c = ps.expect_some(ps.peek())?;
     if c == ':' {
         ps.consume();
-        fmt = parse_format_spec(ps)?;
+
+        let arg_idx_prev = arg.at(1).unwrap_or_else(|| VVal::None);
+        fmt = parse_format_spec(ps, &arg)?;
+        let arg_idx_after = arg.at(1).unwrap_or_else(|| VVal::None);
+
+        if was_implicit_idx && !arg_idx_prev.eqv(&arg_idx_after) {
+            *implicit_index = *implicit_index + 1;
+        }
     }
 
     if !ps.consume_if_eq('}') {
