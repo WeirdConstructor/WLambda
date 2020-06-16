@@ -149,6 +149,8 @@ fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, Pars
         fmt = parse_format_spec(ps, &arg)?;
         let arg_idx_after = arg.at(1).unwrap_or_else(|| VVal::None);
 
+        // There is some magic patching going on in parse_format_spec.
+        // Not entirely clean. But it might get the job done for now.
         if was_implicit_idx && !arg_idx_prev.eqv(&arg_idx_after) {
             *implicit_index = *implicit_index + 1;
         }
