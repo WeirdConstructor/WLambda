@@ -159,7 +159,7 @@ while $true {
 std:assert_eq result 5;
 ```
 
-Different function call syntaxes:
+### Different function call syntaxes:
 
 ```wlambda
 !add = {!(x, y) = @;    # named variables, @ evals to list of all args
@@ -173,6 +173,12 @@ std:displayln add[2, 3];    # less parenthesis
 std:displayln (add 2 3);    # explicit expression delimiting with `( ... )`
 
 std:displayln ~ add 2 3;    # `~` means: evaluate rest as one expression
+
+!add5 = { _ + 5 };
+
+std:displayln 3 &> add5;    # '&>' is an argument pipe operator
+
+std:displayln add5 <& 3;    # '<&' is the reverse argument pipe operator
 ```
 
 ### Returning from nested functions:
