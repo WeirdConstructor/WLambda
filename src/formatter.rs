@@ -16,7 +16,7 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
     let mut identifier = String::new();
     let mut index      = String::new();
 
-    while !ps.lookahead_one_of(":}") {
+    while !ps.lookahead_one_of(":$}") {
         match ps.expect_some(ps.peek())? {
             c if c.is_digit(10) => {
                 ps.consume();
@@ -44,10 +44,18 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_count(ps: &mut State) -> Result<VVal, ParseError> {
-    if let Some(idx) = ps.find_char('$') {
-        // TODO
+    if let Some(_) = ps.find_char('$') {
+        parse_argument(ps)
+    } else {
+        let integer = ps.take_while(|c| c.is_digit(10));
+        if let Ok(idx) = u32::from_str_radix(&integer.to_string(), 10) {
+            Ok(VVal::vec2(VVal::new_sym("count"), VVal::Int(idx as i64)))
+        } else {
+            Err(ps.err(
+                ParseErrorKind::BadFormat(
+                    "expected proper integer".to_string())))
+        }
     }
-    Ok(VVal::None)
 }
 
 fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
@@ -69,12 +77,12 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
         }
     }
 
-    if align_char.is_none() {
+    if align_char .is_none() {
         match ps.expect_some(ps.peek())? {
               c @ '<'
             | c @ '^'
             | c @ '>' => {
-                align_char = Some(c);
+                align_char  = Some(c);
                 ps.consume();
             },
             _ => { },
@@ -117,10 +125,24 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
         };
 
     let m = VVal::map();
-    m.set_key_str("alternate", VVal::Bol(alternate));
-    m.set_key_str("int_pad0",  VVal::Bol(int_pad0));
-    m.set_key_str("precision", precision);
-    m.set_key_str("width",     width);
+    if let Some(fill) = fill {
+        m.set_key_str("fill",   VVal::new_str_mv(fill.to_string()));
+    }
+    match align_char {
+        Some('<') => { m.set_key_str("align", VVal::Int(-1)); },
+        Some('>') => { m.set_key_str("align", VVal::Int( 1)); },
+        Some('^') => { m.set_key_str("align", VVal::Int( 2)); },
+        _         => (),
+    }
+    match sign {
+        Some('-') => { m.set_key_str("sign", VVal::Int(-1)); },
+        Some('+') => { m.set_key_str("sign", VVal::Int( 1)); },
+        _         => (),
+    }
+    m.set_key_str("alternate",  VVal::Bol(alternate));
+    m.set_key_str("int_pad0",   VVal::Bol(int_pad0));
+    m.set_key_str("precision",  precision);
+    m.set_key_str("width",      width);
 
     Ok(m)
 }

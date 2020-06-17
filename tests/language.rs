@@ -4056,7 +4056,6 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{x}{y}x\" $i(3, 4, 5, 6)"),        "a34x");
     assert_eq!(v2s("$F\"a{zx}{xx}x\" $i(3, 4, 5, 6)"),      "a$i(5,3)$i(3,3)x");
     assert_eq!(v2s("$F$b\"a{}x\" 10"),                      "a10x");
-    assert_eq!(v2s("$F$b\"a{}x\" $b\"\\xFF\""),             "a\\xFFx");
     assert_eq!(v2s("$F$b\"a{1}{0}x\" 10 22"),               "a2210x");
     assert_eq!(v2s("$F$b\"a{1}{0}{}x\" 10 22 33"),          format!("a{1}{0}{}x", 10, 22));
 
@@ -4067,4 +4066,6 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{:^05}x\"  399"),    "a00399x");
     assert_eq!(v2s("$F\"a{:^05}x\"  399"),    "a00399x");
     assert_eq!(v2s("$F\"a{:#x}x\" 399"),     "a0xffffx");
+
+    assert_eq!(v2s("$F$b\"a{}x\" $b\"\\xFF\""),             "a\\xFFx");
 }
