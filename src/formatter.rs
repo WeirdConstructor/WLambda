@@ -16,7 +16,7 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
     let mut identifier = String::new();
     let mut index      = String::new();
 
-    while !ps.lookahead_one_of(":$}") {
+    while !ps.lookahead_one_of(":$.}") {
         match ps.expect_some(ps.peek())? {
             c if c.is_digit(10) => {
                 ps.consume();
@@ -44,7 +44,7 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_count(ps: &mut State) -> Result<VVal, ParseError> {
-    if let Some(_) = ps.find_char('$') {
+    if let Some(_) = ps.find_char_not_of('$', ".") {
         parse_argument(ps)
     } else {
         let integer = ps.take_while(|c| c.is_digit(10));
@@ -102,7 +102,14 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
     let alternate = ps.consume_if_eq('#');
     let int_pad0  = ps.consume_if_eq('0');
 
-    let width = parse_count(ps)?;
+    let width =
+        if    ps.find_char_not_of('$', ".").is_some()
+           || (   ps.peek().is_some()
+               && !ps.lookahead(".")) {
+            parse_count(ps)?
+        } else {
+            VVal::None
+        };
 
     let precision =
         if ps.consume_if_eq('.') {
@@ -126,7 +133,9 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
 
     let m = VVal::map();
     if let Some(fill) = fill {
-        m.set_key_str("fill",   VVal::new_str_mv(fill.to_string()));
+        m.set_key_str("fill", VVal::new_str_mv(fill.to_string()));
+    } else {
+        m.set_key_str("fill", VVal::new_str(" "));
     }
     match align_char {
         Some('<') => { m.set_key_str("align", VVal::Int(-1)); },
@@ -268,6 +277,29 @@ impl FormatState {
         }
     }
 
+    fn cur_len(&self) -> usize {
+        if let Some(sd) = &self.str_data.as_ref() {
+            sd.len()
+        } else if let Some(bd) = &self.byte_data.as_ref() {
+            bd.len()
+        } else {
+            0
+        }
+    }
+
+    fn insert_at(&mut self, idx: usize, s: &str) {
+        if let Some(sd) = &mut self.str_data.as_mut() {
+            sd.insert_str(idx, s)
+        } else if let Some(bd) = &mut self.byte_data.as_mut() {
+            for (i, c) in s.chars().enumerate() {
+                let mut b = [0; 4];
+                for cb in c.encode_utf8(&mut b).as_bytes().iter() {
+                    bd.insert(idx, *cb);
+                }
+            }
+        }
+    }
+
     fn add_byte(&mut self, u: u8) {
         if let Some(sd) = &mut self.str_data.as_mut() {
             sd.push(std::char::from_u32(u as u32).unwrap());
@@ -278,20 +310,88 @@ impl FormatState {
 }
 
 pub type FormatNode = Box<dyn Fn(&mut FormatState, &[VVal])>;
+pub type CountNode  = Box<dyn Fn(&mut FormatState, &[VVal]) -> usize>;
+
+pub fn compile_count(count: &VVal) -> CountNode {
+    if count.v_with_s_ref(0, |s| s == "count") {
+        let count = count.v_i(1);
+        Box::new(move |fs: &mut FormatState, args: &[VVal]| -> usize {
+            count as usize
+        })
+    } else {
+        let count = count.clone();
+        Box::new(move |fs: &mut FormatState, args: &[VVal]| -> usize {
+            panic!("other count not yet supported! {}", count.s());
+        })
+    }
+}
 
 pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
+
+    let width = fmt.get_key("width");
+    let width : Option<CountNode> =
+        if let Some(width) = width {
+            Some(compile_count(&width))
+        } else {
+            None
+        };
+
+    let align = fmt.v_ik("align");
+
     Box::new(move |fs: &mut FormatState, args: &[VVal]| {
-        match &arg {
-            FormatArg::Index(i) => {
-                args[*i].with_s_ref(|s| fs.write_str(s));
-            },
-            FormatArg::Key(k) => {
-                let val =
-                    k.with_s_ref(|ks|
-                        args[0].get_key(ks).unwrap_or_else(|| VVal::None));
-                val.with_s_ref(|s| fs.write_str(s));
-            },
+        let (len, is_numeric) =
+            match &arg {
+                FormatArg::Index(i) => {
+                    let is_num =
+                           args[*i].is_int()
+                        || args[*i].is_float();
+
+                    (args[*i].with_s_ref(|s| { fs.write_str(s); s.len() }),
+                     is_num)
+                },
+                FormatArg::Key(k) => {
+                    let val =
+                        k.with_s_ref(|ks|
+                            args[0].get_key(ks).unwrap_or_else(|| VVal::None));
+
+                    let is_num =
+                           val.is_int()
+                        || val.is_float();
+
+                    (val.with_s_ref(|s| { fs.write_str(s); s.len() }),
+                     is_num)
+                },
+            };
+
+        let align =
+            if align == 0 {
+                if is_numeric { 1 } else { -1 }
+            } else {
+                align
+            };
+
+        let fill = " ";
+
+        if let Some(width) = &width {
+            let width = (*width)(fs, args);
+            if width > len {
+                let pad_len = width - len;
+                let pad = fill.repeat(pad_len);
+
+                match align {
+                    1  => {
+                        let idx = fs.cur_len() - len;
+                        fs.insert_at(idx, &pad);
+                    },
+                    2  => { },
+                    -1 => {
+                        fs.insert_at(fs.cur_len(), &pad);
+                    },
+                    _  => (),
+                }
+            }
         }
+
         // For any align: let the lower node write, and check
         // how the buffer changed.
         // then do something like: fs.pad_from_idx_with(last_idx, field_width)

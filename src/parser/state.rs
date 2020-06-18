@@ -433,6 +433,22 @@ impl State {
         None
     }
 
+    pub fn find_char_not_of(&self, c: char, not_of: &str) -> Option<usize> {
+        let len = self.input.len();
+        for i in self.ch_ptr..len {
+            for nc in not_of.chars() {
+                if self.input[i] == nc {
+                    return None;
+                }
+            }
+            if self.input[i] == c {
+                return Some(i);
+            }
+        }
+
+        None
+    }
+
     pub fn consume_lookahead(&mut self, s: &str) -> bool {
         if self.lookahead(s) {
             self.ch_ptr += s.len();
