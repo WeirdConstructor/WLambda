@@ -4069,3 +4069,8 @@ fn check_formatter() {
 
     assert_eq!(v2s("$F$b\"a{}x\" $b\"\\xFF\""),             "a\\xFFx");
 }
+
+#[test]
+fn check_hsv2rgb() {
+    assert_eq!(ve("std:v:rgb2hsv $i(255, 0, 0)"), "");
+}

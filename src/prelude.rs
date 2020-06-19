@@ -7768,13 +7768,15 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::FVec(Box::new(crate::nvec::NVec::rad2vec(env.arg(0).f()))))
         }, Some(1), Some(1), false);
 
-//    func!(st, "v:hex2hsva_i",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
-//
-//    func!(st, "v:hex2hsva_f",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
+    func!(st, "v:hex2hsva_i",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::None)
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:hex2hsva_f",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::None)
+        }, Some(1), Some(1), false);
 
     func!(st, "v:hex2rgba_i",
         |env: &mut Env, _argc: usize| {
@@ -7791,17 +7793,18 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::FVec(Box::new(NVec::from_tpl((r, g, Some(b), Some(a))).unwrap())))
         }, Some(1), Some(1), false);
 
-//    func!(st, "v:rgba2hex",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
-//
-//    func!(st, "v:hsv2rgb",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
+    func!(st, "v:rgba2hex",
+        |env: &mut Env, _argc: usize| {
+        }, Some(1), Some(1), false);
 
-//    func!(st, "v:rgb2hsv",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
+    func!(st, "v:hsv2rgb",
+        |env: &mut Env, _argc: usize| {
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:rgb2hsv",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::None)
+        }, Some(1), Some(1), false);
 
     func!(st, "sort",
         |env: &mut Env, argc: usize| {
