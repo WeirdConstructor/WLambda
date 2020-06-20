@@ -2012,6 +2012,36 @@ impl VVal {
     }
 
     #[inline]
+    pub fn ivec2(x: i64, y: i64) -> VVal {
+        VVal::IVec(Box::new(NVec::Vec2(x, y)))
+    }
+
+    #[inline]
+    pub fn ivec3(x: i64, y: i64, z: i64) -> VVal {
+        VVal::IVec(Box::new(NVec::Vec3(x, y, z)))
+    }
+
+    #[inline]
+    pub fn ivec4(x: i64, y: i64, z: i64, w: i64) -> VVal {
+        VVal::IVec(Box::new(NVec::Vec4(x, y, z, w)))
+    }
+
+    #[inline]
+    pub fn fvec2(x: f64, y: f64) -> VVal {
+        VVal::FVec(Box::new(NVec::Vec2(x, y)))
+    }
+
+    #[inline]
+    pub fn fvec3(x: f64, y: f64, z: f64) -> VVal {
+        VVal::FVec(Box::new(NVec::Vec3(x, y, z)))
+    }
+
+    #[inline]
+    pub fn fvec4(x: f64, y: f64, z: f64, w: f64) -> VVal {
+        VVal::FVec(Box::new(NVec::Vec4(x, y, z, w)))
+    }
+
+    #[inline]
     pub fn vec() -> VVal {
         VVal::Lst(Rc::new(RefCell::new(Vec::new())))
     }

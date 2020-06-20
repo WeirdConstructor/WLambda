@@ -4059,12 +4059,18 @@ fn check_formatter() {
     assert_eq!(v2s("$F$b\"a{1}{0}x\" 10 22"),               "a2210x");
     assert_eq!(v2s("$F$b\"a{1}{0}{}x\" 10 22 33"),          format!("a{1}{0}{}x", 10, 22));
 
-    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     "a399  x");
-    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     "a399  x");
-    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     "a  399x");
-    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     "a 399 x");
-    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    "a00399x");
-    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    "a00399x");
+    assert_eq!(v2s("$F\"a{:<5}x\"  ~ str 399"),     "a399  x");
+    assert_eq!(v2s("$F\"a{:<5}x\"  ~ str 399"),     "a399  x");
+    assert_eq!(v2s("$F\"a{:>5}x\"  ~ str 399"),     "a  399x");
+    assert_eq!(v2s("$F\"a{:^5}x\"  ~ str 399"),     "a 399 x");
+
+    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     format!("a{:<5}x", 399));
+    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     format!("a{:>5}x", 399));
+    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     format!("a{:^5}x", 399));
+
+    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    format!("a{:^05}x", 399));
+    assert_eq!(v2s("$F\"a{:<05}x\"  399"),    format!("a{:<05}x", 399));
+    assert_eq!(v2s("$F\"a{:>05}x\"  399"),    format!("a{:>05}x", 399));
     assert_eq!(v2s("$F\"a{:#x}x\" 399"),     "a0xffffx");
 
     assert_eq!(v2s("$F$b\"a{}x\" $b\"\\xFF\""),             "a\\xFFx");
@@ -4072,5 +4078,23 @@ fn check_formatter() {
 
 #[test]
 fn check_hsv2rgb() {
+    assert_eq!(ve("std:v:hex2hsva_f :FFFFFFFF"), "$f(360,100,100,100)");
+    assert_eq!(ve("std:v:hex2hsva_i :FFFFFFFF"), "$i(360,100,100,100)");
+    assert_eq!(ve("std:v:hex2hsva_f :55FFFFFF"), "$f(120,100,100,100)");
+    assert_eq!(ve("std:v:hex2hsva_i :55FFFFFF"), "$i(120,100,100,100)");
+    assert_eq!(ve("std:v:hex2hsva_f :00FFFFFF"), "$f(0,100,100,100)");
+    assert_eq!(ve("std:v:hex2hsva_i :00FFFFFF"), "$i(0,100,100,100)");
+    assert_eq!(ve("std:v:hex2hsva_f :00FF00FF"), "$f(0,100,0,100)");
+    assert_eq!(ve("std:v:hex2hsva_i :00FF00FF"), "$i(0,100,0,100)");
+    assert_eq!(ve("std:v:hex2hsva_f :0000FFFF"), "$f(0,0,100,100)");
+    assert_eq!(ve("std:v:hex2hsva_i :0000FFFF"), "$i(0,0,100,100)");
+    assert_eq!(ve("std:v:hex2hsva_f :000000FF"), "$f(0,0,0,100)");
+    assert_eq!(ve("std:v:hex2hsva_i :000000FF"), "$i(0,0,0,100)");
+    assert_eq!(ve("std:v:hex2hsva_f :00000000"), "$f(0,0,0,0)");
+    assert_eq!(ve("std:v:hex2hsva_i :00000000"), "$i(0,0,0,0)");
+
+    assert_eq!(ve("std:v:rgba2hex $i(255, 128, 64,  255)"), "\"ff8040ff\"");
+    assert_eq!(ve("std:v:rgba2hex $f(1.0, 0.5, 0.25, 1.0)"), "\"ff8040ff\"");
+
     assert_eq!(ve("std:v:rgb2hsv $i(255, 0, 0)"), "");
 }

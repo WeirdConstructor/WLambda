@@ -7770,12 +7770,28 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "v:hex2hsva_i",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::None)
+            let hsvaf =
+                env.arg_ref(0)
+                   .unwrap()
+                   .with_s_ref(|hex| util::hex2hsvaf(hex));
+            Ok(VVal::ivec4(
+                hsvaf.0.round() as i64,
+                hsvaf.1.round() as i64,
+                hsvaf.2.round() as i64,
+                hsvaf.3.round() as i64))
         }, Some(1), Some(1), false);
 
     func!(st, "v:hex2hsva_f",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::None)
+            let hsvaf =
+                env.arg_ref(0)
+                   .unwrap()
+                   .with_s_ref(|hex| util::hex2hsvaf(hex));
+            Ok(VVal::fvec4(
+                hsvaf.0,
+                hsvaf.1,
+                hsvaf.2,
+                hsvaf.3))
         }, Some(1), Some(1), false);
 
     func!(st, "v:hex2rgba_i",
@@ -7795,10 +7811,31 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "v:rgba2hex",
         |env: &mut Env, _argc: usize| {
+            let arg = env.arg_ref(0).unwrap().deref();
+            match arg {
+                VVal::FVec(fv) =>
+                    Ok(VVal::new_str_mv(util::rgba2hexf((
+                        fv.x_raw(),
+                        fv.y_raw(),
+                        fv.z_raw().unwrap_or(0.0),
+                        fv.w_raw().unwrap_or(0.0))))),
+                VVal::IVec(iv) =>
+                    Ok(VVal::new_str_mv(util::rgba2hex((
+                        iv.x_raw() as u8,
+                        iv.y_raw() as u8,
+                        iv.z_raw().unwrap_or(0) as u8,
+                        iv.w_raw().unwrap_or(0) as u8)))),
+                _ => {
+                    Ok(env.new_err(
+                        "v:rgba2hex expects float or int vectors"
+                        .to_string()))
+                },
+            }
         }, Some(1), Some(1), false);
 
     func!(st, "v:hsv2rgb",
         |env: &mut Env, _argc: usize| {
+            Ok(VVal::None)
         }, Some(1), Some(1), false);
 
     func!(st, "v:rgb2hsv",

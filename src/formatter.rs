@@ -376,15 +376,29 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
             let width = (*width)(fs, args);
             if width > len {
                 let pad_len = width - len;
-                let pad = fill.repeat(pad_len);
 
                 match align {
                     1  => {
                         let idx = fs.cur_len() - len;
+                        let pad = fill.repeat(pad_len);
                         fs.insert_at(idx, &pad);
                     },
-                    2  => { },
+                    2  => {
+                        let first_half_pad  = pad_len / 2;
+                        let second_half_pad =
+                            if first_half_pad <= pad_len {
+                                pad_len - first_half_pad
+                            } else {
+                                0
+                            };
+                        let idx = fs.cur_len() - len;
+                        let pad_l = fill.repeat(first_half_pad);
+                        let pad_r = fill.repeat(second_half_pad);
+                        fs.insert_at(idx, &pad_l);
+                        fs.insert_at(fs.cur_len(), &pad_r);
+                    },
                     -1 => {
+                        let pad = fill.repeat(pad_len);
                         fs.insert_at(fs.cur_len(), &pad);
                     },
                     _  => (),
