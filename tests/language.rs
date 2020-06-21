@@ -3650,12 +3650,6 @@ fooooob b fewif wifw
 }
 
 #[test]
-fn check_color_functions() {
-    assert_eq!(ve("ivec ~ (std:v:hex2rgba_f :33C0CC80) * 100"), "$i(20,75,80,50)");
-    assert_eq!(ve("std:v:hex2rgba_i :33C0CC80"),                "$i(51,192,204,128)");
-}
-
-#[test]
 fn check_regex_patterns() {
     assert_eq!(ve("type $r(a)"),   "\"function\"");
     assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: bad pattern: error[1,3:<pattern>] EOF while parsing: Unexpected EOF at code \'\'");
@@ -4077,7 +4071,10 @@ fn check_formatter() {
 }
 
 #[test]
-fn check_hsv2rgb() {
+fn check_color_functions() {
+    assert_eq!(ve("ivec ~ (std:v:hex2rgba_f :33C0CC80) * 100"), "$i(20,75,80,50)");
+    assert_eq!(ve("std:v:hex2rgba_i :33C0CC80"),                "$i(51,192,204,128)");
+
     assert_eq!(ve("std:v:hex2hsva_f :FFFFFFFF"), "$f(360,100,100,100)");
     assert_eq!(ve("std:v:hex2hsva_i :FFFFFFFF"), "$i(360,100,100,100)");
     assert_eq!(ve("std:v:hex2hsva_f :55FFFFFF"), "$f(120,100,100,100)");
@@ -4093,8 +4090,21 @@ fn check_hsv2rgb() {
     assert_eq!(ve("std:v:hex2hsva_f :00000000"), "$f(0,0,0,0)");
     assert_eq!(ve("std:v:hex2hsva_i :00000000"), "$i(0,0,0,0)");
 
-    assert_eq!(ve("std:v:rgba2hex $i(255, 128, 64,  255)"), "\"ff8040ff\"");
+    assert_eq!(ve("std:v:rgba2hex $i(255, 128, 64,  255)"),  "\"ff8040ff\"");
     assert_eq!(ve("std:v:rgba2hex $f(1.0, 0.5, 0.25, 1.0)"), "\"ff8040ff\"");
+    assert_eq!(ve("std:v:rgba2hex $i(255, 128, 64)"),        "\"ff8040ff\"");
+    assert_eq!(ve("std:v:rgba2hex $f(1.0, 0.5, 0.25)"),      "\"ff8040ff\"");
 
-    assert_eq!(ve("std:v:rgb2hsv $i(255, 0, 0)"), "");
+    assert_eq!(ve("std:v:hsv2rgb $i(360, 0, 0)"),       "");
+    assert_eq!(ve("std:v:hsv2rgb $i(0, 100, 0)"),       "");
+    assert_eq!(ve("std:v:hsv2rgb $i(0, 0, 100)"),       "");
+    assert_eq!(ve("std:v:hsv2rgb $f(360.0, 0, 0)"),       "");
+    assert_eq!(ve("std:v:hsv2rgb $f(0, 1.0, 0)"),       "");
+    assert_eq!(ve("std:v:hsv2rgb $f(0, 0, 1.0)"),       "");
+    assert_eq!(ve("std:v:hsv2rgb $i(360, 0, 0, 50)"),  "");
+    assert_eq!(ve("std:v:hsv2rgb $i(0, 100, 0, 50)"),  "");
+    assert_eq!(ve("std:v:hsv2rgb $i(0, 0, 100, 50)"),  "");
+    assert_eq!(ve("std:v:hsv2rgb $f(1.0, 0, 0, 100)"),  "");
+    assert_eq!(ve("std:v:hsv2rgb $f(0, 1.0, 0, 100)"),  "");
+    assert_eq!(ve("std:v:hsv2rgb $f(0, 0, 1.0, 100)"),  "");
 }

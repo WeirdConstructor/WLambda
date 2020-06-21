@@ -5867,6 +5867,54 @@ macro_rules! sizeof_writeln {
     }
 }
 
+macro_rules! process_vec_input {
+    ($env: ident, $arg: ident, $v: ident, $x: ident, $y: ident, $z: ident, $w: ident, $three_i: block, $three_f: block, $four_i: block, $four_f: block) => {
+        match $arg.nvec_len() {
+            3 => match $arg {
+                VVal::FVec($v) => {
+                    let $x = $v.x_raw();
+                    let $y = $v.y_raw();
+                    let $z = $v.z_raw().unwrap_or(0.0);
+                    $three_f
+                },
+                VVal::IVec($v) => {
+                    let $x = $v.x_raw()              as u8;
+                    let $y = $v.y_raw()              as u8;
+                    let $z = $v.z_raw().unwrap_or(0) as u8;
+                    $three_i
+                },
+                _ => {
+                    Ok($env.new_err(
+                        "expects float or int vectors".to_string()))
+                },
+            },
+            4 => match $arg {
+                VVal::FVec($v) => {
+                    let $x = $v.x_raw();
+                    let $y = $v.y_raw();
+                    let $z = $v.z_raw().unwrap_or(0.0);
+                    let $w = $v.w_raw().unwrap_or(0.0);
+                    $four_f
+                },
+                VVal::IVec($v) => {
+                    let $x = $v.x_raw()              as u8;
+                    let $y = $v.y_raw()              as u8;
+                    let $z = $v.z_raw().unwrap_or(0) as u8;
+                    let $w = $v.w_raw().unwrap_or(0) as u8;
+                    $four_i
+                },
+                _ => {
+                    Ok($env.new_err(
+                        "v:rgba2hex expects float or int vectors"
+                        .to_string()))
+                },
+            },
+            _ => Ok($env.new_err(
+                "expects 3 or 4 dimensional vectors".to_string()))
+        }
+    }
+}
+
 /// Returns a SymbolTable with all WLambda core language symbols.
 #[allow(clippy::cast_lossless,clippy::assign_op_pattern)]
 pub fn core_symbol_table() -> SymbolTable {
@@ -7798,44 +7846,62 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let (r, g, b, a) =
                 env.arg(0).with_s_ref(|s| util::hex2rgba(s));
-            Ok(VVal::IVec(Box::new(NVec::from_tpl(
-                (r as i64, g as i64, Some(b as i64), Some(a as i64))).unwrap())))
+            Ok(VVal::ivec_from_tpl4((r as i64, g as i64, b as i64, a as i64)))
         }, Some(1), Some(1), false);
 
     func!(st, "v:hex2rgba_f",
         |env: &mut Env, _argc: usize| {
             let (r, g, b, a) =
                 env.arg(0).with_s_ref(|s| util::hex2rgbaf(s));
-            Ok(VVal::FVec(Box::new(NVec::from_tpl((r, g, Some(b), Some(a))).unwrap())))
+            Ok(VVal::fvec_from_tpl4((r, g, b, a)))
         }, Some(1), Some(1), false);
 
     func!(st, "v:rgba2hex",
         |env: &mut Env, _argc: usize| {
             let arg = env.arg_ref(0).unwrap().deref();
-            match arg {
-                VVal::FVec(fv) =>
-                    Ok(VVal::new_str_mv(util::rgba2hexf((
-                        fv.x_raw(),
-                        fv.y_raw(),
-                        fv.z_raw().unwrap_or(0.0),
-                        fv.w_raw().unwrap_or(0.0))))),
-                VVal::IVec(iv) =>
-                    Ok(VVal::new_str_mv(util::rgba2hex((
-                        iv.x_raw() as u8,
-                        iv.y_raw() as u8,
-                        iv.z_raw().unwrap_or(0) as u8,
-                        iv.w_raw().unwrap_or(0) as u8)))),
-                _ => {
-                    Ok(env.new_err(
-                        "v:rgba2hex expects float or int vectors"
-                        .to_string()))
-                },
-            }
+            process_vec_input!(env, arg, v, x, y, z, w, {
+                Ok(VVal::new_str_mv(util::rgba2hex((x, y, z, 255))))
+            }, {
+                Ok(VVal::new_str_mv(util::rgba2hexf((x, y, z, 1.0))))
+            }, {
+                Ok(VVal::new_str_mv(util::rgba2hex((x, y, z, w))))
+            }, {
+                Ok(VVal::new_str_mv(util::rgba2hexf((x, y, z, w))))
+            })
         }, Some(1), Some(1), false);
 
     func!(st, "v:hsv2rgb",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::None)
+            let arg = env.arg_ref(0).unwrap().deref();
+            process_vec_input!(env, arg, v, x, y, z, w, {
+                let c =
+                    util::hsv2rgb(
+                        (x as f64),
+                        (y as f64 / 100.0),
+                        (z as f64 / 100.0));
+                Ok(VVal::ivec_from_tpl3((
+                    c.0 as i64,
+                    (c.1 * 100.0) as i64,
+                    (c.2 * 100.0) as i64)))
+            }, {
+                let c = util::hsv2rgb(x, y, z);
+                Ok(VVal::fvec_from_tpl3(c))
+            }, {
+                let c =
+                    util::hsva2rgba((
+                        x as f64,
+                        (y as f64 / 100.0),
+                        (z as f64 / 100.0),
+                        (w as f64 / 100.0)));
+                Ok(VVal::ivec_from_tpl4((
+                    c.0 as i64,
+                    (c.1 * 100.0) as i64,
+                    (c.2 * 100.0) as i64,
+                    (c.3 * 100.0) as i64)))
+            }, {
+                let c = util::hsva2rgba((x, y, z, w));
+                Ok(VVal::fvec_from_tpl4(c))
+            })
         }, Some(1), Some(1), false);
 
     func!(st, "v:rgb2hsv",
