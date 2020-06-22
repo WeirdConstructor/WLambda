@@ -4095,16 +4095,21 @@ fn check_color_functions() {
     assert_eq!(ve("std:v:rgba2hex $i(255, 128, 64)"),        "\"ff8040ff\"");
     assert_eq!(ve("std:v:rgba2hex $f(1.0, 0.5, 0.25)"),      "\"ff8040ff\"");
 
-    assert_eq!(ve("std:v:hsv2rgb $i(360, 0, 0)"),       "");
-    assert_eq!(ve("std:v:hsv2rgb $i(0, 100, 0)"),       "");
-    assert_eq!(ve("std:v:hsv2rgb $i(0, 0, 100)"),       "");
-    assert_eq!(ve("std:v:hsv2rgb $f(360.0, 0, 0)"),       "");
-    assert_eq!(ve("std:v:hsv2rgb $f(0, 1.0, 0)"),       "");
-    assert_eq!(ve("std:v:hsv2rgb $f(0, 0, 1.0)"),       "");
-    assert_eq!(ve("std:v:hsv2rgb $i(360, 0, 0, 50)"),  "");
-    assert_eq!(ve("std:v:hsv2rgb $i(0, 100, 0, 50)"),  "");
-    assert_eq!(ve("std:v:hsv2rgb $i(0, 0, 100, 50)"),  "");
-    assert_eq!(ve("std:v:hsv2rgb $f(1.0, 0, 0, 100)"),  "");
-    assert_eq!(ve("std:v:hsv2rgb $f(0, 1.0, 0, 100)"),  "");
-    assert_eq!(ve("std:v:hsv2rgb $f(0, 0, 1.0, 100)"),  "");
+    assert_eq!(ve("std:v:hsv2rgb $i(0,   100, 100)"),       "$i(255,0,0)");
+    assert_eq!(ve("std:v:hsv2rgb $i(120, 100, 100)"),       "$i(0,255,0)");
+    assert_eq!(ve("std:v:hsv2rgb $i(240, 100, 100)"),       "$i(0,0,255)");
+    assert_eq!(ve("std:v:hsv2rgb $i(0, 0, 50)"),            "$i(128,128,128)");
+    assert_eq!(ve("std:v:hsv2rgb $i(50, 50, 50)"),          "$i(128,117,64)");
+    assert_eq!(ve("std:v:hsv2rgb $i(360, 50, 50)"),         "$i(128,64,64)");
+    assert_eq!(ve("std:v:hsv2rgb $i(0, 100, 50)"),          "");
+    assert_eq!(ve("std:v:hsv2rgb $i(0, 50, 100)"),          "");
+    assert_eq!(ve("std:v:hsv2rgb $f(360.0, 50, 50)"),       "");
+    assert_eq!(ve("std:v:hsv2rgb $f(0, 1.0, 1.0)"),         "");
+    assert_eq!(ve("std:v:hsv2rgb $f(0, 0.5, 1.0)"),         "");
+    assert_eq!(ve("std:v:hsv2rgb $i(360, 50, 50, 50)"),     "");
+    assert_eq!(ve("std:v:hsv2rgb $i(50, 100, 50, 50)"),     "");
+    assert_eq!(ve("std:v:hsv2rgb $i(50, 50, 100, 50)"),     "");
+    assert_eq!(ve("std:v:hsv2rgb $f(1.0, 0.5, 0.5, 100)"),  "");
+    assert_eq!(ve("std:v:hsv2rgb $f(50, 1.0, 0.5, 100)"),   "");
+    assert_eq!(ve("std:v:hsv2rgb $f(0.5, 0.5, 1.0, 100)"),  "");
 }

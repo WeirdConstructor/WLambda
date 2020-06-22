@@ -5878,9 +5878,9 @@ macro_rules! process_vec_input {
                     $three_f
                 },
                 VVal::IVec($v) => {
-                    let $x = $v.x_raw()              as u8;
-                    let $y = $v.y_raw()              as u8;
-                    let $z = $v.z_raw().unwrap_or(0) as u8;
+                    let $x = $v.x_raw();
+                    let $y = $v.y_raw();
+                    let $z = $v.z_raw().unwrap_or(0);
                     $three_i
                 },
                 _ => {
@@ -7860,11 +7860,11 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let arg = env.arg_ref(0).unwrap().deref();
             process_vec_input!(env, arg, v, x, y, z, w, {
-                Ok(VVal::new_str_mv(util::rgba2hex((x, y, z, 255))))
+                Ok(VVal::new_str_mv(util::rgba2hex( (x as u8, y as u8, z as u8, 255))))
             }, {
                 Ok(VVal::new_str_mv(util::rgba2hexf((x, y, z, 1.0))))
             }, {
-                Ok(VVal::new_str_mv(util::rgba2hex((x, y, z, w))))
+                Ok(VVal::new_str_mv(util::rgba2hex( (x as u8, y as u8, z as u8, w as u8))))
             }, {
                 Ok(VVal::new_str_mv(util::rgba2hexf((x, y, z, w))))
             })
@@ -7873,16 +7873,19 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "v:hsv2rgb",
         |env: &mut Env, _argc: usize| {
             let arg = env.arg_ref(0).unwrap().deref();
+            println!("ARG: {}", arg.s());
             process_vec_input!(env, arg, v, x, y, z, w, {
+                println!("IN: {} {} {}", x, y, z);
                 let c =
                     util::hsv2rgb(
                         (x as f64),
                         (y as f64 / 100.0),
                         (z as f64 / 100.0));
+                println!("OUT: {:?} {}", c, c.0 * 255.0);
                 Ok(VVal::ivec_from_tpl3((
-                    c.0 as i64,
-                    (c.1 * 100.0) as i64,
-                    (c.2 * 100.0) as i64)))
+                    (c.0 * 255.0).round() as i64,
+                    (c.1 * 255.0).round() as i64,
+                    (c.2 * 255.0).round() as i64)))
             }, {
                 let c = util::hsv2rgb(x, y, z);
                 Ok(VVal::fvec_from_tpl3(c))
@@ -7894,10 +7897,10 @@ pub fn std_symbol_table() -> SymbolTable {
                         (z as f64 / 100.0),
                         (w as f64 / 100.0)));
                 Ok(VVal::ivec_from_tpl4((
-                    c.0 as i64,
-                    (c.1 * 100.0) as i64,
-                    (c.2 * 100.0) as i64,
-                    (c.3 * 100.0) as i64)))
+                    (c.0 * 255.0).round() as i64,
+                    (c.1 * 255.0).round() as i64,
+                    (c.2 * 255.0).round() as i64,
+                    (c.3 * 255.0).round() as i64)))
             }, {
                 let c = util::hsva2rgba((x, y, z, w));
                 Ok(VVal::fvec_from_tpl4(c))
