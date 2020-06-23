@@ -5885,6 +5885,54 @@ macro_rules! sizeof_writeln {
     }
 }
 
+macro_rules! process_vec_input {
+    ($env: ident, $arg: ident, $v: ident, $x: ident, $y: ident, $z: ident, $w: ident, $three_i: block, $three_f: block, $four_i: block, $four_f: block) => {
+        match $arg.nvec_len() {
+            3 => match $arg {
+                VVal::FVec($v) => {
+                    let $x = $v.x_raw();
+                    let $y = $v.y_raw();
+                    let $z = $v.z_raw().unwrap_or(0.0);
+                    $three_f
+                },
+                VVal::IVec($v) => {
+                    let $x = $v.x_raw();
+                    let $y = $v.y_raw();
+                    let $z = $v.z_raw().unwrap_or(0);
+                    $three_i
+                },
+                _ => {
+                    Ok($env.new_err(
+                        "expects float or int vectors".to_string()))
+                },
+            },
+            4 => match $arg {
+                VVal::FVec($v) => {
+                    let $x = $v.x_raw();
+                    let $y = $v.y_raw();
+                    let $z = $v.z_raw().unwrap_or(0.0);
+                    let $w = $v.w_raw().unwrap_or(0.0);
+                    $four_f
+                },
+                VVal::IVec($v) => {
+                    let $x = $v.x_raw();
+                    let $y = $v.y_raw();
+                    let $z = $v.z_raw().unwrap_or(0);
+                    let $w = $v.w_raw().unwrap_or(0);
+                    $four_i
+                },
+                _ => {
+                    Ok($env.new_err(
+                        "v:rgba2hex expects float or int vectors"
+                        .to_string()))
+                },
+            },
+            _ => Ok($env.new_err(
+                "expects 3 or 4 dimensional vectors".to_string()))
+        }
+    }
+}
+
 /// Returns a SymbolTable with all WLambda core language symbols.
 #[allow(clippy::cast_lossless,clippy::assign_op_pattern)]
 pub fn core_symbol_table() -> SymbolTable {
@@ -7838,40 +7886,128 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::FVec(Box::new(crate::nvec::NVec::rad2vec(env.arg(0).f()))))
         }, Some(1), Some(1), false);
 
-//    func!(st, "v:hex2hsva_i",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
-//
-//    func!(st, "v:hex2hsva_f",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
+    func!(st, "v:hex2hsva_i",
+        |env: &mut Env, _argc: usize| {
+            let hsvaf =
+                env.arg_ref(0)
+                   .unwrap()
+                   .with_s_ref(|hex| util::hex2hsvaf(hex));
+            Ok(VVal::ivec4(
+                hsvaf.0.round() as i64,
+                hsvaf.1.round() as i64,
+                hsvaf.2.round() as i64,
+                hsvaf.3.round() as i64))
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:hex2hsva_f",
+        |env: &mut Env, _argc: usize| {
+            let hsvaf =
+                env.arg_ref(0)
+                   .unwrap()
+                   .with_s_ref(|hex| util::hex2hsvaf(hex));
+            Ok(VVal::fvec4(
+                hsvaf.0,
+                hsvaf.1,
+                hsvaf.2,
+                hsvaf.3))
+        }, Some(1), Some(1), false);
 
     func!(st, "v:hex2rgba_i",
         |env: &mut Env, _argc: usize| {
             let (r, g, b, a) =
                 env.arg(0).with_s_ref(|s| util::hex2rgba(s));
-            Ok(VVal::IVec(Box::new(NVec::from_tpl(
-                (r as i64, g as i64, Some(b as i64), Some(a as i64))).unwrap())))
+            Ok(VVal::ivec_from_tpl4((r as i64, g as i64, b as i64, a as i64)))
         }, Some(1), Some(1), false);
 
     func!(st, "v:hex2rgba_f",
         |env: &mut Env, _argc: usize| {
             let (r, g, b, a) =
                 env.arg(0).with_s_ref(|s| util::hex2rgbaf(s));
-            Ok(VVal::FVec(Box::new(NVec::from_tpl((r, g, Some(b), Some(a))).unwrap())))
+            Ok(VVal::fvec_from_tpl4((r, g, b, a)))
         }, Some(1), Some(1), false);
 
-//    func!(st, "v:rgba2hex",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
-//
-//    func!(st, "v:hsv2rgb",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
+    func!(st, "v:rgba2hex",
+        |env: &mut Env, _argc: usize| {
+            let arg = env.arg_ref(0).unwrap().deref();
+            process_vec_input!(env, arg, v, x, y, z, w, {
+                Ok(VVal::new_str_mv(util::rgba2hex( (x as u8, y as u8, z as u8, 255))))
+            }, {
+                Ok(VVal::new_str_mv(util::rgba2hexf((x, y, z, 1.0))))
+            }, {
+                Ok(VVal::new_str_mv(util::rgba2hex( (x as u8, y as u8, z as u8, w as u8))))
+            }, {
+                Ok(VVal::new_str_mv(util::rgba2hexf((x, y, z, w))))
+            })
+        }, Some(1), Some(1), false);
 
-//    func!(st, "v:rgb2hsv",
-//        |env: &mut Env, _argc: usize| {
-//        }, Some(1), Some(1), false);
+    func!(st, "v:hsv2rgb",
+        |env: &mut Env, _argc: usize| {
+            let arg = env.arg_ref(0).unwrap().deref();
+            println!("ARG: {}", arg.s());
+            process_vec_input!(env, arg, v, x, y, z, w, {
+                let c =
+                    util::hsv2rgb(
+                        (x as f64),
+                        (y as f64 / 100.0),
+                        (z as f64 / 100.0));
+                Ok(VVal::ivec_from_tpl3((
+                    (c.0 * 255.0).round() as i64,
+                    (c.1 * 255.0).round() as i64,
+                    (c.2 * 255.0).round() as i64)))
+            }, {
+                let c = util::hsv2rgb(x, y, z);
+                Ok(VVal::fvec_from_tpl3(c))
+            }, {
+                let c =
+                    util::hsva2rgba((
+                        x as f64,
+                        (y as f64 / 100.0),
+                        (z as f64 / 100.0),
+                        (w as f64 / 100.0)));
+                Ok(VVal::ivec_from_tpl4((
+                    (c.0 * 255.0).round() as i64,
+                    (c.1 * 255.0).round() as i64,
+                    (c.2 * 255.0).round() as i64,
+                    (c.3 * 255.0).round() as i64)))
+            }, {
+                let c = util::hsva2rgba((x, y, z, w));
+                Ok(VVal::fvec_from_tpl4(c))
+            })
+        }, Some(1), Some(1), false);
+
+    func!(st, "v:rgb2hsv",
+        |env: &mut Env, _argc: usize| {
+            let arg = env.arg_ref(0).unwrap().deref();
+            println!("ARG: {}", arg.s());
+            process_vec_input!(env, arg, v, x, y, z, w, {
+                let c =
+                    util::rgb2hsv(
+                        (x as f64) / 255.0,
+                        (y as f64) / 255.0,
+                        (z as f64) / 255.0);
+                Ok(VVal::ivec_from_tpl3((
+                    c.0.round() as i64,
+                    (c.1 * 100.0).round() as i64,
+                    (c.2 * 100.0).round() as i64)))
+            }, {
+                let c = util::rgb2hsv(x, y, z);
+                Ok(VVal::fvec_from_tpl3(c))
+            }, {
+                let c =
+                    util::rgb2hsv(
+                        (x as f64) / 255.0,
+                        (y as f64) / 255.0,
+                        (z as f64) / 255.0);
+                Ok(VVal::ivec_from_tpl4((
+                    c.0.round() as i64,
+                    (c.1 * 100.0).round() as i64,
+                    (c.2 * 100.0).round() as i64,
+                    ((w as f64 / 255.0) * 100.0).round() as i64)))
+            }, {
+                let c = util::rgba2hsvaf((x, y, z, w));
+                Ok(VVal::fvec_from_tpl4(c))
+            })
+        }, Some(1), Some(1), false);
 
     func!(st, "sort",
         |env: &mut Env, argc: usize| {

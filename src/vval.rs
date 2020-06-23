@@ -16,7 +16,7 @@ use std::fmt::{Display, Debug, Formatter};
 
 use crate::str_int::*;
 use crate::compiler::{GlobalEnv, GlobalEnvRef};
-use crate::nvec::NVec;
+use crate::nvec::{NVec, NVecNum};
 use crate::ops::Prog;
 
 use fnv::FnvHashMap;
@@ -2009,6 +2009,84 @@ impl VVal {
             (VVal::new_str(s),
              SynPos { syn: Syntax::Block, line: 0,
                       col: 0, file: FileRef::new("?"), name: None }))))
+    }
+
+    #[inline]
+    pub fn ivec2(x: i64, y: i64) -> VVal {
+        VVal::IVec(Box::new(NVec::Vec2(x, y)))
+    }
+
+    #[inline]
+    pub fn ivec3(x: i64, y: i64, z: i64) -> VVal {
+        VVal::IVec(Box::new(NVec::Vec3(x, y, z)))
+    }
+
+    #[inline]
+    pub fn ivec4(x: i64, y: i64, z: i64, w: i64) -> VVal {
+        VVal::IVec(Box::new(NVec::Vec4(x, y, z, w)))
+    }
+
+    #[inline]
+    pub fn fvec2(x: f64, y: f64) -> VVal {
+        VVal::FVec(Box::new(NVec::Vec2(x, y)))
+    }
+
+    #[inline]
+    pub fn fvec3(x: f64, y: f64, z: f64) -> VVal {
+        VVal::FVec(Box::new(NVec::Vec3(x, y, z)))
+    }
+
+    #[inline]
+    pub fn fvec4(x: f64, y: f64, z: f64, w: f64) -> VVal {
+        VVal::FVec(Box::new(NVec::Vec4(x, y, z, w)))
+    }
+
+    pub fn ivec_from_tpl2(tpl: (i64, i64)) -> VVal {
+        if let Some(nv) = NVec::from_tpl((tpl.0, tpl.1, None, None)) {
+            VVal::IVec(Box::new(nv))
+        } else {
+            VVal::None
+        }
+    }
+
+    pub fn ivec_from_tpl3(tpl: (i64, i64, i64)) -> VVal {
+        if let Some(nv) = NVec::from_tpl((tpl.0, tpl.1, Some(tpl.2), None)) {
+            VVal::IVec(Box::new(nv))
+        } else {
+            VVal::None
+        }
+    }
+
+    pub fn ivec_from_tpl4(tpl: (i64, i64, i64, i64)) -> VVal {
+        if let Some(nv) = NVec::from_tpl((tpl.0, tpl.1, Some(tpl.2), Some(tpl.3))) {
+            VVal::IVec(Box::new(nv))
+        } else {
+            VVal::None
+        }
+    }
+
+    pub fn fvec_from_tpl2(tpl: (f64, f64)) -> VVal {
+        if let Some(nv) = NVec::from_tpl((tpl.0, tpl.1, None, None)) {
+            VVal::FVec(Box::new(nv))
+        } else {
+            VVal::None
+        }
+    }
+
+    pub fn fvec_from_tpl3(tpl: (f64, f64, f64)) -> VVal {
+        if let Some(nv) = NVec::from_tpl((tpl.0, tpl.1, Some(tpl.2), None)) {
+            VVal::FVec(Box::new(nv))
+        } else {
+            VVal::None
+        }
+    }
+
+    pub fn fvec_from_tpl4(tpl: (f64, f64, f64, f64)) -> VVal {
+        if let Some(nv) = NVec::from_tpl((tpl.0, tpl.1, Some(tpl.2), Some(tpl.3))) {
+            VVal::FVec(Box::new(nv))
+        } else {
+            VVal::None
+        }
     }
 
     #[inline]
