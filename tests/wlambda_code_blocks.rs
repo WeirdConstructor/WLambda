@@ -60,6 +60,10 @@ fn wlambda_code_blocks() {
             execute_script(&name, &snip);
         }
 
+        for (name, snip) in get_scripts_from_file("doc/wlambda_reference.md") {
+            execute_script(&name, &snip);
+        }
+
         for (name, snip) in get_scripts_from_file("src/parser.rs") {
             execute_script(&name, &snip);
         }

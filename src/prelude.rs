@@ -2646,6 +2646,24 @@ std:assert ~ is_bytes $b"ABC";
 std:assert ~ not ~ is_bytes "ABC";
 ```
 
+#### - std:bytes:replace _byte-vector_ _pattern_ _replacement_
+
+Replaces all occurences of _pattern_ in _byte-vector_ with _replacement_.
+
+```wlambda
+std:assert_eq
+    (std:bytes:replace $b"XXX\x01\x02\x03OOO" $b"\x01\x02\x03" $b"---")
+    $b"XXX---OOO";
+
+std:assert_eq
+    (std:bytes:replace $b"XXX\x01\x02\x03OOO" $b"\x01\x02\x03" $b"")
+    $b"XXXOOO";
+
+std:assert_eq
+    (std:bytes:replace $b"XXX\x01\x02\x03OOO" $b"\x01\x02\x03" $b"\xFF\xFF\xFF\xFF")
+    $b"XXX\xFF\xFF\xFF\xFFOOO";
+```
+
 ### <a name="311-symbols"></a>3.11 - Symbols
 
 Symbols are a special kind of strings that are interned by the runtime.  That
@@ -6643,6 +6661,58 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             Ok(VVal::new_byt(env.arg(0).as_bytes()))
         }, Some(1), Some(1), false);
+
+    func!(st, "bytes:replace",
+        |env: &mut Env, _argc: usize| {
+            let bv   = env.arg(0);
+            let pat  = env.arg(1);
+            let repl = env.arg(2);
+
+            let mut bv = bv.as_bytes();
+            pat.with_bv_ref(|pat|
+                repl.with_bv_ref(|repl| {
+                    let mut len = bv.len();
+                    let mut i = 0;
+                    let mut plen = pat.len();
+                    let mut rlen = repl.len();
+                    while i < len {
+                        if bv[i..].starts_with(&pat[..]) {
+
+                            if plen < rlen {
+                                for j in 0..rlen {
+                                    if j >= plen {
+                                        bv.insert(i + j, repl[j]);
+                                    } else {
+                                        bv[i + j] = repl[j];
+                                    }
+                                }
+                                i   += rlen;
+                                len += rlen - plen;
+
+                            } else if plen > rlen {
+                                for j in 0..plen {
+                                    if j >= rlen {
+                                        bv.remove(i + rlen);
+                                    } else {
+                                        bv[i + j] = repl[j];
+                                    }
+                                }
+                                len -= plen - rlen;
+
+                            } else {
+                                for j in 0..plen {
+                                    bv[i + j] = repl[j];
+                                }
+                                i += plen;
+                            }
+                        }
+
+                        i += 1;
+                    }
+                }));
+
+            Ok(VVal::new_byt(bv))
+        }, Some(3), Some(3), false);
 
     func!(st, "bytes:from_vec",
         |env: &mut Env, _argc: usize| {

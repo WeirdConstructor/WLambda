@@ -4059,13 +4059,31 @@ fn check_formatter() {
     assert_eq!(v2s("$F$b\"a{1}{0}x\" 10 22"),               "a2210x");
     assert_eq!(v2s("$F$b\"a{1}{0}{}x\" 10 22 33"),          format!("a{1}{0}{}x", 10, 22));
 
-    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     "a399  x");
-    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     "a399  x");
-    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     "a  399x");
-    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     "a 399 x");
-    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    "a00399x");
-    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    "a00399x");
-    assert_eq!(v2s("$F\"a{:#x}x\" 399"),     "a0xffffx");
+//    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     "a399  x");
+//    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     "a399  x");
+//    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     "a  399x");
+//    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     "a 399 x");
+//    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    "a00399x");
+//    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    "a00399x");
+//    assert_eq!(v2s("$F\"a{:#x}x\" 399"),     "a0xffffx");
+//
+//    assert_eq!(v2s("$F$b\"a{}x\" $b\"\\xFF\""),             "a\\xFFx");
+}
 
-    assert_eq!(v2s("$F$b\"a{}x\" $b\"\\xFF\""),             "a\\xFFx");
+#[test]
+fn check_byte_replace() {
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q//    $q/y/"),     "$b\"yfyoyoyxyxyxybyayr\"");
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q/xxx/ $q/yyy/"),   "$b\"fooyyybar\"");
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbar/       $q/xxx/ $q//"),"$b\"foobar\"");
+    assert_eq!(ve("std:bytes:replace $q/xxxfooxxxbar/    $q/xxx/ $q//"),"$b\"foobar\"");
+    assert_eq!(ve("std:bytes:replace $q/xxxfooxxxbarxxx/ $q/xxx/ $q//"),"$b\"foobar\"");
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q/xxx/ $q/yyyy/"),  "$b\"fooyyyybar\"");
+
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q/xxx/ $q/yyxxxyy/"),  "$b\"fooyyxxxyybar\"");
+
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbarxxxbox/ $q/xxx/ $q/yyyy/"), "$b\"fooyyyybaryyyybox\"");
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbarxxxbox/ $q/xxx/ $q/yyy/"),  "$b\"fooyyybaryyybox\"");
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbarxxxbox/ $q/xxx/ $q/yy/"),   "$b\"fooyybaryybox\"");
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbarxxxbox/ $q/xxx/ $q/y/"),    "$b\"fooybarybox\"");
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbarxxxbox/ $q/xxx/ $q//"),     "$b\"foobarbox\"");
 }

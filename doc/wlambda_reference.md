@@ -2632,6 +2632,24 @@ std:assert ~ is_bytes $b"ABC";
 std:assert ~ not ~ is_bytes "ABC";
 ```
 
+#### - std:bytes:replace _byte-vector_ _pattern_ _replacement_
+
+Replaces all occurences of _pattern_ in _byte-vector_ with _replacement_.
+
+```wlambda
+std:assert_eq
+    (std:bytes:replace $b"XXX\x01\x02\x03OOO" $b"\x01\x02\x03" $b"---")
+    $b"XXX---OOO";
+
+std:assert_eq
+    (std:bytes:replace $b"XXX\x01\x02\x03OOO" $b"\x01\x02\x03" $b"")
+    $b"XXXOOO";
+
+std:assert_eq
+    (std:bytes:replace $b"XXX\x01\x02\x03OOO" $b"\x01\x02\x03" $b"\xFF\xFF\xFF\xFF")
+    $b"XXX\xFF\xFF\xFF\xFFOOO";
+```
+
 ### <a name="311-symbols"></a>3.11 - Symbols
 
 Symbols are a special kind of strings that are interned by the runtime.  That

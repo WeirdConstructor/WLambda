@@ -3614,6 +3614,20 @@ impl VVal {
         }
     }
 
+
+    #[inline]
+    pub fn with_bv_ref<T, R>(&self, f: T) -> R
+        where T: FnOnce(&[u8]) -> R
+    {
+        match self {
+            VVal::Byt(v)  => f(&v.as_ref()[..]),
+            _ => {
+                let vec = self.as_bytes();
+                f(&vec[..])
+            }
+        }
+    }
+
     pub fn is_float(&self) -> bool {
         match self { VVal::Flt(_) => true, _ => false }
     }
