@@ -6716,50 +6716,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let pat  = env.arg(1);
             let repl = env.arg(2);
 
-            let mut bv = bv.as_bytes();
-            pat.with_bv_ref(|pat|
-                repl.with_bv_ref(|repl| {
-                    let mut len = bv.len();
-                    let mut i = 0;
-                    let mut plen = pat.len();
-                    let mut rlen = repl.len();
-                    while i < len {
-                        if bv[i..].starts_with(&pat[..]) {
-
-                            if plen < rlen {
-                                for j in 0..rlen {
-                                    if j >= plen {
-                                        bv.insert(i + j, repl[j]);
-                                    } else {
-                                        bv[i + j] = repl[j];
-                                    }
-                                }
-                                i   += rlen;
-                                len += rlen - plen;
-
-                            } else if plen > rlen {
-                                for j in 0..plen {
-                                    if j >= rlen {
-                                        bv.remove(i + rlen);
-                                    } else {
-                                        bv[i + j] = repl[j];
-                                    }
-                                }
-                                len -= plen - rlen;
-
-                            } else {
-                                for j in 0..plen {
-                                    bv[i + j] = repl[j];
-                                }
-                                i += plen;
-                            }
-                        }
-
-                        i += 1;
-                    }
-                }));
-
-            Ok(VVal::new_byt(bv))
+            Ok(bv.bytes_replace(&pat, &repl))
         }, Some(3), Some(3), false);
 
     func!(st, "bytes:from_vec",

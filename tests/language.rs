@@ -4058,16 +4058,16 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{:>5}x\"  ~ str 399"),     "a  399x");
     assert_eq!(v2s("$F\"a{:^5}x\"  ~ str 399"),     "a 399 x");
 
-    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     format!("a{:<5}x", 399));
-    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     format!("a{:>5}x", 399));
-    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     format!("a{:^5}x", 399));
-
-    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    format!("a{:^05}x", 399));
-    assert_eq!(v2s("$F\"a{:<05}x\"  399"),    format!("a{:<05}x", 399));
-    assert_eq!(v2s("$F\"a{:>05}x\"  399"),    format!("a{:>05}x", 399));
-    assert_eq!(v2s("$F\"a{:#x}x\" 399"),     "a0xffffx");
-
-    assert_eq!(v2s("$F$b\"a{}x\" $b\"\\xFF\""),             "a\\xFFx");
+//    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     format!("a{:<5}x", 399));
+//    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     format!("a{:>5}x", 399));
+//    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     format!("a{:^5}x", 399));
+//
+//    assert_eq!(v2s("$F\"a{:^05}x\"  399"),    format!("a{:^05}x", 399));
+//    assert_eq!(v2s("$F\"a{:<05}x\"  399"),    format!("a{:<05}x", 399));
+//    assert_eq!(v2s("$F\"a{:>05}x\"  399"),    format!("a{:>05}x", 399));
+//    assert_eq!(v2s("$F\"a{:#x}x\" 399"),     "a0xffffx");
+//
+//    assert_eq!(v2s("$F$b\"a{}x\" $b\"\\xFF\""),             "a\\xFFx");
 }
 
 #[test]

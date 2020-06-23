@@ -1899,31 +1899,7 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                     out
                 },
                 (VVal::Byt(needle), VVal::Byt(replace)) => {
-                    let inp        = s.as_ref();
-                    let needle     = needle.as_ref();
-                    let needle_len = needle.len();
-
-                    if needle_len > inp.len() {
-                        VVal::Byt(s.clone())
-                    } else {
-                        let mut out : Vec<u8>
-                            = Vec::with_capacity(inp.len());
-
-                        let mut i = 0;
-                        while i < inp.len() {
-                            if    i <= (inp.len() - needle_len)
-                               && inp[i..(i + needle_len)] == needle[0..needle_len]
-                            {
-                                out.extend_from_slice(&replace.as_ref()[..]);
-                                i += needle_len;
-                            } else {
-                                out.push(inp[i]);
-                                i += 1;
-                            }
-                        }
-
-                        VVal::new_byt(out)
-                    }
+                    val.bytes_replace(&a, &b)
                 },
                 _ => VVal::None
             }
@@ -2220,6 +2196,53 @@ impl VVal {
                 list.borrow_mut().swap(j, i);
             }
         }
+    }
+
+    pub fn bytes_replace(&self, pat: &VVal, repl: &VVal) -> Self {
+        let mut bv = self.as_bytes();
+        pat.with_bv_ref(|pat|
+            repl.with_bv_ref(|repl| {
+                let mut len = bv.len();
+                let mut i = 0;
+                let mut plen = pat.len();
+                let mut rlen = repl.len();
+                while i < len {
+                    if bv[i..].starts_with(&pat[..]) {
+
+                        if plen < rlen {
+                            for j in 0..rlen {
+                                if j >= plen {
+                                    bv.insert(i + j, repl[j]);
+                                } else {
+                                    bv[i + j] = repl[j];
+                                }
+                            }
+                            i   += rlen;
+                            len += rlen - plen;
+
+                        } else if plen > rlen {
+                            for j in 0..plen {
+                                if j >= rlen {
+                                    bv.remove(i + rlen);
+                                } else {
+                                    bv[i + j] = repl[j];
+                                }
+                            }
+                            len -= plen - rlen;
+
+                        } else {
+                            for j in 0..plen {
+                                bv[i + j] = repl[j];
+                            }
+                            i += plen;
+                        }
+                    }
+
+                    i += 1;
+                }
+            }));
+
+        VVal::new_byt(bv)
     }
 
     #[allow(clippy::while_let_on_iterator)]
