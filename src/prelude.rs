@@ -5897,10 +5897,10 @@ macro_rules! process_vec_input {
                     $four_f
                 },
                 VVal::IVec($v) => {
-                    let $x = $v.x_raw()              as u8;
-                    let $y = $v.y_raw()              as u8;
-                    let $z = $v.z_raw().unwrap_or(0) as u8;
-                    let $w = $v.w_raw().unwrap_or(0) as u8;
+                    let $x = $v.x_raw();
+                    let $y = $v.y_raw();
+                    let $z = $v.z_raw().unwrap_or(0);
+                    let $w = $v.w_raw().unwrap_or(0);
                     $four_i
                 },
                 _ => {
@@ -7875,13 +7875,11 @@ pub fn std_symbol_table() -> SymbolTable {
             let arg = env.arg_ref(0).unwrap().deref();
             println!("ARG: {}", arg.s());
             process_vec_input!(env, arg, v, x, y, z, w, {
-                println!("IN: {} {} {}", x, y, z);
                 let c =
                     util::hsv2rgb(
                         (x as f64),
                         (y as f64 / 100.0),
                         (z as f64 / 100.0));
-                println!("OUT: {:?} {}", c, c.0 * 255.0);
                 Ok(VVal::ivec_from_tpl3((
                     (c.0 * 255.0).round() as i64,
                     (c.1 * 255.0).round() as i64,
@@ -7909,7 +7907,36 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "v:rgb2hsv",
         |env: &mut Env, _argc: usize| {
-            Ok(VVal::None)
+            let arg = env.arg_ref(0).unwrap().deref();
+            println!("ARG: {}", arg.s());
+            process_vec_input!(env, arg, v, x, y, z, w, {
+                let c =
+                    util::rgb2hsv(
+                        (x as f64) / 255.0,
+                        (y as f64) / 255.0,
+                        (z as f64) / 255.0);
+                Ok(VVal::ivec_from_tpl3((
+                    c.0.round() as i64,
+                    (c.1 * 100.0).round() as i64,
+                    (c.2 * 100.0).round() as i64)))
+            }, {
+                let c = util::rgb2hsv(x, y, z);
+                Ok(VVal::fvec_from_tpl3(c))
+            }, {
+                let c =
+                    util::rgb2hsv(
+                        (x as f64) / 255.0,
+                        (y as f64) / 255.0,
+                        (z as f64) / 255.0);
+                Ok(VVal::ivec_from_tpl4((
+                    c.0.round() as i64,
+                    (c.1 * 100.0).round() as i64,
+                    (c.2 * 100.0).round() as i64,
+                    ((w as f64 / 255.0) * 100.0).round() as i64)))
+            }, {
+                let c = util::rgba2hsvaf((x, y, z, w));
+                Ok(VVal::fvec_from_tpl4(c))
+            })
         }, Some(1), Some(1), false);
 
     func!(st, "sort",

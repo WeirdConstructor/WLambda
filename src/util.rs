@@ -208,10 +208,10 @@ pub fn hsv2rgb(hue: f64, sat: f64, val: f64) -> (f64, f64, f64) {
         } else { // if hue >= 300.0 && hue < 360.0 {
             (c, 0.0, x)
         };
-    println!("in: h={}, s={}, v={}, r:{}, g:{}, b: {}", hue, sat, val,
-        (r_ + m) * 255.0,
-        (g_ + m) * 255.0,
-        (b_ + m) * 255.0);
+//    println!("in: h={}, s={}, v={}, r:{}, g:{}, b: {}", hue, sat, val,
+//        (r_ + m) * 255.0,
+//        (g_ + m) * 255.0,
+//        (b_ + m) * 255.0);
     (r_ + m, g_ + m, b_ + m)
 }
 
