@@ -2210,25 +2210,25 @@ impl VVal {
                     if bv[i..].starts_with(&pat[..]) {
 
                         if plen < rlen {
+                            let len_delta = rlen - plen;
+                            bv.resize(len + len_delta, 0);
+                            bv.copy_within((i + plen)..len, i + rlen);
+                            len += len_delta;
+
                             for j in 0..rlen {
-                                if j >= plen {
-                                    bv.insert(i + j, repl[j]);
-                                } else {
-                                    bv[i + j] = repl[j];
-                                }
+                                bv[i + j] = repl[j];
                             }
-                            i   += rlen;
-                            len += rlen - plen;
+                            i += rlen;
 
                         } else if plen > rlen {
-                            for j in 0..plen {
-                                if j >= rlen {
-                                    bv.remove(i + rlen);
-                                } else {
-                                    bv[i + j] = repl[j];
-                                }
+                            let len_delta = plen - rlen;
+                            bv.copy_within((i + plen)..len, i + rlen);
+                            bv.resize(len - len_delta, 0);
+                            len -= len_delta;
+
+                            for j in 0..rlen {
+                                bv[i + j] = repl[j];
                             }
-                            len -= plen - rlen;
 
                         } else {
                             for j in 0..plen {

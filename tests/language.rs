@@ -4134,12 +4134,13 @@ fn check_color_functions() {
 
 #[test]
 fn check_byte_replace() {
-    assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q//    $q/y/"),     "$b\"yfyoyoyxyxyxybyayr\"");
     assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q/xxx/ $q/yyy/"),   "$b\"fooyyybar\"");
     assert_eq!(ve("std:bytes:replace $q/fooxxxbar/       $q/xxx/ $q//"),"$b\"foobar\"");
     assert_eq!(ve("std:bytes:replace $q/xxxfooxxxbar/    $q/xxx/ $q//"),"$b\"foobar\"");
     assert_eq!(ve("std:bytes:replace $q/xxxfooxxxbarxxx/ $q/xxx/ $q//"),"$b\"foobar\"");
     assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q/xxx/ $q/yyyy/"),  "$b\"fooyyyybar\"");
+
+    assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q//    $q/y/"),     "$b\"yfyoyoyxyxyxybyayr\"");
 
     assert_eq!(ve("std:bytes:replace $q/fooxxxbar/ $q/xxx/ $q/yyxxxyy/"),  "$b\"fooyyxxxyybar\"");
 
