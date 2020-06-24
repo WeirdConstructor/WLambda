@@ -121,8 +121,6 @@ Smalltalk, LISP and Perl.
     - [3.8.14](#3814-stdvslerp-vec1-vec2-t) std:v:slerp _vec1_ _vec2_ _t_
     - [3.8.15](#3815-stdvvec2rad-vec) std:v:vec2rad _vec_
     - [3.8.16](#3816-stdvrad2vec-radians) std:v:rad2vec _radians_
-    - [3.8.17](#3817-stdvhex2rgbaf-string) std:v:hex2rgba\_f _string_
-    - [3.8.18](#3818-stdvhex2rgbai-string) std:v:hex2rgba\_i _string_
   - [3.9](#39-strings) Strings
     - [3.9.1](#391-string-literal-syntaxes) String Literal Syntaxes
     - [3.9.2](#392-str-value) str _value_
@@ -148,6 +146,7 @@ Smalltalk, LISP and Perl.
     - [3.10.1](#3101-call-properties-of-bytes) Call Properties of Bytes
     - [3.10.2](#3102-byte-conversion-functions) Byte Conversion Functions
     - [3.10.3](#3103-isbytes-value) is\_bytes _value_
+    - [3.10.4](#3104-stdbytesreplace-byte-vector-pattern-replacement) std:bytes:replace _byte-vector_ _pattern_ _replacement_
   - [3.11](#311-symbols) Symbols
     - [3.11.1](#3111-stdsymbolscollect) std:symbols:collect
   - [3.12](#312-pairs-pa-b) Pairs `$p(a, b)`
@@ -294,17 +293,24 @@ Smalltalk, LISP and Perl.
   - [11.2](#112-regex) regex
   - [11.3](#113-chrono) chrono
     - [11.3.1](#1131-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
-  - [11.4](#114-hash) hash
-    - [11.4.1](#1141-stdhashfnv1a-arg1-) std:hash:fnv1a _arg1_ ...
-  - [11.5](#115-rand) rand
-    - [11.5.1](#1151-stdrandsplitmix64new) std:rand:split\_mix64\_new
-    - [11.5.2](#1152-stdrandsplitmix64newfrom-seed) std:rand:split\_mix64\_new\_from _seed_
-    - [11.5.3](#1153-stdrandsplitmix64next-smstate-count) std:rand:split\_mix64\_next _sm\_state_ \[_count_]
-    - [11.5.4](#1154-stdrandsplitmix64nextopen01-smstate-count) std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
-  - [11.6](#116-utility-functions) Utility Functions
-    - [11.6.1](#1161-stddumpupvals-function) std:dump\_upvals _function_
+  - [11.4](#114-color-conversion) color conversion
+    - [11.4.1](#1141-stdvrgb2hsv-color-vector) std:v:rgb2hsv _color-vector_
+    - [11.4.2](#1142-stdvhsv2rgb-color-vector) std:v:hsv2rgb _color-vector_
+    - [11.4.3](#1143-stdvrgba2hex-color-vector) std:v:rgba2hex _color-vector_
+    - [11.4.4](#1144-stdvhex2rgbaf-string) std:v:hex2rgba\_f _string_
+    - [11.4.5](#1145-stdvhex2rgbai-string) std:v:hex2rgba\_i _string_
+  - [11.5](#115-hash) hash
+    - [11.5.1](#1151-stdhashfnv1a-arg1-) std:hash:fnv1a _arg1_ ...
+  - [11.6](#116-rand) rand
+    - [11.6.1](#1161-stdrandsplitmix64new) std:rand:split\_mix64\_new
+    - [11.6.2](#1162-stdrandsplitmix64newfrom-seed) std:rand:split\_mix64\_new\_from _seed_
+    - [11.6.3](#1163-stdrandsplitmix64next-smstate-count) std:rand:split\_mix64\_next _sm\_state_ \[_count_]
+    - [11.6.4](#1164-stdrandsplitmix64nextopen01-smstate-count) std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
+  - [11.7](#117-utility-functions) Utility Functions
+    - [11.7.1](#1171-stddumpupvals-function) std:dump\_upvals _function_
 - [12](#12-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [12.1](#121-special-forms) Special Forms
+  - [12.2](#122-string-formatting-syntax) String Formatting Syntax
 
 -----
 
@@ -2156,58 +2162,6 @@ std:assert_rel_eq r.x h.x 0.0001;
 std:assert_rel_eq r.y h.y 0.0001;
 ```
 
-#### <a name="3817-stdvhex2rgbaf-string"></a>3.8.17 - std:v:hex2rgba\_f _string_
-
-Interprets _string_ as an hex encoded color and
-returns a 4 element big float vector. The color components
-of the float vector go from 0.0 to 1.0.
-
-The string can be:
-
-- 8 characters: `"RRGGBBAA"`
-- 6 characters: `"RRGGBB"`, alpha will be 1.0
-- 4 characters: `"RGBA"`
-- 3 characters: `"RGB"`, alpha will be 1.0
-- 2 characters: `"YY"`, where YY is put into R, G and B. Alpha will be 1.0.
-
-```wlambda
-!color = std:v:hex2rgba_f "FF00FFFF";
-
-std:assert_rel_eq color.r 1.0 0.001;
-std:assert_rel_eq color.g 0.0 0.001;
-std:assert_rel_eq color.b 1.0 0.001;
-std:assert_rel_eq color.a 1.0 0.001;
-
-!color2 = std:v:hex2rgba_f "C83F";
-std:assert_rel_eq color2.r 0.8   0.001;
-std:assert_rel_eq color2.g 0.533 0.001;
-std:assert_rel_eq color2.b 0.2   0.001;
-std:assert_rel_eq color2.a 1.0   0.001;
-```
-
-#### <a name="3818-stdvhex2rgbai-string"></a>3.8.18 - std:v:hex2rgba\_i _string_
-
-Like `std:v:hex2rgba_f` this function converts a hex encoded color
-from _string_ but returns an integer vector with 4 elements.
-The integers are in the range of 0 to 255.
-
-About the format of _string_ please refer to `std:v:hex2rgba_f`.
-
-```wlambda
-!color = std:v:hex2rgba_i "FF00FFFF";
-
-std:assert_eq color.r 255;
-std:assert_eq color.g 0;
-std:assert_eq color.b 255;
-std:assert_eq color.a 255;
-
-!color2 = std:v:hex2rgba_i "C83F";
-std:assert_eq color2.r 204;
-std:assert_eq color2.g 136;
-std:assert_eq color2.b 51;
-std:assert_eq color2.a 255;
-```
-
 ### <a name="39-strings"></a>3.9 - Strings
 
 Strings in WLambda are like Rust UTF-8 encoded immutable Unicode strings.
@@ -2632,7 +2586,7 @@ std:assert ~ is_bytes $b"ABC";
 std:assert ~ not ~ is_bytes "ABC";
 ```
 
-#### - std:bytes:replace _byte-vector_ _pattern_ _replacement_
+#### <a name="3104-stdbytesreplace-byte-vector-pattern-replacement"></a>3.10.4 - std:bytes:replace _byte-vector_ _pattern_ _replacement_
 
 Replaces all occurences of _pattern_ in _byte-vector_ with _replacement_.
 
@@ -5425,15 +5379,123 @@ std:assert ~ (year_str | int) == 2020;
 !now_str = std:chrono:timestamp[];
 ```
 
-### <a name="114-hash"></a>11.4 - hash
+### <a name="114-color-conversion"></a>11.4 - color conversion
 
-#### <a name="1141-stdhashfnv1a-arg1-"></a>11.4.1 - std:hash:fnv1a _arg1_ ...
+This section highlights the color conversion functions available in WLambda.
+Numerical vectors are used in WLambda to represent colors. There are two
+representations of a color.
+
+If you use a float vector `$f(r, g, b, a)` the values for RGB are in the range
+of 0.0 to 1.0. For HSV `$f(h, s, v, a)` h is within 0.0 to 360.0 while the
+others are in the range 0.0 to 1.0.
+
+For integer vectors the values for RGB are in the range 0 to 255.
+And the values for HSV are in the range 0 to 360, and the others in the range
+0 to 100.
+
+You can also use 3 dimensional vectors without the alpha value: `$i(r, g, b)` / `$i(h, s, v)`
+and `$f(r, g, b)` / `$f(h, s, v)`.
+
+#### <a name="1141-stdvrgb2hsv-color-vector"></a>11.4.1 - std:v:rgb2hsv _color-vector_
+
+Converts an RGB color into a HSV color representation.
+
+```wlambda
+std:assert_eq std:v:rgb2hsv <& $i(0, 255, 0, 255)   $i(120, 100, 100, 100);
+std:assert_eq std:v:rgb2hsv <& $i(0, 255, 0)        $i(120, 100, 100);
+
+std:assert_eq std:v:rgb2hsv <& $f(0, 1.0, 0, 1.0)   $f(120, 1, 1, 1);
+std:assert_eq std:v:rgb2hsv <& $f(0, 1.0, 0)        $f(120, 1, 1);
+
+std:assert_eq std:v:rgb2hsv <& $f(0, 0.5, 0, 1.0)     $f(120, 1, 0.5, 1);
+std:assert_eq std:v:rgb2hsv <& $f(0.1, 0.5, 0.1, 1.0) $f(120, 0.8, 0.5, 1);
+```
+
+#### <a name="1142-stdvhsv2rgb-color-vector"></a>11.4.2 - std:v:hsv2rgb _color-vector_
+
+Converts a color from HSV to RGB representation.
+
+```wlambda
+std:assert_eq std:v:hsv2rgb <& $i(120, 80, 50, 100)   $i(25,128,25,255);
+
+!clr = std:v:hsv2rgb <& $f(120, 0.8, 0.5, 1.0);
+std:assert_rel_eq clr.r 0.1 0.001;
+std:assert_rel_eq clr.g 0.5 0.001;
+std:assert_rel_eq clr.b 0.1 0.001;
+```
+
+#### <a name="1143-stdvrgba2hex-color-vector"></a>11.4.3 - std:v:rgba2hex _color-vector_
+
+This function converts a color to a string of hex digits (without the common '#'
+prefix however).
+
+```wlambda
+std:assert_eq std:v:rgba2hex <& $i(255, 128, 64, 32)       "ff804020";
+std:assert_eq std:v:rgba2hex <& $f(1.0, 0.5, 0.25, 0.125)  "ff804020";
+```
+
+#### <a name="1144-stdvhex2rgbaf-string"></a>11.4.4 - std:v:hex2rgba\_f _string_
+
+Interprets _string_ as an hex encoded color and
+returns a 4 element big float vector. The color components
+of the float vector go from 0.0 to 1.0.
+
+The string can be:
+
+- 8 characters: `"RRGGBBAA"`
+- 6 characters: `"RRGGBB"`, alpha will be 1.0
+- 4 characters: `"RGBA"`
+- 3 characters: `"RGB"`, alpha will be 1.0
+- 2 characters: `"YY"`, where YY is put into R, G and B. Alpha will be 1.0.
+
+```wlambda
+!color = std:v:hex2rgba_f "FF00FFFF";
+
+std:assert_rel_eq color.r 1.0 0.001;
+std:assert_rel_eq color.g 0.0 0.001;
+std:assert_rel_eq color.b 1.0 0.001;
+std:assert_rel_eq color.a 1.0 0.001;
+
+!color2 = std:v:hex2rgba_f "C83F";
+std:assert_rel_eq color2.r 0.8   0.001;
+std:assert_rel_eq color2.g 0.533 0.001;
+std:assert_rel_eq color2.b 0.2   0.001;
+std:assert_rel_eq color2.a 1.0   0.001;
+```
+
+#### <a name="1145-stdvhex2rgbai-string"></a>11.4.5 - std:v:hex2rgba\_i _string_
+
+Like `std:v:hex2rgba_f` this function converts a hex encoded color
+from _string_ but returns an integer vector with 4 elements.
+The integers are in the range of 0 to 255.
+
+About the format of _string_ please refer to `std:v:hex2rgba_f`.
+
+```wlambda
+!color = std:v:hex2rgba_i "FF00FFFF";
+
+std:assert_eq color.r 255;
+std:assert_eq color.g 0;
+std:assert_eq color.b 255;
+std:assert_eq color.a 255;
+
+!color2 = std:v:hex2rgba_i "C83F";
+std:assert_eq color2.r 204;
+std:assert_eq color2.g 136;
+std:assert_eq color2.b 51;
+std:assert_eq color2.a 255;
+```
+
+
+### <a name="115-hash"></a>11.5 - hash
+
+#### <a name="1151-stdhashfnv1a-arg1-"></a>11.5.1 - std:hash:fnv1a _arg1_ ...
 
 Hashes all the arguments as FNV1a and returns an integer.
 
-### <a name="115-rand"></a>11.5 - rand
+### <a name="116-rand"></a>11.6 - rand
 
-#### <a name="1151-stdrandsplitmix64new"></a>11.5.1 - std:rand:split\_mix64\_new
+#### <a name="1161-stdrandsplitmix64new"></a>11.6.1 - std:rand:split\_mix64\_new
 
 Initializes the _sm_state_ from the current time (seconds) and returns it.
 The time is retrieved in seconds, so don't expect different seed states
@@ -5441,25 +5503,25 @@ if you call this multiple times in the same wall clock second.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1152-stdrandsplitmix64newfrom-seed"></a>11.5.2 - std:rand:split\_mix64\_new\_from _seed_
+#### <a name="1162-stdrandsplitmix64newfrom-seed"></a>11.6.2 - std:rand:split\_mix64\_new\_from _seed_
 
 Initializes the _sm_state_ from the given _seed_ and returns it.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1153-stdrandsplitmix64next-smstate-count"></a>11.5.3 - std:rand:split\_mix64\_next _sm\_state_ \[_count_]
+#### <a name="1163-stdrandsplitmix64next-smstate-count"></a>11.6.3 - std:rand:split\_mix64\_next _sm\_state_ \[_count_]
 
 Returns the _count_ next integer values generated from the given
 _sm_state_.
 
-#### <a name="1154-stdrandsplitmix64nextopen01-smstate-count"></a>11.5.4 - std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
+#### <a name="1164-stdrandsplitmix64nextopen01-smstate-count"></a>11.6.4 - std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
 
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
 
-### <a name="116-utility-functions"></a>11.6 - Utility Functions
+### <a name="117-utility-functions"></a>11.7 - Utility Functions
 
-#### <a name="1161-stddumpupvals-function"></a>11.6.1 - std:dump\_upvals _function_
+#### <a name="1171-stddumpupvals-function"></a>11.7.1 - std:dump\_upvals _function_
 
 Returns a vector of all the upvalues of the _function_.
 Please use this function for debugging purposes only, as the order of the
@@ -5769,7 +5831,7 @@ There are certain calls that are handled by the compiler differently.
 - `match _value-expr_ $p(structure_pattern, branch_block) ... [ branch_block ]
 - `jump _idx-expr_ _block1_ ...`
 
-### - String Formatting Syntax
+### <a name="122-string-formatting-syntax"></a>12.2 - String Formatting Syntax
 
 The `$F` special value takes a string and creates a formatting function.
 The syntax for formatting is very similar to Rust's string formatting:

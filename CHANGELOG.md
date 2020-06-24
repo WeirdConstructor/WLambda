@@ -10,6 +10,8 @@ to prohibit it to recurse into certain keys.
 * Feature: Added positive value condition to recursive selectors `$S(**=:{x=10})`
 to select only specific values to recurse into.
 * Feature: Added std:bytes:replace function.
+* Documentation: Color conversion functions `std:v:rgb2hsv`, `std:v:hsv2rgb`
+and others.
 
 0.6.1 (2020-06-04)
 ==================
