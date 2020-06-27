@@ -7079,6 +7079,26 @@ pub fn std_symbol_table() -> SymbolTable {
             }))
         }, Some(2), Some(2), false);
 
+    func!(st, "io:line",
+        |env: &mut Env, _argc: usize| {
+            let mut line = String::new();
+
+            let mut read = env.stdio.read.borrow_mut();
+            match read.read_line(&mut line) {
+                Ok(n) => {
+                    if n == 0 {
+                        return Ok(VVal::None);
+                    }
+                },
+                Err(e) => {
+                    return Ok(env.new_err(
+                        format!("IO-Error on std:io:line: {}", e)))
+                },
+            }
+
+            Ok(VVal::new_str_mv(line))
+        }, Some(0), Some(0), false);
+
     func!(st, "io:lines",
         |env: &mut Env, _argc: usize| {
             let f = env.arg(0);
