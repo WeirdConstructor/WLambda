@@ -313,6 +313,8 @@ Smalltalk, LISP and Perl.
     - [11.4.3](#1143-stdvrgba2hex-color-vector) std:v:rgba2hex _color-vector_
     - [11.4.4](#1144-stdvhex2rgbaf-string) std:v:hex2rgba\_f _string_
     - [11.4.5](#1145-stdvhex2rgbai-string) std:v:hex2rgba\_i _string_
+    - [11.4.6](#1146-stdvhex2hsvai-string) std:v:hex2hsva\_i _string_
+    - [11.4.7](#1147-stdvhex2hsvaf-string) std:v:hex2hsva\_f _string_
   - [11.5](#115-hash) hash
     - [11.5.1](#1151-stdhashfnv1a-arg1-) std:hash:fnv1a _arg1_ ...
   - [11.6](#116-rand) rand
@@ -5500,6 +5502,33 @@ std:assert_eq color2.b 51;
 std:assert_eq color2.a 255;
 ```
 
+#### <a name="1146-stdvhex2hsvai-string"></a>11.4.6 - std:v:hex2hsva\_i _string_
+
+Converts the hex represenation of a HSVA color to an integer vector `$i(h, s, v, a)`.
+This function is probably not that useful, as the bit distribution along
+the 3 bytes is not ideal. If you want to store colors properly, don't use this.
+It's mostly useful for testing and quick experiments.
+
+```wlambda
+!color = std:v:hex2hsva_i "FF8040FF";
+std:assert_eq color $i(360,50,25,100);
+```
+
+#### <a name="1147-stdvhex2hsvaf-string"></a>11.4.7 - std:v:hex2hsva\_f _string_
+
+Converts the hex represenation of a HSVA color to a float vector `$i(h, s, v, a)`.
+This function is probably not that useful, as the bit distribution along
+the 3 bytes is not ideal. If you want to store colors properly, don't use this.
+It's mostly useful for testing and quick experiments.
+
+```wlambda
+!color = std:v:hex2hsva_f "FF8040FF";
+
+std:assert_rel_eq color.0 360.0 1.0;
+std:assert_rel_eq color.1  50.0 1.0;
+std:assert_rel_eq color.2  25.0 1.0;
+std:assert_rel_eq color.3 100.0 1.0;
+```
 
 ### <a name="115-hash"></a>11.5 - hash
 
