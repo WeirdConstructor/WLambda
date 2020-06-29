@@ -173,8 +173,13 @@ pub fn rpc_handler_step(
                             let arg =
                                 if args.is_none() { vec![] }
                                 else { args.to_vec() };
-                            let ret =
-                                ctx.call(&v, &arg).unwrap_or_else(|_| VVal::None);
+                            let ret = match ctx.call(&v, &arg) {
+                                Ok(v)  => v,
+                                Err(e) =>
+                                    VVal::err_msg(
+                                        &format!("Panic in call to '{}': {:?}",
+                                                 name, e)),
+                            };
                             resp.send(&ret);
                         } else {
                             resp.send(
