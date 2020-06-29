@@ -5,6 +5,7 @@
 right.
 * Bugfix: `!@import wlambda` did not work as expected, it should have the same
 meaning as `!@wlambda`.
+* Bugfix: If a call in RPCHandle paniced, there was absolutely no error message.
 * Feature: Added negative key match to recursive selectors `$S(**!key=childs)`
 to prohibit it to recurse into certain keys.
 * Feature: Added positive value condition to recursive selectors `$S(**=:{x=10})`
