@@ -64,6 +64,10 @@ impl SynPos {
     pub fn s_short(&self) -> String {
         format!("[{},{}({:?})]", self.line, self.col, self.syn)
     }
+
+    pub fn s_only_pos(&self) -> String {
+        format!("[{},{}:{}]", self.line, self.col, self.file.s())
+    }
 }
 
 impl Display for SynPos {
@@ -165,6 +169,7 @@ pub enum Syntax {
     Export,
     DumpStack,
     DumpVM,
+    DebugPrint,
     MapSplice,
     VecSplice,
     Accum,

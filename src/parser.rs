@@ -455,6 +455,10 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 parse_nvec_body(ps, NVecKind::Int)
             }
         },
+        'D' if ps.consume_lookahead("DEBUG") => {
+            ps.skip_ws_and_comments();
+            Ok(ps.syn(Syntax::DebugPrint))
+        },
         'd' => {
             if ps.consume_lookahead("data") {
                 ps.skip_ws_and_comments();
@@ -1364,7 +1368,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                 Ok(exp)
                             },
                             "dump_stack" => Ok(ps.syn(Syntax::DumpStack)),
-                            "dump_vm" => Ok(ps.syn(Syntax::DumpVM)),
+                            "dump_vm"    => Ok(ps.syn(Syntax::DumpVM)),
                             _ => Err(ps.err(ParseErrorKind::BadKeyword(id.to_string(), "import or export"))),
                         }
                     } else {

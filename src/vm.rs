@@ -6,6 +6,7 @@ use crate::selector;
 use crate::struct_pattern;
 use crate::formatter;
 use crate::ops::*;
+use crate::io::debug_print_value;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -2325,6 +2326,17 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 Syntax::SelfData => {
                     pw_provides_result_pos!(prog,
                         { ResPos::Value(ResValue::SelfData) })
+                },
+                Syntax::DebugPrint => {
+                    pw_provides_result_pos!(prog, {
+                        let pos_str = spos.s_only_pos();
+                        let print_fun =
+                            VValFun::new_fun(
+                                move |env: &mut Env, argc: usize| {
+                                    debug_print_value(env, argc, &pos_str)
+                                }, None, None, true);
+                        prog.data_pos(print_fun)
+                    })
                 },
                 Syntax::Accum => {
                     match ast.at(1) {

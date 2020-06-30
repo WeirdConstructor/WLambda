@@ -13,6 +13,8 @@ to select only specific values to recurse into.
 * Feature: Added std:bytes:replace function.
 * Documentation: Color conversion functions `std:v:rgb2hsv`, `std:v:hsv2rgb`
 and others.
+* Feature: Added debug print function special value, that includes source position and
+dynamic type name: `$DEBUG ...`.
 
 0.6.1 (2020-06-04)
 ==================

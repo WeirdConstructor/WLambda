@@ -5138,6 +5138,37 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
+#### - $DEBUG _arg1_ ...
+
+This is a special value that evaluates to a print function that supplies the
+current position in the source code. For example this:
+
+```wlambda
+!k = $[1, 2, 3];
+
+$DEBUG "I got values:" k 99;
+```
+
+Will print this (assuming it's at line 1 col 3 in file `file_foo.wl`):
+
+```
+[1,3:<file_foo.wl>] DEBUG: "I got values:"(string) $[1,2,3](vector) 99(integer)
+```
+
+In case you want to directly write a string or some value, you will have
+to prefix the argument with the symbol `:\`:
+
+```wlambda
+!k = 30;
+$DEBUG :\ "k =" :\ k;
+```
+
+Will print like this:
+
+```
+[1,11:<wlambda::eval>] DEBUG: k = 30
+```
+
 #### <a name="1008-stdwriteln-arg1-"></a>10.0.8 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
@@ -5721,6 +5752,10 @@ In the following grammar, white space and comments are omitted:
                   | "@@" (* returns the current accumulator value *)
                   | "+"  (* resolves to the current accumulator function *)
                   ;
+    debug_print   = "DEBUG" (* evaluates to a debug print function that
+                               also prints source position and dynamic type.
+                               very useful for debugging. *)
+                  ;
     import        = "@import", ident, [ ident ]
                   ;
     export        = "@export", ident, [ "=" ], expr
@@ -5747,6 +5782,7 @@ In the following grammar, white space and comments are omitted:
                   | selector
                   | pattern
                   | struct_match
+                  | debug_print
                   | "\"             (* The global variable with the name "\" *)
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)

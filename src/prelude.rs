@@ -5938,6 +5938,7 @@ use crate::util;
 use std::rc::Rc;
 use crate::threads::*;
 use crate::selector::*;
+use crate::io::print_value;
 
 macro_rules! func {
     ($g: ident, $name: expr, $cb: expr, $min: expr, $max: expr, $err_arg_ok: expr) => {
@@ -6476,42 +6477,6 @@ pub fn core_symbol_table() -> SymbolTable {
         }, Some(4), Some(4), false);
 
     st
-}
-
-fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackAction> {
-    let mut write = env.stdio.write.borrow_mut();
-
-    for i in 0..argc {
-        if raw {
-            env.arg_ref(i).unwrap().with_s_ref(|s: &str| {
-                if i == (argc - 1) {
-                    if i > 0 { write!(write, " ").ok(); }
-                    writeln!(write, "{}", s).ok();
-                } else {
-                    if i > 0 { write!(write, " ").ok(); }
-                    write!(write, "{}", s).ok();
-                }
-            });
-        } else {
-            let s = env.arg_ref(i).unwrap().s();
-
-            if i == (argc - 1) {
-                if i > 0 { write!(write, " ").ok(); }
-                writeln!(write, "{}", s).ok();
-            } else {
-                if i > 0 { write!(write, " ").ok(); }
-                write!(write, "{}", s).ok();
-            }
-        }
-    }
-    if argc == 0 {
-        writeln!(write).ok();
-    }
-    if argc > 0 {
-        Ok(env.arg(argc - 1))
-    } else {
-        Ok(VVal::None)
-    }
 }
 
 /// Returns a SymbolTable with all WLambda standard library language symbols.
