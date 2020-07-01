@@ -30,6 +30,30 @@
 
 
 use std::num::Wrapping as w;
+use std::cell::RefCell;
+
+thread_local! {
+    static RAND_STATE: RefCell<SplitMix64> =
+        RefCell::new(SplitMix64::new(1234567890));
+}
+
+pub fn srand(seed: i64) {
+    RAND_STATE.with(|si| {
+        *si.borrow_mut() = SplitMix64::new(seed as u64);
+    })
+}
+
+pub fn rand_closed_open01() -> f64 {
+    RAND_STATE.with(|si| {
+        u64_to_closed_open01(si.borrow_mut().next_u64())
+    })
+}
+
+pub fn rand_i(max: u64) -> i64 {
+    RAND_STATE.with(|si| {
+        (si.borrow_mut().next_u64() % max) as i64
+    })
+}
 
 /// The `SplitMix64` random number generator.
 #[derive(Copy, Clone)]

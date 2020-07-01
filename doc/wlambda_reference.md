@@ -1026,6 +1026,63 @@ Please note, that the drop function will be executed in a newly constructed
 default EvalContext, this means there is some overhead and that the EvalContext
 dependent results of `std:eval` might be different.
 
+#### - std:time:now [_unit_]
+
+Returns the current system time since the UNIX epoch (1970-01-01 00:00:00 UTC).
+If no _unit_ is specified, the default is `:ms`. Following units are available:
+
+- seconds: `"s"`
+- milliseconds: `"ms"`
+- microseconds: `"us"`
+- nanoseconds: `"ns"`
+
+```wlambda
+std:assert (std:time:now :s)  > 1000;
+std:assert (std:time:now :ms) > 1000;
+std:assert len[str[std:time:now :ns]] > 18;
+```
+
+#### - std:srand [_seed_]
+
+With this function you can seed the internal pseudo random number
+generator based on an unspecified PRNG algorithm, that might or might not
+change in the next WLambda version.
+If no _seed_ is provided, the current system time (in `ns` resolution) is used.
+If _seed_ is provided, it is set to the integer value of that.
+
+```wlambda
+std:srand[];
+
+std:srand 1000;
+```
+
+#### - std:rand [_max_]
+
+Returns a random number between 0 and _max_.  The interval 0
+to _max_ is closed/open, that means 0 is included but _max_
+is not included.
+
+If _max_ is not provided, a float number between 0.0
+and 1.0 (including 0.0 but not including 1.0) is returned.
+
+```wlambda
+std:srand 1234567890;
+
+!zeros = $@i iter i 0 => 1000 {
+    ? std:rand[100] == 0 \$+ 1;
+};
+
+!count_100 = $@i iter i 0 => 1000 {
+    ? std:rand[100] == 100 \$+ 1;
+};
+
+std:assert zeros     >  0;
+std:assert count_100 == 0;
+
+std:assert std:rand[] < 1.0;
+std:assert std:rand[] >= 0.0;
+```
+
 ### <a name="27-function-utilities"></a>2.7 - Function utilities
 
 #### <a name="271-isfun-value"></a>2.7.1 - is\_fun _value_

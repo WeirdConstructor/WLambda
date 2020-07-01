@@ -6479,6 +6479,17 @@ pub fn core_symbol_table() -> SymbolTable {
     st
 }
 
+fn duration_to_vval(dur: std::time::Duration, unit: &str) -> VVal {
+    use std::convert::TryFrom;
+    match unit {
+        "s"  => { VVal::Int(i64::try_from(dur.as_secs())  .unwrap_or(0)) },
+        "ms" => { VVal::Int(i64::try_from(dur.as_millis()).unwrap_or(0)) },
+        "us" => { VVal::Int(i64::try_from(dur.as_micros()).unwrap_or(0)) },
+        "ns" => { VVal::Int(i64::try_from(dur.as_nanos()) .unwrap_or(0)) },
+        _    => { VVal::Int(i64::try_from(dur.as_millis()).unwrap_or(0)) },
+    }
+}
+
 /// Returns a SymbolTable with all WLambda standard library language symbols.
 pub fn std_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
@@ -7402,13 +7413,7 @@ pub fn std_symbol_table() -> SymbolTable {
             match env.arg(1).call_no_args(env) {
                 Ok(v) => {
                     let ret = VVal::vec();
-                    match &unit[..] {
-                        "s"  => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_secs())  .unwrap_or(0))); },
-                        "ms" => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_millis()).unwrap_or(0))); },
-                        "us" => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_micros()).unwrap_or(0))); },
-                        "ns" => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_nanos()) .unwrap_or(0))); },
-                        _    => { ret.push(VVal::Int(i64::try_from(t.elapsed().as_millis()).unwrap_or(0))); },
-                    }
+                    ret.push(duration_to_vval(t.elapsed(), &unit[..]));
                     ret.push(v);
                     Ok(ret)
                 },
@@ -7801,6 +7806,47 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(ret)
             })
         }, Some(3), Some(3), false);
+
+    func!(st, "srand",
+        |env: &mut Env, argc: usize| {
+            if argc == 0 {
+                use std::time::SystemTime;
+                match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                    Ok(n)  => util::srand(n.as_nanos() as i64),
+                    Err(_) => util::srand(1234567890),
+                }
+            } else {
+                util::srand(env.arg(0).i());
+            }
+            Ok(VVal::None)
+        }, Some(0), Some(1), false);
+
+    func!(st, "rand",
+        |env: &mut Env, argc: usize| {
+            if argc == 0 {
+                Ok(VVal::Flt(util::rand_closed_open01()))
+            } else {
+                match env.arg(0).deref() {
+                    VVal::Flt(f)
+                        => Ok(VVal::Flt(util::rand_closed_open01() * f)),
+                    v   => Ok(VVal::Int(util::rand_i(v.i() as u64)))
+                }
+            }
+        }, Some(0), Some(1), false);
+
+    func!(st, "time:now",
+        |env: &mut Env, _argc: usize| {
+            use std::time::SystemTime;
+            match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(n) => {
+                    Ok(env.arg(0).with_s_ref(|unit|
+                        duration_to_vval(n, &unit[..])))
+                },
+                Err(_) =>
+                    Err(StackAction::panic_msg(
+                        format!("SystemTime before UNIX EPOCH!")))
+            }
+        }, Some(0), Some(1), false);
 
     #[cfg(feature="chrono")]
     func!(st, "chrono:timestamp",
