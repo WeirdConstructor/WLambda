@@ -40,6 +40,9 @@ Smalltalk, LISP and Perl.
     - [2.6.1](#261-return-label-value) return [_label_] _value_
     - [2.6.2](#262-block-label-function) block [label] _function_
     - [2.6.3](#263-stdtodrop-function-or-raii-destructors-or-drop-functions) std:to\_drop _function_ (or RAII, Destructors or Drop Functions)
+    - [2.6.4](#264-stdtimenow-unit) std:time:now [_unit_]
+    - [2.6.5](#265-stdsrand-seed) std:srand [_seed_]
+    - [2.6.6](#266-stdrand-max) std:rand [_max_]
   - [2.7](#27-function-utilities) Function utilities
     - [2.7.1](#271-isfun-value) is\_fun _value_
 - [3](#3-data-types) Data Types
@@ -268,13 +271,14 @@ Smalltalk, LISP and Perl.
     - [10.0.5](#1005-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
     - [10.0.6](#1006-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
     - [10.0.7](#1007-stddisplayln-arg1-) std:displayln _arg1_ ...
-    - [10.0.8](#1008-stdwriteln-arg1-) std:writeln _arg1_ ...
-    - [10.0.9](#1009-stdeval-code-string) std:eval _code-string_
-    - [10.0.10](#10010-stdassert-bool-message) std:assert _bool_ \[_message_]
-    - [10.0.11](#10011-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
-    - [10.0.12](#10012-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
-    - [10.0.13](#10013-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
-    - [10.0.14](#10014-stdwlambdaversion) std:wlambda:version
+    - [10.0.8](#1008-debug-arg1-) $DEBUG _arg1_ ...
+    - [10.0.9](#1009-stdwriteln-arg1-) std:writeln _arg1_ ...
+    - [10.0.10](#10010-stdeval-code-string) std:eval _code-string_
+    - [10.0.11](#10011-stdassert-bool-message) std:assert _bool_ \[_message_]
+    - [10.0.12](#10012-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
+    - [10.0.13](#10013-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
+    - [10.0.14](#10014-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+    - [10.0.15](#10015-stdwlambdaversion) std:wlambda:version
   - [10.1](#101-io) I/O
     - [10.1.1](#1011-stdiofilereadtext-filename) std:io:file:read\_text _filename_
     - [10.1.2](#1012-stdiofileread-filename) std:io:file:read _filename_
@@ -1026,7 +1030,7 @@ Please note, that the drop function will be executed in a newly constructed
 default EvalContext, this means there is some overhead and that the EvalContext
 dependent results of `std:eval` might be different.
 
-#### - std:time:now [_unit_]
+#### <a name="264-stdtimenow-unit"></a>2.6.4 - std:time:now [_unit_]
 
 Returns the current system time since the UNIX epoch (1970-01-01 00:00:00 UTC).
 If no _unit_ is specified, the default is `:ms`. Following units are available:
@@ -1042,7 +1046,7 @@ std:assert (std:time:now :ms) > 1000;
 std:assert len[str[std:time:now :ns]] > 18;
 ```
 
-#### - std:srand [_seed_]
+#### <a name="265-stdsrand-seed"></a>2.6.5 - std:srand [_seed_]
 
 With this function you can seed the internal pseudo random number
 generator based on an unspecified PRNG algorithm, that might or might not
@@ -1056,7 +1060,7 @@ std:srand[];
 std:srand 1000;
 ```
 
-#### - std:rand [_max_]
+#### <a name="266-stdrand-max"></a>2.6.6 - std:rand [_max_]
 
 Returns a random number between 0 and _max_.  The interval 0
 to _max_ is closed/open, that means 0 is included but _max_
@@ -5195,7 +5199,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
-#### - $DEBUG _arg1_ ...
+#### <a name="1008-debug-arg1-"></a>10.0.8 - $DEBUG _arg1_ ...
 
 This is a special value that evaluates to a print function that supplies the
 current position in the source code. For example this:
@@ -5226,7 +5230,7 @@ Will print like this:
 [1,11:<wlambda::eval>] DEBUG: k = 30
 ```
 
-#### <a name="1008-stdwriteln-arg1-"></a>10.0.8 - std:writeln _arg1_ ...
+#### <a name="1009-stdwriteln-arg1-"></a>10.0.9 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
@@ -5241,7 +5245,7 @@ See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="1009-stdeval-code-string"></a>10.0.9 - std:eval _code-string_
+#### <a name="10010-stdeval-code-string"></a>10.0.10 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -5253,7 +5257,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="10010-stdassert-bool-message"></a>10.0.10 - std:assert _bool_ \[_message_]
+#### <a name="10011-stdassert-bool-message"></a>10.0.11 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -5264,7 +5268,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="10011-stdasserteq-actual-expected-message"></a>10.0.11 - std:assert\_eq _actual_ _expected_ \[_message_]
+#### <a name="10012-stdasserteq-actual-expected-message"></a>10.0.12 - std:assert\_eq _actual_ _expected_ \[_message_]
 
 This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -5275,7 +5279,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### <a name="10012-stdassertstreq-actual-expected"></a>10.0.12 - std:assert\_str\_eq _actual_ _expected_
+#### <a name="10013-stdassertstreq-actual-expected"></a>10.0.13 - std:assert\_str\_eq _actual_ _expected_
 
 This function stringifies _actual_ and _expected_ using the `str` function
 and compares the resulting strings.
@@ -5287,7 +5291,7 @@ if the maps are stringified using `str`:
 std:assert_str_eq $[1, 2, 3]        $[1, 2, 3];
 ```
 
-#### <a name="10013-stdassertreleq-l-r-epsilon-message"></a>10.0.13 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+#### <a name="10014-stdassertreleq-l-r-epsilon-message"></a>10.0.14 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -5303,7 +5307,7 @@ std:assert_rel_eq x y 1;
 # std:assert_eq x y 0.5;
 ```
 
-#### <a name="10014-stdwlambdaversion"></a>10.0.14 - std:wlambda:version
+#### <a name="10015-stdwlambdaversion"></a>10.0.15 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
