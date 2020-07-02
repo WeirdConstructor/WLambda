@@ -225,26 +225,27 @@ Smalltalk, LISP and Perl.
     - [5.4.3](#543-stdfold-accumulator-func-iteratable) std:fold _accumulator_ _func_ _iteratable_
     - [5.4.4](#544-stdenumerate-map-fn) std:enumerate _map-fn_
 - [6](#6-operators) Operators
-  - [6.1](#61-arithmetic) Arithmetic
-    - [6.1.1](#611--operand-1-operand-2-) + _operand-1_ _operand-2_ ...
-    - [6.1.2](#612---operand-1-operand-2-) - _operand-1_ _operand-2_ ...
-    - [6.1.3](#613--op-a-op-b) * _op-a_ _op-b_
-    - [6.1.4](#614--op-a-op-b) / _op-a_ _op-b_
-    - [6.1.5](#615--op-a-op-b) % _op-a_ _op-b_
-    - [6.1.6](#616--op-a-op-b) ^ _op-a_ _op-b_
-  - [6.2](#62-comparison) Comparison
-    - [6.2.1](#621--op-a-op-b) == _op-a_ _op-b_
-    - [6.2.2](#622--op-a-op-b) != _op-a_ _op-b_
-    - [6.2.3](#623--op-a-op-b) < _op-a_ _op-b_
-    - [6.2.4](#624--op-a-op-b) <= _op-a_ _op-b_
-    - [6.2.5](#625--op-a-op-b) > _op-a_ _op-b_
-    - [6.2.6](#626--op-a-op-b) >= _op-a_ _op-b_
-  - [6.3](#63-bit-operations) Bit Operations
-    - [6.3.1](#631--op-a-op-b) & _op-a_ _op-b_
-    - [6.3.2](#632--op-a-op-b) &^ _op-a_ _op-b_
-    - [6.3.3](#633--op-a-op-b) &| _op-a_ _op-b_
-    - [6.3.4](#634--op-a-op-b) << _op-a_ _op-b_
-    - [6.3.5](#635--op-a-op-b) >> _op-a_ _op-b_
+  - [6.1](#61-operator-assignment) Operator Assignment
+  - [6.2](#62-arithmetic) Arithmetic
+    - [6.2.1](#621--operand-1-operand-2-) + _operand-1_ _operand-2_ ...
+    - [6.2.2](#622---operand-1-operand-2-) - _operand-1_ _operand-2_ ...
+    - [6.2.3](#623--op-a-op-b) * _op-a_ _op-b_
+    - [6.2.4](#624--op-a-op-b) / _op-a_ _op-b_
+    - [6.2.5](#625--op-a-op-b) % _op-a_ _op-b_
+    - [6.2.6](#626--op-a-op-b) ^ _op-a_ _op-b_
+  - [6.3](#63-comparison) Comparison
+    - [6.3.1](#631--op-a-op-b) == _op-a_ _op-b_
+    - [6.3.2](#632--op-a-op-b) != _op-a_ _op-b_
+    - [6.3.3](#633--op-a-op-b) < _op-a_ _op-b_
+    - [6.3.4](#634--op-a-op-b) <= _op-a_ _op-b_
+    - [6.3.5](#635--op-a-op-b) > _op-a_ _op-b_
+    - [6.3.6](#636--op-a-op-b) >= _op-a_ _op-b_
+  - [6.4](#64-bit-operations) Bit Operations
+    - [6.4.1](#641--op-a-op-b) & _op-a_ _op-b_
+    - [6.4.2](#642--op-a-op-b) &^ _op-a_ _op-b_
+    - [6.4.3](#643--op-a-op-b) &| _op-a_ _op-b_
+    - [6.4.4](#644--op-a-op-b) << _op-a_ _op-b_
+    - [6.4.5](#645--op-a-op-b) >> _op-a_ _op-b_
 - [7](#7-data-structure-matchers-selectors-and-string-patternsregex) Data Structure Matchers, Selectors and String Patterns/Regex
   - [7.1](#71-data-structure-matcher) Data Structure Matcher
     - [7.1.1](#711-match-value-expr-match-pair1--default-expr) match _value-expr_ _match-pair1_ ... [_default-expr_]
@@ -2250,9 +2251,9 @@ notate string (and byte vector) literals:
 
 std:assert_eq s "a b c";
 ```
-- Byte vectors
-- Quoted strings
-- Quoted byte vectors
+- Byte vectors `$b"\x02FOO\x03"`
+- Quoted strings `$q(123433)`
+- Quoted byte vectors `$Q(XZY)`
 - WLambda code strings
 ```wlambda
 # Short form $c works too.
@@ -4414,7 +4415,7 @@ std:assert_eq (str l) (str $[$[0, "lo"], $[1, "mid"], $[2, "hi"]]);
 
 ## <a name="6-operators"></a>6 - Operators
 
-### - Operator Assignment
+### <a name="61-operator-assignment"></a>6.1 - Operator Assignment
 
 Please note, that you can use all these operators, as well as special operators
 like `=>`, `&>` and `<&` with assignment operations:
@@ -4439,7 +4440,7 @@ std:assert_eq f 100;
 std:assert_eq f 100;
 ```
 
-### <a name="61-arithmetic"></a>6.1 - Arithmetic
+### <a name="62-arithmetic"></a>6.2 - Arithmetic
 
 The output type (float vs. integer) of the numerical arithmetic operators is defined
 by the _first_ operand of the operation. Use the casting functions `float` or
@@ -4449,7 +4450,7 @@ Please note that not all operators are available as plain identifiers and need
 to be quoted when used in their prefix form or as functions, some of them are
 `*`, `/`, `%` and some others.
 
-#### <a name="611--operand-1-operand-2-"></a>6.1.1 - + _operand-1_ _operand-2_ ...
+#### <a name="621--operand-1-operand-2-"></a>6.2.1 - + _operand-1_ _operand-2_ ...
 
 This function implements arithmetic addition.  If the first operand is a
 float number, the substraction will return a float result. If it is an integer
@@ -4463,7 +4464,7 @@ std:assert_eq (+ "5" 2) 7;
 std:assert_eq (+ :5 2) 7;
 ```
 
-#### <a name="612---operand-1-operand-2-"></a>6.1.2 - - _operand-1_ _operand-2_ ...
+#### <a name="622---operand-1-operand-2-"></a>6.2.2 - - _operand-1_ _operand-2_ ...
 
 This function implements arithmetic substraction.  If the first operand is a
 float number, the substraction will return a float result. If it is an integer
@@ -4477,7 +4478,7 @@ std:assert_eq (- "5" 2) 3;
 std:assert_eq (- :5 2) 3;
 ```
 
-#### <a name="613--op-a-op-b"></a>6.1.3 - * _op-a_ _op-b_
+#### <a name="623--op-a-op-b"></a>6.2.3 - * _op-a_ _op-b_
 
 Returns the multiplication of the two operands.
 
@@ -4491,7 +4492,7 @@ std:assert (`*` 10 4) == 40;
 std:assert (float "10.1") * 4 == 40.4;
 ```
 
-#### <a name="614--op-a-op-b"></a>6.1.4 - / _op-a_ _op-b_
+#### <a name="624--op-a-op-b"></a>6.2.4 - / _op-a_ _op-b_
 
 Returns the division of the two operands.
 
@@ -4505,7 +4506,7 @@ std:assert (`/` 10 4) == 2;
 std:assert (float "10.1") * 4 == 40.4;
 ```
 
-#### <a name="615--op-a-op-b"></a>6.1.5 - % _op-a_ _op-b_
+#### <a name="625--op-a-op-b"></a>6.2.5 - % _op-a_ _op-b_
 
 Returns the remainder of the division of _op-a_ by _op-b_.
 
@@ -4514,7 +4515,7 @@ std:assert     5 % 4 == 1;
 std:assert (`%` 5 4) == 1;
 ```
 
-#### <a name="616--op-a-op-b"></a>6.1.6 - ^ _op-a_ _op-b_
+#### <a name="626--op-a-op-b"></a>6.2.6 - ^ _op-a_ _op-b_
 
 Returns _op-a_ raised by the power of _op-b_.
 Supports float and integers.
@@ -4525,9 +4526,9 @@ std:assert_eq std:num:round[(2.0 ^ 2.1) * 1000] 4287.0;
 std:assert_eq 2 ^ 2.1   4; # first arg type matters!
 ```
 
-### <a name="62-comparison"></a>6.2 - Comparison
+### <a name="63-comparison"></a>6.3 - Comparison
 
-#### <a name="621--op-a-op-b"></a>6.2.1 - == _op-a_ _op-b_
+#### <a name="631--op-a-op-b"></a>6.3.1 - == _op-a_ _op-b_
 
 Checks whether the two operands are equal to each other. Data types like
 booleans, integers, floats, symbols and strings are compared by their contents.
@@ -4549,7 +4550,7 @@ std:assert    $f(1.0,2.0,3.0) == $f(1.0,2.0,3.0);
 std:assert ~ `==` 1 (2 - 1); # prefix form
 ```
 
-#### <a name="622--op-a-op-b"></a>6.2.2 - != _op-a_ _op-b_
+#### <a name="632--op-a-op-b"></a>6.3.2 - != _op-a_ _op-b_
 
 Checks whether the two operands are distinct from each other.  Data types like
 booleans, integers, floats, symbols and strings are compared by their contents.
@@ -4571,7 +4572,7 @@ std:assert ~ `!=` 1 2;
 std:assert r1 != r2;
 ```
 
-#### <a name="623--op-a-op-b"></a>6.2.3 - < _op-a_ _op-b_
+#### <a name="633--op-a-op-b"></a>6.3.3 - < _op-a_ _op-b_
 
 Numerical comparison operator that checks whether _op-a_ is less than _op-b_
 
@@ -4581,7 +4582,7 @@ std:assert   10.1 < 10.2;
 std:assert not[10 < 10.1];  # the type of the first argument decides return type!
 ```
 
-#### <a name="624--op-a-op-b"></a>6.2.4 - <= _op-a_ _op-b_
+#### <a name="634--op-a-op-b"></a>6.3.4 - <= _op-a_ _op-b_
 
 Numerical comparison operator that checks whether _op-a_ is less or equal to _op-b_
 
@@ -4591,7 +4592,7 @@ std:assert 10.1 <= 10.2;
 std:assert 10   <= 10.1;  # integer <=, the type of the first argument decides return type!
 ```
 
-#### <a name="625--op-a-op-b"></a>6.2.5 - > _op-a_ _op-b_
+#### <a name="635--op-a-op-b"></a>6.3.5 - > _op-a_ _op-b_
 
 Numerical comparison operator that checks whether _op-a_ is greater than _op-b_
 
@@ -4601,7 +4602,7 @@ std:assert   11.1 > 11.0;
 std:assert not[10 > 10.1];  # the type of the first argument decides return type!
 ```
 
-#### <a name="626--op-a-op-b"></a>6.2.6 - >= _op-a_ _op-b_
+#### <a name="636--op-a-op-b"></a>6.3.6 - >= _op-a_ _op-b_
 
 Numerical comparison operator that checks whether _op-a_ is greater or equal to _op-b_
 
@@ -4611,9 +4612,9 @@ std:assert 10.2 >= 10.1;
 std:assert 10 >= 10.1;  # integer >=, the type of the first argument decides return type!
 ```
 
-### <a name="63-bit-operations"></a>6.3 - Bit Operations
+### <a name="64-bit-operations"></a>6.4 - Bit Operations
 
-#### <a name="631--op-a-op-b"></a>6.3.1 - & _op-a_ _op-b_
+#### <a name="641--op-a-op-b"></a>6.4.1 - & _op-a_ _op-b_
 
 Binary `and` operation between two integers.
 
@@ -4622,7 +4623,7 @@ std:assert (0b0011 & 0b1011) == 0b011;
 std:assert (3      &     11) == 3;
 ```
 
-#### <a name="632--op-a-op-b"></a>6.3.2 - &^ _op-a_ _op-b_
+#### <a name="642--op-a-op-b"></a>6.4.2 - &^ _op-a_ _op-b_
 
 Binary `xor` operation between two integers.
 
@@ -4631,7 +4632,7 @@ std:assert (0b0011 &^ 0b1011) == 0b1000;
 std:assert (3      &^     11) == 8;
 ```
 
-#### <a name="633--op-a-op-b"></a>6.3.3 - &| _op-a_ _op-b_
+#### <a name="643--op-a-op-b"></a>6.4.3 - &| _op-a_ _op-b_
 
 Binary `or` operation between two integers.
 
@@ -4640,7 +4641,7 @@ std:assert (0b0011 &| 0b1000) == 0b1011;
 std:assert (3      &|      8) == 11;
 ```
 
-#### <a name="634--op-a-op-b"></a>6.3.4 - << _op-a_ _op-b_
+#### <a name="644--op-a-op-b"></a>6.4.4 - << _op-a_ _op-b_
 
 Binary `left shift` operation of _op-a_ by _op-b_ bits.
 
@@ -4649,7 +4650,7 @@ std:assert (0b0011 << 3)   == 0b11000;
 std:assert (`<<` 0b1011 2) == 0b101100
 ```
 
-#### <a name="635--op-a-op-b"></a>6.3.5 - >> _op-a_ _op-b_
+#### <a name="645--op-a-op-b"></a>6.4.5 - >> _op-a_ _op-b_
 
 Binary `right shift` operation of _op-a_ by _op-b_ bits.
 
