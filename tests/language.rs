@@ -4176,6 +4176,9 @@ fn check_op_assignment() {
     assert_eq!(ve("!x = 2; .x <<= 2; x"),  "8");
     assert_eq!(ve("!x = 2; .x === 2; x"),  "$true");
 
+    assert_eq!(ve("!x = $&&2; .*x *= 2; x"), "$&&4");
+    assert_eq!(ve("!x = $&&2; .x *= 2; x"),  "4");
+
     assert_eq!(ve("!x = \\_ * 10; .x <&= 10; x"), "100");
     assert_eq!(ve("!x = 10; .x &>= \\_ * 20; x"), "200");
 }
