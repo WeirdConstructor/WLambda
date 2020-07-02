@@ -719,6 +719,12 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
     } else if op == "<&" {
         ps.syn(Syntax::OpCallLwR)
 
+    } else if op == "&@>" {
+        ps.syn(Syntax::OpCallApplyRwL)
+
+    } else if op == "<@&" {
+        ps.syn(Syntax::OpCallApplyLwR)
+
     } else {
         make_to_call(ps, make_var(ps, &op.to_string()))
     }
@@ -1074,8 +1080,10 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
 }
 
 fn get_op_binding_power(op: StrPart) -> (i32, i32) {
-    if       op == "&>"   { (32, 33) }
-    else if  op == "<&"   { (31, 30) }
+    if       op == "&>"
+          || op == "&@>"  { (32, 33) }
+    else if  op == "<&"
+          || op == "<@&"  { (31, 30) }
     else if  op == "^"    { (25, 26) }
     else if  op == "*"
           || op == "/"
@@ -1102,10 +1110,22 @@ fn get_op_binding_power(op: StrPart) -> (i32, i32) {
 fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
     match binop.at(0).unwrap().get_syn() {
         Syntax::OpNewPair => VVal::pair(left, right),
+        Syntax::OpCallApplyLwR => {
+            binop.set_syn_at(0, Syntax::Apply);
+            binop.push(left);
+            binop.push(right);
+            binop
+        },
         Syntax::OpCallLwR => {
             binop.set_syn_at(0, Syntax::Call);
             binop.push(left);
             binop.push(right);
+            binop
+        },
+        Syntax::OpCallApplyRwL => {
+            binop.set_syn_at(0, Syntax::Apply);
+            binop.push(right);
+            binop.push(left);
             binop
         },
         Syntax::OpCallRwL => {

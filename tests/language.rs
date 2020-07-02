@@ -1653,6 +1653,14 @@ fn check_apply() {
     assert_eq!(ve("std:str:cat[[$[1,2,3]]]"), "\"123\"");
     assert_eq!(ve("std:assert_eq std:str:cat[[$[1,2,3]]] \"123\""), "$true");
     assert_eq!(ve("!a = $[4,5,6]; std:str:cat[[a]]"), "\"456\"");
+
+    assert_eq!(ve("$[1, 2, 3, 4] &@> `+`"), "10");
+    assert_eq!(ve("`+` <@& $[1, 2, 3, 4]"), "10");
+
+    assert_eq!(ve("$[1, 2, 3, 4] &@> std:str:cat"), "\"1234\"");
+    assert_eq!(ve("std:str:cat <@& $[1, 2, 3, 4]"), "\"1234\"");
+
+    assert_eq!(ve("($iter 0 => 10) &> std:values &@> std:str:cat"), "\"0123456789\"");
 }
 
 #[test]

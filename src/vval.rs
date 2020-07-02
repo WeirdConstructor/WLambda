@@ -138,6 +138,8 @@ pub enum Syntax {
     OpNewPair,
     OpCallLwR,
     OpCallRwL,
+    OpCallApplyLwR,
+    OpCallApplyRwL,
     Str,
     Lst,
     IVec,

@@ -340,7 +340,10 @@ impl State {
                     if s == "&and" { return Some(s); }
                 }
                 if let Some(s) = self.peek3() {
-                    if s == "&or" { return Some(s); }
+                    if    s == "&or"
+                       || s == "&@>"
+                       || s == "<@&"
+                       { return Some(s); }
                 }
                 if let Some(s) = self.peek2() {
                     if   s == "<="

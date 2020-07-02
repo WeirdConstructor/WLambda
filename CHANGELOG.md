@@ -18,6 +18,7 @@ dynamic type name: `$DEBUG ...`.
 * Feature: Added `std:time:now`, `std:srand` and `std:rand`.
 * Feature: Introduced variable and field assignment
 operator syntax `.x += 10` and `o.x += 10`.
+* Feature: Added apply operators `&@>` and `<@&`.
 
 0.6.1 (2020-06-04)
 ==================

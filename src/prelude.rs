@@ -49,7 +49,9 @@ Smalltalk, LISP and Perl.
     - [2.5.1](#251--tail-argument-function-chaninig) '|' Tail Argument Function Chaninig
     - [2.5.2](#252--left-hand-function-chaining) '|>' Left Hand Function Chaining
     - [2.5.3](#253-forward-argument-pipe-arg--fun) Forward Argument Pipe `arg &> fun`
-    - [2.5.4](#254-reverse-argument-pipe-fun--arg) Reverse Argument Pipe `fun <& arg`
+    - [2.5.4](#254-forward-argument-apply-pipe-list--fun) Forward Argument Apply Pipe `list &@> fun`
+    - [2.5.5](#255-reverse-argument-pipe-fun--arg) Reverse Argument Pipe `fun <& arg`
+    - [2.5.6](#256-reverse-argument-apply-pipe-list--fun) Reverse Argument Apply Pipe `list &@> fun`
   - [2.6](#26-control-flow---returning) Control Flow - Returning
     - [2.6.1](#261-return-label-value) return [_label_] _value_
     - [2.6.2](#262-block-label-function) block [label] _function_
@@ -604,9 +606,9 @@ Third you can call a function with a vector as argument with `_expr_[[_expr_]]`,
 where the second expression should return a vector (if it doesn't it will use the
 value as first argument).
 
-The fourth alternative is the `&>` and `<&` argument pipe operators which
-can be conveniently used in conjunction with the first variant to prevent
-some parenthesis.
+The fourth alternative is the `&>` and `<&` (and the apply variants `&@>` and
+`<@&`) argument pipe operators which can be conveniently used in conjunction
+with the first variant to prevent some parenthesis.
 
 Here are examples:
 
@@ -918,7 +920,18 @@ You can see it as piping operation:
 std:assert_eq r "0000000abc";
 ```
 
-#### <a name="254-reverse-argument-pipe-fun--arg"></a>2.5.4 - Reverse Argument Pipe `fun <& arg`
+#### <a name="254-forward-argument-apply-pipe-list--fun"></a>2.5.4 - Forward Argument Apply Pipe `list &@> fun`
+
+This operator is like `&>`. But it will call the function with the elements
+in the given _list_ as arguments.
+
+That means: `list &@> fun` is equivalent to `fun[[list]]`.
+
+```
+std:assert_eq $[2, 5] &@> `+`   7;
+```
+
+#### <a name="255-reverse-argument-pipe-fun--arg"></a>2.5.5 - Reverse Argument Pipe `fun <& arg`
 
 Like the `&>` operator this operator, but it has a lower precedence (does not bind
 as strongly as `&>`) and is right associative. That means you can write this:
@@ -930,6 +943,17 @@ std:assert_eq r "0000000abc";
 ```
 
 That means, writing `f <& a <& x` becomes `f[a[x]]` or `(f (a x))`.
+
+#### <a name="256-reverse-argument-apply-pipe-list--fun"></a>2.5.6 - Reverse Argument Apply Pipe `list &@> fun`
+
+This operator is like `<&`. But it will call the function with the elements
+in the given _list_ as arguments.
+
+That means: `fun <@& list` is equivalent to `fun[[list]]`.
+
+```
+std:assert_eq `+` <@& $[2, 5]   7;
+```
 
 ### <a name="26-control-flow---returning"></a>2.6 - Control Flow - Returning
 
@@ -5914,8 +5938,8 @@ In the following grammar, white space and comments are omitted:
                   ;
     op            = (* here all operators are listed line by line regarding
                        their precedence, top to bottom *)
-                    "&>"              (* call rhs with lhs operator *)
-                  | "<&"              (* call lhs with rhs operator *)
+                    "&>" | "&@>"      (* call rhs with lhs operator *)
+                  | "<&" | "<@&"      (* call lhs with rhs operator *)
                   | "^"
                   | "*" | "/" | "%"
                   | "-" | "+"
