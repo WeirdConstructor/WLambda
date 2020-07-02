@@ -979,7 +979,28 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
             };
 
         if let Some(c) = ps.peek() {
+            let op = ps.peek_op_ws_la("=");
+
             match c {
+                _ if op.is_some() => {
+                    let op     = op.unwrap();
+                    let op_len = op.len();
+                    let binop  = make_binop(ps, op);
+
+                    ps.consume_wsc_n(op_len);
+                    ps.consume_wsc(); // consume '=' too!
+
+                    let get_value =
+                        optimize_get_key(ps, obj.clone(), value.clone());
+
+                    let field_set = ps.syn(Syntax::SetKey);
+                    field_set.push(obj);
+                    field_set.push(value);
+                    field_set.push(
+                        construct_op(binop, get_value, parse_expr(ps)?));
+
+                    return Ok(field_set);
+                },
                 '=' => {
                     if !ps.lookahead("==") {
                         ps.consume_wsc();
@@ -1266,6 +1287,8 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
         assign.push(ps.syn_raw(Syntax::Assign));
     }
 
+    let mut is_ref = false;
+
     if is_def {
         if ps.consume_if_eq_wsc(':') {
             let key = parse_identifier(ps)?;
@@ -1278,6 +1301,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     } else {
         if ps.consume_if_eq_wsc('*') {
             assign = ps.syn(Syntax::AssignRef);
+            is_ref = true;
         }
     }
 
@@ -1308,11 +1332,36 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
         _ => { ids.push(VVal::new_sym_mv(parse_identifier(ps)?)); }
     }
 
-    assign.push(ids);
 
-    if !ps.consume_if_eq_wsc('=') {
+    let op = ps.peek_op_ws_la("=");
+    if !is_def && !destructuring && op.is_some() && ids.len() == 1 {
+        let op     = op.unwrap();
+        let op_len = op.len();
+        let binop  = make_binop(ps, op);
+        ps.consume_wsc_n(op_len);
+        ps.consume_wsc(); // consume '=' too!
+
+        let mut var =
+            ids.at(0).unwrap().with_s_ref(|var_name|
+                make_var(ps, var_name));
+
+        if is_ref {
+            let r = ps.syn(Syntax::Deref);
+            r.push(var);
+            var = r;
+        }
+
+        assign.push(ids);
+        assign.push(
+            construct_op(binop, var, parse_expr(ps)?));
+
+        return Ok(assign);
+
+    } else if !ps.consume_if_eq_wsc('=') {
         return Err(ps.err(ParseErrorKind::ExpectedToken('=', "assignment")));
     }
+
+    assign.push(ids);
 
     assign.push(parse_expr(ps)?);
 

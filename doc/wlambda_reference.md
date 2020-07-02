@@ -4413,6 +4413,32 @@ std:assert_eq (str l) (str $[$[0, "lo"], $[1, "mid"], $[2, "hi"]]);
 ```
 
 ## <a name="6-operators"></a>6 - Operators
+
+### - Operator Assignment
+
+Please note, that you can use all these operators, as well as special operators
+like `=>`, `&>` and `<&` with assignment operations:
+
+```wlambda
+!x = 10;
+.x += 3;
+std:assert_eq x 13;
+
+# also comparison operators work
+!y = 10;
+.y < = 10;
+std:assert_eq y $false;
+
+# function argument pipelining also works in this context
+!f = \_ * 10;
+.f <&= 10;
+std:assert_eq f 100;
+
+!x = 10;
+.x &>= \_ * 10;
+std:assert_eq f 100;
+```
+
 ### <a name="61-arithmetic"></a>6.1 - Arithmetic
 
 The output type (float vs. integer) of the numerical arithmetic operators is defined
@@ -5896,7 +5922,7 @@ In the following grammar, white space and comments are omitted:
                   ;
     field         = ".", ( integer | ident | value ), [ field ]
                   ;
-    field_access  = field, "=", expr
+    field_access  = field, [ op ], "=", expr
                   | field, arg_list
                   | field
                   (* please note, that a field access like:
@@ -5920,7 +5946,7 @@ In the following grammar, white space and comments are omitted:
                   | call, { "|>", call }
                   | call, { "||", call }
                   ;
-    simple_assign = qident, "=", expr
+    simple_assign = qident, [ op ], "=", expr
                   ;
     destr_assign  = "(", [ qident, { ",", qident } ], ")", "=" expr
                   ;

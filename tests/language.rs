@@ -4150,3 +4150,24 @@ fn check_byte_replace() {
     assert_eq!(ve("std:bytes:replace $q/fooxxxbarxxxbox/ $q/xxx/ $q/y/"),    "$b\"fooybarybox\"");
     assert_eq!(ve("std:bytes:replace $q/fooxxxbarxxxbox/ $q/xxx/ $q//"),     "$b\"foobarbox\"");
 }
+
+#[test]
+fn check_op_assignment() {
+    assert_eq!(ve("!x = $[1,2,3]; x.1 += 10; x"),  "$[1,12,3]");
+    assert_eq!(ve("!x = $[1,2,3]; x.1 <== 20; x"), "$[1,$true,3]");
+    assert_eq!(ve("!x = $[1,2,3]; x.1 <= 20; x"),  "$[1,2,3]");
+    assert_eq!(ve("!x = $[1,2,3]; x.1 < = 20; x"), "$[1,$true,3]");
+    assert_eq!(ve("!x = $[1,2,3]; x.1 <<= 2; x"),  "$[1,8,3]");
+    assert_eq!(ve("!x = $[1,2,3]; x.1 === 2; x"),  "$[1,$true,3]");
+
+    assert_eq!(ve("!x = 2; .x += 10;  x"), "12");
+    assert_eq!(ve("!x = 2; .x + = 10; x"), "12");
+    assert_eq!(ve("!x = 2; .x <== 20; x"), "$true");
+    assert_eq!(ve("!x = 2; .x < = 20; x"), "$true");
+    assert_eq!(ve("!x = 2; .x > = 20; x"), "$false");
+    assert_eq!(ve("!x = 2; .x <<= 2; x"),  "8");
+    assert_eq!(ve("!x = 2; .x === 2; x"),  "$true");
+
+    assert_eq!(ve("!x = \\_ * 10; .x <&= 10; x"), "100");
+    assert_eq!(ve("!x = 10; .x &>= \\_ * 20; x"), "200");
+}

@@ -289,6 +289,31 @@ impl State {
         }
     }
 
+    /// Tries to peek for an WLambda operator followed
+    /// by the given look-ahead string.
+    pub fn peek_op_ws_la(&self, la: &str) -> Option<StrPart> {
+        let op = self.peek_op();
+        if let Some(op) = op {
+            if self.rest_len() >= (op.len() + la.len()) {
+                let mut inp_ws_offs = 0;
+                for (i, c) in la.chars().enumerate() {
+                    let mut inp = self.input[self.ch_ptr + op.len() + i];
+                    while inp.is_whitespace() {
+                        inp_ws_offs += 1;
+                        inp = self.input[self.ch_ptr + op.len() + inp_ws_offs + i];
+                    }
+                    if c != inp {
+                        return None;
+                    }
+                }
+                return Some(op);
+            } else {
+                return None;
+            }
+        }
+        return op;
+    }
+
     /// Tries to peek for an WLambda operator. Returns `None`
     /// either at EOF or if no operator could be found.
     pub fn peek_op(&self) -> Option<StrPart> {
