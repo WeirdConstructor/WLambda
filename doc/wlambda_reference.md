@@ -5938,6 +5938,26 @@ In the following grammar, white space and comments are omitted:
                   | "&and"            (* logical and, short circuit *)
                   | "&or"             (* logical or, short circuit *)
                   | "=>"              (* pair constructor *)
+                  | "+>"              (* take lhs, wrap it into list if not already
+                                         and append the right side.
+                                         if lhs is an iterator, append all elements. *)
+                  | "<+"              (* take rhs, wrap it into list if not already
+                                         and prepend the left side.
+                                         if rhs is an iterator, prepend all elements. *)
+                  | "%>"              (* take lhs, wrap it into a map if not already
+                                         and sets the given value as key to true.
+                                         if the rhs value is a pair, set as key/value.
+                                         if the rhs is a list, set the first element
+                                         as key, and the list as value.
+                                         if the rhs is a map, copy all keys.
+                                         if the rhs is an iterator, process the elements. *)
+                  | "<%"              (* take rhs, wrap it into a map if not already
+                                         and sets the given value as key to true.
+                                         if the lhs value is a pair, set as key/value.
+                                         if the lhs is a list, set the first element
+                                         as key, and the list as value.
+                                         if the lhs is a map, copy all keys.
+                                         if the lhs is an iterator, process the elements. *)
                   ;
     bin_op        = call_no_ops, { op, bin_op } (* precedence parsing is done
                                                    in a Pratt parser style *)

@@ -725,6 +725,18 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
     } else if op == "<@&" {
         ps.syn(Syntax::OpCallApplyLwR)
 
+    } else if op == "+>" {
+        ps.syn(Syntax::BinOpLstAppL)
+
+    } else if op == "<+" {
+        ps.syn(Syntax::BinOpLstPrepR)
+
+    } else if op == "%>" {
+        ps.syn(Syntax::BinOpMapSetL)
+
+    } else if op == "<%" {
+        ps.syn(Syntax::BinOpMapSetR)
+
     } else {
         make_to_call(ps, make_var(ps, &op.to_string()))
     }
@@ -1081,29 +1093,33 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
 
 fn get_op_binding_power(op: StrPart) -> (i32, i32) {
     if       op == "&>"
-          || op == "&@>"  { (32, 33) }
+          || op == "&@>"  { (54, 55) }
     else if  op == "<&"
-          || op == "<@&"  { (31, 30) }
-    else if  op == "^"    { (25, 26) }
+          || op == "<@&"  { (53, 52) }
+    else if  op == "^"    { (50, 51) }
     else if  op == "*"
           || op == "/"
-          || op == "%"    { (23, 24) }
+          || op == "%"    { (48, 49) }
     else if  op == "+"
-          || op == "-"    { (21, 22) }
+          || op == "-"    { (46, 47) }
     else if  op == "<<"
-          || op == ">>"   { (19, 20) }
+          || op == ">>"   { (44, 45) }
     else if  op == "<"
           || op == ">"
           || op == ">="
-          || op == "<="   { (17, 18) }
+          || op == "<="   { (42, 43) }
     else if  op == "=="
-          || op == "!="   { (15, 16) }
-    else if  op == "&"    { (13, 14) }
-    else if  op == "&^"   { (11, 12) }
-    else if  op == "&|"   { ( 9, 10) }
-    else if  op == "&and" { ( 7,  8) }
-    else if  op == "&or"  { ( 5,  6) }
-    else if  op == "=>"   { ( 2,  1) }
+          || op == "!="   { (40, 41) }
+    else if  op == "&"    { (29, 30) }
+    else if  op == "&^"   { (27, 28) }
+    else if  op == "&|"   { (25, 26) }
+    else if  op == "&and" { (23, 24) }
+    else if  op == "&or"  { (21, 22) }
+    else if  op == "=>"   { (20, 19) }
+    else if  op == "+>"   { (10, 11) }
+    else if  op == "<+"   { ( 9,  8) }
+    else if  op == "%>"   { ( 6,  7) }
+    else if  op == "<%"   { ( 5,  4) }
     else { panic!("Bad op: {}", op.to_string()) }
 }
 

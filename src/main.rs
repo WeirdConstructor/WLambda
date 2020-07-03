@@ -39,6 +39,11 @@ fn main() {
         if argv[1] == "-parse" {
             let contents = std::fs::read_to_string(&argv[2]).unwrap();
             wlambda::parser::parse(&contents, &argv[2]).expect("successful parse");
+        } else if argv.len() > 2 && argv[1] == "-e" {
+            match ctx.eval(&argv[2]) {
+                Ok(v)  => { println!("{}", v.s()); },
+                Err(e) => { println!("*** {}", e); }
+            }
         } else {
             match ctx.eval_file(&argv[1]) {
                 Ok(_) => (),

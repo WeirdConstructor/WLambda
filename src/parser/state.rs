@@ -322,18 +322,28 @@ impl State {
         match ch {
             '+' | '-'
                 => {
-                    if let Some(_s) = self.peek2() {
+                    if let Some(s) = self.peek2() {
                         if self.rest_len() > 1
                            && self.input[self.ch_ptr + 1].is_digit(10)
                         {
                             return None;
+                        } else if s == "+>" {
+                            return Some(s);
                         }
                     }
                     Some(self.spart_ptr(1))
                 },
             '*' | '/' | '%' | '^'
                 => {
-                    Some(self.spart_ptr(1))
+                    if let Some(s) = self.peek2() {
+                        if s == "%>" {
+                            Some(s)
+                        } else {
+                            Some(self.spart_ptr(1))
+                        }
+                    } else {
+                        Some(self.spart_ptr(1))
+                    }
                 },
             '<' | '>' | '!' | '=' | '&' => {
                 if let Some(s) = self.peek4() {
@@ -357,6 +367,8 @@ impl State {
                       || s == "=>"
                       || s == "<&"
                       || s == "&>"
+                      || s == "<+"
+                      || s == "<%"
                     { return Some(s); }
                 }
 
