@@ -4185,11 +4185,21 @@ fn check_op_assignment() {
 
 #[test]
 fn check_list_add_ops() {
-    assert_eq!(ve("1 +> 2 +> 3"),       "$[1,2,3]");
-    assert_eq!(ve("1 <+ 2 <+ 3"),       "$[1,2,3]");
-    assert_eq!(ve("1 +> 2 <+ 3"),       "$[1,2,3]");
-    assert_eq!(ve("1 <+ 2 +> 3"),       "$[1,2,3]");
-    assert_eq!(ve("1 <+ 2"),            "$[1,2]");
-    assert_eq!(ve("1 <++ 2"),           "$[1,2]");
-    assert_eq!(ve("1 <+ +2"),           "$[1,2]");
+    assert_eq!(ve("1 +> 2 +> 3"),       "$e \"Can\\\'t add to non collection, got \\\'1\\\' (type integer)\"");
+    assert_eq!(ve("$[] +> 2 +> 3"),     "$[2,3]");
+    assert_eq!(ve("1 <+ 2 <+ $[]"),     "$[1,2]");
+    assert_eq!(ve("1 <+ +2 <+ $[]"),    "$[1,2]");
+
+    assert_eq!(ve("$[] +> ($iter 1 => 3)"),      "$[1,2]");
+    assert_eq!(ve("($iter 1 => 3) <+ $[]"),      "$[2,1]");
+    assert_eq!(ve("$[] +> ($iter 1 => 3) +> 3"), "$[1,2,3]");
+
+    assert_eq!(ve("\"\" +> :a +> :b +> :c"),                "$[1,2]");
+    assert_eq!(ve("$b\"\" +> :a +> :b +> :c"),              "$[1,2]");
+    assert_eq!(ve("${} +> :a => 10 +> :b => 20 * 2 +> :x"), "$[1,2]");
+
+    assert_eq!(ve("{ _ * 2 } +> 1 +> 2"),    "4");
+    assert_eq!(ve("1 <+ 2 <+ { _ * 3 }"),    "3");
+    assert_eq!(ve("!v = $[]; 1 <+ 2 <+ { std:unshift v _ * 3; v }"), "$[3,6]");
+    assert_eq!(ve("!v = $[]; ($iter 1 => 3) <+ 1 <+ 2 <+ { std:unshift v _ * 3; v }"), "$[3,6]");
 }

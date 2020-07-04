@@ -2656,28 +2656,42 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },
-        VVal::Syn(SynPos { syn: Syntax::OpColAddL, .. }) => {
+        VVal::Syn(SynPos { syn: Syntax::OpColAddL, .. })
+        | VVal::Syn(SynPos { syn: Syntax::OpColAddR, .. }) => {
+            let col_add =
+                match ast {
+                    VVal::Syn(SynPos { syn: Syntax::OpColAddL, .. })
+                        => CollectionAdd::Unshift,
+                    _   => CollectionAdd::Push
+                };
+
             pw_provides_result_pos!(prog, {
                 let add_fun =
                     VValFun::new_fun(
-                        move |env: &mut Env, _argc: usize| {
+                        move |env: &mut Env, argc: usize| {
                             let args = env.argv_ref();
-                            let col = args[0].clone();
-                            col.add(&args[1..], CollectionAdd::Push);
-                            Ok(col)
-                        }, None, None, true);
-                prog.data_pos(add_fun)
-            })
-        },
-        VVal::Syn(SynPos { syn: Syntax::OpColAddR, .. }) => {
-            pw_provides_result_pos!(prog, {
-                let add_fun =
-                    VValFun::new_fun(
-                        move |env: &mut Env, _argc: usize| {
-                            let args = env.argv_ref();
-                            let col = args[0].clone();
-                            col.add(&args[1..], CollectionAdd::Unshift);
-                            Ok(col)
+                            if args[0].is_fun() {
+                                let fun = args[0].clone();
+                                let mut ret = VVal::None;
+
+                                for i in 1..argc {
+                                    let v = env.arg(i);
+                                    env.push(v);
+                                    // TODO: Add iterator special case!
+                                    match fun.call_internal(env, 1) {
+                                        Ok(v)                      => { ret = v; },
+                                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(*v); },
+                                        Err(StackAction::Next)     => { },
+                                        Err(e)                     => { env.popn(1); return Err(e); }
+                                    }
+                                    env.popn(1);
+                                }
+
+                                Ok(ret)
+                            } else {
+                                let col = args[0].clone();
+                                Ok(col.add(&args[1..], col_add))
+                            }
                         }, None, None, true);
                 prog.data_pos(add_fun)
             })

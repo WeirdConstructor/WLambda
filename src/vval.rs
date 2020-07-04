@@ -1402,7 +1402,7 @@ impl Drop for DropFun {
 }
 
 /// This type gives the end where to add the `VVal::add` function.
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone,Copy,PartialEq)]
 pub enum CollectionAdd {
     Push,
     Unshift,
@@ -3250,21 +3250,31 @@ impl VVal {
         }
     }
 
-    pub fn add(&self, env: &mut Env, vals: &[VVal], list_add: CollectionAdd) -> Result<VVal, StackAction> {
+    pub fn add(&self, vals: &[VVal], list_add: CollectionAdd) -> VVal {
         let collection = if self.is_ref() { self.deref() } else { self.clone() };
         println!("ADD: {:?}", vals);
 
-        match collection {
-            VVal::Fun(_) => {
-            },
-            VVal::Lst(_) => {
+        match &collection {
+            VVal::Lst(lst) => {
                 for v in vals.iter() {
                     if v.is_iter() {
+                        v.for_each(|v|
+                            match list_add {
+                                CollectionAdd::Push => {
+                                    lst.borrow_mut().push(v.clone());
+                                },
+                                CollectionAdd::Unshift => {
+                                    lst.borrow_mut().insert(0, v.clone());
+                                },
+                            }
+                        )
                     } else {
                         match list_add {
                             CollectionAdd::Push => {
+                                lst.borrow_mut().push(v.clone());
                             },
                             CollectionAdd::Unshift => {
+                                lst.borrow_mut().insert(0, v.clone());
                             },
                         }
                     }
@@ -3277,12 +3287,14 @@ impl VVal {
             VVal::Byt(_) => {
             },
             v => {
-                return Err(
-                    StackAction::panic_msg(
-                        format!("Can't add to non collection, got '{}' (type {})",
-                                v.s(), v.type_name())));
+                return VVal::err_msg(
+                    &format!("Can't add to non collection, got '{}' (type {})",
+                             v.s(),
+                             v.type_name()));
             },
         }
+
+        collection
 //        let collection =
 //            if (b.is_ref() && b.deref().is_vec() {
 //               b.deref()
