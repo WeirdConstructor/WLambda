@@ -135,15 +135,13 @@ pub enum Syntax {
     BinOpGe,
     BinOpGt,
     BinOpEq,
-    BinOpLstAppL,
-    BinOpLstPrepR,
-    BinOpMapSetL,
-    BinOpMapSetR,
     OpNewPair,
     OpCallLwR,
     OpCallRwL,
     OpCallApplyLwR,
     OpCallApplyRwL,
+    OpColAddL,
+    OpColAddR,
     Str,
     Lst,
     IVec,
@@ -1401,6 +1399,13 @@ impl Drop for DropFun {
             eprintln!("Error in drop function: {}", e);
         }
     }
+}
+
+/// This type gives the end where to add the `VVal::add` function.
+#[derive(Debug,Clone)]
+pub enum CollectionAdd {
+    Push,
+    Unshift,
 }
 
 /// VVal aka. VariantValue is a data structure to represent
@@ -3245,6 +3250,85 @@ impl VVal {
         }
     }
 
+    pub fn add(&self, env: &mut Env, vals: &[VVal], list_add: CollectionAdd) -> Result<VVal, StackAction> {
+        let collection = if self.is_ref() { self.deref() } else { self.clone() };
+        println!("ADD: {:?}", vals);
+
+        match collection {
+            VVal::Fun(_) => {
+            },
+            VVal::Lst(_) => {
+                for v in vals.iter() {
+                    if v.is_iter() {
+                    } else {
+                        match list_add {
+                            CollectionAdd::Push => {
+                            },
+                            CollectionAdd::Unshift => {
+                            },
+                        }
+                    }
+                }
+            },
+            VVal::Map(_) => {
+            },
+            VVal::Str(_) => {
+            },
+            VVal::Byt(_) => {
+            },
+            v => {
+                return Err(
+                    StackAction::panic_msg(
+                        format!("Can't add to non collection, got '{}' (type {})",
+                                v.s(), v.type_name())));
+            },
+        }
+//        let collection =
+//            if (b.is_ref() && b.deref().is_vec() {
+//               b.deref()
+//            } else if !b.is_vec() {
+//               VVal::vec1(b)
+//            } else {
+//                b
+//            };
+//
+//        if !b.is_vec() {
+//        }
+//
+//        match list_add {
+//            CollectionAdd::Push => {
+//                if let VVal::Iter(_) = a {
+//                    a.for_each(|v| b.push(v));
+//
+//                } else if a.is_ref() {
+//                    if let VVal::Iter(_) = a.deref() {
+//                        a.deref().for_each(|v| b.push(v));
+//                    } else {
+//                        b.push(a);
+//                    }
+//                } else {
+//                    b.push(a);
+//                }
+//            },
+//            CollectionAdd::Unshift => {
+//                if let VVal::Iter(_) = a {
+//                    a.for_each(|v| b.unshift(v));
+//
+//                } else if a.is_ref() {
+//                    if let VVal::Iter(_) = a.deref() {
+//                        a.deref().for_each(|v| b.unshift(v));
+//                    } else {
+//                        b.unshift(a);
+//                    }
+//                } else {
+//                    b.unshift(a);
+//                }
+//            },
+//        }
+//
+//        self
+    }
+
     pub fn insert_at(&self, index: usize, val: VVal) {
         if let VVal::Lst(b) = &self {
             b.borrow_mut().insert(index, val);
@@ -4045,6 +4129,11 @@ impl VVal {
         where T: FnMut(&VVal) -> () {
         if let VVal::Lst(b) = &self {
             for i in b.borrow().iter() { op(i); }
+
+        } else if let VVal::Iter(i) = &self {
+            loop {
+                iter_next_value!(i.borrow_mut(), v, { op(&v) }, { break; });
+            }
         }
     }
 

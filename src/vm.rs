@@ -2656,6 +2656,32 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },
+        VVal::Syn(SynPos { syn: Syntax::OpColAddL, .. }) => {
+            pw_provides_result_pos!(prog, {
+                let add_fun =
+                    VValFun::new_fun(
+                        move |env: &mut Env, _argc: usize| {
+                            let args = env.argv_ref();
+                            let col = args[0].clone();
+                            col.add(&args[1..], CollectionAdd::Push);
+                            Ok(col)
+                        }, None, None, true);
+                prog.data_pos(add_fun)
+            })
+        },
+        VVal::Syn(SynPos { syn: Syntax::OpColAddR, .. }) => {
+            pw_provides_result_pos!(prog, {
+                let add_fun =
+                    VValFun::new_fun(
+                        move |env: &mut Env, _argc: usize| {
+                            let args = env.argv_ref();
+                            let col = args[0].clone();
+                            col.add(&args[1..], CollectionAdd::Unshift);
+                            Ok(col)
+                        }, None, None, true);
+                prog.data_pos(add_fun)
+            })
+        },
         VVal::Pair(bx) => {
             let a = vm_compile2(&bx.0, ce)?;
             let b = vm_compile2(&bx.1, ce)?;

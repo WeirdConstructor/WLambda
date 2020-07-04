@@ -4182,3 +4182,14 @@ fn check_op_assignment() {
     assert_eq!(ve("!x = \\_ * 10; .x <&= 10; x"), "100");
     assert_eq!(ve("!x = 10; .x &>= \\_ * 20; x"), "200");
 }
+
+#[test]
+fn check_list_add_ops() {
+    assert_eq!(ve("1 +> 2 +> 3"),       "$[1,2,3]");
+    assert_eq!(ve("1 <+ 2 <+ 3"),       "$[1,2,3]");
+    assert_eq!(ve("1 +> 2 <+ 3"),       "$[1,2,3]");
+    assert_eq!(ve("1 <+ 2 +> 3"),       "$[1,2,3]");
+    assert_eq!(ve("1 <+ 2"),            "$[1,2]");
+    assert_eq!(ve("1 <++ 2"),           "$[1,2]");
+    assert_eq!(ve("1 <+ +2"),           "$[1,2]");
+}

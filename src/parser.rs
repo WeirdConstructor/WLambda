@@ -726,16 +726,10 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
         ps.syn(Syntax::OpCallApplyLwR)
 
     } else if op == "+>" {
-        ps.syn(Syntax::BinOpLstAppL)
+        ps.syn(Syntax::OpColAddR)
 
     } else if op == "<+" {
-        ps.syn(Syntax::BinOpLstPrepR)
-
-    } else if op == "%>" {
-        ps.syn(Syntax::BinOpMapSetL)
-
-    } else if op == "<%" {
-        ps.syn(Syntax::BinOpMapSetR)
+        ps.syn(Syntax::OpColAddL)
 
     } else {
         make_to_call(ps, make_var(ps, &op.to_string()))
@@ -1123,6 +1117,22 @@ fn get_op_binding_power(op: StrPart) -> (i32, i32) {
     else { panic!("Bad op: {}", op.to_string()) }
 }
 
+fn reform_binop(op: VVal) -> VVal {
+    match op.v_(0).get_syn() {
+        Syntax::OpColAddL => {
+            op.unshift(op.v_(0).clone());
+            op.set_syn_at(0, Syntax::Call);
+            op
+        },
+        Syntax::OpColAddR => {
+            op.unshift(op.v_(0).clone());
+            op.set_syn_at(0, Syntax::Call);
+            op
+        },
+        _ => op
+    }
+}
+
 fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
     match binop.at(0).unwrap().get_syn() {
         Syntax::OpNewPair => VVal::pair(left, right),
@@ -1149,6 +1159,26 @@ fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
             binop.push(right);
             binop.push(left);
             binop
+        },
+        Syntax::OpColAddL => {
+            if right.v_(0).get_syn() == Syntax::OpColAddL {
+                right.push(left);
+                right
+            } else {
+                binop.push(right);
+                binop.push(left);
+                binop
+            }
+        },
+        Syntax::OpColAddR => {
+            if left.v_(0).get_syn() == Syntax::OpColAddR {
+                left.push(right);
+                left
+            } else {
+                binop.push(left);
+                binop.push(right);
+                binop
+            }
         },
         _ => {
             binop.push(left);
@@ -1235,7 +1265,9 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                 let op_len = op.len();
                 ps.consume_wsc_n(op_len);
 
-                value = parse_binop(value, ps, r_bp, binop)?;
+                value =
+                    reform_binop(
+                        parse_binop(value, ps, r_bp, binop)?);
             },
             '=' => { break; }, // '=' from parsing map keys
             _ => {
@@ -1977,5 +2009,17 @@ mod tests {
         assert_eq!(parse("x a <& b"),        "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Var,:a],$[&Var,:b]]]]");
         assert_eq!(parse("x a <& b <& c"),   "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Var,:a],$[&Call,$[&Var,:b],$[&Var,:c]]]]]");
         assert_eq!(parse("x a <& b &> c"),   "$[&Block,$[&Call,$[&Var,:x],$[&Call,$[&Var,:a],$[&Call,$[&Var,:c],$[&Var,:b]]]]]");
+    }
+
+    #[test]
+    fn check_coll_add_op() {
+        assert_eq!(parse("a +> b +> c"),     "$[&Block,$[&Call,&OpColAddR,$[&Var,:a],$[&Var,:b],$[&Var,:c]]]");
+        assert_eq!(parse("c <+ b <+ a"),     "$[&Block,$[&Call,&OpColAddL,$[&Var,:a],$[&Var,:b],$[&Var,:c]]]");
+        assert_eq!(parse("a +> b"),          "$[&Block,$[&Call,&OpColAddR,$[&Var,:a],$[&Var,:b]]]");
+        assert_eq!(parse("b <+ a"),          "$[&Block,$[&Call,&OpColAddL,$[&Var,:a],$[&Var,:b]]]");
+
+        assert_eq!(parse("a + x +> b + x"),  "$[&Block,$[&Call,&OpColAddR,$[&BinOpAdd,$[&Var,:a],$[&Var,:x]],$[&BinOpAdd,$[&Var,:b],$[&Var,:x]]]]");
+        assert_eq!(parse("a + c <+ b + c"),  "$[&Block,$[&Call,&OpColAddL,$[&BinOpAdd,$[&Var,:b],$[&Var,:c]],$[&BinOpAdd,$[&Var,:a],$[&Var,:c]]]]");
+
     }
 }
