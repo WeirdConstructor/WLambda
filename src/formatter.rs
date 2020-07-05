@@ -2,12 +2,6 @@ use crate::vval::{VVal, Env, VValFun};
 
 use crate::parser::state::State;
 use crate::parser::state::{ParseError, ParseErrorKind};
-use crate::ops::DirectFun;
-
-use std::rc::Rc;
-use std::cell::RefCell;
-
-use crate::str_int::s2sym;
 
 use std::fmt::Write;
 

@@ -38,7 +38,7 @@ pub fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackA
 pub fn debug_print_value(env: &mut Env, argc: usize, pos_str: &str) -> Result<VVal, StackAction> {
     let mut write = env.stdio.write.borrow_mut();
 
-    write!(write, "{} DEBUG: ", pos_str);
+    write!(write, "{} DEBUG: ", pos_str).ok();
 
     let mut direct_print = false;
     for i in 0..argc {

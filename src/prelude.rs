@@ -6222,7 +6222,6 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use crate::compiler::*;
 use crate::vval::*;
-use crate::nvec::*;
 use crate::util;
 use std::rc::Rc;
 use crate::threads::*;
@@ -7707,7 +7706,6 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "measure_time",
         |env: &mut Env, _argc: usize| {
-            use std::convert::TryFrom;
             let t = std::time::Instant::now();
             let unit = env.arg(0).s_raw();
             match env.arg(1).call_no_args(env) {
@@ -8389,9 +8387,9 @@ pub fn std_symbol_table() -> SymbolTable {
             process_vec_input!(env, arg, v, x, y, z, w, {
                 let c =
                     util::hsv2rgb(
-                        (x as f64),
-                        (y as f64 / 100.0),
-                        (z as f64 / 100.0));
+                        x as f64,
+                        y as f64 / 100.0,
+                        z as f64 / 100.0);
                 Ok(VVal::ivec_from_tpl3((
                     (c.0 * 255.0).round() as i64,
                     (c.1 * 255.0).round() as i64,

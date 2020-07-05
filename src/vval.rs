@@ -16,7 +16,7 @@ use std::fmt::{Display, Debug, Formatter};
 
 use crate::str_int::*;
 use crate::compiler::{GlobalEnv, GlobalEnvRef};
-use crate::nvec::{NVec, NVecNum};
+use crate::nvec::{NVec};
 use crate::ops::Prog;
 
 use fnv::FnvHashMap;
@@ -1914,7 +1914,7 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
 
                     out
                 },
-                (VVal::Byt(needle), VVal::Byt(replace)) => {
+                (VVal::Byt(_needle), VVal::Byt(_replace)) => {
                     val.bytes_replace(&a, &b)
                 },
                 _ => VVal::None
@@ -2220,8 +2220,8 @@ impl VVal {
             repl.with_bv_ref(|repl| {
                 let mut len = bv.len();
                 let mut i = 0;
-                let mut plen = pat.len();
-                let mut rlen = repl.len();
+                let plen = pat.len();
+                let rlen = repl.len();
                 while i < len {
                     if bv[i..].starts_with(&pat[..]) {
 
