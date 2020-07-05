@@ -262,6 +262,9 @@ Smalltalk, LISP and Perl.
     - [6.4.3](#643--op-a-op-b) &| _op-a_ _op-b_
     - [6.4.4](#644--op-a-op-b) << _op-a_ _op-b_
     - [6.4.5](#645--op-a-op-b) >> _op-a_ _op-b_
+  - [6.5](#65-collection-addition-operators--and-) Collection Addition Operators +> and <+
+    - [6.5.1](#651--collection-a-) +> _collection_ _a_ ...
+    - [6.5.2](#652--collection-a-) <+ _collection_ _a_ ...
 - [7](#7-data-structure-matchers-selectors-and-string-patternsregex) Data Structure Matchers, Selectors and String Patterns/Regex
   - [7.1](#71-data-structure-matcher) Data Structure Matcher
     - [7.1.1](#711-match-value-expr-match-pair1--default-expr) match _value-expr_ _match-pair1_ ... [_default-expr_]
@@ -608,7 +611,9 @@ value as first argument).
 
 The fourth alternative is the `&>` and `<&` (and the apply variants `&@>` and
 `<@&`) argument pipe operators which can be conveniently used in conjunction
-with the first variant to prevent some parenthesis.
+with the first variant to prevent some parenthesis. Also belonging into the
+category of function calling operators there is the collection addition operators
+`+>` and `<+` which are described in their own section.
 
 Here are examples:
 
@@ -927,7 +932,7 @@ in the given _list_ as arguments.
 
 That means: `list &@> fun` is equivalent to `fun[[list]]`.
 
-```
+```wlambda
 std:assert_eq $[2, 5] &@> `+`   7;
 ```
 
@@ -951,7 +956,7 @@ in the given _list_ as arguments.
 
 That means: `fun <@& list` is equivalent to `fun[[list]]`.
 
-```
+```wlambda
 std:assert_eq `+` <@& $[2, 5]   7;
 ```
 
@@ -4698,6 +4703,136 @@ std:assert (0b1100 >> 2)      == 0b11;
 std:assert (`>>` 0b1011000 3) == 0b1011
 ```
 
+### <a name="65-collection-addition-operators--and-"></a>6.5 - Collection Addition Operators +> and <+
+
+`+>` and `<+` are special operators for convenient and quick collection creation.
+You can use them also to call a function with multiple arguments.
+
+```wlambda
+!vec = $[] +> 1 +> 2 +> 3;
+
+std:assert_str_eq vec $[1, 2, 3];
+
+!map = ${}
+    +> (:a => 1)
+    +> (:b => 2);
+
+map +> (:c => 3);
+
+std:assert_str_eq map ${a=1,b=2,c=3};
+```
+
+Usually these operators just append (`+>`) or prepend (`<+`) the right/left hand
+side to the collection. But there are some special values which do special things.
+
+First and foremost the iterator data type. If you pass an iterator to this
+operator, the iterator will be iterated and all returned elements are added
+to the collection in the order of the operator:
+
+```wlambda
+!v = $[] +> ($iter 0 => 4) +> ($iter "abc");
+
+std:assert_str_eq v $[0,1,2,3,"a","b","c"];
+```
+
+As the `<+` operator prepends the individual elements, the
+same is happening with the iterated elements. Which means
+that their order is reversed:
+
+```wlambda
+!v = ($iter 0 => 4) <+ ($iter "abc") <+ $[];
+
+std:assert_str_eq v $[3,2,1,0,"c","b","a"];
+```
+
+The following data types can be used as collection for
+these operators:
+
+- Vectors `$[]`
+- Maps `${}`
+- Strings `""`
+- Byte vectors `$b""`
+- Functions
+
+The most special cases are maps and functions, which are described
+in more detail in the next sections.
+
+#### Collection Addition with Maps
+
+If you add to a map, there is some special behavior for some data types.
+
+Adding a key value pair is done with pairs:
+
+```wlambda
+!m = ${}
+    +> $p(:a, 10)
+    +> :b => 20;
+
+std:assert_str_eq m ${a=10,b=20};
+```
+
+If you add an iterator, the iterator is walked and the given keys are
+added if present:
+
+```wlambda
+!m = ${}
+    +> ($iter $[1, 2, 3])
+    +> ($iter ${ a = 10, b = 20 });
+
+std:assert_str_eq m ${1=1,2=2,3=3,a=10,b=20};
+```
+
+If you add a list to a map, the first element of that list is used
+as key, and the list as value:
+
+```wlambda
+!m = ${}
+    +> $[:a, 1, 2]
+    +> $[:b, 3, 4];
+
+std:assert_str_eq m ${a=$[:a,1,2],b=$[:b,3,4]};
+```
+
+#### Collection Addition with Function
+
+If you pass a function as collection to either `+>` or `<+` the function
+is called for each added element. The return value of the expression
+is the return value of the most recent function call.
+
+```wlambda
+!v = $[];
+
+!v2 = { std:push v _; v } +> 1 +> 2 +> ${ a = 3, b = 4 };
+
+std:assert_str_eq v  $[1,2,${a=3,b=4}];
+std:assert_str_eq v2 $[1,2,${a=3,b=4}];
+```
+
+#### <a name="651--collection-a-"></a>6.5.1 - +> _collection_ _a_ ...
+
+Append to collection operator.
+
+```wlambda
+!v  = $[] +> 1 +> "x" +> $b"y" +> ($iter 0 => 3);
+
+!v2 = `+>` $[] 1 "x" $b"y" ($iter 0 => 3);
+
+std:assert_str_eq v v2;
+```
+
+#### <a name="652--collection-a-"></a>6.5.2 - <+ _collection_ _a_ ...
+
+Prepend to collection operator. Please note that the arguments are
+reversed to the order in an operator expression.
+
+```wlambda
+!v  = ($iter 0 => 3) <+ 1 <+ "x" <+ $b"y" <+ $[];
+
+!v2 = `<+` $[] $b"y" "x" 1 ($iter 0 => 3);
+
+std:assert_str_eq v v2;
+```
+
 ## <a name="7-data-structure-matchers-selectors-and-string-patternsregex"></a>7 - Data Structure Matchers, Selectors and String Patterns/Regex
 
 WLambda comes with a builtin DSL (domain specific language) for
@@ -5277,7 +5412,7 @@ $DEBUG "I got values:" k 99;
 
 Will print this (assuming it's at line 1 col 3 in file `file_foo.wl`):
 
-```
+```text
 [1,3:<file_foo.wl>] DEBUG: "I got values:"(string) $[1,2,3](vector) 99(integer)
 ```
 
@@ -5291,7 +5426,7 @@ $DEBUG :\ "k =" :\ k;
 
 Will print like this:
 
-```
+```text
 [1,11:<wlambda::eval>] DEBUG: k = 30
 ```
 
@@ -5952,6 +6087,12 @@ In the following grammar, white space and comments are omitted:
                   | "&and"            (* logical and, short circuit *)
                   | "&or"             (* logical or, short circuit *)
                   | "=>"              (* pair constructor *)
+                  | "+>"              (* take lhs, wrap it into list if not already
+                                         and append the right side.
+                                         if lhs is an iterator, append all elements. *)
+                  | "<+"              (* take rhs, wrap it into list if not already
+                                         and prepend the left side.
+                                         if rhs is an iterator, prepend all elements. *)
                   ;
     bin_op        = call_no_ops, { op, bin_op } (* precedence parsing is done
                                                    in a Pratt parser style *)
@@ -6153,13 +6294,12 @@ macro_rules! add_bin_op_err_ok {
 
 macro_rules! add_sbin_op {
     ($g: ident, $op: literal, $a: ident, $b: ident, $e: expr) => {
-        func!($g,
-                $op, |env: &mut Env, argc: usize| {
-                if argc < 2 { return Ok(VVal::None); }
-                let $a = env.arg(0);
-                let $b = env.arg(1);
-                $e
-                }, Some(2), Some(2), false);
+        func!($g, $op, |env: &mut Env, argc: usize| {
+            if argc < 2 { return Ok(VVal::None); }
+            let $a = env.arg(0);
+            let $b = env.arg(1);
+            $e
+        }, Some(2), Some(2), false);
     }
 }
 
@@ -6310,6 +6450,18 @@ pub fn core_symbol_table() -> SymbolTable {
     add_fi_bin_op!(st, ^, a, b,
         Ok(VVal::Flt(a.f().powf(b.f()))),
         Ok(VVal::Int(a.i().pow(b.i() as u32))));
+
+    func!(st, "+>",
+        |env: &mut Env, argc: usize| {
+            use crate::vm::collection_add;
+            collection_add(env, argc, CollectionAdd::Push)
+        }, None, None, false);
+
+    func!(st, "<+",
+        |env: &mut Env, argc: usize| {
+            use crate::vm::collection_add;
+            collection_add(env, argc, CollectionAdd::Unshift)
+        }, None, None, false);
 
     func!(st, "not",
         |env: &mut Env, _argc: usize| {

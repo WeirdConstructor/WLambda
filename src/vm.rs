@@ -1871,6 +1871,43 @@ pub fn vm_compile_match2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 //    });
 }
 
+pub fn collection_add(env: &mut Env, argc: usize, col_add: CollectionAdd) -> Result<VVal, StackAction> {
+    let args = env.argv_ref();
+    if args[0].is_fun() {
+        let fun = args[0].clone();
+        let mut ret = VVal::None;
+
+        for i in 1..argc {
+            let v = env.arg(i);
+            let mut retf = Ok(VVal::None);
+            v.with_value_or_iter_values(|v, _k| {
+                env.push(v);
+                match fun.call_internal(env, 1) {
+                    Err(StackAction::Break(v)) => {
+                        retf = Ok(*v);
+                        env.popn(1);
+                        return false;
+                    },
+                    r => { retf = r; }
+                }
+                env.popn(1);
+                true
+            });
+
+            match retf {
+                Ok(v)                      => { ret = v; },
+                Err(StackAction::Break(v)) => { return Ok(*v); },
+                Err(StackAction::Next)     => { },
+                Err(e)                     => { return Err(e); }
+            }
+        }
+
+        Ok(ret)
+    } else {
+        let col = args[0].clone();
+        Ok(col.add(&args[1..], col_add))
+    }
+}
 
 #[allow(clippy::cognitive_complexity)]
 pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
@@ -2668,31 +2705,9 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             pw_provides_result_pos!(prog, {
                 let add_fun =
                     VValFun::new_fun(
-                        move |env: &mut Env, argc: usize| {
-                            let args = env.argv_ref();
-                            if args[0].is_fun() {
-                                let fun = args[0].clone();
-                                let mut ret = VVal::None;
-
-                                for i in 1..argc {
-                                    let v = env.arg(i);
-                                    env.push(v);
-                                    // TODO: Add iterator special case!
-                                    match fun.call_internal(env, 1) {
-                                        Ok(v)                      => { ret = v; },
-                                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(*v); },
-                                        Err(StackAction::Next)     => { },
-                                        Err(e)                     => { env.popn(1); return Err(e); }
-                                    }
-                                    env.popn(1);
-                                }
-
-                                Ok(ret)
-                            } else {
-                                let col = args[0].clone();
-                                Ok(col.add(&args[1..], col_add))
-                            }
-                        }, None, None, true);
+                        move |env, argc|
+                            collection_add(env, argc, col_add),
+                        None, None, true);
                 prog.data_pos(add_fun)
             })
         },

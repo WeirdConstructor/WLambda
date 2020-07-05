@@ -1716,23 +1716,6 @@ macro_rules! iter_next_value {
     }
 }
 
-macro_rules! value_or_iter_value {
-    ($v: ident, $k: ident, $do: block) => {
-        if let VVal::Iter(i) = $v {
-            loop {
-                if let Some(($v, $k)) = i.borrow_mut().next() {
-                    $do
-                } else {
-                    break;
-                }
-            }
-        } else {
-            let $k : Option<VVal> = None;
-            $do
-        }
-    }
-}
-
 macro_rules! iter_int_a_to_b {
     ($a: expr, $b: expr) => {
         {
@@ -2562,6 +2545,24 @@ impl VVal {
         }
     }
 
+    pub fn with_value_or_iter_values<T>(self, mut f: T)
+        where T: FnMut(VVal, Option<VVal>) -> bool
+    {
+        if let VVal::Iter(i) = self {
+            loop {
+                if let Some((v, k)) = i.borrow_mut().next() {
+                    if !f(v, k) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        } else {
+            f(self, None);
+        }
+    }
+
     /// This method will disable all arity checks of the function in the VVal.
     /// Does nothing if the VVal is not a function.
     ///
@@ -3268,13 +3269,13 @@ impl VVal {
     }
 
     pub fn add(&self, vals: &[VVal], list_add: CollectionAdd) -> VVal {
-        let collection = if self.is_ref() { self.deref() } else { self.clone() };
-        println!("ADD: {:?}", vals);
+        let mut collection = if self.is_ref() { self.deref() } else { self.clone() };
+        //d// println!("ADD: {:?}", vals);
 
         match &collection {
             VVal::Lst(lst) => {
                 for v in vals.iter() {
-                    value_or_iter_value!(v, _k, {
+                    v.clone().with_value_or_iter_values(|v, _k| {
                         match list_add {
                             CollectionAdd::Push => {
                                 lst.borrow_mut().push(v.clone());
@@ -3283,13 +3284,13 @@ impl VVal {
                                 lst.borrow_mut().insert(0, v.clone());
                             },
                         }
+                        true
                     });
                 }
             },
             VVal::Map(map) => {
                 for v in vals.iter() {
-                    value_or_iter_value!(v, k, {
-                        println!("MAP ADD: {:?} {}", k, v.s());
+                    v.clone().with_value_or_iter_values(|v, k| {
                         match v {
                             VVal::Pair(_) => {
                                 v.at(0).unwrap().with_s_ref(|k| {
@@ -3318,12 +3319,29 @@ impl VVal {
                                 }
                             },
                         }
+                        true
                     })
                 }
             },
             VVal::Str(_) => {
+                let mut out = String::new();
+                for v in vals.iter() {
+                    v.clone().with_value_or_iter_values(|v, _k| {
+                        v.with_s_ref(|s| out.push_str(s));
+                        true
+                    });
+                }
+                collection = VVal::new_str_mv(out);
             },
             VVal::Byt(_) => {
+                let mut out : Vec<u8> = vec![];
+                for v in vals.iter() {
+                    v.clone().with_value_or_iter_values(|v, _k| {
+                        v.with_bv_ref(|b| out.extend_from_slice(b));
+                        true
+                    })
+                }
+                collection = VVal::new_byt(out);
             },
             v => {
                 return VVal::err_msg(

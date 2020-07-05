@@ -1009,7 +1009,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     field_set.push(obj);
                     field_set.push(value);
                     field_set.push(
-                        construct_op(binop, get_value, parse_expr(ps)?));
+                        reform_binop(construct_op(binop, get_value, parse_expr(ps)?)));
 
                     return Ok(field_set);
                 },
@@ -1134,7 +1134,6 @@ fn reform_binop(op: VVal) -> VVal {
 }
 
 fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
-    println!("CONSTRBINOP: ({}) LEFT {}, RIGHT {}", binop.s(), left.s(), right.s());
     match binop.at(0).unwrap().get_syn() {
         Syntax::OpNewPair => VVal::pair(left, right),
         Syntax::OpCallApplyLwR => {
@@ -1431,7 +1430,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
         assign.push(ids);
         assign.push(
-            construct_op(binop, var, parse_expr(ps)?));
+            reform_binop(construct_op(binop, var, parse_expr(ps)?)));
 
         return Ok(assign);
 

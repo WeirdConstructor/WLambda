@@ -4203,11 +4203,22 @@ fn check_list_add_ops() {
     assert_eq!(ve("${} +> ${ k = 10 } +> ${ x = 1, y = 2 }"),   "${k=10,x=1,y=2}");
 
 
-    assert_eq!(ve("\"\" +> :a +> :b +> :c"),                "$[1,2]");
-    assert_eq!(ve("$b\"\" +> :a +> :b +> :c"),              "$[1,2]");
+    assert_eq!(ve("\"\" +> :a +> \"b\" +> $b\"c\" +> 10"),     "\"abc10\"");
+    assert_eq!(ve("$b\"\" +> :a +> :b +> :c +> $b\"\\xFF\""),  "$b\"abc\\xFF\"");
+    assert_eq!(ve("$b\"\" +> :a +> ($iter $[:a, :b, :c]) +> :c +> $b\"\\xFF\""),  "$b\"aabcc\\xFF\"");
 
     assert_eq!(ve("{ _ * 2 } +> 1 +> 2"),    "4");
     assert_eq!(ve("1 <+ 2 <+ { _ * 3 }"),    "3");
     assert_eq!(ve("!v = $[]; 1 <+ 2 <+ { std:unshift v _ * 3; v }"), "$[3,6]");
-    assert_eq!(ve("!v = $[]; ($iter 1 => 3) <+ 1 <+ 2 <+ { std:unshift v _ * 3; v }"), "$[3,6]");
+    assert_eq!(ve("!v = $[]; ($iter 1 => 4) <+ 1 <+ 2 <+ { std:unshift v _ * 3; v }"), "$[9,6,3,3,6]");
+    assert_eq!(ve("!v = $[]; { std:push v _ * 3; v } +> ($iter 1 => 4) +> 1 +> 2"), "$[3,6,9,3,6]");
+
+    assert_eq!(ve("`+>` $[] 1 2 3"), "$[1,2,3]");
+    assert_eq!(ve("`+>` { _ * 10 } 1"), "10");
+    assert_eq!(ve("`<+` $[] 1 2 3"), "$[3,2,1]");
+    assert_eq!(ve("`<+` { _ * 10 } 1"), "10");
+
+    assert_eq!(ve("!m = $[]; .m +>= 1; .m +>= 2; m"),               "$[1,2]");
+    assert_eq!(ve("!m = $[$n,$[]]; m.1 +>= 2; m"),                  "$[$n,$[2]]");
+    assert_eq!(ve("!x = $[]; !m = 1; .m <+= x; .m <+= x; m"),       "$<1=>$[$<1>,1]");
 }
