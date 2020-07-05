@@ -1134,6 +1134,7 @@ fn reform_binop(op: VVal) -> VVal {
 }
 
 fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
+    println!("CONSTRBINOP: ({}) LEFT {}, RIGHT {}", binop.s(), left.s(), right.s());
     match binop.at(0).unwrap().get_syn() {
         Syntax::OpNewPair => VVal::pair(left, right),
         Syntax::OpCallApplyLwR => {
@@ -1174,6 +1175,12 @@ fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
             if left.v_(0).get_syn() == Syntax::OpColAddR {
                 left.push(right);
                 left
+//            } else if right.v_(0).get_syn() == Syntax::OpColAddR {
+//                binop.push(left);
+//                for (v, _) in right.iter().skip(1) {
+//                    binop.push(v);
+//                }
+//                binop
             } else {
                 binop.push(left);
                 binop.push(right);
@@ -1188,27 +1195,28 @@ fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
     }
 }
 
-fn parse_binop(mut left: VVal, ps: &mut State, bind_pow: i32, binop: VVal)
+fn parse_binop(left: Option<VVal>, ps: &mut State, bind_pow: i32)
     -> Result<VVal, ParseError>
 {
-    let mut right = parse_call(ps, true)?;
+    let mut left =
+        if let Some(l) = left { l }
+        else { parse_call(ps, true)? };
 
-    while let Some(next_op) = ps.peek_op() {
-        let (l_bp, r_bp) = get_op_binding_power(next_op);
-        let next_binop = make_binop(ps, next_op);
+    while let Some(op) = ps.peek_op() {
+        let (l_bp, r_bp) = get_op_binding_power(op);
+        if l_bp < bind_pow {
+            break;
+        }
 
-        let op_len = next_op.len();
+        let binop = make_binop(ps, op);
+        let op_len = op.len();
         ps.consume_wsc_n(op_len);
 
-        if l_bp < bind_pow {
-            left = construct_op(binop, left, right);
-            return parse_binop(left, ps, r_bp, next_binop);
-        } else {
-            right = parse_binop(right, ps, r_bp, next_binop)?;
-        }
+        let right = parse_binop(None, ps, r_bp)?;
+        left = construct_op(binop, left, right);
     }
 
-    Ok(construct_op(binop, left, right))
+    Ok(left)
 }
 
 fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
@@ -1258,16 +1266,18 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
             _ if op.is_some() => {
                 if binop_mode { break; }
 
-                let op        = op.unwrap();
-                let binop     = make_binop(ps, op);
-                let (_, r_bp) = get_op_binding_power(op);
+//                let op        = op.unwrap();
+//                let binop     = make_binop(ps, op);
+//                let (_, r_bp) = get_op_binding_power(op);
+//
+//                let op_len = op.len();
+//                ps.consume_wsc_n(op_len);
 
-                let op_len = op.len();
-                ps.consume_wsc_n(op_len);
-
-                value =
-                    reform_binop(
-                        parse_binop(value, ps, r_bp, binop)?);
+                // TODO: Need to fix the pratt parser to properly handle
+                //       the binding power of the first op here.
+                //       There is missing a loop here.
+                // https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+                value = reform_binop(parse_binop(Some(value), ps, 0)?);
             },
             '=' => { break; }, // '=' from parsing map keys
             _ => {
@@ -2013,6 +2023,13 @@ mod tests {
 
     #[test]
     fn check_coll_add_op() {
+        assert_eq!(parse("${} +> k => v"),               "$[&Block,$[&Call,&OpColAddR,$[&Map],$p($[&Var,:k],$[&Var,:v])]]");
+        assert_eq!(parse("${} +> (k => v) +> k2 => v2"), "$[&Block,$[&Call,&OpColAddR,$[&Map],$p($[&Var,:k],$[&Var,:v]),$p($[&Var,:k2],$[&Var,:v2])]]");
+        assert_eq!(parse("${} +> k => v +> k2 => v2"),   "$[&Block,$[&Call,&OpColAddR,$[&Map],$p($[&Var,:k],$[&Var,:v]),$p($[&Var,:k2],$[&Var,:v2])]]");
+        assert_eq!(parse("k3 => v3 <+ k2 => v2 <+ k => v <+ ${}"), "$[&Block,$[&Call,&OpColAddL,$[&Map],$p($[&Var,:k],$[&Var,:v]),$p($[&Var,:k2],$[&Var,:v2]),$p($[&Var,:k3],$[&Var,:v3])]]");
+        assert_eq!(parse("${} +> :a => 10 +> 4 + 3 => 20 * 2 +> :x"), "$[&Block,$[&Call,&OpColAddR,$[&Map],$p($[&Key,:a],10),$p($[&BinOpAdd,4,3],$[&BinOpMul,20,2]),$[&Key,:x]]]");
+        assert_eq!(parse("${} +> :a => 10 +> :b => 20 * 2 +> :x"), "$[&Block,$[&Call,&OpColAddR,$[&Map],$p($[&Key,:a],10),$p($[&Key,:b],$[&BinOpMul,20,2]),$[&Key,:x]]]");
+
         assert_eq!(parse("a +> b +> c"),     "$[&Block,$[&Call,&OpColAddR,$[&Var,:a],$[&Var,:b],$[&Var,:c]]]");
         assert_eq!(parse("c <+ b <+ a"),     "$[&Block,$[&Call,&OpColAddL,$[&Var,:a],$[&Var,:b],$[&Var,:c]]]");
         assert_eq!(parse("a +> b"),          "$[&Block,$[&Call,&OpColAddR,$[&Var,:a],$[&Var,:b]]]");

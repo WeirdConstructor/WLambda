@@ -1716,6 +1716,23 @@ macro_rules! iter_next_value {
     }
 }
 
+macro_rules! value_or_iter_value {
+    ($v: ident, $k: ident, $do: block) => {
+        if let VVal::Iter(i) = $v {
+            loop {
+                if let Some(($v, $k)) = i.borrow_mut().next() {
+                    $do
+                } else {
+                    break;
+                }
+            }
+        } else {
+            let $k : Option<VVal> = None;
+            $do
+        }
+    }
+}
+
 macro_rules! iter_int_a_to_b {
     ($a: expr, $b: expr) => {
         {
@@ -3257,18 +3274,7 @@ impl VVal {
         match &collection {
             VVal::Lst(lst) => {
                 for v in vals.iter() {
-                    if v.is_iter() {
-                        v.for_each(|v|
-                            match list_add {
-                                CollectionAdd::Push => {
-                                    lst.borrow_mut().push(v.clone());
-                                },
-                                CollectionAdd::Unshift => {
-                                    lst.borrow_mut().insert(0, v.clone());
-                                },
-                            }
-                        )
-                    } else {
+                    value_or_iter_value!(v, _k, {
                         match list_add {
                             CollectionAdd::Push => {
                                 lst.borrow_mut().push(v.clone());
@@ -3277,10 +3283,43 @@ impl VVal {
                                 lst.borrow_mut().insert(0, v.clone());
                             },
                         }
-                    }
+                    });
                 }
             },
-            VVal::Map(_) => {
+            VVal::Map(map) => {
+                for v in vals.iter() {
+                    value_or_iter_value!(v, k, {
+                        println!("MAP ADD: {:?} {}", k, v.s());
+                        match v {
+                            VVal::Pair(_) => {
+                                v.at(0).unwrap().with_s_ref(|k| {
+                                    map.borrow_mut().insert(s2sym(k), v.at(1).unwrap())
+                                });
+                            },
+                            VVal::Lst(_) => {
+                                v.v_(0).with_s_ref(|k|
+                                    map.borrow_mut().insert(s2sym(k), v.clone()));
+                            },
+                            VVal::Map(_) => {
+                                for (vm, km) in v.iter() {
+                                    if let Some(k) = km {
+                                        k.with_s_ref(|ks|
+                                            map.borrow_mut().insert(s2sym(ks), vm.clone()));
+                                    }
+                                }
+                            },
+                            _ => {
+                                if let Some(k) = k {
+                                    k.with_s_ref(|kv|
+                                        map.borrow_mut().insert(s2sym(kv), v.clone()));
+                                } else {
+                                    v.with_s_ref(|kv|
+                                        map.borrow_mut().insert(s2sym(kv), v.clone()));
+                                }
+                            },
+                        }
+                    })
+                }
             },
             VVal::Str(_) => {
             },
@@ -4141,11 +4180,6 @@ impl VVal {
         where T: FnMut(&VVal) -> () {
         if let VVal::Lst(b) = &self {
             for i in b.borrow().iter() { op(i); }
-
-        } else if let VVal::Iter(i) = &self {
-            loop {
-                iter_next_value!(i.borrow_mut(), v, { op(&v) }, { break; });
-            }
         }
     }
 

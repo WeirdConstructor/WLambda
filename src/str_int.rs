@@ -7,11 +7,12 @@ use std::hash::{Hash, Hasher};
 struct StringInterner {
     strmap: HashMap<String, Weak<String>>,
     fixed:  std::vec::Vec<Symbol>,
+    allocated_since_gc: usize,
 }
 
 impl StringInterner {
     fn new() -> Self {
-        let mut s = Self { strmap: HashMap::new(), fixed: vec![] };
+        let mut s = Self { strmap: HashMap::new(), fixed: vec![], allocated_since_gc: 0 };
         let mut v = vec![];
         v.push(s.s2sym("x"));
         v.push(s.s2sym("y"));
@@ -44,7 +45,19 @@ impl StringInterner {
             self.strmap.remove(k);
         }
 
+        self.allocated_since_gc = 0;
+
         count
+    }
+
+    fn new_alloc_check_gc(&mut self) {
+        self.allocated_since_gc += 1;
+
+        // TODO: Add a better check? Like num of bytes stored since last gc?
+        let max_alloc_before_gc = 100;
+        if self.allocated_since_gc > max_alloc_before_gc {
+            self.collect();
+        }
     }
 
     #[inline]
@@ -57,6 +70,9 @@ impl StringInterner {
 
         let rc = Rc::new(s.to_string());
         self.strmap.insert(s.to_string(), Rc::downgrade(&rc));
+
+        self.new_alloc_check_gc();
+
         Symbol(rc)
     }
 
@@ -70,6 +86,9 @@ impl StringInterner {
 
         let rc = Rc::new(s.clone());
         self.strmap.insert(s, Rc::downgrade(&rc));
+
+        self.new_alloc_check_gc();
+
         Symbol(rc)
     }
 }
