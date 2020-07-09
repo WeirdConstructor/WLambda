@@ -8,6 +8,7 @@ meaning as `!@wlambda`.
 * Bugfix: `$i(...)` and `$f(...)` constructions were done in the wrong order
 if arguments were on the stack.
 * Bugfix: If a call in RPCHandle paniced, there was absolutely no error message.
+* Change: Give proper error if a numeric vector is mutated.
 * Feature: Added negative key match to recursive selectors `$S(**!key=childs)`
 to prohibit it to recurse into certain keys.
 * Feature: Added positive value condition to recursive selectors `$S(**=:{x=10})`

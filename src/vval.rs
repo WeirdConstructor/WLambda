@@ -3719,6 +3719,12 @@ impl VVal {
                     Err(_) => Err(StackAction::panic_borrow(self)),
                 }
             },
+            VVal::FVec(_) =>
+                Err(StackAction::panic_msg(
+                    "Can't mutate float vector".to_string())),
+            VVal::IVec(_) =>
+                Err(StackAction::panic_msg(
+                    "Can't mutate integer vector".to_string())),
             VVal::Usr(u) => u.set_key(key, val),
             v => v.with_deref(
                 |v| v.set_key(key, val),
