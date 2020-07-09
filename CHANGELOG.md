@@ -5,6 +5,8 @@
 right.
 * Bugfix: `!@import wlambda` did not work as expected, it should have the same
 meaning as `!@wlambda`.
+* Bugfix: `$i(...)` and `$f(...)` constructions were done in the wrong order
+if arguments were on the stack.
 * Bugfix: If a call in RPCHandle paniced, there was absolutely no error message.
 * Feature: Added negative key match to recursive selectors `$S(**!key=childs)`
 to prohibit it to recurse into certain keys.

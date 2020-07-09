@@ -2983,6 +2983,10 @@ fn check_nvec() {
     assert_eq!(ve("nvec_len $f(0,0,0)"),   "3");
     assert_eq!(ve("nvec_len $f(0,0,0,0)"), "4");
     assert_eq!(ve("nvec_len $p(0,0)"),     "0");
+
+    assert_eq!(ve("!v = $i(1, 2, 3, 4); $i(v.0, v.1, v.2, v.3)"),   "$i(1,2,3,4)");
+    assert_eq!(ve("!v = $i(1, 2, 3, 4); $i(v.0, v.1, v.2)"),        "$i(1,2,3)");
+    assert_eq!(ve("!v = $i(1, 2, 3, 4); $i(v.0, v.1)"),             "$i(1,2)");
 }
 
 #[test]

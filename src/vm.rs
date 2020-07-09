@@ -444,17 +444,17 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             Op::NewNVec(vp, r) => {
                 match vp.as_ref() {
                     NVecPos::IVec2(a, b) => {
-                        in_reg!(env, ret, data, a);
                         in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, a);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         out_reg!(env, ret, retv, data, r,
                             VVal::IVec(Box::new(NVec::Vec2(a.i(), b.i()))));
                     },
                     NVecPos::IVec3(a, b, c) => {
-                        in_reg!(env, ret, data, a);
-                        in_reg!(env, ret, data, b);
                         in_reg!(env, ret, data, c);
+                        in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, a);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
@@ -462,10 +462,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             VVal::IVec(Box::new(NVec::Vec3(a.i(), b.i(), c.i()))));
                     },
                     NVecPos::IVec4(a, b, c, d) => {
-                        in_reg!(env, ret, data, a);
-                        in_reg!(env, ret, data, b);
-                        in_reg!(env, ret, data, c);
                         in_reg!(env, ret, data, d);
+                        in_reg!(env, ret, data, c);
+                        in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, a);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
@@ -474,17 +474,17 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             VVal::IVec(Box::new(NVec::Vec4(a.i(), b.i(), c.i(), d.i()))));
                     },
                     NVecPos::FVec2(a, b) => {
-                        in_reg!(env, ret, data, a);
                         in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, a);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         out_reg!(env, ret, retv, data, r,
                             VVal::FVec(Box::new(NVec::Vec2(a.f(), b.f()))));
                     },
                     NVecPos::FVec3(a, b, c) => {
-                        in_reg!(env, ret, data, a);
-                        in_reg!(env, ret, data, b);
                         in_reg!(env, ret, data, c);
+                        in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, a);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
@@ -492,10 +492,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                             VVal::FVec(Box::new(NVec::Vec3(a.f(), b.f(), c.f()))));
                     },
                     NVecPos::FVec4(a, b, c, d) => {
-                        in_reg!(env, ret, data, a);
-                        in_reg!(env, ret, data, b);
-                        in_reg!(env, ret, data, c);
                         in_reg!(env, ret, data, d);
+                        in_reg!(env, ret, data, c);
+                        in_reg!(env, ret, data, b);
+                        in_reg!(env, ret, data, a);
                         let a = handle_err!(a, "x nvector component", retv);
                         let b = handle_err!(b, "y nvector component", retv);
                         let c = handle_err!(c, "z nvector component", retv);
