@@ -9,6 +9,8 @@ meaning as `!@wlambda`.
 if arguments were on the stack.
 * Bugfix: If a call in RPCHandle paniced, there was absolutely no error message.
 * Change: Give proper error if a numeric vector is mutated.
+* Change: Numerical vectors serialize to lists of numbers now instead some
+custom Rust data structure serialization.
 * Feature: Added negative key match to recursive selectors `$S(**!key=childs)`
 to prohibit it to recurse into certain keys.
 * Feature: Added positive value condition to recursive selectors `$S(**=:{x=10})`

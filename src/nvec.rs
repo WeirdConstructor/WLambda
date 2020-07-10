@@ -1,12 +1,9 @@
 use crate::vval::VVal;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::ops::{Neg, Add, Sub, Div, Mul};
 
 
 /// WLambda supports Integer and Float vectors in two, three, and four dimensions.
 #[derive(Debug, Copy, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum NVec<N: NVecNum> {
     Vec2(N, N),
     Vec3(N, N, N),

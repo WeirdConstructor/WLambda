@@ -4547,8 +4547,56 @@ impl serde::ser::Serialize for VVal {
             },
             VVal::Usr(_)     => serializer.serialize_str(&self.s()),
             VVal::Fun(_)     => serializer.serialize_str(&self.s()),
-            VVal::FVec(fv)   => fv.serialize(serializer),
-            VVal::IVec(iv)   => iv.serialize(serializer),
+            VVal::FVec(fv)   => {
+                match fv.as_ref() {
+                    NVec::Vec2(x, y) => {
+                        let mut seq = serializer.serialize_seq(Some(2))?;
+                        seq.serialize_element(x)?;
+                        seq.serialize_element(y)?;
+                        seq.end()
+                    },
+                    NVec::Vec3(x, y, z) => {
+                        let mut seq = serializer.serialize_seq(Some(3))?;
+                        seq.serialize_element(x)?;
+                        seq.serialize_element(y)?;
+                        seq.serialize_element(z)?;
+                        seq.end()
+                    },
+                    NVec::Vec4(x, y, z, w) => {
+                        let mut seq = serializer.serialize_seq(Some(4))?;
+                        seq.serialize_element(x)?;
+                        seq.serialize_element(y)?;
+                        seq.serialize_element(z)?;
+                        seq.serialize_element(w)?;
+                        seq.end()
+                    },
+                }
+            },
+            VVal::IVec(iv)   => {
+                match iv.as_ref() {
+                    NVec::Vec2(x, y) => {
+                        let mut seq = serializer.serialize_seq(Some(2))?;
+                        seq.serialize_element(x)?;
+                        seq.serialize_element(y)?;
+                        seq.end()
+                    },
+                    NVec::Vec3(x, y, z) => {
+                        let mut seq = serializer.serialize_seq(Some(3))?;
+                        seq.serialize_element(x)?;
+                        seq.serialize_element(y)?;
+                        seq.serialize_element(z)?;
+                        seq.end()
+                    },
+                    NVec::Vec4(x, y, z, w) => {
+                        let mut seq = serializer.serialize_seq(Some(4))?;
+                        seq.serialize_element(x)?;
+                        seq.serialize_element(y)?;
+                        seq.serialize_element(z)?;
+                        seq.serialize_element(w)?;
+                        seq.end()
+                    },
+                }
+            },
             VVal::DropFun(_) => serializer.serialize_str(&self.s()),
             VVal::Ref(_)     => self.deref().serialize(serializer),
             VVal::HRef(_)    => self.deref().serialize(serializer),
