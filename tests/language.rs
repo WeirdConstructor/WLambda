@@ -3537,6 +3537,18 @@ fn check_kve_funcs() {
     assert_eq!(ve("!it = $iter ${a=10};    std:keys      it"),         "$[\"a\"]");
     assert_eq!(ve("!it = $iter $i(9,30,4); std:values    it"),         "$[9,13,17,21,25,29]");
     assert_eq!(ve("!it = $iter $i(9,30,4); $[*$iter $p(:enumerate, it)]"), "$[0,1,2,3,4,5]");
+    assert_eq!(ve("std:values $i(1,2)"),        "$[1,2]");
+    assert_eq!(ve("std:values $i(1,2,3)"),      "$[1,2,3]");
+    assert_eq!(ve("std:values $i(1,2,3,4)"),    "$[1,2,3,4]");
+    assert_eq!(ve("std:values $f(1,2)"),        "$[1,2]");
+    assert_eq!(ve("std:values $f(1,2,3)"),      "$[1,2,3]");
+    assert_eq!(ve("std:values $f(1,2,3,4)"),    "$[1,2,3,4]");
+    assert_eq!(ve("fvec ~ std:values $f(1,2)"),        "$f(1,2)");
+    assert_eq!(ve("fvec ~ std:values $f(1,2,3)"),      "$f(1,2,3)");
+    assert_eq!(ve("fvec ~ std:values $f(1,2,3,4)"),    "$f(1,2,3,4)");
+    assert_eq!(ve("ivec ~ std:values $f(1,2)"),        "$i(1,2)");
+    assert_eq!(ve("ivec ~ std:values $f(1,2,3)"),      "$i(1,2,3)");
+    assert_eq!(ve("ivec ~ std:values $f(1,2,3,4)"),    "$i(1,2,3,4)");
 
 }
 

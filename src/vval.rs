@@ -2319,6 +2319,48 @@ impl VVal {
                 }
                 out
             },
+            VVal::IVec(b) => {
+                let out = VVal::vec();
+                match b.as_ref() {
+                    NVec::Vec2(a, b) => {
+                        out.push(VVal::Int(*a));
+                        out.push(VVal::Int(*b));
+                    },
+                    NVec::Vec3(a, b, c) => {
+                        out.push(VVal::Int(*a));
+                        out.push(VVal::Int(*b));
+                        out.push(VVal::Int(*c));
+                    },
+                    NVec::Vec4(a, b, c, d) => {
+                        out.push(VVal::Int(*a));
+                        out.push(VVal::Int(*b));
+                        out.push(VVal::Int(*c));
+                        out.push(VVal::Int(*d));
+                    }
+                }
+                out
+            },
+            VVal::FVec(b) => {
+                let out = VVal::vec();
+                match b.as_ref() {
+                    NVec::Vec2(a, b) => {
+                        out.push(VVal::Flt(*a));
+                        out.push(VVal::Flt(*b));
+                    },
+                    NVec::Vec3(a, b, c) => {
+                        out.push(VVal::Flt(*a));
+                        out.push(VVal::Flt(*b));
+                        out.push(VVal::Flt(*c));
+                    },
+                    NVec::Vec4(a, b, c, d) => {
+                        out.push(VVal::Flt(*a));
+                        out.push(VVal::Flt(*b));
+                        out.push(VVal::Flt(*c));
+                        out.push(VVal::Flt(*d));
+                    }
+                }
+                out
+            },
             v => v.with_deref(
                 |v| v.values(),
                 |_| VVal::None),

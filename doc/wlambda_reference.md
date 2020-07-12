@@ -273,18 +273,19 @@ Smalltalk, LISP and Perl.
     - [10.0.1](#1001-stdshuffle-randfunc-vec) std:shuffle _rand\_func_ _vec_
     - [10.0.2](#1002-stddelete-vector-or-map-index-or-key) std:delete _vector-or-map_ _index-or-key_
     - [10.0.3](#1003-stdcopy-vecormap) std:copy _vec\_or\_map_
-    - [10.0.4](#1004-stdsort-comparefun-vec) std:sort [_compare\_fun_] _vec_
-    - [10.0.5](#1005-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
-    - [10.0.6](#1006-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
-    - [10.0.7](#1007-stddisplayln-arg1-) std:displayln _arg1_ ...
-    - [10.0.8](#1008-debug-arg1-) $DEBUG _arg1_ ...
-    - [10.0.9](#1009-stdwriteln-arg1-) std:writeln _arg1_ ...
-    - [10.0.10](#10010-stdeval-code-string) std:eval _code-string_
-    - [10.0.11](#10011-stdassert-bool-message) std:assert _bool_ \[_message_]
-    - [10.0.12](#10012-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
-    - [10.0.13](#10013-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
-    - [10.0.14](#10014-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
-    - [10.0.15](#10015-stdwlambdaversion) std:wlambda:version
+    - [10.0.4](#1004-stdvalues-collection-or-iter) std:values _collection-or-iter_
+    - [10.0.5](#1005-stdsort-comparefun-vec) std:sort [_compare\_fun_] _vec_
+    - [10.0.6](#1006-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
+    - [10.0.7](#1007-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
+    - [10.0.8](#1008-stddisplayln-arg1-) std:displayln _arg1_ ...
+    - [10.0.9](#1009-debug-arg1-) $DEBUG _arg1_ ...
+    - [10.0.10](#10010-stdwriteln-arg1-) std:writeln _arg1_ ...
+    - [10.0.11](#10011-stdeval-code-string) std:eval _code-string_
+    - [10.0.12](#10012-stdassert-bool-message) std:assert _bool_ \[_message_]
+    - [10.0.13](#10013-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
+    - [10.0.14](#10014-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
+    - [10.0.15](#10015-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+    - [10.0.16](#10016-stdwlambdaversion) std:wlambda:version
   - [10.1](#101-io) I/O
     - [10.1.1](#1011-stdiofilereadtext-filename) std:io:file:read\_text _filename_
     - [10.1.2](#1012-stdiofileread-filename) std:io:file:read _filename_
@@ -5314,7 +5315,26 @@ std:assert_eq a.0 1;
 std:assert_eq b.0 10;
 ```
 
-#### <a name="1004-stdsort-comparefun-vec"></a>10.0.4 - std:sort [_compare\_fun_] _vec_
+#### <a name="1004-stdvalues-collection-or-iter"></a>10.0.4 - std:values _collection-or-iter_
+
+This function returns all values in the given collection or iterator
+as vector. _collection-or-iter_ can have be one of the following data
+types:
+
+- vector
+- numerical float or integer vector
+- map
+- iterator `$iter`
+
+```wlambda
+std:assert_str_eq std:values[$iter 0 => 5]      $[0,1,2,3,4];
+std:assert_str_eq std:values[${a = 10}]         $[10];
+std:assert_str_eq std:values[$iter ${a = 10}]   $[10];
+std:assert_str_eq std:values[$[1,2,3]]          $[1,2,3];
+std:assert_str_eq std:values[$i(1,2,3)]         $[1,2,3];
+```
+
+#### <a name="1005-stdsort-comparefun-vec"></a>10.0.5 - std:sort [_compare\_fun_] _vec_
 
 Sorts the given _vec_ in place. The comparison function _compare_fun_ gets the
 two values a and b and needs to return -1 if a < b, 0 if a = b and 1 if a > b.
@@ -5339,7 +5359,7 @@ std:assert_eq v.1.0 1;
 std:assert_eq v.2.0 -1;
 ```
 
-#### <a name="1005-stdcmpnumasc-a-b"></a>10.0.5 - std:cmp:num:asc _a_ _b_
+#### <a name="1006-stdcmpnumasc-a-b"></a>10.0.6 - std:cmp:num:asc _a_ _b_
 
 Compares _a_ and _b_ numerically and returns:
 
@@ -5355,7 +5375,7 @@ std:assert_eq (std:cmp:num:asc "20" "20")    0;
 std:assert_eq (std:cmp:num:asc 20 21)        1;
 ```
 
-#### <a name="1006-stdcmpnumdesc-a-b"></a>10.0.6 - std:cmp:num:desc _a_ _b_
+#### <a name="1007-stdcmpnumdesc-a-b"></a>10.0.7 - std:cmp:num:desc _a_ _b_
 
 Compares _a_ and _b_ numerically descending and returns:
 
@@ -5371,7 +5391,7 @@ std:assert_eq (std:cmp:num:desc "20" "20")    0;
 std:assert_eq (std:cmp:num:desc 20 21)       -1;
 ```
 
-#### <a name="1007-stddisplayln-arg1-"></a>10.0.7 - std:displayln _arg1_ ...
+#### <a name="1008-stddisplayln-arg1-"></a>10.0.8 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -5385,7 +5405,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
-#### <a name="1008-debug-arg1-"></a>10.0.8 - $DEBUG _arg1_ ...
+#### <a name="1009-debug-arg1-"></a>10.0.9 - $DEBUG _arg1_ ...
 
 This is a special value that evaluates to a print function that supplies the
 current position in the source code. For example this:
@@ -5416,7 +5436,7 @@ Will print like this:
 [1,11:<wlambda::eval>] DEBUG: k = 30
 ```
 
-#### <a name="1009-stdwriteln-arg1-"></a>10.0.9 - std:writeln _arg1_ ...
+#### <a name="10010-stdwriteln-arg1-"></a>10.0.10 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
@@ -5431,7 +5451,7 @@ See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="10010-stdeval-code-string"></a>10.0.10 - std:eval _code-string_
+#### <a name="10011-stdeval-code-string"></a>10.0.11 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -5443,7 +5463,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="10011-stdassert-bool-message"></a>10.0.11 - std:assert _bool_ \[_message_]
+#### <a name="10012-stdassert-bool-message"></a>10.0.12 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -5454,7 +5474,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="10012-stdasserteq-actual-expected-message"></a>10.0.12 - std:assert\_eq _actual_ _expected_ \[_message_]
+#### <a name="10013-stdasserteq-actual-expected-message"></a>10.0.13 - std:assert\_eq _actual_ _expected_ \[_message_]
 
 This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -5465,7 +5485,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### <a name="10013-stdassertstreq-actual-expected"></a>10.0.13 - std:assert\_str\_eq _actual_ _expected_
+#### <a name="10014-stdassertstreq-actual-expected"></a>10.0.14 - std:assert\_str\_eq _actual_ _expected_
 
 This function stringifies _actual_ and _expected_ using the `str` function
 and compares the resulting strings.
@@ -5477,7 +5497,7 @@ if the maps are stringified using `str`:
 std:assert_str_eq $[1, 2, 3]        $[1, 2, 3];
 ```
 
-#### <a name="10014-stdassertreleq-l-r-epsilon-message"></a>10.0.14 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+#### <a name="10015-stdassertreleq-l-r-epsilon-message"></a>10.0.15 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -5493,7 +5513,7 @@ std:assert_rel_eq x y 1;
 # std:assert_eq x y 0.5;
 ```
 
-#### <a name="10015-stdwlambdaversion"></a>10.0.15 - std:wlambda:version
+#### <a name="10016-stdwlambdaversion"></a>10.0.16 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 

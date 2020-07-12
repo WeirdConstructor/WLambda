@@ -18,6 +18,7 @@ to select only specific values to recurse into.
 * Feature: Added std:bytes:replace function.
 * Documentation: Color conversion functions `std:v:rgb2hsv`, `std:v:hsv2rgb`
 and others.
+* Documentation: Added documentation for `std:values`.
 * Feature: Added debug print function special value, that includes source position and
 dynamic type name: `$DEBUG ...`.
 * Feature: Added `std:time:now`, `std:srand` and `std:rand`.
@@ -25,6 +26,7 @@ dynamic type name: `$DEBUG ...`.
 operator syntax `.x += 10` and `o.x += 10`.
 * Feature: Added apply operators `&@>` and `<@&`.
 * Feature: Added collection addition operators `+>` and `<+`.
+* Feature: `std:values` also returns the individual elements of a numerical vector.
 
 0.6.1 (2020-06-04)
 ==================
