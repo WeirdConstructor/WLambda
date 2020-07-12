@@ -2111,6 +2111,16 @@ impl VVal {
     }
 
     #[inline]
+    pub fn vec4(a: VVal, b: VVal, c: VVal, d: VVal) -> VVal {
+        let v = Self::vec();
+        v.push(a);
+        v.push(b);
+        v.push(c);
+        v.push(d);
+        v
+    }
+
+    #[inline]
     pub fn opt(v: VVal) -> VVal {
         VVal::Opt(Some(Rc::new(v)))
     }
@@ -2287,6 +2297,26 @@ impl VVal {
                     out.push(VVal::Int(i as i64));
                 }
                 out
+            },
+            VVal::IVec(b) => {
+                match b.as_ref() {
+                    NVec::Vec2(a, b) =>
+                        VVal::vec2(VVal::Int(0), VVal::Int(1)),
+                    NVec::Vec3(a, b, c) =>
+                        VVal::vec3(VVal::Int(0), VVal::Int(1), VVal::Int(2)),
+                    NVec::Vec4(a, b, c, d) =>
+                        VVal::vec4(VVal::Int(0), VVal::Int(1), VVal::Int(2), VVal::Int(3))
+                }
+            },
+            VVal::FVec(b) => {
+                match b.as_ref() {
+                    NVec::Vec2(a, b) =>
+                        VVal::vec2(VVal::Int(0), VVal::Int(1)),
+                    NVec::Vec3(a, b, c) =>
+                        VVal::vec3(VVal::Int(0), VVal::Int(1), VVal::Int(2)),
+                    NVec::Vec4(a, b, c, d) =>
+                        VVal::vec4(VVal::Int(0), VVal::Int(1), VVal::Int(2), VVal::Int(3))
+                }
             },
             v => v.with_deref(
                 |v| v.keys(),
