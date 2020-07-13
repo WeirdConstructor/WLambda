@@ -2733,13 +2733,13 @@ fn check_threads() {
 
     assert_eq!(ve(r#"
         !chan = std:sync:mpsc:new[];
-        !h = std:thread:spawn ($code {
+        !h = std:thread:spawn $code {
             !@import std;
             !@wlambda;
 
             chan.send 20;
             99
-        }[]) ${ chan = chan };
+        } ${ chan = chan };
 
         !msg = chan.recv_timeout $p(:ms, 1000);
         std:assert_eq (type msg) "optional";
@@ -2750,14 +2750,14 @@ fn check_threads() {
     assert_eq!(ve(r#"
         !chan = std:sync:mpsc:new[];
         !chan2 = std:sync:mpsc:new[];
-        !h = std:thread:spawn ($code {
+        !h = std:thread:spawn $code {
             !@import std;
             !@wlambda;
 
             !m = chan2.recv[];
             chan.send m;
             99
-        }[]) ${ chan = chan, chan2 = chan2 };
+        } ${ chan = chan, chan2 = chan2 };
 
         !msg = chan.try_recv[];
         std:assert_eq (type msg) "optional";
@@ -2784,13 +2784,13 @@ fn check_thread_valslot() {
 
         std:assert_eq slt1.try_recv[] $o();
 
-        !h = std:thread:spawn ($code {
+        !h = std:thread:spawn $code {
             !@import std;
             _READY.send 11;
 
             slt1.send $p(:x, $[1,2,3]);
             slt2.recv[];
-        }[]) ${ slt1 = slt1, slt2 = slt2 };
+        } ${ slt1 = slt1, slt2 = slt2 };
 
         std:assert_eq h.recv_ready[] 11;
 
@@ -2805,7 +2805,7 @@ fn check_thread_valslot() {
         !slt1 = std:sync:slot:new[];
         !slt2 = std:sync:slot:new[];
 
-        !h = std:thread:spawn ($code {
+        !h = std:thread:spawn $code {
             !@import std;
             _READY.send $true;
 
@@ -2814,7 +2814,7 @@ fn check_thread_valslot() {
             slt1.send 44;
 
             100
-        }[]) ${ slt1 = slt1, slt2 = slt2 };
+        } ${ slt1 = slt1, slt2 = slt2 };
 
         std:assert ~ unwrap h.recv_ready[];
 
@@ -2835,7 +2835,7 @@ fn check_thread_valslot() {
     assert_eq!(ve(r#"
         !slt1 = std:sync:slot:new[];
 
-        !h = std:thread:spawn ($code {
+        !h = std:thread:spawn $code {
             !@import std;
             _READY.send $true;
 
@@ -2847,7 +2847,7 @@ fn check_thread_valslot() {
             std:assert_eq ret $true;
 
             100
-        }[]) ${ slt1 = slt1 };
+        } ${ slt1 = slt1 };
 
         slt1.recv_timeout $p(:ms, 500);
 
@@ -3623,6 +3623,10 @@ fn check_optionals() {
 fn check_code_string_literals() {
     assert_eq!(ve(r#"
         !code = $code 1 + 2;
+        code
+    "#), "\"1 + 2\"");
+    assert_eq!(ve(r#"
+        !code = $code { 1 + 2 };
         code
     "#), "\"1 + 2\"");
     assert_eq!(ve(r#"

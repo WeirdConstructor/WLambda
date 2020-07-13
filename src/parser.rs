@@ -799,10 +799,26 @@ fn parse_string_lit(ps: &mut State) -> Result<VVal, ParseError> {
                         ps.consume_wsc();
                     }
 
-                    let code_start_pos = ps.remember();
-                    parse_expr(ps)?;
-                    let code_end_pos = ps.remember();
-                    let code = ps.collect(code_start_pos, code_end_pos).to_string();
+                    let code =
+                        if ps.consume_if_eq_wsc('{') {
+                            let code_start_pos = ps.remember();
+                            parse_block(ps, false, false, true)?;
+                            let code_end_pos = ps.remember();
+                            let code = ps.collect(code_start_pos, code_end_pos).to_string();
+
+                            if !ps.consume_if_eq_wsc('}') {
+                                return Err(ps.err(
+                                    ParseErrorKind::ExpectedToken(
+                                        '}', "block end")));
+                            }
+
+                            code
+                        } else {
+                            let code_start_pos = ps.remember();
+                            parse_expr(ps)?;
+                            let code_end_pos = ps.remember();
+                            ps.collect(code_start_pos, code_end_pos).to_string()
+                        };
 
                     let vec = ps.syn(Syntax::Str);
                     vec.push(VVal::new_str_mv(code));
@@ -837,7 +853,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
         },
         '{' => {
             let syn = ps.syn_raw(Syntax::Func);
-            let block = parse_block(ps, true)?;
+            let block = parse_block(ps, true, true, true)?;
             block.set_at(0, syn);
             block.insert_at(1, VVal::None);
             Ok(block)
@@ -850,7 +866,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
 
                 let block_name = parse_identifier(ps)?;
                 ps.skip_ws_and_comments();
-                let block = parse_block(ps, true)?;
+                let block = parse_block(ps, true, true, true)?;
 
                 block.set_at(0, syn);
                 block.insert_at(1, VVal::new_sym_mv(block_name));
@@ -1558,6 +1574,11 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 
 /// This function parses the an optionally delimited block of WLambda statements.
 ///
+/// If _with_arity_ is set, the arity declaration `|a<b|` is parsed.
+/// If _delimited_ is set, "{" and "}" are expected at the end/beginning of a block.
+/// If _end_delim_ is set, the parsing loop for the statement ends when a "}"
+/// is encountered.
+///
 /// ```rust
 /// use wlambda::parser::{State, parse_block};
 ///
@@ -1565,7 +1586,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 /// let mut ps = State::new(&code, "somefilename");
 ///
 /// // Parse a bare block without '{' ... '}' delimiters:
-/// match parse_block(&mut ps, false) {
+/// match parse_block(&mut ps, false, false, false) {
 ///     Ok(v)  => { println!("Result: {}", v.s()); },
 ///     Err(e) => { panic!(format!("ERROR: {}", e)); },
 /// }
@@ -1575,9 +1596,8 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 /// that is ready for the `compiler` to be compiled. It consists mostly of
 /// `VVal::Lst` and `VVal::Syn` nodes. The latter hold the position information
 /// of the AST nodes.
-pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
-    //println!("parse_block [{}]", ps.rest());
-    if is_func {
+pub fn parse_block(ps: &mut State, with_arity: bool, delimited: bool, end_delim: bool) -> Result<VVal, ParseError> {
+    if delimited {
         if !ps.consume_if_eq_wsc('{') {
             return Err(ps.err(ParseErrorKind::ExpectedToken('{', "block start")));
         }
@@ -1585,27 +1605,29 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
 
     let block = ps.syn(Syntax::Block);
 
-    if is_func && ps.lookahead("|") {
+    if with_arity && ps.lookahead("|") {
         block.push(parse_arity(ps)?);
-    } else if is_func {
+    } else if with_arity {
         block.push(VVal::None);
     }
 
     while let Some(c) = ps.peek() {
-        if is_func { if c == '}' { break; } }
+        if end_delim { if c == '}' { break; } }
 
         let next_stmt = parse_stmt(ps)?;
         block.push(next_stmt);
 
         while ps.consume_if_eq_wsc(';') {
             while ps.consume_if_eq_wsc(';') { }
-            if ps.at_end() || ps.consume_if_eq_wsc('}') { return Ok(block); }
+            if ps.at_end() || (end_delim && ps.peek().unwrap_or(' ') == '}') {
+                return Ok(block);
+            }
             let next_stmt = parse_stmt(ps)?;
             block.push(next_stmt);
         }
     }
 
-    if is_func {
+    if delimited {
         if ps.at_end() {
             return Err(ps.err(ParseErrorKind::EOF("parsing block")));
         }
@@ -1629,7 +1651,7 @@ pub fn parse_block(ps: &mut State, is_func: bool) -> Result<VVal, ParseError> {
 /// ```
 pub fn parse(s: &str, filename: &str) -> Result<VVal, String> {
     let mut ps = State::new(s, filename);
-    parse_block(&mut ps, false).map_err(|e| format!("{}", e))
+    parse_block(&mut ps, false, false, true).map_err(|e| format!("{}", e))
 }
 
 #[cfg(test)]
@@ -1638,7 +1660,7 @@ mod tests {
 
     fn parse(s: &str) -> String {
         let mut ps = State::new(s, "<parser_test>");
-        match parse_block(&mut ps, false) {
+        match parse_block(&mut ps, false, false, true) {
             Ok(v)  => v.s(),
             Err(e) => panic!(format!("Parse error: {}", e)),
         }
@@ -1646,7 +1668,7 @@ mod tests {
 
     fn parse_error(s: &str) -> String {
         let mut ps = State::new(s,"<parser_test>");
-        match parse_block(&mut ps, false) {
+        match parse_block(&mut ps, false, false, true) {
             Ok(v)  => panic!(format!("Expected error but got result: {} for input '{}'",
                                      v.s(), s)),
             Err(e) => format!("Parse error: {}", e),

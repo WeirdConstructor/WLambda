@@ -123,6 +123,7 @@ Smalltalk, LISP and Perl.
     - [3.6.35](#3635-stdnumsmoothstep-a-b-x) std:num:smoothstep _a_ _b_ _x_
   - [3.7](#37-numeric-functions) Numeric Functions
     - [3.7.1](#371-stdnumabs-number) std:num:abs _number_
+    - [3.7.2](#372-stdnumsignum-number) std:num:signum _number_
   - [3.8](#38-numerical-mathematical-vectors) Numerical Mathematical Vectors
     - [3.8.1](#381-vector-conversions) Vector Conversions
     - [3.8.2](#382-vector-component-access) Vector Component Access
@@ -130,16 +131,23 @@ Smalltalk, LISP and Perl.
     - [3.8.4](#384-euler-additionsubtraction) Euler Addition/Subtraction
     - [3.8.5](#385-scalar-multiplicationdivision) Scalar Multiplication/Division
     - [3.8.6](#386-unary-vector-operations) Unary Vector Operations
-    - [3.8.7](#387-stdvdims-vec) std:v:dims _vec_
-    - [3.8.8](#388-stdvmag2-vec) std:v:mag2 _vec_
-    - [3.8.9](#389-stdvmag-vec) std:v:mag _vec_
-    - [3.8.10](#3810-stdvnorm-vec) std:v:norm _vec_
-    - [3.8.11](#3811-stdvdot-vec1-vec2) std:v:dot _vec1_ _vec2_
-    - [3.8.12](#3812-stdvcross-vec1-vec2) std:v:cross _vec1_ _vec2_
-    - [3.8.13](#3813-stdvlerp-vec1-vec2-t) std:v:lerp _vec1_ _vec2_ _t_
-    - [3.8.14](#3814-stdvslerp-vec1-vec2-t) std:v:slerp _vec1_ _vec2_ _t_
-    - [3.8.15](#3815-stdvvec2rad-vec) std:v:vec2rad _vec_
-    - [3.8.16](#3816-stdvrad2vec-radians) std:v:rad2vec _radians_
+    - [3.8.7](#387-isfvec-value) is\_fvec _value_
+    - [3.8.8](#388-isivec-value) is\_ivec _value_
+    - [3.8.9](#389-isnvec-value) is\_nvec _value_
+    - [3.8.10](#3810-fvec-value) fvec _value_
+    - [3.8.11](#3811-fvec2-value) fvec2 _value_
+    - [3.8.12](#3812-fvec3-value) fvec3 _value_
+    - [3.8.13](#3813-fvec4-value) fvec4 _value_
+    - [3.8.14](#3814-stdvdims-vec) std:v:dims _vec_
+    - [3.8.15](#3815-stdvmag2-vec) std:v:mag2 _vec_
+    - [3.8.16](#3816-stdvmag-vec) std:v:mag _vec_
+    - [3.8.17](#3817-stdvnorm-vec) std:v:norm _vec_
+    - [3.8.18](#3818-stdvdot-vec1-vec2) std:v:dot _vec1_ _vec2_
+    - [3.8.19](#3819-stdvcross-vec1-vec2) std:v:cross _vec1_ _vec2_
+    - [3.8.20](#3820-stdvlerp-vec1-vec2-t) std:v:lerp _vec1_ _vec2_ _t_
+    - [3.8.21](#3821-stdvslerp-vec1-vec2-t) std:v:slerp _vec1_ _vec2_ _t_
+    - [3.8.22](#3822-stdvvec2rad-vec) std:v:vec2rad _vec_
+    - [3.8.23](#3823-stdvrad2vec-radians) std:v:rad2vec _radians_
   - [3.9](#39-strings) Strings
     - [3.9.1](#391-string-literal-syntaxes) String Literal Syntaxes
     - [3.9.2](#392-str-value) str _value_
@@ -206,6 +214,7 @@ Smalltalk, LISP and Perl.
     - [3.16.3](#3163-splicing-an-iterator) Splicing an Iterator
     - [3.16.4](#3164-calling-an-iterator-with-a-function) Calling an Iterator with a Function
     - [3.16.5](#3165-zip-iterators) Zip Iterators
+    - [3.16.6](#3166-isiter-value) is\_iter _value_
   - [3.17](#317-calling-semantics-of-data-types) Calling Semantics of Data Types
 - [4](#4-conditional-execution---if--then--else) Conditional Execution - if / then / else
   - [4.1](#41-if-condition-then-expr-else-expr) ?/if _condition_ _then-expr_ [_else-expr_]
@@ -288,18 +297,18 @@ Smalltalk, LISP and Perl.
     - [10.0.2](#1002-stddelete-vector-or-map-index-or-key) std:delete _vector-or-map_ _index-or-key_
     - [10.0.3](#1003-stdcopy-vecormap) std:copy _vec\_or\_map_
     - [10.0.4](#1004-stdvalues-collection-or-iter) std:values _collection-or-iter_
-    - [10.0.5](#1005-stdsort-comparefun-vec) std:sort [_compare\_fun_] _vec_
-    - [10.0.6](#1006-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
-    - [10.0.7](#1007-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
-    - [10.0.8](#1008-stddisplayln-arg1-) std:displayln _arg1_ ...
-    - [10.0.9](#1009-debug-arg1-) $DEBUG _arg1_ ...
-    - [10.0.10](#10010-stdwriteln-arg1-) std:writeln _arg1_ ...
-    - [10.0.11](#10011-stdeval-code-string) std:eval _code-string_
-    - [10.0.12](#10012-stdassert-bool-message) std:assert _bool_ \[_message_]
-    - [10.0.13](#10013-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
-    - [10.0.14](#10014-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
-    - [10.0.15](#10015-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
-    - [10.0.16](#10016-stdwlambdaversion) std:wlambda:version
+    - [10.0.5](#1005-stdkeys-collection-or-iter) std:keys _collection-or-iter_
+    - [10.0.6](#1006-stdsort-comparefun-vec) std:sort [_compare\_fun_] _vec_
+    - [10.0.7](#1007-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
+    - [10.0.8](#1008-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
+    - [10.0.9](#1009-stddisplayln-arg1-) std:displayln _arg1_ ...
+    - [10.0.10](#10010-debug-arg1-) $DEBUG _arg1_ ...
+    - [10.0.11](#10011-stdwriteln-arg1-) std:writeln _arg1_ ...
+    - [10.0.12](#10012-stdeval-code-string) std:eval _code-string_
+    - [10.0.13](#10013-stdassert-bool-message) std:assert _bool_ \[_message_]
+    - [10.0.14](#10014-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
+    - [10.0.15](#10015-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
+    - [10.0.16](#10016-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
   - [10.1](#101-io) I/O
     - [10.1.1](#1011-stdiofilereadtext-filename) std:io:file:read\_text _filename_
     - [10.1.2](#1012-stdiofileread-filename) std:io:file:read _filename_
@@ -335,6 +344,8 @@ Smalltalk, LISP and Perl.
     - [11.6.4](#1164-stdrandsplitmix64nextopen01-smstate-count) std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
   - [11.7](#117-utility-functions) Utility Functions
     - [11.7.1](#1171-stddumpupvals-function) std:dump\_upvals _function_
+    - [11.7.2](#1172-stdwlambdaversion) std:wlambda:version
+    - [11.7.3](#1173-stdwlambdasizes) std:wlambda:sizes
 - [12](#12-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [12.1](#121-special-forms) Special Forms
   - [12.2](#122-string-formatting-syntax) String Formatting Syntax
@@ -1897,6 +1908,18 @@ std:assert_eq (std:num:abs -10)     10;
 std:assert_eq (std:num:abs -13.3)   13.3;
 ```
 
+#### <a name="372-stdnumsignum-number"></a>3.7.2 - std:num:signum _number_
+
+Returns either 1 or -1, depending on the sign of the given _number_.
+
+```wlambda
+std:assert_eq (std:num:signum -4)  -1;
+std:assert_eq (std:num:signum  4)   1;
+
+std:assert_eq (std:num:signum -4.0)  -1.0;
+std:assert_eq (std:num:signum  4.0)   1.0;
+```
+
 ### <a name="38-numerical-mathematical-vectors"></a>3.8 - Numerical Mathematical Vectors
 
 In order to aid in the development of GUIs, games, and other physics/geometry adjacent software,
@@ -2054,7 +2077,120 @@ std:assert_eq (+my_vec) my_vec;
 std:assert_eq[ my_vec + (-my_vec), my_vec * 0 ];
 ```
 
-#### <a name="387-stdvdims-vec"></a>3.8.7 - std:v:dims _vec_
+#### <a name="387-isfvec-value"></a>3.8.7 - is\_fvec _value_
+
+Returns `$true` if _value_ is a float vector.
+
+```wlambda
+std:assert_eq   (is_fvec $f(1,2))       $true;
+std:assert_eq   (is_fvec $f(1,2,3))     $true;
+std:assert_eq   (is_fvec $f(1,2,3,4))   $true;
+std:assert_eq   (is_fvec $none)         $false;
+std:assert_eq   (is_fvec $i(1,2))       $false;
+std:assert_eq   (is_fvec $[3.4, 4.5])   $false;
+
+std:assert_eq   (is_fvec fvec <& $[3.4, 4.5])   $true;
+
+# References are not dereferenced:
+std:assert_eq   (is_fvec $&&$f(3,4))    $false;
+std:assert_eq   (is_fvec $*$&&$f(3,4))  $true;
+```
+
+#### <a name="388-isivec-value"></a>3.8.8 - is\_ivec _value_
+
+Returns `$true` if _value_ is an integer vector.
+
+```wlambda
+std:assert_eq   (is_ivec $i(1,2))       $true;
+std:assert_eq   (is_ivec $i(1,2,3))     $true;
+std:assert_eq   (is_ivec $i(1,2,3,4))   $true;
+std:assert_eq   (is_ivec $none)         $false;
+std:assert_eq   (is_ivec $[3, 4])       $false;
+
+std:assert_eq   (is_ivec ivec <& $[3.4, 4.5])   $true;
+
+# References are not dereferenced:
+std:assert_eq   (is_ivec    $&& $i(3,4))  $false;
+std:assert_eq   (is_ivec $* $&& $i(3,4))  $true;
+```
+
+#### <a name="389-isnvec-value"></a>3.8.9 - is\_nvec _value_
+
+Returns `$true` if _value_ is either a numerical float or integer vector.
+
+```wlambda
+std:assert_eq   (is_nvec $i(1,2))       $true;
+std:assert_eq   (is_nvec $i(1,2,3))     $true;
+std:assert_eq   (is_nvec $i(1,2,3,4))   $true;
+std:assert_eq   (is_nvec $f(1,2))       $true;
+std:assert_eq   (is_nvec $f(1,2,3))     $true;
+std:assert_eq   (is_nvec $f(1,2,3,4))   $true;
+std:assert_eq   (is_nvec $none)         $false;
+std:assert_eq   (is_nvec $[3, 4])       $false;
+
+std:assert_eq   (is_nvec fvec <& $[3.4, 4.5])   $true;
+std:assert_eq   (is_nvec ivec <& $[3.4, 4.5])   $true;
+```
+
+#### <a name="3810-fvec-value"></a>3.8.10 - fvec _value_
+
+Will cast _value_ into a float vector. You can cast a multitude of data types
+into a float vector:
+
+```wlambda
+std:assert_eq   (fvec  $[1,2,3,4])      $f(1,2,3,4);
+std:assert_eq   (fvec  $[1,2,3])        $f(1,2,3);
+std:assert_eq   (fvec  $[1,2])          $f(1,2);
+
+std:assert_eq   (fvec $i(1,2))          $f(1,2);
+std:assert_eq   (fvec $i(1,2,3))        $f(1,2,3);
+std:assert_eq   (fvec $i(1,2,3,4))      $f(1,2,3,4);
+
+std:assert_eq   (fvec $p("2", "3.4"))   $f(2,3.4);
+
+!i = $iter $[] +> $p(3,4) +> $[5,6];
+std:assert_eq   (fvec i)    $f(3,4);
+std:assert_eq   (fvec i)    $f(5,6);
+
+std:assert_eq   (fvec ${x = 1, y = 2})                 $f(1,2);
+std:assert_eq   (fvec ${x = 1, y = 2, z = 3})          $f(1,2,3);
+std:assert_eq   (fvec ${x = 1, y = 2, z = 3, w = 4})   $f(1,2,3,4);
+```
+
+#### <a name="3811-fvec2-value"></a>3.8.11 - fvec2 _value_
+
+Like `fvec` but always returns a 2 dimensional vector.
+
+```wlambda
+std:assert_eq  (fvec2 $i(3,4,5))    $f(3,4);
+std:assert_eq  (fvec2 $[4,5,6,7,8]) $f(4,5);
+
+std:assert_eq  (fvec2 ${x = 1, y = 2, z = 3, w = 4})   $f(1,2);
+```
+
+#### <a name="3812-fvec3-value"></a>3.8.12 - fvec3 _value_
+
+Like `fvec` but always returns a 3 dimensional vector.
+
+```wlambda
+std:assert_eq  (fvec3 $i(3,4,5))    $f(3,4,5);
+std:assert_eq  (fvec3 $[4,5,6,7,8]) $f(4,5,6);
+
+std:assert_eq  (fvec3 ${x = 1, y = 2, z = 3, w = 4})   $f(1,2,3);
+```
+
+#### <a name="3813-fvec4-value"></a>3.8.13 - fvec4 _value_
+
+Like `fvec` but always returns a 4 dimensional vector.
+
+```wlambda
+std:assert_eq  (fvec4 $i(3,4,5))    $f(3,4,5,0);
+std:assert_eq  (fvec4 $[4,5,6,7,8]) $f(4,5,6,7);
+
+std:assert_eq  (fvec4 ${x = 1, y = 2, z = 3, w = 4})   $f(1,2,3,4);
+```
+
+#### <a name="3814-stdvdims-vec"></a>3.8.14 - std:v:dims _vec_
 
 You can use this function to retrieve the number of dimensions in _vec_.
 
@@ -2072,7 +2208,7 @@ std:assert_eq (std:v:dims ${w=0}) 4;
 std:assert_eq (std:v:dims $f(1,2)) (std:v:dims $i(1,2));
 ```
 
-#### <a name="388-stdvmag2-vec"></a>3.8.8 - std:v:mag2 _vec_
+#### <a name="3815-stdvmag2-vec"></a>3.8.15 - std:v:mag2 _vec_
 
 Returns the magnitude of _vec_, squared.
 
@@ -2085,7 +2221,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag2 ${w=4}) 16.0;
 ```
 
-#### <a name="389-stdvmag-vec"></a>3.8.9 - std:v:mag _vec_
+#### <a name="3816-stdvmag-vec"></a>3.8.16 - std:v:mag _vec_
 
 Returns the magnitude (also known as the length) of _vec_.
 
@@ -2095,7 +2231,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag ${w=4}) 4.0;
 ```
 
-#### <a name="3810-stdvnorm-vec"></a>3.8.10 - std:v:norm _vec_
+#### <a name="3817-stdvnorm-vec"></a>3.8.17 - std:v:norm _vec_
 
 Returns a new vector which has a magnitude of `1`, but points in the same direction as _vec_.
 Vectors with a length of one are also known as unit vectors.
@@ -2122,7 +2258,7 @@ These are the only `ivec2`s that have a length of `1`.
 std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
 ```
 
-#### <a name="3811-stdvdot-vec1-vec2"></a>3.8.11 - std:v:dot _vec1_ _vec2_
+#### <a name="3818-stdvdot-vec1-vec2"></a>3.8.18 - std:v:dot _vec1_ _vec2_
 
 Returns the sum of all components after multiplying each component
 in _vec1_ with the corresponding component of _vec2_.
@@ -2153,7 +2289,7 @@ If _vec1_ isn't an `fvec`, then it's coerced into an `ivec`, just like the other
 std:assert_eq[ (dir < 0) "left" "right", "left" ];
 ```
 
-#### <a name="3812-stdvcross-vec1-vec2"></a>3.8.12 - std:v:cross _vec1_ _vec2_
+#### <a name="3819-stdvcross-vec1-vec2"></a>3.8.19 - std:v:cross _vec1_ _vec2_
 
 Returns a vector perpendicular to _vec1_ and _vec2_.
 
@@ -2178,7 +2314,7 @@ std:assert_eq[(std:v:dot x y), (std:v:dot y z)];
 std:assert_eq[(std:v:dot y z), (std:v:dot z x)];
 ```
 
-#### <a name="3813-stdvlerp-vec1-vec2-t"></a>3.8.13 - std:v:lerp _vec1_ _vec2_ _t_
+#### <a name="3820-stdvlerp-vec1-vec2-t"></a>3.8.20 - std:v:lerp _vec1_ _vec2_ _t_
 
 `lerp` stands for linear interpolation.
 This function is useful when animating positions, whereas slerp is useful for animating rotations.
@@ -2201,7 +2337,7 @@ std:assert_eq[ (std:v:mag a) * 2 , std:v:mag (std:v:lerp $f(0,0) a 2.0) ];
 std:assert_eq[ std:v:lerp b a 1.5 , std:v:lerp a b -0.5 ];
 ```
 
-#### <a name="3814-stdvslerp-vec1-vec2-t"></a>3.8.14 - std:v:slerp _vec1_ _vec2_ _t_
+#### <a name="3821-stdvslerp-vec1-vec2-t"></a>3.8.21 - std:v:slerp _vec1_ _vec2_ _t_
 
 `slerp` stands for spherical linear interpolation.
 This function is useful when animating rotations, whereas lerp is useful for animating positions.
@@ -2234,7 +2370,7 @@ std:assert_rel_eq half.x four.x 0.000001;
 std:assert_rel_eq half.y four.y 0.000001;
 ```
 
-#### <a name="3815-stdvvec2rad-vec"></a>3.8.15 - std:v:vec2rad _vec_
+#### <a name="3822-stdvvec2rad-vec"></a>3.8.22 - std:v:vec2rad _vec_
 
 Creates a rotation in radians from the x and y components of _vec_.
 
@@ -2252,7 +2388,7 @@ std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad h) , 45.0 ];
 ```
 
-#### <a name="3816-stdvrad2vec-radians"></a>3.8.16 - std:v:rad2vec _radians_
+#### <a name="3823-stdvrad2vec-radians"></a>3.8.23 - std:v:rad2vec _radians_
 
 Creates a unit vector from _radians_.
 
@@ -3609,6 +3745,22 @@ you pass an iterator as first part of a pair `$p(a, b)`:
 std:assert_eq
     (str elems)
     (str $[$p("a", 0), $p("b", 1), $p("c", 2)]);
+```
+
+#### <a name="3166-isiter-value"></a>3.16.6 - is\_iter _value_
+
+Returns `$true` if _value_ is an iterator.
+
+```wlambda
+std:assert   (is_iter $iter $n);
+std:assert   (is_iter $iter 0 => 30);
+std:assert   not <& (is_iter $[1,2,3]);
+std:assert   (is_iter $iter $[1,2,3]);
+
+std:assert   (not <& is_iter <& $true);
+std:assert   (not <& is_iter <& $false);
+std:assert   (not <& is_iter <& 4);
+std:assert   (not <& is_iter <& $p(1, 2));
 ```
 
 ### <a name="317-calling-semantics-of-data-types"></a>3.17 - Calling Semantics of Data Types
@@ -5341,14 +5493,28 @@ types:
 - iterator `$iter`
 
 ```wlambda
-std:assert_str_eq std:values[$iter 0 => 5]      $[0,1,2,3,4];
-std:assert_str_eq std:values[${a = 10}]         $[10];
-std:assert_str_eq std:values[$iter ${a = 10}]   $[10];
-std:assert_str_eq std:values[$[1,2,3]]          $[1,2,3];
-std:assert_str_eq std:values[$i(1,2,3)]         $[1,2,3];
+std:assert_str_eq (std:values $iter 0 => 5)      $[0,1,2,3,4];
+std:assert_str_eq (std:values ${a = 10})         $[10];
+std:assert_str_eq (std:values $iter ${a = 10})   $[10];
+std:assert_str_eq (std:values $[1,2,3])          $[1,2,3];
+std:assert_str_eq (std:values $i(1,2,3))         $[1,2,3];
 ```
 
-#### <a name="1005-stdsort-comparefun-vec"></a>10.0.5 - std:sort [_compare\_fun_] _vec_
+#### <a name="1005-stdkeys-collection-or-iter"></a>10.0.5 - std:keys _collection-or-iter_
+
+This function returns all keys in the given _collection_ or _iterator_.
+It's most useful for the map data type, but also returns the indices in
+a vector or numerical vector.
+
+```wlambda
+std:assert_str_eq (std:keys ${a = 10})           $["a"];
+std:assert_str_eq (std:keys $iter ${a = 10})     $["a"];
+std:assert_str_eq (std:keys $[3,3,3])            $[0,1,2];
+std:assert_str_eq (std:keys $i(4,4,4))           $[0,1,2];
+std:assert_str_eq (std:keys $i(4,4))             $[0,1];
+```
+
+#### <a name="1006-stdsort-comparefun-vec"></a>10.0.6 - std:sort [_compare\_fun_] _vec_
 
 Sorts the given _vec_ in place. The comparison function _compare_fun_ gets the
 two values a and b and needs to return -1 if a < b, 0 if a = b and 1 if a > b.
@@ -5373,7 +5539,7 @@ std:assert_eq v.1.0 1;
 std:assert_eq v.2.0 -1;
 ```
 
-#### <a name="1006-stdcmpnumasc-a-b"></a>10.0.6 - std:cmp:num:asc _a_ _b_
+#### <a name="1007-stdcmpnumasc-a-b"></a>10.0.7 - std:cmp:num:asc _a_ _b_
 
 Compares _a_ and _b_ numerically and returns:
 
@@ -5389,7 +5555,7 @@ std:assert_eq (std:cmp:num:asc "20" "20")    0;
 std:assert_eq (std:cmp:num:asc 20 21)        1;
 ```
 
-#### <a name="1007-stdcmpnumdesc-a-b"></a>10.0.7 - std:cmp:num:desc _a_ _b_
+#### <a name="1008-stdcmpnumdesc-a-b"></a>10.0.8 - std:cmp:num:desc _a_ _b_
 
 Compares _a_ and _b_ numerically descending and returns:
 
@@ -5405,7 +5571,7 @@ std:assert_eq (std:cmp:num:desc "20" "20")    0;
 std:assert_eq (std:cmp:num:desc 20 21)       -1;
 ```
 
-#### <a name="1008-stddisplayln-arg1-"></a>10.0.8 - std:displayln _arg1_ ...
+#### <a name="1009-stddisplayln-arg1-"></a>10.0.9 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -5419,7 +5585,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
-#### <a name="1009-debug-arg1-"></a>10.0.9 - $DEBUG _arg1_ ...
+#### <a name="10010-debug-arg1-"></a>10.0.10 - $DEBUG _arg1_ ...
 
 This is a special value that evaluates to a print function that supplies the
 current position in the source code. For example this:
@@ -5450,7 +5616,7 @@ Will print like this:
 [1,11:<wlambda::eval>] DEBUG: k = 30
 ```
 
-#### <a name="10010-stdwriteln-arg1-"></a>10.0.10 - std:writeln _arg1_ ...
+#### <a name="10011-stdwriteln-arg1-"></a>10.0.11 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
@@ -5465,7 +5631,7 @@ See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="10011-stdeval-code-string"></a>10.0.11 - std:eval _code-string_
+#### <a name="10012-stdeval-code-string"></a>10.0.12 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -5477,7 +5643,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="10012-stdassert-bool-message"></a>10.0.12 - std:assert _bool_ \[_message_]
+#### <a name="10013-stdassert-bool-message"></a>10.0.13 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -5488,7 +5654,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="10013-stdasserteq-actual-expected-message"></a>10.0.13 - std:assert\_eq _actual_ _expected_ \[_message_]
+#### <a name="10014-stdasserteq-actual-expected-message"></a>10.0.14 - std:assert\_eq _actual_ _expected_ \[_message_]
 
 This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -5499,7 +5665,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### <a name="10014-stdassertstreq-actual-expected"></a>10.0.14 - std:assert\_str\_eq _actual_ _expected_
+#### <a name="10015-stdassertstreq-actual-expected"></a>10.0.15 - std:assert\_str\_eq _actual_ _expected_
 
 This function stringifies _actual_ and _expected_ using the `str` function
 and compares the resulting strings.
@@ -5511,7 +5677,7 @@ if the maps are stringified using `str`:
 std:assert_str_eq $[1, 2, 3]        $[1, 2, 3];
 ```
 
-#### <a name="10015-stdassertreleq-l-r-epsilon-message"></a>10.0.15 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+#### <a name="10016-stdassertreleq-l-r-epsilon-message"></a>10.0.16 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -5526,10 +5692,6 @@ std:assert_rel_eq x y 1;
 # but not within 0.5 of each other, so this line is commented out.
 # std:assert_eq x y 0.5;
 ```
-
-#### <a name="10016-stdwlambdaversion"></a>10.0.16 - std:wlambda:version
-
-Returns the version number of the WLambda crate when called.
 
 ### <a name="101-io"></a>10.1 - I/O
 
@@ -5886,6 +6048,15 @@ std:assert_eq (str upvs) "$[$&3,$&4]";
 std:assert_eq $*(upvs.0) 3;
 std:assert_eq $*(upvs.1) 4;
 ```
+
+#### <a name="1172-stdwlambdaversion"></a>11.7.2 - std:wlambda:version
+
+Returns the version number of the WLambda crate when called.
+
+#### <a name="1173-stdwlambdasizes"></a>11.7.3 - std:wlambda:sizes
+
+Writes a table of internal data structure sizes to stdout. Just for development
+purposes.
 
 ## <a name="12-wlambda-lexical-syntax-and-grammar"></a>12 - WLambda Lexical Syntax and Grammar
 
@@ -6319,6 +6490,18 @@ macro_rules! add_sbin_op {
             let $b = env.arg(1);
             $e
         }, Some(2), Some(2), false);
+    }
+}
+
+macro_rules! add_num_fun {
+    ($g: ident, $op: literal, $e: tt) => {
+        func!($g, $op,
+            |env: &mut Env, _argc: usize| {
+                Ok(match env.arg(0).deref() {
+                    VVal::Int(f) => { VVal::Int(f.$e()) }
+                    v            => { VVal::Flt(v.f().$e()) }
+                })
+            }, Some(1), Some(1), false);
     }
 }
 
@@ -7330,7 +7513,6 @@ pub fn std_symbol_table() -> SymbolTable {
     add_num_fun_flt!(st, "num:cbrt",       cbrt);
     add_num_fun_flt!(st, "num:floor",      floor);
     add_num_fun_flt!(st, "num:round",      round);
-    add_num_fun_flt!(st, "num:signum",     signum);
     add_num_fun_flt!(st, "num:abs",        abs);
     add_num_fun_flt!(st, "num:trunc",      trunc);
     add_num_fun_flt!(st, "num:to_degrees", to_degrees);
@@ -7354,6 +7536,8 @@ pub fn std_symbol_table() -> SymbolTable {
     add_num_fun_flt!(st, "num:exp2",       exp2);
     add_num_fun_flt!(st, "num:atan",       atan);
     add_num_fun_flt!(st, "num:atanh",      atanh);
+
+    add_num_fun!(st, "num:signum",     signum);
 
     add_num_fun_flt2!(st, "num:log",        log);
     add_num_fun_flt2!(st, "num:atan2",      atan2);
