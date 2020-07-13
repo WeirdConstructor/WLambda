@@ -335,6 +335,11 @@ Smalltalk, LISP and Perl.
       - [10.2.5.7](#10257-atomslotwaitempty) atom\_slot.wait\_empty
       - [10.2.5.8](#10258-atomslotwaitemptytimeout-duration) atom\_slot.wait\_empty\_timeout _duration_
     - [10.2.6](#1026-channel-api) Channel API
+      - [10.2.6.1](#10261-stdsyncmpscnew) std:sync:mpsc:new
+      - [10.2.6.2](#10262-channelsend-value) channel.send _value_
+      - [10.2.6.3](#10263-channelrecv) channel.recv
+      - [10.2.6.4](#10264-channeltryrecv) channel.try\_recv
+      - [10.2.6.5](#10265-channelrecvtimeout-duration) channel.recv\_timeout _duration_
 - [11](#11-optional-standard-library) Optional Standard Library
   - [11.1](#111-serialization) serialization
     - [11.1.1](#1111-stdserwlambda-arg) std:ser:wlambda _arg_
@@ -6106,6 +6111,19 @@ empty within the given _duration_ (see std:thread:sleep) it will return `$true`.
 Otherwise it will return `$false`.
 
 #### <a name="1026-channel-api"></a>10.2.6 - Channel API
+
+A channel is a multiple sender, single consumer queue. It can be used to
+establish a message passing based communication between threads.
+
+##### <a name="10261-stdsyncmpscnew"></a>10.2.6.1 - std:sync:mpsc:new
+
+##### <a name="10262-channelsend-value"></a>10.2.6.2 - channel.send _value_
+
+##### <a name="10263-channelrecv"></a>10.2.6.3 - channel.recv
+
+##### <a name="10264-channeltryrecv"></a>10.2.6.4 - channel.try\_recv
+
+##### <a name="10263-channelrecv"></a>10.2.6.3 - channel.recv\_timeout _duration_
 
 ## <a name="11-optional-standard-library"></a>11 - Optional Standard Library
 
