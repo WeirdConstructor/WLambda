@@ -301,6 +301,10 @@ Smalltalk, LISP and Perl.
     - [10.1.3](#1013-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
     - [10.1.4](#1014-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
   - [10.2](#102-threading) Threading
+    - [10.2.1](#1021-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
+    - [10.2.2](#1022-stdthreadsleep-duration) std:thread:sleep _duration_
+      - [10.2.2.1](#10221-thdljoin) thdl.join
+      - [10.2.2.2](#10222-thdlrecvready) thdl.recv\_ready
 - [11](#11-optional-standard-library) Optional Standard Library
   - [11.1](#111-serialization) serialization
     - [11.1.1](#1111-stdserwlambda-arg) std:ser:wlambda _arg_
@@ -2435,7 +2439,7 @@ std:assert_eq s "a b c";
     !@import std std;
     !res = "x" "y" "z";
     std:str:cat res 33;
-}[]).join[];
+}).join[];
 
 std:assert_eq v "xyz33";
 ```
@@ -5732,7 +5736,7 @@ into a thread safe shareable represenation called _AVal_. An AVal is a
 deep copy of the original VVal and can additionally contain atoms (see `std:sync:atom:new`),
 MPSC queues (see `std:sync:mpsc:new`) and value slots (see `std:sync:slot:new`).
 
-#### - std:thread:spawn _string_ [_globals-map_]
+#### <a name="1021-stdthreadspawn-string-globals-map"></a>10.2.1 - std:thread:spawn _string_ [_globals-map_]
 
 This evaluates the given _string_ as WLambda code in a new thread.
 It returns a thread handle, that can be used to join the thread or
@@ -5767,7 +5771,7 @@ a worker thread and wait in a blocking manner:
     _READY.send $[:ok, sum];
 
     100
-}[];
+};
 
 std:assert_str_eq handle.recv_ready[] $[:ok, 45];
 
@@ -5789,16 +5793,80 @@ instance.
 
 !handle = std:thread:spawn $code {
     a + b.1
-}[] globals;
+} globals;
 
 !res = handle.join[];
 
 std:assert_str_eq res 102;
 ```
 
+#### <a name="1022-stdthreadsleep-duration"></a>10.2.2 - std:thread:sleep _duration_
+
+Lets the current thread sleep for the given _duration_.
+_duration_ can either be an integer that will be interpreted
+as milliseconds to sleep. Or a pair, containing the duration unit as first element
+and the integer as second element. Following units are supported:
+
+- `$p(:s, _seconds_)`
+- `$p(:ms, _milliseconds_)`
+- `$p(:us, _microseconds_)`
+- `$p(:ns, _nanoseconds_)`
+
+```wlambda
+!before = std:time:now :ms;
+!thrd = std:thread:spawn $code {
+    !@import std;
+    std:thread:sleep :ms => 150;
+};
+
+thrd.join[];
+
+!after = std:time:now :ms;
+
+std:assert (after - before) >= 150;
+```
+
 #### Thread Handle API
 
+##### <a name="10221-thdljoin"></a>10.2.2.1 - thdl.join
+
+This method will wait for the thread to finish and return
+the return value of the thread.
+
+```wlambda
+!thdl = std:thread:spawn "4 + 3";
+std:assert_eq thdl.join[] 7;
+```
+
+##### <a name="10222-thdlrecvready"></a>10.2.2.2 - thdl.recv\_ready
+
+Waits for the global `_READY` atomic value slot to be sent a value by the
+thread. This is useful for waiting until the thread has started without an
+error before expecting it to run properly.
+If an error happens, you will receive an error object as return value of
+`recv_ready`:
+
+```wlambda
+!thdl = std:thread:spawn $code {
+    !@wlambda; # importing `panic`
+    panic "SOME ERR";
+    _READY.send :ok;
+};
+
+!err_msg =
+    match thdl.recv_ready[]
+        ($e err) => { $\.err.0 }
+        v        => $\.v;
+
+$DEBUG err_msg;
+std:assert err_msg &> $r/*SOME\ ERR*/;
+
+thdl.join[];
+```
+
 #### Atomic Value Slot API
+
+#### Channel API
 
 ## <a name="11-optional-standard-library"></a>11 - Optional Standard Library
 

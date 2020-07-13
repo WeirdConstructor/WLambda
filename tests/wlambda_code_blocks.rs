@@ -42,11 +42,12 @@ fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
 fn execute_script(name: &str, snippet: &str) {
     use wlambda::EvalContext;
 
+    print!("- code block '{}'...", name);
     let mut ctx = EvalContext::new_default();
     match ctx.eval(snippet) {
-        Ok(v) => { println!("result '{}': {}", name, v.s()); },
+        Ok(v) => { println!("  result: {}", v.s()); },
         Err(e) => {
-            panic!(format!("Failed code snippet '{}': {}", name, e));
+            panic!(format!("   FAILED code snippet '{}': {}", name, e));
         }
     }
 }
@@ -56,11 +57,11 @@ fn wlambda_code_blocks() {
 
     #[cfg(feature="regex")]
     {
-        for (name, snip) in get_scripts_from_file("src/prelude.rs") {
+        for (name, snip) in get_scripts_from_file("doc/wlambda_reference.md") {
             execute_script(&name, &snip);
         }
 
-        for (name, snip) in get_scripts_from_file("doc/wlambda_reference.md") {
+        for (name, snip) in get_scripts_from_file("src/prelude.rs") {
             execute_script(&name, &snip);
         }
 

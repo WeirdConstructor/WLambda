@@ -11,6 +11,9 @@ if arguments were on the stack.
 * Change: Give proper error if a numeric vector is mutated.
 * Change: Numerical vectors serialize to lists of numbers now instead some
 custom Rust data structure serialization.
+* Change: `$code` now parses blocks directly. This means `$code { ... }` will
+only contain the text inside the curly bracktes but not the brackets themself.
+This allows for more idiomatic `std:thread:spawn $code { ... }` syntax.
 * Feature: Added negative key match to recursive selectors `$S(**!key=childs)`
 to prohibit it to recurse into certain keys.
 * Feature: Added positive value condition to recursive selectors `$S(**=:{x=10})`
@@ -18,7 +21,8 @@ to select only specific values to recurse into.
 * Feature: Added std:bytes:replace function.
 * Documentation: Color conversion functions `std:v:rgb2hsv`, `std:v:hsv2rgb`
 and others.
-* Documentation: Added documentation for `std:values`.
+* Documentation: Added documentation for `std:values`, `std:thread:spawn`,
+`fvec`, `ivec`, `is_ivec`, `is_fvec`, `is_nvec`.
 * Feature: Added debug print function special value, that includes source position and
 dynamic type name: `$DEBUG ...`.
 * Feature: Added `std:time:now`, `std:srand` and `std:rand`.
