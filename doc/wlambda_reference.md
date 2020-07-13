@@ -303,8 +303,24 @@ Smalltalk, LISP and Perl.
   - [10.2](#102-threading) Threading
     - [10.2.1](#1021-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
     - [10.2.2](#1022-stdthreadsleep-duration) std:thread:sleep _duration_
-      - [10.2.2.1](#10221-thdljoin) thdl.join
-      - [10.2.2.2](#10222-thdlrecvready) thdl.recv\_ready
+    - [10.2.3](#1023-thread-handle-api) Thread Handle API
+      - [10.2.3.1](#10231-thdljoin) thdl.join
+      - [10.2.3.2](#10232-thdlrecvready) thdl.recv\_ready
+    - [10.2.4](#1024-atom-api) Atom API
+      - [10.2.4.1](#10241-stdsyncatomnew-value) std:sync:atom:new _value_
+      - [10.2.4.2](#10242-atomread) atom.read
+      - [10.2.4.3](#10243-atomwrite-value) atom.write _value_
+      - [10.2.4.4](#10244-atomswap-value) atom.swap _value_
+    - [10.2.5](#1025-atom-value-slot-api) Atom Value Slot API
+      - [10.2.5.1](#10251-stdsyncslotnew) std:sync:slot:new
+      - [10.2.5.2](#10252-atomslotsend-value) atom\_slot.send _value_
+      - [10.2.5.3](#10253-atomslotrecv) atom\_slot.recv
+      - [10.2.5.4](#10254-atomslottryrecv) atom\_slot.try\_recv
+      - [10.2.5.5](#10255-atomslotrecvtimeout-duration) atom\_slot.recv\_timeout _duration_
+      - [10.2.5.6](#10256-atomslotcheckempty) atom\_slot.check\_empty
+      - [10.2.5.7](#10257-atomslotwaitempty) atom\_slot.wait\_empty
+      - [10.2.5.8](#10258-atomslotwaitemptytimeout-duration) atom\_slot.wait\_empty\_timeout _duration_
+    - [10.2.6](#1026-channel-api) Channel API
 - [11](#11-optional-standard-library) Optional Standard Library
   - [11.1](#111-serialization) serialization
     - [11.1.1](#1111-stdserwlambda-arg) std:ser:wlambda _arg_
@@ -5736,6 +5752,13 @@ into a thread safe shareable represenation called _AVal_. An AVal is a
 deep copy of the original VVal and can additionally contain atoms (see `std:sync:atom:new`),
 MPSC queues (see `std:sync:mpsc:new`) and value slots (see `std:sync:slot:new`).
 
+The scope of threading in WLambda is primarily to provide a way to do asynchronous
+work and not so much for high performance computing. You can of course enhance
+performance a bit with threading, but if you want to do heavy computing I recommend
+implementing your algorithm in Rust instead. You can of course still manage
+thread orchestration in WLambda if you just provide a simple function
+API to your algorithms.
+
 #### <a name="1021-stdthreadspawn-string-globals-map"></a>10.2.1 - std:thread:spawn _string_ [_globals-map_]
 
 This evaluates the given _string_ as WLambda code in a new thread.
@@ -5826,9 +5849,9 @@ thrd.join[];
 std:assert (after - before) >= 150;
 ```
 
-#### Thread Handle API
+#### <a name="1023-thread-handle-api"></a>10.2.3 - Thread Handle API
 
-##### <a name="10221-thdljoin"></a>10.2.2.1 - thdl.join
+##### <a name="10231-thdljoin"></a>10.2.3.1 - thdl.join
 
 This method will wait for the thread to finish and return
 the return value of the thread.
@@ -5838,7 +5861,7 @@ the return value of the thread.
 std:assert_eq thdl.join[] 7;
 ```
 
-##### <a name="10222-thdlrecvready"></a>10.2.2.2 - thdl.recv\_ready
+##### <a name="10232-thdlrecvready"></a>10.2.3.2 - thdl.recv\_ready
 
 Waits for the global `_READY` atomic value slot to be sent a value by the
 thread. This is useful for waiting until the thread has started without an
@@ -5864,9 +5887,211 @@ std:assert err_msg &> $r/*SOME\ ERR*/;
 thdl.join[];
 ```
 
-#### Atomic Value Slot API
+#### <a name="1024-atom-api"></a>10.2.4 - Atom API
 
-#### Channel API
+For threads a VVal (WLambda data value) is transformed into a value
+that can be shared between threads safely. For this the data values are cloned
+deeply and transformed into a structure of atomic values.
+
+These values are then stored in a so called _Atom_. They can be safely changed
+by threads.
+
+##### <a name="10241-stdsyncatomnew-value"></a>10.2.4.1 - std:sync:atom:new _value_
+
+Creates an Atom, containing the given _value_. The data types for _value_
+is limited to these:
+
+- Numbers (Integer, Float)
+- Numerical Vectors
+- Vectors
+- Maps
+- Strings
+- Symbols
+- Byte vectors
+- Pairs
+- Booleans
+- Optionals
+- Errors
+
+And also these special types:
+
+- Atom
+- Atom Value Slot
+- Channel
+
+```wlambda
+!at = std:sync:atom:new $[1, 2, 3];
+
+!thdl = std:thread:spawn $code {
+    at.write ~ $@i iter i at.read[] {
+        $+ i;
+    };
+    _READY.send :ok;
+} ${ at = at };
+
+thdl.recv_ready[];
+
+std:assert_eq at.read[] 6;
+
+thdl.join[]
+```
+
+##### <a name="10242-atomread"></a>10.2.4.2 - atom.read
+
+Returns the value stored in the atom.
+
+```wlambda
+!at = std:sync:atom:new 99;
+
+std:assert_eq at.read[] 99;
+```
+
+##### <a name="10243-atomwrite-value"></a>10.2.4.3 - atom.write _value_
+
+Overwrites the contents of the atom with the given _value_.
+
+```wlambda
+!at = std:sync:atom:new 99;
+
+at.write 100;
+
+std:assert_eq at.read[] 100;
+```
+
+##### <a name="10244-atomswap-value"></a>10.2.4.4 - atom.swap _value_
+
+Returns the previous value of the atom and writes in
+the given _value_.
+
+```wlambda
+!at = std:sync:atom:new 99;
+
+std:assert_eq at.swap[100] 99;
+
+std:assert_eq at.read[] 100;
+```
+
+#### <a name="1025-atom-value-slot-api"></a>10.2.5 - Atom Value Slot API
+
+An Atom value slot offers more synchronization than a normal Atom value.
+It allows you to set the value of the slot, wait for it to be collected
+and wait for a value becoming available.
+It can be thought of a single element queue, where the element will be
+overwritten when a new value is sent to the slot.
+
+You can theoretically receive or wait from multiple threads and also write from
+multiple threads. But be aware, that the order of which threads get to read or
+write is determined by the operating system and might lead to reader or writer
+starvation.
+
+Best recommendation here is to use a slot only from a single writer and
+a single reader.
+
+##### <a name="10251-stdsyncslotnew"></a>10.2.5.1 - std:sync:slot:new
+
+Constructs a new Atom slot and returns it.
+The slot has the initial status of being _empty_.
+If a value is sent to it, it will not be _empty_ anymore.
+After a value is received from the slot, the status is _empty_ again.
+
+##### <a name="10252-atomslotsend-value"></a>10.2.5.2 - atom\_slot.send _value_
+
+This method sends the value into the slot, overwriting any previous
+set values. The slot can also ha
+
+```wlambda
+!slot = std:sync:slot:new[];
+
+std:assert slot.check_empty[];
+
+slot.send $[:ok, $i(1,2,3)];
+
+std:assert ~ not slot.check_empty[];
+
+std:assert_eq slot.recv[].1 $i(1,2,3);
+
+std:assert slot.check_empty[];
+```
+
+##### <a name="10253-atomslotrecv"></a>10.2.5.3 - atom\_slot.recv
+
+If the slot is empty, it will wait for a value to become available.
+Once a value is available it is returned and the slot is set to _empty_ again.
+
+```wlambda
+!slot = std:sync:slot:new[];
+
+!thrd = std:thread:spawn $code {
+    slot.send 99;
+} ${ slot = slot };
+
+std:assert_eq slot.recv[] 99;
+
+thrd.join[];
+```
+
+##### <a name="10254-atomslottryrecv"></a>10.2.5.4 - atom\_slot.try\_recv
+
+This method returns an optional value. It will provide an empty optional
+value if no value is stored in the slot. But if the slot contains
+a value, it will return the value (wrapped in an optional) and set the
+slot to be _empty_ again.
+
+```wlambda
+!slot       = std:sync:slot:new[];
+!start_flag = std:sync:slot:new[];
+
+!thrd = std:thread:spawn $code {
+
+    start_flag.recv[]; # sync with parent
+
+    slot.send 99;
+
+    _READY.send :ok;
+
+} ${ slot = slot, start_flag = start_flag };
+
+std:assert_eq slot.try_recv[] $o();
+
+start_flag.send :ok;
+thrd.recv_ready[];
+
+std:assert_eq slot.try_recv[] $o(99);
+
+thrd.join[];
+```
+
+##### <a name="10255-atomslotrecvtimeout-duration"></a>10.2.5.5 - atom\_slot.recv\_timeout _duration_
+
+Acts like `atom_slot.recv`, but it will only wait for the given _duration_.  If
+no value was received in the given _duration_ (see std:thread:sleep), `$o()` is
+returned.  Otherwise the optional value will contain the received value.
+
+```wlambda
+!slot = std:sync:slot:new[];
+
+std:assert_eq (slot.recv_timeout :ms => 100) $o();
+
+slot.send 4;
+
+std:assert_eq (slot.recv_timeout :ms => 100) $o(4);
+```
+
+##### <a name="10256-atomslotcheckempty"></a>10.2.5.6 - atom\_slot.check\_empty
+
+Returns `$true` if the slot is empty.
+
+##### <a name="10257-atomslotwaitempty"></a>10.2.5.7 - atom\_slot.wait\_empty
+
+Waits until the slot is empty and then returns `$true`.
+
+##### <a name="10258-atomslotwaitemptytimeout-duration"></a>10.2.5.8 - atom\_slot.wait\_empty\_timeout _duration_
+
+Waits a predefined timeout until the slot is empty. If it did become
+empty within the given _duration_ (see std:thread:sleep) it will return `$true`.
+Otherwise it will return `$false`.
+
+#### <a name="1026-channel-api"></a>10.2.6 - Channel API
 
 ## <a name="11-optional-standard-library"></a>11 - Optional Standard Library
 

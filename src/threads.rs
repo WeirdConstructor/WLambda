@@ -366,14 +366,14 @@ impl AtomicAValSlot {
                 }
             };
 
-        if guard.1 {
-            let val = guard.0.to_vval();
-            *guard = (AVal::None, false);
-            self.0.cv_recv.notify_one();
-            return val;
-        }
-
         if let Some(dur) = dur {
+            if guard.1 {
+                let val = guard.0.to_vval();
+                *guard = (AVal::None, false);
+                self.0.cv_recv.notify_one();
+                return VVal::opt(val);
+            }
+
             loop {
                 match self.0.cv_send.wait_timeout(guard, dur) {
                     Ok(wait_res) => {
@@ -386,7 +386,7 @@ impl AtomicAValSlot {
                             let val = guard.0.to_vval();
                             *guard = (AVal::None, false);
                             self.0.cv_recv.notify_one();
-                            return val;
+                            return VVal::opt(val);
                         }
                     },
                     Err(e) => {
@@ -399,6 +399,13 @@ impl AtomicAValSlot {
                 }
             }
         } else {
+            if guard.1 {
+                let val = guard.0.to_vval();
+                *guard = (AVal::None, false);
+                self.0.cv_recv.notify_one();
+                return val;
+            }
+
             loop {
                 match self.0.cv_send.wait(guard) {
                     Ok(next_guard) => {

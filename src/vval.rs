@@ -2128,6 +2128,14 @@ impl VVal {
     #[inline]
     pub fn opt_none() -> VVal { VVal::Opt(None) }
 
+    pub fn unwrap_opt(&self) -> VVal {
+        if let VVal::Opt(Some(o)) = self {
+            o.as_ref().clone()
+        } else {
+            VVal::None
+        }
+    }
+
     #[inline]
     pub fn pair(a: VVal, b: VVal) -> VVal {
         VVal::Pair(Rc::new((a, b)))

@@ -2826,7 +2826,7 @@ fn check_thread_valslot() {
         .r1 = slt1.recv_timeout $p(:ms, 100);
         std:assert_eq r1 $o();
         .r1 = slt1.recv_timeout $p(:ms, 500);
-        std:assert_eq r1 44;
+        std:assert_eq r1 $o(44);
 
         h.join[]
     "#), "100");
