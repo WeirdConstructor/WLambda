@@ -1620,6 +1620,9 @@ pub fn parse_block(ps: &mut State, with_arity: bool, delimited: bool, end_delim:
         while ps.consume_if_eq_wsc(';') {
             while ps.consume_if_eq_wsc(';') { }
             if ps.at_end() || (end_delim && ps.peek().unwrap_or(' ') == '}') {
+                if delimited {
+                    ps.consume_if_eq_wsc('}');
+                }
                 return Ok(block);
             }
             let next_stmt = parse_stmt(ps)?;
