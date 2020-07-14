@@ -4242,3 +4242,17 @@ fn check_list_add_ops() {
     assert_eq!(ve("!m = $[$n,$[]]; m.1 +>= 2; m"),                  "$[$n,$[2]]");
     assert_eq!(ve("!x = $[]; !m = 1; .m <+= x; .m <+= x; m"),       "$<1=>$[$<1>,1]");
 }
+
+#[test]
+fn check_find() {
+    assert_eq!(ve("std:str:find :abc :d"),          "$n");
+    assert_eq!(ve("std:str:find :abc :c"),          "2");
+    assert_eq!(ve("std:str:find :abc :a"),          "0");
+    assert_eq!(ve("std:str:find :xfcxfc :xf"),      "0");
+    assert_eq!(ve("std:str:find :xfcxfc :xf 2"),    "3");
+    assert_eq!(ve("std:str:find :xfcxfc :xf 20"),   "$n");
+
+    assert_eq!(
+        ve("!s = $q xfcxfc ; !i = std:str:find s :xf 2; i"),
+        "3");
+}

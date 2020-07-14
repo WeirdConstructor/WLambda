@@ -33,6 +33,7 @@ operator syntax `.x += 10` and `o.x += 10`.
 * Feature: Added collection addition operators `+>` and `<+`.
 * Feature: `std:values` also returns the individual elements of a numerical vector.
 * Feature: `std:keys` also returns the keys of a numerical vector.
+* Feature: Implemented `std:str:find`.
 
 0.6.1 (2020-06-04)
 ==================

@@ -56,9 +56,10 @@ Smalltalk, LISP and Perl.
     - [3.2.2](#322-unwrapping-optionals) Unwrapping optionals
   - [3.3](#33-error-values-e-expr-or-error-expr) Error values: `$e expr` or `$error expr`
     - [3.3.1](#331--label-value) _? [_label_] _value_
-    - [3.3.2](#332-onerror-handler-maybe-error-value) on\_error _handler_ _maybe-error-value_
-    - [3.3.3](#333-iserr-value) is\_err _value_
-    - [3.3.4](#334-errortostr-value) error\_to\_str _value_
+    - [3.3.2](#332-unwrap-value) unwrap _value_
+    - [3.3.3](#333-onerror-handler-maybe-error-value) on\_error _handler_ _maybe-error-value_
+    - [3.3.4](#334-iserr-value) is\_err _value_
+    - [3.3.5](#335-errortostr-value) error\_to\_str _value_
   - [3.4](#34-booleans) Booleans
     - [3.4.1](#341-isbool-any-value) is\_bool _any-value_
     - [3.4.2](#342-bool-any-value) bool _any-value_
@@ -120,24 +121,25 @@ Smalltalk, LISP and Perl.
     - [3.8.7](#387-isfvec-value) is\_fvec _value_
     - [3.8.8](#388-isivec-value) is\_ivec _value_
     - [3.8.9](#389-isnvec-value) is\_nvec _value_
-    - [3.8.10](#3810-fvec-value) fvec _value_
-    - [3.8.11](#3811-fvec2-value) fvec2 _value_
-    - [3.8.12](#3812-fvec3-value) fvec3 _value_
-    - [3.8.13](#3813-fvec4-value) fvec4 _value_
-    - [3.8.14](#3814-ivec-value) ivec _value_
-    - [3.8.15](#3815-ivec2-value) ivec2 _value_
-    - [3.8.16](#3816-ivec3-value) ivec3 _value_
-    - [3.8.17](#3817-ivec4-value) ivec4 _value_
-    - [3.8.18](#3818-stdvdims-vec) std:v:dims _vec_
-    - [3.8.19](#3819-stdvmag2-vec) std:v:mag2 _vec_
-    - [3.8.20](#3820-stdvmag-vec) std:v:mag _vec_
-    - [3.8.21](#3821-stdvnorm-vec) std:v:norm _vec_
-    - [3.8.22](#3822-stdvdot-vec1-vec2) std:v:dot _vec1_ _vec2_
-    - [3.8.23](#3823-stdvcross-vec1-vec2) std:v:cross _vec1_ _vec2_
-    - [3.8.24](#3824-stdvlerp-vec1-vec2-t) std:v:lerp _vec1_ _vec2_ _t_
-    - [3.8.25](#3825-stdvslerp-vec1-vec2-t) std:v:slerp _vec1_ _vec2_ _t_
-    - [3.8.26](#3826-stdvvec2rad-vec) std:v:vec2rad _vec_
-    - [3.8.27](#3827-stdvrad2vec-radians) std:v:rad2vec _radians_
+    - [3.8.10](#3810-nveclen-value) nvec\_len _value_
+    - [3.8.11](#3811-fvec-value) fvec _value_
+    - [3.8.12](#3812-fvec2-value) fvec2 _value_
+    - [3.8.13](#3813-fvec3-value) fvec3 _value_
+    - [3.8.14](#3814-fvec4-value) fvec4 _value_
+    - [3.8.15](#3815-ivec-value) ivec _value_
+    - [3.8.16](#3816-ivec2-value) ivec2 _value_
+    - [3.8.17](#3817-ivec3-value) ivec3 _value_
+    - [3.8.18](#3818-ivec4-value) ivec4 _value_
+    - [3.8.19](#3819-stdvdims-vec) std:v:dims _vec_
+    - [3.8.20](#3820-stdvmag2-vec) std:v:mag2 _vec_
+    - [3.8.21](#3821-stdvmag-vec) std:v:mag _vec_
+    - [3.8.22](#3822-stdvnorm-vec) std:v:norm _vec_
+    - [3.8.23](#3823-stdvdot-vec1-vec2) std:v:dot _vec1_ _vec2_
+    - [3.8.24](#3824-stdvcross-vec1-vec2) std:v:cross _vec1_ _vec2_
+    - [3.8.25](#3825-stdvlerp-vec1-vec2-t) std:v:lerp _vec1_ _vec2_ _t_
+    - [3.8.26](#3826-stdvslerp-vec1-vec2-t) std:v:slerp _vec1_ _vec2_ _t_
+    - [3.8.27](#3827-stdvvec2rad-vec) std:v:vec2rad _vec_
+    - [3.8.28](#3828-stdvrad2vec-radians) std:v:rad2vec _radians_
   - [3.9](#39-strings) Strings
     - [3.9.1](#391-string-literal-syntaxes) String Literal Syntaxes
     - [3.9.2](#392-str-value) str _value_
@@ -1476,7 +1478,36 @@ std:assert_eq first 12;
 std:assert (is_err second);
 ```
 
-#### <a name="332-onerror-handler-maybe-error-value"></a>3.3.2 - on\_error _handler_ _maybe-error-value_
+#### <a name="332-unwrap-value"></a>3.3.2 - unwrap _value_
+
+Unwraps the given _value_. If the _value_ is an error object it will panic.
+Otherwise it will just return the given value. If the _value_ is an optional
+value, it will return the value that is wrapped in the optional value.
+If it is an empty optional, it will also panic.
+
+Here an demonstration of the unwrap panic:
+
+```wlambda
+match (std:eval $code { unwrap $e XXX })
+    ($e err) => {
+        std:assert ~ std:str:find $\.err "Variable 'XXX' undefined";
+    }
+    { std:assert $false };
+```
+
+And here how to unwrap optionals:
+
+```wlambda
+std:assert_eq (unwrap $o(123))  123;
+
+match (std:eval $code { unwrap $o() })
+    ($e err) => {
+        std:assert ~ std:str:find $\.err "unwrap empty option";
+    }
+    { std:assert $false };
+```
+
+#### <a name="333-onerror-handler-maybe-error-value"></a>3.3.3 - on\_error _handler_ _maybe-error-value_
 
 The first parameter to `on_error` should be a _handler_ function,
 which will be called with four parameters.
@@ -1517,7 +1548,7 @@ std:assert_eq x "this failed!";
 std:assert_eq ret "all ok!";
 ```
 
-#### <a name="333-iserr-value"></a>3.3.3 - is\_err _value_
+#### <a name="334-iserr-value"></a>3.3.4 - is\_err _value_
 
 Returns `$true` if _value_ is an error value.
 
@@ -1527,7 +1558,7 @@ std:assert ~ not ~ is_err $none;
 std:assert ~ not ~ is_err 10;
 ```
 
-#### <a name="334-errortostr-value"></a>3.3.4 - error\_to\_str _value_
+#### <a name="335-errortostr-value"></a>3.3.5 - error\_to\_str _value_
 
 This function accepts an error value in contrast to `str`, but does
 not panic but transform the error value into its string representation.
@@ -2151,7 +2182,22 @@ std:assert_eq   (is_nvec fvec <& $[3.4, 4.5])   $true;
 std:assert_eq   (is_nvec ivec <& $[3.4, 4.5])   $true;
 ```
 
-#### <a name="3810-fvec-value"></a>3.8.10 - fvec _value_
+#### <a name="3810-nveclen-value"></a>3.8.10 - nvec\_len _value_
+
+Returns the length of a numerical vector, commonly known as the dimension.
+Either 2, 3 or 4.
+
+```wlambda
+std:assert_eq (nvec_len $i(1, 2))       2;
+std:assert_eq (nvec_len $i(1, 2, 3))    3;
+std:assert_eq (nvec_len $i(1, 2, 3, 4)) 4;
+
+std:assert_eq (nvec_len $f(1.1, 2.2))           2;
+std:assert_eq (nvec_len $f(1.1, 2.2, 3.3))      3;
+std:assert_eq (nvec_len $f(1.1, 2.2, 3.3, 4.4)) 4;
+```
+
+#### <a name="3811-fvec-value"></a>3.8.11 - fvec _value_
 
 Will cast _value_ into a float vector. You can cast a multitude of data types
 into a float vector:
@@ -2176,7 +2222,7 @@ std:assert_eq   (fvec ${x = 1, y = 2, z = 3})          $f(1,2,3);
 std:assert_eq   (fvec ${x = 1, y = 2, z = 3, w = 4})   $f(1,2,3,4);
 ```
 
-#### <a name="3811-fvec2-value"></a>3.8.11 - fvec2 _value_
+#### <a name="3812-fvec2-value"></a>3.8.12 - fvec2 _value_
 
 Like `fvec` but always returns a 2 dimensional vector.
 
@@ -2187,7 +2233,7 @@ std:assert_eq  (fvec2 $[4,5,6,7,8]) $f(4,5);
 std:assert_eq  (fvec2 ${x = 1, y = 2, z = 3, w = 4})   $f(1,2);
 ```
 
-#### <a name="3812-fvec3-value"></a>3.8.12 - fvec3 _value_
+#### <a name="3813-fvec3-value"></a>3.8.13 - fvec3 _value_
 
 Like `fvec` but always returns a 3 dimensional vector.
 
@@ -2198,7 +2244,7 @@ std:assert_eq  (fvec3 $[4,5,6,7,8]) $f(4,5,6);
 std:assert_eq  (fvec3 ${x = 1, y = 2, z = 3, w = 4})   $f(1,2,3);
 ```
 
-#### <a name="3813-fvec4-value"></a>3.8.13 - fvec4 _value_
+#### <a name="3814-fvec4-value"></a>3.8.14 - fvec4 _value_
 
 Like `fvec` but always returns a 4 dimensional vector.
 
@@ -2209,7 +2255,7 @@ std:assert_eq  (fvec4 $[4,5,6,7,8]) $f(4,5,6,7);
 std:assert_eq  (fvec4 ${x = 1, y = 2, z = 3, w = 4})   $f(1,2,3,4);
 ```
 
-#### <a name="3814-ivec-value"></a>3.8.14 - ivec _value_
+#### <a name="3815-ivec-value"></a>3.8.15 - ivec _value_
 
 Will cast _value_ into a float vector. You can cast a multitude of data types
 into a float vector:
@@ -2234,7 +2280,7 @@ std:assert_eq   (ivec ${x = 1, y = 2, z = 3})          $i(1,2,3);
 std:assert_eq   (ivec ${x = 1, y = 2, z = 3, w = 4})   $i(1,2,3,4);
 ```
 
-#### <a name="3815-ivec2-value"></a>3.8.15 - ivec2 _value_
+#### <a name="3816-ivec2-value"></a>3.8.16 - ivec2 _value_
 
 Like `ivec` but always returns a 2 dimensional vector.
 
@@ -2245,7 +2291,7 @@ std:assert_eq  (ivec2 $[4,5,6,7,8]) $i(4,5);
 std:assert_eq  (ivec2 ${x = 1, y = 2, z = 3, w = 4})   $i(1,2);
 ```
 
-#### <a name="3816-ivec3-value"></a>3.8.16 - ivec3 _value_
+#### <a name="3817-ivec3-value"></a>3.8.17 - ivec3 _value_
 
 Like `ivec` but always returns a 3 dimensional vector.
 
@@ -2256,7 +2302,7 @@ std:assert_eq  (ivec3 $[4,5,6,7,8]) $i(4,5,6);
 std:assert_eq  (ivec3 ${x = 1, y = 2, z = 3, w = 4})   $i(1,2,3);
 ```
 
-#### <a name="3817-ivec4-value"></a>3.8.17 - ivec4 _value_
+#### <a name="3818-ivec4-value"></a>3.8.18 - ivec4 _value_
 
 Like `ivec` but always returns a 4 dimensional vector.
 
@@ -2267,7 +2313,7 @@ std:assert_eq  (ivec4 $[4,5,6,7,8]) $i(4,5,6,7);
 std:assert_eq  (ivec4 ${x = 1, y = 2, z = 3, w = 4})   $i(1,2,3,4);
 ```
 
-#### <a name="3818-stdvdims-vec"></a>3.8.18 - std:v:dims _vec_
+#### <a name="3819-stdvdims-vec"></a>3.8.19 - std:v:dims _vec_
 
 You can use this function to retrieve the number of dimensions in _vec_.
 
@@ -2285,7 +2331,7 @@ std:assert_eq (std:v:dims ${w=0}) 4;
 std:assert_eq (std:v:dims $f(1,2)) (std:v:dims $i(1,2));
 ```
 
-#### <a name="3819-stdvmag2-vec"></a>3.8.19 - std:v:mag2 _vec_
+#### <a name="3820-stdvmag2-vec"></a>3.8.20 - std:v:mag2 _vec_
 
 Returns the magnitude of _vec_, squared.
 
@@ -2298,7 +2344,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag2 ${w=4}) 16.0;
 ```
 
-#### <a name="3820-stdvmag-vec"></a>3.8.20 - std:v:mag _vec_
+#### <a name="3821-stdvmag-vec"></a>3.8.21 - std:v:mag _vec_
 
 Returns the magnitude (also known as the length) of _vec_.
 
@@ -2308,7 +2354,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag ${w=4}) 4.0;
 ```
 
-#### <a name="3821-stdvnorm-vec"></a>3.8.21 - std:v:norm _vec_
+#### <a name="3822-stdvnorm-vec"></a>3.8.22 - std:v:norm _vec_
 
 Returns a new vector which has a magnitude of `1`, but points in the same direction as _vec_.
 Vectors with a length of one are also known as unit vectors.
@@ -2335,7 +2381,7 @@ These are the only `ivec2`s that have a length of `1`.
 std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
 ```
 
-#### <a name="3822-stdvdot-vec1-vec2"></a>3.8.22 - std:v:dot _vec1_ _vec2_
+#### <a name="3823-stdvdot-vec1-vec2"></a>3.8.23 - std:v:dot _vec1_ _vec2_
 
 Returns the sum of all components after multiplying each component
 in _vec1_ with the corresponding component of _vec2_.
@@ -2366,7 +2412,7 @@ If _vec1_ isn't an `fvec`, then it's coerced into an `ivec`, just like the other
 std:assert_eq[ (dir < 0) "left" "right", "left" ];
 ```
 
-#### <a name="3823-stdvcross-vec1-vec2"></a>3.8.23 - std:v:cross _vec1_ _vec2_
+#### <a name="3824-stdvcross-vec1-vec2"></a>3.8.24 - std:v:cross _vec1_ _vec2_
 
 Returns a vector perpendicular to _vec1_ and _vec2_.
 
@@ -2391,7 +2437,7 @@ std:assert_eq[(std:v:dot x y), (std:v:dot y z)];
 std:assert_eq[(std:v:dot y z), (std:v:dot z x)];
 ```
 
-#### <a name="3824-stdvlerp-vec1-vec2-t"></a>3.8.24 - std:v:lerp _vec1_ _vec2_ _t_
+#### <a name="3825-stdvlerp-vec1-vec2-t"></a>3.8.25 - std:v:lerp _vec1_ _vec2_ _t_
 
 `lerp` stands for linear interpolation.
 This function is useful when animating positions, whereas slerp is useful for animating rotations.
@@ -2414,7 +2460,7 @@ std:assert_eq[ (std:v:mag a) * 2 , std:v:mag (std:v:lerp $f(0,0) a 2.0) ];
 std:assert_eq[ std:v:lerp b a 1.5 , std:v:lerp a b -0.5 ];
 ```
 
-#### <a name="3825-stdvslerp-vec1-vec2-t"></a>3.8.25 - std:v:slerp _vec1_ _vec2_ _t_
+#### <a name="3826-stdvslerp-vec1-vec2-t"></a>3.8.26 - std:v:slerp _vec1_ _vec2_ _t_
 
 `slerp` stands for spherical linear interpolation.
 This function is useful when animating rotations, whereas lerp is useful for animating positions.
@@ -2447,7 +2493,7 @@ std:assert_rel_eq half.x four.x 0.000001;
 std:assert_rel_eq half.y four.y 0.000001;
 ```
 
-#### <a name="3826-stdvvec2rad-vec"></a>3.8.26 - std:v:vec2rad _vec_
+#### <a name="3827-stdvvec2rad-vec"></a>3.8.27 - std:v:vec2rad _vec_
 
 Creates a rotation in radians from the x and y components of _vec_.
 
@@ -2465,7 +2511,7 @@ std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad h) , 45.0 ];
 ```
 
-#### <a name="3827-stdvrad2vec-radians"></a>3.8.27 - std:v:rad2vec _radians_
+#### <a name="3828-stdvrad2vec-radians"></a>3.8.28 - std:v:rad2vec _radians_
 
 Creates a unit vector from _radians_.
 

@@ -33,7 +33,7 @@ fn get_functions_from_file(filename: &str) -> Vec<String> {
 #[cfg(feature="regex")]
 #[test]
 fn wlambda_functions() {
-    let documented_funs = get_functions_from_file("src/prelude.rs");
+    let documented_funs = get_functions_from_file("doc/wlambda_reference.md");
 
     let mut total         = 0;
     let mut count_missing = 0;
