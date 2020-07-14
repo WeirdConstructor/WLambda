@@ -5866,6 +5866,8 @@ the return value of the thread.
 std:assert_eq thdl.join[] 7;
 ```
 
+This method will return an error if the thread handle was already joined.
+
 ##### <a name="10232-thdlrecvready"></a>10.2.3.2 - thdl.recv\_ready
 
 Waits for the global `_READY` atomic value slot to be sent a value by the
@@ -5891,6 +5893,9 @@ std:assert err_msg &> $r/*SOME\ ERR*/;
 
 thdl.join[];
 ```
+
+This method might return an error if the thread provider
+made a handle without a ready slot.
 
 #### <a name="1024-atom-api"></a>10.2.4 - Atom API
 
@@ -5951,6 +5956,8 @@ Returns the value stored in the atom.
 std:assert_eq at.read[] 99;
 ```
 
+This method might return an error if the internal mutex was poisoned.
+
 ##### <a name="10243-atomwrite-value"></a>10.2.4.3 - atom.write _value_
 
 Overwrites the contents of the atom with the given _value_.
@@ -5962,6 +5969,8 @@ at.write 100;
 
 std:assert_eq at.read[] 100;
 ```
+
+This method might return an error if the internal mutex was poisoned.
 
 ##### <a name="10244-atomswap-value"></a>10.2.4.4 - atom.swap _value_
 
@@ -5975,6 +5984,8 @@ std:assert_eq at.swap[100] 99;
 
 std:assert_eq at.read[] 100;
 ```
+
+This method might return an error if the internal mutex was poisoned.
 
 #### <a name="1025-atom-value-slot-api"></a>10.2.5 - Atom Value Slot API
 
@@ -6018,6 +6029,9 @@ std:assert_eq slot.recv[].1 $i(1,2,3);
 std:assert slot.check_empty[];
 ```
 
+This method might return an error if there was an issue with locking
+the internal mutex or the mutex was poisoned.
+
 ##### <a name="10253-atomslotrecv"></a>10.2.5.3 - atom\_slot.recv
 
 If the slot is empty, it will wait for a value to become available.
@@ -6034,6 +6048,9 @@ std:assert_eq slot.recv[] 99;
 
 thrd.join[];
 ```
+
+This method might return an error if there was an issue with locking
+the internal mutex or the mutex was poisoned.
 
 ##### <a name="10254-atomslottryrecv"></a>10.2.5.4 - atom\_slot.try\_recv
 
@@ -6066,6 +6083,9 @@ std:assert_eq slot.try_recv[] $o(99);
 thrd.join[];
 ```
 
+This method might return an error if there was an issue with locking
+the internal mutex or the mutex was poisoned.
+
 ##### <a name="10255-atomslotrecvtimeout-duration"></a>10.2.5.5 - atom\_slot.recv\_timeout _duration_
 
 Acts like `atom_slot.recv`, but it will only wait for the given _duration_.  If
@@ -6082,13 +6102,22 @@ slot.send 4;
 std:assert_eq (slot.recv_timeout :ms => 100) $o(4);
 ```
 
+This method might return an error if there was an issue with locking
+the internal mutex or the mutex was poisoned.
+
 ##### <a name="10256-atomslotcheckempty"></a>10.2.5.6 - atom\_slot.check\_empty
 
 Returns `$true` if the slot is empty.
 
+This method might return an error if there was an issue with locking
+the internal mutex or the mutex was poisoned.
+
 ##### <a name="10257-atomslotwaitempty"></a>10.2.5.7 - atom\_slot.wait\_empty
 
 Waits until the slot is empty and then returns `$true`.
+
+This method might return an error if there was an issue with locking
+the internal mutex or the mutex was poisoned.
 
 ##### <a name="10258-atomslotwaitemptytimeout-duration"></a>10.2.5.8 - atom\_slot.wait\_empty\_timeout _duration_
 
@@ -6096,20 +6125,124 @@ Waits a predefined timeout until the slot is empty. If it did become
 empty within the given _duration_ (see std:thread:sleep) it will return `$true`.
 Otherwise it will return `$false`.
 
+This method might return an error if there was an issue with locking
+the interal mutex or the mutex was poisoned.
+
 #### <a name="1026-channel-api"></a>10.2.6 - Channel API
 
 A channel is a multiple sender, single consumer queue. It can be used to
 establish a message passing based communication between threads.
 
+It is basically a wrapper around the Rust `std::sync::mpsc::channel`.
+
+```wlambda
+!chan = std:sync:mpsc:new[];
+
+!thdl = std:thread:spawn $code {
+    _READY.send :ok;
+    iter i 0 => 10 {
+        chan.send $p(:val, i);
+    };
+    chan.send $p(:quit, $none);
+} ${ chan = chan };
+
+match thdl.recv_ready[]
+    ($e ?) => { std:assert $false };
+
+!item = $none;
+
+!sum = $@i
+    while { .item = chan.recv[]; item.0 == :val } {
+        $+ item.1;
+    };
+
+std:assert_eq sum 45;
+
+thdl.join[];
+```
+
 ##### <a name="10261-stdsyncmpscnew"></a>10.2.6.1 - std:sync:mpsc:new
+
+This creates a new channel. You can safely send from multiple threads
+while reading from one thread at a time.
+
+```wlambda
+!chan = std:sync:mpsc:new[];
+
+chan.send :a;
+chan.send :b;
+chan.send :c;
+
+std:assert_eq chan.recv[] :a;
+std:assert_eq chan.recv[] :b;
+std:assert_eq chan.recv[] :c;
+```
 
 ##### <a name="10262-channelsend-value"></a>10.2.6.2 - channel.send _value_
 
+Sends the given _value_ to the channel queue.
+
+```wlambda
+!chan = std:sync:mpsc:new[];
+
+chan.send :a;
+std:assert_eq chan.recv[] :a;
+```
+
+This method might return an error if the channel failed, for instance due
+to a poisoned internal mutex.
+
 ##### <a name="10263-channelrecv"></a>10.2.6.3 - channel.recv
+
+Receives the next element from the channel. If no element is available
+this method will block the thread until an element becomes available.
+
+```wlambda
+!chan = std:sync:mpsc:new[];
+
+chan.send :a;
+std:assert_eq chan.recv[] :a;
+```
+
+This method might return an error if the channel failed, for instance due
+to a poisoned internal mutex.
 
 ##### <a name="10264-channeltryrecv"></a>10.2.6.4 - channel.try\_recv
 
-##### <a name="10263-channelrecv"></a>10.2.6.3 - channel.recv\_timeout _duration_
+Tries to receive the next element from the channel and return it wrapped
+into an optional. If no element is available an empty optional `$o()` is returned.
+
+```wlambda
+!chan = std:sync:mpsc:new[];
+
+std:assert_eq chan.try_recv[] $o();
+
+chan.send :a;
+
+std:assert_eq chan.try_recv[] $o(:a);
+```
+
+This method might return an error if the channel failed, for instance due
+to a poisoned internal mutex.
+
+##### <a name="10265-channelrecvtimeout-duration"></a>10.2.6.5 - channel.recv\_timeout _duration_
+
+Tries to receive the next element in the given _duration_ (see std:thread:sleep)
+and return it wrapped into an optional. If no element could be received
+within that time an empty optional is returned `$o()`.
+
+```wlambda
+!chan = std:sync:mpsc:new[];
+
+std:assert_eq (chan.recv_timeout $p(:ms, 100)) $o();
+
+chan.send :x;
+
+std:assert_eq (chan.recv_timeout $p(:ms, 100)) $o(:x);
+```
+
+This method might return an error if the channel failed, for instance due
+to a poisoned internal mutex.
 
 ## <a name="11-optional-standard-library"></a>11 - Optional Standard Library
 

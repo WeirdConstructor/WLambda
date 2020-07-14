@@ -38,6 +38,8 @@ fn wlambda_functions() {
     let mut total         = 0;
     let mut count_missing = 0;
 
+    let mut missing = vec![];
+
     let core_syms = core_symbol_table();
     let mut core_syms = core_syms.list();
     core_syms.sort();
@@ -47,6 +49,7 @@ fn wlambda_functions() {
             println!("OK - '{}'", core_sym);
         } else {
             println!("MISSING - '{}'", core_sym);
+            missing.push(core_sym);
             count_missing += 1;
         }
     }
@@ -61,11 +64,17 @@ fn wlambda_functions() {
             println!("OK - {}", std_sym);
         } else {
             println!("MISSING - '{}'", std_sym);
+            missing.push(std_sym);
             count_missing += 1;
         }
     }
 
     if count_missing > 0 {
+
+        eprintln!("--------- MISSING SYMBOLS ---------");
+        for s in missing {
+            eprintln!("MISSING: {}", s);
+        }
         panic!(format!(
             "Found {}/{} undocumented functions!",
             count_missing,

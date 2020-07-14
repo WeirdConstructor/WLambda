@@ -22,6 +22,7 @@ to select only specific values to recurse into.
 * Documentation: Color conversion functions `std:v:rgb2hsv`, `std:v:hsv2rgb`
 and others.
 * Documentation: Added documentation for `std:values`, `std:thread:spawn`,
+* Documentation: Completely documented the currently implemented threading support.
 `fvec`, `ivec`, `is_ivec`, `is_fvec`, `is_nvec`.
 * Feature: Added debug print function special value, that includes source position and
 dynamic type name: `$DEBUG ...`.
