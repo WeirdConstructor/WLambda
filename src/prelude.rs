@@ -138,16 +138,20 @@ Smalltalk, LISP and Perl.
     - [3.8.11](#3811-fvec2-value) fvec2 _value_
     - [3.8.12](#3812-fvec3-value) fvec3 _value_
     - [3.8.13](#3813-fvec4-value) fvec4 _value_
-    - [3.8.14](#3814-stdvdims-vec) std:v:dims _vec_
-    - [3.8.15](#3815-stdvmag2-vec) std:v:mag2 _vec_
-    - [3.8.16](#3816-stdvmag-vec) std:v:mag _vec_
-    - [3.8.17](#3817-stdvnorm-vec) std:v:norm _vec_
-    - [3.8.18](#3818-stdvdot-vec1-vec2) std:v:dot _vec1_ _vec2_
-    - [3.8.19](#3819-stdvcross-vec1-vec2) std:v:cross _vec1_ _vec2_
-    - [3.8.20](#3820-stdvlerp-vec1-vec2-t) std:v:lerp _vec1_ _vec2_ _t_
-    - [3.8.21](#3821-stdvslerp-vec1-vec2-t) std:v:slerp _vec1_ _vec2_ _t_
-    - [3.8.22](#3822-stdvvec2rad-vec) std:v:vec2rad _vec_
-    - [3.8.23](#3823-stdvrad2vec-radians) std:v:rad2vec _radians_
+    - [3.8.14](#3814-ivec-value) ivec _value_
+    - [3.8.15](#3815-ivec2-value) ivec2 _value_
+    - [3.8.16](#3816-ivec3-value) ivec3 _value_
+    - [3.8.17](#3817-ivec4-value) ivec4 _value_
+    - [3.8.18](#3818-stdvdims-vec) std:v:dims _vec_
+    - [3.8.19](#3819-stdvmag2-vec) std:v:mag2 _vec_
+    - [3.8.20](#3820-stdvmag-vec) std:v:mag _vec_
+    - [3.8.21](#3821-stdvnorm-vec) std:v:norm _vec_
+    - [3.8.22](#3822-stdvdot-vec1-vec2) std:v:dot _vec1_ _vec2_
+    - [3.8.23](#3823-stdvcross-vec1-vec2) std:v:cross _vec1_ _vec2_
+    - [3.8.24](#3824-stdvlerp-vec1-vec2-t) std:v:lerp _vec1_ _vec2_ _t_
+    - [3.8.25](#3825-stdvslerp-vec1-vec2-t) std:v:slerp _vec1_ _vec2_ _t_
+    - [3.8.26](#3826-stdvvec2rad-vec) std:v:vec2rad _vec_
+    - [3.8.27](#3827-stdvrad2vec-radians) std:v:rad2vec _radians_
   - [3.9](#39-strings) Strings
     - [3.9.1](#391-string-literal-syntaxes) String Literal Syntaxes
     - [3.9.2](#392-str-value) str _value_
@@ -175,7 +179,9 @@ Smalltalk, LISP and Perl.
     - [3.10.3](#3103-isbytes-value) is\_bytes _value_
     - [3.10.4](#3104-stdbytesreplace-byte-vector-pattern-replacement) std:bytes:replace _byte-vector_ _pattern_ _replacement_
   - [3.11](#311-symbols) Symbols
-    - [3.11.1](#3111-stdsymbolscollect) std:symbols:collect
+    - [3.11.1](#3111-sym-value) sym _value_
+    - [3.11.2](#3112-issym-value) is\_sym _value_
+    - [3.11.3](#3113-stdsymbolscollect) std:symbols:collect
   - [3.12](#312-pairs-pa-b) Pairs `$p(a, b)`
     - [3.12.1](#3121-pair-operator-a--b) Pair Operator `a => b`
     - [3.12.2](#3122-pair-constructor-a--b) Pair Constructor `a => b`
@@ -194,13 +200,15 @@ Smalltalk, LISP and Perl.
     - [3.13.1](#3131-stdpush-vector-item) std:push _vector_ _item_
     - [3.13.2](#3132-stdpop-vector) std:pop _vector_
     - [3.13.3](#3133-stdunshift-vector-item) std:unshift _vector_ _item_
-    - [3.13.4](#3134-vector-splicing) Vector Splicing
-    - [3.13.5](#3135-stdappend-vec-a-value-or-vec-) std:append _vec-a_ _value-or-vec_ ...
-    - [3.13.6](#3136-stdprepend-vec-a-value-or-vec-) std:prepend _vec-a_ _value-or-vec_ ...
-    - [3.13.7](#3137-stdtake-count-vector) std:take _count_ _vector_
-    - [3.13.8](#3138-stddrop-count-vector) std:drop _count_ _vector_
+    - [3.13.4](#3134-isvec-value) is\_vec _value_
+    - [3.13.5](#3135-vector-splicing) Vector Splicing
+    - [3.13.6](#3136-stdappend-vec-a-value-or-vec-) std:append _vec-a_ _value-or-vec_ ...
+    - [3.13.7](#3137-stdprepend-vec-a-value-or-vec-) std:prepend _vec-a_ _value-or-vec_ ...
+    - [3.13.8](#3138-stdtake-count-vector) std:take _count_ _vector_
+    - [3.13.9](#3139-stddrop-count-vector) std:drop _count_ _vector_
   - [3.14](#314-associative-maps-or-string-to-value-mappings) Associative Maps (or String to Value mappings)
     - [3.14.1](#3141-map-splicing) Map Splicing
+    - [3.14.2](#3142-ismap-value) is\_map _value_
   - [3.15](#315-references) References
     - [3.15.1](#3151-stdtoref-value) std:to\_ref _value_
     - [3.15.2](#3152-stdrefweaken-ref) std:ref:weaken _ref_
@@ -2215,7 +2223,65 @@ std:assert_eq  (fvec4 $[4,5,6,7,8]) $f(4,5,6,7);
 std:assert_eq  (fvec4 ${x = 1, y = 2, z = 3, w = 4})   $f(1,2,3,4);
 ```
 
-#### <a name="3814-stdvdims-vec"></a>3.8.14 - std:v:dims _vec_
+#### <a name="3814-ivec-value"></a>3.8.14 - ivec _value_
+
+Will cast _value_ into a float vector. You can cast a multitude of data types
+into a float vector:
+
+```wlambda
+std:assert_eq   (ivec  $[1,2,3,4])      $i(1,2,3,4);
+std:assert_eq   (ivec  $[1,2,3])        $i(1,2,3);
+std:assert_eq   (ivec  $[1,2])          $i(1,2);
+
+std:assert_eq   (ivec $f(1.1,2.1))          $i(1,2);
+std:assert_eq   (ivec $f(1.1,2.1,3.2))      $i(1,2,3);
+std:assert_eq   (ivec $f(1.1,2.1,3.2,4))    $i(1,2,3,4);
+
+std:assert_eq   (ivec $p("2", "3"))   $i(2,3);
+
+!i = $iter $[] +> $p(3,4) +> $[5,6];
+std:assert_eq   (ivec i)    $i(3,4);
+std:assert_eq   (ivec i)    $i(5,6);
+
+std:assert_eq   (ivec ${x = 1, y = 2})                 $i(1,2);
+std:assert_eq   (ivec ${x = 1, y = 2, z = 3})          $i(1,2,3);
+std:assert_eq   (ivec ${x = 1, y = 2, z = 3, w = 4})   $i(1,2,3,4);
+```
+
+#### <a name="3815-ivec2-value"></a>3.8.15 - ivec2 _value_
+
+Like `ivec` but always returns a 2 dimensional vector.
+
+```wlambda
+std:assert_eq  (ivec2 $f(3,4,5))    $i(3,4);
+std:assert_eq  (ivec2 $[4,5,6,7,8]) $i(4,5);
+
+std:assert_eq  (ivec2 ${x = 1, y = 2, z = 3, w = 4})   $i(1,2);
+```
+
+#### <a name="3816-ivec3-value"></a>3.8.16 - ivec3 _value_
+
+Like `ivec` but always returns a 3 dimensional vector.
+
+```wlambda
+std:assert_eq  (ivec3 $f(3,4,5))    $i(3,4,5);
+std:assert_eq  (ivec3 $[4,5,6,7,8]) $i(4,5,6);
+
+std:assert_eq  (ivec3 ${x = 1, y = 2, z = 3, w = 4})   $i(1,2,3);
+```
+
+#### <a name="3817-ivec4-value"></a>3.8.17 - ivec4 _value_
+
+Like `ivec` but always returns a 4 dimensional vector.
+
+```wlambda
+std:assert_eq  (ivec4 $f(3,4,5))    $i(3,4,5,0);
+std:assert_eq  (ivec4 $[4,5,6,7,8]) $i(4,5,6,7);
+
+std:assert_eq  (ivec4 ${x = 1, y = 2, z = 3, w = 4})   $i(1,2,3,4);
+```
+
+#### <a name="3818-stdvdims-vec"></a>3.8.18 - std:v:dims _vec_
 
 You can use this function to retrieve the number of dimensions in _vec_.
 
@@ -2233,7 +2299,7 @@ std:assert_eq (std:v:dims ${w=0}) 4;
 std:assert_eq (std:v:dims $f(1,2)) (std:v:dims $i(1,2));
 ```
 
-#### <a name="3815-stdvmag2-vec"></a>3.8.15 - std:v:mag2 _vec_
+#### <a name="3819-stdvmag2-vec"></a>3.8.19 - std:v:mag2 _vec_
 
 Returns the magnitude of _vec_, squared.
 
@@ -2246,7 +2312,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag2 ${w=4}) 16.0;
 ```
 
-#### <a name="3816-stdvmag-vec"></a>3.8.16 - std:v:mag _vec_
+#### <a name="3820-stdvmag-vec"></a>3.8.20 - std:v:mag _vec_
 
 Returns the magnitude (also known as the length) of _vec_.
 
@@ -2256,7 +2322,7 @@ The magnitude is always a float, regardless of whether the parameter is an `ivec
 std:assert_eq (std:v:mag ${w=4}) 4.0;
 ```
 
-#### <a name="3817-stdvnorm-vec"></a>3.8.17 - std:v:norm _vec_
+#### <a name="3821-stdvnorm-vec"></a>3.8.21 - std:v:norm _vec_
 
 Returns a new vector which has a magnitude of `1`, but points in the same direction as _vec_.
 Vectors with a length of one are also known as unit vectors.
@@ -2283,7 +2349,7 @@ These are the only `ivec2`s that have a length of `1`.
 std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
 ```
 
-#### <a name="3818-stdvdot-vec1-vec2"></a>3.8.18 - std:v:dot _vec1_ _vec2_
+#### <a name="3822-stdvdot-vec1-vec2"></a>3.8.22 - std:v:dot _vec1_ _vec2_
 
 Returns the sum of all components after multiplying each component
 in _vec1_ with the corresponding component of _vec2_.
@@ -2314,7 +2380,7 @@ If _vec1_ isn't an `fvec`, then it's coerced into an `ivec`, just like the other
 std:assert_eq[ (dir < 0) "left" "right", "left" ];
 ```
 
-#### <a name="3819-stdvcross-vec1-vec2"></a>3.8.19 - std:v:cross _vec1_ _vec2_
+#### <a name="3823-stdvcross-vec1-vec2"></a>3.8.23 - std:v:cross _vec1_ _vec2_
 
 Returns a vector perpendicular to _vec1_ and _vec2_.
 
@@ -2339,7 +2405,7 @@ std:assert_eq[(std:v:dot x y), (std:v:dot y z)];
 std:assert_eq[(std:v:dot y z), (std:v:dot z x)];
 ```
 
-#### <a name="3820-stdvlerp-vec1-vec2-t"></a>3.8.20 - std:v:lerp _vec1_ _vec2_ _t_
+#### <a name="3824-stdvlerp-vec1-vec2-t"></a>3.8.24 - std:v:lerp _vec1_ _vec2_ _t_
 
 `lerp` stands for linear interpolation.
 This function is useful when animating positions, whereas slerp is useful for animating rotations.
@@ -2362,7 +2428,7 @@ std:assert_eq[ (std:v:mag a) * 2 , std:v:mag (std:v:lerp $f(0,0) a 2.0) ];
 std:assert_eq[ std:v:lerp b a 1.5 , std:v:lerp a b -0.5 ];
 ```
 
-#### <a name="3821-stdvslerp-vec1-vec2-t"></a>3.8.21 - std:v:slerp _vec1_ _vec2_ _t_
+#### <a name="3825-stdvslerp-vec1-vec2-t"></a>3.8.25 - std:v:slerp _vec1_ _vec2_ _t_
 
 `slerp` stands for spherical linear interpolation.
 This function is useful when animating rotations, whereas lerp is useful for animating positions.
@@ -2395,7 +2461,7 @@ std:assert_rel_eq half.x four.x 0.000001;
 std:assert_rel_eq half.y four.y 0.000001;
 ```
 
-#### <a name="3822-stdvvec2rad-vec"></a>3.8.22 - std:v:vec2rad _vec_
+#### <a name="3826-stdvvec2rad-vec"></a>3.8.26 - std:v:vec2rad _vec_
 
 Creates a rotation in radians from the x and y components of _vec_.
 
@@ -2413,7 +2479,7 @@ std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad h) , 45.0 ];
 ```
 
-#### <a name="3823-stdvrad2vec-radians"></a>3.8.23 - std:v:rad2vec _radians_
+#### <a name="3827-stdvrad2vec-radians"></a>3.8.27 - std:v:rad2vec _radians_
 
 Creates a unit vector from _radians_.
 
@@ -2924,16 +2990,52 @@ Keep in mind, that all symbols are interned strings. And if you create many
 symbols that are not used anymore, you might need to trigger a cleanup
 with `std:symbols::collect`.
 
-#### <a name="3111-stdsymbolscollect"></a>3.11.1 - std:symbols:collect
+The collection of dead symbols is also run automatically for every 100th newly
+allocated symbol.
+
+#### <a name="3111-sym-value"></a>3.11.1 - sym _value_
+
+Casts the given _value_ into a symbol.
+
+```wlambda
+std:assert_eq (sym "a")     :a;
+std:assert_eq (sym $b"a")   :a;
+std:assert_eq (sym $[])     :"$[]";
+std:assert_eq (sym 10)      :10;
+```
+
+#### <a name="3112-issym-value"></a>3.11.2 - is\_sym _value_
+
+Returns `$true` if the _value_ is symbol.
+
+```wlambda
+std:assert ~ is_sym :a;
+std:assert ~ is_sym ~ sym "a";
+std:assert ~ is_sym ~ sym "a";
+std:assert ~ is_sym ~ sym $b"a";
+
+std:assert ~ not ~ is_sym "a";
+std:assert ~ not ~ is_sym $b"a";
+std:assert ~ not ~ is_sym $&&:a;
+std:assert ~ not ~ is_sym ${};
+std:assert ~ not ~ is_sym $none;
+std:assert ~ not ~ is_sym $true;
+```
+
+#### <a name="3113-stdsymbolscollect"></a>3.11.3 - std:symbols:collect
 
 Collect and remove all interned symbols in the current thread that are no
 longer used. Returns the number of freed symbols. Please keep in mind, that
 the `std:ref_id` of any collected symbol will be different from a symbol that
 is created later with the same characters.
 
+The collection of dead symbols is also run automatically for every 100th newly
+allocated symbol.
+
 If you rely on the reference ID of a symbol, you should make sure to keep it
 around. Literal symbols are always kept around as long as the code is running
-or referenced somewhere (eg.  by a function).
+or referenced somewhere (eg. by a function).
+
 
 ```wlambda
 std:symbols:collect[];
@@ -3225,9 +3327,23 @@ std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
 ```
 
+To add elements to a vector, you can use the prepend and append operators `+>`
+and `<+` too:
+
+```wlambda
+!v = $[1];
+
+0 <+ v;
+v +> 2;
+
+std:assert_str_eq v $[0,1,2];
+```
+
 #### <a name="3131-stdpush-vector-item"></a>3.13.1 - std:push _vector_ _item_
 
 Pushes _item_ to the end of _vector_. Returns _item_.
+Be aware, that there is also the `+>` operator, that will append elements
+to a vector.
 
 ```wlambda
 !v = $[1,2];
@@ -3253,6 +3369,8 @@ std:assert_eq (str v) (str $[1,2]);
 
 Inserts _item_ at the front of _vector_. Returns _item_ and mutates _vector_
 inplace. Be aware that this operation is of O(n) complexity.
+Be aware, that there is also the `<+` operator, that will prepend elements
+to a vector (with O(n) complexity however).
 
 ```wlambda
 !v = $[1,2];
@@ -3262,7 +3380,24 @@ std:unshift v 3;
 std:assert_eq (str v) (str $[3,1,2]);
 ```
 
-#### <a name="3134-vector-splicing"></a>3.13.4 - Vector Splicing
+#### <a name="3134-isvec-value"></a>3.13.4 - is\_vec _value_
+
+Returns `$true` if _value_ is a vector.
+
+```wlambda
+std:assert ~ is_vec $[];
+std:assert ~ is_vec $[1,2,3];
+
+std:assert ~ not ~ is_vec 0;
+std:assert ~ not ~ is_vec $none;
+std:assert ~ not ~ is_vec $true;
+std:assert ~ not ~ is_vec $p(1,2);
+std:assert ~ not ~ is_vec $i(1,2);
+std:assert ~ not ~ is_vec $f(1,2);
+std:assert ~ not ~ is_vec ${a = 10};
+```
+
+#### <a name="3135-vector-splicing"></a>3.13.5 - Vector Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -3282,7 +3417,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-#### <a name="3135-stdappend-vec-a-value-or-vec-"></a>3.13.5 - std:append _vec-a_ _value-or-vec_ ...
+#### <a name="3136-stdappend-vec-a-value-or-vec-"></a>3.13.6 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
 If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
@@ -3301,7 +3436,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) "$[1,:a,:b,:c,:d]";
 ```
 
-#### <a name="3136-stdprepend-vec-a-value-or-vec-"></a>3.13.6 - std:prepend _vec-a_ _value-or-vec_ ...
+#### <a name="3137-stdprepend-vec-a-value-or-vec-"></a>3.13.7 - std:prepend _vec-a_ _value-or-vec_ ...
 
 Prepends _value-or-vec_ and all following items to the front of _vec-a_.
 If _value-or-vec_ is a vector, all its items will be prepended to _vec-a_.
@@ -3320,7 +3455,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) (str $[:d, :c, :b, :a, 1]);
 ```
 
-#### <a name="3137-stdtake-count-vector"></a>3.13.7 - std:take _count_ _vector_
+#### <a name="3138-stdtake-count-vector"></a>3.13.8 - std:take _count_ _vector_
 
 Takes and returns the first _count_ elements of _vector_. Does not
 mutate _vector_.
@@ -3334,7 +3469,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[1,2,3,4]";
 ```
 
-#### <a name="3138-stddrop-count-vector"></a>3.13.8 - std:drop _count_ _vector_
+#### <a name="3139-stddrop-count-vector"></a>3.13.9 - std:drop _count_ _vector_
 
 Drops _count_ elements from _vector_ and returns them as new vector.
 Does not mutate _vector_.
@@ -3410,6 +3545,22 @@ std:assert_eq (str ${*${a=10}}) "${a=10}";
 # As a reminder, a full expression can come after the '*':
 
 std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
+```
+
+#### <a name="3142-ismap-value"></a>3.14.2 - is\_map _value_
+
+Returns `$true` if _value_ is a map.
+
+```wlambda
+std:assert ~ is_map ${};
+std:assert ~ is_map ${a = 10};
+
+std:assert ~ not ~ is_map $&&${};
+std:assert ~ not ~ is_map $&${};
+std:assert ~ not ~ is_map $[:a, 10];
+std:assert ~ not ~ is_map $p(:a, 10);
+std:assert ~ not ~ is_map $none;
+std:assert ~ not ~ is_map $true;
 ```
 
 ### <a name="315-references"></a>3.15 - References
