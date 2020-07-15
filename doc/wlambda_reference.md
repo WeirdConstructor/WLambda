@@ -1985,6 +1985,39 @@ std:assert_eq (std:num:signum -4.0)  -1.0;
 std:assert_eq (std:num:signum  4.0)   1.0;
 ```
 
+#### - std:num:int\_to\_closed\_open01 _integer_
+
+Transforms the given 64-Bit _integer_ into a number in the range `0.0` to `1.0`.
+Inclusive `0.0`, exclusive `1.0`. This function is mainly useful if you generated
+the integer from a random number generator.
+
+```wlambda
+std:assert_rel_eq (std:num:int_to_closed_open01 0)  0.0         0.00000001;
+std:assert_rel_eq (std:num:int_to_closed_open01 -1) 0.999999999 0.00000001;
+```
+
+#### - std:num:int\_to\_open01 _integer_
+
+Transforms the given 64-Bit _integer_ into a number in the range `0.0` to `1.0`.
+Exclusive `0.0`, exclusive `1.0`. This function is mainly useful if you generated
+the integer from a random number generator.
+
+```wlambda
+std:assert (std:num:int_to_open01 0)  > 0.0;
+std:assert (std:num:int_to_open01 -1) < 1.0;
+```
+
+#### - std:num:int\_to\_open\_closed01 _integer_
+
+Transforms the given 64-Bit _integer_ into a number in the range `0.0` to `1.0`.
+Inclusive `0.0`, inclusive `1.0`. This function is mainly useful if you generated
+the integer from a random number generator.
+
+```wlambda
+std:assert (std:num:int_to_open_closed01 0)  > 0.0;
+std:assert (std:num:int_to_open_closed01 -1) == 1.0;
+```
+
 ### <a name="38-numerical-mathematical-vectors"></a>3.8 - Numerical Mathematical Vectors
 
 In order to aid in the development of GUIs, games, and other physics/geometry adjacent software,
@@ -3061,7 +3094,6 @@ Converts the given byte vector to a vector of integers in the range 0-255.
 std:assert_str_eq
     (std:bytes:to_vec $b"byte")
     $[98, 121, 116, 101];
-
 ```
 
 ### <a name="311-symbols"></a>3.11 - Symbols
@@ -5930,6 +5962,40 @@ Compares _a_ and _b_ numerically descending and returns:
 std:assert_eq (std:cmp:num:desc "20" "2")     1;
 std:assert_eq (std:cmp:num:desc "20" "20")    0;
 std:assert_eq (std:cmp:num:desc 20 21)       -1;
+```
+
+#### - std:cmp:str:asc _a_ _b_
+
+Compares _a_ and _b_ lexicographically by their byte values. This orders
+Unicode code points based on their positions in the code charts.
+
+| Cases         | Return Value |
+|---------------|--------------|
+| _a_ > _b_     | -1           |
+| _a_ == _b_    | 0            |
+| _a_ < _b_     | 1            |
+
+```wlambda
+std:assert_eq (std:cmp:str:asc "abc" "aba") -1;
+std:assert_eq (std:cmp:str:asc "abc" "abc")  0;
+std:assert_eq (std:cmp:str:asc "abc" "abd")  1;
+```
+
+#### - std:cmp:str:desc _a_ _b_
+
+Compares _a_ and _b_ lexicographically by their byte values. This orders
+Unicode code points based on their positions in the code charts.
+
+| Cases         | Return Value |
+|---------------|--------------|
+| _a_ > _b_     | 1            |
+| _a_ == _b_    | 0            |
+| _a_ < _b_     | -1           |
+
+```wlambda
+std:assert_eq (std:cmp:str:desc "abc" "aba")  1;
+std:assert_eq (std:cmp:str:desc "abc" "abc")  0;
+std:assert_eq (std:cmp:str:desc "abc" "abd") -1;
 ```
 
 #### <a name="10010-stddisplayln-arg1-"></a>10.0.10 - std:displayln _arg1_ ...
