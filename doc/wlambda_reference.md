@@ -6059,6 +6059,15 @@ the file to the given filename.
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
+### - File System
+
+#### - std:fs:rename _file-path_ _new-file-name_
+
+Renames the file at _file-path_ to the new name _new-file-name_. This
+usually does only work on a single file system.
+Returns `$true` if renaming was successful, and an error object if it was not
+successful.
+
 ### <a name="102-threading"></a>10.2 - Threading
 
 WLambda leverages the `std::thread` implementation of Rust's standard library
