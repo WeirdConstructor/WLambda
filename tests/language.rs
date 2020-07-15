@@ -1194,16 +1194,16 @@ fn check_error() {
 
 #[test]
 fn check_prelude() {
-    assert_eq!(ve("bool $n"),           "$false");
-    assert_eq!(ve("int $n"),            "0");
-    assert_eq!(ve("float $q$10.2$"),    "10.2");
-    assert_eq!(ve("str 10.3"),          "\"10.3\"");
-    assert_eq!(ve("sym \"foo\""),       ":foo");
-    assert_eq!(ve("sym 10.4"),          ":\"10.4\"");
+    assert_eq!(ve("bool $n"),                       "$false");
+    assert_eq!(ve("int $n"),                        "0");
+    assert_eq!(ve("float $q$10.2$"),                "10.2");
+    assert_eq!(ve("str 10.3"),                      "\"10.3\"");
+    assert_eq!(ve("sym \"foo\""),                   ":foo");
+    assert_eq!(ve("sym 10.4"),                      ":\"10.4\"");
     assert_eq!(ve("(bool $e :fail) { 10 } { 20 }"), "20");
     assert_eq!(ve("std:fold 1 { _ + _1 } $[1,2,3,4]"), "11");
-    assert_eq!(ve("std:take 2 $[1,2,3,4,5,6]"), "$[1,2]");
-    assert_eq!(ve("std:drop 2 $[1,2,3,4,5,6]"), "$[3,4,5,6]");
+    assert_eq!(ve("std:take 2 $[1,2,3,4,5,6]"),     "$[1,2]");
+    assert_eq!(ve("std:drop 2 $[1,2,3,4,5,6]"),     "$[3,4,5,6]");
 }
 
 #[test]
@@ -4245,14 +4245,21 @@ fn check_list_add_ops() {
 
 #[test]
 fn check_find() {
-    assert_eq!(ve("std:str:find :abc :d"),          "$n");
-    assert_eq!(ve("std:str:find :abc :c"),          "2");
-    assert_eq!(ve("std:str:find :abc :a"),          "0");
-    assert_eq!(ve("std:str:find :xfcxfc :xf"),      "0");
-    assert_eq!(ve("std:str:find :xfcxfc :xf 2"),    "3");
-    assert_eq!(ve("std:str:find :xfcxfc :xf 20"),   "$n");
+    assert_eq!(ve("std:str:find :d  :abc"),         "$n");
+    assert_eq!(ve("std:str:find :c  :abc"),         "2");
+    assert_eq!(ve("std:str:find :a  :abc"),         "0");
+    assert_eq!(ve("std:str:find :xf :xfcxfc"),      "0");
+    assert_eq!(ve("std:str:find :xf :xfcxfc 2"),    "3");
+    assert_eq!(ve("std:str:find :xf :xfcxfc 20"),   "$n");
 
     assert_eq!(
-        ve("!s = $q xfcxfc ; !i = std:str:find s :xf 2; i"),
+        ve("!s = $q xfcxfc ; !i = std:str:find :xf s 2; i"),
         "3");
+}
+
+#[test]
+fn check_write_str() {
+    assert_eq!(ve("str $&&10"),                     "\"10\"");
+    assert_eq!(ve("std:write_str $&&10"),           "\"$&&10\"");
+    assert_eq!(ve("std:write_str \"foo\""),         "\"\\\"foo\\\"\"");
 }

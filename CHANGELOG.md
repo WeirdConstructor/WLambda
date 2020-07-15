@@ -23,7 +23,8 @@ to select only specific values to recurse into.
 and others.
 * Documentation: Added documentation for `std:values`, `std:thread:spawn`,
 * Documentation: Completely documented the currently implemented threading support.
-`fvec`, `ivec`, `is_ivec`, `is_fvec`, `is_nvec`.
+`fvec`, `ivec`, `is_ivec`, `is_fvec`, `is_nvec`, `std:str:find`, `std:ref_id`
+and many more.
 * Feature: Added debug print function special value, that includes source position and
 dynamic type name: `$DEBUG ...`.
 * Feature: Added `std:time:now`, `std:srand` and `std:rand`.
@@ -34,6 +35,7 @@ operator syntax `.x += 10` and `o.x += 10`.
 * Feature: `std:values` also returns the individual elements of a numerical vector.
 * Feature: `std:keys` also returns the keys of a numerical vector.
 * Feature: Implemented `std:str:find`.
+* Feature: Implemented `std:write_str`.
 
 0.6.1 (2020-06-04)
 ==================

@@ -157,24 +157,26 @@ Smalltalk, LISP and Perl.
   - [3.9](#39-strings) Strings
     - [3.9.1](#391-string-literal-syntaxes) String Literal Syntaxes
     - [3.9.2](#392-str-value) str _value_
-    - [3.9.3](#393-isstr-value) is\_str _value_
-    - [3.9.4](#394-stdstrcat-a-b-) std:str:cat _a_ _b_ ...
-    - [3.9.5](#395-stdstrjoin-sep-vector) std:str:join _sep_ _vector_
-    - [3.9.6](#396-stdstrlen-value) std:str:len _value_
-    - [3.9.7](#397-stdstrreplace-pattern-replacement-string) std:str:replace _pattern_ _replacement_ _string_
-    - [3.9.8](#398-stdstrreplacen-pattern-replacement-count-string) std:str:replace\_n _pattern_ _replacement_ _count_ _string_
-    - [3.9.9](#399-stdstrtrim-value) std:str:trim _value_
-    - [3.9.10](#3910-stdstrtrimstart-value) std:str:trim\_start _value_
-    - [3.9.11](#3911-stdstrtrimend-value) std:str:trim\_end _value_
-    - [3.9.12](#3912-stdstrpadstart-len-pad-str-value) std:str:pad\_start _len_ _pad-str_ _value_
-    - [3.9.13](#3913-stdstrpadend-len-pad-str-value) std:str:pad\_end _len_ _pad-str_ _value_
-    - [3.9.14](#3914-stdstrtobytes-string) std:str:to\_bytes _string_
-    - [3.9.15](#3915-stdstrfromutf8-byte-vector) std:str:from\_utf8 _byte-vector_
-    - [3.9.16](#3916-stdstrfromutf8lossy-byte-vector) std:str:from\_utf8\_lossy _byte-vector_
-    - [3.9.17](#3917-stdstrtocharvec-string) std:str:to\_char\_vec _string_
-    - [3.9.18](#3918-stdstrfromcharvec-vector) std:str:from\_char\_vec _vector_
-    - [3.9.19](#3919-stdstrtolowercase-string) std:str:to\_lowercase _string_
-    - [3.9.20](#3920-stdstrtouppercase-string) std:str:to\_uppercase _string_
+    - [3.9.3](#393-stdwritestr-value) std:write\_str _value_
+    - [3.9.4](#394-isstr-value) is\_str _value_
+    - [3.9.5](#395-stdstrcat-a-b-) std:str:cat _a_ _b_ ...
+    - [3.9.6](#396-stdstrjoin-sep-vector) std:str:join _sep_ _vector_
+    - [3.9.7](#397-stdstrlen-value) std:str:len _value_
+    - [3.9.8](#398-stdstrfind-pattern-string-offset) std:str:find _pattern_ _string_ [_offset_]
+    - [3.9.9](#399-stdstrreplace-pattern-replacement-string) std:str:replace _pattern_ _replacement_ _string_
+    - [3.9.10](#3910-stdstrreplacen-pattern-replacement-count-string) std:str:replace\_n _pattern_ _replacement_ _count_ _string_
+    - [3.9.11](#3911-stdstrtrim-value) std:str:trim _value_
+    - [3.9.12](#3912-stdstrtrimstart-value) std:str:trim\_start _value_
+    - [3.9.13](#3913-stdstrtrimend-value) std:str:trim\_end _value_
+    - [3.9.14](#3914-stdstrpadstart-len-pad-str-value) std:str:pad\_start _len_ _pad-str_ _value_
+    - [3.9.15](#3915-stdstrpadend-len-pad-str-value) std:str:pad\_end _len_ _pad-str_ _value_
+    - [3.9.16](#3916-stdstrtobytes-string) std:str:to\_bytes _string_
+    - [3.9.17](#3917-stdstrfromutf8-byte-vector) std:str:from\_utf8 _byte-vector_
+    - [3.9.18](#3918-stdstrfromutf8lossy-byte-vector) std:str:from\_utf8\_lossy _byte-vector_
+    - [3.9.19](#3919-stdstrtocharvec-string) std:str:to\_char\_vec _string_
+    - [3.9.20](#3920-stdstrfromcharvec-vector) std:str:from\_char\_vec _vector_
+    - [3.9.21](#3921-stdstrtolowercase-string) std:str:to\_lowercase _string_
+    - [3.9.22](#3922-stdstrtouppercase-string) std:str:to\_uppercase _string_
   - [3.10](#310-bytes-or-byte-vectors) Bytes (or Byte Vectors)
     - [3.10.1](#3101-call-properties-of-bytes) Call Properties of Bytes
     - [3.10.2](#3102-byte-conversion-functions) Byte Conversion Functions
@@ -186,18 +188,17 @@ Smalltalk, LISP and Perl.
     - [3.11.3](#3113-stdsymbolscollect) std:symbols:collect
   - [3.12](#312-pairs-pa-b) Pairs `$p(a, b)`
     - [3.12.1](#3121-pair-operator-a--b) Pair Operator `a => b`
-    - [3.12.2](#3122-pair-constructor-a--b) Pair Constructor `a => b`
-    - [3.12.3](#3123-cons-a-b) cons _a_ _b_
-    - [3.12.4](#3124-pair-stringbyte-vector-operations) Pair string/byte vector operations
-      - [3.12.4.1](#31241-p-from--count--string-or-byte-vec) $p( _from_ , _count_ ) _string-or-byte-vec_
-      - [3.12.4.2](#31242-p-pattern--replacement--string-or-byte-vec) $p( _pattern_ , _replacement_ ) _string-or-byte-vec_
-      - [3.12.4.3](#31243-p-split-pattern--max--string-or-byte-vec) $p( _split-pattern_ , _max_ ) _string-or-byte-vec_
-    - [3.12.5](#3125-pair-to-iterator) Pair to Iterator
-      - [3.12.5.1](#31251-iter---range) Iter - Range
-      - [3.12.5.2](#31252-iter---enumerate) Iter - Enumerate
-      - [3.12.5.3](#31253-iter---values) Iter - Values
-      - [3.12.5.4](#31254-iter---keys) Iter - Keys
-    - [3.12.6](#3126-ispair-value) is\_pair _value_
+    - [3.12.2](#3122-cons-a-b) cons _a_ _b_
+    - [3.12.3](#3123-pair-stringbyte-vector-operations) Pair string/byte vector operations
+      - [3.12.3.1](#31231-p-from--count--string-or-byte-vec) $p( _from_ , _count_ ) _string-or-byte-vec_
+      - [3.12.3.2](#31232-p-pattern--replacement--string-or-byte-vec) $p( _pattern_ , _replacement_ ) _string-or-byte-vec_
+      - [3.12.3.3](#31233-p-split-pattern--max--string-or-byte-vec) $p( _split-pattern_ , _max_ ) _string-or-byte-vec_
+    - [3.12.4](#3124-pair-to-iterator) Pair to Iterator
+      - [3.12.4.1](#31241-iter---range) Iter - Range
+      - [3.12.4.2](#31242-iter---enumerate) Iter - Enumerate
+      - [3.12.4.3](#31243-iter---values) Iter - Values
+      - [3.12.4.4](#31244-iter---keys) Iter - Keys
+    - [3.12.5](#3125-ispair-value) is\_pair _value_
   - [3.13](#313-vectors-or-lists) Vectors (or Lists)
     - [3.13.1](#3131-stdpush-vector-item) std:push _vector_ _item_
     - [3.13.2](#3132-stdpop-vector) std:pop _vector_
@@ -214,10 +215,11 @@ Smalltalk, LISP and Perl.
   - [3.15](#315-references) References
     - [3.15.1](#3151-stdtoref-value) std:to\_ref _value_
     - [3.15.2](#3152-stdrefweaken-ref) std:ref:weaken _ref_
-    - [3.15.3](#3153-isref-value) is\_ref _value_
-    - [3.15.4](#3154-iswref-value) is\_wref _value_
-    - [3.15.5](#3155-stdrefstrengthen-ref) std:ref:strengthen _ref_
-    - [3.15.6](#3156-stdrefset-ref-value) std:ref:set _ref_ _value_
+    - [3.15.3](#3153-stdrefhide-value) std:ref:hide _value_
+    - [3.15.4](#3154-isref-value) is\_ref _value_
+    - [3.15.5](#3155-iswref-value) is\_wref _value_
+    - [3.15.6](#3156-stdrefstrengthen-ref) std:ref:strengthen _ref_
+    - [3.15.7](#3157-stdrefset-ref-value) std:ref:set _ref_ _value_
   - [3.16](#316-iterators-iter-expression) Iterators $iter _expression_
     - [3.16.1](#3161-iterator-kinds) Iterator Kinds
     - [3.16.2](#3162-iterators-on-mutated-data) Iterators on mutated data
@@ -290,7 +292,8 @@ Smalltalk, LISP and Perl.
     - [7.1.2](#712-m-expr) $M _expr_
     - [7.1.3](#713-data-structure-matcher-syntax) Data Structure Matcher Syntax
   - [7.2](#72-data-structure-selectors-s) Data Structure Selectors `$S(...)`
-    - [7.2.1](#721-selector-and-wlambda-regex-syntax) Selector and WLambda Regex Syntax:
+    - [7.2.1](#721-stdselector-string) std:selector _string_
+    - [7.2.2](#722-selector-and-wlambda-regex-syntax) Selector and WLambda Regex Syntax:
   - [7.3](#73-string-patterns-regex-r) String Patterns (Regex) `$r/.../`
     - [7.3.1](#731-pattern-syntax-overview) Pattern Syntax Overview
     - [7.3.2](#732-standard-regular-expressions) Standard Regular Expressions
@@ -305,20 +308,21 @@ Smalltalk, LISP and Perl.
 - [10](#10-standard-library) Standard Library
     - [10.0.1](#1001-stdshuffle-randfunc-vec) std:shuffle _rand\_func_ _vec_
     - [10.0.2](#1002-stddelete-vector-or-map-index-or-key) std:delete _vector-or-map_ _index-or-key_
-    - [10.0.3](#1003-stdcopy-vecormap) std:copy _vec\_or\_map_
-    - [10.0.4](#1004-stdvalues-collection-or-iter) std:values _collection-or-iter_
-    - [10.0.5](#1005-stdkeys-collection-or-iter) std:keys _collection-or-iter_
-    - [10.0.6](#1006-stdsort-comparefun-vec) std:sort [_compare\_fun_] _vec_
-    - [10.0.7](#1007-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
-    - [10.0.8](#1008-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
-    - [10.0.9](#1009-stddisplayln-arg1-) std:displayln _arg1_ ...
-    - [10.0.10](#10010-debug-arg1-) $DEBUG _arg1_ ...
-    - [10.0.11](#10011-stdwriteln-arg1-) std:writeln _arg1_ ...
-    - [10.0.12](#10012-stdeval-code-string) std:eval _code-string_
-    - [10.0.13](#10013-stdassert-bool-message) std:assert _bool_ \[_message_]
-    - [10.0.14](#10014-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
-    - [10.0.15](#10015-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
-    - [10.0.16](#10016-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+    - [10.0.3](#1003-stdrefid-value) std:ref\_id _value_
+    - [10.0.4](#1004-stdcopy-vecormap) std:copy _vec\_or\_map_
+    - [10.0.5](#1005-stdvalues-collection-or-iter) std:values _collection-or-iter_
+    - [10.0.6](#1006-stdkeys-collection-or-iter) std:keys _collection-or-iter_
+    - [10.0.7](#1007-stdsort-comparefun-vec) std:sort [_compare\_fun_] _vec_
+    - [10.0.8](#1008-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
+    - [10.0.9](#1009-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
+    - [10.0.10](#10010-stddisplayln-arg1-) std:displayln _arg1_ ...
+    - [10.0.11](#10011-debug-arg1-) $DEBUG _arg1_ ...
+    - [10.0.12](#10012-stdwriteln-arg1-) std:writeln _arg1_ ...
+    - [10.0.13](#10013-stdeval-code-string) std:eval _code-string_
+    - [10.0.14](#10014-stdassert-bool-message) std:assert _bool_ \[_message_]
+    - [10.0.15](#10015-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
+    - [10.0.16](#10016-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
+    - [10.0.17](#10017-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
   - [10.1](#101-io) I/O
     - [10.1.1](#1011-stdiofilereadtext-filename) std:io:file:read\_text _filename_
     - [10.1.2](#1012-stdiofileread-filename) std:io:file:read _filename_
@@ -1504,7 +1508,7 @@ Here an demonstration of the unwrap panic:
 ```wlambda
 match (std:eval $code { unwrap $e XXX })
     ($e err) => {
-        std:assert ~ std:str:find $\.err "Variable 'XXX' undefined";
+        std:assert ~ std:str:find "Variable 'XXX' undefined" $\.err;
     }
     { std:assert $false };
 ```
@@ -1516,7 +1520,7 @@ std:assert_eq (unwrap $o(123))  123;
 
 match (std:eval $code { unwrap $o() })
     ($e err) => {
-        std:assert ~ std:str:find $\.err "unwrap empty option";
+        std:assert ~ std:str:find "unwrap empty option" $\.err;
     }
     { std:assert $false };
 ```
@@ -2614,7 +2618,31 @@ std:assert_eq (str $o())       "";
 std:assert_eq (str ~ std:ref:weaken x)   "10";
 ```
 
-#### <a name="393-isstr-value"></a>3.9.3 - is\_str _value_
+#### <a name="393-stdwritestr-value"></a>3.9.3 - std:write\_str _value_
+
+Writes a WLambda syntax representation of the given _value_ to a string.
+This is useful for debugging purposes or in combination with `std:eval`.
+
+
+```wlambda
+std:assert_eq (std:write_str "foo")         "\"foo\"";
+std:assert_eq (std:write_str $&&10)         "$&&10";
+std:assert_eq (std:write_str $[1, 2, 3])    "$[1,2,3]"
+```
+
+Here an example in combination with `std:eval`:
+
+```wlambda
+!code =
+    std:str:cat
+        "$@i iter i "
+        (std:write_str $[1, 2, 3, 4])
+        " { $+ i }";
+
+std:assert_eq (std:eval code) 10;
+```
+
+#### <a name="394-isstr-value"></a>3.9.4 - is\_str _value_
 
 Returns `$true` if _value_ is a string.
 
@@ -2629,7 +2657,7 @@ std:assert ~ not ~ is_str $&&"foo";
 std:assert ~ is_str $*$&&"foo";
 ```
 
-#### <a name="394-stdstrcat-a-b-"></a>3.9.4 - std:str:cat _a_ _b_ ...
+#### <a name="395-stdstrcat-a-b-"></a>3.9.5 - std:str:cat _a_ _b_ ...
 
 Stringifies (like with `str`) and concatenates all its arguments.
 If an argument is a vector, it's elements will be stringified and concatenated.
@@ -2653,7 +2681,7 @@ std:push out "XXX";
 std:assert_eq s "abc123XXX";
 ```
 
-#### <a name="395-stdstrjoin-sep-vector"></a>3.9.5 - std:str:join _sep_ _vector_
+#### <a name="396-stdstrjoin-sep-vector"></a>3.9.6 - std:str:join _sep_ _vector_
 
 Join's the stringified elements of _vector_ with the _sep_ string.
 Will return an error if _vector_ is not a vector.
@@ -2664,7 +2692,7 @@ std:assert_eq
     "1::2::3";
 ```
 
-#### <a name="396-stdstrlen-value"></a>3.9.6 - std:str:len _value_
+#### <a name="397-stdstrlen-value"></a>3.9.7 - std:str:len _value_
 
 Returns the length of the stringified _value_ in unicode characters.
 The core function `len` does return the number of bytes in the string
@@ -2679,7 +2707,19 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### <a name="397-stdstrreplace-pattern-replacement-string"></a>3.9.7 - std:str:replace _pattern_ _replacement_ _string_
+#### <a name="398-stdstrfind-pattern-string-offset"></a>3.9.8 - std:str:find _pattern_ _string_ [_offset_]
+
+Searches for the string _pattern_ in the _string_ and returns the 0 based position
+in the string the given _pattern_ starts.
+If no pattern was found `$none` is returned.
+
+```wlambda
+std:assert_eq (std:str:find "xyz" "abcxyz")         3;
+std:assert_eq (std:str:find "xyz" "abcxyzxyz" 6)    6;
+std:assert_eq (std:str:find "xyz" "abcxyzfooxyz" 6) 9;
+```
+
+#### <a name="399-stdstrreplace-pattern-replacement-string"></a>3.9.9 - std:str:replace _pattern_ _replacement_ _string_
 
 Replaces every occurence of _pattern_ in _string_ with _replacement_
 and returns a new string. All values will be casted to a string if
@@ -2695,7 +2735,7 @@ std:assert_eq s
 std:assert_eq s "1111";
 ```
 
-#### <a name="398-stdstrreplacen-pattern-replacement-count-string"></a>3.9.8 - std:str:replace\_n _pattern_ _replacement_ _count_ _string_
+#### <a name="3910-stdstrreplacen-pattern-replacement-count-string"></a>3.9.10 - std:str:replace\_n _pattern_ _replacement_ _count_ _string_
 
 Replaces _count_ occurences of _pattern_ in _string_ with _replacement_
 and returns a new string. All values will be casted to a string if
@@ -2711,7 +2751,7 @@ std:assert_eq s
 std:assert_eq s "1119";
 ```
 
-#### <a name="399-stdstrtrim-value"></a>3.9.9 - std:str:trim _value_
+#### <a name="3911-stdstrtrim-value"></a>3.9.11 - std:str:trim _value_
 
 Trims off any (unicode) white space from the start and end of the
 stringified _value_.
@@ -2722,7 +2762,7 @@ std:assert_eq
     "fooo bar";
 ```
 
-#### <a name="3910-stdstrtrimstart-value"></a>3.9.10 - std:str:trim\_start _value_
+#### <a name="3912-stdstrtrimstart-value"></a>3.9.12 - std:str:trim\_start _value_
 
 Trims off any (unicode) white space from the start of the stringified _value_.
 
@@ -2732,7 +2772,7 @@ std:assert_eq
     "fooo bar \n";
 ```
 
-#### <a name="3911-stdstrtrimend-value"></a>3.9.11 - std:str:trim\_end _value_
+#### <a name="3913-stdstrtrimend-value"></a>3.9.13 - std:str:trim\_end _value_
 
 Trims off any (unicode) white space from the end of the stringified _value_.
 
@@ -2742,7 +2782,7 @@ std:assert_eq
     "  \nfooo bar";
 ```
 
-#### <a name="3912-stdstrpadstart-len-pad-str-value"></a>3.9.12 - std:str:pad\_start _len_ _pad-str_ _value_
+#### <a name="3914-stdstrpadstart-len-pad-str-value"></a>3.9.14 - std:str:pad\_start _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters, inserting
 at the start of the string.
@@ -2766,7 +2806,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="3913-stdstrpadend-len-pad-str-value"></a>3.9.13 - std:str:pad\_end _len_ _pad-str_ _value_
+#### <a name="3915-stdstrpadend-len-pad-str-value"></a>3.9.15 - std:str:pad\_end _len_ _pad-str_ _value_
 
 Pads the stringified _value_ by _pad-str_ up to _len_ characters,
 appending at the end.
@@ -2790,7 +2830,7 @@ std:assert_eq
     "∑∑";
 ```
 
-#### <a name="3914-stdstrtobytes-string"></a>3.9.14 - std:str:to\_bytes _string_
+#### <a name="3916-stdstrtobytes-string"></a>3.9.16 - std:str:to\_bytes _string_
 
 Encodes _string_ in UTF-8 and returns a byte vector containing all it's bytes.
 
@@ -2802,7 +2842,7 @@ std:assert_eq b $b"1234";
 std:assert_eq b $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
 ```
 
-#### <a name="3915-stdstrfromutf8-byte-vector"></a>3.9.15 - std:str:from\_utf8 _byte-vector_
+#### <a name="3917-stdstrfromutf8-byte-vector"></a>3.9.17 - std:str:from\_utf8 _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences an
@@ -2816,7 +2856,7 @@ std:assert_eq s "Äß日本人";
 std:assert_eq r "str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0";
 ```
 
-#### <a name="3916-stdstrfromutf8lossy-byte-vector"></a>3.9.16 - std:str:from\_utf8\_lossy _byte-vector_
+#### <a name="3918-stdstrfromutf8lossy-byte-vector"></a>3.9.18 - std:str:from\_utf8\_lossy _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences a `"�"` will be
@@ -2828,7 +2868,7 @@ inserted.
 std:assert_eq s "Ä�ß日本人��\0";
 ```
 
-#### <a name="3917-stdstrtocharvec-string"></a>3.9.17 - std:str:to\_char\_vec _string_
+#### <a name="3919-stdstrtocharvec-string"></a>3.9.19 - std:str:to\_char\_vec _string_
 
 Converts the _string_ into a vector of integers which represent the Unicode
 character number.
@@ -2841,7 +2881,7 @@ std:assert_eq (str v) ~ str $[49,50,51,52];
 std:assert_eq (str v) ~ str $[196,223,0x65E5,0x672C,0x4EBA];
 ```
 
-#### <a name="3918-stdstrfromcharvec-vector"></a>3.9.18 - std:str:from\_char\_vec _vector_
+#### <a name="3920-stdstrfromcharvec-vector"></a>3.9.20 - std:str:from\_char\_vec _vector_
 
 The reverse operation of `std:str:to_char_vec`. It converts
 a vector of integers to a unicode string. Any integer that has
@@ -2855,7 +2895,7 @@ std:assert_eq
     "12Äß日本人";
 ```
 
-#### <a name="3919-stdstrtolowercase-string"></a>3.9.19 - std:str:to\_lowercase _string_
+#### <a name="3921-stdstrtolowercase-string"></a>3.9.21 - std:str:to\_lowercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -2863,7 +2903,7 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_lowercase "ZABzabÄßÜÖ") "zabzabäßüö";
 ```
 
-#### <a name="3920-stdstrtouppercase-string"></a>3.9.20 - std:str:to\_uppercase _string_
+#### <a name="3922-stdstrtouppercase-string"></a>3.9.22 - std:str:to\_uppercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -3200,10 +3240,7 @@ std:assert_eq b $p(2, $p(3, 4));
 std:assert_eq b 2 => 3 => 4;
 ```
 
-#### <a name="3122-pair-constructor-a--b"></a>3.12.2 - Pair Constructor `a => b`
-
-
-#### <a name="3123-cons-a-b"></a>3.12.3 - cons _a_ _b_
+#### <a name="3122-cons-a-b"></a>3.12.2 - cons _a_ _b_
 
 Creates a new pair from the values _a_ and _b_.
 
@@ -3213,12 +3250,12 @@ Creates a new pair from the values _a_ and _b_.
 std:assert_eq p $p(3, 4);
 ```
 
-#### <a name="3124-pair-stringbyte-vector-operations"></a>3.12.4 - Pair string/byte vector operations
+#### <a name="3123-pair-stringbyte-vector-operations"></a>3.12.3 - Pair string/byte vector operations
 
 If you call a pair with a string or byte vector as argument, there are some
 operations that can be done:
 
-##### <a name="31241-p-from--count--string-or-byte-vec"></a>3.12.4.1 - $p( _from_ , _count_ ) _string-or-byte-vec_
+##### <a name="31231-p-from--count--string-or-byte-vec"></a>3.12.3.1 - $p( _from_ , _count_ ) _string-or-byte-vec_
 
 Returns a substring starting at _from_ with the length _count_.
 
@@ -3232,7 +3269,7 @@ The same works for byte vectors:
 std:assert_eq ($p(2, 4) $b"abcdefgh") $b"cdef";
 ```
 
-##### <a name="31242-p-pattern--replacement--string-or-byte-vec"></a>3.12.4.2 - $p( _pattern_ , _replacement_ ) _string-or-byte-vec_
+##### <a name="31232-p-pattern--replacement--string-or-byte-vec"></a>3.12.3.2 - $p( _pattern_ , _replacement_ ) _string-or-byte-vec_
 
 Replaces all _pattern_ occurences in _string_ by _replacement_.
 
@@ -3246,7 +3283,7 @@ The same works for byte vectors:
 std:assert_eq ($p($b";", $b"_") $b"A;B;D;EFG;HI") $b"A_B_D_EFG_HI";
 ```
 
-##### <a name="31243-p-split-pattern--max--string-or-byte-vec"></a>3.12.4.3 - $p( _split-pattern_ , _max_ ) _string-or-byte-vec_
+##### <a name="31233-p-split-pattern--max--string-or-byte-vec"></a>3.12.3.3 - $p( _split-pattern_ , _max_ ) _string-or-byte-vec_
 
 Splits _string_ at _split-pattern_ a _max_ number of times.
 If _max_ is 0, it is split completely.
@@ -3263,14 +3300,14 @@ The same works for byte vectors:
 std:assert_eq str[$p($b";", 0) $b"A;B;D;EFG;HI"] ~ str $[$b"A", $b"B", $b"D", $b"EFG", $b"HI"];
 ```
 
-#### <a name="3125-pair-to-iterator"></a>3.12.5 - Pair to Iterator
+#### <a name="3124-pair-to-iterator"></a>3.12.4 - Pair to Iterator
 
 Pairs play a special role if you make an iterator from it.
 It can be used to create a specialized iterator that only
 iterates over keys or values of a map. Or that enumerates
 a vector or map.
 
-##### <a name="31251-iter---range"></a>3.12.5.1 - Iter - Range
+##### <a name="31241-iter---range"></a>3.12.4.1 - Iter - Range
 
 `$iter $p(0, 10)` is the same as `$iter $i(0, 10)` and will construct an
 iterator that iterates from `0` to `9` (inclusive).
@@ -3284,7 +3321,7 @@ Because of the pair operator `a => b` we can nicely write a counting loop like t
 std:assert_eq sum 45;
 ```
 
-##### <a name="31252-iter---enumerate"></a>3.12.5.2 - Iter - Enumerate
+##### <a name="31242-iter---enumerate"></a>3.12.4.2 - Iter - Enumerate
 
 If the first value of the pair is `:enumerate`
 it will enumerate entries in a map or values in a vector.
@@ -3311,7 +3348,7 @@ iter i $p(:enumerate, ${a = 10, b = 20})
 std:assert_eq (str v) (str $[0, 1]);
 ```
 
-##### <a name="31253-iter---values"></a>3.12.5.3 - Iter - Values
+##### <a name="31243-iter---values"></a>3.12.4.3 - Iter - Values
 
 This is useful for iterating over the values in a map in an undefined order:
 
@@ -3323,7 +3360,7 @@ This is useful for iterating over the values in a map in an undefined order:
 std:assert_eq sum 63;
 ```
 
-##### <a name="31254-iter---keys"></a>3.12.5.4 - Iter - Keys
+##### <a name="31244-iter---keys"></a>3.12.4.4 - Iter - Keys
 
 You can also iterate over map keys in an undefined order:
 
@@ -3335,7 +3372,7 @@ You can also iterate over map keys in an undefined order:
 std:assert_eq sum 60;
 ```
 
-#### <a name="3126-ispair-value"></a>3.12.6 - is\_pair _value_
+#### <a name="3125-ispair-value"></a>3.12.5 - is\_pair _value_
 
 Checks if _value_ is a pair.
 
@@ -3733,7 +3770,26 @@ std:assert_eq x      &> type "ref_strong";
 std:assert_eq x_weak &> type "ref_weak";
 ```
 
-#### <a name="3153-isref-value"></a>3.15.3 - is\_ref _value_
+#### <a name="3153-stdrefhide-value"></a>3.15.3 - std:ref:hide _value_
+
+Creates a hidden reference from a given value or reference.
+
+```wlambda
+!r = $&& 10;            # strong ref to value 10
+
+# hide the reference for direct access via local variables
+!h = std:ref:hide r;
+
+.h += 11;
+
+std:assert_eq $*r       21;
+std:assert_eq h         21;
+std:assert_eq (std:write_str $:h) "$&&21";
+
+std:assert_eq (std:write_str $[r, $:h]) "$[$<1=>$&&21,$<1>]";
+```
+
+#### <a name="3154-isref-value"></a>3.15.4 - is\_ref _value_
 
 Returns `$true` if _value_ is a reference (strong, hidden or weak).
 
@@ -3749,7 +3805,7 @@ std:assert ~ not ~ is_ref $true;
 std:assert ~ not ~ is_ref $none;
 ```
 
-#### <a name="3154-iswref-value"></a>3.15.4 - is\_wref _value_
+#### <a name="3155-iswref-value"></a>3.15.5 - is\_wref _value_
 
 Returns `$true` if _value_ is a weak reference.
 
@@ -3760,7 +3816,7 @@ std:assert ~ is_wref y;
 std:assert ~ not ~ is_wref x;
 ```
 
-#### <a name="3155-stdrefstrengthen-ref"></a>3.15.5 - std:ref:strengthen _ref_
+#### <a name="3156-stdrefstrengthen-ref"></a>3.15.6 - std:ref:strengthen _ref_
 
 You can convert a weak reference (weakened by `std:ref:weaken`) or a captured weak
 reference `$&` to strong with `std:ref:strengthen
@@ -3784,7 +3840,7 @@ std:assert ~ is_some $*y2;
 std:assert ~ is_none $*y;
 ```
 
-#### <a name="3156-stdrefset-ref-value"></a>3.15.6 - std:ref:set _ref_ _value_
+#### <a name="3157-stdrefset-ref-value"></a>3.15.7 - std:ref:set _ref_ _value_
 
 Sets the value of the reference _ref_ to _value_.
 If _ref_ is not a strong, hidden or weak reference nothing happens.
@@ -5305,7 +5361,29 @@ This section shows how data structure selectors can be used.
 
 TODO
 
-#### <a name="721-selector-and-wlambda-regex-syntax"></a>7.2.1 - Selector and WLambda Regex Syntax:
+#### <a name="721-stdselector-string"></a>7.2.1 - std:selector _string_
+
+Parses the given _string_ as WLambda data structure selector and returns
+a function that takes a data structure as first argument. That function will
+then query the data structure according to the given selector.
+That function will also set the global variable `$\` to the result.
+
+The main usage of this function is, when you want to define the selector
+at runtime. Otherwise WLambda provides the handy `$S(...)` syntax for
+generating the structure pattern function at compile time.
+
+```wlambda
+!runtime_name = "foo";
+!sel = std:selector (" * / " runtime_name);
+
+? sel <& $[${foo = 1}, ${foo = 2}, ${foo = 3}] {
+    std:assert_str_eq $\ $[1,2,3];
+} {
+    std:assert $false
+};
+```
+
+#### <a name="722-selector-and-wlambda-regex-syntax"></a>7.2.2 - Selector and WLambda Regex Syntax:
 
 ```ebnf
     (* NOTE: Whitespace is not part of a pattern in most places. This means
@@ -5488,7 +5566,7 @@ std:assert_eq res "//\\/";
 #### <a name="731-pattern-syntax-overview"></a>7.3.1 - Pattern Syntax Overview
 
 While
-[Selector and WLambda Regex Syntax](#721-selector-and-wlambda-regex-syntax)
+[Selector and WLambda Regex Syntax](#722-selector-and-wlambda-regex-syntax)
 describes the pattern syntax in detail,
 here is the WLambda pattern regex syntax in a nutshell:
 
@@ -5690,7 +5768,29 @@ std:assert_eq (str m) (str ${b = 20});
 
 Please note that this operation is potentially O(n) on vectors.
 
-#### <a name="1003-stdcopy-vecormap"></a>10.0.3 - std:copy _vec\_or\_map_
+#### <a name="1003-stdrefid-value"></a>10.0.3 - std:ref\_id _value_
+
+Returns an integer identifier for a given referential value.
+The ID will stay the same as long as the reference is allocated.
+This returns a value for all data types that have some form
+of internal reference to a value on the heap.
+
+The main usage of this function is to get a pre process unique ID
+for an allocated value. But be aware, that once the value is deallocated,
+the reference ID does not belong to that value anymore.
+
+```wlambda
+!v = $[1,2,3];
+
+!v_id1 = std:ref_id v;
+std:push v 4;
+
+!v_id2 = std:ref_id v;
+
+std:assert_eq v_id1 v_id2;
+```
+
+#### <a name="1004-stdcopy-vecormap"></a>10.0.4 - std:copy _vec\_or\_map_
 
 Makes a shallow copy of the given vector or map.
 
@@ -5703,7 +5803,7 @@ std:assert_eq a.0 1;
 std:assert_eq b.0 10;
 ```
 
-#### <a name="1004-stdvalues-collection-or-iter"></a>10.0.4 - std:values _collection-or-iter_
+#### <a name="1005-stdvalues-collection-or-iter"></a>10.0.5 - std:values _collection-or-iter_
 
 This function returns all values in the given collection or iterator
 as vector. _collection-or-iter_ can have be one of the following data
@@ -5722,7 +5822,7 @@ std:assert_str_eq (std:values $[1,2,3])          $[1,2,3];
 std:assert_str_eq (std:values $i(1,2,3))         $[1,2,3];
 ```
 
-#### <a name="1005-stdkeys-collection-or-iter"></a>10.0.5 - std:keys _collection-or-iter_
+#### <a name="1006-stdkeys-collection-or-iter"></a>10.0.6 - std:keys _collection-or-iter_
 
 This function returns all keys in the given _collection_ or _iterator_.
 It's most useful for the map data type, but also returns the indices in
@@ -5736,7 +5836,7 @@ std:assert_str_eq (std:keys $i(4,4,4))           $[0,1,2];
 std:assert_str_eq (std:keys $i(4,4))             $[0,1];
 ```
 
-#### <a name="1006-stdsort-comparefun-vec"></a>10.0.6 - std:sort [_compare\_fun_] _vec_
+#### <a name="1007-stdsort-comparefun-vec"></a>10.0.7 - std:sort [_compare\_fun_] _vec_
 
 Sorts the given _vec_ in place. The comparison function _compare_fun_ gets the
 two values a and b and needs to return -1 if a < b, 0 if a = b and 1 if a > b.
@@ -5761,7 +5861,7 @@ std:assert_eq v.1.0 1;
 std:assert_eq v.2.0 -1;
 ```
 
-#### <a name="1007-stdcmpnumasc-a-b"></a>10.0.7 - std:cmp:num:asc _a_ _b_
+#### <a name="1008-stdcmpnumasc-a-b"></a>10.0.8 - std:cmp:num:asc _a_ _b_
 
 Compares _a_ and _b_ numerically and returns:
 
@@ -5777,7 +5877,7 @@ std:assert_eq (std:cmp:num:asc "20" "20")    0;
 std:assert_eq (std:cmp:num:asc 20 21)        1;
 ```
 
-#### <a name="1008-stdcmpnumdesc-a-b"></a>10.0.8 - std:cmp:num:desc _a_ _b_
+#### <a name="1009-stdcmpnumdesc-a-b"></a>10.0.9 - std:cmp:num:desc _a_ _b_
 
 Compares _a_ and _b_ numerically descending and returns:
 
@@ -5793,7 +5893,7 @@ std:assert_eq (std:cmp:num:desc "20" "20")    0;
 std:assert_eq (std:cmp:num:desc 20 21)       -1;
 ```
 
-#### <a name="1009-stddisplayln-arg1-"></a>10.0.9 - std:displayln _arg1_ ...
+#### <a name="10010-stddisplayln-arg1-"></a>10.0.10 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -5807,7 +5907,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
-#### <a name="10010-debug-arg1-"></a>10.0.10 - $DEBUG _arg1_ ...
+#### <a name="10011-debug-arg1-"></a>10.0.11 - $DEBUG _arg1_ ...
 
 This is a special value that evaluates to a print function that supplies the
 current position in the source code. For example this:
@@ -5838,7 +5938,7 @@ Will print like this:
 [1,11:<wlambda::eval>] DEBUG: k = 30
 ```
 
-#### <a name="10011-stdwriteln-arg1-"></a>10.0.11 - std:writeln _arg1_ ...
+#### <a name="10012-stdwriteln-arg1-"></a>10.0.12 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
@@ -5853,7 +5953,7 @@ See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="10012-stdeval-code-string"></a>10.0.12 - std:eval _code-string_
+#### <a name="10013-stdeval-code-string"></a>10.0.13 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -5865,7 +5965,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="10013-stdassert-bool-message"></a>10.0.13 - std:assert _bool_ \[_message_]
+#### <a name="10014-stdassert-bool-message"></a>10.0.14 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -5876,7 +5976,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="10014-stdasserteq-actual-expected-message"></a>10.0.14 - std:assert\_eq _actual_ _expected_ \[_message_]
+#### <a name="10015-stdasserteq-actual-expected-message"></a>10.0.15 - std:assert\_eq _actual_ _expected_ \[_message_]
 
 This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -5887,7 +5987,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### <a name="10015-stdassertstreq-actual-expected"></a>10.0.15 - std:assert\_str\_eq _actual_ _expected_
+#### <a name="10016-stdassertstreq-actual-expected"></a>10.0.16 - std:assert\_str\_eq _actual_ _expected_
 
 This function stringifies _actual_ and _expected_ using the `str` function
 and compares the resulting strings.
@@ -5899,7 +5999,7 @@ if the maps are stringified using `str`:
 std:assert_str_eq $[1, 2, 3]        $[1, 2, 3];
 ```
 
-#### <a name="10016-stdassertreleq-l-r-epsilon-message"></a>10.0.16 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+#### <a name="10017-stdassertreleq-l-r-epsilon-message"></a>10.0.17 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -6100,7 +6200,7 @@ If an error happens, you will receive an error object as return value of
         v        => $\.v;
 
 $DEBUG err_msg;
-std:assert err_msg &> $r/*SOME\ ERR*/;
+std:assert err_msg &> $r/ *SOME\ ERR* /;
 
 thdl.join[];
 ```
@@ -7891,8 +7991,8 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "str:find",
         |env: &mut Env, argc: usize| {
             if argc == 2 {
-                env.arg_ref(0).unwrap().with_s_ref(|s|
-                    env.arg_ref(1).unwrap().with_s_ref(|pat| {
+                env.arg_ref(1).unwrap().with_s_ref(|s|
+                    env.arg_ref(0).unwrap().with_s_ref(|pat| {
                         match s.find(pat) {
                             Some(idx) => Ok(VVal::Int(idx as i64)),
                             None      => Ok(VVal::None),
@@ -7902,8 +8002,8 @@ pub fn std_symbol_table() -> SymbolTable {
             } else {
                 let start_idx = env.arg(2).i() as usize;
 
-                env.arg_ref(0).unwrap().with_s_ref(|s|
-                    env.arg_ref(1).unwrap().with_s_ref(|pat| {
+                env.arg_ref(1).unwrap().with_s_ref(|s|
+                    env.arg_ref(0).unwrap().with_s_ref(|pat| {
                         if start_idx >= s.len() {
                             return Ok(VVal::None);
                         }
@@ -8597,6 +8697,11 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, argc: usize| {
             print_value(env, argc, true)
         }, None, None, false);
+
+    func!(st, "write_str",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str_mv(env.arg_ref(0).unwrap().s()))
+        }, Some(1), Some(1), false);
 
     func!(st, "dump_upvals",
         |env: &mut Env, _argc: usize| {
