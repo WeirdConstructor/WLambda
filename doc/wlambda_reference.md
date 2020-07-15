@@ -6001,6 +6001,27 @@ std:assert_rel_eq x y 1;
 # std:assert_eq x y 0.5;
 ```
 
+#### - std:measure\_time _unit_ _function_
+
+This function measures the time the given _function_ took to execute.
+The _unit_ defines how precisely the time is measured. Following strings are supported
+units:
+
+- `s` - seconds
+- `ms` - milliseconds
+- `us` - microseconds
+- `ns` - nanoseconds
+
+The return value is a vector where the first element is the
+time it took to execute the function, and the second element is the
+return value of that function.
+
+```wlambda
+!res = std:measure_time :ns { $@i iter i 0 => 100000 { $+ i } };
+std:assert res.0 > 100;
+std:assert_eq res.1 4999950000;
+```
+
 ### <a name="101-io"></a>10.1 - I/O
 
 #### <a name="1011-stdiofilereadtext-filename"></a>10.1.1 - std:io:file:read\_text _filename_
