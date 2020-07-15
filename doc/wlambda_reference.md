@@ -3033,13 +3033,35 @@ std:assert_eq bv $b"byte";
 
 #### - std:bytes:from\_vec _vector-of-ints_
 
-Decodes a vector of integers into a byte vector. If an integer is larger than
-255 don't expect a sensible result. But it will most likely just wrap around.
+Decodes a vector of integers in the range 0-255 into a byte vector. If an
+integer is larger than 255 don't expect a sensible result. But it will most
+likely just wrap around.
 
 ```wlambda
 std:assert_eq
     (std:bytes:from_vec $[1,2,3,0x62,0x79,0x74,0x65])
     $b"\x01\x02\x03byte";
+```
+
+#### - std:bytes:to\_hex _byte-vector_
+
+Converts the given byte vector to a string of hex encoded bytes.
+
+```wlambda
+std:assert_eq
+    (std:bytes:to_hex $b"byte")
+    "62797465";
+```
+
+#### - std:bytes:to\_vec _byte-vector_
+
+Converts the given byte vector to a vector of integers in the range 0-255.
+
+```wlambda
+std:assert_str_eq
+    (std:bytes:to_vec $b"byte")
+    $[98, 121, 116, 101];
+
 ```
 
 ### <a name="311-symbols"></a>3.11 - Symbols
