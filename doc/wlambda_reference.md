@@ -1511,6 +1511,17 @@ match (std:eval $code { unwrap $o() })
     { std:assert $false };
 ```
 
+#### - unwrap\_err _error-value_
+
+Unwraps an error value. Does panic if _error-value_ is not an error value.
+If it is an error value, the inner wrapped value is returned.
+
+```wlambda
+!v = unwrap_err $e "Some Error";
+
+std:assert_eq v "Some Error";
+```
+
 #### <a name="333-onerror-handler-maybe-error-value"></a>3.3.3 - on\_error _handler_ _maybe-error-value_
 
 The first parameter to `on_error` should be a _handler_ function,
@@ -3009,6 +3020,26 @@ std:assert_eq
 std:assert_eq
     (std:bytes:replace $b"XXX\x01\x02\x03OOO" $b"\x01\x02\x03" $b"\xFF\xFF\xFF\xFF")
     $b"XXX\xFF\xFF\xFF\xFFOOO";
+```
+
+#### - std:bytes:from\_hex _string-with-hex-chars_
+
+This function decodes a string of hex characters into a byte vector.
+
+```wlambda
+!bv = std:bytes:from_hex "62797465";
+std:assert_eq bv $b"byte";
+```
+
+#### - std:bytes:from\_vec _vector-of-ints_
+
+Decodes a vector of integers into a byte vector. If an integer is larger than
+255 don't expect a sensible result. But it will most likely just wrap around.
+
+```wlambda
+std:assert_eq
+    (std:bytes:from_vec $[1,2,3,0x62,0x79,0x74,0x65])
+    $b"\x01\x02\x03byte";
 ```
 
 ### <a name="311-symbols"></a>3.11 - Symbols
