@@ -146,26 +146,26 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
 
     let m = VVal::map();
     if let Some(fill) = fill {
-        m.set_key_str("fill", VVal::new_str_mv(fill.to_string()));
+        m.set_key_str("fill", VVal::new_str_mv(fill.to_string())).unwrap();
     } else {
-        m.set_key_str("fill", VVal::new_str(" "));
+        m.set_key_str("fill", VVal::new_str(" ")).unwrap();
     }
     match align_char {
-        Some('<') => { m.set_key_str("align", VVal::Int(-1)); },
-        Some('>') => { m.set_key_str("align", VVal::Int( 1)); },
-        Some('^') => { m.set_key_str("align", VVal::Int( 2)); },
+        Some('<') => { m.set_key_str("align", VVal::Int(-1)).unwrap(); },
+        Some('>') => { m.set_key_str("align", VVal::Int( 1)).unwrap(); },
+        Some('^') => { m.set_key_str("align", VVal::Int( 2)).unwrap(); },
         _         => (),
     }
     match sign {
-        Some('-') => { m.set_key_str("sign", VVal::Int(-1)); },
-        Some('+') => { m.set_key_str("sign", VVal::Int( 1)); },
+        Some('-') => { m.set_key_str("sign", VVal::Int(-1)).unwrap(); },
+        Some('+') => { m.set_key_str("sign", VVal::Int( 1)).unwrap(); },
         _         => (),
     }
-    m.set_key_str("alternate",  VVal::Bol(alternate));
-    m.set_key_str("pad0",       VVal::Bol(pad0));
-    if precision.is_some() { m.set_key_str("precision", precision); }
-    if width.is_some()     { m.set_key_str("width",     width); }
-    m.set_key_str("cast_type",  cast_type);
+    m.set_key_str("alternate",  VVal::Bol(alternate)).unwrap();
+    m.set_key_str("pad0",       VVal::Bol(pad0)).unwrap();
+    if precision.is_some() { m.set_key_str("precision", precision).unwrap(); }
+    if width.is_some()     { m.set_key_str("width",     width).unwrap(); }
+    m.set_key_str("cast_type",  cast_type).unwrap();
 
     Ok(m)
 }
@@ -213,7 +213,7 @@ fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, Pars
 fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
     let mut ps = State::new(s, "<selector>");
 
-    let mut fmt = VVal::vec();
+    let fmt = VVal::vec();
 
     let mut cur_text = String::new();
 
@@ -281,16 +281,16 @@ impl core::fmt::Write for FormatState {
 }
 
 impl FormatState {
-    fn add_char(&mut self, c: char) {
-        if let Some(sd) = &mut self.str_data.as_mut() {
-            sd.push(c);
-        } else if let Some(bd) = &mut self.byte_data.as_mut() {
-            let mut b = [0; 4];
-            for cb in c.encode_utf8(&mut b).as_bytes().iter() {
-                bd.push(*cb);
-            }
-        }
-    }
+//    fn add_char(&mut self, c: char) {
+//        if let Some(sd) = &mut self.str_data.as_mut() {
+//            sd.push(c);
+//        } else if let Some(bd) = &mut self.byte_data.as_mut() {
+//            let mut b = [0; 4];
+//            for cb in c.encode_utf8(&mut b).as_bytes().iter() {
+//                bd.push(*cb);
+//            }
+//        }
+//    }
 
     fn cur_len(&self) -> usize {
         if let Some(sd) = &self.str_data.as_ref() {
@@ -306,7 +306,7 @@ impl FormatState {
         if let Some(sd) = &mut self.str_data.as_mut() {
             sd.insert_str(idx, s)
         } else if let Some(bd) = &mut self.byte_data.as_mut() {
-            for (i, c) in s.chars().enumerate() {
+            for c in s.chars() {
                 let mut b = [0; 4];
                 for cb in c.encode_utf8(&mut b).as_bytes().iter() {
                     bd.insert(idx, *cb);
@@ -315,13 +315,13 @@ impl FormatState {
         }
     }
 
-    fn add_byte(&mut self, u: u8) {
-        if let Some(sd) = &mut self.str_data.as_mut() {
-            sd.push(std::char::from_u32(u as u32).unwrap());
-        } else if let Some(bd) = &mut self.byte_data.as_mut() {
-            bd.push(u);
-        }
-    }
+//    fn add_byte(&mut self, u: u8) {
+//        if let Some(sd) = &mut self.str_data.as_mut() {
+//            sd.push(std::char::from_u32(u as u32).unwrap());
+//        } else if let Some(bd) = &mut self.byte_data.as_mut() {
+//            bd.push(u);
+//        }
+//    }
 }
 
 pub type FormatNode = Box<dyn Fn(&mut FormatState, &[VVal]) -> std::fmt::Result>;
@@ -562,6 +562,7 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
 pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
     let mut fmts : Vec<FormatNode> = vec![];
 
+    let mut max_argc = 0;
     for (item, _) in fmt.iter() {
         let arg = item.at(1).unwrap_or_else(|| VVal::None);
         item.at(0).unwrap().with_s_ref(|syn| {
@@ -575,8 +576,19 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
                     let arg =
                         arg.at(0).unwrap().with_s_ref(|arg_syn| {
                             match &arg_syn[..] {
-                                "index" => FormatArg::Index(arg.v_i(1) as usize),
-                                _       => FormatArg::Key(arg.v_(1)),
+                                "index" => {
+                                    if max_argc < arg.v_i(1) + 1 {
+                                        max_argc = arg.v_i(1) + 1;
+                                    }
+
+                                    FormatArg::Index(arg.v_i(1) as usize)
+                                },
+                                _ => {
+                                    if max_argc < 1 {
+                                        max_argc = 1;
+                                    }
+                                    FormatArg::Key(arg.v_(1))
+                                }
                             }
                         });
                     fmts.push(
@@ -596,7 +608,7 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
             (*f)(fs, args)?
         }
         Ok(())
-    }), 0)
+    }), max_argc as usize)
 }
 
 pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
@@ -620,7 +632,7 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
     Ok(if is_bytes {
         VValFun::new_fun(
             move |env: &mut Env, _argc: usize| {
-                let mut out : Vec<u8> = Vec::new();
+                let out : Vec<u8> = Vec::new();
                 let mut fs = FormatState {
                     str_data:   None,
                     byte_data:  Some(out),
@@ -630,12 +642,11 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                         Ok(env.new_err(format!("Formatter error: {}", e))),
                     _ => Ok(VVal::new_byt(fs.byte_data.take().unwrap()))
                 }
-            }, None, None, false)
-//            }, Some(argc), Some(argc), false)
+            }, Some(argc), Some(argc), false)
     } else {
         VValFun::new_fun(
             move |env: &mut Env, _argc: usize| {
-                let mut out = String::new();
+                let out = String::new();
                 let mut fs = FormatState {
                     str_data:   Some(out),
                     byte_data:  None,

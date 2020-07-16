@@ -4079,7 +4079,7 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{zx}{xx}x\" $i(3, 4, 5, 6)"),      "a$i(5,3)$i(3,3)x");
     assert_eq!(v2s("$F$b\"a{}x\" 10"),                      "a10x");
     assert_eq!(v2s("$F$b\"a{1}{0}x\" 10 22"),               "a2210x");
-    assert_eq!(v2s("$F$b\"a{1}{0}{}x\" 10 22 33"),          format!("a{1}{0}{}x", 10, 22));
+    assert_eq!(v2s("$F$b\"a{1}{0}{}x\" 10 22"),             format!("a{1}{0}{}x", 10, 22));
 
     assert_eq!(v2s("$F\"a{:<5}x\"  ~ str 399"),     "a399  x");
     assert_eq!(v2s("$F\"a{:<5}x\"  ~ str 399"),     "a399  x");
