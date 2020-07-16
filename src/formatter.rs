@@ -171,19 +171,20 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
 }
 
 fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, ParseError> {
-    let mut arg = VVal::None;
     let mut fmt = VVal::None;
 
     let mut was_implicit_idx = false;
     let c = ps.expect_some(ps.peek())?;
-    if c != ':' && c != '}' {
-        arg = parse_argument(ps)?;
-    } else {
-        arg = VVal::vec2(VVal::new_sym("index"),
-                         VVal::Int(*implicit_index as i64));
-        *implicit_index = *implicit_index + 1;
-        was_implicit_idx = true;
-    }
+    let arg =
+        if c != ':' && c != '}' {
+            parse_argument(ps)?
+        } else {
+            let arg = VVal::vec2(VVal::new_sym("index"),
+                             VVal::Int(*implicit_index as i64));
+            *implicit_index = *implicit_index + 1;
+            was_implicit_idx = true;
+            arg
+        };
 
 
     let c = ps.expect_some(ps.peek())?;
@@ -329,12 +330,12 @@ pub type CountNode  = Box<dyn Fn(&mut FormatState, &[VVal]) -> usize>;
 pub fn compile_count(count: &VVal) -> CountNode {
     if count.v_with_s_ref(0, |s| s == "count") {
         let count = count.v_i(1);
-        Box::new(move |fs: &mut FormatState, args: &[VVal]| -> usize {
+        Box::new(move |_fs: &mut FormatState, _args: &[VVal]| -> usize {
             count as usize
         })
     } else {
         let count = count.clone();
-        Box::new(move |fs: &mut FormatState, args: &[VVal]| -> usize {
+        Box::new(move |_fs: &mut FormatState, _args: &[VVal]| -> usize {
             panic!("other count not yet supported! {}", count.s());
         })
     }
@@ -559,8 +560,6 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
 }
 
 pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
-    println!("COMPFMT[ {} ]", fmt.s());
-
     let mut fmts : Vec<FormatNode> = vec![];
 
     for (item, _) in fmt.iter() {

@@ -2308,21 +2308,21 @@ impl VVal {
             },
             VVal::IVec(b) => {
                 match b.as_ref() {
-                    NVec::Vec2(a, b) =>
+                    NVec::Vec2(_, _) =>
                         VVal::vec2(VVal::Int(0), VVal::Int(1)),
-                    NVec::Vec3(a, b, c) =>
+                    NVec::Vec3(_, _, _) =>
                         VVal::vec3(VVal::Int(0), VVal::Int(1), VVal::Int(2)),
-                    NVec::Vec4(a, b, c, d) =>
+                    NVec::Vec4(_, _, _, _) =>
                         VVal::vec4(VVal::Int(0), VVal::Int(1), VVal::Int(2), VVal::Int(3))
                 }
             },
             VVal::FVec(b) => {
                 match b.as_ref() {
-                    NVec::Vec2(a, b) =>
+                    NVec::Vec2(_, _) =>
                         VVal::vec2(VVal::Int(0), VVal::Int(1)),
-                    NVec::Vec3(a, b, c) =>
+                    NVec::Vec3(_, _, _) =>
                         VVal::vec3(VVal::Int(0), VVal::Int(1), VVal::Int(2)),
-                    NVec::Vec4(a, b, c, d) =>
+                    NVec::Vec4(_, _, _, _) =>
                         VVal::vec4(VVal::Int(0), VVal::Int(1), VVal::Int(2), VVal::Int(3))
                 }
             },
