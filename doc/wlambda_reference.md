@@ -7317,7 +7317,7 @@ The syntax for formatting is very similar to Rust's string formatting:
                   | identifier (* requires a map as parameter *)
                   ;
 
-    format_spec   = [[fill]align][sign]['#']['0'][width]['.' precision][type]
+    format_spec   = [[fill]align][sign]['#']['0'][width]['.' precision]['!' cast_type][type]
                   ;
     fill          = character
                   ;
@@ -7328,6 +7328,10 @@ The syntax for formatting is very similar to Rust's string formatting:
     width         = count
                   ;
     precision     = count | '*'
+                  ;
+    cast_type     = 'i'             (* interpret arg as integer *)
+                  | 'f'             (* interpret arg as float *)
+                  | 's'             (* (default) interpret arg as string *)
                   ;
     type          = 'x'             (* hex lower case *)
                   | 'X'             (* hex upper case *)

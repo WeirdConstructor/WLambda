@@ -38,7 +38,7 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_count(ps: &mut State) -> Result<VVal, ParseError> {
-    if let Some(_) = ps.find_char_not_of('$', ".") {
+    if let Some(_) = ps.find_char_not_of('$', ".!") {
         parse_argument(ps)
     } else {
         let integer = ps.take_while(|c| c.is_digit(10));
@@ -76,7 +76,7 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
               c @ '<'
             | c @ '^'
             | c @ '>' => {
-                align_char  = Some(c);
+                align_char = Some(c);
                 ps.consume();
             },
             _ => { },
@@ -94,11 +94,12 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
     }
 
     let alternate = ps.consume_if_eq('#');
-    let int_pad0  = ps.consume_if_eq('0');
+    let pad0      = ps.consume_if_eq('0');
 
     let width =
-        if    ps.find_char_not_of('$', ".").is_some()
+        if    ps.find_char_not_of('$', ".!").is_some()
            || (   ps.peek().is_some()
+               && !ps.lookahead("!")
                && !ps.lookahead(".")) {
             parse_count(ps)?
         } else {
@@ -125,6 +126,24 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
             VVal::None
         };
 
+    let cast_type =
+        if ps.consume_if_eq('!') {
+            match ps.expect_some(ps.peek())? {
+                'i' => { ps.consume(); VVal::Int(0) },
+                'f' => { ps.consume(); VVal::Flt(0.0) },
+                's' => { ps.consume(); VVal::new_str("") },
+                'b' => { ps.consume(); VVal::new_byt(vec![]) },
+                'B' => { ps.consume(); VVal::Bol(true) },
+                c => {
+                    return Err(ps.err(
+                        ParseErrorKind::BadFormat(
+                            format!("Unknown cast type: {}", c))));
+                }
+            }
+        } else {
+            VVal::None
+        };
+
     let m = VVal::map();
     if let Some(fill) = fill {
         m.set_key_str("fill", VVal::new_str_mv(fill.to_string()));
@@ -143,9 +162,10 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
         _         => (),
     }
     m.set_key_str("alternate",  VVal::Bol(alternate));
-    m.set_key_str("int_pad0",   VVal::Bol(int_pad0));
-    m.set_key_str("precision",  precision);
-    m.set_key_str("width",      width);
+    m.set_key_str("pad0",       VVal::Bol(pad0));
+    if precision.is_some() { m.set_key_str("precision", precision); }
+    if width.is_some()     { m.set_key_str("width",     width); }
+    m.set_key_str("cast_type",  cast_type);
 
     Ok(m)
 }
@@ -303,7 +323,7 @@ impl FormatState {
     }
 }
 
-pub type FormatNode = Box<dyn Fn(&mut FormatState, &[VVal])>;
+pub type FormatNode = Box<dyn Fn(&mut FormatState, &[VVal]) -> std::fmt::Result>;
 pub type CountNode  = Box<dyn Fn(&mut FormatState, &[VVal]) -> usize>;
 
 pub fn compile_count(count: &VVal) -> CountNode {
@@ -320,8 +340,23 @@ pub fn compile_count(count: &VVal) -> CountNode {
     }
 }
 
-pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
+pub fn with_format_arg<F, R>(arg: &FormatArg, args: &[VVal], f: F) -> R
+    where F: FnOnce(&VVal) -> R
+{
+    match arg {
+        FormatArg::Index(i) => {
+            f(&args[*i])
+        },
+        FormatArg::Key(k) => {
+            let val =
+                k.with_s_ref(|ks|
+                    args[0].get_key(ks).unwrap_or_else(|| VVal::None));
+            f(&val)
+        },
+    }
+}
 
+pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
     let width = fmt.get_key("width");
     let width : Option<CountNode> =
         if let Some(width) = width {
@@ -330,81 +365,197 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
             None
         };
 
+    let prec = fmt.get_key("precision");
+    let prec : Option<CountNode> =
+        if let Some(prec) = prec {
+            Some(compile_count(&prec))
+        } else {
+            None
+        };
+
+    println!("FMT: {}", fmt.s());
+
     let align = fmt.v_ik("align");
+    let mut fill  = fmt.v_s_rawk("fill");
+    if fill == "" {
+        fill = String::from(" ");
+    }
 
-    Box::new(move |fs: &mut FormatState, args: &[VVal]| {
-        let (len, is_numeric) =
-            match &arg {
-                FormatArg::Index(i) => {
-                    let is_num =
-                           args[*i].is_int()
-                        || args[*i].is_float();
+    match fmt.v_k("cast_type") {
+        VVal::Int(_) => {
+            if let Some(width) = width {
+                let align =
+                    if align == 0 { 1 } else { align };
 
-                    (args[*i].with_s_ref(|s| { fs.write_str(s); s.len() }),
-                     is_num)
-                },
-                FormatArg::Key(k) => {
-                    let val =
-                        k.with_s_ref(|ks|
-                            args[0].get_key(ks).unwrap_or_else(|| VVal::None));
+                if fmt.v_ik("pad0") > 0 {
+                    Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                        let width = (*width)(fs, args);
 
-                    let is_num =
-                           val.is_int()
-                        || val.is_float();
+                        with_format_arg(&arg, args, |v| {
+                            match align {
+                                1 => { write!(fs, "{0:>01$}", v.i(), width) },
+                                2 => { write!(fs, "{0:^01$}", v.i(), width) },
+                                _ => { write!(fs, "{0:<01$}", v.i(), width) },
+                            }
+                        })
+                    })
 
-                    (val.with_s_ref(|s| { fs.write_str(s); s.len() }),
-                     is_num)
-                },
-            };
+                } else {
+                    Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                        let width = (*width)(fs, args);
 
-        let align =
-            if align == 0 {
-                if is_numeric { 1 } else { -1 }
+                        with_format_arg(&arg, args, |v| {
+                            match align {
+                                1 => { write!(fs, "{0:>1$}", v.i(), width) },
+                                2 => { write!(fs, "{0:^1$}", v.i(), width) },
+                                _ => { write!(fs, "{0:<1$}", v.i(), width) },
+                            }
+                        })
+                    })
+                }
+
             } else {
-                align
-            };
+                Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                    with_format_arg(&arg, args, |v| {
+                        write!(fs, "{}", v.i())
+                    })
+                })
+            }
+        },
+        VVal::Flt(_) => {
+            if let Some(width) = width {
+                let align =
+                    if align == 0 { 1 } else { align };
 
-        let fill = " ";
+                if let Some(prec) = prec {
+                    if fmt.v_ik("pad0") > 0 {
+                        Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                            let width = (*width)(fs, args);
+                            let prec  = (*prec)(fs, args);
 
-        if let Some(width) = &width {
-            let width = (*width)(fs, args);
-            if width > len {
-                let pad_len = width - len;
+                            with_format_arg(&arg, args, |v| {
+                                match align {
+                                    1 => { write!(fs, "{0:>01$.2$}", v.f(), width, prec) },
+                                    2 => { write!(fs, "{0:^01$.2$}", v.f(), width, prec) },
+                                    _ => { write!(fs, "{0:<01$.2$}", v.f(), width, prec) },
+                                }
+                            })
+                        })
 
-                match align {
-                    1  => {
-                        let idx = fs.cur_len() - len;
-                        let pad = fill.repeat(pad_len);
-                        fs.insert_at(idx, &pad);
-                    },
-                    2  => {
-                        let first_half_pad  = pad_len / 2;
-                        let second_half_pad =
-                            if first_half_pad <= pad_len {
-                                pad_len - first_half_pad
-                            } else {
-                                0
-                            };
-                        let idx = fs.cur_len() - len;
-                        let pad_l = fill.repeat(first_half_pad);
-                        let pad_r = fill.repeat(second_half_pad);
-                        fs.insert_at(idx, &pad_l);
-                        fs.insert_at(fs.cur_len(), &pad_r);
-                    },
-                    -1 => {
-                        let pad = fill.repeat(pad_len);
-                        fs.insert_at(fs.cur_len(), &pad);
-                    },
-                    _  => (),
+                    } else {
+                        Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                            let width = (*width)(fs, args);
+                            let prec  = (*prec)(fs, args);
+
+                            with_format_arg(&arg, args, |v| {
+                                match align {
+                                    1 => { write!(fs, "{0:>1$.2$}", v.f(), width, prec) },
+                                    2 => { write!(fs, "{0:^1$.2$}", v.f(), width, prec) },
+                                    _ => { write!(fs, "{0:<1$.2$}", v.f(), width, prec) },
+                                }
+                            })
+                        })
+                    }
+                } else {
+                    if fmt.v_ik("pad0") > 0 {
+                        Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                            let width = (*width)(fs, args);
+
+                            with_format_arg(&arg, args, |v| {
+                                match align {
+                                    1 => { write!(fs, "{0:>01$}", v.f(), width) },
+                                    2 => { write!(fs, "{0:^01$}", v.f(), width) },
+                                    _ => { write!(fs, "{0:<01$}", v.f(), width) },
+                                }
+                            })
+                        })
+
+                    } else {
+                        Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                            let width = (*width)(fs, args);
+
+                            with_format_arg(&arg, args, |v| {
+                                match align {
+                                    1 => { write!(fs, "{0:>1$}", v.f(), width) },
+                                    2 => { write!(fs, "{0:^1$}", v.f(), width) },
+                                    _ => { write!(fs, "{0:<1$}", v.f(), width) },
+                                }
+                            })
+                        })
+                    }
+                }
+
+            } else {
+                if let Some(prec) = prec {
+                    Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                        let prec = (*prec)(fs, args);
+
+                        with_format_arg(&arg, args, |v| {
+                            write!(fs, "{0:.1$}", v.f(), prec)
+                        })
+                    })
+                } else {
+                    Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                        with_format_arg(&arg, args, |v| {
+                            write!(fs, "{}", v.f())
+                        })
+                    })
                 }
             }
         }
+        _ => Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+            let len =
+                with_format_arg(
+                    &arg, args,
+                    |v| v.with_s_ref(|s| -> Result<usize, std::fmt::Error> {
+                        fs.write_str(s)?;
+                        Ok(s.len())
+                    }))?;
 
-        // For any align: let the lower node write, and check
-        // how the buffer changed.
-        // then do something like: fs.pad_from_idx_with(last_idx, field_width)
-//        fs.write_str(s).unwrap()
-    })
+            let align =
+                if align == 0 {
+                    -1
+                } else {
+                    align
+                };
+
+            if let Some(width) = &width {
+                let width = (*width)(fs, args);
+                if width > len {
+                    let pad_len = width - len;
+
+                    match align {
+                        1  => {
+                            let idx = fs.cur_len() - len;
+                            let pad = fill.repeat(pad_len);
+                            fs.insert_at(idx, &pad);
+                        },
+                        2  => {
+                            let first_half_pad  = pad_len / 2;
+                            let second_half_pad =
+                                if first_half_pad <= pad_len {
+                                    pad_len - first_half_pad
+                                } else {
+                                    0
+                                };
+                            let idx = fs.cur_len() - len;
+                            let pad_l = fill.repeat(first_half_pad);
+                            let pad_r = fill.repeat(second_half_pad);
+                            fs.insert_at(idx, &pad_l);
+                            fs.insert_at(fs.cur_len(), &pad_r);
+                        },
+                        -1 => {
+                            let pad = fill.repeat(pad_len);
+                            fs.insert_at(fs.cur_len(), &pad);
+                        },
+                        _  => (),
+                    }
+                }
+            }
+
+            Ok(())
+        }),
+    }
 }
 
 pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
@@ -418,7 +569,7 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
             match &syn[..] {
                 "text" => {
                     fmts.push(Box::new(move |fs: &mut FormatState, _args: &[VVal]| {
-                        arg.with_s_ref(|s| fs.write_str(s).unwrap());
+                        arg.with_s_ref(|s| fs.write_str(s))
                     }));
                 },
                 _ => {
@@ -443,8 +594,9 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
     }
     (Box::new(move |fs: &mut FormatState, args: &[VVal]| {
         for f in fmts.iter() {
-            (*f)(fs, args);
+            (*f)(fs, args)?
         }
+        Ok(())
     }), 0)
 }
 
@@ -474,8 +626,11 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                     str_data:   None,
                     byte_data:  Some(out),
                 };
-                (fun)(&mut fs, env.argv_ref());
-                Ok(VVal::new_byt(fs.byte_data.take().unwrap()))
+                match (fun)(&mut fs, env.argv_ref()) {
+                    Err(e) =>
+                        Ok(env.new_err(format!("Formatter error: {}", e))),
+                    _ => Ok(VVal::new_byt(fs.byte_data.take().unwrap()))
+                }
             }, None, None, false)
 //            }, Some(argc), Some(argc), false)
     } else {
@@ -486,9 +641,11 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                     str_data:   Some(out),
                     byte_data:  None,
                 };
-                (fun)(&mut fs, env.argv_ref());
-                println!("STR: {:?}", fs);
-                Ok(VVal::new_str_mv(fs.str_data.take().unwrap()))
+                match (fun)(&mut fs, env.argv_ref()) {
+                    Err(e) =>
+                        Ok(env.new_err(format!("Formatter error: {}", e))),
+                    _ => Ok(VVal::new_str_mv(fs.str_data.take().unwrap()))
+                }
             }, None, None, false)
 //            }, Some(argc), Some(argc), false)
     })

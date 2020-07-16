@@ -4086,6 +4086,48 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{:>5}x\"  ~ str 399"),     "a  399x");
     assert_eq!(v2s("$F\"a{:^5}x\"  ~ str 399"),     "a 399 x");
 
+    assert_eq!(v2s("$F\"a{:!i}\"     4.3456"), format!("a{}",      4));
+    assert_eq!(v2s("$F\"a{:0!i}\"    4.3456"), format!("a{:0}",    4));
+
+    assert_eq!(v2s("$F\"a{:7!i}\"   4.3456"),  format!("a{:7}",    4));
+    assert_eq!(v2s("$F\"a{:<7!i}\"  4.3456"),  format!("a{:<7}",   4));
+    assert_eq!(v2s("$F\"a{:>7!i}\"  4.3456"),  format!("a{:>7}",   4));
+    assert_eq!(v2s("$F\"a{:^7!i}\"  4.3456"),  format!("a{:^7}",   4));
+
+    assert_eq!(v2s("$F\"a{:07!i}\"   4.3456"),  format!("a{:07}",  4));
+    assert_eq!(v2s("$F\"a{:<07!i}\"  4.3456"),  format!("a{:<07}", 4));
+    assert_eq!(v2s("$F\"a{:>07!i}\"  4.3456"),  format!("a{:>07}", 4));
+    assert_eq!(v2s("$F\"a{:^07!i}\"  4.3456"),  format!("a{:^07}", 4));
+
+    assert_eq!(v2s("$F\"a{:!f}\"     4.3456"),  format!("a{}",      4.3456));
+    assert_eq!(v2s("$F\"a{:0!f}\"    4.3456"),  format!("a{:0}",    4.3456));
+    assert_eq!(v2s("$F\"a{:0.2!f}\"  4.3456"),  format!("a{:0.2}",  4.3456));
+    assert_eq!(v2s("$F\"a{:05.2!f}\" 4.3456"),  format!("a{:05.2}", 4.3456));
+    assert_eq!(v2s("$F\"a{:5.2!f}\"  4.3456"),  format!("a{:5.2}",  4.3456));
+
+    assert_eq!(v2s("$F\"a{:7!f}\"   4.3456"),   format!("a{:7}",    4.3456));
+    assert_eq!(v2s("$F\"a{:<7!f}\"  4.3456"),   format!("a{:<7}",   4.3456));
+    assert_eq!(v2s("$F\"a{:>7!f}\"  4.3456"),   format!("a{:>7}",   4.3456));
+    assert_eq!(v2s("$F\"a{:^7!f}\"  4.3456"),   format!("a{:^7}",   4.3456));
+    assert_eq!(v2s("$F\"a{:7.2!f}\"   4.3456"), format!("a{:7.2}",  4.3456));
+    assert_eq!(v2s("$F\"a{:<7.2!f}\"  4.3456"), format!("a{:<7.2}", 4.3456));
+    assert_eq!(v2s("$F\"a{:>7.2!f}\"  4.3456"), format!("a{:>7.2}", 4.3456));
+    assert_eq!(v2s("$F\"a{:^7.2!f}\"  4.3456"), format!("a{:^7.2}", 4.3456));
+
+    assert_eq!(v2s("$F\"a{:07!f}\"   4.3456"),      format!("a{:07}",  4.3456));
+    assert_eq!(v2s("$F\"a{:<07!f}\"  4.3456"),      format!("a{:<07}", 4.3456));
+    assert_eq!(v2s("$F\"a{:>07!f}\"  4.3456"),      format!("a{:>07}", 4.3456));
+    assert_eq!(v2s("$F\"a{:^07!f}\"  4.3456"),      format!("a{:^07}", 4.3456));
+    assert_eq!(v2s("$F\"a{:07.2!f}\"   4.3456"),    format!("a{:07.2}",  4.3456));
+    assert_eq!(v2s("$F\"a{:<07.2!f}\"  4.3456"),    format!("a{:<07.2}", 4.3456));
+    assert_eq!(v2s("$F\"a{:>07.2!f}\"  4.3456"),    format!("a{:>07.2}", 4.3456));
+    assert_eq!(v2s("$F\"a{:^07.2!f}\"  4.3456"),    format!("a{:^07.2}", 4.3456));
+
+//    assert_eq!(v2s("$F\"a{:<7.3}\"  4.3456"),  format!("a{:>7.3}", 4.3456));
+
+//    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     format!("a{:>5}x", 399));
+//    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     format!("a{:^5}x", 399));
+
 //    assert_eq!(v2s("$F\"a{:<5}x\"  399"),     format!("a{:<5}x", 399));
 //    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     format!("a{:>5}x", 399));
 //    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     format!("a{:^5}x", 399));
