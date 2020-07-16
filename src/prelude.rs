@@ -7227,6 +7227,7 @@ use crate::util;
 use std::rc::Rc;
 use crate::threads::*;
 use crate::selector::*;
+use crate::formatter::*;
 use crate::io::print_value;
 
 macro_rules! func {
@@ -8913,6 +8914,21 @@ pub fn std_symbol_table() -> SymbolTable {
                     }
                 })
         }, Some(1), Some(1), false);
+
+    func!(st, "formatter",
+        |env: &mut Env, _argc: usize| {
+            let fmt_src = env.arg(0);
+            match create_formatter_fun(&fmt_src) {
+                Ok(fun) => Ok(fun),
+                Err(e) => {
+                    Ok(env.new_err(
+                        format!("bad formatter: {}, formatter was: /{}/",
+                                e, fmt_src.s_raw())))
+                }
+            }
+        }, Some(1), Some(1), false);
+
+
 
 //    func!(st, "tree_select",
 //        |env: &mut Env, _argc: usize| {

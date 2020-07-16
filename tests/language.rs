@@ -4123,6 +4123,9 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{:>07.2!f}\"  4.3456"),    format!("a{:>07.2}", 4.3456));
     assert_eq!(v2s("$F\"a{:^07.2!f}\"  4.3456"),    format!("a{:^07.2}", 4.3456));
 
+    assert_eq!(v2s("(std:formatter \"{2:07.1!f}\") 1.23 3.45 6.78"),
+               "??");
+
 //    assert_eq!(v2s("$F\"a{:<7.3}\"  4.3456"),  format!("a{:>7.3}", 4.3456));
 
 //    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     format!("a{:>5}x", 399));
