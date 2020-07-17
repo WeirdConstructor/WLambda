@@ -36,6 +36,9 @@ operator syntax `.x += 10` and `o.x += 10`.
 * Feature: `std:keys` also returns the keys of a numerical vector.
 * Feature: Implemented `std:str:find`.
 * Feature: Implemented `std:write_str`.
+* Feature: Implemented custom WLambda string formatting, that even supports
+writing numerical vectors, vectors or maps in a nicer formatted way.
+See also `$F` and `std:formatter`.
 
 0.6.1 (2020-06-04)
 ==================

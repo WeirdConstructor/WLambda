@@ -341,20 +341,138 @@ pub fn compile_count(count: &VVal) -> CountNode {
     }
 }
 
-pub fn with_format_arg<F, R>(arg: &FormatArg, args: &[VVal], f: F) -> R
-    where F: FnOnce(&VVal) -> R
+pub fn write_vval<F>(arg: &VVal, fs: &mut FormatState, mut f: F) -> std::fmt::Result
+    where F: FnMut(&mut FormatState, &VVal) -> std::fmt::Result
+{
+    use crate::nvec::NVec;
+
+    match arg {
+        VVal::IVec(v) => {
+            write!(fs, "(")?;
+            match v.as_ref() {
+                NVec::Vec2(a, b) => {
+                    f(fs, &VVal::Int(*a))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Int(*b))?;
+                },
+                NVec::Vec3(a, b, c) => {
+                    f(fs, &VVal::Int(*a))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Int(*b))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Int(*c))?;
+                },
+                NVec::Vec4(a, b, c, d) => {
+                    f(fs, &VVal::Int(*a))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Int(*b))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Int(*c))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Int(*d))?;
+                },
+            }
+            write!(fs, ")")?;
+        },
+        VVal::FVec(v) => {
+            write!(fs, "(")?;
+            match v.as_ref() {
+                NVec::Vec2(a, b) => {
+                    f(fs, &VVal::Flt(*a))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Flt(*b))?;
+                },
+                NVec::Vec3(a, b, c) => {
+                    f(fs, &VVal::Flt(*a))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Flt(*b))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Flt(*c))?;
+                },
+                NVec::Vec4(a, b, c, d) => {
+                    f(fs, &VVal::Flt(*a))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Flt(*b))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Flt(*c))?;
+                    write!(fs, ",")?;
+                    f(fs, &VVal::Flt(*d))?;
+                },
+            }
+            write!(fs, ")")?;
+        },
+        VVal::Pair(ab) => {
+            let (a, b) = ab.as_ref();
+            write!(fs, "(")?;
+            f(fs, a)?;
+            write!(fs, ",")?;
+            f(fs, b)?;
+            write!(fs, ")")?;
+        },
+        VVal::Lst(_) => {
+            write!(fs, "[")?;
+            let mut first = true;
+            for (a, _) in arg.iter() {
+                if first { first = false; }
+                else     { write!(fs, ",")?; }
+
+                f(fs, &a)?;
+            }
+            write!(fs, "]")?;
+        },
+        VVal::Map(m) => {
+            use crate::str_int::*;
+            write!(fs, "{{")?;
+            let hm = m.borrow();
+            let mut keys : Vec<&Symbol> = hm.keys().collect();
+            keys.sort();
+
+            let mut first = true;
+            for k in keys {
+                if first { first = false; }
+                else     { write!(fs, ", ")?; }
+
+                let v = hm.get(k).unwrap();
+                write!(fs, "{}:", k.as_ref())?;
+                f(fs, &v)?;
+            }
+
+            write!(fs, "}}")?;
+        },
+        v => f(fs, v)?,
+    }
+    Ok(())
+}
+
+pub fn with_format_arg_write<F>(arg: &FormatArg, args: &[VVal], fs: &mut FormatState, f: F) -> std::fmt::Result
+    where F: FnMut(&mut FormatState, &VVal) -> std::fmt::Result
 {
     match arg {
-        FormatArg::Index(i) => {
-            f(&args[*i])
-        },
+        FormatArg::Index(i) => { write_vval(&args[*i], fs, f) },
         FormatArg::Key(k) => {
             let val =
                 k.with_s_ref(|ks|
                     args[0].get_key(ks).unwrap_or_else(|| VVal::None));
-            f(&val)
+            write_vval(&val, fs, f)
         },
     }
+}
+
+macro_rules! align_write {
+    ($align: ident, $fs: ident, $prefix: literal, $postfix: literal, $arg0: expr, $arg1: expr) => {
+        match $align {
+            1 => { write!($fs, concat!($prefix, ">", $postfix), $arg0, $arg1) },
+            2 => { write!($fs, concat!($prefix, "^", $postfix), $arg0, $arg1) },
+            _ => { write!($fs, concat!($prefix, "<", $postfix), $arg0, $arg1) },
+        }
+    };
+    ($align: ident, $fs: ident, $prefix: literal, $postfix: literal, $arg0: expr, $arg1: expr, $arg2: expr) => {
+        match $align {
+            1 => { write!($fs, concat!($prefix, ">", $postfix), $arg0, $arg1, $arg2) },
+            2 => { write!($fs, concat!($prefix, "^", $postfix), $arg0, $arg1, $arg2) },
+            _ => { write!($fs, concat!($prefix, "<", $postfix), $arg0, $arg1, $arg2) },
+        }
+    };
 }
 
 pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
@@ -374,8 +492,6 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
             None
         };
 
-    println!("FMT: {}", fmt.s());
-
     let align = fmt.v_ik("align");
     let mut fill  = fmt.v_s_rawk("fill");
     if fill == "" {
@@ -392,12 +508,8 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                     Box::new(move |fs: &mut FormatState, args: &[VVal]| {
                         let width = (*width)(fs, args);
 
-                        with_format_arg(&arg, args, |v| {
-                            match align {
-                                1 => { write!(fs, "{0:>01$}", v.i(), width) },
-                                2 => { write!(fs, "{0:^01$}", v.i(), width) },
-                                _ => { write!(fs, "{0:<01$}", v.i(), width) },
-                            }
+                        with_format_arg_write(&arg, args, fs, |fs, v| {
+                            align_write!(align, fs, "{0:", "01$}", v.i(), width)
                         })
                     })
 
@@ -405,19 +517,15 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                     Box::new(move |fs: &mut FormatState, args: &[VVal]| {
                         let width = (*width)(fs, args);
 
-                        with_format_arg(&arg, args, |v| {
-                            match align {
-                                1 => { write!(fs, "{0:>1$}", v.i(), width) },
-                                2 => { write!(fs, "{0:^1$}", v.i(), width) },
-                                _ => { write!(fs, "{0:<1$}", v.i(), width) },
-                            }
+                        with_format_arg_write(&arg, args, fs, |fs, v| {
+                            align_write!(align, fs, "{0:", "1$}", v.i(), width)
                         })
                     })
                 }
 
             } else {
                 Box::new(move |fs: &mut FormatState, args: &[VVal]| {
-                    with_format_arg(&arg, args, |v| {
+                    with_format_arg_write(&arg, args, fs, |fs, v| {
                         write!(fs, "{}", v.i())
                     })
                 })
@@ -434,12 +542,8 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                             let width = (*width)(fs, args);
                             let prec  = (*prec)(fs, args);
 
-                            with_format_arg(&arg, args, |v| {
-                                match align {
-                                    1 => { write!(fs, "{0:>01$.2$}", v.f(), width, prec) },
-                                    2 => { write!(fs, "{0:^01$.2$}", v.f(), width, prec) },
-                                    _ => { write!(fs, "{0:<01$.2$}", v.f(), width, prec) },
-                                }
+                            with_format_arg_write(&arg, args, fs, |fs, v| {
+                                align_write!(align, fs, "{0:", "01$.2$}", v.f(), width, prec)
                             })
                         })
 
@@ -448,12 +552,8 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                             let width = (*width)(fs, args);
                             let prec  = (*prec)(fs, args);
 
-                            with_format_arg(&arg, args, |v| {
-                                match align {
-                                    1 => { write!(fs, "{0:>1$.2$}", v.f(), width, prec) },
-                                    2 => { write!(fs, "{0:^1$.2$}", v.f(), width, prec) },
-                                    _ => { write!(fs, "{0:<1$.2$}", v.f(), width, prec) },
-                                }
+                            with_format_arg_write(&arg, args, fs, |fs, v| {
+                                align_write!(align, fs, "{0:", "1$.2$}", v.f(), width, prec)
                             })
                         })
                     }
@@ -462,12 +562,8 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                         Box::new(move |fs: &mut FormatState, args: &[VVal]| {
                             let width = (*width)(fs, args);
 
-                            with_format_arg(&arg, args, |v| {
-                                match align {
-                                    1 => { write!(fs, "{0:>01$}", v.f(), width) },
-                                    2 => { write!(fs, "{0:^01$}", v.f(), width) },
-                                    _ => { write!(fs, "{0:<01$}", v.f(), width) },
-                                }
+                            with_format_arg_write(&arg, args, fs, |fs, v| {
+                                align_write!(align, fs, "{0:", "01$}", v.f(), width)
                             })
                         })
 
@@ -475,12 +571,8 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                         Box::new(move |fs: &mut FormatState, args: &[VVal]| {
                             let width = (*width)(fs, args);
 
-                            with_format_arg(&arg, args, |v| {
-                                match align {
-                                    1 => { write!(fs, "{0:>1$}", v.f(), width) },
-                                    2 => { write!(fs, "{0:^1$}", v.f(), width) },
-                                    _ => { write!(fs, "{0:<1$}", v.f(), width) },
-                                }
+                            with_format_arg_write(&arg, args, fs, |fs, v| {
+                                align_write!(align, fs, "{0:", "1$}", v.f(), width)
                             })
                         })
                     }
@@ -491,13 +583,13 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                     Box::new(move |fs: &mut FormatState, args: &[VVal]| {
                         let prec = (*prec)(fs, args);
 
-                        with_format_arg(&arg, args, |v| {
+                        with_format_arg_write(&arg, args, fs, |fs, v| {
                             write!(fs, "{0:.1$}", v.f(), prec)
                         })
                     })
                 } else {
                     Box::new(move |fs: &mut FormatState, args: &[VVal]| {
-                        with_format_arg(&arg, args, |v| {
+                        with_format_arg_write(&arg, args, fs, |fs, v| {
                             write!(fs, "{}", v.f())
                         })
                     })
@@ -505,56 +597,56 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
             }
         }
         _ => Box::new(move |fs: &mut FormatState, args: &[VVal]| {
-            let len =
-                with_format_arg(
-                    &arg, args,
-                    |v| v.with_s_ref(|s| -> Result<usize, std::fmt::Error> {
-                        fs.write_str(s)?;
-                        Ok(s.len())
-                    }))?;
+            let mut len = 0;
+            with_format_arg_write(
+                &arg, args, fs,
+                |fs, v| v.with_s_ref(|s| {
+                    fs.write_str(s)?;
+                    len = s.len();
 
-            let align =
-                if align == 0 {
-                    -1
-                } else {
-                    align
-                };
+                    let align =
+                        if align == 0 {
+                            -1
+                        } else {
+                            align
+                        };
 
-            if let Some(width) = &width {
-                let width = (*width)(fs, args);
-                if width > len {
-                    let pad_len = width - len;
+                    if let Some(width) = &width {
+                        let width = (*width)(fs, args);
+                        if width > len {
+                            let pad_len = width - len;
 
-                    match align {
-                        1  => {
-                            let idx = fs.cur_len() - len;
-                            let pad = fill.repeat(pad_len);
-                            fs.insert_at(idx, &pad);
-                        },
-                        2  => {
-                            let first_half_pad  = pad_len / 2;
-                            let second_half_pad =
-                                if first_half_pad <= pad_len {
-                                    pad_len - first_half_pad
-                                } else {
-                                    0
-                                };
-                            let idx = fs.cur_len() - len;
-                            let pad_l = fill.repeat(first_half_pad);
-                            let pad_r = fill.repeat(second_half_pad);
-                            fs.insert_at(idx, &pad_l);
-                            fs.insert_at(fs.cur_len(), &pad_r);
-                        },
-                        -1 => {
-                            let pad = fill.repeat(pad_len);
-                            fs.insert_at(fs.cur_len(), &pad);
-                        },
-                        _  => (),
+                            match align {
+                                1  => {
+                                    let idx = fs.cur_len() - len;
+                                    let pad = fill.repeat(pad_len);
+                                    fs.insert_at(idx, &pad);
+                                },
+                                2  => {
+                                    let first_half_pad  = pad_len / 2;
+                                    let second_half_pad =
+                                        if first_half_pad <= pad_len {
+                                            pad_len - first_half_pad
+                                        } else {
+                                            0
+                                        };
+                                    let idx = fs.cur_len() - len;
+                                    let pad_l = fill.repeat(first_half_pad);
+                                    let pad_r = fill.repeat(second_half_pad);
+                                    fs.insert_at(idx, &pad_l);
+                                    fs.insert_at(fs.cur_len(), &pad_r);
+                                },
+                                -1 => {
+                                    let pad = fill.repeat(pad_len);
+                                    fs.insert_at(fs.cur_len(), &pad);
+                                },
+                                _  => (),
+                            }
+                        }
                     }
-                }
-            }
 
-            Ok(())
+                    Ok(())
+                }))
         }),
     }
 }
@@ -612,8 +704,6 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
 }
 
 pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
-    let fmt = fmt.at(1).unwrap();
-
     let (is_bytes, fmt_str) =
         if let VVal::Byt(bytes) = fmt {
             let mut s = String::new();

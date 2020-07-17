@@ -2677,7 +2677,7 @@ pub fn vm_compile2(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 Syntax::Formatter => {
                     let fun =
                         match formatter::create_formatter_fun(
-                                &ast.at(1).unwrap())
+                                &ast.at(1).unwrap().at(1).unwrap())
                         {
                             Ok(fun) => fun,
                             Err(e) => {
