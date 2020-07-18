@@ -4094,6 +4094,21 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{:>7!i}\"  4.3456"),  format!("a{:>7}",   4));
     assert_eq!(v2s("$F\"a{:^7!i}\"  4.3456"),  format!("a{:^7}",   4));
 
+    assert_eq!(v2s("$F\"a{:7!ix}\"   4.3456"),  format!("a{:7x}",    4));
+    assert_eq!(v2s("$F\"a{:<7!ix}\"  4.3456"),  format!("a{:<7x}",   4));
+    assert_eq!(v2s("$F\"a{:>7!ix}\"  4.3456"),  format!("a{:>7x}",   4));
+    assert_eq!(v2s("$F\"a{:^7!ix}\"  4.3456"),  format!("a{:^7x}",   4));
+
+    assert_eq!(v2s("$F\"a{:7!io}\"   4.3456"),  format!("a{:7o}",    4));
+    assert_eq!(v2s("$F\"a{:<7!io}\"  4.3456"),  format!("a{:<7o}",   4));
+    assert_eq!(v2s("$F\"a{:>7!io}\"  4.3456"),  format!("a{:>7o}",   4));
+    assert_eq!(v2s("$F\"a{:^7!io}\"  4.3456"),  format!("a{:^7o}",   4));
+
+    assert_eq!(v2s("$F\"a{:7!ib}\"   4.3456"),  format!("a{:7b}",    4));
+    assert_eq!(v2s("$F\"a{:<7!ib}\"  4.3456"),  format!("a{:<7b}",   4));
+    assert_eq!(v2s("$F\"a{:>7!ib}\"  4.3456"),  format!("a{:>7b}",   4));
+    assert_eq!(v2s("$F\"a{:^7!ib}\"  4.3456"),  format!("a{:^7b}",   4));
+
     assert_eq!(v2s("$F\"a{:07!i}\"   4.3456"),  format!("a{:07}",  4));
     assert_eq!(v2s("$F\"a{:<07!i}\"  4.3456"),  format!("a{:<07}", 4));
     assert_eq!(v2s("$F\"a{:>07!i}\"  4.3456"),  format!("a{:>07}", 4));

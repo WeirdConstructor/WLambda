@@ -5301,7 +5301,6 @@ For a reference of the matcher syntax see below.
 
 The match operation is a very versatile control flow operation.
 
-
 #### <a name="712-m-expr"></a>7.1.2 - $M _expr_
 
 This is a structure matcher expression. It will compile _expr_ into a structure

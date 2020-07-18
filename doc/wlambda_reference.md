@@ -5335,6 +5335,27 @@ reversed to the order in an operator expression.
 std:assert_str_eq v v2;
 ```
 
+## - String and Byte Vector Formatting
+
+WLambda comes with a built in functionality for string (and byte vector)
+formatting.  It works by creating a specialized formatting function from a
+given string literal at compile time with the `$F"..."` syntax, or a string at
+runtime with the `std:formatter _str_` function.
+
+The formatter syntax is documented in detail at [12.2 String Formatting
+Syntax](#122-string-formatting-syntax). It is basically the Rust `std::fmt`
+Syntax with a few extensions for WLambda data types and the dynamically typed
+nature of WLambda.
+
+This is a very simple example:
+
+```wlambda
+!x = "abc";
+!s = $F"x = {}" x;
+
+std:assert_eq s "x = abc";
+```
+
 ## <a name="7-data-structure-matchers-selectors-and-string-patternsregex"></a>7 - Data Structure Matchers, Selectors and String Patterns/Regex
 
 WLambda comes with a builtin DSL (domain specific language) for
@@ -7343,7 +7364,7 @@ The syntax for formatting is very similar to Rust's string formatting:
                                        This also supports proper
                                        escaping using '"' *)
                   | 'J', ['p']      (* JSON, optional pretty printed *)
-                  | '?', ['p']      (* print written WLambda representation,
+                  | 'w', ['p']      (* print written WLambda representation,
                                        optional pretty printed *)
                   | ''
                   ;
