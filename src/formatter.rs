@@ -163,7 +163,7 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
             VVal::None
         };
 
-    let cast_type =
+    let mut cast_type =
         if ps.consume_if_eq('!') {
             match ps.expect_some(ps.peek())? {
                 'i' => { ps.consume(); CastType::Int },
@@ -217,7 +217,10 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
     }
     m.set_key_str("alternate",  VVal::Bol(alternate)).unwrap();
     m.set_key_str("pad0",       VVal::Bol(pad0)).unwrap();
-    if precision.is_some() { m.set_key_str("precision", precision).unwrap(); }
+    if precision.is_some() {
+        m.set_key_str("precision", precision).unwrap();
+        cast_type = CastType::Flt;
+    }
     if width.is_some()     { m.set_key_str("width",     width).unwrap(); }
     m.set_key_str("cast_type", VVal::Int(cast_type as i64)).unwrap();
 
