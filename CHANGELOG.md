@@ -1,4 +1,4 @@
-0.6.2 (unreleased)
+0.6.2 (2020-07-20)
 ==================
 
 * Bugfix: Selectors for recursive `$S(**/..)` did not process node conditions
