@@ -38,7 +38,7 @@ fn parse_argument(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_count(ps: &mut State) -> Result<VVal, ParseError> {
-    if let Some(_) = ps.find_char_not_of('$', ".!") {
+    if ps.find_char_not_of('$', ".!").is_some() {
         parse_argument(ps)
     } else {
         let integer = ps.take_while(|c| c.is_digit(10));
@@ -246,7 +246,7 @@ fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, Pars
         } else {
             let arg = VVal::vec2(VVal::new_sym("index"),
                              VVal::Int(*implicit_index as i64));
-            *implicit_index = *implicit_index + 1;
+            *implicit_index += 1;
             was_implicit_idx = true;
             arg
         };
@@ -263,7 +263,7 @@ fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, Pars
         // There is some magic patching going on in parse_format_spec.
         // Not entirely clean. But it might get the job done for now.
         if was_implicit_idx && !arg_idx_prev.eqv(&arg_idx_after) {
-            *implicit_index = *implicit_index + 1;
+            *implicit_index += 1;
         }
     }
 
@@ -292,7 +292,7 @@ fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
                 } else {
                     ps.consume();
 
-                    if cur_text.len() > 0 {
+                    if !cur_text.is_empty() {
                         fmt.push(VVal::vec2(VVal::new_sym("text"),
                                             VVal::new_str(&cur_text)));
                         cur_text = String::new();
@@ -313,7 +313,7 @@ fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
         }
     }
 
-    if cur_text.len() > 0 {
+    if !cur_text.is_empty() {
         fmt.push(VVal::vec2(VVal::new_sym("text"), VVal::new_str_mv(cur_text)));
     }
 
@@ -406,16 +406,14 @@ pub fn compile_count(count: &VVal) -> CountNode {
     }
 }
 
+#[allow(clippy::many_single_char_names)]
 pub fn write_vval<F>(arg: &VVal, fs: &mut FormatState, ct: CastType, mut f: F) -> std::fmt::Result
     where F: FnMut(&mut FormatState, &VVal) -> std::fmt::Result
 {
     use crate::nvec::NVec;
 
-    match ct {
-        CastType::Written => {
-            return f(fs, &arg);
-        },
-        _ => {},
+    if let CastType::Written = ct {
+        return f(fs, &arg);
     }
 
     match arg {
@@ -611,6 +609,7 @@ pub fn compile_align_fun(fill: String, width: Option<CountNode>, align: i64) -> 
     }
 }
 
+#[allow(clippy::collapsible_if)]
 pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
     let width = fmt.get_key("width");
     let width : Option<CountNode> =

@@ -34,7 +34,7 @@ use std::cell::RefCell;
 
 thread_local! {
     static RAND_STATE: RefCell<SplitMix64> =
-        RefCell::new(SplitMix64::new(1234567890));
+        RefCell::new(SplitMix64::new(1_234_567_890));
 }
 
 pub fn srand(seed: i64) {

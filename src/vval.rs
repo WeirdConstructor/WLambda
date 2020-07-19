@@ -2111,6 +2111,7 @@ impl VVal {
     }
 
     #[inline]
+    #[allow(clippy::many_single_char_names)]
     pub fn vec4(a: VVal, b: VVal, c: VVal, d: VVal) -> VVal {
         let v = Self::vec();
         v.push(a);
@@ -2233,6 +2234,8 @@ impl VVal {
     }
 
     pub fn bytes_replace(&self, pat: &VVal, repl: &VVal) -> Self {
+        use std::cmp::Ordering;
+
         let mut bv = self.as_bytes();
         pat.with_bv_ref(|pat|
             repl.with_bv_ref(|repl| {
@@ -2242,33 +2245,29 @@ impl VVal {
                 let rlen = repl.len();
                 while i < len {
                     if bv[i..].starts_with(&pat[..]) {
+                        match plen.cmp(&rlen) {
+                            Ordering::Less => {
+                                let len_delta = rlen - plen;
+                                bv.resize(len + len_delta, 0);
+                                bv.copy_within((i + plen)..len, i + rlen);
+                                len += len_delta;
 
-                        if plen < rlen {
-                            let len_delta = rlen - plen;
-                            bv.resize(len + len_delta, 0);
-                            bv.copy_within((i + plen)..len, i + rlen);
-                            len += len_delta;
+                                bv[i..(rlen + i)].clone_from_slice(&repl[..rlen]);
 
-                            for j in 0..rlen {
-                                bv[i + j] = repl[j];
+                                i += rlen;
                             }
-                            i += rlen;
+                            Ordering::Greater => {
+                                let len_delta = plen - rlen;
+                                bv.copy_within((i + plen)..len, i + rlen);
+                                bv.resize(len - len_delta, 0);
+                                len -= len_delta;
 
-                        } else if plen > rlen {
-                            let len_delta = plen - rlen;
-                            bv.copy_within((i + plen)..len, i + rlen);
-                            bv.resize(len - len_delta, 0);
-                            len -= len_delta;
-
-                            for j in 0..rlen {
-                                bv[i + j] = repl[j];
+                                bv[i..(rlen + i)].clone_from_slice(&repl[..rlen]);
                             }
-
-                        } else {
-                            for j in 0..plen {
-                                bv[i + j] = repl[j];
+                            Ordering::Equal => {
+                                bv[i..(plen + i)].clone_from_slice(&repl[..plen]);
+                                i += plen;
                             }
-                            i += plen;
                         }
                     }
 
@@ -2629,12 +2628,8 @@ impl VVal {
         where T: FnMut(VVal, Option<VVal>) -> bool
     {
         if let VVal::Iter(i) = self {
-            loop {
-                if let Some((v, k)) = i.borrow_mut().next() {
-                    if !f(v, k) {
-                        break;
-                    }
-                } else {
+            while let Some((v, k)) = i.borrow_mut().next() {
+                if !f(v, k) {
                     break;
                 }
             }
@@ -3358,10 +3353,10 @@ impl VVal {
                     v.clone().with_value_or_iter_values(|v, _k| {
                         match list_add {
                             CollectionAdd::Push => {
-                                lst.borrow_mut().push(v.clone());
+                                lst.borrow_mut().push(v);
                             },
                             CollectionAdd::Unshift => {
-                                lst.borrow_mut().insert(0, v.clone());
+                                lst.borrow_mut().insert(0, v);
                             },
                         }
                         true

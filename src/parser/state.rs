@@ -311,7 +311,8 @@ impl State {
                 return None;
             }
         }
-        return op;
+
+        op
     }
 
     /// Tries to peek for an WLambda operator. Returns `None`

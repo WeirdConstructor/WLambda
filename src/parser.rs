@@ -1136,12 +1136,12 @@ fn get_op_binding_power(op: StrPart) -> (i32, i32) {
 fn reform_binop(op: VVal) -> VVal {
     match op.v_(0).get_syn() {
         Syntax::OpColAddL => {
-            op.unshift(op.v_(0).clone());
+            op.unshift(op.v_(0));
             op.set_syn_at(0, Syntax::Call);
             op
         },
         Syntax::OpColAddR => {
-            op.unshift(op.v_(0).clone());
+            op.unshift(op.v_(0));
             op.set_syn_at(0, Syntax::Call);
             op
         },
@@ -1368,6 +1368,7 @@ fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(call)
 }
 
+#[allow(clippy::unnecessary_unwrap)]
 fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     if ps.at_end() {
         return Err(ps.err(ParseErrorKind::EOF("assignment")));

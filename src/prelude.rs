@@ -9451,7 +9451,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 use std::time::SystemTime;
                 match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                     Ok(n)  => util::srand(n.as_nanos() as i64),
-                    Err(_) => util::srand(1234567890),
+                    Err(_) => util::srand(1_234_567_890),
                 }
             } else {
                 util::srand(env.arg(0).i());
@@ -9482,7 +9482,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 },
                 Err(_) =>
                     Err(StackAction::panic_msg(
-                        format!("SystemTime before UNIX EPOCH!")))
+                        "SystemTime before UNIX EPOCH!".to_string()))
             }
         }, Some(0), Some(1), false);
 
