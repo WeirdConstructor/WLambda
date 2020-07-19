@@ -5377,6 +5377,20 @@ Syntax](#132-string-formatting-syntax). It is basically the Rust `std::fmt`
 Syntax with a few extensions for WLambda data types and the dynamically typed
 nature of WLambda.
 
+The WLambda syntax for `$F` is: `$F string-literal`. This means, you can
+use any WLambda string literal after `$F`:
+
+```wlambda
+$F"...";        # normal string
+$F$b"...";      # byte vector
+$F$q/.../;      # normal string, quote syntax
+$F$Q"...";      # byte vector quote syntax
+$F$code{ };     # code block string
+```
+
+(Please note, that `$code{ ... }` is not as useful in this context, because
+the formatter placeholders usually are not valid WLambda syntax.)
+
 This is a very simple example:
 
 ```wlambda
