@@ -166,9 +166,9 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
     let mut cast_type =
         if ps.consume_if_eq('!') {
             match ps.expect_some(ps.peek())? {
-                'i' => { ps.consume(); CastType::Int },
-                'f' => { ps.consume(); CastType::Flt },
-                'w' => { ps.consume(); CastType::Written },
+                'i' => { ps.consume(); Some(CastType::Int) },
+                'f' => { ps.consume(); Some(CastType::Flt) },
+                'w' => { ps.consume(); Some(CastType::Written) },
                 c => {
                     return Err(ps.err(
                         ParseErrorKind::BadFormat(
@@ -176,7 +176,7 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
                 }
             }
         } else {
-            CastType::Str
+            None
         };
 
     let m = VVal::map();
@@ -217,12 +217,20 @@ fn parse_format_spec(ps: &mut State, arg: &VVal) -> Result<VVal, ParseError> {
     }
     m.set_key_str("alternate",  VVal::Bol(alternate)).unwrap();
     m.set_key_str("pad0",       VVal::Bol(pad0)).unwrap();
+    if width.is_some() {
+        m.set_key_str("width", width).unwrap();
+    }
     if precision.is_some() {
         m.set_key_str("precision", precision).unwrap();
-        cast_type = CastType::Flt;
+        if cast_type.is_none() {
+            cast_type = Some(CastType::Flt);
+        }
     }
-    if width.is_some()     { m.set_key_str("width",     width).unwrap(); }
-    m.set_key_str("cast_type", VVal::Int(cast_type as i64)).unwrap();
+    if let Some(ct) = cast_type {
+        m.set_key_str("cast_type", VVal::Int(ct as i64)).unwrap();
+    } else {
+        m.set_key_str("cast_type", VVal::Int(CastType::Str as i64)).unwrap();
+    }
 
     Ok(m)
 }
