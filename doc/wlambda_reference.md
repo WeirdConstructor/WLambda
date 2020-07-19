@@ -57,9 +57,10 @@ Smalltalk, LISP and Perl.
   - [3.3](#33-error-values-e-expr-or-error-expr) Error values: `$e expr` or `$error expr`
     - [3.3.1](#331--label-value) _? [_label_] _value_
     - [3.3.2](#332-unwrap-value) unwrap _value_
-    - [3.3.3](#333-onerror-handler-maybe-error-value) on\_error _handler_ _maybe-error-value_
-    - [3.3.4](#334-iserr-value) is\_err _value_
-    - [3.3.5](#335-errortostr-value) error\_to\_str _value_
+    - [3.3.3](#333-unwraperr-error-value) unwrap\_err _error-value_
+    - [3.3.4](#334-onerror-handler-maybe-error-value) on\_error _handler_ _maybe-error-value_
+    - [3.3.5](#335-iserr-value) is\_err _value_
+    - [3.3.6](#336-errortostr-value) error\_to\_str _value_
   - [3.4](#34-booleans) Booleans
     - [3.4.1](#341-isbool-any-value) is\_bool _any-value_
     - [3.4.2](#342-bool-any-value) bool _any-value_
@@ -111,6 +112,9 @@ Smalltalk, LISP and Perl.
   - [3.7](#37-numeric-functions) Numeric Functions
     - [3.7.1](#371-stdnumabs-number) std:num:abs _number_
     - [3.7.2](#372-stdnumsignum-number) std:num:signum _number_
+    - [3.7.3](#373-stdnuminttoclosedopen01-integer) std:num:int\_to\_closed\_open01 _integer_
+    - [3.7.4](#374-stdnuminttoopen01-integer) std:num:int\_to\_open01 _integer_
+    - [3.7.5](#375-stdnuminttoopenclosed01-integer) std:num:int\_to\_open\_closed01 _integer_
   - [3.8](#38-numerical-mathematical-vectors) Numerical Mathematical Vectors
     - [3.8.1](#381-vector-conversions) Vector Conversions
     - [3.8.2](#382-vector-component-access) Vector Component Access
@@ -168,6 +172,10 @@ Smalltalk, LISP and Perl.
     - [3.10.2](#3102-byte-conversion-functions) Byte Conversion Functions
     - [3.10.3](#3103-isbytes-value) is\_bytes _value_
     - [3.10.4](#3104-stdbytesreplace-byte-vector-pattern-replacement) std:bytes:replace _byte-vector_ _pattern_ _replacement_
+    - [3.10.5](#3105-stdbytesfromhex-string-with-hex-chars) std:bytes:from\_hex _string-with-hex-chars_
+    - [3.10.6](#3106-stdbytesfromvec-vector-of-ints) std:bytes:from\_vec _vector-of-ints_
+    - [3.10.7](#3107-stdbytestohex-byte-vector) std:bytes:to\_hex _byte-vector_
+    - [3.10.8](#3108-stdbytestovec-byte-vector) std:bytes:to\_vec _byte-vector_
   - [3.11](#311-symbols) Symbols
     - [3.11.1](#3111-sym-value) sym _value_
     - [3.11.2](#3112-issym-value) is\_sym _value_
@@ -272,108 +280,116 @@ Smalltalk, LISP and Perl.
   - [6.5](#65-collection-addition-operators--and-) Collection Addition Operators +> and <+
     - [6.5.1](#651--collection-a-) +> _collection_ _a_ ...
     - [6.5.2](#652--collection-a-) <+ _collection_ _a_ ...
-- [7](#7-data-structure-matchers-selectors-and-string-patternsregex) Data Structure Matchers, Selectors and String Patterns/Regex
-  - [7.1](#71-data-structure-matcher) Data Structure Matcher
-    - [7.1.1](#711-match-value-expr-match-pair1--default-expr) match _value-expr_ _match-pair1_ ... [_default-expr_]
-    - [7.1.2](#712-m-expr) $M _expr_
-    - [7.1.3](#713-data-structure-matcher-syntax) Data Structure Matcher Syntax
-  - [7.2](#72-data-structure-selectors-s) Data Structure Selectors `$S(...)`
-    - [7.2.1](#721-stdselector-string) std:selector _string_
-    - [7.2.2](#722-selector-and-wlambda-regex-syntax) Selector and WLambda Regex Syntax:
-  - [7.3](#73-string-patterns-regex-r) String Patterns (Regex) `$r/.../`
-    - [7.3.1](#731-pattern-syntax-overview) Pattern Syntax Overview
-    - [7.3.2](#732-standard-regular-expressions) Standard Regular Expressions
-    - [7.3.3](#733-stdpattern-string) std:pattern _string_
-- [8](#8-modules) Modules
-  - [8.1](#81-export) export
-  - [8.2](#82-import) import
-- [9](#9-core-library) Core Library
-    - [9.0.1](#901-type-value) type _value_
-    - [9.0.2](#902-len-value) len _value_
-    - [9.0.3](#903-panic-message) panic _message_
-- [10](#10-standard-library) Standard Library
-    - [10.0.1](#1001-stdshuffle-randfunc-vec) std:shuffle _rand\_func_ _vec_
-    - [10.0.2](#1002-stddelete-vector-or-map-index-or-key) std:delete _vector-or-map_ _index-or-key_
-    - [10.0.3](#1003-stdrefid-value) std:ref\_id _value_
-    - [10.0.4](#1004-stdcopy-vecormap) std:copy _vec\_or\_map_
-    - [10.0.5](#1005-stdvalues-collection-or-iter) std:values _collection-or-iter_
-    - [10.0.6](#1006-stdkeys-collection-or-iter) std:keys _collection-or-iter_
-    - [10.0.7](#1007-stdsort-comparefun-vec) std:sort [_compare\_fun_] _vec_
-    - [10.0.8](#1008-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
-    - [10.0.9](#1009-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
-    - [10.0.10](#10010-stddisplayln-arg1-) std:displayln _arg1_ ...
-    - [10.0.11](#10011-debug-arg1-) $DEBUG _arg1_ ...
-    - [10.0.12](#10012-stdwriteln-arg1-) std:writeln _arg1_ ...
-    - [10.0.13](#10013-stdeval-code-string) std:eval _code-string_
-    - [10.0.14](#10014-stdassert-bool-message) std:assert _bool_ \[_message_]
-    - [10.0.15](#10015-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
-    - [10.0.16](#10016-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
-    - [10.0.17](#10017-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
-  - [10.1](#101-io) I/O
-    - [10.1.1](#1011-stdiofilereadtext-filename) std:io:file:read\_text _filename_
-    - [10.1.2](#1012-stdiofileread-filename) std:io:file:read _filename_
-    - [10.1.3](#1013-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
-    - [10.1.4](#1014-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
-  - [10.2](#102-threading) Threading
-    - [10.2.1](#1021-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
-    - [10.2.2](#1022-stdthreadsleep-duration) std:thread:sleep _duration_
-    - [10.2.3](#1023-thread-handle-api) Thread Handle API
-      - [10.2.3.1](#10231-thdljoin) thdl.join
-      - [10.2.3.2](#10232-thdlrecvready) thdl.recv\_ready
-    - [10.2.4](#1024-atom-api) Atom API
-      - [10.2.4.1](#10241-stdsyncatomnew-value) std:sync:atom:new _value_
-      - [10.2.4.2](#10242-atomread) atom.read
-      - [10.2.4.3](#10243-atomwrite-value) atom.write _value_
-      - [10.2.4.4](#10244-atomswap-value) atom.swap _value_
-    - [10.2.5](#1025-atom-value-slot-api) Atom Value Slot API
-      - [10.2.5.1](#10251-stdsyncslotnew) std:sync:slot:new
-      - [10.2.5.2](#10252-atomslotsend-value) atom\_slot.send _value_
-      - [10.2.5.3](#10253-atomslotrecv) atom\_slot.recv
-      - [10.2.5.4](#10254-atomslottryrecv) atom\_slot.try\_recv
-      - [10.2.5.5](#10255-atomslotrecvtimeout-duration) atom\_slot.recv\_timeout _duration_
-      - [10.2.5.6](#10256-atomslotcheckempty) atom\_slot.check\_empty
-      - [10.2.5.7](#10257-atomslotwaitempty) atom\_slot.wait\_empty
-      - [10.2.5.8](#10258-atomslotwaitemptytimeout-duration) atom\_slot.wait\_empty\_timeout _duration_
-    - [10.2.6](#1026-channel-api) Channel API
-      - [10.2.6.1](#10261-stdsyncmpscnew) std:sync:mpsc:new
-      - [10.2.6.2](#10262-channelsend-value) channel.send _value_
-      - [10.2.6.3](#10263-channelrecv) channel.recv
-      - [10.2.6.4](#10264-channeltryrecv) channel.try\_recv
-      - [10.2.6.5](#10265-channelrecvtimeout-duration) channel.recv\_timeout _duration_
-- [11](#11-optional-standard-library) Optional Standard Library
-  - [11.1](#111-serialization) serialization
-    - [11.1.1](#1111-stdserwlambda-arg) std:ser:wlambda _arg_
-    - [11.1.2](#1112-stdserjson-data-nopretty) std:ser:json _data_ \[_no\_pretty_]
-    - [11.1.3](#1113-stddeserjson-string) std:deser:json _string_
-    - [11.1.4](#1114-stdsercsv-fielddelim-rowseparator-escapeall-table) std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
-    - [11.1.5](#1115-stddesercsv-fielddelim-rowseparator-data) std:deser:csv _field\_delim_ _row\_separator_ _data_
-    - [11.1.6](#1116-stdsermsgpack-data) std:ser:msgpack _data_
-    - [11.1.7](#1117-stddesermsgpack-bytes) std:deser:msgpack _bytes_
-  - [11.2](#112-regex) regex
-  - [11.3](#113-chrono) chrono
-    - [11.3.1](#1131-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
-  - [11.4](#114-color-conversion) color conversion
-    - [11.4.1](#1141-stdvrgb2hsv-color-vector) std:v:rgb2hsv _color-vector_
-    - [11.4.2](#1142-stdvhsv2rgb-color-vector) std:v:hsv2rgb _color-vector_
-    - [11.4.3](#1143-stdvrgba2hex-color-vector) std:v:rgba2hex _color-vector_
-    - [11.4.4](#1144-stdvhex2rgbaf-string) std:v:hex2rgba\_f _string_
-    - [11.4.5](#1145-stdvhex2rgbai-string) std:v:hex2rgba\_i _string_
-    - [11.4.6](#1146-stdvhex2hsvai-string) std:v:hex2hsva\_i _string_
-    - [11.4.7](#1147-stdvhex2hsvaf-string) std:v:hex2hsva\_f _string_
-  - [11.5](#115-hash) hash
-    - [11.5.1](#1151-stdhashfnv1a-arg1-) std:hash:fnv1a _arg1_ ...
-  - [11.6](#116-rand) rand
-    - [11.6.1](#1161-stdrandsplitmix64new) std:rand:split\_mix64\_new
-    - [11.6.2](#1162-stdrandsplitmix64newfrom-seed) std:rand:split\_mix64\_new\_from _seed_
-    - [11.6.3](#1163-stdrandsplitmix64next-smstate-count) std:rand:split\_mix64\_next _sm\_state_ \[_count_]
-    - [11.6.4](#1164-stdrandsplitmix64nextopen01-smstate-count) std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
-  - [11.7](#117-utility-functions) Utility Functions
-    - [11.7.1](#1171-stddumpupvals-function) std:dump\_upvals _function_
-    - [11.7.2](#1172-stdwlambdaversion) std:wlambda:version
-    - [11.7.3](#1173-stdwlambdasizes) std:wlambda:sizes
-- [12](#12-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
-  - [12.1](#121-special-forms) Special Forms
-  - [12.2](#122-string-formatting-syntax) String Formatting Syntax
+- [7](#7-string-and-byte-vector-formatting) String and Byte Vector Formatting
+    - [7.0.1](#701-stdformatter-format-string) std:formatter _format-string_
+  - [7.1](#71-formatting-numbers) Formatting Numbers
+- [8](#8-data-structure-matchers-selectors-and-string-patternsregex) Data Structure Matchers, Selectors and String Patterns/Regex
+  - [8.1](#81-data-structure-matcher) Data Structure Matcher
+    - [8.1.1](#811-match-value-expr-match-pair1--default-expr) match _value-expr_ _match-pair1_ ... [_default-expr_]
+    - [8.1.2](#812-m-expr) $M _expr_
+    - [8.1.3](#813-data-structure-matcher-syntax) Data Structure Matcher Syntax
+  - [8.2](#82-data-structure-selectors-s) Data Structure Selectors `$S(...)`
+    - [8.2.1](#821-stdselector-string) std:selector _string_
+    - [8.2.2](#822-selector-and-wlambda-regex-syntax) Selector and WLambda Regex Syntax:
+  - [8.3](#83-string-patterns-regex-r) String Patterns (Regex) `$r/.../`
+    - [8.3.1](#831-pattern-syntax-overview) Pattern Syntax Overview
+    - [8.3.2](#832-standard-regular-expressions) Standard Regular Expressions
+    - [8.3.3](#833-stdpattern-string) std:pattern _string_
+- [9](#9-modules) Modules
+  - [9.1](#91-export) export
+  - [9.2](#92-import) import
+- [10](#10-core-library) Core Library
+    - [10.0.1](#1001-type-value) type _value_
+    - [10.0.2](#1002-len-value) len _value_
+    - [10.0.3](#1003-panic-message) panic _message_
+- [11](#11-standard-library) Standard Library
+    - [11.0.1](#1101-stdshuffle-randfunc-vec) std:shuffle _rand\_func_ _vec_
+    - [11.0.2](#1102-stddelete-vector-or-map-index-or-key) std:delete _vector-or-map_ _index-or-key_
+    - [11.0.3](#1103-stdrefid-value) std:ref\_id _value_
+    - [11.0.4](#1104-stdcopy-vecormap) std:copy _vec\_or\_map_
+    - [11.0.5](#1105-stdvalues-collection-or-iter) std:values _collection-or-iter_
+    - [11.0.6](#1106-stdkeys-collection-or-iter) std:keys _collection-or-iter_
+    - [11.0.7](#1107-stdsort-comparefun-vec) std:sort [_compare\_fun_] _vec_
+    - [11.0.8](#1108-stdcmpnumasc-a-b) std:cmp:num:asc _a_ _b_
+    - [11.0.9](#1109-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
+    - [11.0.10](#11010-stdcmpstrasc-a-b) std:cmp:str:asc _a_ _b_
+    - [11.0.11](#11011-stdcmpstrdesc-a-b) std:cmp:str:desc _a_ _b_
+    - [11.0.12](#11012-stddisplayln-arg1-) std:displayln _arg1_ ...
+    - [11.0.13](#11013-debug-arg1-) $DEBUG _arg1_ ...
+    - [11.0.14](#11014-stdwriteln-arg1-) std:writeln _arg1_ ...
+    - [11.0.15](#11015-stdeval-code-string) std:eval _code-string_
+    - [11.0.16](#11016-stdassert-bool-message) std:assert _bool_ \[_message_]
+    - [11.0.17](#11017-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
+    - [11.0.18](#11018-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
+    - [11.0.19](#11019-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+    - [11.0.20](#11020-stdmeasuretime-unit-function) std:measure\_time _unit_ _function_
+  - [11.1](#111-io) I/O
+    - [11.1.1](#1111-stdiofilereadtext-filename) std:io:file:read\_text _filename_
+    - [11.1.2](#1112-stdiofileread-filename) std:io:file:read _filename_
+    - [11.1.3](#1113-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
+    - [11.1.4](#1114-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
+  - [11.2](#112-file-system) File System
+    - [11.2.1](#1121-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
+  - [11.3](#113-threading) Threading
+    - [11.3.1](#1131-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
+    - [11.3.2](#1132-stdthreadsleep-duration) std:thread:sleep _duration_
+    - [11.3.3](#1133-thread-handle-api) Thread Handle API
+      - [11.3.3.1](#11331-thdljoin) thdl.join
+      - [11.3.3.2](#11332-thdlrecvready) thdl.recv\_ready
+    - [11.3.4](#1134-atom-api) Atom API
+      - [11.3.4.1](#11341-stdsyncatomnew-value) std:sync:atom:new _value_
+      - [11.3.4.2](#11342-atomread) atom.read
+      - [11.3.4.3](#11343-atomwrite-value) atom.write _value_
+      - [11.3.4.4](#11344-atomswap-value) atom.swap _value_
+    - [11.3.5](#1135-atom-value-slot-api) Atom Value Slot API
+      - [11.3.5.1](#11351-stdsyncslotnew) std:sync:slot:new
+      - [11.3.5.2](#11352-atomslotsend-value) atom\_slot.send _value_
+      - [11.3.5.3](#11353-atomslotrecv) atom\_slot.recv
+      - [11.3.5.4](#11354-atomslottryrecv) atom\_slot.try\_recv
+      - [11.3.5.5](#11355-atomslotrecvtimeout-duration) atom\_slot.recv\_timeout _duration_
+      - [11.3.5.6](#11356-atomslotcheckempty) atom\_slot.check\_empty
+      - [11.3.5.7](#11357-atomslotwaitempty) atom\_slot.wait\_empty
+      - [11.3.5.8](#11358-atomslotwaitemptytimeout-duration) atom\_slot.wait\_empty\_timeout _duration_
+    - [11.3.6](#1136-channel-api) Channel API
+      - [11.3.6.1](#11361-stdsyncmpscnew) std:sync:mpsc:new
+      - [11.3.6.2](#11362-channelsend-value) channel.send _value_
+      - [11.3.6.3](#11363-channelrecv) channel.recv
+      - [11.3.6.4](#11364-channeltryrecv) channel.try\_recv
+      - [11.3.6.5](#11365-channelrecvtimeout-duration) channel.recv\_timeout _duration_
+- [12](#12-optional-standard-library) Optional Standard Library
+  - [12.1](#121-serialization) serialization
+    - [12.1.1](#1211-stdserwlambda-arg) std:ser:wlambda _arg_
+    - [12.1.2](#1212-stdserjson-data-nopretty) std:ser:json _data_ \[_no\_pretty_]
+    - [12.1.3](#1213-stddeserjson-string) std:deser:json _string_
+    - [12.1.4](#1214-stdsercsv-fielddelim-rowseparator-escapeall-table) std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
+    - [12.1.5](#1215-stddesercsv-fielddelim-rowseparator-data) std:deser:csv _field\_delim_ _row\_separator_ _data_
+    - [12.1.6](#1216-stdsermsgpack-data) std:ser:msgpack _data_
+    - [12.1.7](#1217-stddesermsgpack-bytes) std:deser:msgpack _bytes_
+  - [12.2](#122-regex) regex
+  - [12.3](#123-chrono) chrono
+    - [12.3.1](#1231-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
+  - [12.4](#124-color-conversion) color conversion
+    - [12.4.1](#1241-stdvrgb2hsv-color-vector) std:v:rgb2hsv _color-vector_
+    - [12.4.2](#1242-stdvhsv2rgb-color-vector) std:v:hsv2rgb _color-vector_
+    - [12.4.3](#1243-stdvrgba2hex-color-vector) std:v:rgba2hex _color-vector_
+    - [12.4.4](#1244-stdvhex2rgbaf-string) std:v:hex2rgba\_f _string_
+    - [12.4.5](#1245-stdvhex2rgbai-string) std:v:hex2rgba\_i _string_
+    - [12.4.6](#1246-stdvhex2hsvai-string) std:v:hex2hsva\_i _string_
+    - [12.4.7](#1247-stdvhex2hsvaf-string) std:v:hex2hsva\_f _string_
+  - [12.5](#125-hash) hash
+    - [12.5.1](#1251-stdhashfnv1a-arg1-) std:hash:fnv1a _arg1_ ...
+  - [12.6](#126-rand) rand
+    - [12.6.1](#1261-stdrandsplitmix64new) std:rand:split\_mix64\_new
+    - [12.6.2](#1262-stdrandsplitmix64newfrom-seed) std:rand:split\_mix64\_new\_from _seed_
+    - [12.6.3](#1263-stdrandsplitmix64next-smstate-count) std:rand:split\_mix64\_next _sm\_state_ \[_count_]
+    - [12.6.4](#1264-stdrandsplitmix64nextopen01-smstate-count) std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
+  - [12.7](#127-utility-functions) Utility Functions
+    - [12.7.1](#1271-stddumpupvals-function) std:dump\_upvals _function_
+    - [12.7.2](#1272-stdwlambdaversion) std:wlambda:version
+    - [12.7.3](#1273-stdwlambdasizes) std:wlambda:sizes
+- [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
+  - [13.1](#131-special-forms) Special Forms
+  - [13.2](#132-string-formatting-syntax) String Formatting Syntax
 
 -----
 
@@ -1511,7 +1527,7 @@ match (std:eval $code { unwrap $o() })
     { std:assert $false };
 ```
 
-#### - unwrap\_err _error-value_
+#### <a name="333-unwraperr-error-value"></a>3.3.3 - unwrap\_err _error-value_
 
 Unwraps an error value. Does panic if _error-value_ is not an error value.
 If it is an error value, the inner wrapped value is returned.
@@ -1522,7 +1538,7 @@ If it is an error value, the inner wrapped value is returned.
 std:assert_eq v "Some Error";
 ```
 
-#### <a name="333-onerror-handler-maybe-error-value"></a>3.3.3 - on\_error _handler_ _maybe-error-value_
+#### <a name="334-onerror-handler-maybe-error-value"></a>3.3.4 - on\_error _handler_ _maybe-error-value_
 
 The first parameter to `on_error` should be a _handler_ function,
 which will be called with four parameters.
@@ -1563,7 +1579,7 @@ std:assert_eq x "this failed!";
 std:assert_eq ret "all ok!";
 ```
 
-#### <a name="334-iserr-value"></a>3.3.4 - is\_err _value_
+#### <a name="335-iserr-value"></a>3.3.5 - is\_err _value_
 
 Returns `$true` if _value_ is an error value.
 
@@ -1573,7 +1589,7 @@ std:assert ~ not ~ is_err $none;
 std:assert ~ not ~ is_err 10;
 ```
 
-#### <a name="335-errortostr-value"></a>3.3.5 - error\_to\_str _value_
+#### <a name="336-errortostr-value"></a>3.3.6 - error\_to\_str _value_
 
 This function accepts an error value in contrast to `str`, but does
 not panic but transform the error value into its string representation.
@@ -1985,7 +2001,7 @@ std:assert_eq (std:num:signum -4.0)  -1.0;
 std:assert_eq (std:num:signum  4.0)   1.0;
 ```
 
-#### - std:num:int\_to\_closed\_open01 _integer_
+#### <a name="373-stdnuminttoclosedopen01-integer"></a>3.7.3 - std:num:int\_to\_closed\_open01 _integer_
 
 Transforms the given 64-Bit _integer_ into a number in the range `0.0` to `1.0`.
 Inclusive `0.0`, exclusive `1.0`. This function is mainly useful if you generated
@@ -1996,7 +2012,7 @@ std:assert_rel_eq (std:num:int_to_closed_open01 0)  0.0         0.00000001;
 std:assert_rel_eq (std:num:int_to_closed_open01 -1) 0.999999999 0.00000001;
 ```
 
-#### - std:num:int\_to\_open01 _integer_
+#### <a name="374-stdnuminttoopen01-integer"></a>3.7.4 - std:num:int\_to\_open01 _integer_
 
 Transforms the given 64-Bit _integer_ into a number in the range `0.0` to `1.0`.
 Exclusive `0.0`, exclusive `1.0`. This function is mainly useful if you generated
@@ -2007,7 +2023,7 @@ std:assert (std:num:int_to_open01 0)  > 0.0;
 std:assert (std:num:int_to_open01 -1) < 1.0;
 ```
 
-#### - std:num:int\_to\_open\_closed01 _integer_
+#### <a name="375-stdnuminttoopenclosed01-integer"></a>3.7.5 - std:num:int\_to\_open\_closed01 _integer_
 
 Transforms the given 64-Bit _integer_ into a number in the range `0.0` to `1.0`.
 Inclusive `0.0`, inclusive `1.0`. This function is mainly useful if you generated
@@ -3055,7 +3071,7 @@ std:assert_eq
     $b"XXX\xFF\xFF\xFF\xFFOOO";
 ```
 
-#### - std:bytes:from\_hex _string-with-hex-chars_
+#### <a name="3105-stdbytesfromhex-string-with-hex-chars"></a>3.10.5 - std:bytes:from\_hex _string-with-hex-chars_
 
 This function decodes a string of hex characters into a byte vector.
 
@@ -3064,7 +3080,7 @@ This function decodes a string of hex characters into a byte vector.
 std:assert_eq bv $b"byte";
 ```
 
-#### - std:bytes:from\_vec _vector-of-ints_
+#### <a name="3106-stdbytesfromvec-vector-of-ints"></a>3.10.6 - std:bytes:from\_vec _vector-of-ints_
 
 Decodes a vector of integers in the range 0-255 into a byte vector. If an
 integer is larger than 255 don't expect a sensible result. But it will most
@@ -3076,7 +3092,7 @@ std:assert_eq
     $b"\x01\x02\x03byte";
 ```
 
-#### - std:bytes:to\_hex _byte-vector_
+#### <a name="3107-stdbytestohex-byte-vector"></a>3.10.7 - std:bytes:to\_hex _byte-vector_
 
 Converts the given byte vector to a string of hex encoded bytes.
 
@@ -3086,7 +3102,7 @@ std:assert_eq
     "62797465";
 ```
 
-#### - std:bytes:to\_vec _byte-vector_
+#### <a name="3108-stdbytestovec-byte-vector"></a>3.10.8 - std:bytes:to\_vec _byte-vector_
 
 Converts the given byte vector to a vector of integers in the range 0-255.
 
@@ -4265,7 +4281,7 @@ whereas with indexing approach, the opposite is true.
 
 ### <a name="43-value-matching-with---match-value-expr-"></a>4.3 - Value matching with - match _value-expr_ ...
 
-See also [7.1.1](#711-match-value-expr-match-pair1--default-expr) for a more
+See also [8.1.1](#811-match-value-expr-match-pair1--default-expr) for a more
 comprehensive discussion of `match` and structure matchers.
 
 `match` allows for easily select from a set of values:
@@ -5335,7 +5351,7 @@ reversed to the order in an operator expression.
 std:assert_str_eq v v2;
 ```
 
-## - String and Byte Vector Formatting
+## <a name="7-string-and-byte-vector-formatting"></a>7 - String and Byte Vector Formatting
 
 WLambda comes with a built in functionality for string (and byte vector)
 formatting.  It works by creating a specialized formatting function from a
@@ -5343,7 +5359,7 @@ given string literal at compile time with the `$F"..."` syntax, or a string at
 runtime with the `std:formatter _str_` function.
 
 The formatter syntax is documented in detail at [12.2 String Formatting
-Syntax](#122-string-formatting-syntax). It is basically the Rust `std::fmt`
+Syntax](#132-string-formatting-syntax). It is basically the Rust `std::fmt`
 Syntax with a few extensions for WLambda data types and the dynamically typed
 nature of WLambda.
 
@@ -5376,7 +5392,7 @@ std:assert_eq ($F"x={:!w}" $&&$[1, 2, 3, 4]) "x=$&&$[1,2,3,4]";
 std:assert_eq ($F"x={}"   $&&$[1, 2, 3, 4]) "x=$[1,2,3,4]";
 ```
 
-#### - std:formatter _format-string_
+#### <a name="701-stdformatter-format-string"></a>7.0.1 - std:formatter _format-string_
 
 Returns a formatting function that takes exactly the arguments specified
 in the _format-string_. If the format syntax is wrong, an error is returned.
@@ -5391,7 +5407,7 @@ because `$F` only allows string/byte vector literals.
 std:assert_eq (fmt_fun 3.43554 1.2323) "1.2323 [  3.44]";
 ```
 
-### - Formatting Numbers
+### <a name="71-formatting-numbers"></a>7.1 - Formatting Numbers
 
 Number formatting, that is integers, float and numerical vectors, require an
 extension of the formatting syntax. You need to specify whether an integer
@@ -5444,7 +5460,7 @@ std:assert_eq ($F "{:<11!ib}" 321)  "101000001  ";
 std:assert_eq ($F "{:011!ib}" 321)  "00101000001";
 ```
 
-## <a name="7-data-structure-matchers-selectors-and-string-patternsregex"></a>7 - Data Structure Matchers, Selectors and String Patterns/Regex
+## <a name="8-data-structure-matchers-selectors-and-string-patternsregex"></a>8 - Data Structure Matchers, Selectors and String Patterns/Regex
 
 WLambda comes with a builtin DSL (domain specific language) for
 shallow data structure matches and deep data structure selection and regular expression (regex) pattern
@@ -5466,7 +5482,7 @@ For an in depth description of the _selector_ and _pattern_ syntax
 please refer to the [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
 in the wlambda::selector module.
 
-### <a name="71-data-structure-matcher"></a>7.1 - Data Structure Matcher
+### <a name="81-data-structure-matcher"></a>8.1 - Data Structure Matcher
 
 This is probably one of the most convenient matching features of WLambda.
 While selectors (`$S[a / * / b]`) allow searching deep into data structures,
@@ -5477,12 +5493,12 @@ match (commonly used in an if expression).
 
 For a reference of the matcher syntax see below.
 
-#### <a name="711-match-value-expr-match-pair1--default-expr"></a>7.1.1 - match _value-expr_ _match-pair1_ ... [_default-expr_]
+#### <a name="811-match-value-expr-match-pair1--default-expr"></a>8.1.1 - match _value-expr_ _match-pair1_ ... [_default-expr_]
 
 The match operation is a very versatile control flow operation.
 
 
-#### <a name="712-m-expr"></a>7.1.2 - $M _expr_
+#### <a name="812-m-expr"></a>8.1.2 - $M _expr_
 
 This is a structure matcher expression. It will compile _expr_ into a structure
 matcher function. The reslting function will match it's first argument agianst
@@ -5502,7 +5518,7 @@ a data structure in an if statement:
 };
 ```
 
-#### <a name="713-data-structure-matcher-syntax"></a>7.1.3 - Data Structure Matcher Syntax
+#### <a name="813-data-structure-matcher-syntax"></a>8.1.3 - Data Structure Matcher Syntax
 
 This the the compiletime syntax that is understood by the
 structure matchers that are used by `$M ...` and `match`.
@@ -5535,13 +5551,13 @@ structure matchers that are used by `$M ...` and `match`.
 | `$n`                   | Matches $none. |
 | literal values         | Literal values like booleans, strings, symbols and numbers match their value. |
 
-### <a name="72-data-structure-selectors-s"></a>7.2 - Data Structure Selectors `$S(...)`
+### <a name="82-data-structure-selectors-s"></a>8.2 - Data Structure Selectors `$S(...)`
 
 This section shows how data structure selectors can be used.
 
 TODO
 
-#### <a name="721-stdselector-string"></a>7.2.1 - std:selector _string_
+#### <a name="821-stdselector-string"></a>8.2.1 - std:selector _string_
 
 Parses the given _string_ as WLambda data structure selector and returns
 a function that takes a data structure as first argument. That function will
@@ -5563,7 +5579,7 @@ generating the structure pattern function at compile time.
 };
 ```
 
-#### <a name="722-selector-and-wlambda-regex-syntax"></a>7.2.2 - Selector and WLambda Regex Syntax:
+#### <a name="822-selector-and-wlambda-regex-syntax"></a>8.2.2 - Selector and WLambda Regex Syntax:
 
 ```ebnf
     (* NOTE: Whitespace is not part of a pattern in most places. This means
@@ -5686,7 +5702,7 @@ generating the structure pattern function at compile time.
                 ;
 ```
 
-### <a name="73-string-patterns-regex-r"></a>7.3 - String Patterns (Regex) `$r/.../`
+### <a name="83-string-patterns-regex-r"></a>8.3 - String Patterns (Regex) `$r/.../`
 
 This section shows how to use the builtin pattern regex engine
 in WLambda. You can embed patterns directly in your WLambda source
@@ -5743,10 +5759,10 @@ the results of the latest match that was exectuted:
 std:assert_eq res "//\\/";
 ```
 
-#### <a name="731-pattern-syntax-overview"></a>7.3.1 - Pattern Syntax Overview
+#### <a name="831-pattern-syntax-overview"></a>8.3.1 - Pattern Syntax Overview
 
 While
-[Selector and WLambda Regex Syntax](#722-selector-and-wlambda-regex-syntax)
+[Selector and WLambda Regex Syntax](#822-selector-and-wlambda-regex-syntax)
 describes the pattern syntax in detail,
 here is the WLambda pattern regex syntax in a nutshell:
 
@@ -5776,14 +5792,14 @@ here is the WLambda pattern regex syntax in a nutshell:
 | `$&L`         | Transforms the input string for the following pattern matching parts to lowercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
 | `$&U`         | Transforms the input string for the following pattern matching parts to uppercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
 
-#### <a name="732-standard-regular-expressions"></a>7.3.2 - Standard Regular Expressions
+#### <a name="832-standard-regular-expressions"></a>8.3.2 - Standard Regular Expressions
 
 Please note that WLambda can optionally be compiled with the `regex` crate,
 which implements a more common syntax for regular expressions.
 Please refer to the functions `std:re:match` in the WLambda standard library
 for this.
 
-#### <a name="733-stdpattern-string"></a>7.3.3 - std:pattern _string_
+#### <a name="833-stdpattern-string"></a>8.3.3 - std:pattern _string_
 
 Compiles the regex pattern _string_ to a function just like `$r/.../` would do.
 Useful for composing WLambda patterns at runtime:
@@ -5802,9 +5818,9 @@ Returns an error if the syntax failes to parse as pattern:
 std:assert_eq $i(0, 11)[err] "bad pattern";
 ```
 
-## <a name="8-modules"></a>8 - Modules
+## <a name="9-modules"></a>9 - Modules
 
-### <a name="81-export"></a>8.1 - export
+### <a name="91-export"></a>9.1 - export
 
 ```wlambda
 
@@ -5833,7 +5849,7 @@ Alternatively make the helper a strong reference:
 !@export doit = { helper 10 };
 ```
 
-### <a name="82-import"></a>8.2 - import
+### <a name="92-import"></a>9.2 - import
 
 ```wlambda
 
@@ -5856,13 +5872,13 @@ std:push v 20;
 std:assert_eq (str v) "$[10,20]";
 ```
 
-## <a name="9-core-library"></a>9 - Core Library
+## <a name="10-core-library"></a>10 - Core Library
 
 This library contains all the core functions which belong to the
 core of the WLambda Programming Language. These functions can be seen
 as keywords of WLambda. Some functions are also available as operators.
 
-#### <a name="901-type-value"></a>9.0.1 - type _value_
+#### <a name="1001-type-value"></a>10.0.1 - type _value_
 
 Returns the name of the data type of _value_ as string.
 
@@ -5886,7 +5902,7 @@ std:assert_eq (type $&10)       "ref_hidden";
 std:assert_eq (type ~ $w&x)     "ref_weak";
 ```
 
-#### <a name="902-len-value"></a>9.0.2 - len _value_
+#### <a name="1002-len-value"></a>10.0.2 - len _value_
 
 Returns the length of _value_. Depending on the data type you will get
 different semantics.
@@ -5906,14 +5922,14 @@ std:assert_eq (len ${a=1, b=2})     2;
 std:assert_eq (len ${a=1, b=2})     2;
 ```
 
-#### <a name="903-panic-message"></a>9.0.3 - panic _message_
+#### <a name="1003-panic-message"></a>10.0.3 - panic _message_
 
 If your program runs into something that deserves a slap on the fingers
 of the developer you can use `panic` to do that.
 
-## <a name="10-standard-library"></a>10 - Standard Library
+## <a name="11-standard-library"></a>11 - Standard Library
 
-#### <a name="1001-stdshuffle-randfunc-vec"></a>10.0.1 - std:shuffle _rand\_func_ _vec_
+#### <a name="1101-stdshuffle-randfunc-vec"></a>11.0.1 - std:shuffle _rand\_func_ _vec_
 
 Shuffles the _vec_ in place. The function _rand_func_ needs to return
 a random 64 bit integer on each call. Here is an example:
@@ -5926,7 +5942,7 @@ std:shuffle { std:rand:split_mix64_next sm } vec;
 std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
 ```
 
-#### <a name="1002-stddelete-vector-or-map-index-or-key"></a>10.0.2 - std:delete _vector-or-map_ _index-or-key_
+#### <a name="1102-stddelete-vector-or-map-index-or-key"></a>11.0.2 - std:delete _vector-or-map_ _index-or-key_
 
 This removes the designated element from the collection (either vector or map).
 This works for:
@@ -5948,7 +5964,7 @@ std:assert_eq (str m) (str ${b = 20});
 
 Please note that this operation is potentially O(n) on vectors.
 
-#### <a name="1003-stdrefid-value"></a>10.0.3 - std:ref\_id _value_
+#### <a name="1103-stdrefid-value"></a>11.0.3 - std:ref\_id _value_
 
 Returns an integer identifier for a given referential value.
 The ID will stay the same as long as the reference is allocated.
@@ -5970,7 +5986,7 @@ std:push v 4;
 std:assert_eq v_id1 v_id2;
 ```
 
-#### <a name="1004-stdcopy-vecormap"></a>10.0.4 - std:copy _vec\_or\_map_
+#### <a name="1104-stdcopy-vecormap"></a>11.0.4 - std:copy _vec\_or\_map_
 
 Makes a shallow copy of the given vector or map.
 
@@ -5983,7 +5999,7 @@ std:assert_eq a.0 1;
 std:assert_eq b.0 10;
 ```
 
-#### <a name="1005-stdvalues-collection-or-iter"></a>10.0.5 - std:values _collection-or-iter_
+#### <a name="1105-stdvalues-collection-or-iter"></a>11.0.5 - std:values _collection-or-iter_
 
 This function returns all values in the given collection or iterator
 as vector. _collection-or-iter_ can have be one of the following data
@@ -6002,7 +6018,7 @@ std:assert_str_eq (std:values $[1,2,3])          $[1,2,3];
 std:assert_str_eq (std:values $i(1,2,3))         $[1,2,3];
 ```
 
-#### <a name="1006-stdkeys-collection-or-iter"></a>10.0.6 - std:keys _collection-or-iter_
+#### <a name="1106-stdkeys-collection-or-iter"></a>11.0.6 - std:keys _collection-or-iter_
 
 This function returns all keys in the given _collection_ or _iterator_.
 It's most useful for the map data type, but also returns the indices in
@@ -6016,7 +6032,7 @@ std:assert_str_eq (std:keys $i(4,4,4))           $[0,1,2];
 std:assert_str_eq (std:keys $i(4,4))             $[0,1];
 ```
 
-#### <a name="1007-stdsort-comparefun-vec"></a>10.0.7 - std:sort [_compare\_fun_] _vec_
+#### <a name="1107-stdsort-comparefun-vec"></a>11.0.7 - std:sort [_compare\_fun_] _vec_
 
 Sorts the given _vec_ in place. The comparison function _compare_fun_ gets the
 two values a and b and needs to return -1 if a < b, 0 if a = b and 1 if a > b.
@@ -6041,7 +6057,7 @@ std:assert_eq v.1.0 1;
 std:assert_eq v.2.0 -1;
 ```
 
-#### <a name="1008-stdcmpnumasc-a-b"></a>10.0.8 - std:cmp:num:asc _a_ _b_
+#### <a name="1108-stdcmpnumasc-a-b"></a>11.0.8 - std:cmp:num:asc _a_ _b_
 
 Compares _a_ and _b_ numerically and returns:
 
@@ -6057,7 +6073,7 @@ std:assert_eq (std:cmp:num:asc "20" "20")    0;
 std:assert_eq (std:cmp:num:asc 20 21)        1;
 ```
 
-#### <a name="1009-stdcmpnumdesc-a-b"></a>10.0.9 - std:cmp:num:desc _a_ _b_
+#### <a name="1109-stdcmpnumdesc-a-b"></a>11.0.9 - std:cmp:num:desc _a_ _b_
 
 Compares _a_ and _b_ numerically descending and returns:
 
@@ -6073,7 +6089,7 @@ std:assert_eq (std:cmp:num:desc "20" "20")    0;
 std:assert_eq (std:cmp:num:desc 20 21)       -1;
 ```
 
-#### - std:cmp:str:asc _a_ _b_
+#### <a name="11010-stdcmpstrasc-a-b"></a>11.0.10 - std:cmp:str:asc _a_ _b_
 
 Compares _a_ and _b_ lexicographically by their byte values. This orders
 Unicode code points based on their positions in the code charts.
@@ -6090,7 +6106,7 @@ std:assert_eq (std:cmp:str:asc "abc" "abc")  0;
 std:assert_eq (std:cmp:str:asc "abc" "abd")  1;
 ```
 
-#### - std:cmp:str:desc _a_ _b_
+#### <a name="11011-stdcmpstrdesc-a-b"></a>11.0.11 - std:cmp:str:desc _a_ _b_
 
 Compares _a_ and _b_ lexicographically by their byte values. This orders
 Unicode code points based on their positions in the code charts.
@@ -6107,7 +6123,7 @@ std:assert_eq (std:cmp:str:desc "abc" "abc")  0;
 std:assert_eq (std:cmp:str:desc "abc" "abd") -1;
 ```
 
-#### <a name="10010-stddisplayln-arg1-"></a>10.0.10 - std:displayln _arg1_ ...
+#### <a name="11012-stddisplayln-arg1-"></a>11.0.12 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -6121,7 +6137,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
-#### <a name="10011-debug-arg1-"></a>10.0.11 - $DEBUG _arg1_ ...
+#### <a name="11013-debug-arg1-"></a>11.0.13 - $DEBUG _arg1_ ...
 
 This is a special value that evaluates to a print function that supplies the
 current position in the source code. For example this:
@@ -6152,7 +6168,7 @@ Will print like this:
 [1,11:<wlambda::eval>] DEBUG: k = 30
 ```
 
-#### <a name="10012-stdwriteln-arg1-"></a>10.0.12 - std:writeln _arg1_ ...
+#### <a name="11014-stdwriteln-arg1-"></a>11.0.14 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
@@ -6167,7 +6183,7 @@ See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="10013-stdeval-code-string"></a>10.0.13 - std:eval _code-string_
+#### <a name="11015-stdeval-code-string"></a>11.0.15 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -6179,7 +6195,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="10014-stdassert-bool-message"></a>10.0.14 - std:assert _bool_ \[_message_]
+#### <a name="11016-stdassert-bool-message"></a>11.0.16 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -6190,7 +6206,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="10015-stdasserteq-actual-expected-message"></a>10.0.15 - std:assert\_eq _actual_ _expected_ \[_message_]
+#### <a name="11017-stdasserteq-actual-expected-message"></a>11.0.17 - std:assert\_eq _actual_ _expected_ \[_message_]
 
 This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -6201,7 +6217,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### <a name="10016-stdassertstreq-actual-expected"></a>10.0.16 - std:assert\_str\_eq _actual_ _expected_
+#### <a name="11018-stdassertstreq-actual-expected"></a>11.0.18 - std:assert\_str\_eq _actual_ _expected_
 
 This function stringifies _actual_ and _expected_ using the `str` function
 and compares the resulting strings.
@@ -6213,7 +6229,7 @@ if the maps are stringified using `str`:
 std:assert_str_eq $[1, 2, 3]        $[1, 2, 3];
 ```
 
-#### <a name="10017-stdassertreleq-l-r-epsilon-message"></a>10.0.17 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+#### <a name="11019-stdassertreleq-l-r-epsilon-message"></a>11.0.19 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -6229,7 +6245,7 @@ std:assert_rel_eq x y 1;
 # std:assert_eq x y 0.5;
 ```
 
-#### - std:measure\_time _unit_ _function_
+#### <a name="11020-stdmeasuretime-unit-function"></a>11.0.20 - std:measure\_time _unit_ _function_
 
 This function measures the time the given _function_ took to execute.
 The _unit_ defines how precisely the time is measured. Following strings are supported
@@ -6250,9 +6266,9 @@ std:assert res.0 > 100;
 std:assert_eq res.1 4999950000;
 ```
 
-### <a name="101-io"></a>10.1 - I/O
+### <a name="111-io"></a>11.1 - I/O
 
-#### <a name="1011-stdiofilereadtext-filename"></a>10.1.1 - std:io:file:read\_text _filename_
+#### <a name="1111-stdiofilereadtext-filename"></a>11.1.1 - std:io:file:read\_text _filename_
 
 Opens the file _filename_ and returns its contents interpreted as UTF8
 text as string.
@@ -6264,7 +6280,7 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading text from file works";
 ```
 
-#### <a name="1012-stdiofileread-filename"></a>10.1.2 - std:io:file:read _filename_
+#### <a name="1112-stdiofileread-filename"></a>11.1.2 - std:io:file:read _filename_
 
 Opens the file _filename_ and returns its contents as byte buffer.
 
@@ -6276,27 +6292,27 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading binary from file works";
 ```
 
-#### <a name="1013-stdiofilewritesafe-filename-bytes-or-string"></a>10.1.3 - std:io:file:write\_safe _filename_ _bytes-or-string_
+#### <a name="1113-stdiofilewritesafe-filename-bytes-or-string"></a>11.1.3 - std:io:file:write\_safe _filename_ _bytes-or-string_
 
 Creates a new file with the given filename but with a "~" appended
 and writes the contents into it. After successful write, it renames
 the file to the given filename.
 
-#### <a name="1014-stdiofileappend-filename-bytes-or-string"></a>10.1.4 - std:io:file:append _filename_ _bytes-or-string_
+#### <a name="1114-stdiofileappend-filename-bytes-or-string"></a>11.1.4 - std:io:file:append _filename_ _bytes-or-string_
 
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
-### - File System
+### <a name="112-file-system"></a>11.2 - File System
 
-#### - std:fs:rename _file-path_ _new-file-name_
+#### <a name="1121-stdfsrename-file-path-new-file-name"></a>11.2.1 - std:fs:rename _file-path_ _new-file-name_
 
 Renames the file at _file-path_ to the new name _new-file-name_. This
 usually does only work on a single file system.
 Returns `$true` if renaming was successful, and an error object if it was not
 successful.
 
-### <a name="102-threading"></a>10.2 - Threading
+### <a name="113-threading"></a>11.3 - Threading
 
 WLambda leverages the `std::thread` implementation of Rust's standard library
 to provide safe threading. Threading works by spawning new threads that
@@ -6319,7 +6335,7 @@ implementing your algorithm in Rust instead. You can of course still manage
 thread orchestration in WLambda if you just provide a simple function
 API to your algorithms.
 
-#### <a name="1021-stdthreadspawn-string-globals-map"></a>10.2.1 - std:thread:spawn _string_ [_globals-map_]
+#### <a name="1131-stdthreadspawn-string-globals-map"></a>11.3.1 - std:thread:spawn _string_ [_globals-map_]
 
 This evaluates the given _string_ as WLambda code in a new thread.
 It returns a thread handle, that can be used to join the thread or
@@ -6383,7 +6399,7 @@ instance.
 std:assert_str_eq res 102;
 ```
 
-#### <a name="1022-stdthreadsleep-duration"></a>10.2.2 - std:thread:sleep _duration_
+#### <a name="1132-stdthreadsleep-duration"></a>11.3.2 - std:thread:sleep _duration_
 
 Lets the current thread sleep for the given _duration_.
 _duration_ can either be an integer that will be interpreted
@@ -6409,9 +6425,9 @@ thrd.join[];
 std:assert (after - before) >= 150;
 ```
 
-#### <a name="1023-thread-handle-api"></a>10.2.3 - Thread Handle API
+#### <a name="1133-thread-handle-api"></a>11.3.3 - Thread Handle API
 
-##### <a name="10231-thdljoin"></a>10.2.3.1 - thdl.join
+##### <a name="11331-thdljoin"></a>11.3.3.1 - thdl.join
 
 This method will wait for the thread to finish and return
 the return value of the thread.
@@ -6423,7 +6439,7 @@ std:assert_eq thdl.join[] 7;
 
 This method will return an error if the thread handle was already joined.
 
-##### <a name="10232-thdlrecvready"></a>10.2.3.2 - thdl.recv\_ready
+##### <a name="11332-thdlrecvready"></a>11.3.3.2 - thdl.recv\_ready
 
 Waits for the global `_READY` atomic value slot to be sent a value by the
 thread. This is useful for waiting until the thread has started without an
@@ -6452,7 +6468,7 @@ thdl.join[];
 This method might return an error if the thread provider
 made a handle without a ready slot.
 
-#### <a name="1024-atom-api"></a>10.2.4 - Atom API
+#### <a name="1134-atom-api"></a>11.3.4 - Atom API
 
 For threads a VVal (WLambda data value) is transformed into a value
 that can be shared between threads safely. For this the data values are cloned
@@ -6461,7 +6477,7 @@ deeply and transformed into a structure of atomic values.
 These values are then stored in a so called _Atom_. They can be safely changed
 by threads.
 
-##### <a name="10241-stdsyncatomnew-value"></a>10.2.4.1 - std:sync:atom:new _value_
+##### <a name="11341-stdsyncatomnew-value"></a>11.3.4.1 - std:sync:atom:new _value_
 
 Creates an Atom, containing the given _value_. The data types for _value_
 is limited to these:
@@ -6501,7 +6517,7 @@ std:assert_eq at.read[] 6;
 thdl.join[]
 ```
 
-##### <a name="10242-atomread"></a>10.2.4.2 - atom.read
+##### <a name="11342-atomread"></a>11.3.4.2 - atom.read
 
 Returns the value stored in the atom.
 
@@ -6513,7 +6529,7 @@ std:assert_eq at.read[] 99;
 
 This method might return an error if the internal mutex was poisoned.
 
-##### <a name="10243-atomwrite-value"></a>10.2.4.3 - atom.write _value_
+##### <a name="11343-atomwrite-value"></a>11.3.4.3 - atom.write _value_
 
 Overwrites the contents of the atom with the given _value_.
 
@@ -6527,7 +6543,7 @@ std:assert_eq at.read[] 100;
 
 This method might return an error if the internal mutex was poisoned.
 
-##### <a name="10244-atomswap-value"></a>10.2.4.4 - atom.swap _value_
+##### <a name="11344-atomswap-value"></a>11.3.4.4 - atom.swap _value_
 
 Returns the previous value of the atom and writes in
 the given _value_.
@@ -6542,7 +6558,7 @@ std:assert_eq at.read[] 100;
 
 This method might return an error if the internal mutex was poisoned.
 
-#### <a name="1025-atom-value-slot-api"></a>10.2.5 - Atom Value Slot API
+#### <a name="1135-atom-value-slot-api"></a>11.3.5 - Atom Value Slot API
 
 An Atom value slot offers more synchronization than a normal Atom value.
 It allows you to set the value of the slot, wait for it to be collected
@@ -6558,14 +6574,14 @@ starvation.
 Best recommendation here is to use a slot only from a single writer and
 a single reader.
 
-##### <a name="10251-stdsyncslotnew"></a>10.2.5.1 - std:sync:slot:new
+##### <a name="11351-stdsyncslotnew"></a>11.3.5.1 - std:sync:slot:new
 
 Constructs a new Atom slot and returns it.
 The slot has the initial status of being _empty_.
 If a value is sent to it, it will not be _empty_ anymore.
 After a value is received from the slot, the status is _empty_ again.
 
-##### <a name="10252-atomslotsend-value"></a>10.2.5.2 - atom\_slot.send _value_
+##### <a name="11352-atomslotsend-value"></a>11.3.5.2 - atom\_slot.send _value_
 
 This method sends the value into the slot, overwriting any previous
 set values. The slot can also ha
@@ -6587,7 +6603,7 @@ std:assert slot.check_empty[];
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="10253-atomslotrecv"></a>10.2.5.3 - atom\_slot.recv
+##### <a name="11353-atomslotrecv"></a>11.3.5.3 - atom\_slot.recv
 
 If the slot is empty, it will wait for a value to become available.
 Once a value is available it is returned and the slot is set to _empty_ again.
@@ -6607,7 +6623,7 @@ thrd.join[];
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="10254-atomslottryrecv"></a>10.2.5.4 - atom\_slot.try\_recv
+##### <a name="11354-atomslottryrecv"></a>11.3.5.4 - atom\_slot.try\_recv
 
 This method returns an optional value. It will provide an empty optional
 value if no value is stored in the slot. But if the slot contains
@@ -6641,7 +6657,7 @@ thrd.join[];
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="10255-atomslotrecvtimeout-duration"></a>10.2.5.5 - atom\_slot.recv\_timeout _duration_
+##### <a name="11355-atomslotrecvtimeout-duration"></a>11.3.5.5 - atom\_slot.recv\_timeout _duration_
 
 Acts like `atom_slot.recv`, but it will only wait for the given _duration_.  If
 no value was received in the given _duration_ (see std:thread:sleep), `$o()` is
@@ -6660,21 +6676,21 @@ std:assert_eq (slot.recv_timeout :ms => 100) $o(4);
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="10256-atomslotcheckempty"></a>10.2.5.6 - atom\_slot.check\_empty
+##### <a name="11356-atomslotcheckempty"></a>11.3.5.6 - atom\_slot.check\_empty
 
 Returns `$true` if the slot is empty.
 
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="10257-atomslotwaitempty"></a>10.2.5.7 - atom\_slot.wait\_empty
+##### <a name="11357-atomslotwaitempty"></a>11.3.5.7 - atom\_slot.wait\_empty
 
 Waits until the slot is empty and then returns `$true`.
 
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="10258-atomslotwaitemptytimeout-duration"></a>10.2.5.8 - atom\_slot.wait\_empty\_timeout _duration_
+##### <a name="11358-atomslotwaitemptytimeout-duration"></a>11.3.5.8 - atom\_slot.wait\_empty\_timeout _duration_
 
 Waits a predefined timeout until the slot is empty. If it did become
 empty within the given _duration_ (see std:thread:sleep) it will return `$true`.
@@ -6683,7 +6699,7 @@ Otherwise it will return `$false`.
 This method might return an error if there was an issue with locking
 the interal mutex or the mutex was poisoned.
 
-#### <a name="1026-channel-api"></a>10.2.6 - Channel API
+#### <a name="1136-channel-api"></a>11.3.6 - Channel API
 
 A channel is a multiple sender, single consumer queue. It can be used to
 establish a message passing based communication between threads.
@@ -6716,7 +6732,7 @@ std:assert_eq sum 45;
 thdl.join[];
 ```
 
-##### <a name="10261-stdsyncmpscnew"></a>10.2.6.1 - std:sync:mpsc:new
+##### <a name="11361-stdsyncmpscnew"></a>11.3.6.1 - std:sync:mpsc:new
 
 This creates a new channel. You can safely send from multiple threads
 while reading from one thread at a time.
@@ -6733,7 +6749,7 @@ std:assert_eq chan.recv[] :b;
 std:assert_eq chan.recv[] :c;
 ```
 
-##### <a name="10262-channelsend-value"></a>10.2.6.2 - channel.send _value_
+##### <a name="11362-channelsend-value"></a>11.3.6.2 - channel.send _value_
 
 Sends the given _value_ to the channel queue.
 
@@ -6747,7 +6763,7 @@ std:assert_eq chan.recv[] :a;
 This method might return an error if the channel failed, for instance due
 to a poisoned internal mutex.
 
-##### <a name="10263-channelrecv"></a>10.2.6.3 - channel.recv
+##### <a name="11363-channelrecv"></a>11.3.6.3 - channel.recv
 
 Receives the next element from the channel. If no element is available
 this method will block the thread until an element becomes available.
@@ -6762,7 +6778,7 @@ std:assert_eq chan.recv[] :a;
 This method might return an error if the channel failed, for instance due
 to a poisoned internal mutex.
 
-##### <a name="10264-channeltryrecv"></a>10.2.6.4 - channel.try\_recv
+##### <a name="11364-channeltryrecv"></a>11.3.6.4 - channel.try\_recv
 
 Tries to receive the next element from the channel and return it wrapped
 into an optional. If no element is available an empty optional `$o()` is returned.
@@ -6780,7 +6796,7 @@ std:assert_eq chan.try_recv[] $o(:a);
 This method might return an error if the channel failed, for instance due
 to a poisoned internal mutex.
 
-##### <a name="10265-channelrecvtimeout-duration"></a>10.2.6.5 - channel.recv\_timeout _duration_
+##### <a name="11365-channelrecvtimeout-duration"></a>11.3.6.5 - channel.recv\_timeout _duration_
 
 Tries to receive the next element in the given _duration_ (see std:thread:sleep)
 and return it wrapped into an optional. If no element could be received
@@ -6799,11 +6815,11 @@ std:assert_eq (chan.recv_timeout $p(:ms, 100)) $o(:x);
 This method might return an error if the channel failed, for instance due
 to a poisoned internal mutex.
 
-## <a name="11-optional-standard-library"></a>11 - Optional Standard Library
+## <a name="12-optional-standard-library"></a>12 - Optional Standard Library
 
-### <a name="111-serialization"></a>11.1 - serialization
+### <a name="121-serialization"></a>12.1 - serialization
 
-#### <a name="1111-stdserwlambda-arg"></a>11.1.1 - std:ser:wlambda _arg_
+#### <a name="1211-stdserwlambda-arg"></a>12.1.1 - std:ser:wlambda _arg_
 
 Returns the serialized WLambda representation of the value _arg_ as string.
 
@@ -6819,7 +6835,7 @@ std:assert_eq (std:ser:wlambda $none) $q|$n|;
 std:assert_eq (std:ser:wlambda $[1,:a]) $q|$[1,:a]|;
 ```
 
-#### <a name="1112-stdserjson-data-nopretty"></a>11.1.2 - std:ser:json _data_ \[_no\_pretty_]
+#### <a name="1212-stdserjson-data-nopretty"></a>12.1.2 - std:ser:json _data_ \[_no\_pretty_]
 
 Serializes the _data_ and returns a JSON formatted (and pretty printed) string.
 Optionally not pretty printed if _no_pretty_ is a true value.
@@ -6829,7 +6845,7 @@ Optionally not pretty printed if _no_pretty_ is a true value.
 std:assert_eq str "[1,2.3,{\"a\":4}]";
 ```
 
-#### <a name="1113-stddeserjson-string"></a>11.1.3 - std:deser:json _string_
+#### <a name="1213-stddeserjson-string"></a>12.1.3 - std:deser:json _string_
 
 Deserializes the JSON formatted _string_ into a data structure.
 
@@ -6840,7 +6856,7 @@ std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
 ```
 
-#### <a name="1114-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>11.1.4 - std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
+#### <a name="1214-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.4 - std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
 
 This serializes the _table_ as CSV with the given _field_delim_
 and _row_separator_. If _escape_all_ is `$true` all fields will be
@@ -6862,7 +6878,7 @@ std:assert_eq
     "a;\";\";\"|\";\" \"|";
 ```
 
-#### <a name="1115-stddesercsv-fielddelim-rowseparator-data"></a>11.1.5 - std:deser:csv _field\_delim_ _row\_separator_ _data_
+#### <a name="1215-stddesercsv-fielddelim-rowseparator-data"></a>12.1.5 - std:deser:csv _field\_delim_ _row\_separator_ _data_
 
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
@@ -6874,7 +6890,7 @@ std:assert_eq table.0.1 "bar";
 std:assert_eq table.1.1 "y";
 ```
 
-#### <a name="1116-stdsermsgpack-data"></a>11.1.6 - std:ser:msgpack _data_
+#### <a name="1216-stdsermsgpack-data"></a>12.1.6 - std:ser:msgpack _data_
 
 Serializes the _data_ and returns a msgpack bytes value.
 
@@ -6882,7 +6898,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
-#### <a name="1117-stddesermsgpack-bytes"></a>11.1.7 - std:deser:msgpack _bytes_
+#### <a name="1217-stddesermsgpack-bytes"></a>12.1.7 - std:deser:msgpack _bytes_
 
 Deserializes the msgpack bytes value into a data structure.
 
@@ -6890,12 +6906,12 @@ Deserializes the msgpack bytes value into a data structure.
 std:assert_eq (std:deser:msgpack $b"\xC4\x03abc") $b"abc";
 ```
 
-### <a name="112-regex"></a>11.2 - regex
+### <a name="122-regex"></a>12.2 - regex
 
 
-### <a name="113-chrono"></a>11.3 - chrono
+### <a name="123-chrono"></a>12.3 - chrono
 
-#### <a name="1131-stdchronotimestamp-format"></a>11.3.1 - std:chrono:timestamp \[_format_]
+#### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]
 
 For the documentation of _format_ please consule the
 chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
@@ -6908,7 +6924,7 @@ std:assert ~ (year_str | int) == 2020;
 !now_str = std:chrono:timestamp[];
 ```
 
-### <a name="114-color-conversion"></a>11.4 - color conversion
+### <a name="124-color-conversion"></a>12.4 - color conversion
 
 This section highlights the color conversion functions available in WLambda.
 Numerical vectors are used in WLambda to represent colors. There are two
@@ -6925,7 +6941,7 @@ And the values for HSV are in the range 0 to 360, and the others in the range
 You can also use 3 dimensional vectors without the alpha value: `$i(r, g, b)` / `$i(h, s, v)`
 and `$f(r, g, b)` / `$f(h, s, v)`.
 
-#### <a name="1141-stdvrgb2hsv-color-vector"></a>11.4.1 - std:v:rgb2hsv _color-vector_
+#### <a name="1241-stdvrgb2hsv-color-vector"></a>12.4.1 - std:v:rgb2hsv _color-vector_
 
 Converts an RGB color into a HSV color representation.
 
@@ -6940,7 +6956,7 @@ std:assert_eq std:v:rgb2hsv <& $f(0, 0.5, 0, 1.0)     $f(120, 1, 0.5, 1);
 std:assert_eq std:v:rgb2hsv <& $f(0.1, 0.5, 0.1, 1.0) $f(120, 0.8, 0.5, 1);
 ```
 
-#### <a name="1142-stdvhsv2rgb-color-vector"></a>11.4.2 - std:v:hsv2rgb _color-vector_
+#### <a name="1242-stdvhsv2rgb-color-vector"></a>12.4.2 - std:v:hsv2rgb _color-vector_
 
 Converts a color from HSV to RGB representation.
 
@@ -6953,7 +6969,7 @@ std:assert_rel_eq clr.g 0.5 0.001;
 std:assert_rel_eq clr.b 0.1 0.001;
 ```
 
-#### <a name="1143-stdvrgba2hex-color-vector"></a>11.4.3 - std:v:rgba2hex _color-vector_
+#### <a name="1243-stdvrgba2hex-color-vector"></a>12.4.3 - std:v:rgba2hex _color-vector_
 
 This function converts a color to a string of hex digits (without the common '#'
 prefix however).
@@ -6963,7 +6979,7 @@ std:assert_eq std:v:rgba2hex <& $i(255, 128, 64, 32)       "ff804020";
 std:assert_eq std:v:rgba2hex <& $f(1.0, 0.5, 0.25, 0.125)  "ff804020";
 ```
 
-#### <a name="1144-stdvhex2rgbaf-string"></a>11.4.4 - std:v:hex2rgba\_f _string_
+#### <a name="1244-stdvhex2rgbaf-string"></a>12.4.4 - std:v:hex2rgba\_f _string_
 
 Interprets _string_ as an hex encoded color and
 returns a 4 element big float vector. The color components
@@ -6992,7 +7008,7 @@ std:assert_rel_eq color2.b 0.2   0.001;
 std:assert_rel_eq color2.a 1.0   0.001;
 ```
 
-#### <a name="1145-stdvhex2rgbai-string"></a>11.4.5 - std:v:hex2rgba\_i _string_
+#### <a name="1245-stdvhex2rgbai-string"></a>12.4.5 - std:v:hex2rgba\_i _string_
 
 Like `std:v:hex2rgba_f` this function converts a hex encoded color
 from _string_ but returns an integer vector with 4 elements.
@@ -7015,7 +7031,7 @@ std:assert_eq color2.b 51;
 std:assert_eq color2.a 255;
 ```
 
-#### <a name="1146-stdvhex2hsvai-string"></a>11.4.6 - std:v:hex2hsva\_i _string_
+#### <a name="1246-stdvhex2hsvai-string"></a>12.4.6 - std:v:hex2hsva\_i _string_
 
 Converts the hex represenation of a HSVA color to an integer vector `$i(h, s, v, a)`.
 This function is probably not that useful, as the bit distribution along
@@ -7027,7 +7043,7 @@ It's mostly useful for testing and quick experiments.
 std:assert_eq color $i(360,50,25,100);
 ```
 
-#### <a name="1147-stdvhex2hsvaf-string"></a>11.4.7 - std:v:hex2hsva\_f _string_
+#### <a name="1247-stdvhex2hsvaf-string"></a>12.4.7 - std:v:hex2hsva\_f _string_
 
 Converts the hex represenation of a HSVA color to a float vector `$i(h, s, v, a)`.
 This function is probably not that useful, as the bit distribution along
@@ -7043,15 +7059,15 @@ std:assert_rel_eq color.2  25.0 1.0;
 std:assert_rel_eq color.3 100.0 1.0;
 ```
 
-### <a name="115-hash"></a>11.5 - hash
+### <a name="125-hash"></a>12.5 - hash
 
-#### <a name="1151-stdhashfnv1a-arg1-"></a>11.5.1 - std:hash:fnv1a _arg1_ ...
+#### <a name="1251-stdhashfnv1a-arg1-"></a>12.5.1 - std:hash:fnv1a _arg1_ ...
 
 Hashes all the arguments as FNV1a and returns an integer.
 
-### <a name="116-rand"></a>11.6 - rand
+### <a name="126-rand"></a>12.6 - rand
 
-#### <a name="1161-stdrandsplitmix64new"></a>11.6.1 - std:rand:split\_mix64\_new
+#### <a name="1261-stdrandsplitmix64new"></a>12.6.1 - std:rand:split\_mix64\_new
 
 Initializes the _sm_state_ from the current time (seconds) and returns it.
 The time is retrieved in seconds, so don't expect different seed states
@@ -7059,25 +7075,25 @@ if you call this multiple times in the same wall clock second.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1162-stdrandsplitmix64newfrom-seed"></a>11.6.2 - std:rand:split\_mix64\_new\_from _seed_
+#### <a name="1262-stdrandsplitmix64newfrom-seed"></a>12.6.2 - std:rand:split\_mix64\_new\_from _seed_
 
 Initializes the _sm_state_ from the given _seed_ and returns it.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1163-stdrandsplitmix64next-smstate-count"></a>11.6.3 - std:rand:split\_mix64\_next _sm\_state_ \[_count_]
+#### <a name="1263-stdrandsplitmix64next-smstate-count"></a>12.6.3 - std:rand:split\_mix64\_next _sm\_state_ \[_count_]
 
 Returns the _count_ next integer values generated from the given
 _sm_state_.
 
-#### <a name="1164-stdrandsplitmix64nextopen01-smstate-count"></a>11.6.4 - std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
+#### <a name="1264-stdrandsplitmix64nextopen01-smstate-count"></a>12.6.4 - std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
 
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
 
-### <a name="117-utility-functions"></a>11.7 - Utility Functions
+### <a name="127-utility-functions"></a>12.7 - Utility Functions
 
-#### <a name="1171-stddumpupvals-function"></a>11.7.1 - std:dump\_upvals _function_
+#### <a name="1271-stddumpupvals-function"></a>12.7.1 - std:dump\_upvals _function_
 
 Returns a vector of all the upvalues of the _function_.
 Please use this function for debugging purposes only, as the order of the
@@ -7102,16 +7118,16 @@ std:assert_eq $*(upvs.0) 3;
 std:assert_eq $*(upvs.1) 4;
 ```
 
-#### <a name="1172-stdwlambdaversion"></a>11.7.2 - std:wlambda:version
+#### <a name="1272-stdwlambdaversion"></a>12.7.2 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
-#### <a name="1173-stdwlambdasizes"></a>11.7.3 - std:wlambda:sizes
+#### <a name="1273-stdwlambdasizes"></a>12.7.3 - std:wlambda:sizes
 
 Writes a table of internal data structure sizes to stdout. Just for development
 purposes.
 
-## <a name="12-wlambda-lexical-syntax-and-grammar"></a>12 - WLambda Lexical Syntax and Grammar
+## <a name="13-wlambda-lexical-syntax-and-grammar"></a>13 - WLambda Lexical Syntax and Grammar
 
 White space is everything that satisfies `std::char::is_whitespace`,
 so unicode white space is respected. Comments have the following syntax:
@@ -7396,7 +7412,7 @@ In the following grammar, white space and comments are omitted:
                   ;
 ```
 
-### <a name="121-special-forms"></a>12.1 - Special Forms
+### <a name="131-special-forms"></a>13.1 - Special Forms
 
 There are certain calls that are handled by the compiler differently.
 
@@ -7408,7 +7424,7 @@ There are certain calls that are handled by the compiler differently.
 - `match _value-expr_ $p(structure_pattern, branch_block) ... [ branch_block ]
 - `jump _idx-expr_ _block1_ ...`
 
-### <a name="122-string-formatting-syntax"></a>12.2 - String Formatting Syntax
+### <a name="132-string-formatting-syntax"></a>13.2 - String Formatting Syntax
 
 The `$F` special value takes a string and creates a formatting function.
 The syntax for formatting is very similar to Rust's string formatting:
