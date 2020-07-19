@@ -4179,6 +4179,11 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{:<7.3!f}\"  4.3456"),  format!("a{:<7.3}", 4.3456));
     assert_eq!(v2s("$F\"a{:<7.3}\"  4.3456"),    format!("a{:<7.3}", 4.3456));
 
+    assert_eq!(ve("$F$Q x=\\xFF{}\\xF3 $b\"\\xF0\\xFF\\xF2\""), "$b\"x=\\\\xFF\\xF0\\xFF\\xF2\\\\xF3\"");
+    assert_eq!(ve("$F$q x=\\xFF{}\\xF3 $b\"\\xF0\\xFF\\xF2\""), "\"x=\\\\xFFðÿò\\\\xF3\"");
+    assert_eq!(ve("$F$q x=\\xFF{}\\xF3 \"\\xF0\\xFF\\xF2\""),   "\"x=\\\\xFFðÿò\\\\xF3\"");
+    assert_eq!(ve("$F$Q x=\\xFF{}\\xF3 \"\\xF0\\xFF\\xF2\""),   "$b\"x=\\\\xFF\\xC3\\xB0\\xC3\\xBF\\xC3\\xB2\\\\xF3\"");
+
 //    assert_eq!(v2s("$F\"a{:>5}x\"  399"),     format!("a{:>5}x", 399));
 //    assert_eq!(v2s("$F\"a{:^5}x\"  399"),     format!("a{:^5}x", 399));
 

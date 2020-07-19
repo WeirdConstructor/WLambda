@@ -380,13 +380,13 @@ impl FormatState {
         }
     }
 
-//    fn add_byte(&mut self, u: u8) {
-//        if let Some(sd) = &mut self.str_data.as_mut() {
-//            sd.push(std::char::from_u32(u as u32).unwrap());
-//        } else if let Some(bd) = &mut self.byte_data.as_mut() {
-//            bd.push(u);
-//        }
-//    }
+    fn add_byte(&mut self, u: u8) {
+        if let Some(sd) = &mut self.str_data.as_mut() {
+            sd.push(std::char::from_u32(u as u32).unwrap());
+        } else if let Some(bd) = &mut self.byte_data.as_mut() {
+            bd.push(u);
+        }
+    }
 }
 
 pub type FormatNode = Box<dyn Fn(&mut FormatState, &[VVal]) -> std::fmt::Result>;
@@ -779,11 +779,20 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
             Box::new(move |fs: &mut FormatState, args: &[VVal]| {
                 let mut len = 0;
                 with_format_arg_write(&arg, args, fs, cast_type,|fs, v| {
-                    v.with_s_ref(|s| {
-                        fs.write_str(s)?;
-                        len = s.len();
-                        Ok(())
-                    })?;
+                    if v.is_bytes() {
+                        v.with_bv_ref(|bv| {
+                            len = bv.len();
+                            for b in bv {
+                                fs.add_byte(*b)
+                            }
+                        });
+                    } else {
+                        v.with_s_ref(|s| {
+                            fs.write_str(s)?;
+                            len = s.len();
+                            Ok(())
+                        })?;
+                    }
 
                     (*align_fun)(fs, args, len)?;
 

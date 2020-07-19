@@ -5356,6 +5356,94 @@ This is a very simple example:
 std:assert_eq s "x = abc";
 ```
 
+You can also use string formatting to generate byte vectors:
+
+```wlambda
+!bv = $F$b"x={}" $b"\xFF";
+
+std:assert_eq bv $b"x=\xFF";
+```
+
+If you want to generate the WLambda written representation of a piece of
+data like `std:write_str` would return it, you have to specify the
+special formatting syntax `{:...!w}`:
+
+```wlambda
+std:assert_eq ($F"x={:!w}" $&&$[1, 2, 3, 4]) "x=$&&$[1,2,3,4]";
+
+# Without the `!w` the reference would just
+# be auto dereferenced like `str` would do it:
+std:assert_eq ($F"x={}"   $&&$[1, 2, 3, 4]) "x=$[1,2,3,4]";
+```
+
+#### - std:formatter _format-string_
+
+Returns a formatting function that takes exactly the arguments specified
+in the _format-string_. If the format syntax is wrong, an error is returned.
+
+This is useful, if you need to build a format string at runtime,
+because `$F` only allows string/byte vector literals.
+
+```wlambda
+!fmt = ">6.2";
+!fmt_fun = (std:formatter (std:str:cat "{1} [{0:" fmt "}]"));
+
+std:assert_eq (fmt_fun 3.43554 1.2323) "1.2323 [  3.44]";
+```
+
+### - Formatting Numbers
+
+Number formatting, that is integers, float and numerical vectors, require an
+extension of the formatting syntax. You need to specify whether an integer
+`"{:...!i}"` or a float `{:...!f}` is formatted. Otherwise WLambda will cast
+everything to a string for formatting.
+
+Here are some examples:
+
+```wlambda
+std:assert_eq ($F "{:8!i}"  123)   "     123";
+std:assert_eq ($F "{:08!i}" 123)   "00000123";
+std:assert_eq ($F "{:<8!i}" 123)   "123     ";
+std:assert_eq ($F "{:^8!i}" 123)   "  123   ";
+std:assert_eq ($F "{:>8!i}" 123)   "     123";
+
+std:assert_eq ($F "{:8.2!f}"  123.567)   "  123.57";
+std:assert_eq ($F "{:08.2!f}" 123.567)   "00123.57";
+std:assert_eq ($F "{:<8.2!f}" 123.567)   "123.57  ";
+std:assert_eq ($F "{:^8.2!f}" 123.567)   " 123.57 ";
+std:assert_eq ($F "{:>8.2!f}" 123.567)   "  123.57";
+
+# Note: For floats, the "!f" is implicit if you specify a precision:
+std:assert_eq ($F "{:8.2}"  123.567)   "  123.57";
+std:assert_eq ($F "{:08.2}" 123.567)   "00123.57";
+std:assert_eq ($F "{:<8.2}" 123.567)   "123.57  ";
+std:assert_eq ($F "{:^8.2}" 123.567)   " 123.57 ";
+std:assert_eq ($F "{:>8.2}" 123.567)   "  123.57";
+```
+
+You can even format numbers in numerical vectors, data vector, pairs or maps:
+
+```wlambda
+std:assert_eq ($F "{:8.2}" $f(1.2, 3.456, 8.232)) "(    1.20,    3.46,    8.23)";
+std:assert_eq ($F "{:8.2}" $[1.2, 3.456, 8.232])  "[    1.20,    3.46,    8.23]";
+std:assert_eq ($F "{:8.2}" $p(1.2, 3.456))        "(    1.20,    3.46)";
+std:assert_eq ($F "{:8.2}" ${x = 1.2, y = 3.456, z = 8.232})
+              "{x:    1.20, y:    3.46, z:    8.23}";
+
+std:assert_eq
+    ($F "{:>8!i}" $i(1.2, 3.456, 8.232))
+    "(       1,       3,       8)";
+```
+
+Also hexadecimal, octal and binary are supported for integers, they come after the `!i`:
+
+```wlambda
+std:assert_eq ($F "{:5!ix}" 321)    "  141";
+std:assert_eq ($F "{:5!io}" 321)    "  501";
+std:assert_eq ($F "{:<11!ib}" 321)  "101000001  ";
+std:assert_eq ($F "{:011!ib}" 321)  "00101000001";
+```
+
 ## <a name="7-data-structure-matchers-selectors-and-string-patternsregex"></a>7 - Data Structure Matchers, Selectors and String Patterns/Regex
 
 WLambda comes with a builtin DSL (domain specific language) for
