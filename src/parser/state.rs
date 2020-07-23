@@ -589,7 +589,7 @@ impl State {
     /// let code    = "{ 123 }";
     /// let mut ps  = State::new(code, "filenamehere");
     /// // ...
-    /// wlambda::parser::parse_block(&mut ps, true);
+    /// wlambda::parser::parse_block(&mut ps, true, true, true);
     /// // ...
     /// ```
     pub fn new(code: &str, filename: &str) -> State {

@@ -171,7 +171,7 @@ impl SymbolTable {
     /// assert_eq!(ctx.get_exports().get("to_rust").cloned(), Some(VVal::Flt(42.0)));
     /// ```
     #[allow(dead_code)]
-    pub fn get(&mut self, name: &str) -> Option<&VVal> {
+    pub fn get(&self, name: &str) -> Option<&VVal> {
         self.symbols.get(&s2sym(name))
     }
 
@@ -266,8 +266,16 @@ pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
     mem_modules:
         std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, SymbolTable>>>,
+
+    /// Holds the default module resolver for this global environment.
+    /// If some code executed with this global environment uses `!@import`
+    /// this resolver will be used to resolve the given module name.
     pub resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
-    thread_creator: Option<Arc<Mutex<dyn ThreadCreator>>>,
+    /// Holds the default thread creator for this global environment.
+    /// If some code executed with this global environment spawns a thread,
+    /// then this thread creator will create the thread handle, which is passed
+    /// back to WLambda.
+    pub thread_creator: Option<Arc<Mutex<dyn ThreadCreator>>>,
 }
 
 impl std::fmt::Debug for GlobalEnv {
@@ -320,7 +328,7 @@ impl GlobalEnv {
     ///
     /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
     #[allow(dead_code)]
-    pub fn get_var(&mut self, var: &str) -> Option<VVal> {
+    pub fn get_var(&self, var: &str) -> Option<VVal> {
         match self.env.get(var) {
             Some(v) => Some(v.deref()),
             None    => None,
@@ -328,10 +336,12 @@ impl GlobalEnv {
     }
 
     /// Returns the reference to the value of a global variable.
+    /// This does not dereference the VVal::Ref that usually holds the
+    /// global variable.
     ///
     /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
     #[allow(dead_code)]
-    pub fn get_var_ref(&mut self, var: &str) -> Option<VVal> {
+    pub fn get_var_ref(&self, var: &str) -> Option<VVal> {
         match self.env.get(var) {
             Some(v) => Some(v.clone()),
             None    => None,
@@ -348,6 +358,8 @@ impl GlobalEnv {
     ///
     /// let my_mod = SymbolTable::new();
     ///
+    /// let genv = GlobalEnv::new_default();
+    /// genv.borrow_mut().set_module("test", my_mod);
     ///```
     #[allow(dead_code)]
     pub fn set_module(&mut self, mod_name: &str, symtbl: SymbolTable) {
@@ -570,6 +582,14 @@ pub struct EvalContext {
 }
 
 impl EvalContext {
+    /// Creates an EvalContext from a given GlobalEnv.
+    ///
+    ///```
+    /// use wlambda::{GlobalEnv, EvalContext, VVal};
+    ///
+    /// let genv = GlobalEnv::new_default();
+    /// let ctx = EvalContext::new(genv);
+    ///```
     pub fn new(global: GlobalEnvRef) -> EvalContext {
         (Self::new_with_user_impl(global, Rc::new(RefCell::new(VVal::vec()))))
         .register_self_eval()
@@ -635,6 +655,20 @@ impl EvalContext {
         self
     }
 
+    /// Returns a SymbolTable of the locally exported symbols.
+    /// This is useful, if you want to execute WLambda code yourself
+    /// and use the local environment to export symbols.
+    ///
+    ///```
+    /// use wlambda::{EvalContext};
+    ///
+    /// let mut ctx = EvalContext::new_default();
+    ///
+    /// ctx.eval("!@export foo = 10").unwrap();
+    ///
+    /// let mut sym_tbl = ctx.get_exports();
+    /// assert_eq!(sym_tbl.get("foo").unwrap().i(), 10);
+    ///```
     pub fn get_exports(&self) -> SymbolTable {
         SymbolTable { symbols: self.local.borrow_mut().exports.clone() }
     }

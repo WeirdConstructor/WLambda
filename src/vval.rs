@@ -250,6 +250,20 @@ pub enum UnwindAction {
 }
 
 /// The runtime environment of the evaluator.
+///
+/// The easiest way to get an instance of this, is to create
+/// an EvalContext:
+///```
+/// use wlambda::{VVal, EvalContext};
+///
+/// let mut ctx = EvalContext::new_default();
+/// let res =
+///     VVal::new_str("a")
+///     .call(&mut *ctx.local.borrow_mut(), &[VVal::new_str("b")])
+///     .unwrap();
+///
+/// assert_eq!(res.s(), "\"ab\"");
+///```
 #[derive(Debug)]
 pub struct Env {
     /// The argument stack, initialized to a size of `START_STACK_SIZE`.
@@ -2673,7 +2687,7 @@ impl VVal {
         self.call_internal(env, 0)
     }
 
-    pub fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
+    pub(crate) fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         match self {
             VVal::None => {
                 Err(StackAction::panic_msg("Calling $none is invalid".to_string()))

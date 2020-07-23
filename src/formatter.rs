@@ -53,7 +53,7 @@ fn parse_count(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum CastType {
+pub(crate) enum CastType {
     Str     = 0,
     Int     = 1,
     Flt     = 2,
@@ -72,7 +72,7 @@ impl CastType {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum FormatType {
+pub(crate) enum FormatType {
     Unknown = 0,
     Hex     = 1,
     Oct     = 2,
@@ -321,12 +321,12 @@ fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
 }
 
 #[derive(Debug, Clone)]
-pub struct FormatState {
+pub(crate) struct FormatState {
     str_data:  Option<String>,
     byte_data: Option<Vec<u8>>,
 }
 
-pub enum FormatArg {
+pub(crate) enum FormatArg {
     Index(usize),
     Key(VVal),
 }
@@ -389,10 +389,10 @@ impl FormatState {
     }
 }
 
-pub type FormatNode = Box<dyn Fn(&mut FormatState, &[VVal]) -> std::fmt::Result>;
-pub type CountNode  = Box<dyn Fn(&mut FormatState, &[VVal]) -> usize>;
+pub(crate) type FormatNode = Box<dyn Fn(&mut FormatState, &[VVal]) -> std::fmt::Result>;
+pub(crate) type CountNode  = Box<dyn Fn(&mut FormatState, &[VVal]) -> usize>;
 
-pub fn compile_count(count: &VVal) -> CountNode {
+pub(crate) fn compile_count(count: &VVal) -> CountNode {
     if count.v_with_s_ref(0, |s| s == "count") {
         let count = count.v_i(1);
         Box::new(move |_fs: &mut FormatState, _args: &[VVal]| -> usize {
@@ -407,7 +407,7 @@ pub fn compile_count(count: &VVal) -> CountNode {
 }
 
 #[allow(clippy::many_single_char_names)]
-pub fn write_vval<F>(arg: &VVal, fs: &mut FormatState, ct: CastType, mut f: F) -> std::fmt::Result
+pub(crate) fn write_vval<F>(arg: &VVal, fs: &mut FormatState, ct: CastType, mut f: F) -> std::fmt::Result
     where F: FnMut(&mut FormatState, &VVal) -> std::fmt::Result
 {
     use crate::nvec::NVec;
@@ -514,7 +514,7 @@ pub fn write_vval<F>(arg: &VVal, fs: &mut FormatState, ct: CastType, mut f: F) -
     Ok(())
 }
 
-pub fn with_format_arg_write<F>(arg: &FormatArg, args: &[VVal], fs: &mut FormatState, ct: CastType, f: F) -> std::fmt::Result
+pub(crate) fn with_format_arg_write<F>(arg: &FormatArg, args: &[VVal], fs: &mut FormatState, ct: CastType, f: F) -> std::fmt::Result
     where F: FnMut(&mut FormatState, &VVal) -> std::fmt::Result
 {
     match arg {
@@ -561,9 +561,9 @@ macro_rules! align_write {
     };
 }
 
-pub type AlignNode  = Box<dyn Fn(&mut FormatState, &[VVal], usize) -> std::fmt::Result>;
+pub(crate) type AlignNode  = Box<dyn Fn(&mut FormatState, &[VVal], usize) -> std::fmt::Result>;
 
-pub fn compile_align_fun(fill: String, width: Option<CountNode>, align: i64) -> AlignNode {
+pub(crate) fn compile_align_fun(fill: String, width: Option<CountNode>, align: i64) -> AlignNode {
     if let Some(width) = width {
         Box::new(move |fs: &mut FormatState, args: &[VVal], len: usize| -> std::fmt::Result {
             let align = if align == 0 { -1 } else { align };
@@ -610,7 +610,7 @@ pub fn compile_align_fun(fill: String, width: Option<CountNode>, align: i64) -> 
 }
 
 #[allow(clippy::collapsible_if)]
-pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
+pub(crate) fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
     let width = fmt.get_key("width");
     let width : Option<CountNode> =
         if let Some(width) = width {
@@ -802,7 +802,7 @@ pub fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
     }
 }
 
-pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
+pub(crate) fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
     let mut fmts : Vec<FormatNode> = vec![];
 
     let mut max_argc = 0;
@@ -854,6 +854,30 @@ pub fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
     }), max_argc as usize)
 }
 
+/// This function takes a VVal::Str or VVal::Byt and parses it as formatting
+/// template. The return value is a VVal with a function that takes
+/// as many arguments as specified in the formatting template.
+///
+///```
+/// use wlambda::{VVal, EvalContext};
+/// use wlambda::formatter::create_formatter_fun;
+///
+/// let mut ctx = EvalContext::new_default();
+///
+/// let fmt_src = VVal::new_str("a {} in {:8.3}");
+/// match create_formatter_fun(&fmt_src) {
+///     Ok(fun) => {
+///         let ret =
+///             ctx.call(
+///                 &fun,
+///                 &[VVal::new_str("b"),
+///                   VVal::Flt(43.29432)])
+///                .unwrap();
+///         assert_eq!(ret.s_raw(), "a b in   43.294");
+///     },
+///     Err(e) => { panic!(format!("Bad formatter: {}", e)); }
+/// }
+///```
 pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
     let (is_bytes, fmt_str) =
         if let VVal::Byt(bytes) = fmt {
