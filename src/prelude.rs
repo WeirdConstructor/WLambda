@@ -7758,13 +7758,13 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "+>",
         |env: &mut Env, argc: usize| {
-            use crate::vm::collection_add;
+            use crate::compiler::collection_add;
             collection_add(env, argc, CollectionAdd::Push)
         }, None, None, false);
 
     func!(st, "<+",
         |env: &mut Env, argc: usize| {
-            use crate::vm::collection_add;
+            use crate::compiler::collection_add;
             collection_add(env, argc, CollectionAdd::Unshift)
         }, None, None, false);
 

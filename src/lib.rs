@@ -626,6 +626,7 @@ pub mod csv;
 pub mod selector;
 pub mod struct_pattern;
 pub mod formatter;
+mod prog_writer;
 mod io;
 mod str_int;
 
@@ -636,5 +637,15 @@ pub use vval::VValUserData;
 pub use threads::AVal;
 pub use compiler::GlobalEnv;
 pub use compiler::EvalContext;
-pub use compiler::eval;
 pub use compiler::SymbolTable;
+
+/// Evaluates a piece of WLambda code in a default global environment.
+///
+/// ```
+/// println!("> {}", wlambda::eval("${a = 10, b = 20}").unwrap().s());
+/// ```
+#[allow(dead_code)]
+pub fn eval(s: &str) -> Result<VVal, crate::compiler::EvalError>  {
+    let mut ctx = EvalContext::new_default();
+    ctx.eval(s)
+}

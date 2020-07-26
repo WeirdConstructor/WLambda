@@ -1,7 +1,4 @@
 use wlambda::*;
-use wlambda::compiler::{CompileEnv, ResPos, ResValue};
-use wlambda::vm::*;
-use wlambda::ops::Prog;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -21,41 +18,9 @@ pub fn v2s(s: &str) -> String {
     }
 }
 
-pub fn ve(s: &str) -> String {
-    let global = GlobalEnv::new_default();
-    match parser::parse(s, "<compiler:s_eval>") {
-        Ok(ast) => {
-            let mut ce = CompileEnv::new(global.clone());
-            match vm_compile2(&ast, &mut ce) {
-                Ok(prog) => {
-                    let local_space = ce.borrow().get_local_space();
-
-                    let mut p = Prog::new();
-                    prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));
-                    p.op_end();
-
-                    let mut e = Env::new(global);
-                    e.push(VVal::Int(10));
-                    e.push(VVal::Flt(14.4));
-                    e.argc = 2;
-                    e.set_bp(0);
-                    e.push_sp(local_space);
-
-                    match vm(&p, &mut e) {
-                        Ok(v) => v.s(),
-                        Err(je) => {
-                            format!("EXEC ERR: Caught {:?}", je)
-                        }
-                    }
-                },
-                Err(re) => format!("COMPILE ERROR: {}", re),
-            }
-        }
-        Err(e)  => format!("PARSE ERROR: {}", e),
-    }
+fn ve(s: &str) -> String {
+    wlambda::compiler::test_eval_to_string(s)
 }
-
-
 
 #[test]
 fn check_function_string_rep() {
