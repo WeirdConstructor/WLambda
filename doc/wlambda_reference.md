@@ -383,6 +383,8 @@ Smalltalk, LISP and Perl.
     - [12.6.2](#1262-stdrandsplitmix64newfrom-seed) std:rand:split\_mix64\_new\_from _seed_
     - [12.6.3](#1263-stdrandsplitmix64next-smstate-count) std:rand:split\_mix64\_next _sm\_state_ \[_count_]
     - [12.6.4](#1264-stdrandsplitmix64nextopen01-smstate-count) std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
+    - [12.6.5](#1265-stdrandsplitmix64nextopenclosed01-smstate-count) std:rand:split\_mix64\_next\_open\_closed01 _sm\_state_ \[_count_]
+    - [12.6.6](#1266-stdrandsplitmix64nextclosedopen01-smstate-count) std:rand:split\_mix64\_next\_closed\_open01 _sm\_state_ \[_count_]
   - [12.7](#127-utility-functions) Utility Functions
     - [12.7.1](#1271-stddumpupvals-function) std:dump\_upvals _function_
     - [12.7.2](#1272-stdwlambdaversion) std:wlambda:version
@@ -1157,13 +1159,16 @@ std:srand[];
 std:srand 1000;
 ```
 
-#### <a name="266-stdrand-max"></a>2.6.6 - std:rand [_max_]
+#### <a name="266-stdrand-max"></a>2.6.6 - std:rand [_max-or-mode_]
 
 Returns a random number between 0 and _max_.  The interval 0
-to _max_ is closed/open, that means 0 is included but _max_
+to _max-or-mode_ is closed/open, that means 0 is included but _max-or-mode_
 is not included.
 
-If _max_ is not provided, a float number between 0.0
+If _max-or-mode_ is a string `"i64"` or symbol `:i64`, then std:rand will
+return a random signed 64 bit integer.
+
+If _max-or-mode_ is not provided, a float number between 0.0
 and 1.0 (including 0.0 but not including 1.0) is returned.
 
 ```wlambda
@@ -1183,6 +1188,10 @@ std:assert count_100 == 0;
 std:assert std:rand[] < 1.0;
 std:assert std:rand[] >= 0.0;
 ```
+
+Please note: The PRNG algorithm used for `std:rand` may change
+without further notice. If you require your project to have consistent
+PRNG results across all WLambda versions use `std:rand:split_mix64_*`.
 
 ### <a name="27-function-utilities"></a>2.7 - Function utilities
 
@@ -5949,6 +5958,16 @@ Shuffles the _vec_ in place. The function _rand_func_ needs to return
 a random 64 bit integer on each call. Here is an example:
 
 ```wlambda
+std:srand 1234;
+!vec = $[1,2,3,4,5,6,7,8];
+std:shuffle { std:rand :i64 } vec;
+
+std:assert_eq (str vec) "$[2,1,7,4,8,5,3,6]";
+```
+
+An Example with std:rand:split\_mix64\_next:
+
+```wlambda
 !sm  = std:rand:split_mix64_new_from 1234;
 !vec = $[1,2,3,4,5,6,7,8];
 std:shuffle { std:rand:split_mix64_next sm } vec;
@@ -7101,6 +7120,16 @@ Returns the _count_ next integer values generated from the given
 _sm_state_.
 
 #### <a name="1264-stdrandsplitmix64nextopen01-smstate-count"></a>12.6.4 - std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
+
+Returns the _count_ next float values (in an open [0, 1) interval)
+generated from the given _sm_state_.
+
+#### <a name="1265-stdrandsplitmix64nextopenclosed01-smstate-count"></a>12.6.5 - std:rand:split\_mix64\_next\_open\_closed01 _sm\_state_ \[_count_]
+
+Returns the _count_ next float values (in an open (0, 1] interval)
+generated from the given _sm_state_.
+
+#### <a name="1266-stdrandsplitmix64nextclosedopen01-smstate-count"></a>12.6.6 - std:rand:split\_mix64\_next\_closed\_open01 _sm\_state_ \[_count_]
 
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.

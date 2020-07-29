@@ -55,6 +55,12 @@ pub fn rand_i(max: u64) -> i64 {
     })
 }
 
+pub fn rand_full_i() -> i64 {
+    RAND_STATE.with(|si| {
+        si.borrow_mut().next_i64()
+    })
+}
+
 /// The `SplitMix64` random number generator.
 #[derive(Copy, Clone)]
 pub struct SplitMix64(pub u64);
