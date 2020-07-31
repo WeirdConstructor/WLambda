@@ -58,7 +58,7 @@ Smalltalk, LISP and Perl.
     - [2.6.3](#263-stdtodrop-function-or-raii-destructors-or-drop-functions) std:to\_drop _function_ (or RAII, Destructors or Drop Functions)
     - [2.6.4](#264-stdtimenow-unit) std:time:now [_unit_]
     - [2.6.5](#265-stdsrand-seed) std:srand [_seed_]
-    - [2.6.6](#266-stdrand-max) std:rand [_max_]
+    - [2.6.6](#266-stdrand-max-or-mode) std:rand [_max-or-mode_]
   - [2.7](#27-function-utilities) Function utilities
     - [2.7.1](#271-isfun-value) is\_fun _value_
 - [3](#3-data-types) Data Types
@@ -338,10 +338,11 @@ Smalltalk, LISP and Perl.
     - [11.0.19](#11019-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
     - [11.0.20](#11020-stdmeasuretime-unit-function) std:measure\_time _unit_ _function_
   - [11.1](#111-io) I/O
-    - [11.1.1](#1111-stdiofilereadtext-filename) std:io:file:read\_text _filename_
-    - [11.1.2](#1112-stdiofileread-filename) std:io:file:read _filename_
-    - [11.1.3](#1113-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
-    - [11.1.4](#1114-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
+    - [11.1.1](#1111-stdioline) std:io:line
+    - [11.1.2](#1112-stdiofilereadtext-filename) std:io:file:read\_text _filename_
+    - [11.1.3](#1113-stdiofileread-filename) std:io:file:read _filename_
+    - [11.1.4](#1114-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
+    - [11.1.5](#1115-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
   - [11.2](#112-file-system) File System
     - [11.2.1](#1121-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
   - [11.3](#113-threading) Threading
@@ -1173,13 +1174,16 @@ std:srand[];
 std:srand 1000;
 ```
 
-#### <a name="266-stdrand-max"></a>2.6.6 - std:rand [_max_]
+#### <a name="266-stdrand-max-or-mode"></a>2.6.6 - std:rand [_max-or-mode_]
 
 Returns a random number between 0 and _max_.  The interval 0
-to _max_ is closed/open, that means 0 is included but _max_
+to _max-or-mode_ is closed/open, that means 0 is included but _max-or-mode_
 is not included.
 
-If _max_ is not provided, a float number between 0.0
+If _max-or-mode_ is a string `"i64"` or symbol `:i64`, then std:rand will
+return a random signed 64 bit integer.
+
+If _max-or-mode_ is not provided, a float number between 0.0
 and 1.0 (including 0.0 but not including 1.0) is returned.
 
 ```wlambda
@@ -6312,7 +6316,17 @@ std:assert_eq res.1 4999950000;
 
 ### <a name="111-io"></a>11.1 - I/O
 
-#### <a name="1111-stdiofilereadtext-filename"></a>11.1.1 - std:io:file:read\_text _filename_
+#### <a name="1111-stdioline"></a>11.1.1 - std:io:line
+
+Reads a line from standard input and returns it. Returns an error if something
+went wrong.
+
+```
+!line = unwrap std:io:line[];
+std:displayln "you entered: " std:str:trim_end[line];
+```
+
+#### <a name="1112-stdiofilereadtext-filename"></a>11.1.2 - std:io:file:read\_text _filename_
 
 Opens the file _filename_ and returns its contents interpreted as UTF8
 text as string.
@@ -6324,7 +6338,7 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading text from file works";
 ```
 
-#### <a name="1112-stdiofileread-filename"></a>11.1.2 - std:io:file:read _filename_
+#### <a name="1113-stdiofileread-filename"></a>11.1.3 - std:io:file:read _filename_
 
 Opens the file _filename_ and returns its contents as byte buffer.
 
@@ -6336,13 +6350,13 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading binary from file works";
 ```
 
-#### <a name="1113-stdiofilewritesafe-filename-bytes-or-string"></a>11.1.3 - std:io:file:write\_safe _filename_ _bytes-or-string_
+#### <a name="1114-stdiofilewritesafe-filename-bytes-or-string"></a>11.1.4 - std:io:file:write\_safe _filename_ _bytes-or-string_
 
 Creates a new file with the given filename but with a "~" appended
 and writes the contents into it. After successful write, it renames
 the file to the given filename.
 
-#### <a name="1114-stdiofileappend-filename-bytes-or-string"></a>11.1.4 - std:io:file:append _filename_ _bytes-or-string_
+#### <a name="1115-stdiofileappend-filename-bytes-or-string"></a>11.1.5 - std:io:file:append _filename_ _bytes-or-string_
 
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
