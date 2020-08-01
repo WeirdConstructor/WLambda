@@ -1,4 +1,4 @@
-std:io:file:copy "doc/wlambda_reference.md" "doc/wlambda_reference.bak";
+std:fs:copy "doc/wlambda_reference.md" "doc/wlambda_reference.bak";
 !ref_doc_md = std:io:file:read_text "doc/wlambda_reference.md";
 
 !make_new_section_str = { std:str:cat _.1 " - " _.2 };
@@ -104,7 +104,7 @@ std:io:file:write_safe "doc/wlambda_reference.md" orig;
 # Now load prelude.rs and replace the REFERENCE DOC START  ... END with
 # the generated documentation in the variable `orig`:
 
-std:io:file:copy "src/prelude.rs" "src/prelude.bak";
+std:fs:copy "src/prelude.rs" "src/prelude.bak";
 !prelude_rs = std:io:file:read_text "src/prelude.rs";
 
 .prelude_rs = prelude_rs | std:re:replace_all $q_(?s)\[\]: ---- REFERENCE DOC START ----.*?\[\]: ---- REFERENCE DOC END ----_ {||

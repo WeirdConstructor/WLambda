@@ -339,12 +339,14 @@ Smalltalk, LISP and Perl.
     - [11.0.20](#11020-stdmeasuretime-unit-function) std:measure\_time _unit_ _function_
   - [11.1](#111-io) I/O
     - [11.1.1](#1111-stdioline) std:io:line
-    - [11.1.2](#1112-stdiofilereadtext-filename) std:io:file:read\_text _filename_
-    - [11.1.3](#1113-stdiofileread-filename) std:io:file:read _filename_
-    - [11.1.4](#1114-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
-    - [11.1.5](#1115-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
+    - [11.1.2](#1112-stdiolines-value) std:io:lines [_value_]
+    - [11.1.3](#1113-stdiofilereadtext-filename) std:io:file:read\_text _filename_
+    - [11.1.4](#1114-stdiofileread-filename) std:io:file:read _filename_
+    - [11.1.5](#1115-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
+    - [11.1.6](#1116-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
   - [11.2](#112-file-system) File System
     - [11.2.1](#1121-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
+    - [11.2.2](#1122-stdfscopy-src-file-path-dst-file-path) std:fs:copy _src-file-path_ _dst-file-path_
   - [11.3](#113-threading) Threading
     - [11.3.1](#1131-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
     - [11.3.2](#1132-stdthreadsleep-duration) std:thread:sleep _duration_
@@ -6326,7 +6328,24 @@ went wrong.
 std:displayln "you entered: " std:str:trim_end[line];
 ```
 
-#### <a name="1112-stdiofilereadtext-filename"></a>11.1.2 - std:io:file:read\_text _filename_
+#### <a name="1112-stdiolines-value"></a>11.1.2 - std:io:lines [_value_]
+
+Calls the given _value_ for each line in standard input until EOF and returns
+the last returned value from that call.  If _value_ is not given, all lines
+will be appended to a new vector and returned.  Returns an error if some IO
+error occured.
+
+```
+!lines = std:io:lines[];
+
+!lines = $@v std:io:lines $+;
+
+std:io:lines {!(line) = @;
+    std:displayln "You entered: [" std:str:trim[line] "]";
+};
+```
+
+#### <a name="1113-stdiofilereadtext-filename"></a>11.1.3 - std:io:file:read\_text _filename_
 
 Opens the file _filename_ and returns its contents interpreted as UTF8
 text as string.
@@ -6338,7 +6357,7 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading text from file works";
 ```
 
-#### <a name="1113-stdiofileread-filename"></a>11.1.3 - std:io:file:read _filename_
+#### <a name="1114-stdiofileread-filename"></a>11.1.4 - std:io:file:read _filename_
 
 Opens the file _filename_ and returns its contents as byte buffer.
 
@@ -6350,13 +6369,13 @@ std:io:file:write_safe "prelude_test.txt" "abcäöü";
 std:assert_eq t "abcäöü" "reading binary from file works";
 ```
 
-#### <a name="1114-stdiofilewritesafe-filename-bytes-or-string"></a>11.1.4 - std:io:file:write\_safe _filename_ _bytes-or-string_
+#### <a name="1115-stdiofilewritesafe-filename-bytes-or-string"></a>11.1.5 - std:io:file:write\_safe _filename_ _bytes-or-string_
 
 Creates a new file with the given filename but with a "~" appended
 and writes the contents into it. After successful write, it renames
 the file to the given filename.
 
-#### <a name="1115-stdiofileappend-filename-bytes-or-string"></a>11.1.5 - std:io:file:append _filename_ _bytes-or-string_
+#### <a name="1116-stdiofileappend-filename-bytes-or-string"></a>11.1.6 - std:io:file:append _filename_ _bytes-or-string_
 
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
@@ -6369,6 +6388,11 @@ Renames the file at _file-path_ to the new name _new-file-name_. This
 usually does only work on a single file system.
 Returns `$true` if renaming was successful, and an error object if it was not
 successful.
+
+#### <a name="1122-stdfscopy-src-file-path-dst-file-path"></a>11.2.2 - std:fs:copy _src-file-path_ _dst-file-path_
+
+Copies the file _src-file-path_ to the _dst-file-path_.
+Returns an error if something went wrong.
 
 ### <a name="113-threading"></a>11.3 - Threading
 
@@ -8741,6 +8765,24 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::Flt(x * x * (3.0 - (2.0 * x))))
         }, Some(3), Some(3), false);
 
+    func!(st, "fs:copy",
+        |env: &mut Env, _argc: usize| {
+            let from = env.arg(0).s_raw();
+            let to   = env.arg(1).s_raw();
+
+            use std::path::Path;
+
+            match std::fs::copy(Path::new(&from), Path::new(&to)) {
+                Ok(_) => Ok(VVal::Bol(true)),
+                Err(e) => {
+                    Ok(env.new_err(
+                        format!(
+                            "Couldn't copy file '{}' to file '{}': {}",
+                            from, to, e)))
+                },
+            }
+        }, Some(2), Some(2), false);
+
     func!(st, "fs:rename",
         |env: &mut Env, _argc: usize| {
             let from = env.arg(0);
@@ -8778,9 +8820,15 @@ pub fn std_symbol_table() -> SymbolTable {
         }, Some(0), Some(0), false);
 
     func!(st, "io:lines",
-        |env: &mut Env, _argc: usize| {
-            let f = env.arg(0);
+        |env: &mut Env, argc: usize| {
+            let mut f = env.arg(0);
             let mut ret = VVal::None;
+
+            if argc == 0 {
+                f = VVal::vec();
+                ret = f.clone();
+            }
+
             loop {
                 let mut line = String::new();
                 {
@@ -8794,18 +8842,22 @@ pub fn std_symbol_table() -> SymbolTable {
                     }
                 }
 
-                env.push(VVal::new_str_mv(line));
-                match f.call_internal(env, 1) {
-                    Ok(v)                      => { ret = v; },
-                    Err(StackAction::Break(v)) => { env.popn(1); return Ok(*v); },
-                    Err(StackAction::Next)     => { },
-                    Err(e)                     => { env.popn(1); return Err(e); }
+                if f.is_vec() {
+                    f.push(VVal::new_str_mv(line));
+                } else {
+                    env.push(VVal::new_str_mv(line));
+                    match f.call_internal(env, 1) {
+                        Ok(v)                      => { ret = v; },
+                        Err(StackAction::Break(v)) => { env.popn(1); return Ok(*v); },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { env.popn(1); return Err(e); }
+                    }
+                    env.popn(1);
                 }
-                env.popn(1);
             }
 
             Ok(ret)
-        }, Some(1), Some(1), false);
+        }, Some(0), Some(1), false);
 
     func!(st, "io:stdout:flush",
         |env: &mut Env, _argc: usize| {
@@ -8916,24 +8968,6 @@ pub fn std_symbol_table() -> SymbolTable {
                 },
             }
         }, Some(1), Some(1), false);
-
-    func!(st, "io:file:copy",
-        |env: &mut Env, _argc: usize| {
-            let from = env.arg(0).s_raw();
-            let to   = env.arg(1).s_raw();
-
-            use std::path::Path;
-
-            match std::fs::copy(Path::new(&from), Path::new(&to)) {
-                Ok(_) => Ok(VVal::Bol(true)),
-                Err(e) => {
-                    Ok(env.new_err(
-                        format!(
-                            "Couldn't copy file '{}' to file '{}': {}",
-                            from, to, e)))
-                },
-            }
-        }, Some(2), Some(2), false);
 
     func!(st, "io:file:write_safe",
         |env: &mut Env, _argc: usize| {

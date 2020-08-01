@@ -1,8 +1,10 @@
 0.6.3 (unreleased)
 ==================
 
+* Incompatible Change: Renamed `std:io:file:copy` to `std:fs:copy`.
 * Feature: `std:rand :i64` now returns an integer in the full i64 range.
-* Documentation: Improved `std:shuffle` documentation.
+* Documentation: Improved `std:shuffle` documentation, and added more missing
+function documentation.
 
 0.6.2 (2020-07-20)
 ==================
