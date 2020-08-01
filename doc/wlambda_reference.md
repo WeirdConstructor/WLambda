@@ -330,6 +330,10 @@ Smalltalk, LISP and Perl.
     - [11.1.4](#1114-stdiofileread-filename) std:io:file:read _filename_
     - [11.1.5](#1115-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
     - [11.1.6](#1116-stdiofileappend-filename-bytes-or-string) std:io:file:append _filename_ _bytes-or-string_
+    - [11.1.7](#1117-stdiostdoutnewline) std:io:stdout:newline
+    - [11.1.8](#1118-stdiostdoutflush) std:io:stdout:flush
+    - [11.1.9](#1119-stdiostdoutprint-value) std:io:stdout:print _value_
+    - [11.1.10](#11110-stdiostdoutwrite-value) std:io:stdout:write _value_
   - [11.2](#112-file-system) File System
     - [11.2.1](#1121-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
     - [11.2.2](#1122-stdfscopy-src-file-path-dst-file-path) std:fs:copy _src-file-path_ _dst-file-path_
@@ -368,7 +372,8 @@ Smalltalk, LISP and Perl.
     - [12.1.5](#1215-stddesercsv-fielddelim-rowseparator-data) std:deser:csv _field\_delim_ _row\_separator_ _data_
     - [12.1.6](#1216-stdsermsgpack-data) std:ser:msgpack _data_
     - [12.1.7](#1217-stddesermsgpack-bytes) std:deser:msgpack _bytes_
-  - [12.2](#122-regex) regex
+  - [12.2](#122-regular-expressions-more-classic-syntax) Regular Expressions (more classic syntax)
+    - [12.2.1](#1221-stdrematch-regex-string-input-string-function) std:re:match _regex-string_ _input-string_ _function_
   - [12.3](#123-chrono) chrono
     - [12.3.1](#1231-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
   - [12.4](#124-color-conversion) color conversion
@@ -4156,6 +4161,10 @@ Here is an overview of the data type calling semantics:
 | `$false`  | `$[1,2]`          | Will return the first element `1` of the list. |
 | symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
+| $p(int_from, int_count) | vector | Vector slice operation. |
+| $i(int_from, int_count) | vector | Vector slice operation. |
+| $p(int_from, int_count) | iterator | Iterator result list slice operation. |
+| $i(int_from, int_count) | iterator | Iterator result list slice operation. |
 | $p(int_from, int_count) | string | Substring operation. (See also section about pairs) |
 | $i(int_from, int_count, ...) | string | Substring operation. |
 | string | $i(int_from, int_count, ...) | Substring operation. |
@@ -6366,6 +6375,34 @@ the file to the given filename.
 Opens the given filename in append mode and appends _bytes-or-string_ to the
 end of the file.
 
+#### <a name="1117-stdiostdoutnewline"></a>11.1.7 - std:io:stdout:newline
+
+Writes a newline to standard output. Returns an error if an error occured or
+`$true` otherwise.
+
+#### <a name="1118-stdiostdoutflush"></a>11.1.8 - std:io:stdout:flush
+
+Flushes the standard output buffer. Returns an error if an error occured or
+`$true` otherwise.
+
+#### <a name="1119-stdiostdoutprint-value"></a>11.1.9 - std:io:stdout:print _value_
+
+Writes the given _value_ to standard output in a human readable form like `std:displayln`
+does. Returns an error if an error occured. `$true` if everything is fine.
+
+```
+std:io:stdout:write "xxx"; # => Writes `xxx` to standard output
+```
+
+#### <a name="11110-stdiostdoutwrite-value"></a>11.1.10 - std:io:stdout:write _value_
+
+Writes a WLambda representation of _value_ to standard output.
+Returns an error if an error occured. `$true` if everything is fine.
+
+```
+std:io:stdout:write "xxx"; # => Writes `"xxx"` to standard output
+```
+
 ### <a name="112-file-system"></a>11.2 - File System
 
 #### <a name="1121-stdfsrename-file-path-new-file-name"></a>11.2.1 - std:fs:rename _file-path_ _new-file-name_
@@ -6974,8 +7011,29 @@ Deserializes the msgpack bytes value into a data structure.
 std:assert_eq (std:deser:msgpack $b"\xC4\x03abc") $b"abc";
 ```
 
-### <a name="122-regex"></a>12.2 - regex
+### <a name="122-regular-expressions-more-classic-syntax"></a>12.2 - Regular Expressions (more classic syntax)
 
+WLambda supports a more common form of regular expression syntax
+if the "regex" feature is enabled when compiling WLambda.
+
+It uses the regex syntax as described in the Rust "regex" crate:
+[https://docs.rs/regex/newest/regex/](https://docs.rs/regex/newest/regex/#syntax).
+
+#### <a name="1221-stdrematch-regex-string-input-string-function"></a>12.2.1 - std:re:match _regex-string_ _input-string_ _function_
+
+If the given regular expression _regex-string_ matches the given _input-string_
+the _function_ will be called with a vector containing the matched string
+and the captures as first argument.
+The return value is the return value of the function call or `$none`.
+Returns an error if the _regex-string_ has a syntax error.
+
+```wlambda
+!ret = std:re:match $q|(\d+)-(\d+)-(\d+)| "2020-05-01" {
+    std:str:join "." std:reverse <& (1 => 3) <&_;
+};
+
+std:assert_str_eq ret "01.05.2020";
+```
 
 ### <a name="123-chrono"></a>12.3 - chrono
 

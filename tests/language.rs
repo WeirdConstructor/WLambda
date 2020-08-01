@@ -4329,3 +4329,23 @@ fn check_write_str() {
     assert_eq!(ve("std:write_str $&&10"),           "\"$&&10\"");
     assert_eq!(ve("std:write_str \"foo\""),         "\"\\\"foo\\\"\"");
 }
+
+#[test]
+fn check_slice() {
+    assert_eq!(ve("$p(2, 2) $q ABCDEF "),           "\"CD\"");
+    assert_eq!(ve("$p(2, 2) $Q ABCDEF "),           "$b\"CD\"");
+    assert_eq!(ve("$p(2, 2) $[1,2,3,4,5]"),         "$[3,4]");
+    assert_eq!(ve("$p(2, 2) $iter $[1,2,3,4,5]"),   "$[3,4]");
+    assert_eq!(ve("$i(2, 2) $q ABCDEF "),           "\"CD\"");
+    assert_eq!(ve("$i(2, 2) $Q ABCDEF "),           "$b\"CD\"");
+    assert_eq!(ve("$i(2, 2) $[1,2,3,4,5]"),         "$[3,4]");
+    assert_eq!(ve("$i(2, 2) $iter $[1,2,3,4,5]"),   "$[3,4]");
+}
+
+#[test]
+fn check_reverse() {
+    assert_eq!(ve("std:reverse $q ABCDEF "),        "\"FEDCBA\"");
+    assert_eq!(ve("std:reverse $Q ABCDEF "),        "$b\"FEDCBA\"");
+    assert_eq!(ve("std:reverse $[1,2,3,4]"),        "$[4,3,2,1]");
+    assert_eq!(ve("std:reverse $iter $[1,2,3,4]"),  "$[4,3,2,1]");
+}

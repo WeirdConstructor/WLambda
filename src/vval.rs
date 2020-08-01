@@ -1857,6 +1857,28 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                  .skip(from as usize)
                  .take(cnt as usize).collect())
         },
+        VVal::Lst(l) => {
+            let v : Vec<VVal> =
+                l.borrow()
+                 .iter()
+                 .skip(from as usize)
+                 .take(cnt as usize)
+                 .cloned()
+                 .collect();
+            VVal::vec_mv(v)
+        },
+        VVal::Iter(i) => {
+            let mut out = Vec::with_capacity(cnt as usize);
+            let mut i = i.borrow_mut();
+            let mut idx = 0;
+            while let Some((v, _)) = i.next() {
+                if idx >= (from as usize) && idx < ((from + cnt) as usize) {
+                    out.push(v);
+                }
+                idx += 1;
+            }
+            VVal::vec_mv(out)
+        },
         _ => VVal::None,
     }
 }
@@ -1959,6 +1981,22 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                             needle.as_ref(), replace.as_ref()))
                 },
                 _ => VVal::None
+            }
+        },
+        VVal::Lst(_) => {
+            match (a, b) {
+                (VVal::Int(from), VVal::Int(cnt)) => {
+                    range_extract(*from, *cnt, val)
+                },
+                _ => VVal::None,
+            }
+        },
+        VVal::Iter(_) => {
+            match (a, b) {
+                (VVal::Int(from), VVal::Int(cnt)) => {
+                    range_extract(*from, *cnt, val)
+                },
+                _ => VVal::None,
             }
         },
         _ => VVal::None
@@ -2290,6 +2328,30 @@ impl VVal {
             }));
 
         VVal::new_byt(bv)
+    }
+
+    pub fn reverse(&self) -> VVal {
+        match self.deref() {
+            VVal::Str(s) => {
+                VVal::new_str_mv(s.chars().rev().collect::<String>())
+            },
+            VVal::Byt(b) => {
+                VVal::new_byt(b.iter().rev().copied().collect::<Vec<u8>>())
+            },
+            VVal::Lst(l) => {
+                VVal::vec_mv(l.borrow().iter().rev().cloned().collect::<Vec<VVal>>())
+            },
+            VVal::Iter(i) => {
+                let mut out = vec![];
+                let mut i = i.borrow_mut();
+                while let Some((v, _)) = i.next() {
+                    out.push(v);
+                }
+                out.reverse();
+                VVal::vec_mv(out)
+            },
+            _ => VVal::None
+        }
     }
 
     #[allow(clippy::while_let_on_iterator)]
