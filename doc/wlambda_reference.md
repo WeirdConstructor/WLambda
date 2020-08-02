@@ -7075,6 +7075,10 @@ and the function that is called if the regex matches as second parameter.
 std:assert_str_eq ret "01.05.2020";
 ```
 
+#### - std:re:map _regex-string_ _function_ _input-string_
+
+
+
 ### <a name="123-chrono"></a>12.3 - chrono
 
 #### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]
