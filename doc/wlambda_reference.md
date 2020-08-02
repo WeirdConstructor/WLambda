@@ -7056,6 +7056,25 @@ Returns an error if the _regex-string_ has a syntax error.
 std:assert_str_eq ret "01.05.2020";
 ```
 
+#### - std:re:match\_compile _regex-string_
+
+This function compiles the given _regex-string_ and returns a function that
+will execute the regex matching. If the syntax in _regex-string_ is wrong,
+an error is returned.
+
+The returned function takes the string to match against as first parameter
+and the function that is called if the regex matches as second parameter.
+
+```wlambda
+!match_fun = std:re:match_compile $q|(\d+)-(\d+)-(\d+)|;
+
+!ret = match_fun "2020-05-01" {
+    std:str:join "." std:reverse <& (1 => 3) <&_;
+};
+
+std:assert_str_eq ret "01.05.2020";
+```
+
 ### <a name="123-chrono"></a>12.3 - chrono
 
 #### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]
