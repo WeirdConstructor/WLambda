@@ -1857,6 +1857,280 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                  .skip(from as usize)
                  .take(cnt as usize).collect())
         },
+        VVal::IVec(b) => {
+            let mut v = vec![];
+            match b.as_ref() {
+                NVec::Vec2(a, b) => {
+                    if cnt == 1 {
+                        match from {
+                            0 => v.push(VVal::Int(*a)),
+                            1 => v.push(VVal::Int(*b)),
+                            _ => (),
+                        }
+                    } else if cnt > 1 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Int(*a));
+                                v.push(VVal::Int(*b));
+                            },
+                            1 => v.push(VVal::Int(*b)),
+                            _ => (),
+                        }
+                    }
+                },
+                NVec::Vec3(a, b, c) => {
+                    if cnt == 1 {
+                        match from {
+                            0 => v.push(VVal::Int(*a)),
+                            1 => v.push(VVal::Int(*b)),
+                            2 => v.push(VVal::Int(*c)),
+                            _ => (),
+                        }
+                    } else if cnt == 2 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Int(*a));
+                                v.push(VVal::Int(*b));
+                            },
+                            1 => {
+                                v.push(VVal::Int(*b));
+                                v.push(VVal::Int(*c));
+                            },
+                            2 => {
+                                v.push(VVal::Int(*c));
+                            },
+                            _ => (),
+                        }
+                    } else if cnt > 2 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Int(*a));
+                                v.push(VVal::Int(*b));
+                                v.push(VVal::Int(*c));
+                            },
+                            1 => {
+                                v.push(VVal::Int(*b));
+                                v.push(VVal::Int(*c));
+                            }
+                            2 => v.push(VVal::Int(*c)),
+                            _ => (),
+                        }
+                    }
+                },
+                NVec::Vec4(a, b, c, d) => {
+                    if cnt == 1 {
+                        match from {
+                            0 => v.push(VVal::Int(*a)),
+                            1 => v.push(VVal::Int(*b)),
+                            2 => v.push(VVal::Int(*c)),
+                            3 => v.push(VVal::Int(*d)),
+                            _ => (),
+                        }
+                    } else if cnt == 2 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Int(*a));
+                                v.push(VVal::Int(*b));
+                            },
+                            1 => {
+                                v.push(VVal::Int(*b));
+                                v.push(VVal::Int(*c));
+                            },
+                            2 => {
+                                v.push(VVal::Int(*c));
+                                v.push(VVal::Int(*d));
+                            },
+                            3 => {
+                                v.push(VVal::Int(*d));
+                            },
+                            _ => (),
+                        }
+                    } else if cnt == 3 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Int(*a));
+                                v.push(VVal::Int(*b));
+                                v.push(VVal::Int(*c));
+                            },
+                            1 => {
+                                v.push(VVal::Int(*b));
+                                v.push(VVal::Int(*c));
+                                v.push(VVal::Int(*d));
+                            },
+                            2 => {
+                                v.push(VVal::Int(*c));
+                                v.push(VVal::Int(*d));
+                            },
+                            3 => {
+                                v.push(VVal::Int(*d));
+                            },
+                            _ => (),
+                        }
+                    } else if cnt > 2 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Int(*a));
+                                v.push(VVal::Int(*b));
+                                v.push(VVal::Int(*c));
+                                v.push(VVal::Int(*d));
+                            },
+                            1 => {
+                                v.push(VVal::Int(*b));
+                                v.push(VVal::Int(*c));
+                                v.push(VVal::Int(*d));
+                            },
+                            2 => {
+                                v.push(VVal::Int(*c));
+                                v.push(VVal::Int(*d));
+                            },
+                            3 => {
+                                v.push(VVal::Int(*d));
+                            },
+                            _ => (),
+                        }
+                    }
+                }
+            }
+
+            VVal::vec_mv(v)
+        },
+        VVal::FVec(b) => {
+            let mut v = vec![];
+            match b.as_ref() {
+                NVec::Vec2(a, b) => {
+                    if cnt == 1 {
+                        match from {
+                            0 => v.push(VVal::Flt(*a)),
+                            1 => v.push(VVal::Flt(*b)),
+                            _ => (),
+                        }
+                    } else if cnt > 1 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Flt(*a));
+                                v.push(VVal::Flt(*b));
+                            },
+                            1 => v.push(VVal::Flt(*b)),
+                            _ => (),
+                        }
+                    }
+                },
+                NVec::Vec3(a, b, c) => {
+                    if cnt == 1 {
+                        match from {
+                            0 => v.push(VVal::Flt(*a)),
+                            1 => v.push(VVal::Flt(*b)),
+                            2 => v.push(VVal::Flt(*c)),
+                            _ => (),
+                        }
+                    } else if cnt == 2 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Flt(*a));
+                                v.push(VVal::Flt(*b));
+                            },
+                            1 => {
+                                v.push(VVal::Flt(*b));
+                                v.push(VVal::Flt(*c));
+                            },
+                            2 => {
+                                v.push(VVal::Flt(*c));
+                            },
+                            _ => (),
+                        }
+                    } else if cnt > 2 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Flt(*a));
+                                v.push(VVal::Flt(*b));
+                                v.push(VVal::Flt(*c));
+                            },
+                            1 => {
+                                v.push(VVal::Flt(*b));
+                                v.push(VVal::Flt(*c));
+                            }
+                            2 => v.push(VVal::Flt(*c)),
+                            _ => (),
+                        }
+                    }
+                },
+                NVec::Vec4(a, b, c, d) => {
+                    if cnt == 1 {
+                        match from {
+                            0 => v.push(VVal::Flt(*a)),
+                            1 => v.push(VVal::Flt(*b)),
+                            2 => v.push(VVal::Flt(*c)),
+                            3 => v.push(VVal::Flt(*d)),
+                            _ => (),
+                        }
+                    } else if cnt == 2 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Flt(*a));
+                                v.push(VVal::Flt(*b));
+                            },
+                            1 => {
+                                v.push(VVal::Flt(*b));
+                                v.push(VVal::Flt(*c));
+                            },
+                            2 => {
+                                v.push(VVal::Flt(*c));
+                                v.push(VVal::Flt(*d));
+                            },
+                            3 => {
+                                v.push(VVal::Flt(*d));
+                            },
+                            _ => (),
+                        }
+                    } else if cnt == 3 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Flt(*a));
+                                v.push(VVal::Flt(*b));
+                                v.push(VVal::Flt(*c));
+                            },
+                            1 => {
+                                v.push(VVal::Flt(*b));
+                                v.push(VVal::Flt(*c));
+                                v.push(VVal::Flt(*d));
+                            },
+                            2 => {
+                                v.push(VVal::Flt(*c));
+                                v.push(VVal::Flt(*d));
+                            },
+                            3 => {
+                                v.push(VVal::Flt(*d));
+                            },
+                            _ => (),
+                        }
+                    } else if cnt > 2 {
+                        match from {
+                            0 => {
+                                v.push(VVal::Flt(*a));
+                                v.push(VVal::Flt(*b));
+                                v.push(VVal::Flt(*c));
+                                v.push(VVal::Flt(*d));
+                            },
+                            1 => {
+                                v.push(VVal::Flt(*b));
+                                v.push(VVal::Flt(*c));
+                                v.push(VVal::Flt(*d));
+                            },
+                            2 => {
+                                v.push(VVal::Flt(*c));
+                                v.push(VVal::Flt(*d));
+                            },
+                            3 => {
+                                v.push(VVal::Flt(*d));
+                            },
+                            _ => (),
+                        }
+                    }
+                }
+            }
+
+            VVal::vec_mv(v)
+        },
         VVal::Lst(l) => {
             let v : Vec<VVal> =
                 l.borrow()
@@ -1992,6 +2266,22 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
             }
         },
         VVal::Iter(_) => {
+            match (a, b) {
+                (VVal::Int(from), VVal::Int(cnt)) => {
+                    range_extract(*from, *cnt, val)
+                },
+                _ => VVal::None,
+            }
+        },
+        VVal::IVec(_) => {
+            match (a, b) {
+                (VVal::Int(from), VVal::Int(cnt)) => {
+                    range_extract(*from, *cnt, val)
+                },
+                _ => VVal::None,
+            }
+        },
+        VVal::FVec(_) => {
             match (a, b) {
                 (VVal::Int(from), VVal::Int(cnt)) => {
                     range_extract(*from, *cnt, val)
@@ -2340,6 +2630,26 @@ impl VVal {
             },
             VVal::Lst(l) => {
                 VVal::vec_mv(l.borrow().iter().rev().cloned().collect::<Vec<VVal>>())
+            },
+            VVal::IVec(b) => {
+                match b.as_ref() {
+                    NVec::Vec2(a, b)       =>
+                        VVal::IVec(Box::new(NVec::Vec2(*b, *a))),
+                    NVec::Vec3(a, b, c)    =>
+                        VVal::IVec(Box::new(NVec::Vec3(*c, *b, *a))),
+                    NVec::Vec4(a, b, c, d) =>
+                        VVal::IVec(Box::new(NVec::Vec4(*d, *c, *b, *a))),
+                }
+            },
+            VVal::FVec(b) => {
+                match b.as_ref() {
+                    NVec::Vec2(a, b)       =>
+                        VVal::FVec(Box::new(NVec::Vec2(*b, *a))),
+                    NVec::Vec3(a, b, c)    =>
+                        VVal::FVec(Box::new(NVec::Vec3(*c, *b, *a))),
+                    NVec::Vec4(a, b, c, d) =>
+                        VVal::FVec(Box::new(NVec::Vec4(*d, *c, *b, *a))),
+                }
             },
             VVal::Iter(i) => {
                 let mut out = vec![];

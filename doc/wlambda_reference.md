@@ -314,15 +314,16 @@ Smalltalk, LISP and Perl.
     - [11.0.9](#1109-stdcmpnumdesc-a-b) std:cmp:num:desc _a_ _b_
     - [11.0.10](#11010-stdcmpstrasc-a-b) std:cmp:str:asc _a_ _b_
     - [11.0.11](#11011-stdcmpstrdesc-a-b) std:cmp:str:desc _a_ _b_
-    - [11.0.12](#11012-stddisplayln-arg1-) std:displayln _arg1_ ...
-    - [11.0.13](#11013-debug-arg1-) $DEBUG _arg1_ ...
-    - [11.0.14](#11014-stdwriteln-arg1-) std:writeln _arg1_ ...
-    - [11.0.15](#11015-stdeval-code-string) std:eval _code-string_
-    - [11.0.16](#11016-stdassert-bool-message) std:assert _bool_ \[_message_]
-    - [11.0.17](#11017-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
-    - [11.0.18](#11018-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
-    - [11.0.19](#11019-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
-    - [11.0.20](#11020-stdmeasuretime-unit-function) std:measure\_time _unit_ _function_
+    - [11.0.12](#11012-stdreverse-value) std:reverse _value_
+    - [11.0.13](#11013-stddisplayln-arg1-) std:displayln _arg1_ ...
+    - [11.0.14](#11014-debug-arg1-) $DEBUG _arg1_ ...
+    - [11.0.15](#11015-stdwriteln-arg1-) std:writeln _arg1_ ...
+    - [11.0.16](#11016-stdeval-code-string) std:eval _code-string_
+    - [11.0.17](#11017-stdassert-bool-message) std:assert _bool_ \[_message_]
+    - [11.0.18](#11018-stdasserteq-actual-expected-message) std:assert\_eq _actual_ _expected_ \[_message_]
+    - [11.0.19](#11019-stdassertstreq-actual-expected) std:assert\_str\_eq _actual_ _expected_
+    - [11.0.20](#11020-stdassertreleq-l-r-epsilon-message) std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+    - [11.0.21](#11021-stdmeasuretime-unit-function) std:measure\_time _unit_ _function_
   - [11.1](#111-io) I/O
     - [11.1.1](#1111-stdioline) std:io:line
     - [11.1.2](#1112-stdiolines-value) std:io:lines [_value_]
@@ -4163,6 +4164,8 @@ Here is an overview of the data type calling semantics:
 | map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
 | $p(int_from, int_count) | vector | Vector slice operation. |
 | $i(int_from, int_count) | vector | Vector slice operation. |
+| $p(int_from, int_count) | numeric vector | Creates a vector slice from a numeric vector. |
+| $i(int_from, int_count) | numeric vector | Creates a vector slice from a numeric vector. |
 | $p(int_from, int_count) | iterator | Iterator result list slice operation. |
 | $i(int_from, int_count) | iterator | Iterator result list slice operation. |
 | $p(int_from, int_count) | string | Substring operation. (See also section about pairs) |
@@ -6168,7 +6171,25 @@ std:assert_eq (std:cmp:str:desc "abc" "abc")  0;
 std:assert_eq (std:cmp:str:desc "abc" "abd") -1;
 ```
 
-#### <a name="11012-stddisplayln-arg1-"></a>11.0.12 - std:displayln _arg1_ ...
+#### <a name="11012-stdreverse-value"></a>11.0.12 - std:reverse _value_
+
+Reverses the given sequence of values. This works for following data types:
+
+- Strings
+- Byte vectors
+- Vectors
+- Numeric vectors
+- Iterators
+
+```wlambda
+std:assert_str_eq (std:reverse $[1, 2, 3, 4])       $[4,3,2,1];
+std:assert_str_eq (std:reverse "ABC")               "CBA";
+std:assert_str_eq (std:reverse $b"ABC")             $b"CBA";
+std:assert_str_eq (std:reverse $i(1,2,3,4))         $i(4,3,2,1);
+std:assert_str_eq (std:reverse $f(1.1,2.2,3.3,4.4)) $f(4.4,3.3,2.2,1.1);
+```
+
+#### <a name="11013-stddisplayln-arg1-"></a>11.0.13 - std:displayln _arg1_ ...
 
 This function writes a humand readable version of all the arguments
 (with a space inbetween) to the standard output. This means that:
@@ -6182,7 +6203,7 @@ Will just print `foo` and a newline.
 If you need a less ambigous form, use `std:writeln`, which
 handles its argument like written via `std:ser:wlambda` instead of `str`.
 
-#### <a name="11013-debug-arg1-"></a>11.0.13 - $DEBUG _arg1_ ...
+#### <a name="11014-debug-arg1-"></a>11.0.14 - $DEBUG _arg1_ ...
 
 This is a special value that evaluates to a print function that supplies the
 current position in the source code. For example this:
@@ -6213,7 +6234,7 @@ Will print like this:
 [1,11:<wlambda::eval>] DEBUG: k = 30
 ```
 
-#### <a name="11014-stdwriteln-arg1-"></a>11.0.14 - std:writeln _arg1_ ...
+#### <a name="11015-stdwriteln-arg1-"></a>11.0.15 - std:writeln _arg1_ ...
 
 This function writes the WLambda representation of its arguments
 (with a space inbetween) to standard output. This means that:
@@ -6228,7 +6249,7 @@ See also the description of `std:ser:wlambda`.
 
 If you need a more human readable form use `std:displayln`.
 
-#### <a name="11015-stdeval-code-string"></a>11.0.15 - std:eval _code-string_
+#### <a name="11016-stdeval-code-string"></a>11.0.16 - std:eval _code-string_
 
 Evaluates _code-string_ in the current global environment and returns
 the generated value. If the code leads to any kind of evaluation error,
@@ -6240,7 +6261,7 @@ std:assert_eq (std:eval "1 + 2") 3;
 std:assert_eq (std:eval "1 + X") 21;
 ```
 
-#### <a name="11016-stdassert-bool-message"></a>11.0.16 - std:assert _bool_ \[_message_]
+#### <a name="11017-stdassert-bool-message"></a>11.0.17 - std:assert _bool_ \[_message_]
 
 Just a simple assertion function that panics if the first argument is not true.
 Returns the passed value if it is a true value.
@@ -6251,7 +6272,7 @@ std:assert $false; #=> Panic
 std:assert 120;    #=> 120
 ```
 
-#### <a name="11017-stdasserteq-actual-expected-message"></a>11.0.17 - std:assert\_eq _actual_ _expected_ \[_message_]
+#### <a name="11018-stdasserteq-actual-expected-message"></a>11.0.18 - std:assert\_eq _actual_ _expected_ \[_message_]
 
 This function checks if the _actual_ value is equal to the
 _expected_ value and panics if not. The optional _message_ is
@@ -6262,7 +6283,7 @@ passed in the panic for reference.
 std:assert_eq x 60 "30 * 2 == 60";
 ```
 
-#### <a name="11018-stdassertstreq-actual-expected"></a>11.0.18 - std:assert\_str\_eq _actual_ _expected_
+#### <a name="11019-stdassertstreq-actual-expected"></a>11.0.19 - std:assert\_str\_eq _actual_ _expected_
 
 This function stringifies _actual_ and _expected_ using the `str` function
 and compares the resulting strings.
@@ -6274,7 +6295,7 @@ if the maps are stringified using `str`:
 std:assert_str_eq $[1, 2, 3]        $[1, 2, 3];
 ```
 
-#### <a name="11019-stdassertreleq-l-r-epsilon-message"></a>11.0.19 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
+#### <a name="11020-stdassertreleq-l-r-epsilon-message"></a>11.0.20 - std:assert\_rel\_eq _l_ _r_ _epsilon_ \[_message_]
 
 This function checks if `l` is within `epsilon` of `r`.
 If the absolute value of the difference between `l` and `r` is greater than `epsilon`,
@@ -6290,7 +6311,7 @@ std:assert_rel_eq x y 1;
 # std:assert_eq x y 0.5;
 ```
 
-#### <a name="11020-stdmeasuretime-unit-function"></a>11.0.20 - std:measure\_time _unit_ _function_
+#### <a name="11021-stdmeasuretime-unit-function"></a>11.0.21 - std:measure\_time _unit_ _function_
 
 This function measures the time the given _function_ took to execute.
 The _unit_ defines how precisely the time is measured. Following strings are supported
