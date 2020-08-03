@@ -79,5 +79,7 @@ fn wlambda_functions() {
             "Found {}/{} undocumented functions!",
             count_missing,
             total));
+    } else {
+        println!("Found {} functions!", total);
     }
 }

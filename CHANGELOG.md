@@ -2,6 +2,7 @@
 ==================
 
 * Incompatible Change: Renamed `std:io:file:copy` to `std:fs:copy`.
+* Incompatible Change: Renamed `error_to_str` to `std:error_to_str`.
 * Documentation: Improved `std:shuffle` documentation, and added all missing
 function documentation.
 * Feature: `std:rand :i64` now returns an integer in the full i64 range.

@@ -60,7 +60,7 @@ Smalltalk, LISP and Perl.
     - [3.3.3](#333-unwraperr-error-value) unwrap\_err _error-value_
     - [3.3.4](#334-onerror-handler-maybe-error-value) on\_error _handler_ _maybe-error-value_
     - [3.3.5](#335-iserr-value) is\_err _value_
-    - [3.3.6](#336-errortostr-value) error\_to\_str _value_
+    - [3.3.6](#336-stderrortostr-value) std:error\_to\_str _value_
   - [3.4](#34-booleans) Booleans
     - [3.4.1](#341-isbool-any-value) is\_bool _any-value_
     - [3.4.2](#342-bool-any-value) bool _any-value_
@@ -1411,7 +1411,7 @@ a few functions that accept error values in their arguments:
 - panic
 - `_?`
 - unwrap_err
-- error_to_str
+- std:error_to_str
 - unwrap
 - on_error
 - return
@@ -1610,13 +1610,13 @@ std:assert ~ not ~ is_err $none;
 std:assert ~ not ~ is_err 10;
 ```
 
-#### <a name="336-errortostr-value"></a>3.3.6 - error\_to\_str _value_
+#### <a name="336-stderrortostr-value"></a>3.3.6 - std:error\_to\_str _value_
 
 This function accepts an error value in contrast to `str`, but does
 not panic but transform the error value into its string representation.
 
 ```wlambda
-!r = error_to_str $e "TEST";
+!r = std:error_to_str $e "TEST";
 
 std:assert_eq r "$e[1,22:<wlambda::eval>(Err)] \"TEST\"";
 ```
