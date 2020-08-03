@@ -375,6 +375,9 @@ Smalltalk, LISP and Perl.
     - [12.1.7](#1217-stddesermsgpack-bytes) std:deser:msgpack _bytes_
   - [12.2](#122-regular-expressions-more-classic-syntax) Regular Expressions (more classic syntax)
     - [12.2.1](#1221-stdrematch-regex-string-input-string-function) std:re:match _regex-string_ _input-string_ _function_
+    - [12.2.2](#1222-stdrematchcompile-regex-string) std:re:match\_compile _regex-string_
+    - [12.2.3](#1223-stdremap-regex-string-function-input-string) std:re:map _regex-string_ _function_ _input-string_
+    - [12.2.4](#1224-stdrereplaceall-regex-string-replace-function-input-string) std:re:replace\_all _regex-string_ _replace-function_ _input-string_
   - [12.3](#123-chrono) chrono
     - [12.3.1](#1231-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
   - [12.4](#124-color-conversion) color conversion
@@ -6339,7 +6342,7 @@ std:assert_eq res.1 4999950000;
 Reads a line from standard input and returns it. Returns an error if something
 went wrong.
 
-```
+```text
 !line = unwrap std:io:line[];
 std:displayln "you entered: " std:str:trim_end[line];
 ```
@@ -6351,7 +6354,7 @@ the last returned value from that call.  If _value_ is not given, all lines
 will be appended to a new vector and returned.  Returns an error if some IO
 error occured.
 
-```
+```text
 !lines = std:io:lines[];
 
 !lines = $@v std:io:lines $+;
@@ -6411,7 +6414,7 @@ Flushes the standard output buffer. Returns an error if an error occured or
 Writes the given _value_ to standard output in a human readable form like `std:displayln`
 does. Returns an error if an error occured. `$true` if everything is fine.
 
-```
+```text
 std:io:stdout:write "xxx"; # => Writes `xxx` to standard output
 ```
 
@@ -6420,7 +6423,7 @@ std:io:stdout:write "xxx"; # => Writes `xxx` to standard output
 Writes a WLambda representation of _value_ to standard output.
 Returns an error if an error occured. `$true` if everything is fine.
 
-```
+```text
 std:io:stdout:write "xxx"; # => Writes `"xxx"` to standard output
 ```
 
@@ -7056,7 +7059,7 @@ Returns an error if the _regex-string_ has a syntax error.
 std:assert_str_eq ret "01.05.2020";
 ```
 
-#### - std:re:match\_compile _regex-string_
+#### <a name="1222-stdrematchcompile-regex-string"></a>12.2.2 - std:re:match\_compile _regex-string_
 
 This function compiles the given _regex-string_ and returns a function that
 will execute the regex matching. If the syntax in _regex-string_ is wrong,
@@ -7075,9 +7078,33 @@ and the function that is called if the regex matches as second parameter.
 std:assert_str_eq ret "01.05.2020";
 ```
 
-#### - std:re:map _regex-string_ _function_ _input-string_
+#### <a name="1223-stdremap-regex-string-function-input-string"></a>12.2.3 - std:re:map _regex-string_ _function_ _input-string_
 
+Executes _function_ for each match of the regex defined by _regex-string_
+on the _input-string_. Returns an error if there is a syntax error in the regex.
+Otherwise returns the last return value of _function_.
 
+```wlambda
+!res = $@vec std:re:map $q|(\d+)-(\d+)-(\d+)| {!(str, d1, d2, d3) = _;
+    $+ $[int d1, int d2, int d3]
+} "foo bar 2020-05-01 fofo 2020-06-01 bar 2019-12-31";
+
+std:assert_str_eq res $[$[2020,5,1], $[2020,6,1], $[2019,12,31]];
+```
+
+#### <a name="1224-stdrereplaceall-regex-string-replace-function-input-string"></a>12.2.4 - std:re:replace\_all _regex-string_ _replace-function_ _input-string_
+
+This function replaces all matches of the regex _regex-string_ in the _input-string_
+by the return value of the _replace-function_. Returns an error if there is
+a syntax error in the _regex-string_.
+
+```wlambda
+!res = std:re:replace_all $q"(\d+)" {
+    str (int _.1) + 1
+} "foo 32 fifi 99";
+
+std:assert_eq res "foo 33 fifi 100";
+```
 
 ### <a name="123-chrono"></a>12.3 - chrono
 

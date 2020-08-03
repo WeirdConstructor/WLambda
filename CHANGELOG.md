@@ -2,7 +2,7 @@
 ==================
 
 * Incompatible Change: Renamed `std:io:file:copy` to `std:fs:copy`.
-* Documentation: Improved `std:shuffle` documentation, and added more missing
+* Documentation: Improved `std:shuffle` documentation, and added all missing
 function documentation.
 * Feature: `std:rand :i64` now returns an integer in the full i64 range.
 * Feature: Implemented slicing operations for calling pairse and integer vectors
