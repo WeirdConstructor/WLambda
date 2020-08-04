@@ -1632,7 +1632,7 @@ not panic but transform the error value into its string representation.
 ```wlambda
 !r = std:error_to_str $e "TEST";
 
-std:assert_eq r "$e[1,22:<wlambda::eval>(Err)] \"TEST\"";
+std:assert_eq r "$e[1,26:<wlambda::eval>(Err)] \"TEST\"";
 ```
 
 WARNING: The string representation might change between wlambda versions.
@@ -8955,13 +8955,13 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "io:lines",
         |env: &mut Env, argc: usize| {
-            let mut f = env.arg(0);
-            let mut ret = VVal::None;
-
-            if argc == 0 {
-                f = VVal::vec();
-                ret = f.clone();
-            }
+            let (f, mut ret) =
+                if argc == 0 {
+                    let vec = VVal::vec();
+                    (vec.clone(), vec)
+                } else {
+                    (env.arg(0), VVal::None)
+                };
 
             loop {
                 let mut line = String::new();

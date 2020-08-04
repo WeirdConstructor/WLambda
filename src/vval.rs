@@ -1843,6 +1843,9 @@ macro_rules! pair_key_to_iter {
     }
 }
 
+#[allow(clippy::cognitive_complexity)]
+#[allow(clippy::comparison_chain)]
+#[allow(clippy::while_let_on_iterator)]
 fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
     match val {
         VVal::Byt(s) => {
@@ -1858,22 +1861,22 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                  .take(cnt as usize).collect())
         },
         VVal::IVec(b) => {
-            let mut v = vec![];
+            let mut out = vec![];
             match b.as_ref() {
                 NVec::Vec2(a, b) => {
                     if cnt == 1 {
                         match from {
-                            0 => v.push(VVal::Int(*a)),
-                            1 => v.push(VVal::Int(*b)),
+                            0 => out.push(VVal::Int(*a)),
+                            1 => out.push(VVal::Int(*b)),
                             _ => (),
                         }
                     } else if cnt > 1 {
                         match from {
                             0 => {
-                                v.push(VVal::Int(*a));
-                                v.push(VVal::Int(*b));
+                                out.push(VVal::Int(*a));
+                                out.push(VVal::Int(*b));
                             },
-                            1 => v.push(VVal::Int(*b)),
+                            1 => out.push(VVal::Int(*b)),
                             _ => (),
                         }
                     }
@@ -1881,38 +1884,38 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                 NVec::Vec3(a, b, c) => {
                     if cnt == 1 {
                         match from {
-                            0 => v.push(VVal::Int(*a)),
-                            1 => v.push(VVal::Int(*b)),
-                            2 => v.push(VVal::Int(*c)),
+                            0 => out.push(VVal::Int(*a)),
+                            1 => out.push(VVal::Int(*b)),
+                            2 => out.push(VVal::Int(*c)),
                             _ => (),
                         }
                     } else if cnt == 2 {
                         match from {
                             0 => {
-                                v.push(VVal::Int(*a));
-                                v.push(VVal::Int(*b));
+                                out.push(VVal::Int(*a));
+                                out.push(VVal::Int(*b));
                             },
                             1 => {
-                                v.push(VVal::Int(*b));
-                                v.push(VVal::Int(*c));
+                                out.push(VVal::Int(*b));
+                                out.push(VVal::Int(*c));
                             },
                             2 => {
-                                v.push(VVal::Int(*c));
+                                out.push(VVal::Int(*c));
                             },
                             _ => (),
                         }
                     } else if cnt > 2 {
                         match from {
                             0 => {
-                                v.push(VVal::Int(*a));
-                                v.push(VVal::Int(*b));
-                                v.push(VVal::Int(*c));
+                                out.push(VVal::Int(*a));
+                                out.push(VVal::Int(*b));
+                                out.push(VVal::Int(*c));
                             },
                             1 => {
-                                v.push(VVal::Int(*b));
-                                v.push(VVal::Int(*c));
+                                out.push(VVal::Int(*b));
+                                out.push(VVal::Int(*c));
                             }
-                            2 => v.push(VVal::Int(*c)),
+                            2 => out.push(VVal::Int(*c)),
                             _ => (),
                         }
                     }
@@ -1920,71 +1923,71 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                 NVec::Vec4(a, b, c, d) => {
                     if cnt == 1 {
                         match from {
-                            0 => v.push(VVal::Int(*a)),
-                            1 => v.push(VVal::Int(*b)),
-                            2 => v.push(VVal::Int(*c)),
-                            3 => v.push(VVal::Int(*d)),
+                            0 => out.push(VVal::Int(*a)),
+                            1 => out.push(VVal::Int(*b)),
+                            2 => out.push(VVal::Int(*c)),
+                            3 => out.push(VVal::Int(*d)),
                             _ => (),
                         }
                     } else if cnt == 2 {
                         match from {
                             0 => {
-                                v.push(VVal::Int(*a));
-                                v.push(VVal::Int(*b));
+                                out.push(VVal::Int(*a));
+                                out.push(VVal::Int(*b));
                             },
                             1 => {
-                                v.push(VVal::Int(*b));
-                                v.push(VVal::Int(*c));
+                                out.push(VVal::Int(*b));
+                                out.push(VVal::Int(*c));
                             },
                             2 => {
-                                v.push(VVal::Int(*c));
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*c));
+                                out.push(VVal::Int(*d));
                             },
                             3 => {
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*d));
                             },
                             _ => (),
                         }
                     } else if cnt == 3 {
                         match from {
                             0 => {
-                                v.push(VVal::Int(*a));
-                                v.push(VVal::Int(*b));
-                                v.push(VVal::Int(*c));
+                                out.push(VVal::Int(*a));
+                                out.push(VVal::Int(*b));
+                                out.push(VVal::Int(*c));
                             },
                             1 => {
-                                v.push(VVal::Int(*b));
-                                v.push(VVal::Int(*c));
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*b));
+                                out.push(VVal::Int(*c));
+                                out.push(VVal::Int(*d));
                             },
                             2 => {
-                                v.push(VVal::Int(*c));
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*c));
+                                out.push(VVal::Int(*d));
                             },
                             3 => {
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*d));
                             },
                             _ => (),
                         }
                     } else if cnt > 2 {
                         match from {
                             0 => {
-                                v.push(VVal::Int(*a));
-                                v.push(VVal::Int(*b));
-                                v.push(VVal::Int(*c));
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*a));
+                                out.push(VVal::Int(*b));
+                                out.push(VVal::Int(*c));
+                                out.push(VVal::Int(*d));
                             },
                             1 => {
-                                v.push(VVal::Int(*b));
-                                v.push(VVal::Int(*c));
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*b));
+                                out.push(VVal::Int(*c));
+                                out.push(VVal::Int(*d));
                             },
                             2 => {
-                                v.push(VVal::Int(*c));
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*c));
+                                out.push(VVal::Int(*d));
                             },
                             3 => {
-                                v.push(VVal::Int(*d));
+                                out.push(VVal::Int(*d));
                             },
                             _ => (),
                         }
@@ -1992,25 +1995,25 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                 }
             }
 
-            VVal::vec_mv(v)
+            VVal::vec_mv(out)
         },
         VVal::FVec(b) => {
-            let mut v = vec![];
+            let mut out = vec![];
             match b.as_ref() {
                 NVec::Vec2(a, b) => {
                     if cnt == 1 {
                         match from {
-                            0 => v.push(VVal::Flt(*a)),
-                            1 => v.push(VVal::Flt(*b)),
+                            0 => out.push(VVal::Flt(*a)),
+                            1 => out.push(VVal::Flt(*b)),
                             _ => (),
                         }
                     } else if cnt > 1 {
                         match from {
                             0 => {
-                                v.push(VVal::Flt(*a));
-                                v.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*a));
+                                out.push(VVal::Flt(*b));
                             },
-                            1 => v.push(VVal::Flt(*b)),
+                            1 => out.push(VVal::Flt(*b)),
                             _ => (),
                         }
                     }
@@ -2018,38 +2021,38 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                 NVec::Vec3(a, b, c) => {
                     if cnt == 1 {
                         match from {
-                            0 => v.push(VVal::Flt(*a)),
-                            1 => v.push(VVal::Flt(*b)),
-                            2 => v.push(VVal::Flt(*c)),
+                            0 => out.push(VVal::Flt(*a)),
+                            1 => out.push(VVal::Flt(*b)),
+                            2 => out.push(VVal::Flt(*c)),
                             _ => (),
                         }
                     } else if cnt == 2 {
                         match from {
                             0 => {
-                                v.push(VVal::Flt(*a));
-                                v.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*a));
+                                out.push(VVal::Flt(*b));
                             },
                             1 => {
-                                v.push(VVal::Flt(*b));
-                                v.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*c));
                             },
                             2 => {
-                                v.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*c));
                             },
                             _ => (),
                         }
                     } else if cnt > 2 {
                         match from {
                             0 => {
-                                v.push(VVal::Flt(*a));
-                                v.push(VVal::Flt(*b));
-                                v.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*a));
+                                out.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*c));
                             },
                             1 => {
-                                v.push(VVal::Flt(*b));
-                                v.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*c));
                             }
-                            2 => v.push(VVal::Flt(*c)),
+                            2 => out.push(VVal::Flt(*c)),
                             _ => (),
                         }
                     }
@@ -2057,71 +2060,71 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                 NVec::Vec4(a, b, c, d) => {
                     if cnt == 1 {
                         match from {
-                            0 => v.push(VVal::Flt(*a)),
-                            1 => v.push(VVal::Flt(*b)),
-                            2 => v.push(VVal::Flt(*c)),
-                            3 => v.push(VVal::Flt(*d)),
+                            0 => out.push(VVal::Flt(*a)),
+                            1 => out.push(VVal::Flt(*b)),
+                            2 => out.push(VVal::Flt(*c)),
+                            3 => out.push(VVal::Flt(*d)),
                             _ => (),
                         }
                     } else if cnt == 2 {
                         match from {
                             0 => {
-                                v.push(VVal::Flt(*a));
-                                v.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*a));
+                                out.push(VVal::Flt(*b));
                             },
                             1 => {
-                                v.push(VVal::Flt(*b));
-                                v.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*c));
                             },
                             2 => {
-                                v.push(VVal::Flt(*c));
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*d));
                             },
                             3 => {
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*d));
                             },
                             _ => (),
                         }
                     } else if cnt == 3 {
                         match from {
                             0 => {
-                                v.push(VVal::Flt(*a));
-                                v.push(VVal::Flt(*b));
-                                v.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*a));
+                                out.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*c));
                             },
                             1 => {
-                                v.push(VVal::Flt(*b));
-                                v.push(VVal::Flt(*c));
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*d));
                             },
                             2 => {
-                                v.push(VVal::Flt(*c));
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*d));
                             },
                             3 => {
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*d));
                             },
                             _ => (),
                         }
                     } else if cnt > 2 {
                         match from {
                             0 => {
-                                v.push(VVal::Flt(*a));
-                                v.push(VVal::Flt(*b));
-                                v.push(VVal::Flt(*c));
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*a));
+                                out.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*d));
                             },
                             1 => {
-                                v.push(VVal::Flt(*b));
-                                v.push(VVal::Flt(*c));
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*b));
+                                out.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*d));
                             },
                             2 => {
-                                v.push(VVal::Flt(*c));
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*c));
+                                out.push(VVal::Flt(*d));
                             },
                             3 => {
-                                v.push(VVal::Flt(*d));
+                                out.push(VVal::Flt(*d));
                             },
                             _ => (),
                         }
@@ -2129,7 +2132,7 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                 }
             }
 
-            VVal::vec_mv(v)
+            VVal::vec_mv(out)
         },
         VVal::Lst(l) => {
             let v : Vec<VVal> =
@@ -2620,6 +2623,7 @@ impl VVal {
         VVal::new_byt(bv)
     }
 
+    #[allow(clippy::while_let_on_iterator)]
     pub fn reverse(&self) -> VVal {
         match self.deref() {
             VVal::Str(s) => {

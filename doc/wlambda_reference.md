@@ -1618,7 +1618,7 @@ not panic but transform the error value into its string representation.
 ```wlambda
 !r = std:error_to_str $e "TEST";
 
-std:assert_eq r "$e[1,22:<wlambda::eval>(Err)] \"TEST\"";
+std:assert_eq r "$e[1,26:<wlambda::eval>(Err)] \"TEST\"";
 ```
 
 WARNING: The string representation might change between wlambda versions.
