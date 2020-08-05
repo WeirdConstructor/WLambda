@@ -519,6 +519,7 @@ Current remaining goals for WLambda are:
 dependencies.
 - Improve and further document the VVal API for interacting with WLambda.
 - Improve [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) documentation.
+- DONE: Complete function reference documentation in [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 - DONE: Add proper module support (via `!@import` and `!@export`).
 - DONE: Add prototyped inheritance for OOP paradigm.
 - DONE: Add data structure matching/destructuring/selection primitives
