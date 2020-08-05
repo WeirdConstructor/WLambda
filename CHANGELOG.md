@@ -1,10 +1,9 @@
-0.6.3 (unreleased)
+0.6.3 (2020-08-06)
 ==================
 
 * Incompatible Change: Renamed `std:io:file:copy` to `std:fs:copy`.
 * Incompatible Change: Renamed `error_to_str` to `std:error_to_str`.
-* Documentation: Improved `std:shuffle` documentation, and added all missing
-function documentation.
+* Documentation: Completed standard library function reference documentation.
 * Feature: `std:rand :i64` now returns an integer in the full i64 range.
 * Feature: Implemented slicing operations for calling pairse and integer vectors
 with vectors and iterators.

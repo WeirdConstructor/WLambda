@@ -45,7 +45,7 @@ Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newes
 ```rust
 use wlambda::*;
 
-match wlambda::compiler::eval("40 + 2") {
+match wlambda::eval("40 + 2") {
     Ok(v)  => { println!("Output: {}", v.s()); },
     Err(e) => { eprintln!("Error: {}", e); },
 }
@@ -449,7 +449,7 @@ Here is how you can quickly evaluate a piece of WLambda code:
 
 ```rust
 let s = "$[1,2,3]";
-let r = wlambda::compiler::eval(&s).unwrap();
+let r = wlambda::eval(&s).unwrap();
 println!("Res: {}", r.s());
 ```
 
