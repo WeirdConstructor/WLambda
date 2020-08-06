@@ -12,7 +12,15 @@ use std::cell::RefCell;
 
 use crate::str_int::s2sym;
 
-fn is_ident_char(c: char) -> bool {
+fn is_ident_pattern_char(c: char) -> bool {
+    match c {
+          '?' | '|' | '[' | ']' | '(' | ')' | '$' | '*'
+               => false,
+           _   => !c.is_whitespace(),
+    }
+}
+
+fn is_ident_selector_char(c: char) -> bool {
     match c {
           '!' | '?' | '/' | '\\' | '|' | '{' | '}'
         | '[' | ']' | '(' | ')' | '\'' | '^'
@@ -35,7 +43,11 @@ fn parse_ident_char(ps: &mut State) -> Result<Option<char>, ParseError> {
                 ps.skip_ws();
                 Ok(Some(c))
             },
-            c if is_ident_char(c) => {
+            c if ps.is_pattern_ident_mode() && is_ident_pattern_char(c) => {
+                ps.consume_ws();
+                Ok(Some(c))
+            },
+            c if !ps.is_pattern_ident_mode() && is_ident_selector_char(c) => {
                 ps.consume_ws();
                 Ok(Some(c))
             },
@@ -256,7 +268,10 @@ fn parse_glob_atom(ps: &mut State) ->  Result<VVal, ParseError> {
 fn parse_pat_branch(ps: &mut State) -> Result<VVal, ParseError> {
     let pat_branch = VVal::vec();
 
-    while !ps.at_end() && !ps.lookahead_one_of("|:&=)]}/,") {
+    while !ps.at_end()
+        && (   (ps.is_pattern_ident_mode()  && !ps.lookahead_one_of("|)]"))
+            || (!ps.is_pattern_ident_mode() && !ps.lookahead_one_of("|:&=)]}/,")))
+    {
         //d// println!("GO {}", ps.rest().to_string());
         pat_branch.push(parse_glob_atom(ps)?);
     }
@@ -1599,8 +1614,9 @@ pub fn create_regex_find(pat: &str, result_ref: VVal)
     -> Result<Box<dyn Fn(&VVal) -> VVal>, ParseError>
 {
     let mut ps = State::new(pat, "<pattern>");
+    ps.set_pattern_ident_mode();
     ps.skip_ws();
-    let pattern  = parse_pattern(&mut ps)?;
+    let pattern = parse_pattern(&mut ps)?;
 
     ps.skip_ws();
 
@@ -1752,6 +1768,7 @@ mod tests {
 
     fn pat(pat: &str, st: &str) -> String {
         let mut ps = State::new(pat, "<pattern>");
+        ps.set_pattern_ident_mode();
         ps.skip_ws();
         match parse_pattern(&mut ps) {
             Ok(v) => {
@@ -2185,6 +2202,11 @@ mod tests {
         assert_eq!(pat("$+ \\$",              "ABx$$$xxFO"),              "$$$");
         assert_eq!(pat("x$* \\$",             "ABx$$$xxFO"),              "x$$$");
         assert_eq!(pat("\\u{2211}",           "∑"),                       "∑");
+    }
+
+    #[test]
+    fn check_pattern_ident_mode() {
+        assert_eq!(pat("($*!/$*\\\\^$*,':;{}=)", "!!!/\\\\\\^':;{}="), "!!!/\\\\\\^':;{}=");
     }
 
     #[test]

@@ -30,6 +30,16 @@ pub struct State {
     line_indent:    u32,
     last_tok_char:  char,
     file:           FileRef,
+    ident_mode:     IdentMode,
+}
+
+/// This is a special mode for selector parsing.
+/// It differenciates between normal (selector)
+/// identifiers and direct pattern identifiers.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum IdentMode {
+    IdentSelector,
+    IdentPattern,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -602,9 +612,18 @@ impl State {
             line_indent:    0,
             last_tok_char:  ' ',
             file:           FileRef::new(filename),
+            ident_mode:     IdentMode::IdentSelector,
         };
         ps.skip_ws_and_comments();
         ps
+    }
+
+    pub fn is_pattern_ident_mode(&self) -> bool {
+        self.ident_mode == IdentMode::IdentPattern
+    }
+
+    pub fn set_pattern_ident_mode(&mut self) {
+        self.ident_mode = IdentMode::IdentPattern;
     }
 
     pub fn expect_some<T>(&self, o: Option<T>) -> Result<T, ParseError> {

@@ -5520,8 +5520,7 @@ these patterns aim to be easily used to match parts of a specific
 string like filename globs `photo_???_*.jpg`.
 
 For an in depth description of the _selector_ and _pattern_ syntax
-please refer to the [Pattern and Selector Syntax](https://docs.rs/wlambda/newest/wlambda/selector/index.html)
-in the wlambda::selector module.
+please refer to the [Pattern and Selector Syntax](#821-selector-and-wlambda-regex-syntax).
 
 ### <a name="81-data-structure-matcher"></a>8.1 - Data Structure Matcher
 
@@ -5598,29 +5597,7 @@ This section shows how data structure selectors can be used.
 
 TODO
 
-#### <a name="821-stdselector-string"></a>8.2.1 - std:selector _string_
-
-Parses the given _string_ as WLambda data structure selector and returns
-a function that takes a data structure as first argument. That function will
-then query the data structure according to the given selector.
-That function will also set the global variable `$\` to the result.
-
-The main usage of this function is, when you want to define the selector
-at runtime. Otherwise WLambda provides the handy `$S(...)` syntax for
-generating the structure pattern function at compile time.
-
-```wlambda
-!runtime_name = "foo";
-!sel = std:selector (" * / " runtime_name);
-
-? sel <& $[${foo = 1}, ${foo = 2}, ${foo = 3}] {
-    std:assert_str_eq $\ $[1,2,3];
-} {
-    std:assert $false
-};
-```
-
-#### <a name="822-selector-and-wlambda-regex-syntax"></a>8.2.2 - Selector and WLambda Regex Syntax:
+#### <a name="821-selector-and-wlambda-regex-syntax"></a>8.2.2 - Selector and WLambda Regex Syntax:
 
 ```ebnf
     (* NOTE: Whitespace is not part of a pattern in most places. This means
@@ -5633,11 +5610,23 @@ generating the structure pattern function at compile time.
                      and "\]" => "]" *)
                 ;
 
-    ident_char  = { ?any character except whitespace,
+    ident_char_in_selector =
+                  (* if regex is used inside a selector: *)
+                  { ?any character except whitespace,
                     "!", "?", "/", "\", "|", "^", ",",
                     "'", "&", ":", ";", "$", "(", ")",
-                    "{", "}", "[", "]", "*" or "="? }
-                  (* allows the usual backslash escaping! *)
+                    "{", "}", "[", "]", "*" and "="? }
+                  (* allows the usual backslash escaping from strings! *)
+                ;
+
+    ident_char_in_direct_pattern =
+                | (* if regex is used as pattern directly: *)
+                  { ?any character except whitespace,
+                    "?", "|", "$", "(", ")", "[", "]" and "*"? }
+                  (* allows the usual backslash escaping from strings! *)
+                ;
+    ident_char  = ident_char_in_direct_pattern
+                | ident_char_in_selector
                 ;
 
     ident       = ident_char, { ident_char }
@@ -5743,6 +5732,29 @@ generating the structure pattern function at compile time.
                 ;
 ```
 
+#### <a name="822-stdselector-string"></a>8.2.1 - std:selector _string_
+
+Parses the given _string_ as WLambda data structure selector and returns
+a function that takes a data structure as first argument. That function will
+then query the data structure according to the given selector.
+That function will also set the global variable `$\` to the result.
+
+The main usage of this function is, when you want to define the selector
+at runtime. Otherwise WLambda provides the handy `$S(...)` syntax for
+generating the structure pattern function at compile time.
+
+```wlambda
+!runtime_name = "foo";
+!sel = std:selector (" * / " runtime_name);
+
+? sel <& $[${foo = 1}, ${foo = 2}, ${foo = 3}] {
+    std:assert_str_eq $\ $[1,2,3];
+} {
+    std:assert $false
+};
+```
+
+
 ### <a name="83-string-patterns-regex-r"></a>8.3 - String Patterns (Regex) `$r/.../`
 
 This section shows how to use the builtin pattern regex engine
@@ -5803,13 +5815,13 @@ std:assert_eq res "//\\/";
 #### <a name="831-pattern-syntax-overview"></a>8.3.1 - Pattern Syntax Overview
 
 While
-[Selector and WLambda Regex Syntax](#822-selector-and-wlambda-regex-syntax)
+[Selector and WLambda Regex Syntax](#821-selector-and-wlambda-regex-syntax)
 describes the pattern syntax in detail,
 here is the WLambda pattern regex syntax in a nutshell:
 
 | Pattern Syntax | Semantics |
 |-|-|
-| `!?\|^,'&:;$(){}[]*=/\\` | Many special chars are reserved in WLambda patterns. Please escape then using `\\/` or `[/]`.|
+| `?|$()[]*`    | Many special chars are reserved in WLambda patterns. Be aware that more characters are reserved if you use the patterns in a data structure selector, instead of a single pattern. Please escape then using backslash like `\\/` or `[/]`.|
 | _whitespace_  | Please note, that whitespace to be matched must be escaped using '\' or inside a character calss `[ ]`. |
 | `\.`          | Backslash escapes work the same as in regular WLambda strings. `\` escapes the following character to have no special syntactic meaning in a pattern except matching itself. While escape sequences like `\x41` match the character `A` or `\u{2211}` matches `∑`. These also work inside of character classes. |
 | `*`           | Match 0 to N occurences of any character. |
