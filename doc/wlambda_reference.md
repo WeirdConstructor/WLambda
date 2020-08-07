@@ -7433,7 +7433,8 @@ In the following grammar, white space and comments are omitted:
                     (* parses substring like 'q', but constructs a
                        selector_rs_syntax matcher at compile time *)
                   ;
-    pattern       = "r", ?any character as quote?,
+    pattern       = "r", [ "g" ], (* "g" for find all *)
+                         ?any character as quote?,
                          selector_rs_pattern_syntax,
                          ?any character as quote?
                     (* parses substring like 'q', but constructs a

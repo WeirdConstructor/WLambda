@@ -9386,8 +9386,9 @@ pub fn std_symbol_table() -> SymbolTable {
                 env.global.borrow_mut()
                    .get_var_ref("\\")
                    .unwrap_or_else(|| VVal::None);
+            let find_all = env.arg(1).with_s_ref(|s| s == "g");
             pat_src.with_s_ref(|pat_src|
-                match create_regex_find_function(pat_src, res_ref) {
+                match create_regex_find_function(pat_src, res_ref, find_all) {
                     Ok(fun) => Ok(fun),
                     Err(e) => {
                         Ok(env.new_err(
@@ -9395,7 +9396,7 @@ pub fn std_symbol_table() -> SymbolTable {
                                     e, pat_src)))
                     }
                 })
-        }, Some(1), Some(1), false);
+        }, Some(1), Some(2), false);
 
     func!(st, "selector",
         |env: &mut Env, _argc: usize| {
