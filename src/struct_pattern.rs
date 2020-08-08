@@ -600,22 +600,48 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
             let find_all = ast.at(2).unwrap().b();
             // TODO: If find_all, then we should collect all results!
 
-            match ast.at(1).unwrap().with_s_ref(|pat_src|
-                    selector::create_regex_find(pat_src, res_ref, find_all))
-            {
-                Ok(fun) => {
-                    Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
-                        let r = fun(&v.deref());
-                        if r.is_some() {
-                            store_var(&r, &var, f);
-                            true
-                        } else {
-                            false
-                        }
-                    }))
-                },
-                Err(e) => {
-                    Err(ast.compile_err(format!("bad pattern: {}", e)))
+            if find_all {
+                match ast.at(1).unwrap().with_s_ref(|pat_src|
+                        selector::create_regex_find_all(pat_src, res_ref))
+                {
+                    Ok(fun) => {
+                        Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                            let matches = VVal::vec();
+                            let matches_o = matches.clone();
+                            fun(&v.deref(), Box::new(move |v, _pos| {
+                                matches.push(v);
+                            }));
+                            if matches_o.len() > 0 {
+                                store_var(&matches_o, &var, f);
+                                true
+                            } else {
+                                false
+                            }
+                        }))
+                    },
+                    Err(e) => {
+                        Err(ast.compile_err(format!("bad pattern: {}", e)))
+                    }
+                }
+
+            } else {
+                match ast.at(1).unwrap().with_s_ref(|pat_src|
+                        selector::create_regex_find(pat_src, res_ref))
+                {
+                    Ok(fun) => {
+                        Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                            let r = fun(&v.deref());
+                            if r.is_some() {
+                                store_var(&r, &var, f);
+                                true
+                            } else {
+                                false
+                            }
+                        }))
+                    },
+                    Err(e) => {
+                        Err(ast.compile_err(format!("bad pattern: {}", e)))
+                    }
                 }
             }
         },
