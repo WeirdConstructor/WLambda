@@ -5800,7 +5800,7 @@ std:assert_eq ($r/$+ \$/ "FF$$$FF").0   "$$$";
 
 To access captured groups you can either use the return value of the
 matcher function, or use the global variable `$\` which will contain
-the results of the latest match that was exectuted:
+the results of the latest match that was executed:
 
 ```wlambda
 # Notice the usage of the `<&` function call operator:
@@ -9702,6 +9702,47 @@ pub fn std_symbol_table() -> SymbolTable {
                 }
             }
         }, Some(0), Some(1), false);
+
+    func!(st, "process:exec",
+        |env: &mut Env, argc: usize| {
+            let cmd_exe = env.arg(0).deref();
+
+            let mut cmd =
+                cmd_exe.with_s_ref(|s| std::process::Command::new(s));
+
+            if argc > 1 {
+                let args = env.arg(1).deref();
+                for a in args.iter() {
+                    a.0.with_s_ref(|s| cmd.arg(s));
+                }
+            }
+
+            match cmd.output() {
+                Ok(out) => {
+                    let ret = VVal::map();
+                    ret.set_key_str("status", VVal::Int(out.status.code().unwrap_or(-1) as i64))
+                        .expect("single use");
+                    ret.set_key_str("success", VVal::Bol(out.status.success()))
+                        .expect("single use");
+                    ret.set_key_str("stdout", VVal::new_byt(out.stdout))
+                        .expect("single use");
+                    ret.set_key_str("stderr", VVal::new_byt(out.stderr))
+                        .expect("single use");
+
+                    Ok(ret)
+                },
+                Err(e) => {
+                    return Ok(env.new_err(
+                        format!("Error executing '{}': {}", cmd_exe.s(), e)));
+                },
+            }
+
+        }, Some(1), Some(2), false);
+
+    func!(st, "sys:os",
+        |_env: &mut Env, _argc: usize| {
+            Ok(VVal::new_str(std::env::consts::OS))
+        }, Some(0), Some(0), false);
 
     func!(st, "time:now",
         |env: &mut Env, _argc: usize| {

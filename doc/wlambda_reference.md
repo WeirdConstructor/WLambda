@@ -5798,7 +5798,7 @@ std:assert_eq ($r/$+ \$/ "FF$$$FF").0   "$$$";
 
 To access captured groups you can either use the return value of the
 matcher function, or use the global variable `$\` which will contain
-the results of the latest match that was exectuted:
+the results of the latest match that was executed:
 
 ```wlambda
 # Notice the usage of the `<&` function call operator:
