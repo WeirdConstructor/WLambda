@@ -4439,3 +4439,25 @@ fn check_reverse() {
     assert_eq!(ve("std:reverse $[1,2,3,4]"),        "$[4,3,2,1]");
     assert_eq!(ve("std:reverse $iter $[1,2,3,4]"),  "$[4,3,2,1]");
 }
+
+#[test]
+fn check_process_os() {
+    assert_eq!(ve(r#"
+        ? std:sys:os[] == $q linux {
+            !ret = std:process:run :sh $[$q/-c/, $q/echo "test"/];
+            $DEBUG ret;
+            std:assert_eq ret.status                  0;
+            std:assert_eq ret.success                 $true;
+            std:assert_eq std:str:trim[ret.stderr]    $q//;
+            std:assert_eq std:str:trim[ret.stdout]    $q/test/;
+            $true
+        } {
+            !ret = std:process:run :cmd $[$q|/C|, $q/echo "test"/];
+            std:assert_eq ret.status    0;
+            std:assert_eq ret.success   $true;
+            std:assert_eq std:str:trim[ret.stderr]    $q//;
+            std:assert_eq std:str:trim[ret.stdout]    $q/test/;
+            $true
+        };
+    "#), "$true");
+}

@@ -1,7 +1,7 @@
 0.6.4 (unreleased)
 ==================
 
-* Feature: Implemented `std:sys:os` and `std:process:exec`.
+* Feature: Implemented `std:sys:os` and `std:process:run`.
 * Change: Regexes/Patterns allow more characters like `/` and `!` to be
 used directly now. But only in the context of a single regex
 pattern like `$r(foo/bar)`. This makes it easier to process text.
