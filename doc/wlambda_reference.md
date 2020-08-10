@@ -6458,7 +6458,7 @@ This function will block the current thread while the child process
 is executed. It collects the output of the child process and returns
 it in a data structure of the following form:
 
-```
+```text
 {
     status  = 0,        # exit code
     success = $true,    # $true or $false
@@ -6469,7 +6469,7 @@ it in a data structure of the following form:
 
 Here is an example for Linux:
 
-```
+```text
 !ret = unwrap ~ std:process:run "sh" $["-c", "echo \"test\""];
 
 std:assert_eq ret.status  0;

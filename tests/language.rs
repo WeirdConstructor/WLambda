@@ -4452,7 +4452,7 @@ fn check_process_os() {
             std:assert_eq std:str:trim[ret.stdout]    $q/test/;
             $true
         } {
-            !ret = std:process:run :cmd $[$q|/C|, $q/echo "test"/];
+            !ret = std:process:run :cmd $[$q|/C|, $q/echo test/];
             std:assert_eq ret.status    0;
             std:assert_eq ret.success   $true;
             std:assert_eq std:str:trim[ret.stderr]    $q//;
