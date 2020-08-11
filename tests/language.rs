@@ -4461,3 +4461,8 @@ fn check_process_os() {
         };
     "#), "$true");
 }
+
+#[test]
+fn check_regex_pattern_global() {
+    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof $+"), "");
+}
