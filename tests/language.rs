@@ -4466,5 +4466,9 @@ fn check_process_os() {
 fn check_regex_pattern_global() {
     assert_eq!(ve("($M x $r $+f ) \"fffoooffffffoofffof\""), "${x=$[\"fff\"]}");
     assert_eq!(ve("($M x $rg $+f ) \"fffoooffffffoofffof\""), "${x=$[$[\"fff\"],$[\"ffffff\"],$[\"fff\"],$[\"f\"]]}");
-    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof $+"), "");
+    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof $+"), "$[$[\"fff\"],$[\"ffff\"],$[\"f\"],$[\"f\"]]");
+    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $+ $\\ }"), "$[$[\"fff\"],$[\"ffff\"],$[\"f\"],$[\"f\"]]");
+    assert_eq!(ve("$rg $+f  $q fffooffffofof { ? len[_.0] > 3 { break _.0; } }"), "\"ffff\"");
+    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { ? len[_.0] > 3 { next[]; } { $+ _.0 } }"), "$[\"fff\",\"f\",\"f\"]");
+    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught [1,34:<compiler:s_eval>(Err)] SA::Panic(\"Dropped error value: 11\")");
 }

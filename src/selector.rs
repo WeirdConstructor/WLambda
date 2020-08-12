@@ -1,7 +1,7 @@
 /*!
 */
 
-use crate::vval::{VVal, Env, VValFun};
+use crate::vval::{VVal, Env, VValFun, StackAction};
 
 use crate::parser::state::State;
 use crate::parser::state::{ParseError, ParseErrorKind};
@@ -1719,21 +1719,32 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal, find_all: bool)
 {
     let rref2 = result_ref.clone();
     if find_all {
-        let match_fun = create_regex_find_all(pat, result_ref)?;
+        let comp_pat = parse_and_compile_regex(pat)?;
         Ok(VValFun::new_fun(
             move |env: &mut Env, _argc: usize| {
-                if let Some(s) = env.arg_ref(0) {
-                    let _fun = env.arg(1);
-                    let ret = VVal::vec();
-                    let ret_o = ret.clone();
-                    match_fun(&s, Box::new(move |v, _pos| {
-                        ret.push(v);
-                    }));
-                    Ok(ret_o)
-                } else {
-                    rref2.set_ref(VVal::None);
-                    Ok(VVal::None)
-                }
+                let s   = env.arg(0);
+                let fun = env.arg(1).disable_function_arity();
+
+                s.with_s_ref(|s| {
+                    let mut fs = FindAllState::new(s, &comp_pat);
+                    let mut ret = Ok(VVal::None);
+
+                    while let Some((v, pos)) = fs.next() {
+                        result_ref.set_ref(v.clone());
+                        env.push(v);
+                        env.push(VVal::Int(pos.0 as i64));
+                        env.push(VVal::Int(pos.1 as i64));
+                        match fun.call_internal(env, 3) {
+                            Ok(r)                      => { ret = Ok(r); },
+                            Err(StackAction::Break(v)) => { ret = Ok(v.as_ref().clone()); env.popn(3); break; },
+                            Err(StackAction::Next)     => { },
+                            Err(e)                     => { ret = Err(e); env.popn(3); break; },
+                        }
+                        env.popn(3);
+                    }
+
+                    ret
+                })
             }, Some(2), Some(2), false))
 
     } else {
