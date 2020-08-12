@@ -1679,8 +1679,8 @@ impl<'a, 'b> FindAllState<'a, 'b> {
 
         let pat_res = (*self.comp_pat)(rxb, &mut self.ss);
         if let Some(pos) = pat_res.pos() {
-            self.cur_offs += pos.0 + pos.1;
             let v = pat_res.to_vval(&self.s[self.cur_offs..]);
+            self.cur_offs += pos.0 + pos.1;
             Some((v, pos))
 
         } else {
@@ -1726,8 +1726,7 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal, find_all: bool)
                     let _fun = env.arg(1);
                     let ret = VVal::vec();
                     let ret_o = ret.clone();
-                    match_fun(&s, Box::new(move |v, pos| {
-                        println!("RESREF: {:?} {}", pos, v.s());
+                    match_fun(&s, Box::new(move |v, _pos| {
                         ret.push(v);
                     }));
                     Ok(ret_o)

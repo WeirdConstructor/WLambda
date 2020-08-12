@@ -4464,5 +4464,7 @@ fn check_process_os() {
 
 #[test]
 fn check_regex_pattern_global() {
+    assert_eq!(ve("($M x $r $+f ) \"fffoooffffffoofffof\""), "${x=$[\"fff\"]}");
+    assert_eq!(ve("($M x $rg $+f ) \"fffoooffffffoofffof\""), "${x=$[$[\"fff\"],$[\"ffffff\"],$[\"fff\"],$[\"f\"]]}");
     assert_eq!(ve("$@v $rg $+f  $q fffooffffofof $+"), "");
 }
