@@ -9462,9 +9462,9 @@ pub fn std_symbol_table() -> SymbolTable {
                 env.global.borrow_mut()
                    .get_var_ref("\\")
                    .unwrap_or_else(|| VVal::None);
-            let find_all = env.arg(1).with_s_ref(|s| s == "g");
+            let mode = env.arg(1).with_s_ref(|s| RegexMode::from_str(s));
             pat_src.with_s_ref(|pat_src|
-                match create_regex_find_function(pat_src, res_ref, find_all) {
+                match create_regex_find_function(pat_src, res_ref, mode) {
                     Ok(fun) => Ok(fun),
                     Err(e) => {
                         Ok(env.new_err(

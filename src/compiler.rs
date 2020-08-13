@@ -2866,11 +2866,15 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                           .get_var_ref("\\")
                           .unwrap_or_else(|| VVal::None);
 
-                    let find_all = ast.at(2).unwrap().b();
+                    let regex_mode =
+                        ast.at(2)
+                           .unwrap()
+                           .with_s_ref(
+                               |mode_s| selector::RegexMode::from_str(mode_s));
 
                     ast.at(1).unwrap().with_s_ref(|pat_src| {
                         match selector::create_regex_find_function(
-                                pat_src, res_ref, find_all)
+                                pat_src, res_ref, regex_mode)
                         {
                             Ok(fun) => {
                                 pw_provides_result_pos!(prog, {

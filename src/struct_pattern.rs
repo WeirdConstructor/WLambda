@@ -597,10 +597,9 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
         Syntax::Pattern => {
             let res_ref = (VVal::None).to_ref();
 
-            let find_all = ast.at(2).unwrap().b();
-            // TODO: If find_all, then we should collect all results!
+            let mode = ast.at(2).unwrap().with_s_ref(|s| selector::RegexMode::from_str(s));
 
-            if find_all {
+            if mode == selector::RegexMode::FindAll {
                 match ast.at(1).unwrap().with_s_ref(|pat_src|
                         selector::create_regex_find_all(pat_src, res_ref))
                 {

@@ -406,12 +406,15 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
     match c {
         'r' => {
             ps.consume();
-            let find_all = ps.consume_if_eq('g');
+            let mode =
+                     if ps.consume_if_eq('g') { "g" }
+                else if ps.consume_if_eq('s') { "s" }
+                else                          { "f" };
 
             let pattern_source = parse_quoted(ps, String::new(), |s, c| s.push(c))?;
             let vec = ps.syn(Syntax::Pattern);
             vec.push(VVal::new_str_mv(pattern_source));
-            vec.push(VVal::Bol(find_all));
+            vec.push(VVal::new_str_mv(String::from(mode)));
             Ok(vec)
         },
         'S' => {

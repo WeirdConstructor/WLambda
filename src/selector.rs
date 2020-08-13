@@ -1680,8 +1680,9 @@ impl<'a, 'b> FindAllState<'a, 'b> {
         let pat_res = (*self.comp_pat)(rxb, &mut self.ss);
         if let Some(pos) = pat_res.pos() {
             let v = pat_res.to_vval(&self.s[self.cur_offs..]);
+            let out_pos = (self.cur_offs + pos.0, pos.1);
             self.cur_offs += pos.0 + pos.1;
-            Some((v, pos))
+            Some((v, out_pos))
 
         } else {
             None
@@ -1710,54 +1711,135 @@ pub fn create_regex_find_all(pat: &str, result_ref: VVal)
     }))
 }
 
+#[derive(PartialEq,Debug,Copy,Clone)]
+pub enum RegexMode {
+    Find,
+    FindAll,
+    Substitute
+}
+
+impl RegexMode {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "g" => RegexMode::FindAll,
+            "s" => RegexMode::Substitute,
+            _   => RegexMode::Find,
+        }
+    }
+}
+
 /// Creates a WLambda function that takes a string slice and tries to
 /// find the compiled regular expression in it.
 /// The returned function then returns a `PatResult` which stores
 /// the captures and whether the pattern matched.
-pub fn create_regex_find_function(pat: &str, result_ref: VVal, find_all: bool)
+pub fn create_regex_find_function(pat: &str, result_ref: VVal, mode: RegexMode)
     -> Result<VVal, ParseError>
 {
     let rref2 = result_ref.clone();
-    if find_all {
-        let comp_pat = parse_and_compile_regex(pat)?;
-        Ok(VValFun::new_fun(
-            move |env: &mut Env, _argc: usize| {
-                let s   = env.arg(0);
-                let fun = env.arg(1).disable_function_arity();
+    match mode {
+        RegexMode::FindAll => {
+            let comp_pat = parse_and_compile_regex(pat)?;
+            Ok(VValFun::new_fun(
+                move |env: &mut Env, _argc: usize| {
+                    let s   = env.arg(0);
+                    let fun = env.arg(1).disable_function_arity();
 
-                s.with_s_ref(|s| {
-                    let mut fs = FindAllState::new(s, &comp_pat);
-                    let mut ret = Ok(VVal::None);
+                    s.with_s_ref(|s| {
+                        let mut fs = FindAllState::new(s, &comp_pat);
+                        let mut ret = Ok(VVal::None);
 
-                    while let Some((v, pos)) = fs.next() {
-                        result_ref.set_ref(v.clone());
-                        env.push(v);
-                        env.push(VVal::Int(pos.0 as i64));
-                        env.push(VVal::Int(pos.1 as i64));
-                        match fun.call_internal(env, 3) {
-                            Ok(r)                      => { ret = Ok(r); },
-                            Err(StackAction::Break(v)) => { ret = Ok(v.as_ref().clone()); env.popn(3); break; },
-                            Err(StackAction::Next)     => { },
-                            Err(e)                     => { ret = Err(e); env.popn(3); break; },
+                        while let Some((v, pos)) = fs.next() {
+                            result_ref.set_ref(v.clone());
+                            env.push(v);
+                            env.push(VVal::Int(pos.0 as i64));
+                            env.push(VVal::Int(pos.1 as i64));
+                            match fun.call_internal(env, 3) {
+                                Ok(r)                      => { ret = Ok(r); },
+                                Err(StackAction::Break(v)) => { ret = Ok(v.as_ref().clone()); env.popn(3); break; },
+                                Err(StackAction::Next)     => { },
+                                Err(e)                     => { ret = Err(e); env.popn(3); break; },
+                            }
+                            env.popn(3);
                         }
-                        env.popn(3);
+
+                        ret
+                    })
+                }, Some(2), Some(2), false))
+        },
+        RegexMode::Substitute => {
+            let comp_pat = parse_and_compile_regex(pat)?;
+            Ok(VValFun::new_fun(
+                move |env: &mut Env, _argc: usize| {
+                    let s   = env.arg(0);
+                    let fun = env.arg(1).disable_function_arity();
+
+                    let mut out = String::new();
+                    let mut last_offs = 0;
+
+                    s.with_s_ref(|s| {
+                        let mut fs = FindAllState::new(s, &comp_pat);
+                        let mut ret = Ok(VVal::None);
+
+                        while let Some((v, pos)) = fs.next() {
+                            if last_offs < pos.0 {
+                                out.push_str(&s[last_offs..pos.0]);
+                                last_offs = pos.0 + pos.1;
+                            }
+
+                            result_ref.set_ref(v.clone());
+                            env.push(v);
+                            env.push(VVal::Int(pos.0 as i64));
+                            env.push(VVal::Int(pos.1 as i64));
+                            match fun.call_internal(env, 3) {
+                                Ok(r) => {
+                                    r.with_s_ref(|r| {
+                                        out.push_str(r);
+                                        last_offs = pos.0 + pos.1;
+                                    });
+                                },
+                                Err(StackAction::Break(v)) => {
+                                    v.with_s_ref(|r| {
+                                        out.push_str(r);
+                                        last_offs = pos.0 + pos.1;
+                                    });
+                                    env.popn(3);
+                                    break;
+                                },
+                                Err(StackAction::Next) => {
+                                },
+                                Err(e) => {
+                                    ret = Err(e);
+                                    env.popn(3);
+                                    break;
+                                },
+                            }
+                            env.popn(3);
+                        }
+
+                        if last_offs < s.len() {
+                            out.push_str(&s[last_offs..]);
+                        }
+
+                        if let Ok(VVal::None) = ret {
+                            ret = Ok(VVal::new_str_mv(out));
+                        }
+
+                        ret
+                    })
+                }, Some(2), Some(2), false))
+        },
+        RegexMode::Find => {
+            let match_fun = create_regex_find(pat, result_ref)?;
+            Ok(VValFun::new_fun(
+                move |env: &mut Env, _argc: usize| {
+                    if let Some(s) = env.arg_ref(0) {
+                        Ok(match_fun(&s))
+                    } else {
+                        rref2.set_ref(VVal::None);
+                        Ok(VVal::None)
                     }
-
-                    ret
-                })
-            }, Some(2), Some(2), false))
-
-    } else {
-        let match_fun = create_regex_find(pat, result_ref)?;
-        Ok(VValFun::new_fun(
-            move |env: &mut Env, _argc: usize| {
-                if let Some(s) = env.arg_ref(0) {
-                    Ok(match_fun(&s))
-                } else {
-                    rref2.set_ref(VVal::None);
-                    Ok(VVal::None)
-                }
-            }, Some(1), Some(1), false))
+                }, Some(1), Some(1), false))
+        },
     }
 }
 

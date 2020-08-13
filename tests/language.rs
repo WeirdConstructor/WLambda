@@ -4471,4 +4471,29 @@ fn check_regex_pattern_global() {
     assert_eq!(ve("$rg $+f  $q fffooffffofof { ? len[_.0] > 3 { break _.0; } }"), "\"ffff\"");
     assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { ? len[_.0] > 3 { next[]; } { $+ _.0 } }"), "$[\"fff\",\"f\",\"f\"]");
     assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught [1,34:<compiler:s_eval>(Err)] SA::Panic(\"Dropped error value: 11\")");
+
+    assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { ? len[_.0] > 3 { next[]; } { $+ _.0 } }"), "$[\"fff\",\"f\",\"f\"]");
+    assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught [1,49:<compiler:s_eval>(Err)] SA::Panic(\"Dropped error value: 11\")");
+
+    assert_eq!(ve("$@v $rg\"$^$+f\" \"ffooofffofo\" \\$+ _.0"), "$[\"ff\"]");
+}
+
+#[test]
+fn check_regex_pattern_substitution() {
+    assert_eq!(ve("$rs\"$+f\" \"foofffooof\" {:x}"),    "\"xooxooox\"");
+    assert_eq!(ve("$rs\"$+f\" \"ff\" {:x}"),            "\"x\"");
+    assert_eq!(ve("$rs\"$+f\" \"\" {:x}"),              "\"\"");
+    assert_eq!(ve("$rs\"$+f\" \"o\" {:x}"),             "\"o\"");
+    assert_eq!(ve("$rs\"$+f\" \"offfo\" {:x}"),         "\"oxo\"");
+
+    assert_eq!(ve("(std:pattern $q $+f :s) $q fffooffffofof { :x }"), "\"xooxoxox\"");
+
+    // simple rot13:
+    assert_eq!(ve(r#"
+        $rs"?" "jynzoqn"
+            \std:str:from_char_vec
+                $[((((0 ~ std:str:to_char_vec _.0) - 97) + 13)
+                   % 26)
+                  + 97]
+    "#), "\"wlambda\"");
 }
