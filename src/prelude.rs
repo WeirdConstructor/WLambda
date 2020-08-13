@@ -306,9 +306,11 @@ Smalltalk, LISP and Perl.
     - [8.2.1](#821-selector-and-wlambda-regex-syntax) Selector and WLambda Regex Syntax:
     - [8.2.2](#822-stdselector-string) std:selector _string_
   - [8.3](#83-string-patterns-regex-r) String Patterns (Regex) `$r/.../`
-    - [8.3.1](#831-pattern-syntax-overview) Pattern Syntax Overview
-    - [8.3.2](#832-standard-regular-expressions) Standard Regular Expressions
-    - [8.3.3](#833-stdpattern-string) std:pattern _string_
+    - [8.3.1](#831-global-patterns-rg) Global Patterns `$rg/.../`
+    - [8.3.2](#832-pattern-substitutions-rs) Pattern Substitutions `$rs/.../`
+    - [8.3.3](#833-pattern-syntax-overview) Pattern Syntax Overview
+    - [8.3.4](#834-standard-regular-expressions) Standard Regular Expressions
+    - [8.3.5](#835-stdpattern-string-mode) std:pattern _string_ [_mode_]
 - [9](#9-modules) Modules
   - [9.1](#91-export) export
   - [9.2](#92-import) import
@@ -5830,7 +5832,47 @@ the results of the latest match that was executed:
 std:assert_eq res "//\\/";
 ```
 
-#### <a name="831-pattern-syntax-overview"></a>8.3.1 - Pattern Syntax Overview
+#### <a name="831-global-patterns-rg"></a>8.3.1 - Global Patterns `$rg/.../`
+
+With the `g` modifier the regex can be modified and will match the input
+string with the given pattern repeatedly and call a given function
+for each match.
+
+The match function will receive the input string as first argument
+and a function that will be called for each match as second argument.
+
+The match function receives the contents of `$\` as first argument,
+the offset of the match in the input string as second argument
+and the length of the match as third argument:
+
+```wlambda
+!found = $@vec $rg/x(^?)y/ "aax9yaaxcy" {!(match, offs, len) = @;
+    $+ $[match.1, offs, len]
+};
+
+std:assert_str_eq found $[$["9", 2, 3], $["c", 7, 3]];
+```
+
+#### <a name="832-pattern-substitutions-rs"></a>8.3.2 - Pattern Substitutions `$rs/.../`
+
+The `s` modifier creates a substitution that will substitute each match
+of the pattern in the given input string with the return value of the
+match function. The match function is called with the same values as `$rg`
+does.
+
+```wlambda
+!digits =
+    $["zero", "one", "two", "three", "four",
+      "five", "six", "seven", "eight", "nine"];
+
+!ret = $rs/[0-9]/ "on 1 at 0 of 8" {!(match, offs, len) = @;
+    digits.(int match.0)
+};
+
+std:assert_eq ret "on one at zero of eight";
+```
+
+#### <a name="833-pattern-syntax-overview"></a>8.3.3 - Pattern Syntax Overview
 
 While
 [Selector and WLambda Regex Syntax](#821-selector-and-wlambda-regex-syntax)
@@ -5863,17 +5905,18 @@ here is the WLambda pattern regex syntax in a nutshell:
 | `$&L`         | Transforms the input string for the following pattern matching parts to lowercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
 | `$&U`         | Transforms the input string for the following pattern matching parts to uppercase (attention: O(n) operation on the complete rest of the string!). Useful for matching case-insensitively. |
 
-#### <a name="832-standard-regular-expressions"></a>8.3.2 - Standard Regular Expressions
+#### <a name="834-standard-regular-expressions"></a>8.3.4 - Standard Regular Expressions
 
 Please note that WLambda can optionally be compiled with the `regex` crate,
 which implements a more common syntax for regular expressions.
 Please refer to the functions `std:re:match` in the WLambda standard library
 for this.
 
-#### <a name="833-stdpattern-string"></a>8.3.3 - std:pattern _string_
+#### <a name="835-stdpattern-string-mode"></a>8.3.5 - std:pattern _string_ [_mode_]
 
 Compiles the regex pattern _string_ to a function just like `$r/.../` would do.
-Useful for composing WLambda patterns at runtime:
+The _mode_ can either be `:g` (global match like `$rg...`), `:s` (substitution
+like `$rs...`) or `$none`.  Useful for composing WLambda patterns at runtime:
 
 ```wlambda
 !rx = std:pattern ~ std:str:cat "(^" "$+" "[a-z]" ")";
@@ -5887,6 +5930,13 @@ Returns an error if the syntax failes to parse as pattern:
 !err = unwrap_err ~ std:pattern "($+[a-z]";
 
 std:assert_eq $i(0, 11)[err] "bad pattern";
+```
+
+Here an example of substitution:
+
+```wlambda
+!subs = std:pattern "$+x" :s;
+std:assert_eq subs["fooxxxoxx", \"a"] "fooaoa";
 ```
 
 ## <a name="9-modules"></a>9 - Modules
