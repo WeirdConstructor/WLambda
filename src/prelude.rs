@@ -5557,7 +5557,6 @@ For a reference of the matcher syntax see below.
 
 The match operation is a very versatile control flow operation.
 
-
 #### <a name="812-m-expr"></a>8.1.2 - $M _expr_
 
 This is a structure matcher expression. It will compile _expr_ into a structure
@@ -5599,6 +5598,8 @@ structure matchers that are used by `$M ...` and `match`.
 | `_+ $M`                | Placeholder for 1 or N items that match $M in the vector. |
 | `_? $M`                | Placeholder for 0 or 1 items that match $M in the vector. |
 | `_type? :integer ...`  | Matches an element of one of the given types.  Symbol names should have the same name as the type names returned by the `type` function. |
+| `$r/.../`              | Matches any element, where it's string contents matches the given pattern. |
+| `$rg/.../`             | Matches any element, where it's string contents matches the given pattern. Returns a list with all global matches. |
 | `$M1 &or $M2`          | Matches if $M1 or $M2 matches. |
 | `$M1 &and $M2`         | Matches if $M1 and $M2 matches. |
 | `$[$M1, $M2, ...]`     | Matches a vector. |
@@ -5841,6 +5842,9 @@ for each match.
 The match function will receive the input string as first argument
 and a function that will be called for each match as second argument.
 
+Inside the match function, you can use the control flow functions `break`
+and `next` to skip ahead.
+
 The match function receives the contents of `$\` as first argument,
 the offset of the match in the input string as second argument
 and the length of the match as third argument:
@@ -5870,6 +5874,16 @@ does.
 };
 
 std:assert_eq ret "on one at zero of eight";
+```
+
+Inside the match function, you can use the control flow functions `break`
+and `next`. You can use that to control which occurence within the string to
+replace:
+
+```wlambda
+!res = $rs/xxx/ "fxxxfxxxfxxxf" { break "O" };
+
+std:assert_eq res "fOfxxxfxxxf";
 ```
 
 #### <a name="833-pattern-syntax-overview"></a>8.3.3 - Pattern Syntax Overview

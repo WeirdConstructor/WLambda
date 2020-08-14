@@ -5543,7 +5543,6 @@ For a reference of the matcher syntax see below.
 
 The match operation is a very versatile control flow operation.
 
-
 #### <a name="812-m-expr"></a>8.1.2 - $M _expr_
 
 This is a structure matcher expression. It will compile _expr_ into a structure
@@ -5829,6 +5828,9 @@ for each match.
 The match function will receive the input string as first argument
 and a function that will be called for each match as second argument.
 
+Inside the match function, you can use the control flow functions `break`
+and `next` to skip ahead.
+
 The match function receives the contents of `$\` as first argument,
 the offset of the match in the input string as second argument
 and the length of the match as third argument:
@@ -5858,6 +5860,16 @@ does.
 };
 
 std:assert_eq ret "on one at zero of eight";
+```
+
+Inside the match function, you can use the control flow functions `break`
+and `next`. You can use that to control which occurence within the string to
+replace:
+
+```wlambda
+!res = $rs/xxx/ "fxxxfxxxfxxxf" { break "O" };
+
+std:assert_eq res "fOfxxxfxxxf";
 ```
 
 #### <a name="833-pattern-syntax-overview"></a>8.3.3 - Pattern Syntax Overview
