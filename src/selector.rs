@@ -1951,7 +1951,7 @@ mod tests {
         ps.skip_ws();
         match parse_pattern(&mut ps) {
             Ok(v) => {
-                println!("PAT: {}", v.s());
+                //d// println!("PAT: {}", v.s());
                 let pn = compile_find_pattern(&v);
                 let mut ss = SelectorState::new();
                 ss.set_str(st);
@@ -2415,5 +2415,9 @@ mod tests {
         assert_eq!(pat("(^$+A)(^$?L)(^$+B)$+(^X)$$",   "AABBBXX"),     "AABBBXX-AA--BBB-X");
 
         assert_eq!(pat("(^$<+(^aa)$*(^a)$+(^AA) | $<+(^aa)$*(^a)$+(^AA)C)$$",   "aaaaAAAAC"),       "aaaaAAAAC-aaaaAAAAC-aa-a-AA");
+
+        assert_eq!(pat("(^a)$*?(^$+b)$*?c", "afoefoeeoobbbbfec"),       "afoefoeeoobbbbfec-a-b");
+        assert_eq!(pat("(^a)$<*?(^$+b)$*?c", "afoefoeeoobbbbfec"),      "afoefoeeoobbbbfec-a-bbbb");
+        assert_eq!(pat("(^a)$*[^b](^$+b)$*?c", "afoefoeeoobbbbfec"),    "afoefoeeoobbbbfec-a-bbbb");
     }
 }

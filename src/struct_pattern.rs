@@ -50,7 +50,7 @@ pub fn compile_struct_list_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbo
 {
     let syn  = ast.v_(0);
 
-    println!("LIST PAT: {}", ast.s());
+    //d// println!("LIST PAT: {}", ast.s());
 
     match syn.get_syn() {
         Syntax::Var if ast.v_(1).to_sym().to_string() == "_*" => {

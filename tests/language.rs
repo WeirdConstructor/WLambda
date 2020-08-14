@@ -4038,8 +4038,9 @@ fn check_formatter() {
 
     assert_eq!(v2s("$F\"a{}x\" 10"),                        "a10x");
     assert_eq!(v2s("$F\"a{1}{0}x\" 10 22"),                 "a2210x");
-    assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22 33"),            format!("a{1}{0}{}x", 10, 22));
-    assert_eq!(v2s("$F\"a{1}{0}{}{}x\" 10 22 33"),          format!("a{1}{0}{}{}x", 10, 22));
+    assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22"),               format!("a{1}{0}{}x", 10, 22));
+    assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22 33"),            "Execution error: Jumped out of execution: [?]=>[1,16:<wlambda::eval>(Call)] SA::Panic(\"function expects at most 2 arguments, got 3\")");
+    assert_eq!(v2s("$F\"a{1}{0}{}{}x\" 10 22"),             format!("a{1}{0}{}{}x", 10, 22));
     assert_eq!(v2s("$F\"a{x}{y}x\" $i(3, 4, 5, 6)"),        "a34x");
     assert_eq!(v2s("$F\"a{zx}{xx}x\" $i(3, 4, 5, 6)"),      "a(5,3)(3,3)x");
     assert_eq!(v2s("$F$b\"a{}x\" 10"),                      "a10x");
@@ -4476,6 +4477,18 @@ fn check_regex_pattern_global() {
     assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught [1,49:<compiler:s_eval>(Err)] SA::Panic(\"Dropped error value: 11\")");
 
     assert_eq!(ve("$@v $rg\"$^$+f\" \"ffooofffofo\" \\$+ _.0"), "$[\"ff\"]");
+
+    assert_eq!(ve(r#"
+        !f = $M $[_?, x $r/(^a)$*[^b](^$+b)$<*?c/, _*];
+        f $[$[], "afoefoeeoobbbbfec", 22];
+        $\.x
+    "#), "$[\"afoefoeeoobbbbfec\",\"a\",\"bbbb\"]");
+
+    assert_eq!(ve(r#"
+        !f = $M $[_?, x $rg/(^a)$*[^b](^$+b)$<*?c/, _*];
+        f $[$[], "afoefoeeoobbbbfecabbbcabc", 22];
+        $\.x
+    "#), "$[$[\"afoefoeeoobbbbfec\",\"a\",\"bbbb\"],$[\"abbbc\",\"a\",\"bbb\"],$[\"abc\",\"a\",\"b\"]]");
 }
 
 #[test]

@@ -5585,6 +5585,8 @@ structure matchers that are used by `$M ...` and `match`.
 | `_+ $M`                | Placeholder for 1 or N items that match $M in the vector. |
 | `_? $M`                | Placeholder for 0 or 1 items that match $M in the vector. |
 | `_type? :integer ...`  | Matches an element of one of the given types.  Symbol names should have the same name as the type names returned by the `type` function. |
+| `$r/.../`              | Matches any element, where it's string contents matches the given pattern. |
+| `$rg/.../`             | Matches any element, where it's string contents matches the given pattern. Returns a list with all global matches. |
 | `$M1 &or $M2`          | Matches if $M1 or $M2 matches. |
 | `$M1 &and $M2`         | Matches if $M1 and $M2 matches. |
 | `$[$M1, $M2, ...]`     | Matches a vector. |

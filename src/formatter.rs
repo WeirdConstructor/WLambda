@@ -921,7 +921,6 @@ pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
                         Ok(env.new_err(format!("Formatter error: {}", e))),
                     _ => Ok(VVal::new_str_mv(fs.str_data.take().unwrap()))
                 }
-            }, None, None, false)
-//            }, Some(argc), Some(argc), false)
+            }, Some(argc), Some(argc), false)
     })
 }
