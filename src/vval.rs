@@ -3360,13 +3360,13 @@ impl VVal {
             },
             VVal::Pair(p) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc != 1 { return Ok(VVal::None) }
+                    if argc != 1 { return Ok(self.clone()) }
                     Ok(pair_extract(&p.0, &p.1, e.arg_ref(0).unwrap()))
                 })
             },
             VVal::IVec(iv) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc != 1 { return Ok(VVal::None) }
+                    if argc != 1 { return Ok(self.clone()) }
                     Ok(range_extract(iv.x_raw(), iv.y_raw(), e.arg_ref(0).unwrap()))
                 })
             },

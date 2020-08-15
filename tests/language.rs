@@ -4510,3 +4510,23 @@ fn check_regex_pattern_substitution() {
                   + 97]
     "#), "\"wlambda\"");
 }
+
+#[test]
+fn check_call_self() {
+    assert_eq!(ve("$true[]"),             "$true");
+    assert_eq!(ve("$false[]"),            "$false");
+    assert_eq!(ve(":x[]"),                ":x");
+    assert_eq!(ve("$o()[]"),              "$n");
+    assert_eq!(ve("$o(10)[]"),            "10");
+    assert_eq!(ve("$q fefe []"),          "\"fefe\"");
+    assert_eq!(ve("$Q fefe []"),          "$b\"fefe\"");
+    assert_eq!(ve("$p(12,4)[]"),          "$p(12,4)");
+    assert_eq!(ve("$p(:f,:t)[]"),         "$p(:f,:t)");
+    assert_eq!(ve("$i(1,2)[]"),           "$i(1,2)");
+    assert_eq!(ve("$i(1,2,3)[]"),         "$i(1,2,3)");
+    assert_eq!(ve("$i(1,2,3,4)[]"),       "$i(1,2,3,4)");
+    assert_eq!(ve("$f(1,2)[]"),           "$f(1,2)");
+    assert_eq!(ve("$f(1,2,3)[]"),         "$f(1,2,3)");
+    assert_eq!(ve("$f(1,2,3,4)[]"),       "$f(1,2,3,4)");
+    assert_eq!(ve("$n[]"),                "EXEC ERR: Caught [1,3:<compiler:s_eval>(Call)] SA::Panic(\"Calling $none is invalid\")");
+}
