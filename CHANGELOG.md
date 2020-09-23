@@ -7,6 +7,7 @@ used directly now. But only in the context of a single regex
 pattern like `$r(foo/bar)`. This makes it easier to process text.
 * Feature: Global regex matches with `$rg/.../`.
 * Feature: Global regex substitutions with `$rs/.../`.
+* Feature: Implemented `&or` and `$and` for structure patterns (`match` and `$M`).
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.
 

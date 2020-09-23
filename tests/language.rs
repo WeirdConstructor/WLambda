@@ -3970,6 +3970,10 @@ fn check_struct_patterns() {
 
     assert_eq!(ve("($M x $[:a, $S& */a &])    $[:a, $[${a=2},${a=3},${a=4}]]"),   "${x=$[:a,$[${a=2},${a=3},${a=4}]]}");
     assert_eq!(ve("($M x $[:a, o $S& */a &])  $[:a, $[${a=2},${a=3},${a=4}]]"),   "${o=$[2,3,4],x=$[:a,$[${a=2},${a=3},${a=4}]]}");
+
+    assert_eq!(ve("($M (a $q(X)) &or (b $q(Y))) $q(X)"), "${a=\"X\"}");
+    assert_eq!(ve("($M (a $q(X)) &or (b $q(Y))) $q(Y)"), "${b=\"Y\"}");
+    assert_eq!(ve("($M (a $q(X)) &and (b ?))    $q(X)"), "${a=$<1=>\"X\",b=$<1>}");
 }
 
 #[test]

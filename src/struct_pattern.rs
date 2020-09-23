@@ -653,7 +653,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                 Ok(fun) => {
                     Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                         let r = fun(&v.deref());
-                        println!("STORE V: {:?} = {}", var, r.s());
+                        //d// println!("STORE V: {:?} = {}", var, r.s());
                         if r.is_some() {
                             store_var(&r, &var, f);
                             true
@@ -666,6 +666,28 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                     Err(ast.compile_err(format!("bad pattern: {}", e)))
                 }
             }
+        },
+        Syntax::And => {
+            let variant_a = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+            let variant_b = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+
+            Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                store_var_if(
+                       variant_a(&v, f)
+                    && variant_b(&v, f),
+                    &v, &var, f)
+            }))
+        },
+        Syntax::Or => {
+            let variant_a = compile_struct_pattern(&ast.v_(1), var_map, None)?;
+            let variant_b = compile_struct_pattern(&ast.v_(2), var_map, None)?;
+
+            Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
+                store_var_if(
+                       variant_a(&v, f)
+                    || variant_b(&v, f),
+                    &v, &var, f)
+            }))
         },
         _ => {
             if ast.is_pair() {
