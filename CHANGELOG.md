@@ -8,6 +8,8 @@ pattern like `$r(foo/bar)`. This makes it easier to process text.
 * Feature: Global regex matches with `$rg/.../`.
 * Feature: Global regex substitutions with `$rs/.../`.
 * Feature: Implemented `&or` and `$and` for structure patterns (`match` and `$M`).
+* Feature: Commandline scripts with -e and file based evaluation get command line arguments via
+global variable `@@` now.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.
 

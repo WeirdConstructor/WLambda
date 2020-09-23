@@ -24,6 +24,8 @@ fn main() {
 //    println!("R: {}", r);
 //    return;
 
+    let argv : Vec<String> = std::env::args().collect();
+
     let global = GlobalEnv::new_default();
     global.borrow_mut().add_func(
         "dump_stack",
@@ -32,19 +34,31 @@ fn main() {
             Ok(VVal::None)
         }, Some(0), Some(0));
 
+
     let mut ctx = EvalContext::new(global);
 
-    let argv : Vec<String> = std::env::args().collect();
+    let v_argv = VVal::vec();
+    for a in argv.iter().skip(1) {
+        v_argv.push(VVal::new_str(&a));
+    }
+    ctx.set_global_var("@@", &v_argv);
+
     if argv.len() > 1 {
         if argv[1] == "-parse" {
             let contents = std::fs::read_to_string(&argv[2]).unwrap();
             wlambda::parser::parse(&contents, &argv[2]).expect("successful parse");
+
         } else if argv.len() > 2 && argv[1] == "-e" {
+            v_argv.delete_key(&VVal::Int(0)).expect("-e argument");
+            v_argv.delete_key(&VVal::Int(0)).expect("script argument");
+
             match ctx.eval(&argv[2]) {
                 Ok(v)  => { println!("{}", v.s()); },
                 Err(e) => { println!("*** {}", e); }
             }
         } else {
+            v_argv.delete_key(&VVal::Int(0)).expect("file argument");
+
             match ctx.eval_file(&argv[1]) {
                 Ok(_) => (),
                 Err(e) => {
