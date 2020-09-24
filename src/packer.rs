@@ -3,9 +3,28 @@ use crate::parser::state::{ParseError, ParseErrorKind};
 use crate::vval::VVal;
 
 enum Endian {
-    NA,
+    NE,
     LE,
     BE,
+}
+
+macro_rules! endian_data {
+    ($ps: ident, $i: ident, $u8vec: ident, $endian: ident, $type: ident, $len: expr, $out: expr) => {
+        if ($i + $len) > $u8vec.len() {
+            return Err($ps.err(
+                ParseErrorKind::BadPack(
+                    format!("data too small at offset={}, expected len={}",
+                            $i, $len))));
+        }
+        let mut numb : [u8; $len] = Default::default();
+        numb.copy_from_slice(&$u8vec[$i..($i + $len)]);
+
+        match $endian {
+            Endian::LE => $out.push(VVal::Int($type::from_le_bytes(numb) as i64)),
+            Endian::BE => $out.push(VVal::Int($type::from_be_bytes(numb) as i64)),
+            Endian::NE => $out.push(VVal::Int($type::from_ne_bytes(numb) as i64)),
+        }
+    }
 }
 
 macro_rules! endian_bytes {
@@ -13,7 +32,7 @@ macro_rules! endian_bytes {
         match $endian {
             Endian::LE => $u8vec.extend_from_slice(&($v).to_le_bytes()),
             Endian::BE => $u8vec.extend_from_slice(&($v).to_be_bytes()),
-            Endian::NA => $u8vec.extend_from_slice(&($v).to_ne_bytes()),
+            Endian::NE => $u8vec.extend_from_slice(&($v).to_ne_bytes()),
         }
     }
 }
@@ -35,7 +54,7 @@ pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
 
     let mut byts : Vec<u8> = Vec::new();
 
-    let mut endian = Endian::NA;
+    let mut endian = Endian::NE;
 
     let mut i = 0;
 
@@ -49,7 +68,7 @@ pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
         match ps.expect_some(ps.peek())? {
             '<' => { ps.consume(); endian = Endian::LE; }
             '>' => { ps.consume(); endian = Endian::BE; }
-            '=' => { ps.consume(); endian = Endian::NA; }
+            '=' => { ps.consume(); endian = Endian::NE; }
             'x' => { ps.consume(); byts.push(0x00); },
             'z' => {
                 ps.consume();
@@ -199,7 +218,7 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
     ps.skip_ws();
 
     data.with_bv_ref(|b| {
-        let mut endian = Endian::NA;
+        let mut endian = Endian::NE;
 
         let mut i = 0;
 
@@ -209,7 +228,7 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
             match ps.expect_some(ps.peek())? {
                 '<' => { ps.consume(); endian = Endian::LE; }
                 '>' => { ps.consume(); endian = Endian::BE; }
-                '=' => { ps.consume(); endian = Endian::NA; }
+                '=' => { ps.consume(); endian = Endian::NE; }
                 'x' => { ps.consume(); i += 1; },
                 'z' => {
                     ps.consume();
@@ -242,7 +261,8 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
                     if (i + len) > b.len() {
                         return Err(ps.err(
                             ParseErrorKind::BadPack(
-                                "'c<len>' data to small".to_string())));
+                                format!("'c{}' data too small at offset={}",
+                                        len, i))));
                     }
 
                     out.push(VVal::new_byt(b[i..(i + len)].to_vec()));
@@ -254,7 +274,7 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
                     if (i + 1) > b.len() {
                         return Err(ps.err(
                             ParseErrorKind::BadPack(
-                                "'b' data to small".to_string())));
+                                format!("'b' data too small at offset={}", i))));
                     }
 
                     out.push(VVal::new_byt(b[i..(i + 1)].to_vec()));
@@ -291,32 +311,64 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
 //                        Ok(())
 //                    })?;
 //                },
-//                'u' => {
-//                    ps.consume();
-//                    i += 1;
-//                    let i : i64 = v.i();
-//
-//                    if ps.consume_lookahead("8") {
-//                        byts.extend_from_slice(&(i as u8).to_ne_bytes());
-//
-//                    } else if ps.consume_lookahead("16") {
-//                        endian_bytes!(byts, endian, i as u16);
-//
-//                    } else if ps.consume_lookahead("32") {
-//                        endian_bytes!(byts, endian, i as u32);
-//
-//                    } else if ps.consume_lookahead("64") {
-//                        endian_bytes!(byts, endian, i as u64);
-//
-//                    } else if ps.consume_lookahead("128") {
-//                        endian_bytes!(byts, endian, i as u128);
-//
-//                    } else {
-//                        return Err(ps.err(
-//                            ParseErrorKind::BadPack(
-//                                "unknown size in u<n> pack string".to_string())));
-//                    }
-//                },
+                'i' => {
+                    ps.consume();
+
+                    if ps.consume_lookahead("8") {
+                        endian_data!(ps, i, b, endian, i8, 1, out);
+                        i += 1;
+
+                    } else if ps.consume_lookahead("16") {
+                        endian_data!(ps, i, b, endian, i16, 2, out);
+                        i += 2;
+
+                    } else if ps.consume_lookahead("32") {
+                        endian_data!(ps, i, b, endian, i32, 4, out);
+                        i += 4;
+
+                    } else if ps.consume_lookahead("64") {
+                        endian_data!(ps, i, b, endian, i64, 8, out);
+                        i += 8;
+
+                    } else if ps.consume_lookahead("128") {
+                        endian_data!(ps, i, b, endian, i128, 16, out);
+                        i += 16;
+
+                    } else {
+                        return Err(ps.err(
+                            ParseErrorKind::BadPack(
+                                "unknown size in i<n> pack string".to_string())));
+                    }
+                },
+                'u' => {
+                    ps.consume();
+
+                    if ps.consume_lookahead("8") {
+                        endian_data!(ps, i, b, endian, u8, 1, out);
+                        i += 1;
+
+                    } else if ps.consume_lookahead("16") {
+                        endian_data!(ps, i, b, endian, u16, 2, out);
+                        i += 2;
+
+                    } else if ps.consume_lookahead("32") {
+                        endian_data!(ps, i, b, endian, u32, 4, out);
+                        i += 4;
+
+                    } else if ps.consume_lookahead("64") {
+                        endian_data!(ps, i, b, endian, u64, 8, out);
+                        i += 8;
+
+                    } else if ps.consume_lookahead("128") {
+                        endian_data!(ps, i, b, endian, u128, 16, out);
+                        i += 16;
+
+                    } else {
+                        return Err(ps.err(
+                            ParseErrorKind::BadPack(
+                                "unknown size in u<n> pack string".to_string())));
+                    }
+                },
 //                'i' => {
 //                    ps.consume();
 //                    i += 1;

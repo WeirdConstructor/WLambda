@@ -4622,4 +4622,37 @@ fn check_unpack() {
                "$[$b\"aa\\0b\",$b\"b\",$b\"bbb\"]");
     assert_eq!(ve("std:bytes:unpack $q bc4c1bzb $b\"aaa\\x00bbbbbb\\x00\""),
                "$[$b\"a\",$b\"aa\\0b\",$b\"b\",$b\"b\",$b\"bbb\"]");
+
+    assert_eq!(ve("std:bytes:unpack $q u8 $b\"\\x3A\""),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q xu16 $b\"\\x00\\x3A\\x00\""),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q >xu16 $b\"\\x00\\x00\\x3A\""),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q <xu16 $b\"\\x00\\x3A\\x00\""),
+               "$[58]");
+
+    assert_eq!(ve("std:bytes:unpack $q <xu128 ~ std:bytes:pack $q <xu128 $[58]"),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q <xu64 ~ std:bytes:pack $q <xu64 $[58]"),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q <xu32 ~ std:bytes:pack $q <xu32 $[58]"),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q >xu128 ~ std:bytes:pack $q >xu128 $[58]"),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q >xu64 ~ std:bytes:pack $q >xu64 $[58]"),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q >xu32 ~ std:bytes:pack $q >xu32 $[58]"),
+               "$[58]");
+    assert_eq!(ve("std:bytes:unpack $q <xu64 ~ std:bytes:pack $q >xu64 $[58]"),
+               "$[4179340454199820288]");
+    assert_eq!(ve("std:bytes:unpack $q >xu64 ~ std:bytes:pack $q <xu64 $[58]"),
+               "$[4179340454199820288]");
+
+    assert_eq!(ve("std:bytes:unpack $q i8u8 $b\"\\xFF\\xFF\""), "$[-1,255]");
+    assert_eq!(ve("std:bytes:unpack $q i16u16 $b\"\\xFF\\xFF\\xFF\\xFF\""), "$[-1,65535]");
+    assert_eq!(ve("std:bytes:unpack $q i32u32 ~ std:bytes:pack $q i32u32 $[-1, -1]"),
+               "$[-1,4294967295]");
+    assert_eq!(ve("std:bytes:unpack $q i64u64 ~ std:bytes:pack $q i64u64 $[-1, -1]"),
+               "$[-1,-1]");
 }
