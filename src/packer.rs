@@ -217,6 +217,7 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
                         if b[o] == 0x00 {
                             out.push(VVal::new_byt(b[i..o].to_vec()));
                             i = o + 1;
+                            break;
                         }
                     }
                 },
@@ -230,27 +231,25 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
                     ps.consume();
 
                     let len = parse_size(&mut ps)?;
-                    i += 1;
-                    v.with_bv_ref(|s| {
-                        if len > s.len() {
-                            byts.extend_from_slice(&s[..]);
-                            for _ in 0..(len - s.len()) {
-                                byts.push(0x00);
-                            }
-                        } else {
-                            byts.extend_from_slice(&s[..len]);
-                        }
-                    })
+                    if (i + len) > b.len() {
+                        return Err(ps.err(
+                            ParseErrorKind::BadPack(
+                                "'c<len>' data to small".to_string())));
+                    }
+
+                    out.push(VVal::new_byt(b[i..(i + len)].to_vec()));
+                    i += len;
                 },
                 'b' => {
                     ps.consume();
-                    v.with_bv_ref(|s| {
-                        if s.len() == 0 {
-                            byts.push(0x00)
-                        } else {
-                            byts.push(s[0])
-                        }
-                    });
+
+                    if (i + 1) > b.len() {
+                        return Err(ps.err(
+                            ParseErrorKind::BadPack(
+                                "'b' data to small".to_string())));
+                    }
+
+                    out.push(VVal::new_byt(b[i..(i + 1)].to_vec()));
                 },
                 's' => {
                     ps.consume();
