@@ -82,6 +82,7 @@ pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
             },
             'b' => {
                 ps.consume();
+                i += 1;
                 v.with_bv_ref(|s| {
                     if s.len() == 0 {
                         byts.push(0x00)
@@ -213,12 +214,19 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
                 'z' => {
                     ps.consume();
 
+                    let mut found = false;
                     for o in i..b.len() {
                         if b[o] == 0x00 {
                             out.push(VVal::new_byt(b[i..o].to_vec()));
+                            found = true;
                             i = o + 1;
                             break;
                         }
+                    }
+
+                    if !found {
+                        out.push(VVal::new_byt(b[i..].to_vec()));
+                        i = b.len();
                     }
                 },
                 'y' => {
@@ -250,100 +258,101 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
                     }
 
                     out.push(VVal::new_byt(b[i..(i + 1)].to_vec()));
-                },
-                's' => {
-                    ps.consume();
                     i += 1;
-                    v.with_bv_ref(|s| {
-                        let size = s.len();
-
-                        if ps.consume_lookahead("8") {
-                            byts.extend_from_slice(&(size as u8).to_ne_bytes());
-
-                        } else if ps.consume_lookahead("16") {
-                            endian_bytes!(byts, endian, size as u16);
-
-                        } else if ps.consume_lookahead("32") {
-                            endian_bytes!(byts, endian, size as u32);
-
-                        } else if ps.consume_lookahead("64") {
-                            endian_bytes!(byts, endian, size as u64);
-
-                        } else if ps.consume_lookahead("128") {
-                            endian_bytes!(byts, endian, size as u128);
-
-                        } else {
-                            return Err(ps.err(
-                                ParseErrorKind::BadPack(
-                                    "unknown size in s<n> pack string".to_string())));
-                        }
-
-                        byts.extend_from_slice(&s[..]);
-                        Ok(())
-                    })?;
                 },
-                'u' => {
-                    ps.consume();
-                    i += 1;
-                    let i : i64 = v.i();
-
-                    if ps.consume_lookahead("8") {
-                        byts.extend_from_slice(&(i as u8).to_ne_bytes());
-
-                    } else if ps.consume_lookahead("16") {
-                        endian_bytes!(byts, endian, i as u16);
-
-                    } else if ps.consume_lookahead("32") {
-                        endian_bytes!(byts, endian, i as u32);
-
-                    } else if ps.consume_lookahead("64") {
-                        endian_bytes!(byts, endian, i as u64);
-
-                    } else if ps.consume_lookahead("128") {
-                        endian_bytes!(byts, endian, i as u128);
-
-                    } else {
-                        return Err(ps.err(
-                            ParseErrorKind::BadPack(
-                                "unknown size in u<n> pack string".to_string())));
-                    }
-                },
-                'i' => {
-                    ps.consume();
-                    i += 1;
-                    let i : i64 = v.i();
-
-                    if ps.consume_lookahead("8") {
-                        byts.extend_from_slice(&(i as i8).to_ne_bytes());
-
-                    } else if ps.consume_lookahead("16") {
-                        endian_bytes!(byts, endian, i as i16);
-
-                    } else if ps.consume_lookahead("32") {
-                        endian_bytes!(byts, endian, i as i32);
-
-                    } else if ps.consume_lookahead("64") {
-                        endian_bytes!(byts, endian, i as i64);
-
-                    } else if ps.consume_lookahead("128") {
-                        endian_bytes!(byts, endian, i as i128);
-
-                    } else {
-                        return Err(ps.err(
-                            ParseErrorKind::BadPack(
-                                "unknown size in i<n> pack string".to_string())));
-                    }
-                },
-                'f' => {
-                    ps.consume();
-                    i += 1;
-                    endian_bytes!(byts, endian, v.f() as f32);
-                },
-                'd' => {
-                    ps.consume();
-                    i += 1;
-                    endian_bytes!(byts, endian, v.f());
-                },
+//                's' => {
+//                    ps.consume();
+//                    i += 1;
+//                    v.with_bv_ref(|s| {
+//                        let size = s.len();
+//
+//                        if ps.consume_lookahead("8") {
+//                            byts.extend_from_slice(&(size as u8).to_ne_bytes());
+//
+//                        } else if ps.consume_lookahead("16") {
+//                            endian_bytes!(byts, endian, size as u16);
+//
+//                        } else if ps.consume_lookahead("32") {
+//                            endian_bytes!(byts, endian, size as u32);
+//
+//                        } else if ps.consume_lookahead("64") {
+//                            endian_bytes!(byts, endian, size as u64);
+//
+//                        } else if ps.consume_lookahead("128") {
+//                            endian_bytes!(byts, endian, size as u128);
+//
+//                        } else {
+//                            return Err(ps.err(
+//                                ParseErrorKind::BadPack(
+//                                    "unknown size in s<n> pack string".to_string())));
+//                        }
+//
+//                        byts.extend_from_slice(&s[..]);
+//                        Ok(())
+//                    })?;
+//                },
+//                'u' => {
+//                    ps.consume();
+//                    i += 1;
+//                    let i : i64 = v.i();
+//
+//                    if ps.consume_lookahead("8") {
+//                        byts.extend_from_slice(&(i as u8).to_ne_bytes());
+//
+//                    } else if ps.consume_lookahead("16") {
+//                        endian_bytes!(byts, endian, i as u16);
+//
+//                    } else if ps.consume_lookahead("32") {
+//                        endian_bytes!(byts, endian, i as u32);
+//
+//                    } else if ps.consume_lookahead("64") {
+//                        endian_bytes!(byts, endian, i as u64);
+//
+//                    } else if ps.consume_lookahead("128") {
+//                        endian_bytes!(byts, endian, i as u128);
+//
+//                    } else {
+//                        return Err(ps.err(
+//                            ParseErrorKind::BadPack(
+//                                "unknown size in u<n> pack string".to_string())));
+//                    }
+//                },
+//                'i' => {
+//                    ps.consume();
+//                    i += 1;
+//                    let i : i64 = v.i();
+//
+//                    if ps.consume_lookahead("8") {
+//                        byts.extend_from_slice(&(i as i8).to_ne_bytes());
+//
+//                    } else if ps.consume_lookahead("16") {
+//                        endian_bytes!(byts, endian, i as i16);
+//
+//                    } else if ps.consume_lookahead("32") {
+//                        endian_bytes!(byts, endian, i as i32);
+//
+//                    } else if ps.consume_lookahead("64") {
+//                        endian_bytes!(byts, endian, i as i64);
+//
+//                    } else if ps.consume_lookahead("128") {
+//                        endian_bytes!(byts, endian, i as i128);
+//
+//                    } else {
+//                        return Err(ps.err(
+//                            ParseErrorKind::BadPack(
+//                                "unknown size in i<n> pack string".to_string())));
+//                    }
+//                },
+//                'f' => {
+//                    ps.consume();
+//                    i += 1;
+//                    endian_bytes!(byts, endian, v.f() as f32);
+//                },
+//                'd' => {
+//                    ps.consume();
+//                    i += 1;
+//                    endian_bytes!(byts, endian, v.f());
+//                },
                 c => {
                     return Err(ps.err(ParseErrorKind::UnexpectedToken(c, "in pack string")));
                 },
@@ -351,6 +360,6 @@ pub(crate) fn do_unpack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> 
             ps.skip_ws();
         }
 
-        Ok(VVal::new_byt(byts))
+        Ok(out)
     })
-
+}

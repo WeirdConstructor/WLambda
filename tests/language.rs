@@ -4534,3 +4534,92 @@ fn check_call_self() {
     assert_eq!(ve("$f(1,2,3,4)[]"),       "$f(1,2,3,4)");
     assert_eq!(ve("$n[]"),                "EXEC ERR: Caught [1,3:<compiler:s_eval>(Call)] SA::Panic(\"Calling $none is invalid\")");
 }
+
+#[test]
+fn check_pack() {
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q b $[]"),
+               "\"00\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q b $[:@]"),
+               "\"40\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q xbx $[$b\"\\x01\"]"),
+               "\"000100\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q z $[$b\"\\x01\"]"),
+               "\"0100\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q zb $[$b\"\\x01\",:@]"),
+               "\"010040\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q zby $[$b\"\\x01\",:@,$b\"a\\x02a\"]"),
+               "\"010040610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q zbs8 $[$b\"\\x01\",:@,$b\"a\\x02a\"]"),
+               "\"01004003610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q zbs16 $[$b\"\\x01\",:@,$b\"a\\x02a\"]"),
+               "\"0100400300610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q zbs32 $[$b\"\\x01\",:@,$b\"a\\x02a\"]"),
+               "\"01004003000000610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q zbs64 $[$b\"\\x01\",:@,$b\"a\\x02a\"]"),
+               "\"0100400300000000000000610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q zbs128 $[$b\"\\x01\",:@,$b\"a\\x02a\"]"),
+               "\"01004003000000000000000000000000000000610261\"");
+
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >s8   $[$b\"a\\x02a\"]"),
+               "\"03610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >s16  $[$b\"a\\x02a\"]"),
+               "\"0003610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >s32  $[$b\"a\\x02a\"]"),
+               "\"00000003610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >s64  $[$b\"a\\x02a\"]"),
+               "\"0000000000000003610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >s128 $[$b\"a\\x02a\"]"),
+               "\"00000000000000000000000000000003610261\"");
+
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <s8   $[$b\"a\\x02a\"]"),
+               "\"03610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <s16  $[$b\"a\\x02a\"]"),
+               "\"0300610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <s32  $[$b\"a\\x02a\"]"),
+               "\"03000000610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <s64  $[$b\"a\\x02a\"]"),
+               "\"0300000000000000610261\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <s128 $[$b\"a\\x02a\"]"),
+               "\"03000000000000000000000000000000610261\"");
+
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q u8xu16xu32xu64xu128 $[0x12,0x3456,0x67891234,0x12ABCDEF345678,0x0123456789ABCDEF]"),
+               "\"12005634003412896700785634EFCDAB120000EFCDAB89674523010000000000000000\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <u8xu16xu32xu64xu128 $[0x12,0x3456,0x67891234,0x12ABCDEF345678,0x0123456789ABCDEF]"),
+               "\"12005634003412896700785634EFCDAB120000EFCDAB89674523010000000000000000\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >u8xu16xu32xu64xu128 $[0x12,0x3456,0x67891234,0x12ABCDEF345678,0x0123456789ABCDEF]"),
+               "\"120034560067891234000012ABCDEF3456780000000000000000000123456789ABCDEF\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >i32u32 $[-0xFFFF,-0xFFFF]"),
+               "\"FFFF0001FFFF0001\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >i32u32 $[-0x01,-0x01]"),
+               "\"FFFFFFFFFFFFFFFF\"");
+
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q f $[0.1234]"),
+               "\"24B9FC3D\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >f $[0.1234]"),
+               "\"3DFCB924\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <f $[0.1234]"),
+               "\"24B9FC3D\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q d $[0.1234]"),
+               "\"F38E53742497BF3F\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q >d $[0.1234]"),
+               "\"3FBF972474538EF3\"");
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <d $[0.1234]"),
+               "\"F38E53742497BF3F\"");
+
+    assert_eq!(ve("std:bytes:to_hex ~ std:bytes:pack $q <d>xf $[0.1234,0.1234]"),
+               "\"F38E53742497BF3F003DFCB924\"");
+}
+
+#[test]
+fn check_unpack() {
+    assert_eq!(ve("std:bytes:unpack $q zz $b\"aaa\\x00bbbbbb\\x00\""),
+               "$[$b\"aaa\",$b\"bbbbbb\"]");
+    assert_eq!(ve("std:bytes:unpack $q zy $b\"aaa\\x00bbbbbb\\x00\""),
+               "$[$b\"aaa\",$b\"bbbbbb\\0\"]");
+    assert_eq!(ve("std:bytes:unpack $q zz $b\"aaaaaa\""),
+               "$[$b\"aaaaaa\"]");
+    assert_eq!(ve("std:bytes:unpack $q xc4c1xz $b\"aaa\\x00bbbbbb\\x00\""),
+               "$[$b\"aa\\0b\",$b\"b\",$b\"bbb\"]");
+    assert_eq!(ve("std:bytes:unpack $q bc4c1bzb $b\"aaa\\x00bbbbbb\\x00\""),
+               "$[$b\"a\",$b\"aa\\0b\",$b\"b\",$b\"b\",$b\"bbb\"]");
+}

@@ -8854,7 +8854,22 @@ pub fn std_symbol_table() -> SymbolTable {
                     Ok(v) => Ok(v),
                     Err(e) => {
                         Ok(env.new_err(
-                            format!("Bad pack string '{}': {}", s, e)))
+                            format!("Bad pack '{}': {}", s, e)))
+                    },
+                }
+            })
+        }, Some(2), Some(2), false);
+
+    func!(st, "bytes:unpack",
+        |env: &mut Env, _argc: usize| {
+            use crate::packer;
+            let data = env.arg(1);
+            env.arg_ref(0).unwrap().with_s_ref(|s: &str| {
+                match packer::do_unpack(s, &data) {
+                    Ok(v) => Ok(v),
+                    Err(e) => {
+                        Ok(env.new_err(
+                            format!("Bad (un)pack '{}': {}", s, e)))
                     },
                 }
             })
