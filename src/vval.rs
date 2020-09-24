@@ -4356,7 +4356,10 @@ impl VVal {
         where T: FnOnce(&[u8]) -> R
     {
         match self {
-            VVal::Byt(v)  => f(&v.as_ref()[..]),
+            VVal::Byt(v) => f(&v.as_ref()[..]),
+            VVal::Str(_) => {
+                self.with_s_ref(|s| f(s.as_bytes()))
+            },
             _ => {
                 let vec = self.as_bytes();
                 f(&vec[..])

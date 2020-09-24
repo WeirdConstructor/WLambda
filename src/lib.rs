@@ -627,6 +627,7 @@ pub mod csv;
 pub mod selector;
 pub mod struct_pattern;
 pub mod formatter;
+mod packer;
 mod prog_writer;
 mod io;
 mod str_int;
