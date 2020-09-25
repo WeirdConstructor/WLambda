@@ -4655,4 +4655,21 @@ fn check_unpack() {
                "$[-1,4294967295]");
     assert_eq!(ve("std:bytes:unpack $q i64u64 ~ std:bytes:pack $q i64u64 $[-1, -1]"),
                "$[-1,-1]");
+
+    assert_eq!(ve("std:num:round ~ 100000000.0 * 0[std:bytes:unpack $q >xf ~ std:bytes:pack $q >xf $[0.12345678]]"),
+               "12345678");
+    assert_eq!(ve("std:num:round ~ 100000000000000000.0 * 0[std:bytes:unpack $q >xd ~ std:bytes:pack $q >xd $[0.12345678912345678]]"),
+               "12345678912345678");
+
+    assert_eq!(ve("std:bytes:unpack $q i8xs8u16 ~ std:bytes:pack $q i8xs8u16 $[42, $Q FOOBAR , 25500]"),
+               "$[42,$b\"FOOBAR\",25500]");
+    assert_eq!(ve("std:bytes:unpack $q i8xs16u16 ~ std:bytes:pack $q i8xs16u16 $[42, $Q FOOBAR , 25500]"),
+               "$[42,$b\"FOOBAR\",25500]");
+    assert_eq!(ve("std:bytes:unpack $q i8xs32u16 ~ std:bytes:pack $q i8xs32u16 $[42, $Q FOOBAR , 25500]"),
+               "$[42,$b\"FOOBAR\",25500]");
+    assert_eq!(ve("std:bytes:unpack $q i8xs64u16 ~ std:bytes:pack $q i8xs64u16 $[42, $Q FOOBAR , 25500]"),
+               "$[42,$b\"FOOBAR\",25500]");
+    assert_eq!(ve("std:bytes:unpack $q i8xs128u16 ~ std:bytes:pack $q i8xs128u16 $[42, $Q FOOBAR , 25500]"),
+               "$[42,$b\"FOOBAR\",25500]");
+
 }

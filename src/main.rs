@@ -53,7 +53,7 @@ fn main() {
             v_argv.delete_key(&VVal::Int(0)).expect("script argument");
 
             match ctx.eval(&argv[2]) {
-                Ok(v)  => { println!("{}", v.s()); },
+                Ok(v)  => { v.with_s_ref(|s| println!("{}", s)); },
                 Err(e) => { println!("*** {}", e); }
             }
         } else {
