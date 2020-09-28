@@ -7721,7 +7721,8 @@ In the following grammar, white space and comments are omitted:
                      The exception is "=" which assigns
                      the field as specified.
                      BUT: There is a special case, when you specify
-                     an `indent` it is quoted and interpreted as symbol. *)
+                          an identifier as field, it is quoted and
+                          interpreted as symbol. *)
                   ;
     call_no_ops   = value, { arg_list | field_access }
                   ;
