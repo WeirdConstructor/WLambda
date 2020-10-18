@@ -176,6 +176,8 @@ Smalltalk, LISP and Perl.
     - [3.10.6](#3106-stdbytesfromvec-vector-of-ints) std:bytes:from\_vec _vector-of-ints_
     - [3.10.7](#3107-stdbytestohex-byte-vector) std:bytes:to\_hex _byte-vector_
     - [3.10.8](#3108-stdbytestovec-byte-vector) std:bytes:to\_vec _byte-vector_
+    - [3.10.9](#3109-stdbytespack-pack-format-string-list-of-values) std:bytes:pack _pack-format-string_ _list-of-values_
+    - [3.10.10](#31010-stdbytesunpack-pack-format-string-byte-vector) std:bytes:unpack _pack-format-string_ _byte-vector_
   - [3.11](#311-symbols) Symbols
     - [3.11.1](#3111-sym-value) sym _value_
     - [3.11.2](#3112-issym-value) is\_sym _value_
@@ -410,6 +412,7 @@ Smalltalk, LISP and Perl.
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
+  - [13.3](#133-format-string-syntax-for-stdbytespack-and-stdbytesunpack) Format String Syntax for std:bytes:pack and std:bytes:unpack
 
 -----
 
@@ -3137,6 +3140,44 @@ Converts the given byte vector to a vector of integers in the range 0-255.
 std:assert_str_eq
     (std:bytes:to_vec $b"byte")
     $[98, 121, 116, 101];
+```
+
+#### <a name="3109-stdbytespack-pack-format-string-list-of-values"></a>3.10.9 - std:bytes:pack _pack-format-string_ _list-of-values_
+
+Returns a byte vector containing the values of _list-of-values_
+serialized in binary form (packed) according to the given _pack-format-string_.
+
+If the syntax of the _pack-format-string_ has errors, an error value is returned.
+
+See also the section [Format String Syntax](#133-format-string-syntax-for-stdbytespack-and-stdbytesunpack)
+for a description of the syntax for _pack-format-string_.
+
+This function is very useful for constructing binary data for file formats and
+network protocols.
+
+```wlambda
+std:assert_eq
+    (std:bytes:pack "> i16 x s8 x f" $[1, "test", 0.5])
+    $b"\0\x01\0\x04test\0?\0\0\0";
+```
+
+#### <a name="31010-stdbytesunpack-pack-format-string-byte-vector"></a>3.10.10 - std:bytes:unpack _pack-format-string_ _byte-vector_
+
+Decodes the given _byte-vector_ according to the _pack-format-string_ and returns it
+as list of values.
+
+If the syntax of the _pack-format-string_ has errors or the given _byte-vector_
+is too short, an error value is returned.
+
+See also the section [Format String Syntax](#133-format-string-syntax-for-stdbytespack-and-stdbytesunpack)
+for a description of the syntax for _pack-format-string_.
+
+```wlambda
+std:assert_str_eq
+    (std:bytes:unpack
+        "< i16 x c3 s16 x y"
+        $b"\x10\x00\x00ABC\x02\x00XY\x00This is the rest")
+    $[16, $b"ABC", $b"XY", $b"This is the rest"];
 ```
 
 ### <a name="311-symbols"></a>3.11 - Symbols
@@ -7824,3 +7865,28 @@ The syntax for formatting is very similar to Rust's string formatting:
     parameter     = argument, '$'
                   ;
 ```
+
+### <a name="133-format-string-syntax-for-stdbytespack-and-stdbytesunpack"></a>13.3 - Format String Syntax for std:bytes:pack and std:bytes:unpack
+
+This syntax describes the accepted format strigns for the `std:bytes:pack` and
+`std:bytes:unpack`. The format is loosely adapted from the Lua syntax for
+`string.pack` and `string.unpack`.
+
+| Syntax | Semantics |
+|-|-|
+| `<` | Sets little endian |
+| `>` | Sets big endian |
+| `=` | Sets native endian |
+| `x` | One zero byte of padding |
+| `y` | Byte content with unspecified length. On `unpack` this reads to the end of the input.  |
+| `z` | A zero-terminated string of bytes. |
+| `c<n>` | An `n` long field of bytes. |
+| `b` | A single byte. |
+| `s<bits>` | A string of bytes that is prefixed with a `<bits>` wide binary length field. |
+| `u<bits>` | A `<bits>` wide unsigned integer field. |
+| `i<bits>` | A `<bits>` wide signed integer field. |
+| `f` | A float field (32 bits). |
+| `d` | A double field (64 bits). |
+
+- `<n>` can be any number.
+- `<bits>` can be 8, 16, 32, 64 or 128.

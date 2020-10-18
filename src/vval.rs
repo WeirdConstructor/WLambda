@@ -474,7 +474,7 @@ impl Env {
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {
         let old_self = std::mem::replace(&mut self.current_self, object);
         let ret = f(self);
-        std::mem::replace(&mut self.current_self, old_self);
+        self.current_self = old_self;
         ret
     }
 
@@ -882,17 +882,17 @@ impl Env {
                 self.null_locals(from, to);
             },
             UnwindAction::RestoreLoopInfo(li) => {
-                std::mem::replace(&mut self.loop_info, li);
+                self.loop_info = li;
             },
             UnwindAction::RestoreAccum(fun, val) => {
-                std::mem::replace(&mut self.accum_fun, fun);
-                std::mem::replace(&mut self.accum_val, val);
+                self.accum_fun = fun;
+                self.accum_val = val;
             },
             UnwindAction::RestoreSelf(slf) => {
-                std::mem::replace(&mut self.current_self, slf);
+                self.current_self = slf;
             },
             UnwindAction::RestoreIter(i) => {
-                std::mem::replace(&mut self.iter, i);
+                self.iter = i;
             },
             UnwindAction::FunctionCall(argc, old_bp, local_size) => {
                 self.reset_bp(local_size, old_bp);

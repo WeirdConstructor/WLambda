@@ -10,6 +10,7 @@ pattern like `$r(foo/bar)`. This makes it easier to process text.
 * Feature: Implemented `&or` and `$and` for structure patterns (`match` and `$M`).
 * Feature: Commandline scripts with -e and file based evaluation get command line arguments via
 global variable `@@` now.
+* Feature: Added `std:bytes:pack` and `std:bytes:unpack` for handling binary data formats.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.
 
