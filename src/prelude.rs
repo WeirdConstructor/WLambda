@@ -8470,6 +8470,17 @@ pub fn core_symbol_table() -> SymbolTable {
     st
 }
 
+fn systime_to_unix(syst: &std::time::SystemTime, unit: &str) -> Result<VVal, StackAction> {
+    match syst.duration_since(std::time::SystemTime::UNIX_EPOCH) {
+        Ok(n) => {
+            Ok(duration_to_vval(n, &unit[..]))
+        },
+        Err(_) =>
+            Err(StackAction::panic_msg(
+                "SystemTime before UNIX EPOCH!".to_string()))
+    }
+}
+
 fn duration_to_vval(dur: std::time::Duration, unit: &str) -> VVal {
     use std::convert::TryFrom;
     match unit {
@@ -8479,6 +8490,66 @@ fn duration_to_vval(dur: std::time::Duration, unit: &str) -> VVal {
         "ns" => { VVal::Int(i64::try_from(dur.as_nanos()) .unwrap_or(0)) },
         _    => { VVal::Int(i64::try_from(dur.as_millis()).unwrap_or(0)) },
     }
+}
+
+fn dir_entry_to_vval(env: &mut Env, path: &str, entry: Result<std::fs::DirEntry, std::io::Error>) -> Result<VVal, StackAction> {
+    let entry = match entry {
+        Ok(e) => e,
+        Err(e) => {
+            return Ok(env.new_err(
+                format!(
+                    "Couldn't directory read entry '{}': {}",
+                    path, e)))
+        },
+    };
+
+    let metadata = match entry.metadata() {
+        Ok(m) => m,
+        Err(e) => {
+            return Ok(env.new_err(
+                format!(
+                    "Couldn't read entry metadata '{}': {}",
+                    entry.path().to_string_lossy(), e)))
+        },
+    };
+
+    let ve = VVal::map3(
+        "name", VVal::new_str_mv(entry.file_name().to_string_lossy().to_string()),
+        "path", VVal::new_str_mv(entry.path().to_string_lossy().to_string()),
+        "type", if metadata.file_type().is_dir() {
+            VVal::sym("d")
+        } else if metadata.file_type().is_symlink() {
+            VVal::sym("l")
+        } else {
+            VVal::sym("f")
+        });
+    ve.set_key_str("len", VVal::Int(metadata.len() as i64))
+      .expect("single use");
+
+    if let Ok(atime) = metadata.accessed() {
+        ve.set_key_str(
+            "atime", systime_to_unix(&atime, "s")?)
+          .expect("single use");
+    }
+
+    if let Ok(mtime) = metadata.modified() {
+        ve.set_key_str(
+            "mtime", systime_to_unix(&mtime, "s")?)
+          .expect("single use");
+    }
+
+    if let Ok(ctime) = metadata.created() {
+        ve.set_key_str(
+            "ctime", systime_to_unix(&ctime, "s")?)
+          .expect("single use");
+    }
+
+    ve.set_key_str(
+      "read_only",
+      VVal::Bol(metadata.permissions().readonly()))
+      .expect("single use");
+
+    Ok(ve)
 }
 
 /// Returns a SymbolTable with all WLambda standard library language symbols.
@@ -9134,6 +9205,51 @@ pub fn std_symbol_table() -> SymbolTable {
             let x = x.max(0.0).min(1.0);
             Ok(VVal::Flt(x * x * (3.0 - (2.0 * x))))
         }, Some(3), Some(3), false);
+
+    func!(st, "fs:read_dir",
+        |env: &mut Env, _argc: usize| {
+            let path = env.arg(0);
+            let f    = env.arg(1);
+
+            path.with_s_ref(|path| {
+                let mut ret = VVal::None;
+
+                let mut stack = vec![path.to_string()];
+                while !stack.is_empty() {
+                    let path = stack.pop().unwrap();
+
+                    match std::fs::read_dir(&path) {
+                        Ok(iter) => {
+                            for entry in iter {
+                                let ve = dir_entry_to_vval(env, &path, entry)?;
+                                let is_dir     = ve.get_key("type").unwrap().with_s_ref(|s| s == "d");
+                                let entry_path = if is_dir { Some(ve.get_key("path").unwrap().s_raw()) } else { None };
+                                env.push(ve);
+                                match f.call_internal(env, 1) {
+                                    Ok(v)                      => { ret = v; },
+                                    Err(StackAction::Break(v)) => { env.popn(1); return Ok(*v); },
+                                    Err(StackAction::Next)     => { },
+                                    Err(e)                     => { env.popn(1); return Err(e); }
+                                }
+                                env.popn(1);
+
+                                if is_dir && ret.b() {
+                                    stack.push(entry_path.unwrap());
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            return Ok(env.new_err(
+                                format!(
+                                    "Couldn't read directory '{}': {}",
+                                    path, e)))
+                        },
+                    }
+                }
+
+                Ok(ret)
+            })
+        }, Some(2), Some(2), false);
 
     func!(st, "fs:copy",
         |env: &mut Env, _argc: usize| {
@@ -10003,6 +10119,20 @@ pub fn std_symbol_table() -> SymbolTable {
             let dt = Local::now();
 
             let fmt = env.arg(0);
+            if fmt.is_str() {
+                fmt.with_s_ref(|fmt: &str|
+                    Ok(VVal::new_str_mv(dt.format(fmt).to_string())))
+            } else {
+                Ok(VVal::new_str_mv(dt.format("%Y-%m-%d %H:%M:%S.%f").to_string()))
+            }
+
+        }, Some(0), Some(1), false);
+
+    func!(st, "chrono:format_utc",
+        |env: &mut Env, _argc: usize| {
+            use chrono::prelude::*;
+            let dt = Utc.timestamp(env.arg(0).i(), 0);
+            let fmt = env.arg(1);
             if fmt.is_str() {
                 fmt.with_s_ref(|fmt: &str|
                     Ok(VVal::new_str_mv(dt.format(fmt).to_string())))
