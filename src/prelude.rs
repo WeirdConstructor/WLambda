@@ -358,6 +358,7 @@ Smalltalk, LISP and Perl.
   - [11.3](#113-file-system) File System
     - [11.3.1](#1131-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
     - [11.3.2](#1132-stdfscopy-src-file-path-dst-file-path) std:fs:copy _src-file-path_ _dst-file-path_
+    - [11.3.3](#1133-stdfsreaddir-path-function) std:fs:read\_dir _path_ _function_
   - [11.4](#114-system) System
     - [11.4.1](#1141-stdsysos) std:sys:os
   - [11.5](#115-threading) Threading
@@ -402,6 +403,8 @@ Smalltalk, LISP and Perl.
     - [12.2.4](#1224-stdrereplaceall-regex-string-replace-function-input-string) std:re:replace\_all _regex-string_ _replace-function_ _input-string_
   - [12.3](#123-chrono) chrono
     - [12.3.1](#1231-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
+    - [12.3.2](#1232-stdchronoformatutc-utc-timestamp-format) std:chrono:format\_utc _utc-timestamp_ [_format_]
+    - [12.3.3](#1233-stdchronoformatlocal-utc-timestamp-format) std:chrono:format\_local _utc-timestamp_ [_format_]
   - [12.4](#124-color-conversion) color conversion
     - [12.4.1](#1241-stdvrgb2hsv-color-vector) std:v:rgb2hsv _color-vector_
     - [12.4.2](#1242-stdvhsv2rgb-color-vector) std:v:hsv2rgb _color-vector_
@@ -6611,6 +6614,30 @@ successful.
 Copies the file _src-file-path_ to the _dst-file-path_.
 Returns an error if something went wrong.
 
+#### <a name="1133-stdfsreaddir-path-function"></a>11.3.3 - std:fs:read\_dir _path_ _function_
+
+Calls _function_ with the first argument being the directory entry as map
+of this structure:
+
+    ${
+        atime     = 1587628635, # seconds since UNIX Epoch
+        ctime     = 1557382099, # seconds since UNIX Epoch
+        mtime     = 1557382099, # seconds since UNIX Epoch
+        len       = 478,        # bytes
+        name      = "test"      # file name
+        path      = "..\\test", # path name
+        read_only = $false,     # read only flag
+        type      = :f          # possible values:
+                                #   - :f for files
+                                #   - :l for symlinks
+                                #   - :d for directories
+    }
+
+If the _function_ is called with a directory, you can recurse into that
+directory by returning a `$true` value.
+
+You can format the timestamps using `std:chrono:format_utc`.
+
 ### <a name="114-system"></a>11.4 - System
 
 This chapter contains a few system as in _operating system_ related functions.
@@ -7315,6 +7342,32 @@ std:assert ~ (year_str | int) == 2020;
 !now_str = std:chrono:timestamp[];
 ```
 
+#### <a name="1232-stdchronoformatutc-utc-timestamp-format"></a>12.3.2 - std:chrono:format\_utc _utc-timestamp_ [_format_]
+
+Formats the given _utc-timestamp_ in seconds according to _format_.
+
+For the documentation of _format_ please consule the
+chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
+
+```wlambda
+!year_str = std:chrono:format_utc 1603796989 "%H:%M:%S %Y";
+
+std:assert_str_eq year_str "11:09:49 2020";
+```
+
+#### <a name="1233-stdchronoformatlocal-utc-timestamp-format"></a>12.3.3 - std:chrono:format\_local _utc-timestamp_ [_format_]
+
+Formats the given _utc-timestamp_ in seconds according to _format_ in the local timezone.
+
+For the documentation of _format_ please consule the
+chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
+
+```wlambda
+!year_str = std:chrono:format_local 1603796989 "%H:%M:%S %Y";
+
+std:assert_str_eq year_str "12:09:49 2020";
+```
+
 ### <a name="124-color-conversion"></a>12.4 - color conversion
 
 This section highlights the color conversion functions available in WLambda.
@@ -7776,7 +7829,8 @@ In the following grammar, white space and comments are omitted:
                      The exception is "=" which assigns
                      the field as specified.
                      BUT: There is a special case, when you specify
-                     an `indent` it is quoted and interpreted as symbol. *)
+                          an identifier as field, it is quoted and
+                          interpreted as symbol. *)
                   ;
     call_no_ops   = value, { arg_list | field_access }
                   ;
@@ -10140,7 +10194,21 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::new_str_mv(dt.format("%Y-%m-%d %H:%M:%S.%f").to_string()))
             }
 
-        }, Some(0), Some(1), false);
+        }, Some(1), Some(2), false);
+
+    func!(st, "chrono:format_local",
+        |env: &mut Env, _argc: usize| {
+            use chrono::prelude::*;
+            let dt = Local.timestamp(env.arg(0).i(), 0);
+            let fmt = env.arg(1);
+            if fmt.is_str() {
+                fmt.with_s_ref(|fmt: &str|
+                    Ok(VVal::new_str_mv(dt.format(fmt).to_string())))
+            } else {
+                Ok(VVal::new_str_mv(dt.format("%Y-%m-%d %H:%M:%S.%f").to_string()))
+            }
+
+        }, Some(1), Some(2), false);
 
     #[cfg(feature="serde_json")]
     func!(st, "ser:json",
