@@ -1599,7 +1599,7 @@ as second argument, the _maybe-error-value_.
 An example to demonstrate the handler arguments:
 
 ```wlambda
-on_error {!(func, line, col, filename) = @;
+on_error {!(err_val, line, col, filename) = @;
     # ...
 } ($e "test");
 ```
@@ -7327,6 +7327,19 @@ a syntax error in the _regex-string_.
 std:assert_eq res "foo 33 fifi 100";
 ```
 
+### - xml
+
+
+#### - std:xml:parse_sax _xml-string_ _event-callback-function_
+
+```wlambda
+\:x {
+    $@v _? :x ~ std:xml:parse_sax
+        "x<x a='12'>fooo fweor weio ew <i/> foefoe</i></x>y"
+        $+;
+}[]
+```
+
 ### <a name="123-chrono"></a>12.3 - chrono
 
 #### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]
@@ -10182,6 +10195,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
         }, Some(0), Some(1), false);
 
+    #[cfg(feature="chrono")]
     func!(st, "chrono:format_utc",
         |env: &mut Env, _argc: usize| {
             use chrono::prelude::*;
@@ -10196,6 +10210,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
         }, Some(1), Some(2), false);
 
+    #[cfg(feature="chrono")]
     func!(st, "chrono:format_local",
         |env: &mut Env, _argc: usize| {
             use chrono::prelude::*;
@@ -10209,6 +10224,119 @@ pub fn std_symbol_table() -> SymbolTable {
             }
 
         }, Some(1), Some(2), false);
+
+
+    #[cfg(feature="quick-xml")]
+    func!(st, "xml:parse_sax",
+        |env: &mut Env, _argc: usize| {
+            use quick_xml::Reader;
+            use quick_xml::events::Event;
+
+            let input      = env.arg(0);
+            let event_func = env.arg(1);
+
+            input.with_s_ref(|xml| {
+                let mut buf = Vec::new();
+                let mut rd  = Reader::from_str(xml);
+                let mut ret = VVal::None;
+
+                #[allow(unused_assignments)]
+                loop {
+                    let mut call_arg = None;
+
+                    match rd.read_event(&mut buf) {
+                        Ok(Event::Start(ref e)) => {
+                            call_arg = Some(
+                                VVal::vec2(
+                                    VVal::sym("start"),
+                                    VVal::new_str_mv(
+                                        String::from_utf8_lossy(
+                                            e.local_name()).to_string())));
+                        },
+                        Ok(Event::Empty(ref e)) => {
+                            call_arg = Some(
+                                VVal::vec2(
+                                    VVal::sym("empty"),
+                                    VVal::new_str_mv(
+                                        String::from_utf8_lossy(
+                                            e.local_name()).to_string())));
+                        },
+                        Ok(Event::Comment(ref t)) => {
+                            let text = t.unescape_and_decode(&rd).unwrap();
+                            call_arg = Some(
+                                VVal::vec2(
+                                    VVal::sym("comment"),
+                                    VVal::new_str_mv(text)));
+                        },
+                        Ok(Event::Decl(ref _t)) => {
+                            call_arg = Some(
+                                VVal::vec1(VVal::sym("decl")));
+                        },
+                        Ok(Event::PI(ref t)) => {
+                            let text = t.unescape_and_decode(&rd).unwrap();
+                            call_arg = Some(
+                                VVal::vec2(
+                                    VVal::sym("pi"),
+                                    VVal::new_str_mv(text)));
+                        },
+                        Ok(Event::DocType(ref t)) => {
+                            let text = t.unescape_and_decode(&rd).unwrap();
+                            call_arg = Some(
+                                VVal::vec2(
+                                    VVal::sym("doctype"),
+                                    VVal::new_str_mv(text)));
+                        },
+                        Ok(Event::CData(ref t)) => {
+                            let text = t.unescape_and_decode(&rd).unwrap();
+                            call_arg = Some(
+                                VVal::vec2(
+                                    VVal::sym("cdata"),
+                                    VVal::new_str_mv(text)));
+                        },
+                        Ok(Event::Text(t)) => {
+                            let text = t.unescape_and_decode(&rd).unwrap();
+                            call_arg = Some(
+                                VVal::vec2(
+                                    VVal::sym("text"),
+                                    VVal::new_str_mv(text)));
+                        },
+                        Ok(Event::End(ref e)) => {
+                            call_arg = Some(
+                                VVal::vec2(
+                                    VVal::sym("end"),
+                                    VVal::new_str_mv(
+                                        String::from_utf8_lossy(
+                                            e.local_name()).to_string())));
+                        },
+                        Ok(Event::Eof) => break,
+                        Err(e) => {
+                            return
+                                Ok(env.new_err(
+                                    format!("XML parse error at {}: {}",
+                                            rd.buffer_position(),
+                                            e)));
+                        }
+                    }
+
+                    if let Some(call_arg) = call_arg {
+                        env.push(call_arg);
+                        match event_func.call_internal(env, 1) {
+                            Ok(v)                      => { ret = v; },
+                            Err(StackAction::Break(v)) => { ret = *v; break; },
+                            Err(StackAction::Next)     => { },
+                            Err(e)                     => { return Err(e); },
+                        };
+                        env.popn(1);
+                    }
+
+                    buf.clear();
+                }
+
+                Ok(ret)
+            })
+
+        }, Some(2), Some(2), false);
+
 
     #[cfg(feature="serde_json")]
     func!(st, "ser:json",
