@@ -12,6 +12,7 @@ pattern like `$r(foo/bar)`. This makes it easier to process text.
 global variable `@@` now.
 * Feature: Added `std:bytes:pack` and `std:bytes:unpack` for handling binary data formats.
 * Feature: Added `std:fs:read_dir`, `std:chrono:format_utc` and `std:chrono:format_local`.
+* Bugfix: `v.0 => v.1` did not parse correctly.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.
 

@@ -1338,6 +1338,57 @@ fn check_prelude_chrono() {
 }
 
 #[test]
+fn check_prelude_xml() {
+    if cfg!(feature="quick-xml") {
+        assert_eq!(
+            ve(r#"
+                $@v std:xml:parse_sax $q$
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <!DOCTYPE test>
+                    <x>
+                        foo
+                        <!-- foo bar -->
+                        <![CDATA[
+                            Some Stuff Bla
+                        ]]>
+                        <?do this foobar?>
+                        <img/>
+                        xxx
+                    </x>
+                $ {!event = _;
+                    $+ ~ match event.0
+                        (? :start :end :text :comment :cdata) => {
+                            event.0 => std:str:trim <& event.1
+                        }
+                        event.0;
+                };
+            "#),
+            "$[:decl,:doctype,$p(:start,\"x\"),$p(:text,\"foo\"),$p(:comment,\"foo bar\"),$p(:cdata,\"Some Stuff Bla\"),:pi,:empty,$p(:text,\"xxx\"),$p(:end,\"x\")]");
+
+        assert_eq!(
+            ve(r#"
+                $@v std:xml:parse_sax $q$
+                    <x a="10" b="&gt;20">&gt;foo<i xxx="foo"/></x>
+                $ $+;
+            "#),
+            "$[$[:start,\"x\",${a=\"10\",b=\">20\"}],$[:text,\">foo\"],$[:empty,\"i\",${xxx=\"foo\"}],$[:end,\"x\"]]");
+
+        assert_eq!(
+            ve(r#" 0 ~ $@v std:xml:parse_sax $q$ <?xml version="1.0"?> $ $+; "#),
+            "$[:decl,\"1.0\",$n,$n]");
+        assert_eq!(
+            ve(r#" 0 ~ $@v std:xml:parse_sax $q$ <?xml version="1.0" standalone="yes"?> $ $+; "#),
+            "$[:decl,\"1.0\",$n,\"yes\"]");
+        assert_eq!(
+            ve(r#" 0 ~ $@v std:xml:parse_sax $q$ <?xml version="1.0" standalone="no"?> $ $+; "#),
+            "$[:decl,\"1.0\",$n,\"no\"]");
+        assert_eq!(
+            ve(r#" 0 ~ $@v std:xml:parse_sax $q$ <?xml version="1.0" encoding="UTF-8" standalone="yes"?> $ $+; "#),
+            "$[:decl,\"1.0\",\"UTF-8\",\"yes\"]");
+    }
+}
+
+#[test]
 fn check_prelude_regex() {
     if cfg!(feature="regex") {
         assert_eq!(ve("($@v $q$fofoaaaaofefoeaafefeoaaaa$ | std:re:map $q{(a+)} { $+ _.1 }) | std:str:join $q$,$"),

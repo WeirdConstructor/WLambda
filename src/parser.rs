@@ -1036,7 +1036,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     return Ok(field_set);
                 },
                 '=' => {
-                    if !ps.lookahead("==") {
+                    if let None = ps.peek_op() {
                         ps.consume_wsc();
                         let field_set = ps.syn(Syntax::SetKey);
                         field_set.push(obj);

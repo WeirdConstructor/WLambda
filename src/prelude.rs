@@ -10225,116 +10225,15 @@ pub fn std_symbol_table() -> SymbolTable {
 
         }, Some(1), Some(2), false);
 
-
     #[cfg(feature="quick-xml")]
     func!(st, "xml:parse_sax",
         |env: &mut Env, _argc: usize| {
-            use quick_xml::Reader;
-            use quick_xml::events::Event;
+            use crate::xml::parse_sax;
 
             let input      = env.arg(0);
             let event_func = env.arg(1);
 
-            input.with_s_ref(|xml| {
-                let mut buf = Vec::new();
-                let mut rd  = Reader::from_str(xml);
-                let mut ret = VVal::None;
-
-                #[allow(unused_assignments)]
-                loop {
-                    let mut call_arg = None;
-
-                    match rd.read_event(&mut buf) {
-                        Ok(Event::Start(ref e)) => {
-                            call_arg = Some(
-                                VVal::vec2(
-                                    VVal::sym("start"),
-                                    VVal::new_str_mv(
-                                        String::from_utf8_lossy(
-                                            e.local_name()).to_string())));
-                        },
-                        Ok(Event::Empty(ref e)) => {
-                            call_arg = Some(
-                                VVal::vec2(
-                                    VVal::sym("empty"),
-                                    VVal::new_str_mv(
-                                        String::from_utf8_lossy(
-                                            e.local_name()).to_string())));
-                        },
-                        Ok(Event::Comment(ref t)) => {
-                            let text = t.unescape_and_decode(&rd).unwrap();
-                            call_arg = Some(
-                                VVal::vec2(
-                                    VVal::sym("comment"),
-                                    VVal::new_str_mv(text)));
-                        },
-                        Ok(Event::Decl(ref _t)) => {
-                            call_arg = Some(
-                                VVal::vec1(VVal::sym("decl")));
-                        },
-                        Ok(Event::PI(ref t)) => {
-                            let text = t.unescape_and_decode(&rd).unwrap();
-                            call_arg = Some(
-                                VVal::vec2(
-                                    VVal::sym("pi"),
-                                    VVal::new_str_mv(text)));
-                        },
-                        Ok(Event::DocType(ref t)) => {
-                            let text = t.unescape_and_decode(&rd).unwrap();
-                            call_arg = Some(
-                                VVal::vec2(
-                                    VVal::sym("doctype"),
-                                    VVal::new_str_mv(text)));
-                        },
-                        Ok(Event::CData(ref t)) => {
-                            let text = t.unescape_and_decode(&rd).unwrap();
-                            call_arg = Some(
-                                VVal::vec2(
-                                    VVal::sym("cdata"),
-                                    VVal::new_str_mv(text)));
-                        },
-                        Ok(Event::Text(t)) => {
-                            let text = t.unescape_and_decode(&rd).unwrap();
-                            call_arg = Some(
-                                VVal::vec2(
-                                    VVal::sym("text"),
-                                    VVal::new_str_mv(text)));
-                        },
-                        Ok(Event::End(ref e)) => {
-                            call_arg = Some(
-                                VVal::vec2(
-                                    VVal::sym("end"),
-                                    VVal::new_str_mv(
-                                        String::from_utf8_lossy(
-                                            e.local_name()).to_string())));
-                        },
-                        Ok(Event::Eof) => break,
-                        Err(e) => {
-                            return
-                                Ok(env.new_err(
-                                    format!("XML parse error at {}: {}",
-                                            rd.buffer_position(),
-                                            e)));
-                        }
-                    }
-
-                    if let Some(call_arg) = call_arg {
-                        env.push(call_arg);
-                        match event_func.call_internal(env, 1) {
-                            Ok(v)                      => { ret = v; },
-                            Err(StackAction::Break(v)) => { ret = *v; break; },
-                            Err(StackAction::Next)     => { },
-                            Err(e)                     => { return Err(e); },
-                        };
-                        env.popn(1);
-                    }
-
-                    buf.clear();
-                }
-
-                Ok(ret)
-            })
-
+            parse_sax(env, input, event_func)
         }, Some(2), Some(2), false);
 
 
