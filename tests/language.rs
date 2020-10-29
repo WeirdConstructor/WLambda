@@ -1342,7 +1342,7 @@ fn check_prelude_xml() {
     if cfg!(feature="quick-xml") {
         assert_eq!(
             ve(r#"
-                $@v std:xml:parse_sax $q$
+                $@v std:xml:read_sax $q$
                     <?xml version="1.0" encoding="UTF-8"?>
                     <!DOCTYPE test>
                     <x>
@@ -1367,24 +1367,114 @@ fn check_prelude_xml() {
 
         assert_eq!(
             ve(r#"
-                $@v std:xml:parse_sax $q$
+                $@v std:xml:read_sax $q$
                     <x a="10" b="&gt;20">&gt;foo<i xxx="foo"/></x>
                 $ $+;
             "#),
             "$[$[:start,\"x\",${a=\"10\",b=\">20\"}],$[:text,\">foo\"],$[:empty,\"i\",${xxx=\"foo\"}],$[:end,\"x\"]]");
 
         assert_eq!(
-            ve(r#" 0 ~ $@v std:xml:parse_sax $q$ <?xml version="1.0"?> $ $+; "#),
+            ve(r#" 0 ~ $@v std:xml:read_sax $q$ <?xml version="1.0"?> $ $+; "#),
             "$[:decl,\"1.0\",$n,$n]");
         assert_eq!(
-            ve(r#" 0 ~ $@v std:xml:parse_sax $q$ <?xml version="1.0" standalone="yes"?> $ $+; "#),
+            ve(r#" 0 ~ $@v std:xml:read_sax $q$ <?xml version="1.0" standalone="yes"?> $ $+; "#),
             "$[:decl,\"1.0\",$n,\"yes\"]");
         assert_eq!(
-            ve(r#" 0 ~ $@v std:xml:parse_sax $q$ <?xml version="1.0" standalone="no"?> $ $+; "#),
+            ve(r#" 0 ~ $@v std:xml:read_sax $q$ <?xml version="1.0" standalone="no"?> $ $+; "#),
             "$[:decl,\"1.0\",$n,\"no\"]");
         assert_eq!(
-            ve(r#" 0 ~ $@v std:xml:parse_sax $q$ <?xml version="1.0" encoding="UTF-8" standalone="yes"?> $ $+; "#),
+            ve(r#" 0 ~ $@v std:xml:read_sax $q$ <?xml version="1.0" encoding="UTF-8" standalone="yes"?> $ $+; "#),
             "$[:decl,\"1.0\",\"UTF-8\",\"yes\"]");
+
+        assert_eq!(
+            v2s(r#"
+                !w = std:xml:create_sax_writer[];
+                w :start => "test";
+                w :start => "test-inner";
+                w :end   => "test-inner";
+                w :end   => "test";
+                w[]
+            "#),
+            "<test><test-inner></test-inner></test>");
+
+        assert_eq!(
+            v2s(r#"
+                !w = std:xml:create_sax_writer 2;
+                w :start => "test";
+                w :start => "test-inner";
+                w :end   => "test-inner";
+                w :end   => "test";
+                w[]
+            "#),
+            "<test>\n  <test-inner>\n  </test-inner>\n</test>");
+
+        assert_eq!(
+            v2s(r#"
+                !w = std:xml:create_sax_writer[];
+                w $[:start, "test", ${ a = 12.12 }];
+                w $[:end, "test"];
+                w $[:start, "test", ${ a = "a & b" }];
+                w $[:empty, "test", ${ a = "a & b" }];
+                w $[:end, "test"];
+                w[]
+            "#),
+            "<test a=\"12.12\"></test><test a=\"a &amp; b\"><test a=\"a &amp; b\"/></test>");
+
+        assert_eq!(
+            v2s(r#"
+                !w = std:xml:create_sax_writer[];
+                w $[:comment, "Wurst <!-- foefoeo --> feofoe"];
+                w[]
+            "#),
+            "<!--Wurst &lt;!-- foefoeo --&gt; feofoe-->");
+
+        assert_eq!(
+            v2s(r#"
+                !xml = $q$
+                    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                    <!DOCTYPE wurst>
+                    <h>
+                        Hello!
+                        <xx:img xx:src="foobar"/>
+                        Here: <!-- comment here -->
+                        And PI: <?pi something here?>
+                        And CDATA: <![CDATA[FOO foe ofe o]]>
+                    </h>
+                $;
+                !writer = std:xml:create_sax_writer[];
+                std:xml:read_sax xml writer;
+                writer[]
+            "#),
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><!DOCTYPE wurst><h>Hello!<xx:img xx:src=\"foobar\"/>Here:<!-- comment here -->And PI:<?pi something here?>And CDATA:<![CDATA[FOO foe ofe o]]></h>");
+
+        assert_eq!(
+            v2s(r#"
+                !xml = $q$
+                    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                    <!DOCTYPE wurst>
+                    <h>
+                        Hello!
+                        <xx:img xx:src="foobar"/>
+                        Here: <!-- comment here -->
+                        And PI: <?pi something here?>
+                        And CDATA: <![CDATA[FOO foe ofe o]]>
+                    </h>
+                $;
+                !writer = std:xml:create_sax_writer[];
+                std:xml:read_sax xml writer $t;
+                writer[]
+            "#),
+            r#"
+                    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                    <!DOCTYPE wurst>
+                    <h>
+                        Hello!
+                        <xx:img xx:src="foobar"/>
+                        Here: <!-- comment here -->
+                        And PI: <?pi something here?>
+                        And CDATA: <![CDATA[FOO foe ofe o]]>
+                    </h>
+                "#);
     }
 }
 

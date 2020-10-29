@@ -7313,6 +7313,33 @@ a syntax error in the _regex-string_.
 std:assert_eq res "foo 33 fifi 100";
 ```
 
+### - xml
+
+#### - std:xml:read\_sax _xml-string_ _event-callback-function_ [_do-not-trim-text_]
+
+```wlambda
+\:x {
+    $@v _? :x ~ std:xml:read_sax
+        "x<x a='12'>fooo fweor weio ew <i/> foefoe</i></x>y"
+        $+;
+}[]
+```
+
+#### - std:xml:create\_sax\_writer [_indent_]
+
+Creates an XML SAX event based writer function. The function
+should be called with single events as received by `std:xml:read_sax`.
+To receive the final output of the writer, call the returned function
+without any arguments.
+
+```wlambda
+!writer = std:xml:create_sax_writer[];
+writer $[:start, "test"];
+writer $[:end, "test"];
+
+std:assert_eq writer[] "<test></test>";
+```
+
 ### <a name="123-chrono"></a>12.3 - chrono
 
 #### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]

@@ -7327,19 +7327,6 @@ a syntax error in the _regex-string_.
 std:assert_eq res "foo 33 fifi 100";
 ```
 
-### - xml
-
-
-#### - std:xml:parse_sax _xml-string_ _event-callback-function_
-
-```wlambda
-\:x {
-    $@v _? :x ~ std:xml:parse_sax
-        "x<x a='12'>fooo fweor weio ew <i/> foefoe</i></x>y"
-        $+;
-}[]
-```
-
 ### <a name="123-chrono"></a>12.3 - chrono
 
 #### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]
@@ -10226,16 +10213,29 @@ pub fn std_symbol_table() -> SymbolTable {
         }, Some(1), Some(2), false);
 
     #[cfg(feature="quick-xml")]
-    func!(st, "xml:parse_sax",
+    func!(st, "xml:read_sax",
         |env: &mut Env, _argc: usize| {
-            use crate::xml::parse_sax;
+            use crate::xml::read_sax;
 
             let input      = env.arg(0);
             let event_func = env.arg(1);
+            let no_trim    = env.arg(2).b();
 
-            parse_sax(env, input, event_func)
-        }, Some(2), Some(2), false);
+            read_sax(env, input, event_func, !no_trim)
+        }, Some(2), Some(3), false);
 
+    #[cfg(feature="quick-xml")]
+    func!(st, "xml:create_sax_writer",
+        |env: &mut Env, _argc: usize| {
+            use crate::xml::create_sax_writer;
+
+            if env.arg(0).is_some() {
+                Ok(create_sax_writer(Some(env.arg(0).i() as usize)))
+            } else {
+                Ok(create_sax_writer(None))
+            }
+
+        }, Some(0), Some(1), false);
 
     #[cfg(feature="serde_json")]
     func!(st, "ser:json",

@@ -1,6 +1,8 @@
 use crate::{Env, VVal, StackAction};
+use crate::vval::VValFun;
 use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::Writer;
+use quick_xml::events::{Event, BytesStart, BytesEnd, BytesText, BytesDecl};
 
 macro_rules! unesc_val_to_vval_or_err {
     ($env: ident, $rd: ident, $val: expr) => {
@@ -34,7 +36,7 @@ macro_rules! unesc_to_vval_or_err {
 fn xml_start_attrs<'a, B>(
     env: &mut Env,
     rd: &Reader<B>,
-    e: &quick_xml::events::BytesStart<'a>)
+    e: &BytesStart<'a>)
     -> Result<VVal, StackAction>
     where B: std::io::BufRead {
 
@@ -65,14 +67,17 @@ fn xml_start_attrs<'a, B>(
 }
 
 #[cfg(feature="quick-xml")]
-pub(crate) fn parse_sax(env: &mut Env, input: VVal, event_func: VVal)
+pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
     -> Result<VVal, StackAction> {
 
     input.with_s_ref(|xml| {
         let mut buf = Vec::new();
         let mut rd  = Reader::from_str(xml);
         let mut ret = VVal::None;
-        rd.trim_text(true);
+
+        if trim {
+            rd.trim_text(true);
+        }
 
         #[allow(unused_assignments)]
         loop {
@@ -87,7 +92,7 @@ pub(crate) fn parse_sax(env: &mut Env, input: VVal, event_func: VVal)
                             VVal::sym("start"),
                             VVal::new_str_mv(
                                 String::from_utf8_lossy(
-                                    e.local_name()).to_string()),
+                                    e.name()).to_string()),
                             attrs));
                 },
                 Ok(Event::Empty(ref e)) => {
@@ -98,7 +103,7 @@ pub(crate) fn parse_sax(env: &mut Env, input: VVal, event_func: VVal)
                             VVal::sym("empty"),
                             VVal::new_str_mv(
                                 String::from_utf8_lossy(
-                                    e.local_name()).to_string()),
+                                    e.name()).to_string()),
                             attrs));
                 },
                 Ok(Event::Comment(ref t)) => {
@@ -196,7 +201,7 @@ pub(crate) fn parse_sax(env: &mut Env, input: VVal, event_func: VVal)
                             VVal::sym("end"),
                             VVal::new_str_mv(
                                 String::from_utf8_lossy(
-                                    e.local_name()).to_string())));
+                                    e.name()).to_string())));
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => {
@@ -224,4 +229,147 @@ pub(crate) fn parse_sax(env: &mut Env, input: VVal, event_func: VVal)
 
         Ok(ret)
     })
+}
+
+macro_rules! write_event {
+    ($env: ident, $writer: ident, $event: expr) => {
+        if let Err(e) = $writer.borrow_mut().write_event($event) {
+            return Ok($env.new_err(format!("XML writer error: {}", e)));
+        } else {
+            Ok(VVal::None)
+        }
+    }
+}
+
+pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
+    let writer =
+        if let Some(indent_depth) = indent_depth {
+            Writer::new_with_indent(
+                std::io::Cursor::new(Vec::new()),
+                b' ', indent_depth)
+        } else {
+            Writer::new(std::io::Cursor::new(Vec::new()))
+        };
+
+    let writer = std::rc::Rc::new(std::cell::RefCell::new(writer));
+
+    VValFun::new_fun(
+        move |env: &mut Env, argc: usize| {
+            if argc == 0 {
+                let writer = writer.replace(
+                    if let Some(indent_depth) = indent_depth {
+                        Writer::new_with_indent(
+                            std::io::Cursor::new(Vec::new()),
+                            b' ', indent_depth)
+                    } else {
+                        Writer::new(std::io::Cursor::new(Vec::new()))
+                    });
+                let res = writer.into_inner().into_inner();
+                return Ok(VVal::new_str_mv(
+                    String::from_utf8(res)
+                        .expect("XML writer should output correct UTF-8")));
+            }
+
+            let elem = env.arg(0);
+            elem.v_with_s_ref(0, |s| {
+                match &s[..] {
+                    "start" => {
+                        elem.v_with_s_ref(1, |name| {
+                            let mut bytes =
+                                BytesStart::borrowed(
+                                    name.as_bytes(),
+                                    name.as_bytes().len());
+
+                            for (v, k) in elem.v_(2).iter() {
+                                if let Some(k) = k {
+                                    v.with_s_ref(|v|
+                                        k.with_s_ref(|k|
+                                            bytes.push_attribute((k, v))));
+                                }
+                            }
+
+                            write_event!(env, writer, Event::Start(bytes))
+                        })
+                    },
+                    "empty" => {
+                        elem.v_with_s_ref(1, |name| {
+                            let mut bytes =
+                                BytesStart::borrowed(
+                                    name.as_bytes(),
+                                    name.as_bytes().len());
+
+                            for (v, k) in elem.v_(2).iter() {
+                                if let Some(k) = k {
+                                    v.with_s_ref(|v|
+                                        k.with_s_ref(|k|
+                                            bytes.push_attribute((k, v))));
+                                }
+                            }
+
+                            write_event!(env, writer, Event::Empty(bytes))
+                        })
+                    },
+                    "end" => {
+                        elem.v_with_s_ref(1, |name|
+                            write_event!(
+                                env, writer,
+                                Event::End(BytesEnd::borrowed(name.as_bytes()))))
+                    },
+                    "text" => {
+                        elem.v_with_s_ref(1, |text|
+                            write_event!(
+                                env, writer,
+                                Event::Text(BytesText::from_plain_str(text))))
+                    },
+                    "comment" => {
+                        elem.v_with_s_ref(1, |text|
+                            write_event!(
+                                env, writer,
+                                Event::Comment(BytesText::from_plain_str(text))))
+                    },
+                    "pi" => {
+                        elem.v_with_s_ref(1, |text|
+                            write_event!(
+                                env, writer,
+                                Event::PI(BytesText::from_plain_str(text))))
+                    },
+                    "doctype" => {
+                        elem.v_with_s_ref(1, |text|
+                            write_event!(
+                                env, writer,
+                                Event::DocType(BytesText::from_plain_str(text))))
+                    },
+                    "cdata" => {
+                        elem.v_with_s_ref(1, |text|
+                            write_event!(
+                                env, writer,
+                                Event::CData(BytesText::from_plain_str(text))))
+                    },
+                    "decl" => {
+                        elem.v_with_s_ref(1, |version| {
+                            let encoding =
+                                if elem.v_(2).is_some() {
+                                    Some(elem.v_s_raw(2))
+                                } else {
+                                    None
+                                };
+                            let standalone =
+                                if elem.v_(3).is_some() {
+                                    Some(elem.v_s_raw(3))
+                                } else {
+                                    None
+                                };
+
+                            write_event!(
+                                env, writer,
+                                Event::Decl(BytesDecl::new(
+                                    version.as_bytes(),
+                                    encoding.as_ref().map(|e| e.as_bytes()),
+                                    standalone.as_ref().map(|s| s.as_bytes()))))
+                        })
+                    },
+                    _ => Ok(VVal::None),
+                }
+            })
+        }, Some(0), Some(1), false)
 }

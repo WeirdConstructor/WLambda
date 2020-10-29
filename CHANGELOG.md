@@ -8,10 +8,14 @@ pattern like `$r(foo/bar)`. This makes it easier to process text.
 * Feature: Global regex matches with `$rg/.../`.
 * Feature: Global regex substitutions with `$rs/.../`.
 * Feature: Implemented `&or` and `$and` for structure patterns (`match` and `$M`).
-* Feature: Commandline scripts with -e and file based evaluation get command line arguments via
-global variable `@@` now.
-* Feature: Added `std:bytes:pack` and `std:bytes:unpack` for handling binary data formats.
-* Feature: Added `std:fs:read_dir`, `std:chrono:format_utc` and `std:chrono:format_local`.
+* Feature: Commandline scripts with -e and file based evaluation get
+command line arguments via global variable `@@` now.
+* Feature: Added `std:bytes:pack` and `std:bytes:unpack` for handling
+binary data formats.
+* Feature: Added `std:fs:read_dir`, `std:chrono:format_utc`
+and `std:chrono:format_local`.
+* Feature: Added XML parsing and writing functionality `std:xml:read_sax`
+and `std:xml:create_sax_writer`.
 * Bugfix: `v.0 => v.1` did not parse correctly.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.
