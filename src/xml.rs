@@ -375,7 +375,7 @@ pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
 }
 
 #[derive(Clone, Debug)]
-struct VValBuilder {
+pub struct VValBuilder {
     stack:       std::vec::Vec<VVal>,
     cur:         VVal,
     sym_decl:    VVal,

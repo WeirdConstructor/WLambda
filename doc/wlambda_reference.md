@@ -387,31 +387,35 @@ Smalltalk, LISP and Perl.
     - [12.2.2](#1222-stdrematchcompile-regex-string) std:re:match\_compile _regex-string_
     - [12.2.3](#1223-stdremap-regex-string-function-input-string) std:re:map _regex-string_ _function_ _input-string_
     - [12.2.4](#1224-stdrereplaceall-regex-string-replace-function-input-string) std:re:replace\_all _regex-string_ _replace-function_ _input-string_
-  - [12.3](#123-chrono) chrono
-    - [12.3.1](#1231-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
-    - [12.3.2](#1232-stdchronoformatutc-utc-timestamp-format) std:chrono:format\_utc _utc-timestamp_ [_format_]
-    - [12.3.3](#1233-stdchronoformatlocal-utc-timestamp-format) std:chrono:format\_local _utc-timestamp_ [_format_]
-  - [12.4](#124-color-conversion) color conversion
-    - [12.4.1](#1241-stdvrgb2hsv-color-vector) std:v:rgb2hsv _color-vector_
-    - [12.4.2](#1242-stdvhsv2rgb-color-vector) std:v:hsv2rgb _color-vector_
-    - [12.4.3](#1243-stdvrgba2hex-color-vector) std:v:rgba2hex _color-vector_
-    - [12.4.4](#1244-stdvhex2rgbaf-string) std:v:hex2rgba\_f _string_
-    - [12.4.5](#1245-stdvhex2rgbai-string) std:v:hex2rgba\_i _string_
-    - [12.4.6](#1246-stdvhex2hsvai-string) std:v:hex2hsva\_i _string_
-    - [12.4.7](#1247-stdvhex2hsvaf-string) std:v:hex2hsva\_f _string_
-  - [12.5](#125-hash) hash
-    - [12.5.1](#1251-stdhashfnv1a-arg1-) std:hash:fnv1a _arg1_ ...
-  - [12.6](#126-rand) rand
-    - [12.6.1](#1261-stdrandsplitmix64new) std:rand:split\_mix64\_new
-    - [12.6.2](#1262-stdrandsplitmix64newfrom-seed) std:rand:split\_mix64\_new\_from _seed_
-    - [12.6.3](#1263-stdrandsplitmix64next-smstate-count) std:rand:split\_mix64\_next _sm\_state_ \[_count_]
-    - [12.6.4](#1264-stdrandsplitmix64nextopen01-smstate-count) std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
-    - [12.6.5](#1265-stdrandsplitmix64nextopenclosed01-smstate-count) std:rand:split\_mix64\_next\_open\_closed01 _sm\_state_ \[_count_]
-    - [12.6.6](#1266-stdrandsplitmix64nextclosedopen01-smstate-count) std:rand:split\_mix64\_next\_closed\_open01 _sm\_state_ \[_count_]
-  - [12.7](#127-utility-functions) Utility Functions
-    - [12.7.1](#1271-stddumpupvals-function) std:dump\_upvals _function_
-    - [12.7.2](#1272-stdwlambdaversion) std:wlambda:version
-    - [12.7.3](#1273-stdwlambdasizes) std:wlambda:sizes
+  - [12.3](#123-xml) xml
+    - [12.3.1](#1231-stdxmlreadsax-xml-string-event-callback-function-do-not-trim-text) std:xml:read\_sax _xml-string_ _event-callback-function_ [_do-not-trim-text_]
+    - [12.3.2](#1232-stdxmlcreatesaxwriter-indent) std:xml:create\_sax\_writer [_indent_]
+    - [12.3.3](#1233-stdxmlcreatetreebuilder) std:xml:create\_tree\_builder
+  - [12.4](#124-chrono) chrono
+    - [12.4.1](#1241-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
+    - [12.4.2](#1242-stdchronoformatutc-utc-timestamp-format) std:chrono:format\_utc _utc-timestamp_ [_format_]
+    - [12.4.3](#1243-stdchronoformatlocal-utc-timestamp-format) std:chrono:format\_local _utc-timestamp_ [_format_]
+  - [12.5](#125-color-conversion) color conversion
+    - [12.5.1](#1251-stdvrgb2hsv-color-vector) std:v:rgb2hsv _color-vector_
+    - [12.5.2](#1252-stdvhsv2rgb-color-vector) std:v:hsv2rgb _color-vector_
+    - [12.5.3](#1253-stdvrgba2hex-color-vector) std:v:rgba2hex _color-vector_
+    - [12.5.4](#1254-stdvhex2rgbaf-string) std:v:hex2rgba\_f _string_
+    - [12.5.5](#1255-stdvhex2rgbai-string) std:v:hex2rgba\_i _string_
+    - [12.5.6](#1256-stdvhex2hsvai-string) std:v:hex2hsva\_i _string_
+    - [12.5.7](#1257-stdvhex2hsvaf-string) std:v:hex2hsva\_f _string_
+  - [12.6](#126-hash) hash
+    - [12.6.1](#1261-stdhashfnv1a-arg1-) std:hash:fnv1a _arg1_ ...
+  - [12.7](#127-rand) rand
+    - [12.7.1](#1271-stdrandsplitmix64new) std:rand:split\_mix64\_new
+    - [12.7.2](#1272-stdrandsplitmix64newfrom-seed) std:rand:split\_mix64\_new\_from _seed_
+    - [12.7.3](#1273-stdrandsplitmix64next-smstate-count) std:rand:split\_mix64\_next _sm\_state_ \[_count_]
+    - [12.7.4](#1274-stdrandsplitmix64nextopen01-smstate-count) std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
+    - [12.7.5](#1275-stdrandsplitmix64nextopenclosed01-smstate-count) std:rand:split\_mix64\_next\_open\_closed01 _sm\_state_ \[_count_]
+    - [12.7.6](#1276-stdrandsplitmix64nextclosedopen01-smstate-count) std:rand:split\_mix64\_next\_closed\_open01 _sm\_state_ \[_count_]
+  - [12.8](#128-utility-functions) Utility Functions
+    - [12.8.1](#1281-stddumpupvals-function) std:dump\_upvals _function_
+    - [12.8.2](#1282-stdwlambdaversion) std:wlambda:version
+    - [12.8.3](#1283-stdwlambdasizes) std:wlambda:sizes
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -6605,12 +6609,13 @@ Returns an error if something went wrong.
 Calls _function_ with the first argument being the directory entry as map
 of this structure:
 
+```wlambda
     ${
         atime     = 1587628635, # seconds since UNIX Epoch
         ctime     = 1557382099, # seconds since UNIX Epoch
         mtime     = 1557382099, # seconds since UNIX Epoch
         len       = 478,        # bytes
-        name      = "test"      # file name
+        name      = "test",     # file name
         path      = "..\\test", # path name
         read_only = $false,     # read only flag
         type      = :f          # possible values:
@@ -6618,6 +6623,7 @@ of this structure:
                                 #   - :l for symlinks
                                 #   - :d for directories
     }
+```
 
 If the _function_ is called with a directory, you can recurse into that
 directory by returning a `$true` value.
@@ -7313,9 +7319,9 @@ a syntax error in the _regex-string_.
 std:assert_eq res "foo 33 fifi 100";
 ```
 
-### - xml
+### <a name="123-xml"></a>12.3 - xml
 
-#### - std:xml:read\_sax _xml-string_ _event-callback-function_ [_do-not-trim-text_]
+#### <a name="1231-stdxmlreadsax-xml-string-event-callback-function-do-not-trim-text"></a>12.3.1 - std:xml:read\_sax _xml-string_ _event-callback-function_ [_do-not-trim-text_]
 
 ```wlambda
 \:x {
@@ -7325,7 +7331,7 @@ std:assert_eq res "foo 33 fifi 100";
 }[]
 ```
 
-#### - std:xml:create\_sax\_writer [_indent_]
+#### <a name="1232-stdxmlcreatesaxwriter-indent"></a>12.3.2 - std:xml:create\_sax\_writer [_indent_]
 
 Creates an XML SAX event based writer function. The function
 should be called with single events as received by `std:xml:read_sax`.
@@ -7340,9 +7346,59 @@ writer $[:end, "test"];
 std:assert_eq writer[] "<test></test>";
 ```
 
-### <a name="123-chrono"></a>12.3 - chrono
+#### <a name="1233-stdxmlcreatetreebuilder"></a>12.3.3 - std:xml:create\_tree\_builder
 
-#### <a name="1231-stdchronotimestamp-format"></a>12.3.1 - std:chrono:timestamp \[_format_]
+This function returns a function that acts as WLambda data structure builder
+that accepts SAX events as given to the callback of `std:xml:read_sax`.
+
+The returned data structure is a tree build of the following elements:
+
+- `$[:decl,    ${ version=..., encoding=..., standalone=... }]`
+- `$[:elem,    name, ${ <attributes> }, $[ <child elements> ]]`
+- `$[:comment, text]`
+- `$[:pi,      text]`
+- `$[:text,    text]`
+- `$[:doctype, text]`
+- `$[:cdata,   text]`
+
+Here is a more elaborate example on how to use it:
+
+```wlambda
+!tb = std:xml:create_tree_builder[];
+
+!tree = std:xml:read_sax $q$
+    <foo>
+        <i x="here"/>
+        hello
+    </foo>
+    <foo>
+        blop<i x="10"/>
+        lol
+    </foo>$
+    tb;
+
+std:assert_str_eq
+    tree
+    $[:root,$n,$n,$[
+        $[:elem,"foo",$n,$[
+            $[:elem,"i",${x="here"},$n],$[:text,"hello"]]],
+        $[:elem,"foo",$n,$[
+            $[:text,"blop"],$[:elem,"i",${x="10"},$n],$[:text,"lol"]]]
+    ]];
+
+# Here we use the structure matchers for finding the values of the x attributes
+# of the <i> elements:
+std:assert_str_eq
+    $S[ 3 / *:{0=elem,1=foo} /
+        3 / *:{0=elem,1=i} /
+        2 / x
+    ] <& tree
+    $["here","10"];
+```
+
+### <a name="124-chrono"></a>12.4 - chrono
+
+#### <a name="1241-stdchronotimestamp-format"></a>12.4.1 - std:chrono:timestamp \[_format_]
 
 For the documentation of _format_ please consule the
 chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers).
@@ -7355,7 +7411,7 @@ std:assert ~ (year_str | int) == 2020;
 !now_str = std:chrono:timestamp[];
 ```
 
-#### <a name="1232-stdchronoformatutc-utc-timestamp-format"></a>12.3.2 - std:chrono:format\_utc _utc-timestamp_ [_format_]
+#### <a name="1242-stdchronoformatutc-utc-timestamp-format"></a>12.4.2 - std:chrono:format\_utc _utc-timestamp_ [_format_]
 
 Formats the given _utc-timestamp_ in seconds according to _format_.
 
@@ -7368,7 +7424,7 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 std:assert_str_eq year_str "11:09:49 2020";
 ```
 
-#### <a name="1233-stdchronoformatlocal-utc-timestamp-format"></a>12.3.3 - std:chrono:format\_local _utc-timestamp_ [_format_]
+#### <a name="1243-stdchronoformatlocal-utc-timestamp-format"></a>12.4.3 - std:chrono:format\_local _utc-timestamp_ [_format_]
 
 Formats the given _utc-timestamp_ in seconds according to _format_ in the local timezone.
 
@@ -7381,7 +7437,7 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 std:assert_str_eq year_str "12:09:49 2020";
 ```
 
-### <a name="124-color-conversion"></a>12.4 - color conversion
+### <a name="125-color-conversion"></a>12.5 - color conversion
 
 This section highlights the color conversion functions available in WLambda.
 Numerical vectors are used in WLambda to represent colors. There are two
@@ -7398,7 +7454,7 @@ And the values for HSV are in the range 0 to 360, and the others in the range
 You can also use 3 dimensional vectors without the alpha value: `$i(r, g, b)` / `$i(h, s, v)`
 and `$f(r, g, b)` / `$f(h, s, v)`.
 
-#### <a name="1241-stdvrgb2hsv-color-vector"></a>12.4.1 - std:v:rgb2hsv _color-vector_
+#### <a name="1251-stdvrgb2hsv-color-vector"></a>12.5.1 - std:v:rgb2hsv _color-vector_
 
 Converts an RGB color into a HSV color representation.
 
@@ -7413,7 +7469,7 @@ std:assert_eq std:v:rgb2hsv <& $f(0, 0.5, 0, 1.0)     $f(120, 1, 0.5, 1);
 std:assert_eq std:v:rgb2hsv <& $f(0.1, 0.5, 0.1, 1.0) $f(120, 0.8, 0.5, 1);
 ```
 
-#### <a name="1242-stdvhsv2rgb-color-vector"></a>12.4.2 - std:v:hsv2rgb _color-vector_
+#### <a name="1252-stdvhsv2rgb-color-vector"></a>12.5.2 - std:v:hsv2rgb _color-vector_
 
 Converts a color from HSV to RGB representation.
 
@@ -7426,7 +7482,7 @@ std:assert_rel_eq clr.g 0.5 0.001;
 std:assert_rel_eq clr.b 0.1 0.001;
 ```
 
-#### <a name="1243-stdvrgba2hex-color-vector"></a>12.4.3 - std:v:rgba2hex _color-vector_
+#### <a name="1253-stdvrgba2hex-color-vector"></a>12.5.3 - std:v:rgba2hex _color-vector_
 
 This function converts a color to a string of hex digits (without the common '#'
 prefix however).
@@ -7436,7 +7492,7 @@ std:assert_eq std:v:rgba2hex <& $i(255, 128, 64, 32)       "ff804020";
 std:assert_eq std:v:rgba2hex <& $f(1.0, 0.5, 0.25, 0.125)  "ff804020";
 ```
 
-#### <a name="1244-stdvhex2rgbaf-string"></a>12.4.4 - std:v:hex2rgba\_f _string_
+#### <a name="1254-stdvhex2rgbaf-string"></a>12.5.4 - std:v:hex2rgba\_f _string_
 
 Interprets _string_ as an hex encoded color and
 returns a 4 element big float vector. The color components
@@ -7465,7 +7521,7 @@ std:assert_rel_eq color2.b 0.2   0.001;
 std:assert_rel_eq color2.a 1.0   0.001;
 ```
 
-#### <a name="1245-stdvhex2rgbai-string"></a>12.4.5 - std:v:hex2rgba\_i _string_
+#### <a name="1255-stdvhex2rgbai-string"></a>12.5.5 - std:v:hex2rgba\_i _string_
 
 Like `std:v:hex2rgba_f` this function converts a hex encoded color
 from _string_ but returns an integer vector with 4 elements.
@@ -7488,7 +7544,7 @@ std:assert_eq color2.b 51;
 std:assert_eq color2.a 255;
 ```
 
-#### <a name="1246-stdvhex2hsvai-string"></a>12.4.6 - std:v:hex2hsva\_i _string_
+#### <a name="1256-stdvhex2hsvai-string"></a>12.5.6 - std:v:hex2hsva\_i _string_
 
 Converts the hex represenation of a HSVA color to an integer vector `$i(h, s, v, a)`.
 This function is probably not that useful, as the bit distribution along
@@ -7500,7 +7556,7 @@ It's mostly useful for testing and quick experiments.
 std:assert_eq color $i(360,50,25,100);
 ```
 
-#### <a name="1247-stdvhex2hsvaf-string"></a>12.4.7 - std:v:hex2hsva\_f _string_
+#### <a name="1257-stdvhex2hsvaf-string"></a>12.5.7 - std:v:hex2hsva\_f _string_
 
 Converts the hex represenation of a HSVA color to a float vector `$i(h, s, v, a)`.
 This function is probably not that useful, as the bit distribution along
@@ -7516,15 +7572,15 @@ std:assert_rel_eq color.2  25.0 1.0;
 std:assert_rel_eq color.3 100.0 1.0;
 ```
 
-### <a name="125-hash"></a>12.5 - hash
+### <a name="126-hash"></a>12.6 - hash
 
-#### <a name="1251-stdhashfnv1a-arg1-"></a>12.5.1 - std:hash:fnv1a _arg1_ ...
+#### <a name="1261-stdhashfnv1a-arg1-"></a>12.6.1 - std:hash:fnv1a _arg1_ ...
 
 Hashes all the arguments as FNV1a and returns an integer.
 
-### <a name="126-rand"></a>12.6 - rand
+### <a name="127-rand"></a>12.7 - rand
 
-#### <a name="1261-stdrandsplitmix64new"></a>12.6.1 - std:rand:split\_mix64\_new
+#### <a name="1271-stdrandsplitmix64new"></a>12.7.1 - std:rand:split\_mix64\_new
 
 Initializes the _sm_state_ from the current time (seconds) and returns it.
 The time is retrieved in seconds, so don't expect different seed states
@@ -7532,35 +7588,35 @@ if you call this multiple times in the same wall clock second.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1262-stdrandsplitmix64newfrom-seed"></a>12.6.2 - std:rand:split\_mix64\_new\_from _seed_
+#### <a name="1272-stdrandsplitmix64newfrom-seed"></a>12.7.2 - std:rand:split\_mix64\_new\_from _seed_
 
 Initializes the _sm_state_ from the given _seed_ and returns it.
 The returned value is supposed to be passed to `rand:split_mix64_next`
 or `rand:split_mix64_next_open01`.
 
-#### <a name="1263-stdrandsplitmix64next-smstate-count"></a>12.6.3 - std:rand:split\_mix64\_next _sm\_state_ \[_count_]
+#### <a name="1273-stdrandsplitmix64next-smstate-count"></a>12.7.3 - std:rand:split\_mix64\_next _sm\_state_ \[_count_]
 
 Returns the _count_ next integer values generated from the given
 _sm_state_.
 
-#### <a name="1264-stdrandsplitmix64nextopen01-smstate-count"></a>12.6.4 - std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
+#### <a name="1274-stdrandsplitmix64nextopen01-smstate-count"></a>12.7.4 - std:rand:split\_mix64\_next\_open01 _sm\_state_ \[_count_]
 
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
 
-#### <a name="1265-stdrandsplitmix64nextopenclosed01-smstate-count"></a>12.6.5 - std:rand:split\_mix64\_next\_open\_closed01 _sm\_state_ \[_count_]
+#### <a name="1275-stdrandsplitmix64nextopenclosed01-smstate-count"></a>12.7.5 - std:rand:split\_mix64\_next\_open\_closed01 _sm\_state_ \[_count_]
 
 Returns the _count_ next float values (in an open (0, 1] interval)
 generated from the given _sm_state_.
 
-#### <a name="1266-stdrandsplitmix64nextclosedopen01-smstate-count"></a>12.6.6 - std:rand:split\_mix64\_next\_closed\_open01 _sm\_state_ \[_count_]
+#### <a name="1276-stdrandsplitmix64nextclosedopen01-smstate-count"></a>12.7.6 - std:rand:split\_mix64\_next\_closed\_open01 _sm\_state_ \[_count_]
 
 Returns the _count_ next float values (in an open [0, 1) interval)
 generated from the given _sm_state_.
 
-### <a name="127-utility-functions"></a>12.7 - Utility Functions
+### <a name="128-utility-functions"></a>12.8 - Utility Functions
 
-#### <a name="1271-stddumpupvals-function"></a>12.7.1 - std:dump\_upvals _function_
+#### <a name="1281-stddumpupvals-function"></a>12.8.1 - std:dump\_upvals _function_
 
 Returns a vector of all the upvalues of the _function_.
 Please use this function for debugging purposes only, as the order of the
@@ -7585,11 +7641,11 @@ std:assert_eq $*(upvs.0) 3;
 std:assert_eq $*(upvs.1) 4;
 ```
 
-#### <a name="1272-stdwlambdaversion"></a>12.7.2 - std:wlambda:version
+#### <a name="1282-stdwlambdaversion"></a>12.8.2 - std:wlambda:version
 
 Returns the version number of the WLambda crate when called.
 
-#### <a name="1273-stdwlambdasizes"></a>12.7.3 - std:wlambda:sizes
+#### <a name="1283-stdwlambdasizes"></a>12.8.3 - std:wlambda:sizes
 
 Writes a table of internal data structure sizes to stdout. Just for development
 purposes.
