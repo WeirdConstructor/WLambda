@@ -373,3 +373,112 @@ pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
             })
         }, Some(0), Some(1), false)
 }
+
+#[derive(Clone, Debug)]
+struct VValBuilder {
+    stack:       std::vec::Vec<VVal>,
+    cur:         VVal,
+    sym_decl:    VVal,
+    sym_comment: VVal,
+    sym_text:    VVal,
+    sym_doctype: VVal,
+    sym_cdata:   VVal,
+    sym_pi:      VVal,
+    sym_elem:    VVal,
+}
+
+impl VValBuilder {
+    pub fn new() -> Self {
+        Self {
+            stack:       vec![],
+            cur:         VVal::vec4(VVal::sym("root"), VVal::None, VVal::None, VVal::vec()),
+            sym_decl:    VVal::sym("decl"),
+            sym_comment: VVal::sym("comment"),
+            sym_text:    VVal::sym("text"),
+            sym_doctype: VVal::sym("doctype"),
+            sym_cdata:   VVal::sym("cdata"),
+            sym_pi:      VVal::sym("pi"),
+            sym_elem:    VVal::sym("elem"),
+        }
+    }
+
+    //
+    // $[:decl,    ${ version=..., encoding=..., standalone=... }]
+    // $[:elem,    name, ${ attrs }, $[childs]]
+    // $[:comment, text]
+    // $[:pi,      text]
+    // $[:text,    text]
+    // $[:doctype, text]
+    // $[:cdata,   text]
+    //
+    pub fn event(&mut self, elem: &VVal) {
+        elem.v_with_s_ref(0, |s| {
+            match &s[..] {
+                "start" => {
+                    self.stack.push(std::mem::replace(&mut self.cur,
+                        VVal::vec4(
+                            self.sym_elem.clone(),
+                            elem.v_(1),
+                            elem.v_(2),
+                            VVal::vec())));
+                },
+                "end" => {
+                    let elem = self.stack.pop().unwrap_or(VVal::None);
+                    elem.v_(3).push(self.cur.clone());
+                    self.cur = elem;
+                },
+                "empty" => {
+                    self.cur.v_(3).push(
+                        VVal::vec4(
+                            self.sym_elem.clone(),
+                            elem.v_(1),
+                            elem.v_(2),
+                            VVal::None));
+                },
+                "text" => {
+                    self.cur.v_(3).push(
+                        VVal::vec2(
+                            self.sym_text.clone(),
+                            elem.v_(1)));
+                },
+                "comment" => {
+                    self.cur.v_(3).push(
+                        VVal::vec2(
+                            self.sym_comment.clone(),
+                            elem.v_(1)));
+                },
+                "pi" => {
+                    self.cur.v_(3).push(
+                        VVal::vec2(
+                            self.sym_pi.clone(),
+                            elem.v_(1)));
+                },
+                "doctype" => {
+                    self.cur.v_(3).push(
+                        VVal::vec2(
+                            self.sym_doctype.clone(),
+                            elem.v_(1)));
+                },
+                "cdata" => {
+                    self.cur.v_(3).push(
+                        VVal::vec2(
+                            self.sym_cdata.clone(),
+                            elem.v_(1)));
+                },
+                "decl" => {
+                    self.cur.v_(3).push(
+                        VVal::vec2(
+                            self.sym_decl.clone(),
+                            VVal::map3(
+                                "version",    elem.v_(1),
+                                "encoding",   elem.v_(2),
+                                "standalone", elem.v_(3))));
+                },
+                _ => {
+                },
+            }
+        })
+    }
+
+    pub fn result(&self) -> VVal { self.cur.clone() }
+}
