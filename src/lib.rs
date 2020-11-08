@@ -364,7 +364,7 @@ std:assert_str_eq res $[
 !crate  = $none;
 !domain = $none;
 
-? some_url &> $r{$^ (^$+[^:]) \:\/\/ (^$*[^/]) \/crates\/ (^$+[a-z]) } {
+? some_url &> $r{$^ (^$+[^:]) :// (^$*[^/]) /crates/ (^$+[a-z]) } {
     .domain = $\.2;
     .crate = $\.3;
 };

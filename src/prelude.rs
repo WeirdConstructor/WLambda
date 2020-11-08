@@ -10321,7 +10321,7 @@ pub fn std_symbol_table() -> SymbolTable {
         }, Some(0), Some(1), false);
 
     func!(st, "xml:create_tree_builder",
-        |env: &mut Env, _argc: usize| {
+        |_env: &mut Env, _argc: usize| {
             use crate::xml::VValBuilder;
 
             let builder = Rc::new(std::cell::RefCell::new(VValBuilder::new()));
