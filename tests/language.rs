@@ -1333,7 +1333,7 @@ fn check_prelude_str() {
 #[test]
 fn check_prelude_chrono() {
     if cfg!(feature="chrono") {
-        assert_eq!(ve("std:chrono:timestamp $q$%Y$ | int"), "2020");
+        assert_eq!(ve("std:chrono:timestamp $q$%Y$ | int"), "2021");
     }
 }
 

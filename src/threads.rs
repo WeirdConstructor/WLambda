@@ -736,6 +736,7 @@ impl VValUserData for AtomicAVal {
 /// ```
 /// use std::sync::Arc;
 /// use std::sync::Mutex;
+/// use wlambda::compiler::GlobalEnv;
 /// use wlambda::threads::{DefaultThreadCreator, FunctionGlobalEnvCreator};
 ///
 /// let global_env = GlobalEnv::new_default();
@@ -761,6 +762,10 @@ impl VValUserData for AtomicAVal {
 /// pub struct CustomThreadCreator();
 ///
 /// impl ThreadCreator for CustomThreadCreator {
+///     fn new_env(&mut self) -> GlobalEnvRef {
+///         GlobalEnv::new_empty_default()
+///     }
+///
 ///     fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
 ///              code: String,
 ///              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
@@ -830,6 +835,7 @@ pub trait ThreadGlobalEnvCreator: Send {
 /// ```
 /// use std::sync::Arc;
 /// use std::sync::Mutex;
+/// use wlambda::{GlobalEnv};
 /// use wlambda::threads::{DefaultThreadCreator, FunctionGlobalEnvCreator};
 ///
 /// let global_env = GlobalEnv::new_default();
@@ -847,9 +853,17 @@ impl FunctionGlobalEnvCreator {
     /// Creates a new FunctionGlobalEnvCreator from a closure.
     ///
     /// ```
+    /// use std::sync::Arc;
+    /// use std::sync::Mutex;
+    /// use wlambda::{GlobalEnv};
     /// use wlambda::threads::{DefaultThreadCreator, FunctionGlobalEnvCreator};
-    /// FunctionGlobalEnvCreator::from(
-    ///     Box::new(|| GlobalEnv::new_default())))))));
+    ///
+    /// let global_env = GlobalEnv::new_default();
+    /// global_env.borrow_mut().set_thread_creator(
+    ///     Some(Arc::new(Mutex::new(
+    ///         DefaultThreadCreator::new(
+    ///             FunctionGlobalEnvCreator::from(
+    ///                 Box::new(|| GlobalEnv::new_default())))))));
     /// ```
     pub fn from(fun: Box<dyn FnMut() -> GlobalEnvRef + Send>) -> Self {
         Self { fun }
