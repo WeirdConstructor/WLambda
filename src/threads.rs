@@ -729,6 +729,25 @@ impl VValUserData for AtomicAVal {
 /// your own might be necessary if you want to customize
 /// how a thread is created.
 ///
+/// If you only want to customize the GlobalEnv of newly created
+/// threads please consider just providing your own
+/// `DefaultGlobalEnvCreator`:
+///
+/// ```
+/// use std::sync::Arc;
+/// use std::sync::Mutex;
+/// use wlambda::threads::{DefaultThreadCreator, FunctionGlobalEnvCreator};
+///
+/// let global_env = GlobalEnv::new_default();
+/// global_env.borrow_mut().set_thread_creator(
+///     Some(Arc::new(Mutex::new(
+///         DefaultThreadCreator::new(
+///             FunctionGlobalEnvCreator::from(
+///                 Box::new(|| GlobalEnv::new_default())))))));
+/// ```
+///
+/// If you want to influence more things on thread creation,
+/// see the followign example.
 /// Please refer to the source of `DefaultThreadCreator`
 /// for a comprehensive example.
 ///
@@ -784,6 +803,8 @@ pub trait ThreadCreator: Send {
     fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
              code: String,
              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal;
+
+    fn new_env(&mut self) -> GlobalEnvRef;
 }
 
 impl std::fmt::Debug for dyn ThreadCreator {
@@ -792,15 +813,64 @@ impl std::fmt::Debug for dyn ThreadCreator {
     }
 }
 
+/// This trait handles creation of the GlobalEnv for new
+/// threads. You can reuse the `DefaultThreadCreator` by
+/// just providing it a custom `ThreadGlobalEnvCreator` implementation.
+/// This suffices in most cases where you want to embed WLambda
+/// and provide a custom API to new threads.
+pub trait ThreadGlobalEnvCreator: Send {
+    fn new_env(&mut self) -> GlobalEnvRef {
+        GlobalEnv::new_empty_default()
+    }
+}
+
+/// This is an easy way to provide a `GlobalEnv` creation
+/// function to the DefaultThreadCreator.
+///
+/// ```
+/// use std::sync::Arc;
+/// use std::sync::Mutex;
+/// use wlambda::threads::{DefaultThreadCreator, FunctionGlobalEnvCreator};
+///
+/// let global_env = GlobalEnv::new_default();
+/// global_env.borrow_mut().set_thread_creator(
+///     Some(Arc::new(Mutex::new(
+///         DefaultThreadCreator::new(
+///             FunctionGlobalEnvCreator::from(
+///                 Box::new(|| GlobalEnv::new_default())))))));
+/// ```
+pub struct FunctionGlobalEnvCreator {
+    fun: Box<dyn FnMut() -> GlobalEnvRef + Send>,
+}
+
+impl FunctionGlobalEnvCreator {
+    /// Creates a new FunctionGlobalEnvCreator from a closure.
+    ///
+    /// ```
+    /// use wlambda::threads::{DefaultThreadCreator, FunctionGlobalEnvCreator};
+    /// FunctionGlobalEnvCreator::from(
+    ///     Box::new(|| GlobalEnv::new_default())))))));
+    /// ```
+    pub fn from(fun: Box<dyn FnMut() -> GlobalEnvRef + Send>) -> Self {
+        Self { fun }
+    }
+}
+
+impl ThreadGlobalEnvCreator for FunctionGlobalEnvCreator {
+    fn new_env(&mut self) -> GlobalEnvRef {
+        (self.fun)()
+    }
+}
+
 /// Default implementation of a ThreadCreator.
 ///
 /// See also `GlobalEnv::new_default` for further information
 /// how this may be used.
-pub(crate) struct DefaultThreadCreator();
+pub struct DefaultThreadCreator<A: ThreadGlobalEnvCreator>(A);
 
 #[allow(clippy::new_without_default)]
-impl DefaultThreadCreator {
-    pub fn new() -> Self { Self {} }
+impl<A> DefaultThreadCreator<A> where A: ThreadGlobalEnvCreator {
+    pub fn new(env_creator: A) -> Self { Self(env_creator) }
 }
 
 /// To join a thread that was created by a DefaultThreadCreator
@@ -854,7 +924,9 @@ impl VValUserData for DefaultThreadHandle {
     }
 }
 
-impl ThreadCreator for DefaultThreadCreator {
+impl<A> ThreadCreator for DefaultThreadCreator<A> where A: ThreadGlobalEnvCreator {
+    fn new_env(&mut self) -> GlobalEnvRef { self.0.new_env() }
+
     fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
              code: String,
              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
@@ -865,7 +937,12 @@ impl ThreadCreator for DefaultThreadCreator {
         let trdy = ready.clone();
         let hdl =
             std::thread::spawn(move || {
-                let genv = GlobalEnv::new_empty_default();
+                let genv =
+                    match tcc.lock() {
+                        Ok(mut tcc) => { (*tcc).new_env() },
+                        Err(e) => panic!("Can't lock ThreadCreator: {}", e),
+                    };
+
                 genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
 
                 genv.borrow_mut().set_var(

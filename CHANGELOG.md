@@ -16,6 +16,10 @@ binary data formats.
 and `std:chrono:format_local`.
 * Feature: Added XML parsing and writing functionality `std:xml:read_sax`
 and `std:xml:create_sax_writer`.
+* Feature: You can customize the `DefaultThreadCreator` easily with a
+`DefaultGlobalEnvCreator` trait implementation which is conveniently provided
+by `FunctionGlobalEnvCreator`. This makes embedding WLambda with threading
+easier.
 * Bugfix: `v.0 => v.1` did not parse correctly.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.
