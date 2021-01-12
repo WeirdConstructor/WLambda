@@ -10864,5 +10864,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(1), Some(2), false);
 
+    crate::net::add_to_symtable(&mut st);
+
     st
 }

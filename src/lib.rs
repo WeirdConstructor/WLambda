@@ -632,6 +632,7 @@ mod prog_writer;
 mod io;
 mod str_int;
 mod xml;
+mod net;
 
 pub use vval::VVal;
 pub use vval::Env;

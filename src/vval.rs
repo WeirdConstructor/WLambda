@@ -4538,6 +4538,21 @@ impl VVal {
         }
     }
 
+    /// Accesses the user data of type T directly.
+    /// If the user data is not of that type it returns `None`.
+    pub fn with_usr_ref<T: 'static, F, X>(&mut self, f: F) -> Option<X>
+        where F: FnOnce(&mut T) -> X {
+        if let VVal::Usr(bx) = self {
+            if let Some(ud) = bx.as_any().downcast_mut::<T>() {
+                Some(f(ud))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     /// Quick access method for retrieving the VVal at index `idx`.
     /// Returns VVal::None if the VVal is not a VVal::Lst or no such index exists.
     /// See also the shorthands `v_i`, `v_f`, `v_s` and `v_s_raw`.
