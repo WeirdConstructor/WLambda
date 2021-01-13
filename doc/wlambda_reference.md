@@ -2931,11 +2931,14 @@ std:assert_eq b $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
 #### <a name="3917-stdstrtobyteslatin1-string"></a>3.9.17 - std:str:to\_bytes\_latin1 _string_
 
 Encodes _string_ as bytes in Latin1 (ISO-8859-1) encoding and returns
-a byte vector containing all it's bytes.
+a byte vector containing all it's bytes. If a character is outside the Latin1 Unicode
+range, it will be replaced by a "?".
 
 ```wlambda
 !b = std:str:to_bytes_latin1 "\u{FF}\u{F0}";
 std:assert_eq b $b"\xFF\xF0";
+!b = std:str:to_bytes_latin1 "\u{FE00}\u{FF}\u{3232}";
+std:assert_eq b $b"?\xFF?";
 ```
 
 #### <a name="3918-stdstrfromlatin1-byte-vector"></a>3.9.18 - std:str:from\_latin1 _byte-vector_

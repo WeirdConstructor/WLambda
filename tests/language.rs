@@ -1652,6 +1652,7 @@ fn check_bytes_impl() {
     assert_eq!(ve("std:str:from_utf8_lossy $b\"\\xC4\\xC3\""),       "\"��\"", "Bytes to String from invalid UTF8 lossy");
     assert_eq!(ve("std:str:to_bytes \"aäß\""),                       "$b\"a\\xC3\\xA4\\xC3\\x9F\"", "Bytes from String as UTF8");
     assert_eq!(ve("std:str:to_bytes_latin1 \"Äß\""),            "$b\"\\xC4\\xDF\"", "Bytes from latin1");
+    assert_eq!(ve("std:str:to_bytes_latin1 \"\\u{FE00}\""),          "$b\"?\"", "Bytes from latin1");
     assert_eq!(ve("std:str:to_bytes_latin1 \"\\u{FF}\\u{F0}\""),"$b\"\\xFF\\xF0\"", "Bytes from latin1");
     assert_eq!(ve("std:str:from_utf8 ~ std:str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
     assert_eq!(ve("$b\"abc\" 1"),                                "$b\"b\"", "Get single byte from bytes");
