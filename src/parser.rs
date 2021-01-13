@@ -19,7 +19,7 @@ to parse in this hand written parser.
 */
 
 
-use crate::vval::VVal;
+use crate::vval::{VVal, VValChr};
 use crate::vval::Syntax;
 
 pub mod state;
@@ -277,6 +277,61 @@ pub fn parse_str_backslash(ps: &mut State) -> Result<EscSeqValue, ParseError>
         },
         c   => { ps.consume(); Ok(EscSeqValue::Char(c)) },
     }
+}
+
+/// Parses a WLambda character or byte
+fn parse_char(ps: &mut State, byte: bool) -> Result<VVal, ParseError> {
+    if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("character"))); }
+
+    if !ps.consume_if_eq('\'') {
+        return Err(ps.err(ParseErrorKind::ExpectedToken('\'', "character start")));
+    }
+
+    let c = ps.expect_some(ps.peek())?;
+    let ret =
+        match c {
+            '\\' => {
+                ps.consume();
+                match parse_str_backslash(ps)? {
+                    EscSeqValue::Char(c) => {
+                        if byte {
+                            let c = c as u32;
+                            if c > 0xFF {
+                                VVal::Chr(VValChr::Byte('?' as u32 as u8))
+                            } else {
+                                VVal::Chr(VValChr::Byte(c as u8))
+                            }
+                        } else {
+                            VVal::Chr(VValChr::Char(c))
+                        }
+                    },
+                    EscSeqValue::Byte(b) =>
+                        if byte { VVal::Chr(VValChr::Byte(b)) }
+                        else    { VVal::Chr(VValChr::Char(b as char)) },
+                }
+            },
+            _ => {
+                ps.consume();
+                if byte {
+                    let c = c as u32;
+                    if c > 0xFF {
+                        VVal::Chr(VValChr::Byte('?' as u32 as u8))
+                    } else {
+                        VVal::Chr(VValChr::Byte(c as u8))
+                    }
+                } else {
+                    VVal::Chr(VValChr::Char(c))
+                }
+            },
+        };
+
+    if !ps.consume_if_eq('\'') {
+        return Err(ps.err(ParseErrorKind::ExpectedToken('\'', "character end")));
+    }
+
+    ps.skip_ws_and_comments();
+
+    Ok(ret)
 }
 
 /// Parsers a WLambda string or byte buffer.
@@ -877,9 +932,16 @@ fn is_ident_start(c: char) -> bool {
 fn parse_string_lit(ps: &mut State) -> Result<VVal, ParseError> {
     match ps.expect_some(ps.peek())? {
         '"' => parse_string(ps, false),
+        '\'' => parse_char(ps, false),
         '$' => { ps.consume();
             match ps.expect_some(ps.peek())? {
-                'b' => { ps.consume(); parse_string(ps, true) },
+                'b' => { ps.consume();
+                    if ps.lookahead("'") {
+                        parse_char(ps, true)
+                    } else {
+                        parse_string(ps, true)
+                    }
+                },
                 'q' => { ps.consume(); parse_q_string(ps, false) },
                 'Q' => { ps.consume(); parse_q_string(ps, true) },
                 'c' => {
@@ -929,6 +991,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
           || ps.lookahead("$Q")
           || ps.lookahead("$b")
           || ps.lookahead("$c")
+          || ps.lookahead("'")
           || ps.lookahead("\"") => parse_string_lit(ps),
         '$' => { ps.consume_wsc(); parse_special_value(ps) },
         '(' => {
@@ -2153,5 +2216,18 @@ mod tests {
         assert_eq!(parse("a + x +> b + x"),  "$[&Block,$[&Call,&OpColAddR,$[&BinOpAdd,$[&Var,:a],$[&Var,:x]],$[&BinOpAdd,$[&Var,:b],$[&Var,:x]]]]");
         assert_eq!(parse("a + c <+ b + c"),  "$[&Block,$[&Call,&OpColAddL,$[&BinOpAdd,$[&Var,:b],$[&Var,:c]],$[&BinOpAdd,$[&Var,:a],$[&Var,:c]]]]");
 
+    }
+
+    #[test]
+    fn check_char() {
+        assert_eq!(parse("'f'"),         "$[&Block,\'f\']");
+        assert_eq!(parse("'\\xFF'"),     "$[&Block,\'ÿ\']");
+        assert_eq!(parse("$b'f'"),       "$[&Block,$b\'f\']");
+        assert_eq!(parse("$b'\\xFF'"),   "$[&Block,$b\'\\xFF\']");
+
+        assert_eq!(parse("'\\u{3132}'"),   "$[&Block,\'ㄲ\']");
+        assert_eq!(parse("'\\u{FF}'"),     "$[&Block,\'ÿ\']");
+        assert_eq!(parse("$b'\\u{3132}'"), "$[&Block,$b\'?\']");
+        assert_eq!(parse("$b'\\u{FF}'"),   "$[&Block,$b\'\\xFF\']");
     }
 }

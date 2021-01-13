@@ -1287,6 +1287,8 @@ fn check_test_funs() {
     assert_eq!(ve("is_bytes \"f\""),    "$false");
     assert_eq!(ve("is_bytes $b\"f\""),  "$true");
     assert_eq!(ve("is_bytes $Q'f'"),    "$true");
+    assert_eq!(ve("is_byte $b'f'"),     "$true");
+    assert_eq!(ve("is_char 'f'"),       "$true");
     assert_eq!(ve("is_str \"f\""),      "$true");
     assert_eq!(ve("is_int 1"),          "$true");
     assert_eq!(ve("is_float 1.2"),      "$true");
@@ -1299,6 +1301,8 @@ fn check_len_fun() {
     assert_eq!(ve("len $[1,2,3]"),       "3");
     assert_eq!(ve("len ${a=1,b=20}"),    "2");
     assert_eq!(ve("len ${}"),            "0");
+    assert_eq!(ve("len 'x'"),            "1");
+    assert_eq!(ve("len $b'x'"),          "1");
     assert_eq!(ve("std:str:len ${}"),        "3");
     assert_eq!(ve("len $q abcdef "),     "6");
     assert_eq!(ve("len $q abcüdef "),    "8");
@@ -4987,4 +4991,51 @@ fn check_tcp() {
     "#), "$b\"QUIT\"");
 
     thrd.join().unwrap();
+}
+
+#[test]
+fn check_chars_and_bytes() {
+    assert_eq!("type        'x'",   "");
+    assert_eq!("type        $b'x'", "");
+    assert_eq!("is_char     $b'x'", "");
+    assert_eq!("is_byte     $b'x'", "");
+    assert_eq!("is_bytes    $b'x'", "");
+    assert_eq!("is_char     'x'",   "");
+    assert_eq!("is_byte     'x'",   "");
+    assert_eq!("is_bytes    'x'",   "");
+    assert_eq!("float       'x'",   "");
+    assert_eq!("int         'x'",   "");
+    assert_eq!("char        \"xoo\"", "");
+    assert_eq!("byte        \"xoo\"", "");
+    assert_eq!("char        42",      "");
+    assert_eq!("byte        42",      "");
+    assert_eq!("str     '\x42'",      "");
+    assert_eq!("str   $b'\x42'",      "");
+    assert_eq!("len     '\x42'",      "");
+    assert_eq!("len   $b'\x42'",      "");
+    assert_eq!("str:str:len   '\x42'",              "");
+    assert_eq!("str:str:len $b'\x42'",              "");
+    assert_eq!("$@bytes iter c \"abcÄ\" ~ $+ c",    "");
+    assert_eq!("$@bytes iter b $b\"abcÄ\" ~ $+ b",  "");
+    assert_eq!("$@bytes $+ '@'",                    "");
+    assert_eq!("$@bytes $+ $b'@'",                  "");
+    assert_eq!("$@str iter c \"abcÄ\" ~ $+ c",      "");
+    assert_eq!("$@str iter b $b\"abcÄ\" ~ $+ b",    "");
+    assert_eq!("$@str $+ '@'",                      "");
+    assert_eq!("$@str $+ $b'@'",                    "");
+    assert_eq!("$@v iter c   \"ab\" ~ $+ ~ type c",   "");
+    assert_eq!("$@v iter c $b\"ab\" ~ $+ ~ type c",   "");
+    assert_eq!("\"foobar\"   $p($b'o', $b'x')",   "");
+    assert_eq!("\"foobar\"   $p('o', 'x')",   "");
+    assert_eq!("$b\"foobar\" $p($b'o', $b'x')",   "");
+    assert_eq!("$b\"foobar\" $p('o', 'x')",   "");
+    assert_eq!("str:str:len $b'\x42'",      "");
+    assert_eq!("std:char:to_uppercase 'x'", "");
+    assert_eq!("std:char:to_lowercase 'X'", "");
+}
+
+#[test]
+#[cfg(feature="serde_json")]
+fn check_json_char_byte() {
+    assert_eq!(ve("std:ser:json $['x',$b'x']"), "");
 }

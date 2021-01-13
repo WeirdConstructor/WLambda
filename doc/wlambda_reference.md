@@ -7769,11 +7769,16 @@ In the following grammar, white space and comments are omitted:
                   | "\\<", ascii_c_name, ">" (* the corresponding ascii value *)
                   ;
     string_lit    = string
+                  | character
                   | "$", quote_string
                   | "$", byte_string
                   | "$", code_string
                   ;
-    string        = "\"", { "\\", string_escape | ?any character? - "\\" },"\""
+    character     = "'", { "\\", string_escape | ?any character? - "\\" and "'" }, "'"
+                  ;
+    string        = "\"", { "\\", string_escape | ?any character? - "\\" and "\"" },"\""
+                  ;
+    byte_char     = "b", character
                   ;
     byte_string   = "b", string
                   ;

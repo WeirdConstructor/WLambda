@@ -5,6 +5,8 @@
 * Change: Regexes/Patterns allow more characters like `/` and `!` to be
 used directly now. But only in the context of a single regex
 pattern like `$r(foo/bar)`. This makes it easier to process text.
+* Feature: Character and Byte literals `'c'` and `$b'c'` were added.
+With functions: `is_byte`, `is_char`.
 * Feature: Global regex matches with `$rg/.../`.
 * Feature: Global regex substitutions with `$rs/.../`.
 * Feature: Implemented `&or` and `$and` for structure patterns (`match` and `$M`).

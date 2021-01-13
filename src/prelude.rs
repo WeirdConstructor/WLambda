@@ -8568,6 +8568,12 @@ pub fn core_symbol_table() -> SymbolTable {
     func!(st, "is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) },
         Some(1), Some(1), true);
+    func!(st, "is_char",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_char())) },
+        Some(1), Some(1), true);
+    func!(st, "is_byte",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_byte())) },
+        Some(1), Some(1), true);
 
     func!(st, "len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).len() as i64)) },
@@ -9194,6 +9200,16 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             Ok(VVal::new_byt(env.arg(0).as_bytes()))
         }, Some(1), Some(1), false);
+
+    func!(st, "char:to_lowercase",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Chr(VValChr::Char(env.arg().c().to_lowercase())))
+        Some(1), Some(1), false);
+
+    func!(st, "char:to_uppercase",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Chr(VValChr::Char(env.arg().c().to_uppercase())))
+        Some(1), Some(1), false);
 
     func!(st, "bytes:replace",
         |env: &mut Env, _argc: usize| {

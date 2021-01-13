@@ -1432,6 +1432,27 @@ pub enum CollectionAdd {
     Unshift,
 }
 
+/// The internal distinction between a character and a byte.
+/// They share parts of the lexical represenation and also the
+/// semantic purspose is similar.
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum VValChr {
+    Char(char),
+    Byte(u8),
+}
+
+impl VValChr {
+    pub fn to_string(&self) -> String {
+        match self {
+            VValChr::Char(c) => format!("'{}'", format_escape_char(*c, false)),
+            VValChr::Byte(b) => format!("$b'{}'",
+                format_escape_char(
+                    std::char::from_u32(*b as u32).unwrap_or('?'),
+                    true)),
+        }
+    }
+}
+
 /// VVal aka. VariantValue is a data structure to represent
 /// all kinds of WLambda data structures.
 ///
@@ -1449,6 +1470,8 @@ pub enum VVal {
     Bol(bool),
     /// Representation of an interned string aka symbol or key.
     Sym(Symbol),
+    /// Representation of a single character (or byte)
+    Chr(VValChr),
     /// Representation of a unicode/text string.
     Str(Rc<String>),
     /// Representation of a byte buffer.
@@ -1506,29 +1529,33 @@ impl std::fmt::Debug for VValFun {
     }
 }
 
-pub fn format_vval_str(s: &str, narrow_ascii: bool) -> String {
-    let mut v : Vec<String> = s.chars().map(|c| {
-        match c {
-            '\\' => { String::from("\\\\") },
-            '\n' => { String::from("\\n")  },
-            '\t' => { String::from("\\t")  },
-            '\r' => { String::from("\\r")  },
-            '\0' => { String::from("\\0")  },
-            '\'' => { String::from("\\'")  },
-            '\"' => { String::from("\\\"") },
-            _ if narrow_ascii
-                 && c.is_ascii()
-                 && (c.is_ascii_alphanumeric()
-                     || c.is_ascii_graphic()
-                     || c.is_ascii_punctuation()
-                     || c == ' ') => { format!("{}", c) },
-            _ if narrow_ascii => { format!("\\x{:02X}", c as u32) },
-            _ if !narrow_ascii && c.is_ascii_control() => { format!("\\x{:02x}", c as u32) },
-            _ if !narrow_ascii && c.is_control() => { c.escape_unicode().to_string() },
-            _ => { format!("{}", c) }
+pub fn format_escape_char(c: char, narrow_ascii: bool) -> String {
+    match c {
+        '\\' => { String::from("\\\\") },
+        '\n' => { String::from("\\n")  },
+        '\t' => { String::from("\\t")  },
+        '\r' => { String::from("\\r")  },
+        '\0' => { String::from("\\0")  },
+        '\'' => { String::from("\\'")  },
+        '\"' => { String::from("\\\"") },
+        _ if narrow_ascii
+             && c.is_ascii()
+             && (c.is_ascii_alphanumeric()
+                 || c.is_ascii_graphic()
+                 || c.is_ascii_punctuation()
+                 || c == ' ') => { format!("{}", c) },
+        _ if narrow_ascii => { format!("\\x{:02X}", c as u32) },
+        _ if !narrow_ascii && c.is_ascii_control() => { format!("\\x{:02X}", c as u32) },
+        _ if !narrow_ascii && c.is_control() => { c.escape_unicode().to_string() },
+        _ => { format!("{}", c) }
 
-        }
-    }).collect();
+    }
+}
+
+pub fn format_vval_str(s: &str, narrow_ascii: bool) -> String {
+    // TODO: FIXME: Use writers to write into a buffered writer.
+    let mut v : Vec<String> =
+        s.chars().map(|c| { format_escape_char(c, narrow_ascii) }).collect();
     v.insert(0, String::from("\""));
     v.push(String::from("\""));
     v.concat()
@@ -1605,6 +1632,7 @@ impl CycleCheck {
             | VVal::IVec(_)
             | VVal::Int(_)
             | VVal::Flt(_)
+            | VVal::Chr(_)
             | VVal::Usr(_) => {},
         }
     }
@@ -2237,6 +2265,9 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
 
                     out
                 },
+                (VVal::Chr(_needle), VVal::Chr(_replace)) => {
+                    val.bytes_replace(&a, &b)
+                },
                 (VVal::Byt(_needle), VVal::Byt(_replace)) => {
                     val.bytes_replace(&a, &b)
                 },
@@ -2260,6 +2291,11 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                         }
                     }
                     l
+                },
+                (VVal::Chr(needle), VVal::Chr(replace)) => {
+                    VVal::new_str_mv(
+                        s.as_ref()
+                         .replace(needle.c(), replace.c()))
                 },
                 (VVal::Str(needle), VVal::Str(replace)) => {
                     VVal::new_str_mv(
@@ -2915,7 +2951,7 @@ impl VVal {
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     if idx >= b.len() { return None; }
-                    let r = Some((VVal::new_byt(vec![b[idx]]), None));
+                    let r = Some((VVal::Chr(VValChr::Byte(b[idx])), None));
                     idx += 1;
                     r
                 }))
@@ -2939,9 +2975,9 @@ impl VVal {
                     match s[idx..].chars().next() {
                         Some(chr) => {
                             idx += chr.len_utf8();
-                            Some((VVal::new_str_mv(chr.to_string()), None))
+                            Some((VVal::Chr(VValChr::Char(chr)), None))
                         },
-                        None      => None,
+                        None => None,
                     }
                 }))
             },
@@ -3243,6 +3279,12 @@ impl VVal {
                                     Ok(VVal::new_byt(accum))
                                 }
                             },
+                            VVal::Chr(_) => {
+                                let mut accum = vval_bytes.as_ref().clone();
+                                first_arg.with_bv_ref(
+                                    |b2| accum.extend_from_slice(b2));
+                                Ok(VVal::new_byt(accum))
+                            },
                             VVal::Int(arg_int) => {
                                 if argc > 1 {
                                     let from = arg_int as usize;
@@ -3349,6 +3391,10 @@ impl VVal {
                                 } else {
                                     Ok(VVal::new_str_mv(vval_str.as_ref().clone() + s2.as_ref()))
                                 }
+                            },
+                            VVal::Chr(_) => {
+                                let mut accum = vval_bytes.as_ref().clone();
+                                Ok(VVal::new_str_mv(vval_str.as_ref().clone() + s2.as_ref()))
                             },
                             VVal::Map(_) => Ok(
                                 first_arg
@@ -3593,6 +3639,7 @@ impl VVal {
             VVal::None    => { if let VVal::None = v { true } else { false } },
             VVal::Bol(ia) => { if let VVal::Bol(ib) = v { ia == ib } else { false } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { ia == ib } else { false } },
+            VVal::Chr(ca) => { if let VVal::Chr(cb) = v { ca == cb } else { false } },
             VVal::Flt(ia) => { if let VVal::Flt(ib) = v { (ia - ib).abs() < std::f64::EPSILON } else { false } },
             VVal::Sym(s)  => { if let VVal::Sym(ib) = v { s == ib } else { false } },
             VVal::Syn(s)  => { if let VVal::Syn(ib) = v { *s == *ib } else { false } },
@@ -3902,16 +3949,15 @@ impl VVal {
                 if index as usize >= vval_bytes.len() {
                     None
                 } else {
-                    Some(VVal::new_byt(vec![vval_bytes[index as usize]]))
+                    Some(VVal::Chr(VValChr::Byte(vval_bytes[index as usize]))
                 }
             },
             VVal::Str(vval_str) => {
                 let opt_char = vval_str.chars().nth(index as usize);
                 match opt_char {
-                    None    => None,
+                    None => None,
                     Some(char) => {
-                        let mut buf = [0; 4];
-                        Some(VVal::new_str(char.encode_utf8(&mut buf)))
+                        Some(VVal::Chr(VValChr::Char(char)))
                     },
                 }
             },
@@ -4226,10 +4272,8 @@ impl VVal {
                     VVal::Byt(s) => { Rc::make_mut(b).extend_from_slice(s.as_ref()); },
                     VVal::Bol(o) => { Rc::make_mut(b).push(*o as u8); },
                     _ => {
-                        val.with_s_ref(|s: &str|
-                            Rc::make_mut(b)
-                                .extend_from_slice(
-                                    s.as_bytes()));
+                        val.with_bv_ref(
+                            |s: &[u8]| Rc::make_mut(b).extend_from_slice(s));
                     }
                 }
             },
@@ -4271,6 +4315,7 @@ impl VVal {
 
     pub fn len(&self) -> usize {
         match self {
+            VVal::Chr(_) => 1,
             VVal::Lst(l) => l.borrow().len(),
             VVal::Map(l) => l.borrow().len(),
             VVal::Byt(l) => l.len(),
@@ -4282,6 +4327,7 @@ impl VVal {
 
     pub fn s_len(&self) -> usize {
         match self {
+            VVal::Chr(_)  => 1,
             VVal::Str(s)  => s.chars().count(),
             VVal::Sym(s)  => s.chars().count(),
             VVal::Usr(s)  => s.s_raw().chars().count(),
@@ -4312,6 +4358,11 @@ impl VVal {
     /// ```
     pub fn s_raw(&self) -> String {
         match self {
+            VVal::Chr(s)  => {
+                let mut buf = [0; 6];
+                let chrstr = c.encode_utf8(&mut buf);
+                chrstr.clone()
+            },
             VVal::Str(s)  => s.as_ref().clone(),
             VVal::Sym(s)  => String::from(s.as_ref()),
             VVal::Usr(s)  => s.s_raw(),
@@ -4351,6 +4402,11 @@ impl VVal {
         where T: FnOnce(&str) -> R
     {
         match self {
+            VVal::Chr(c)  => {
+                let mut buf = [0; 6];
+                let chrstr = c.encode_utf8(&mut buf);
+                f(chrstr)
+            },
             VVal::Str(s)  => f(s.as_ref()),
             VVal::Sym(s)  => f(&*s),
             VVal::Usr(s)  => f(&s.s_raw()),
@@ -4366,6 +4422,7 @@ impl VVal {
         where T: FnOnce(&[u8]) -> R
     {
         match self {
+            VVal::Chr(c) => f(&[c.b()]),
             VVal::Byt(v) => f(&v.as_ref()[..]),
             VVal::Str(_) => {
                 self.with_s_ref(|s| f(s.as_bytes()))
@@ -4383,6 +4440,14 @@ impl VVal {
 
     pub fn is_int(&self) -> bool {
         match self { VVal::Int(_) => true, _ => false }
+    }
+
+    pub fn is_char(&self) -> bool {
+        match self { VVal::Chr(VValChr::Char(_)) => true, _ => false }
+    }
+
+    pub fn is_byte(&self) -> bool {
+        match self { VVal::Chr(VValChr::Char(_)) => true, _ => false }
     }
 
     pub fn is_sym(&self) -> bool {
@@ -4523,28 +4588,30 @@ impl VVal {
 
     pub fn type_name(&self) -> &str {
         match self {
-            VVal::Str(_)     => "string",
-            VVal::Byt(_)     => "bytes",
-            VVal::None       => "none",
-            VVal::Err(_)     => "error",
-            VVal::Bol(_)     => "bool",
-            VVal::Sym(_)     => "symbol",
-            VVal::Syn(_)     => "syntax",
-            VVal::Int(_)     => "integer",
-            VVal::Flt(_)     => "float",
-            VVal::Pair(_)    => "pair",
-            VVal::Iter(_)    => "iter",
-            VVal::Opt(_)     => "optional",
-            VVal::Lst(_)     => "vector",
-            VVal::Map(_)     => "map",
-            VVal::Usr(_)     => "userdata",
-            VVal::Fun(_)     => "function",
-            VVal::IVec(_)    => "integer_vector",
-            VVal::FVec(_)    => "float_vector",
-            VVal::DropFun(_) => "drop_function",
-            VVal::Ref(_)     => "ref_strong",
-            VVal::HRef(_)    => "ref_hidden",
-            VVal::WWRef(_)   => "ref_weak",
+            VVal::Str(_)                 => "string",
+            VVal::Byt(_)                 => "bytes",
+            VVal::Chr(VValChr::Char(_))  => "byte",
+            VVal::Chr(VValChr::Byte(_))  => "char",
+            VVal::None                   => "none",
+            VVal::Err(_)                 => "error",
+            VVal::Bol(_)                 => "bool",
+            VVal::Sym(_)                 => "symbol",
+            VVal::Syn(_)                 => "syntax",
+            VVal::Int(_)                 => "integer",
+            VVal::Flt(_)                 => "float",
+            VVal::Pair(_)                => "pair",
+            VVal::Iter(_)                => "iter",
+            VVal::Opt(_)                 => "optional",
+            VVal::Lst(_)                 => "vector",
+            VVal::Map(_)                 => "map",
+            VVal::Usr(_)                 => "userdata",
+            VVal::Fun(_)                 => "function",
+            VVal::IVec(_)                => "integer_vector",
+            VVal::FVec(_)                => "float_vector",
+            VVal::DropFun(_)             => "drop_function",
+            VVal::Ref(_)                 => "ref_strong",
+            VVal::HRef(_)                => "ref_hidden",
+            VVal::WWRef(_)               => "ref_weak",
         }
     }
 
@@ -4612,6 +4679,42 @@ impl VVal {
     /// assert_eq!(v.v_ik("aaa"), 10);
     ///```
     pub fn v_ik(&self, key: &str)     -> i64 { self.v_k(key).i() }
+    /// Quick access of a character at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::Int(11));
+    /// assert_eq!(v.v_c(0),    11);
+    ///```
+    pub fn v_c(&self, idx: usize)     -> i64 { self.v_(idx).c() }
+    /// Quick access of the character at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_key_str("aaa", wlambda::VVal::new_char('@'));
+    /// assert_eq!(v.v_ck("aaa"), '@');
+    ///```
+    pub fn v_ck(&self, key: &str)     -> i64 { self.v_k(key).c() }
+    /// Quick access of a byte at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::Int(11));
+    /// assert_eq!(v.v_byte(0), '\x0b');
+    ///```
+    pub fn v_byte(&self, idx: usize)     -> i64 { self.v_(idx).byte() }
+    /// Quick access of the byte at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_key_str("aaa", wlambda::VVal::new_byte('@'));
+    /// assert_eq!(v.v_bytek("aaa"), '@');
+    ///```
+    pub fn v_bytek(&self, key: &str)     -> i64 { self.v_k(key).byte() }
     /// Quick access of a raw string at the given `idx`.
     /// See also `v_`.
     ///
@@ -4713,6 +4816,7 @@ impl VVal {
             VVal::Str(s)     => (*s).parse::<f64>().unwrap_or(0.0),
             VVal::Sym(s)     => (*s).parse::<f64>().unwrap_or(0.0),
             VVal::Byt(s)     => if s.len() > 0 { s[0] as f64 } else { 0.0 },
+            VVal::Chr(c)     => c.i() as f64,
             VVal::None       => 0.0,
             VVal::Err(_)     => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
@@ -4736,6 +4840,7 @@ impl VVal {
         match self {
             VVal::Str(s)     => (*s).parse::<i64>().unwrap_or(0),
             VVal::Sym(s)     => (*s).parse::<i64>().unwrap_or(0),
+            VVal::Chr(c)     => c.i(),
             VVal::Byt(s)     => if s.len() > 0 { s[0] as i64 } else { 0 as i64 },
             VVal::None       => 0,
             VVal::Err(_)     => 0,
@@ -4756,10 +4861,36 @@ impl VVal {
     }
 
     #[allow(clippy::cast_lossless)]
+    pub fn c(&self) -> char {
+        match self {
+            VVal::Str(s)     => (*s).chars().take(1),
+            VVal::Sym(s)     => (*s).chars().take(1),
+            VVal::Chr(c)     => c.c(),
+            VVal::Byt(s)     => if s.len() > 0 { s[0] as char } else { '\0' },
+            VVal::None       => '\0',
+            VVal::Err(_)     => '\0',
+            VVal::Bol(b)     => if *b { '\u{01}' } else { '\0' },
+            VVal::Syn(s)     => s.syn.clone() as i64 as u32 as char,
+            VVal::Int(i)     => *i as u32 as char,
+            VVal::Flt(f)     => *f as u32 as char,
+            VVal::Pair(b)    => b.0.c(),
+            VVal::Lst(l)     => l.borrow().len() as i64,
+            VVal::Map(l)     => l.borrow().len() as i64,
+            VVal::Usr(u)     => u.c(),
+            VVal::Fun(_)     => '\u{01}',
+            VVal::IVec(iv)   => iv.x_raw() as u32 as char,
+            VVal::FVec(fv)   => fv.x_raw() as u32 as char,
+            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.c() }, '\0'),
+            v => v.with_deref(|v| v.c(), |_| '\0'),
+        }
+    }
+
+    #[allow(clippy::cast_lossless)]
     pub fn b(&self) -> bool {
         match self {
             VVal::Str(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
             VVal::Sym(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
+            VVal::Chr(c)       => c.i() > 0,
             VVal::Byt(s)       => (if s.len() > 0 { s[0] as i64 } else { 0 as i64 }) != 0,
             VVal::None         => false,
             VVal::Err(_)       => false,
@@ -4848,6 +4979,7 @@ impl VVal {
             VVal::Err(e)     => format!("$e{} {}", (*e).borrow().1, (*e).borrow().0.s_cy(c)),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
             VVal::Syn(s)     => format!("&{:?}", s.syn),
+            VVal::Chr(c)     => c.to_string(),
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),
             VVal::Pair(b)    => format!("$p({},{})", b.0.s_cy(c), b.1.s_cy(c)),
@@ -4894,6 +5026,7 @@ impl VVal {
 
     pub fn as_bytes(&self) -> std::vec::Vec<u8> {
         match self {
+            VVal::Chr(c) => vec![c.b()],
             VVal::Byt(b) => b.as_ref().clone(),
             v => v.with_deref(
                 |v| v.as_bytes(),
@@ -4999,6 +5132,14 @@ impl serde::ser::Serialize for VVal {
             VVal::Str(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Sym(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Byt(b)     => serializer.serialize_bytes(&b[..]),
+            VVal::Chr(b)     =>
+                match b {
+                    VValChr::Char(c) => {
+                        let mut buf = [0; 6];
+                        serializer.serialize_str(c.encode_utf8(&mut buf))
+                    },
+                    VValChr::Byte(b) => { serializer.serialize_bytes(&[*b]) },
+                },
             VVal::None       => serializer.serialize_none(),
             VVal::Iter(_)    => serializer.serialize_none(),
             VVal::Err(_)     => serializer.serialize_str(&self.s()),
@@ -5128,7 +5269,7 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
     fn visit_u16<E>(self, value: u16) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
     fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
+        where E: serde::de::Error { Ok(VVal::Chr(VValChr::Byte(u8::from(value)))) }
 
     fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Flt(value)) }
