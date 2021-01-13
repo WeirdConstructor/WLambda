@@ -1,6 +1,6 @@
 [package]
 name         = "wlambda"
-version      = "0.6.4-alpha3"
+version      = "0.6.4-alpha4"
 authors      = ["Weird Constructor <weirdconstructor@gmail.com>"]
 license      = "GPL-3.0-or-later"
 edition      = "2018"
@@ -12,7 +12,10 @@ categories   = ["parsing","config","parser-implementations"]
 exclude      = ["res/*"]
 
 [features]
-default = ["rustyline", "regex", "chrono", "serde", "serde_json", "rmp-serde", "quick-xml"]
+default = [
+    "rustyline", "regex", "chrono", "serde", "serde_json",
+    "rmp-serde", "quick-xml", "socket2"
+]
 
 [dependencies]
 fnv        = "1.0.7"
@@ -24,6 +27,7 @@ serde_json = { version = "1.0.53",  optional = true }
 rmp-serde  = { version = "0.14.3",  optional = true }
 mint       = { version = "0.5.5",   optional = true }
 quick-xml  = { version = "0.20.0",  optional = true }
+socket2    = { version = "0.3.19",  optional = true, features = ["reuseport"] }
 
 [dev-dependencies]
 regex-syntax = { version = "0.6.18" }

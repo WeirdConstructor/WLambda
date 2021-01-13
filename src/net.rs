@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 use std::net::{SocketAddr, ToSocketAddrs};
 
-fn vv2socketaddr(vv: VVal) -> Result<Box<dyn std::iter::Iterator<Item = SocketAddr>>, String> {
+fn vv2socketaddr(vv: &VVal) -> Result<Box<dyn std::iter::Iterator<Item = SocketAddr>>, String> {
     let addr =
         if vv.is_pair() {
             let port = vv.v_i(1) as u16;
@@ -46,6 +46,71 @@ impl VValUserData for VTcpStream {
 }
 
 pub fn add_to_symtable(st: &mut SymbolTable) {
+    st.fun("net:tcp:listen", |env: &mut Env, _argc: usize| {
+        let vaddr = env.arg(0);
+        let fun   = env.arg(1);
+
+        let mut addr =
+            match vv2socketaddr(&vaddr) {
+                Ok(addr) => addr,
+                Err(e) => { return Ok(env.new_err(e)) },
+            };
+
+        let first = addr.next();
+        if first.is_none() {
+            return Ok(env.new_err(format!(
+                "Couldn't get socket address to bind to from '{}'",
+                vaddr.s_raw())));
+        }
+
+        match std::net::TcpListener::bind(first.unwrap()) {
+            Ok(listener) => {
+                #[cfg(feature="socket2")]
+                let listener = {
+                    use socket2::Socket;
+                    let socket = Socket::from(listener);
+                    socket.set_reuse_address(true);
+                    #[cfg(unix)]
+                    socket.set_reuse_port(true);
+                    println!("TETET");
+                    socket.into_tcp_listener()
+                };
+
+                for stream in listener.incoming() {
+                    match stream {
+                        Err(e) => {
+                            return Ok(
+                                env.new_err(format!(
+                                    "Couldn't get client: {}", e)));
+                        },
+                        Ok(stream) => {
+                            let stream = VVal::Usr(Box::new(VTcpStream {
+                                stream: Rc::new(RefCell::new(stream)),
+                            }));
+                            env.push(stream);
+                            match fun.call_internal(env, 1) {
+                                Ok(_) => {
+                                    env.popn(1);
+                                },
+                                Err(e) => {
+                                    env.popn(1);
+                                    return Err(e);
+                                },
+                            }
+                        },
+                    }
+                }
+
+                Ok(VVal::None)
+            },
+            Err(e) => {
+                Ok(env.new_err(format!(
+                    "Couldn't create listener for '{}': {}",
+                    vaddr.s_raw(), e)))
+            },
+        }
+    }, Some(2), Some(2), false);
+
     st.fun("net:tcp:connect", |env: &mut Env, argc: usize| {
         let mut vaddr = env.arg(0);
         let mut adr_mode = 0;
@@ -63,7 +128,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         }
 
         let mut addr =
-            match vv2socketaddr(vaddr) {
+            match vv2socketaddr(&vaddr) {
                 Ok(addr) => addr,
                 Err(e) => { return Ok(env.new_err(e)) },
             };
@@ -90,9 +155,9 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
             match stream {
                 Ok(stream) => {
-                    stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
-                    stream.set_write_timeout(Some(std::time::Duration::from_secs(10)));
-
+//                    stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+//                    stream.set_write_timeout(Some(std::time::Duration::from_secs(10)));
+//
                     return Ok(VVal::Usr(Box::new(VTcpStream {
                         stream: Rc::new(RefCell::new(stream)),
                     })));
@@ -106,7 +171,79 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         Ok(env.new_err(last_err))
     }, Some(1), Some(2), false);
 
-    st.fun("io:read_some", |env: &mut Env, argc: usize| {
+    st.fun("io:write", |env: &mut Env, _argc: usize| {
+        let mut fd = env.arg(0);
+        let data = env.arg(1);
+        let offs = env.arg(2).i() as usize;
+
+        Ok(fd.with_usr_ref(|vts: &mut VTcpStream| {
+            use std::io::Write;
+
+            data.with_bv_ref(|bytes| {
+                if offs >= bytes.len() {
+                    return env.new_err(
+                        format!("std:io:write_some: bad buffer offset"));
+                }
+
+                let r = vts.stream.borrow_mut().write_all(&bytes[offs..]);
+                match r {
+                    Ok(()) => {
+                        VVal::Int(bytes.len() as i64)
+                    },
+                    Err(e) => {
+                        match e.kind() {
+                            std::io::ErrorKind::Interrupted => { VVal::None },
+                            _ =>
+                                env.new_err(
+                                    format!("std:io:write_some: {}", e)),
+                        }
+                    }
+                }
+            })
+        }).unwrap_or(VVal::None))
+    }, Some(2), Some(3), false);
+
+    st.fun("io:write_some", |env: &mut Env, _argc: usize| {
+        let mut fd = env.arg(0);
+        let data = env.arg(1);
+        let offs = env.arg(2).i() as usize;
+
+        Ok(fd.with_usr_ref(|vts: &mut VTcpStream| {
+            use std::io::Write;
+
+            data.with_bv_ref(|bytes| {
+                if offs >= bytes.len() {
+                    return env.new_err(
+                        format!("std:io:write_some: bad buffer offset"));
+                }
+
+                let r = vts.stream.borrow_mut().write(&bytes[offs..]);
+                match r {
+                    Ok(n) => {
+                        if n == 0 {
+                            VVal::opt_none()
+                        } else {
+                            VVal::opt(VVal::Int(n as i64))
+                        }
+                    },
+                    Err(e) => {
+                        match e.kind() {
+                              std::io::ErrorKind::WouldBlock
+                            | std::io::ErrorKind::TimedOut
+                            | std::io::ErrorKind::Interrupted => {
+                                VVal::None
+                            },
+                            _ =>
+                                env.new_err(
+                                    format!("std:io:write_some: {}", e)),
+                        }
+                    }
+                }
+            })
+        }).unwrap_or(VVal::None))
+    }, Some(2), Some(3), false);
+
+    st.fun("io:read_some", |env: &mut Env, _argc: usize| {
         let mut fd = env.arg(0);
         Ok(fd.with_usr_ref(|vts: &mut VTcpStream| {
             use std::io::Read;
