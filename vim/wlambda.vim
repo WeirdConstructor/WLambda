@@ -54,8 +54,14 @@ syn keyword wlKeyword std:io:file:append
 syn keyword wlKeyword std:io:file:read
 syn keyword wlKeyword std:io:file:read_text
 syn keyword wlKeyword std:io:file:write_safe
+syn keyword wlKeyword std:io:flush
+syn keyword wlKeyword std:io:read_some
+syn keyword wlKeyword std:io:write
+syn keyword wlKeyword std:io:write_some
 syn keyword wlKeyword std:measure_time
 syn keyword wlKeyword std:neg
+syn keyword wlKeyword std:net:tcp:connect
+syn keyword wlKeyword std:net:tcp:listen
 syn keyword wlKeyword std:num:abs
 syn keyword wlKeyword std:num:int_to_closed_open01
 syn keyword wlKeyword std:num:int_to_open01
@@ -83,6 +89,7 @@ syn keyword wlKeyword std:sort
 syn keyword wlKeyword str
 syn keyword wlKeyword std:str:cat
 syn keyword wlKeyword std:str:from_char_vec
+syn keyword wlKeyword std:str:from_latin1
 syn keyword wlKeyword std:str:from_utf8
 syn keyword wlKeyword std:str:from_utf8_lossy
 syn keyword wlKeyword std:str:join
@@ -90,6 +97,7 @@ syn keyword wlKeyword std:str:len
 syn keyword wlKeyword std:str:padl
 syn keyword wlKeyword std:str:padr
 syn keyword wlKeyword std:str:to_bytes
+syn keyword wlKeyword std:str:to_bytes_latin1
 syn keyword wlKeyword std:str:to_char_vec
 syn keyword wlKeyword std:str:to_lowercase
 syn keyword wlKeyword std:str:to_uppercase
