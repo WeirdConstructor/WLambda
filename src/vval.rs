@@ -1345,6 +1345,10 @@ pub trait VValUserData {
     fn s_raw(&self) -> String { self.s() }
     /// Returns the i64 representation of your data.
     fn i(&self)     -> i64    { -1 }
+    /// Returns the byte representation of your data.
+    fn byte(&self)  -> u8     { self.i() as u8 }
+    /// Returns the char representation of your data.
+    fn c(&self)     -> char   { std::char::from_u32(self.i() as u32).unwrap_or('?') }
     /// Returns the f64 representation of your data.
     fn f(&self)     -> f64    { self.i() as f64 }
     /// Returns the boolean representation of your data. Can for instance
@@ -1449,6 +1453,24 @@ impl VValChr {
                 format_escape_char(
                     std::char::from_u32(*b as u32).unwrap_or('?'),
                     true)),
+        }
+    }
+
+    pub fn byte(&self) -> u8 {
+        match self {
+            VValChr::Char(c) => {
+                let c = *c as u32;
+                if c > 0xFF { b'?' } else { c as u8 }
+            },
+            VValChr::Byte(b) => *b,
+        }
+    }
+
+    pub fn c(&self) -> char {
+        match self {
+            VValChr::Char(c) => *c,
+            VValChr::Byte(b) =>
+                std::char::from_u32(*b as u32).unwrap_or('?'),
         }
     }
 }
@@ -2293,9 +2315,11 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                     l
                 },
                 (VVal::Chr(needle), VVal::Chr(replace)) => {
+                    let mut buf = [0; 6];
+                    let chrstr = replace.c().encode_utf8(&mut buf);
                     VVal::new_str_mv(
                         s.as_ref()
-                         .replace(needle.c(), replace.c()))
+                         .replace(needle.c(), chrstr))
                 },
                 (VVal::Str(needle), VVal::Str(replace)) => {
                     VVal::new_str_mv(
@@ -3393,8 +3417,8 @@ impl VVal {
                                 }
                             },
                             VVal::Chr(_) => {
-                                let mut accum = vval_bytes.as_ref().clone();
-                                Ok(VVal::new_str_mv(vval_str.as_ref().clone() + s2.as_ref()))
+                                first_arg.with_s_ref(|s|
+                                    Ok(VVal::new_str_mv(vval_str.as_ref().clone() + s)))
                             },
                             VVal::Map(_) => Ok(
                                 first_arg
@@ -4358,10 +4382,10 @@ impl VVal {
     /// ```
     pub fn s_raw(&self) -> String {
         match self {
-            VVal::Chr(s)  => {
+            VVal::Chr(c)  => {
                 let mut buf = [0; 6];
-                let chrstr = c.encode_utf8(&mut buf);
-                chrstr.clone()
+                let chrstr = c.c().encode_utf8(&mut buf);
+                chrstr.to_string()
             },
             VVal::Str(s)  => s.as_ref().clone(),
             VVal::Sym(s)  => String::from(s.as_ref()),
@@ -4404,7 +4428,7 @@ impl VVal {
         match self {
             VVal::Chr(c)  => {
                 let mut buf = [0; 6];
-                let chrstr = c.encode_utf8(&mut buf);
+                let chrstr = c.c().encode_utf8(&mut buf);
                 f(chrstr)
             },
             VVal::Str(s)  => f(s.as_ref()),
@@ -4422,7 +4446,7 @@ impl VVal {
         where T: FnOnce(&[u8]) -> R
     {
         match self {
-            VVal::Chr(c) => f(&[c.b()]),
+            VVal::Chr(c) => f(&[c.byte()]),
             VVal::Byt(v) => f(&v.as_ref()[..]),
             VVal::Str(_) => {
                 self.with_s_ref(|s| f(s.as_bytes()))
@@ -4687,7 +4711,7 @@ impl VVal {
     /// v.push(wlambda::VVal::Int(11));
     /// assert_eq!(v.v_c(0),    11);
     ///```
-    pub fn v_c(&self, idx: usize)     -> i64 { self.v_(idx).c() }
+    pub fn v_c(&self, idx: usize)     -> char { self.v_(idx).c() }
     /// Quick access of the character at the given `key`.
     /// See also `v_k`.
     ///
@@ -4696,7 +4720,7 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::new_char('@'));
     /// assert_eq!(v.v_ck("aaa"), '@');
     ///```
-    pub fn v_ck(&self, key: &str)     -> i64 { self.v_k(key).c() }
+    pub fn v_ck(&self, key: &str)     -> char { self.v_k(key).c() }
     /// Quick access of a byte at the given `idx`.
     /// See also `v_`.
     ///
@@ -4705,7 +4729,7 @@ impl VVal {
     /// v.push(wlambda::VVal::Int(11));
     /// assert_eq!(v.v_byte(0), '\x0b');
     ///```
-    pub fn v_byte(&self, idx: usize)     -> i64 { self.v_(idx).byte() }
+    pub fn v_byte(&self, idx: usize)     -> u8 { self.v_(idx).byte() }
     /// Quick access of the byte at the given `key`.
     /// See also `v_k`.
     ///
@@ -4714,7 +4738,7 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::new_byte('@'));
     /// assert_eq!(v.v_bytek("aaa"), '@');
     ///```
-    pub fn v_bytek(&self, key: &str)     -> i64 { self.v_k(key).byte() }
+    pub fn v_bytek(&self, key: &str)     -> u8 { self.v_k(key).byte() }
     /// Quick access of a raw string at the given `idx`.
     /// See also `v_`.
     ///
@@ -4816,7 +4840,7 @@ impl VVal {
             VVal::Str(s)     => (*s).parse::<f64>().unwrap_or(0.0),
             VVal::Sym(s)     => (*s).parse::<f64>().unwrap_or(0.0),
             VVal::Byt(s)     => if s.len() > 0 { s[0] as f64 } else { 0.0 },
-            VVal::Chr(c)     => c.i() as f64,
+            VVal::Chr(c)     => c.c() as u32 as f64,
             VVal::None       => 0.0,
             VVal::Err(_)     => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
@@ -4840,7 +4864,7 @@ impl VVal {
         match self {
             VVal::Str(s)     => (*s).parse::<i64>().unwrap_or(0),
             VVal::Sym(s)     => (*s).parse::<i64>().unwrap_or(0),
-            VVal::Chr(c)     => c.i(),
+            VVal::Chr(c)     => c.c() as u32 as i64,
             VVal::Byt(s)     => if s.len() > 0 { s[0] as i64 } else { 0 as i64 },
             VVal::None       => 0,
             VVal::Err(_)     => 0,
@@ -4861,25 +4885,51 @@ impl VVal {
     }
 
     #[allow(clippy::cast_lossless)]
+    pub fn byte(&self) -> u8 {
+        match self {
+            VVal::Str(s)     => { if (*s).len() > 0 { (*s).as_bytes()[0] } else { 0 } },
+            VVal::Sym(s)     => { if (*s).len() > 0 { (*s).as_bytes()[0] } else { 0 } },
+            VVal::Chr(c)     => c.byte(),
+            VVal::Byt(s)     => if s.len() > 0 { s[0] } else { b'\0' },
+            VVal::None       => b'\0',
+            VVal::Err(_)     => b'\0',
+            VVal::Bol(b)     => if *b { b'\x01' } else { b'\0' },
+            VVal::Syn(s)     => s.syn.clone() as i64 as u32 as u8,
+            VVal::Int(i)     => *i as u8,
+            VVal::Flt(f)     => *f as u8,
+            VVal::Pair(b)    => b.0.byte(),
+            VVal::Lst(l)     => l.borrow().len() as u8,
+            VVal::Map(l)     => l.borrow().len() as u8,
+            VVal::Usr(u)     => u.byte(),
+            VVal::Fun(_)     => b'\x01',
+            VVal::IVec(iv)   => iv.x_raw() as u8,
+            VVal::FVec(fv)   => fv.x_raw() as u8,
+            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.byte() }, b'\0'),
+            v => v.with_deref(|v| v.byte(), |_| b'\0'),
+        }
+    }
+
+
+    #[allow(clippy::cast_lossless)]
     pub fn c(&self) -> char {
         match self {
-            VVal::Str(s)     => (*s).chars().take(1),
-            VVal::Sym(s)     => (*s).chars().take(1),
+            VVal::Str(s)     => (*s).chars().nth(0).unwrap_or('\0'),
+            VVal::Sym(s)     => (*s).chars().nth(0).unwrap_or('\0'),
             VVal::Chr(c)     => c.c(),
             VVal::Byt(s)     => if s.len() > 0 { s[0] as char } else { '\0' },
             VVal::None       => '\0',
             VVal::Err(_)     => '\0',
             VVal::Bol(b)     => if *b { '\u{01}' } else { '\0' },
-            VVal::Syn(s)     => s.syn.clone() as i64 as u32 as char,
-            VVal::Int(i)     => *i as u32 as char,
-            VVal::Flt(f)     => *f as u32 as char,
+            VVal::Syn(s)     => std::char::from_u32(s.syn.clone() as i64 as u32).unwrap_or('\0'),
+            VVal::Int(i)     => std::char::from_u32(*i as u32).unwrap_or('\0'),
+            VVal::Flt(f)     => std::char::from_u32(*f as u32).unwrap_or('\0'),
             VVal::Pair(b)    => b.0.c(),
-            VVal::Lst(l)     => l.borrow().len() as i64,
-            VVal::Map(l)     => l.borrow().len() as i64,
+            VVal::Lst(l)     => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
+            VVal::Map(l)     => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
             VVal::Usr(u)     => u.c(),
             VVal::Fun(_)     => '\u{01}',
-            VVal::IVec(iv)   => iv.x_raw() as u32 as char,
-            VVal::FVec(fv)   => fv.x_raw() as u32 as char,
+            VVal::IVec(iv)   => std::char::from_u32(iv.x_raw() as u32).unwrap_or('\0'),
+            VVal::FVec(fv)   => std::char::from_u32(fv.x_raw() as u32).unwrap_or('\0'),
             VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.c() }, '\0'),
             v => v.with_deref(|v| v.c(), |_| '\0'),
         }
@@ -4890,7 +4940,7 @@ impl VVal {
         match self {
             VVal::Str(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
             VVal::Sym(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
-            VVal::Chr(c)       => c.i() > 0,
+            VVal::Chr(c)       => (c.c() as u32) > 0,
             VVal::Byt(s)       => (if s.len() > 0 { s[0] as i64 } else { 0 as i64 }) != 0,
             VVal::None         => false,
             VVal::Err(_)       => false,
@@ -5026,7 +5076,7 @@ impl VVal {
 
     pub fn as_bytes(&self) -> std::vec::Vec<u8> {
         match self {
-            VVal::Chr(c) => vec![c.b()],
+            VVal::Chr(c) => vec![c.byte()],
             VVal::Byt(b) => b.as_ref().clone(),
             v => v.with_deref(
                 |v| v.as_bytes(),
