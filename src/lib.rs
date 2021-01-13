@@ -632,6 +632,7 @@ mod prog_writer;
 mod io;
 mod str_int;
 mod xml;
+mod net;
 
 pub use vval::VVal;
 pub use vval::Env;
@@ -639,6 +640,7 @@ pub use vval::StackAction;
 pub use vval::VValUserData;
 pub use threads::AVal;
 pub use compiler::GlobalEnv;
+pub use compiler::GlobalEnvRef;
 pub use compiler::EvalContext;
 pub use compiler::SymbolTable;
 

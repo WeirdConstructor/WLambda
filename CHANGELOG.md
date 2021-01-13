@@ -5,6 +5,8 @@
 * Change: Regexes/Patterns allow more characters like `/` and `!` to be
 used directly now. But only in the context of a single regex
 pattern like `$r(foo/bar)`. This makes it easier to process text.
+* Feature: Character and Byte literals `'c'` and `$b'c'` were added.
+With functions: `is_byte`, `is_char`.
 * Feature: Global regex matches with `$rg/.../`.
 * Feature: Global regex substitutions with `$rs/.../`.
 * Feature: Implemented `&or` and `$and` for structure patterns (`match` and `$M`).
@@ -16,6 +18,17 @@ binary data formats.
 and `std:chrono:format_local`.
 * Feature: Added XML parsing and writing functionality `std:xml:read_sax`
 and `std:xml:create_sax_writer`.
+* Feature: You can customize the `DefaultThreadCreator` easily with a
+`DefaultGlobalEnvCreator` trait implementation which is conveniently provided
+by `FunctionGlobalEnvCreator`. This makes embedding WLambda with threading
+easier.
+* Feature: Implemented `std:bytes:find`.
+* Feature: Extended syntax for string escapes by ASCII character names
+like `$b"\<STX>"` or `$b"\<DEL>"`.
+* Feature: Added `std:str:from_latin1` and `std:str:to_bytes_latin1` to
+be able to convert bytes to/from ISO-8859-1 encoding in a more or less
+clean way. It allows better parsing of text protocols by converting
+them to strings directly.
 * Bugfix: `v.0 => v.1` did not parse correctly.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.

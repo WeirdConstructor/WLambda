@@ -175,23 +175,26 @@ Smalltalk, LISP and Perl.
     - [3.9.14](#3914-stdstrpadstart-len-pad-str-value) std:str:pad\_start _len_ _pad-str_ _value_
     - [3.9.15](#3915-stdstrpadend-len-pad-str-value) std:str:pad\_end _len_ _pad-str_ _value_
     - [3.9.16](#3916-stdstrtobytes-string) std:str:to\_bytes _string_
-    - [3.9.17](#3917-stdstrfromutf8-byte-vector) std:str:from\_utf8 _byte-vector_
-    - [3.9.18](#3918-stdstrfromutf8lossy-byte-vector) std:str:from\_utf8\_lossy _byte-vector_
-    - [3.9.19](#3919-stdstrtocharvec-string) std:str:to\_char\_vec _string_
-    - [3.9.20](#3920-stdstrfromcharvec-vector) std:str:from\_char\_vec _vector_
-    - [3.9.21](#3921-stdstrtolowercase-string) std:str:to\_lowercase _string_
-    - [3.9.22](#3922-stdstrtouppercase-string) std:str:to\_uppercase _string_
+    - [3.9.17](#3917-stdstrtobyteslatin1-string) std:str:to\_bytes\_latin1 _string_
+    - [3.9.18](#3918-stdstrfromlatin1-byte-vector) std:str:from\_latin1 _byte-vector_
+    - [3.9.19](#3919-stdstrfromutf8-byte-vector) std:str:from\_utf8 _byte-vector_
+    - [3.9.20](#3920-stdstrfromutf8lossy-byte-vector) std:str:from\_utf8\_lossy _byte-vector_
+    - [3.9.21](#3921-stdstrtocharvec-string) std:str:to\_char\_vec _string_
+    - [3.9.22](#3922-stdstrfromcharvec-vector) std:str:from\_char\_vec _vector_
+    - [3.9.23](#3923-stdstrtolowercase-string) std:str:to\_lowercase _string_
+    - [3.9.24](#3924-stdstrtouppercase-string) std:str:to\_uppercase _string_
   - [3.10](#310-bytes-or-byte-vectors) Bytes (or Byte Vectors)
     - [3.10.1](#3101-call-properties-of-bytes) Call Properties of Bytes
     - [3.10.2](#3102-byte-conversion-functions) Byte Conversion Functions
     - [3.10.3](#3103-isbytes-value) is\_bytes _value_
-    - [3.10.4](#3104-stdbytesreplace-byte-vector-pattern-replacement) std:bytes:replace _byte-vector_ _pattern_ _replacement_
-    - [3.10.5](#3105-stdbytesfromhex-string-with-hex-chars) std:bytes:from\_hex _string-with-hex-chars_
-    - [3.10.6](#3106-stdbytesfromvec-vector-of-ints) std:bytes:from\_vec _vector-of-ints_
-    - [3.10.7](#3107-stdbytestohex-byte-vector) std:bytes:to\_hex _byte-vector_
-    - [3.10.8](#3108-stdbytestovec-byte-vector) std:bytes:to\_vec _byte-vector_
-    - [3.10.9](#3109-stdbytespack-pack-format-string-list-of-values) std:bytes:pack _pack-format-string_ _list-of-values_
-    - [3.10.10](#31010-stdbytesunpack-pack-format-string-byte-vector) std:bytes:unpack _pack-format-string_ _byte-vector_
+    - [3.10.4](#3104-stdbytesfind-pattern-string-offset) std:bytes:find _pattern_ _string_ [_offset_]
+    - [3.10.5](#3105-stdbytesreplace-byte-vector-pattern-replacement) std:bytes:replace _byte-vector_ _pattern_ _replacement_
+    - [3.10.6](#3106-stdbytesfromhex-string-with-hex-chars) std:bytes:from\_hex _string-with-hex-chars_
+    - [3.10.7](#3107-stdbytesfromvec-vector-of-ints) std:bytes:from\_vec _vector-of-ints_
+    - [3.10.8](#3108-stdbytestohex-byte-vector) std:bytes:to\_hex _byte-vector_
+    - [3.10.9](#3109-stdbytestovec-byte-vector) std:bytes:to\_vec _byte-vector_
+    - [3.10.10](#31010-stdbytespack-pack-format-string-list-of-values) std:bytes:pack _pack-format-string_ _list-of-values_
+    - [3.10.11](#31011-stdbytesunpack-pack-format-string-byte-vector) std:bytes:unpack _pack-format-string_ _byte-vector_
   - [3.11](#311-symbols) Symbols
     - [3.11.1](#3111-sym-value) sym _value_
     - [3.11.2](#3112-issym-value) is\_sym _value_
@@ -2939,7 +2942,33 @@ std:assert_eq b $b"1234";
 std:assert_eq b $b"\xC3\x84\xC3\x9F\xE6\x97\xA5\xE6\x9C\xAC\xE4\xBA\xBA";
 ```
 
-#### <a name="3917-stdstrfromutf8-byte-vector"></a>3.9.17 - std:str:from\_utf8 _byte-vector_
+#### <a name="3917-stdstrtobyteslatin1-string"></a>3.9.17 - std:str:to\_bytes\_latin1 _string_
+
+Encodes _string_ as bytes in Latin1 (ISO-8859-1) encoding and returns
+a byte vector containing all it's bytes. If a character is outside the Latin1 Unicode
+range, it will be replaced by a "?".
+
+```wlambda
+!b = std:str:to_bytes_latin1 "\u{FF}\u{F0}";
+std:assert_eq b $b"\xFF\xF0";
+!b = std:str:to_bytes_latin1 "\u{FE00}\u{FF}\u{3232}";
+std:assert_eq b $b"?\xFF?";
+```
+
+#### <a name="3918-stdstrfromlatin1-byte-vector"></a>3.9.18 - std:str:from\_latin1 _byte-vector_
+
+Converts the _byte-vector_ to a Unicode string, assuming Latin 1 (ISO-8859-1) encoding
+and returns it.
+
+```wlambda
+!s = std:str:from_latin1 $b"Ä";
+std:assert_eq s "\u{C3}\u{84}";
+
+!s = std:str:from_latin1 $b"\xFF\xF0";
+std:assert_eq s "\u{FF}\u{F0}";
+```
+
+#### <a name="3919-stdstrfromutf8-byte-vector"></a>3.9.19 - std:str:from\_utf8 _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences an
@@ -2953,7 +2982,7 @@ std:assert_eq s "Äß日本人";
 std:assert_eq r "str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0";
 ```
 
-#### <a name="3918-stdstrfromutf8lossy-byte-vector"></a>3.9.18 - std:str:from\_utf8\_lossy _byte-vector_
+#### <a name="3920-stdstrfromutf8lossy-byte-vector"></a>3.9.20 - std:str:from\_utf8\_lossy _byte-vector_
 
 Converts the _byte-vector_ to a Unicode string and returns it.
 If the _byte-vector_ contains invalid UTF-8 sequences a `"�"` will be
@@ -2965,7 +2994,7 @@ inserted.
 std:assert_eq s "Ä�ß日本人��\0";
 ```
 
-#### <a name="3919-stdstrtocharvec-string"></a>3.9.19 - std:str:to\_char\_vec _string_
+#### <a name="3921-stdstrtocharvec-string"></a>3.9.21 - std:str:to\_char\_vec _string_
 
 Converts the _string_ into a vector of integers which represent the Unicode
 character number.
@@ -2978,7 +3007,7 @@ std:assert_eq (str v) ~ str $[49,50,51,52];
 std:assert_eq (str v) ~ str $[196,223,0x65E5,0x672C,0x4EBA];
 ```
 
-#### <a name="3920-stdstrfromcharvec-vector"></a>3.9.20 - std:str:from\_char\_vec _vector_
+#### <a name="3922-stdstrfromcharvec-vector"></a>3.9.22 - std:str:from\_char\_vec _vector_
 
 The reverse operation of `std:str:to_char_vec`. It converts
 a vector of integers to a unicode string. Any integer that has
@@ -2992,7 +3021,7 @@ std:assert_eq
     "12Äß日本人";
 ```
 
-#### <a name="3921-stdstrtolowercase-string"></a>3.9.21 - std:str:to\_lowercase _string_
+#### <a name="3923-stdstrtolowercase-string"></a>3.9.23 - std:str:to\_lowercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -3000,7 +3029,7 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_lowercase "ZABzabÄßÜÖ") "zabzabäßüö";
 ```
 
-#### <a name="3922-stdstrtouppercase-string"></a>3.9.22 - std:str:to\_uppercase _string_
+#### <a name="3924-stdstrtouppercase-string"></a>3.9.24 - std:str:to\_uppercase _string_
 
 Swaps all (Unicode) characters in _string_ to their lowercase version.
 
@@ -3057,7 +3086,7 @@ You can convert bytes to strings in a multitude of ways:
   std:assert_eq (str $b"abc\xFF")    "abcÿ";
   std:assert_eq (str $Q/ABCDEF\xFD/) "ABCDEF\\xFD";
   ```
-- std:bytes:to_hex _bytes_ \[_group-len_ \[_group-sep_]]
+- std:bytes:to\_hex _bytes_ \[_group-len_ \[_group-sep_]]
   ```wlambda
   std:assert_eq (std:bytes:to_hex $b"\xFF\x0A\xBE\xEF")
                 "FF0ABEEF";
@@ -3066,14 +3095,18 @@ You can convert bytes to strings in a multitude of ways:
   std:assert_eq (std:bytes:to_hex $b"\xFF\x0A\xBE\xEF" 2 ":")
                 "FF:0A:BE:EF";
   ```
-- std:str:from_utf8 _bytes_
+- std:str:from\_latin1 _bytes_
+  ```wlambda
+  std:assert_eq (std:str:from_latin1 $b"\xFF\xF0") "\u{FF}\u{F0}";
+  ```
+- std:str:from\_utf8 _bytes_
   ```wlambda
   std:assert_eq (std:str:from_utf8 $b"\xC3\xA4\xC3\x9F\xC3\xBF") "äßÿ";
   std:assert_eq (std:str:from_utf8 [std:str:to_bytes "äßÿ"])         "äßÿ";
   # broken UTF8 will result in an error:
   std:assert ~ is_err (std:str:from_utf8 $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF");
   ```
-- std:str:from_utf8_lossy _bytes_
+- std:str:from\_utf8\_lossy _bytes_
   ```wlambda
   std:assert_eq (std:str:from_utf8_lossy $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF") "�äßÿ";
   ```
@@ -3104,7 +3137,19 @@ std:assert ~ is_bytes $b"ABC";
 std:assert ~ not ~ is_bytes "ABC";
 ```
 
-#### <a name="3104-stdbytesreplace-byte-vector-pattern-replacement"></a>3.10.4 - std:bytes:replace _byte-vector_ _pattern_ _replacement_
+#### <a name="3104-stdbytesfind-pattern-string-offset"></a>3.10.4 - std:bytes:find _pattern_ _string_ [_offset_]
+
+Searches for the string _pattern_ in the _string_ and returns the 0 based position
+in the string the given _pattern_ starts.
+If no pattern was found `$none` is returned.
+
+```wlambda
+std:assert_eq (std:bytes:find $b"xyz" $b"abcxyz")         3;
+std:assert_eq (std:bytes:find $b"xyz" $b"abcxyzxyz" 6)    6;
+std:assert_eq (std:bytes:find $b"xyz" $b"abcxyzfooxyz" 6) 9;
+```
+
+#### <a name="3105-stdbytesreplace-byte-vector-pattern-replacement"></a>3.10.5 - std:bytes:replace _byte-vector_ _pattern_ _replacement_
 
 Replaces all occurences of _pattern_ in _byte-vector_ with _replacement_.
 
@@ -3122,7 +3167,7 @@ std:assert_eq
     $b"XXX\xFF\xFF\xFF\xFFOOO";
 ```
 
-#### <a name="3105-stdbytesfromhex-string-with-hex-chars"></a>3.10.5 - std:bytes:from\_hex _string-with-hex-chars_
+#### <a name="3106-stdbytesfromhex-string-with-hex-chars"></a>3.10.6 - std:bytes:from\_hex _string-with-hex-chars_
 
 This function decodes a string of hex characters into a byte vector.
 
@@ -3131,7 +3176,7 @@ This function decodes a string of hex characters into a byte vector.
 std:assert_eq bv $b"byte";
 ```
 
-#### <a name="3106-stdbytesfromvec-vector-of-ints"></a>3.10.6 - std:bytes:from\_vec _vector-of-ints_
+#### <a name="3107-stdbytesfromvec-vector-of-ints"></a>3.10.7 - std:bytes:from\_vec _vector-of-ints_
 
 Decodes a vector of integers in the range 0-255 into a byte vector. If an
 integer is larger than 255 don't expect a sensible result. But it will most
@@ -3143,7 +3188,7 @@ std:assert_eq
     $b"\x01\x02\x03byte";
 ```
 
-#### <a name="3107-stdbytestohex-byte-vector"></a>3.10.7 - std:bytes:to\_hex _byte-vector_
+#### <a name="3108-stdbytestohex-byte-vector"></a>3.10.8 - std:bytes:to\_hex _byte-vector_
 
 Converts the given byte vector to a string of hex encoded bytes.
 
@@ -3153,7 +3198,7 @@ std:assert_eq
     "62797465";
 ```
 
-#### <a name="3108-stdbytestovec-byte-vector"></a>3.10.8 - std:bytes:to\_vec _byte-vector_
+#### <a name="3109-stdbytestovec-byte-vector"></a>3.10.9 - std:bytes:to\_vec _byte-vector_
 
 Converts the given byte vector to a vector of integers in the range 0-255.
 
@@ -3163,7 +3208,7 @@ std:assert_str_eq
     $[98, 121, 116, 101];
 ```
 
-#### <a name="3109-stdbytespack-pack-format-string-list-of-values"></a>3.10.9 - std:bytes:pack _pack-format-string_ _list-of-values_
+#### <a name="31010-stdbytespack-pack-format-string-list-of-values"></a>3.10.10 - std:bytes:pack _pack-format-string_ _list-of-values_
 
 Returns a byte vector containing the values of _list-of-values_
 serialized in binary form (packed) according to the given _pack-format-string_.
@@ -3182,7 +3227,7 @@ std:assert_eq
     $b"\0\x01\0\x04test\0?\0\0\0";
 ```
 
-#### <a name="31010-stdbytesunpack-pack-format-string-byte-vector"></a>3.10.10 - std:bytes:unpack _pack-format-string_ _byte-vector_
+#### <a name="31011-stdbytesunpack-pack-format-string-byte-vector"></a>3.10.11 - std:bytes:unpack _pack-format-string_ _byte-vector_
 
 Decodes the given _byte-vector_ according to the _pack-format-string_ and returns it
 as list of values.
@@ -7419,8 +7464,8 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 
 ```wlambda
 !year_str = std:chrono:timestamp "%Y";
-std:displayln :XXXX ~ (year_str | int) == 2020;
-std:assert ~ (year_str | int) == 2020;
+std:displayln :XXXX ~ (year_str | int) == 2021;
+std:assert ~ (year_str | int) == 2021;
 
 !now_str = std:chrono:timestamp[];
 ```
@@ -7717,6 +7762,13 @@ In the following grammar, white space and comments are omitted:
                   ;
     hexdigit      = ?hexdigit, upper or lower case?
                   ;
+    ascii_c_name  = (* note: upper and lower case versions are possible *)
+                    "NULL" | "SOH" | "STX" | "ETX" | "EOT" | "ENQ" | "ACK"
+                  | "BEL" | "BS" | "HT" | "LF" | "VT" | "FF" | "CR" | "SO"
+                  | "SI" | "DLE" | "DC1" | "DC2" | "DC3" | "DC4" | "NAK"
+                  | "SYN" | "ETB" | "CAN" | "EM" | "SUB" | "ESC" | "FS"
+                  | "GS" | "RS" | "US" | "DEL" | "SPACE" | "NBSP"
+                  ;
     string_escape = "x", hexdigit, hexdigit  (* byte/ascii escape *)
                   | "n"                      (* newline *)
                   | "r"                      (* carriage return *)
@@ -7728,6 +7780,7 @@ In the following grammar, white space and comments are omitted:
                   | "\""
                   | "\'"
                   | "\\"
+                  | "\\<", ascii_c_name, ">" (* the corresponding ascii value *)
                   ;
     string_lit    = string
                   | "$", quote_string
@@ -8515,6 +8568,12 @@ pub fn core_symbol_table() -> SymbolTable {
     func!(st, "is_int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_int())) },
         Some(1), Some(1), true);
+    func!(st, "is_char",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_char())) },
+        Some(1), Some(1), true);
+    func!(st, "is_byte",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Bol(env.arg(0).is_byte())) },
+        Some(1), Some(1), true);
 
     func!(st, "len",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).len() as i64)) },
@@ -8687,6 +8746,20 @@ fn dir_entry_to_vval(env: &mut Env, path: &str, entry: Result<std::fs::DirEntry,
       .expect("single use");
 
     Ok(ve)
+}
+
+fn find_bytes(needle: &[u8], start_idx: usize, data: &[u8]) -> VVal {
+    if needle.len() > (data.len() + start_idx) {
+        return VVal::None;
+    }
+
+    for i in start_idx..=(data.len() - needle.len()) {
+        if needle[..] == data[i..(i + needle.len())] {
+            return VVal::Int(i as i64);
+        }
+    }
+
+    VVal::None
 }
 
 /// Returns a SymbolTable with all WLambda standard library language symbols.
@@ -8920,6 +8993,23 @@ pub fn std_symbol_table() -> SymbolTable {
                     }))
             }
         }, Some(2), Some(3), false);
+    func!(st, "bytes:find",
+        |env: &mut Env, argc: usize| {
+            if argc == 2 {
+                env.arg_ref(1).unwrap().with_bv_ref(|s|
+                    env.arg_ref(0).unwrap().with_bv_ref(|pat| {
+                        Ok(find_bytes(pat, 0, s))
+                    }))
+
+            } else {
+                let start_idx = env.arg(2).i() as usize;
+
+                env.arg_ref(1).unwrap().with_bv_ref(|s|
+                    env.arg_ref(0).unwrap().with_bv_ref(|pat| {
+                        Ok(find_bytes(pat, start_idx, s))
+                    }))
+            }
+        }, Some(2), Some(3), false);
     func!(st, "str:pad_start",
         |env: &mut Env, _argc: usize| {
             let len   = env.arg(0).i() as usize;
@@ -9061,7 +9151,20 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::None)
             }
         }, Some(1), Some(1), false);
+    func!(st, "str:from_latin1",
+        |env: &mut Env, _argc: usize| {
+            let b = env.arg(0);
+            if let VVal::Byt(u) = b {
+                let new_str =
+                    u.iter()
+                     .map(|byte| std::char::from_u32(*byte as u32).unwrap_or('?'))
+                     .collect();
 
+                Ok(VVal::new_str_mv(new_str))
+            } else {
+                Ok(VVal::None)
+            }
+        }, Some(1), Some(1), false);
     func!(st, "str:to_char_vec",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::vec_mv(
@@ -9080,10 +9183,33 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::new_str_mv(s))
         }, Some(1), Some(1), false);
 
+    func!(st, "str:to_bytes_latin1",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_s_ref(|s| {
+                Ok(VVal::new_byt(
+                    s.chars()
+                     .map(|c| {
+                         let c = c as u32;
+                         if c > 0xFF { '?' as u32 as u8 } else { c as u8 }
+                     })
+                     .collect()))
+            })
+        }, Some(1), Some(1), false);
+
     func!(st, "str:to_bytes",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::new_byt(env.arg(0).as_bytes()))
         }, Some(1), Some(1), false);
+
+    func!(st, "char:to_lowercase",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Chr(VValChr::Char(env.arg().c().to_lowercase())))
+        Some(1), Some(1), false);
+
+    func!(st, "char:to_uppercase",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Chr(VValChr::Char(env.arg().c().to_uppercase())))
+        Some(1), Some(1), false);
 
     func!(st, "bytes:replace",
         |env: &mut Env, _argc: usize| {
@@ -10863,6 +10989,8 @@ pub fn std_symbol_table() -> SymbolTable {
                     None))
             }
         }, Some(1), Some(2), false);
+
+    crate::net::add_to_symtable(&mut st);
 
     st
 }

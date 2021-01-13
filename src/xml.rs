@@ -1,9 +1,19 @@
-use crate::{Env, VVal, StackAction};
+// Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
+// This is a part of WLambda. See README.md and COPYING for details.
+
+use crate::VVal;
+#[cfg(feature="quick-xml")]
+use crate::{Env, StackAction};
+#[cfg(feature="quick-xml")]
 use crate::vval::VValFun;
+#[cfg(feature="quick-xml")]
 use quick_xml::Reader;
+#[cfg(feature="quick-xml")]
 use quick_xml::Writer;
+#[cfg(feature="quick-xml")]
 use quick_xml::events::{Event, BytesStart, BytesEnd, BytesText, BytesDecl};
 
+#[allow(unused_macros)]
 macro_rules! unesc_val_to_vval_or_err {
     ($env: ident, $rd: ident, $val: expr) => {
         match $val.unescape_and_decode_value(&$rd) {
@@ -18,6 +28,7 @@ macro_rules! unesc_val_to_vval_or_err {
     }
 }
 
+#[allow(unused_macros)]
 macro_rules! unesc_to_vval_or_err {
     ($env: ident, $rd: ident, $val: expr) => {
         match $val.unescape_and_decode(&$rd) {
@@ -231,6 +242,7 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
     })
 }
 
+#[allow(unused_macros)]
 macro_rules! write_event {
     ($env: ident, $writer: ident, $event: expr) => {
         if let Err(e) = $writer.borrow_mut().write_event($event) {
@@ -241,6 +253,7 @@ macro_rules! write_event {
     }
 }
 
+#[cfg(feature="quick-xml")]
 pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
     let writer =
         if let Some(indent_depth) = indent_depth {

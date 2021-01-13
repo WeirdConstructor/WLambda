@@ -492,7 +492,10 @@ impl GlobalEnv {
         g.borrow_mut().set_module("wlambda", core_symbol_table());
         g.borrow_mut().set_module("std",     std_symbol_table());
         g.borrow_mut().set_thread_creator(
-            Some(Arc::new(Mutex::new(DefaultThreadCreator::new()))));
+            Some(Arc::new(Mutex::new(
+                DefaultThreadCreator::new(
+                    FunctionGlobalEnvCreator::from(
+                        Box::new(|| GlobalEnv::new_default())))))));
         g.borrow_mut().set_resolver(
             Rc::new(RefCell::new(LocalFileModuleResolver::new())));
         g.borrow_mut().set_var("\\", &VVal::None);
