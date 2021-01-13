@@ -3949,7 +3949,7 @@ impl VVal {
                 if index as usize >= vval_bytes.len() {
                     None
                 } else {
-                    Some(VVal::Chr(VValChr::Byte(vval_bytes[index as usize]))
+                    Some(VVal::Chr(VValChr::Byte(vval_bytes[index as usize])))
                 }
             },
             VVal::Str(vval_str) => {

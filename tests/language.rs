@@ -5004,6 +5004,8 @@ fn check_chars_and_bytes() {
     assert_eq!("is_byte     'x'",   "");
     assert_eq!("is_bytes    'x'",   "");
     assert_eq!("float       'x'",   "");
+    assert_eq!("type ~ \"abc\".0",   "");
+    assert_eq!("type ~ $b\"abc\".0",   "");
     assert_eq!("int         'x'",   "");
     assert_eq!("char        \"xoo\"", "");
     assert_eq!("byte        \"xoo\"", "");

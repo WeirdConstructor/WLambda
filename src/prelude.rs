@@ -9204,12 +9204,12 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "char:to_lowercase",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Chr(VValChr::Char(env.arg().c().to_lowercase())))
-        Some(1), Some(1), false);
+        }, Some(1), Some(1), false);
 
     func!(st, "char:to_uppercase",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Chr(VValChr::Char(env.arg().c().to_uppercase())))
-        Some(1), Some(1), false);
+        }, Some(1), Some(1), false);
 
     func!(st, "bytes:replace",
         |env: &mut Env, _argc: usize| {
