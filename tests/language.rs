@@ -1645,10 +1645,14 @@ fn check_bytes_impl() {
 
     assert_eq!(ve("str $b\"abc\""),                              "\"abc\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
     assert_eq!(ve("str $b\"äbcß\""),                             "\"Ã¤bcÃ\\u{9f}\"", "Bytes to String by 1:1 Byte to Unicode Char mapping");
+    assert_eq!(ve("std:str:from_latin1 $b\"Äß\""),               "\"Ã\\u{84}Ã\\u{9f}\"", "Bytes from latin1");
+    assert_eq!(ve("std:str:from_latin1 $b\"\\xFF\\xF0\""),       "\"ÿð\"", "Bytes from latin1");
     assert_eq!(ve("std:str:from_utf8 $b\"äbcß\""),                   "\"äbcß\"", "Bytes to String from UTF8");
     assert_eq!(ve("std:str:from_utf8 $b\"\\xC4\\xC3\""),             "$e \"str:from_utf8 decoding error: invalid utf-8 sequence of 1 bytes from index 0\"", "Bytes to String from invalid UTF8");
     assert_eq!(ve("std:str:from_utf8_lossy $b\"\\xC4\\xC3\""),       "\"��\"", "Bytes to String from invalid UTF8 lossy");
     assert_eq!(ve("std:str:to_bytes \"aäß\""),                       "$b\"a\\xC3\\xA4\\xC3\\x9F\"", "Bytes from String as UTF8");
+    assert_eq!(ve("std:str:to_bytes_latin1 \"Äß\""),            "$b\"\\xC4\\xDF\"", "Bytes from latin1");
+    assert_eq!(ve("std:str:to_bytes_latin1 \"\\u{FF}\\u{F0}\""),"$b\"\\xFF\\xF0\"", "Bytes from latin1");
     assert_eq!(ve("std:str:from_utf8 ~ std:str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
     assert_eq!(ve("$b\"abc\" 1"),                                "$b\"b\"", "Get single byte from bytes");
     assert_eq!(ve("$b\"abcdef\" 0 2"),                           "$b\"ab\"", "Substring bytes operation");

@@ -23,6 +23,10 @@ easier.
 * Feature: Implemented `std:bytes:find`.
 * Feature: Extended syntax for string escapes by ASCII character names
 like `$b"\<STX>"` or `$b"\<DEL>"`.
+* Feature: Added `std:str:from_latin1` and `std:str:to_bytes_latin1` to
+be able to convert bytes to/from ISO-8859-1 encoding in a more or less
+clean way. It allows better parsing of text protocols by converting
+them to strings directly.
 * Bugfix: `v.0 => v.1` did not parse correctly.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.

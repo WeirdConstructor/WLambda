@@ -286,7 +286,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         Ok(fd.with_usr_ref(|vts: &mut VTcpStream| {
             use std::io::Read;
 
-            let mut buf : [u8; 10] = [0; 10];
+            let mut buf : [u8; 4096] = [0; 4096];
             let r = vts.stream.borrow_mut().read(&mut buf[..]);
             match r {
                 Ok(n) => {
