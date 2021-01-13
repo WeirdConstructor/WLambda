@@ -24,6 +24,16 @@ use std::fmt::Formatter;
 
 use fnv::FnvHashMap;
 
+pub trait ThreadSafeUsr: Send + Sync {
+    fn to_vval(&self) -> VVal;
+}
+
+impl std::fmt::Debug for dyn ThreadSafeUsr {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "<<ThreadSafeUsr>>")
+    }
+}
+
 /// AVal is a copy-by-value structure for storing the most
 /// important data of VVals inside an atomic container (AtomicAVal).
 ///
@@ -46,7 +56,7 @@ use fnv::FnvHashMap;
 /// ```
 ///
 /// And get back the VVal like this:
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum AVal {
     None,
     Err(Box<AVal>, String),
@@ -65,6 +75,7 @@ pub enum AVal {
     Chan(AValChannel),
     Slot(AtomicAValSlot),
     Atom(AtomicAVal),
+    Usr(Box<dyn ThreadSafeUsr>),
 }
 
 impl AVal {
@@ -127,6 +138,7 @@ impl AVal {
             AVal::Pair(p)      => VVal::pair(p.0.to_vval(), p.1.to_vval()),
             AVal::FVec(v)      => VVal::FVec(Box::new(*v)),
             AVal::IVec(v)      => VVal::IVec(Box::new(*v)),
+            AVal::Usr(u)       => u.to_vval(),
             AVal::Lst(l) => {
                 let v = VVal::vec();
                 for av in l.iter() {
@@ -205,6 +217,8 @@ impl AVal {
                     AVal::Chan(ud.clone())
                 } else if let Some(ud) = cl_ud.as_any().downcast_mut::<AtomicAValSlot>() {
                     AVal::Slot(ud.clone())
+                } else if let Some(ud) = cl_ud.as_thread_safe_usr() {
+                    AVal::Usr(ud)
                 } else {
                     AVal::None
                 }

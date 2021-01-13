@@ -1384,6 +1384,16 @@ pub trait VValUserData {
     /// fn as_any(&mut self) -> &mut dyn std::any::Any { self }
     ///```
     fn as_any(&mut self) -> &mut dyn std::any::Any;
+
+    /// This function is called when you try to pass a user data value
+    /// between threads via the Atoms provided by the thread implementation
+    /// of WLambda.
+    ///
+    /// You need to return something that implements the `ThreadSafeUsr` trait,
+    /// that handles transformation into and from an `AVal`.
+    fn as_thread_safe_usr(&mut self) -> Option<Box<dyn crate::threads::ThreadSafeUsr>> {
+        None
+    }
 }
 
 impl std::fmt::Debug for dyn VValUserData {

@@ -4954,11 +4954,31 @@ fn check_tcp() {
 
     assert_eq!(ve(r#"
         !socket = std:net:tcp:connect "127.0.0.1:19323";
-        !first = std:io:read_some socket;
-        std:io:write_some socket $b"q";
-        std:io:flush socket;
-        !first = std:io:read_some socket;
-        unwrap[first]
+        !slot = std:sync:slot:new[];
+
+        !h = std:thread:spawn $q{
+            !@wlambda;
+            !@import std;
+
+            !socket = THREAD_ARG0;
+            !first = std:io:read_some socket;
+            std:io:write_some socket $b"q";
+            std:io:flush socket;
+
+            THREAD_ARG1.send("OK");
+        } $[socket, slot];
+
+        !h2 = std:thread:spawn $q{
+            !@wlambda;
+            !@import std;
+
+            std:assert_eq slot.recv[] "OK";
+            !first = std:io:read_some socket;
+            unwrap[first]
+        } ${ socket = socket, slot = slot };
+
+        h.join[];
+        h2.join[]
     "#), "$b\"QUIT\"");
 
     thrd.join().unwrap();

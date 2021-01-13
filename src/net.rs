@@ -29,6 +29,24 @@ struct VTcpStream {
     stream: Rc<RefCell<std::net::TcpStream>>,
 }
 
+struct VTcpStreamThreadSafe {
+    stream: std::net::TcpStream,
+}
+
+impl crate::threads::ThreadSafeUsr for VTcpStreamThreadSafe {
+    fn to_vval(&self) -> VVal {
+        match self.stream.try_clone() {
+            Ok(stream) => {
+                VVal::Usr(Box::new(VTcpStream {
+                    stream: Rc::new(RefCell::new(stream))
+                }))
+            },
+            Err(e) =>
+                VVal::err_msg(&format!("Can't clone TcpStream: {}", e)),
+        }
+    }
+}
+
 impl VValUserData for VTcpStream {
     fn s(&self) -> String {
         format!(
@@ -42,6 +60,15 @@ impl VValUserData for VTcpStream {
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
         Box::new(self.clone())
+    }
+
+    fn as_thread_safe_usr(&mut self) -> Option<Box<dyn crate::threads::ThreadSafeUsr>> {
+        match self.stream.borrow().try_clone() {
+            Ok(stream) => {
+                Some(Box::new(VTcpStreamThreadSafe { stream }))
+            },
+            Err(_e) => None,
+        }
     }
 }
 
