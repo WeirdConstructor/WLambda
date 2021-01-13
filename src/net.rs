@@ -69,10 +69,9 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 let listener = {
                     use socket2::Socket;
                     let socket = Socket::from(listener);
-                    socket.set_reuse_address(true);
+                    socket.set_reuse_address(true).is_ok();
                     #[cfg(unix)]
                     socket.set_reuse_port(true);
-                    println!("TETET");
                     socket.into_tcp_listener()
                 };
 
@@ -170,6 +169,18 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
         Ok(env.new_err(last_err))
     }, Some(1), Some(2), false);
+
+    st.fun("io:flush", |env: &mut Env, _argc: usize| {
+        use std::io::Write;
+
+        let mut fd = env.arg(0);
+        Ok(fd.with_usr_ref(|vts: &mut VTcpStream| {
+            match vts.stream.borrow_mut().flush() {
+                Ok(_)  => VVal::Bol(true),
+                Err(e) => env.new_err(format!("std:io:flush: {}", e)),
+            }
+        }).unwrap_or(VVal::None))
+    }, Some(1), Some(1), false);
 
     st.fun("io:write", |env: &mut Env, _argc: usize| {
         let mut fd = env.arg(0);

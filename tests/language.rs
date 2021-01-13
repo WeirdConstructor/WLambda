@@ -4914,3 +4914,52 @@ fn check_ascii_character_names() {
     assert_eq!(ve(r#"$b"\<space>""#), "$b\" \"");
     assert_eq!(ve(r#"$b"\<nbsp>""#),  "$b\"\\xFF\"");
 }
+
+#[test]
+fn check_tcp() {
+    let thrd = std::thread::spawn(move || {
+        ve(r#"
+            std:net:tcp:listen "127.0.0.1" => 19323 {!(con) = @;
+                std:io:write con "HELLO!\r\n";
+                !end = $false;
+                while not[end] {
+                    match std:io:read_some[con]
+                        $o(buf) => {
+                            ? is_some <& (std:bytes:find $b"q" $\.buf) {
+                                std:io:write con "QUIT";
+                                std:io:flush con;
+                                return :all $none;
+                            } { };
+                            std:io:write con $\.buf;
+                            std:io:flush con;
+                        }
+                        { .end = $true; };
+                };
+            };
+        "#);
+    });
+
+    assert_eq!(ve(r#"
+        !socket = std:net:tcp:connect "127.0.0.1:19323";
+        std:io:read_some socket;
+    "#), "$o($b\"HELLO!\\r\\n\")");
+
+    assert_eq!(ve(r#"
+        !socket = std:net:tcp:connect "127.0.0.1:19323";
+        !first = std:io:read_some socket;
+        std:io:write_some socket $b"FOOBAR";
+        std:io:flush socket;
+        unwrap[first] => unwrap[std:io:read_some socket]
+    "#), "$p($b\"HELLO!\\r\\n\",$b\"FOOBAR\")");
+
+    assert_eq!(ve(r#"
+        !socket = std:net:tcp:connect "127.0.0.1:19323";
+        !first = std:io:read_some socket;
+        std:io:write_some socket $b"q";
+        std:io:flush socket;
+        !first = std:io:read_some socket;
+        unwrap[first]
+    "#), "$b\"QUIT\"");
+
+    thrd.join().unwrap();
+}
