@@ -4814,3 +4814,103 @@ fn check_unpack() {
                "$[42,$b\"FOOBAR\",25500]");
 
 }
+
+#[test]
+fn check_find_bytes() {
+    assert_eq!(ve("std:bytes:find :f   $q ofofo "),     "1");
+    assert_eq!(ve("std:bytes:find :f   $q ooo "),       "$n");
+    assert_eq!(ve("std:bytes:find :fff $q fff "),       "0");
+    assert_eq!(ve("std:bytes:find :fff $q ooofff "),    "3");
+    assert_eq!(ve("std:bytes:find :fff $q fff 0"),      "0");
+    assert_eq!(ve("std:bytes:find :fff $q ooofff 0"),   "3");
+    assert_eq!(ve("std:bytes:find :fff $q ooofff 2"),   "3");
+    assert_eq!(ve("std:bytes:find :fff $q ooofff 3"),   "3");
+    assert_eq!(ve("std:bytes:find :fff $q ooofff 4"),   "$n");
+    assert_eq!(ve("std:bytes:find :fff $q ooofff 9"),   "$n");
+
+    assert_eq!(ve("std:bytes:find $Q f   $Q ofofo "),     "1");
+    assert_eq!(ve("std:bytes:find $Q f   $Q ooo "),       "$n");
+    assert_eq!(ve("std:bytes:find $Q fff $Q fff "),       "0");
+    assert_eq!(ve("std:bytes:find $Q fff $Q ooofff "),    "3");
+    assert_eq!(ve("std:bytes:find $Q fff $Q fff 0"),      "0");
+    assert_eq!(ve("std:bytes:find $Q fff $Q ooofff 0"),   "3");
+    assert_eq!(ve("std:bytes:find $Q fff $Q ooofff 2"),   "3");
+    assert_eq!(ve("std:bytes:find $Q fff $Q ooofff 3"),   "3");
+    assert_eq!(ve("std:bytes:find $Q fff $Q ooofff 4"),   "$n");
+    assert_eq!(ve("std:bytes:find $Q fff $Q ooofff 9"),   "$n");
+}
+
+#[test]
+fn check_ascii_character_names() {
+    assert_eq!(ve(r#"$b"\<NULL>""#),  "$b\"\\0\"");
+    assert_eq!(ve(r#"$b"\<SOH>""#),   "$b\"\\x01\"");
+    assert_eq!(ve(r#"$b"\<STX>""#),   "$b\"\\x02\"");
+    assert_eq!(ve(r#"$b"\<ETX>""#),   "$b\"\\x03\"");
+    assert_eq!(ve(r#"$b"\<EOT>""#),   "$b\"\\x04\"");
+    assert_eq!(ve(r#"$b"\<ENQ>""#),   "$b\"\\x05\"");
+    assert_eq!(ve(r#"$b"\<ACK>""#),   "$b\"\\x06\"");
+    assert_eq!(ve(r#"$b"\<BEL>""#),   "$b\"\\x07\"");
+    assert_eq!(ve(r#"$b"\<BS>""#),    "$b\"\\x08\"");
+    assert_eq!(ve(r#"$b"\<HT>""#),    "$b\"\\t\"");
+    assert_eq!(ve(r#"$b"\<LF>""#),    "$b\"\\n\"");
+    assert_eq!(ve(r#"$b"\<VT>""#),    "$b\"\\x0B\"");
+    assert_eq!(ve(r#"$b"\<FF>""#),    "$b\"\\x0C\"");
+    assert_eq!(ve(r#"$b"\<CR>""#),    "$b\"\\r\"");
+    assert_eq!(ve(r#"$b"\<SO>""#),    "$b\"\\x0E\"");
+    assert_eq!(ve(r#"$b"\<SI>""#),    "$b\"\\x0F\"");
+    assert_eq!(ve(r#"$b"\<DLE>""#),   "$b\"\\x10\"");
+    assert_eq!(ve(r#"$b"\<DC1>""#),   "$b\"\\x11\"");
+    assert_eq!(ve(r#"$b"\<DC2>""#),   "$b\"\\x12\"");
+    assert_eq!(ve(r#"$b"\<DC3>""#),   "$b\"\\x13\"");
+    assert_eq!(ve(r#"$b"\<DC4>""#),   "$b\"\\x14\"");
+    assert_eq!(ve(r#"$b"\<NAK>""#),   "$b\"\\x15\"");
+    assert_eq!(ve(r#"$b"\<SYN>""#),   "$b\"\\x16\"");
+    assert_eq!(ve(r#"$b"\<ETB>""#),   "$b\"\\x17\"");
+    assert_eq!(ve(r#"$b"\<CAN>""#),   "$b\"\\x18\"");
+    assert_eq!(ve(r#"$b"\<EM>""#),    "$b\"\\x19\"");
+    assert_eq!(ve(r#"$b"\<SUB>""#),   "$b\"\\x1A\"");
+    assert_eq!(ve(r#"$b"\<ESC>""#),   "$b\"\\x1B\"");
+    assert_eq!(ve(r#"$b"\<FS>""#),    "$b\"\\x1C\"");
+    assert_eq!(ve(r#"$b"\<GS>""#),    "$b\"\\x1D\"");
+    assert_eq!(ve(r#"$b"\<RS>""#),    "$b\"\\x1E\"");
+    assert_eq!(ve(r#"$b"\<US>""#),    "$b\"\\x1F\"");
+    assert_eq!(ve(r#"$b"\<DEL>""#),   "$b\"\\x7F\"");
+    assert_eq!(ve(r#"$b"\<SPACE>""#), "$b\" \"");
+    assert_eq!(ve(r#"$b"\<NBSP>""#),  "$b\"\\xFF\"");
+
+    assert_eq!(ve(r#"$b"\<null>""#),  "$b\"\\0\"");
+    assert_eq!(ve(r#"$b"\<soh>""#),   "$b\"\\x01\"");
+    assert_eq!(ve(r#"$b"\<stx>""#),   "$b\"\\x02\"");
+    assert_eq!(ve(r#"$b"\<etx>""#),   "$b\"\\x03\"");
+    assert_eq!(ve(r#"$b"\<eot>""#),   "$b\"\\x04\"");
+    assert_eq!(ve(r#"$b"\<enq>""#),   "$b\"\\x05\"");
+    assert_eq!(ve(r#"$b"\<ack>""#),   "$b\"\\x06\"");
+    assert_eq!(ve(r#"$b"\<bel>""#),   "$b\"\\x07\"");
+    assert_eq!(ve(r#"$b"\<bs>""#),    "$b\"\\x08\"");
+    assert_eq!(ve(r#"$b"\<ht>""#),    "$b\"\\t\"");
+    assert_eq!(ve(r#"$b"\<lf>""#),    "$b\"\\n\"");
+    assert_eq!(ve(r#"$b"\<vt>""#),    "$b\"\\x0B\"");
+    assert_eq!(ve(r#"$b"\<ff>""#),    "$b\"\\x0C\"");
+    assert_eq!(ve(r#"$b"\<cr>""#),    "$b\"\\r\"");
+    assert_eq!(ve(r#"$b"\<so>""#),    "$b\"\\x0E\"");
+    assert_eq!(ve(r#"$b"\<si>""#),    "$b\"\\x0F\"");
+    assert_eq!(ve(r#"$b"\<dle>""#),   "$b\"\\x10\"");
+    assert_eq!(ve(r#"$b"\<dc1>""#),   "$b\"\\x11\"");
+    assert_eq!(ve(r#"$b"\<dc2>""#),   "$b\"\\x12\"");
+    assert_eq!(ve(r#"$b"\<dc3>""#),   "$b\"\\x13\"");
+    assert_eq!(ve(r#"$b"\<dc4>""#),   "$b\"\\x14\"");
+    assert_eq!(ve(r#"$b"\<nak>""#),   "$b\"\\x15\"");
+    assert_eq!(ve(r#"$b"\<syn>""#),   "$b\"\\x16\"");
+    assert_eq!(ve(r#"$b"\<etb>""#),   "$b\"\\x17\"");
+    assert_eq!(ve(r#"$b"\<can>""#),   "$b\"\\x18\"");
+    assert_eq!(ve(r#"$b"\<em>""#),    "$b\"\\x19\"");
+    assert_eq!(ve(r#"$b"\<sub>""#),   "$b\"\\x1A\"");
+    assert_eq!(ve(r#"$b"\<esc>""#),   "$b\"\\x1B\"");
+    assert_eq!(ve(r#"$b"\<fs>""#),    "$b\"\\x1C\"");
+    assert_eq!(ve(r#"$b"\<gs>""#),    "$b\"\\x1D\"");
+    assert_eq!(ve(r#"$b"\<rs>""#),    "$b\"\\x1E\"");
+    assert_eq!(ve(r#"$b"\<us>""#),    "$b\"\\x1F\"");
+    assert_eq!(ve(r#"$b"\<del>""#),   "$b\"\\x7F\"");
+    assert_eq!(ve(r#"$b"\<space>""#), "$b\" \"");
+    assert_eq!(ve(r#"$b"\<nbsp>""#),  "$b\"\\xFF\"");
+}

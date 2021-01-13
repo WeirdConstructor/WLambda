@@ -3090,6 +3090,18 @@ std:assert ~ is_bytes $b"ABC";
 std:assert ~ not ~ is_bytes "ABC";
 ```
 
+#### - std:bytes:find _pattern_ _string_ [_offset_]
+
+Searches for the string _pattern_ in the _string_ and returns the 0 based position
+in the string the given _pattern_ starts.
+If no pattern was found `$none` is returned.
+
+```wlambda
+std:assert_eq (std:bytes:find $b"xyz" $b"abcxyz")         3;
+std:assert_eq (std:bytes:find $b"xyz" $b"abcxyzxyz" 6)    6;
+std:assert_eq (std:bytes:find $b"xyz" $b"abcxyzfooxyz" 6) 9;
+```
+
 #### <a name="3104-stdbytesreplace-byte-vector-pattern-replacement"></a>3.10.4 - std:bytes:replace _byte-vector_ _pattern_ _replacement_
 
 Replaces all occurences of _pattern_ in _byte-vector_ with _replacement_.
@@ -7703,6 +7715,13 @@ In the following grammar, white space and comments are omitted:
                   ;
     hexdigit      = ?hexdigit, upper or lower case?
                   ;
+    ascii_c_name  = (* note: upper and lower case versions are possible *)
+                    "NULL" | "SOH" | "STX" | "ETX" | "EOT" | "ENQ" | "ACK"
+                  | "BEL" | "BS" | "HT" | "LF" | "VT" | "FF" | "CR" | "SO"
+                  | "SI" | "DLE" | "DC1" | "DC2" | "DC3" | "DC4" | "NAK"
+                  | "SYN" | "ETB" | "CAN" | "EM" | "SUB" | "ESC" | "FS"
+                  | "GS" | "RS" | "US" | "DEL" | "SPACE" | "NBSP"
+                  ;
     string_escape = "x", hexdigit, hexdigit  (* byte/ascii escape *)
                   | "n"                      (* newline *)
                   | "r"                      (* carriage return *)
@@ -7714,6 +7733,7 @@ In the following grammar, white space and comments are omitted:
                   | "\""
                   | "\'"
                   | "\\"
+                  | "\\<", ascii_c_name, ">" (* the corresponding ascii value *)
                   ;
     string_lit    = string
                   | "$", quote_string

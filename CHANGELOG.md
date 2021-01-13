@@ -20,6 +20,9 @@ and `std:xml:create_sax_writer`.
 `DefaultGlobalEnvCreator` trait implementation which is conveniently provided
 by `FunctionGlobalEnvCreator`. This makes embedding WLambda with threading
 easier.
+* Feature: Implemented `std:bytes:find`.
+* Feature: Extended syntax for string escapes by ASCII character names
+like `$b"\<STX>"` or `$b"\<DEL>"`.
 * Bugfix: `v.0 => v.1` did not parse correctly.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.

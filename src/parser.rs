@@ -182,6 +182,82 @@ pub enum EscSeqValue {
     Byte(u8),
 }
 
+pub fn parse_ascii_char_name(ps: &mut State) -> Result<EscSeqValue, ParseError> {
+    if        ps.consume_lookahead("NULL") || ps.consume_lookahead("null") {
+        Ok(EscSeqValue::Byte(b'\x00'))
+    } else if ps.consume_lookahead("SOH")  || ps.consume_lookahead("soh") {
+        Ok(EscSeqValue::Byte(b'\x01'))
+    } else if ps.consume_lookahead("STX")  || ps.consume_lookahead("stx") {
+        Ok(EscSeqValue::Byte(b'\x02'))
+    } else if ps.consume_lookahead("ETX")  || ps.consume_lookahead("etx") {
+        Ok(EscSeqValue::Byte(b'\x03'))
+    } else if ps.consume_lookahead("EOT")  || ps.consume_lookahead("eot") {
+        Ok(EscSeqValue::Byte(b'\x04'))
+    } else if ps.consume_lookahead("ENQ")  || ps.consume_lookahead("enq") {
+        Ok(EscSeqValue::Byte(b'\x05'))
+    } else if ps.consume_lookahead("ACK")  || ps.consume_lookahead("ack") {
+        Ok(EscSeqValue::Byte(b'\x06'))
+    } else if ps.consume_lookahead("BEL")  || ps.consume_lookahead("bel") {
+        Ok(EscSeqValue::Byte(b'\x07'))
+    } else if ps.consume_lookahead("BS")   || ps.consume_lookahead("bs") {
+        Ok(EscSeqValue::Byte(b'\x08'))
+    } else if ps.consume_lookahead("HT")   || ps.consume_lookahead("ht") {
+        Ok(EscSeqValue::Byte(b'\x09'))
+    } else if ps.consume_lookahead("LF")   || ps.consume_lookahead("lf") {
+        Ok(EscSeqValue::Byte(b'\x0a'))
+    } else if ps.consume_lookahead("VT")   || ps.consume_lookahead("vt") {
+        Ok(EscSeqValue::Byte(b'\x0b'))
+    } else if ps.consume_lookahead("FF")   || ps.consume_lookahead("ff") {
+        Ok(EscSeqValue::Byte(b'\x0c'))
+    } else if ps.consume_lookahead("CR")   || ps.consume_lookahead("cr") {
+        Ok(EscSeqValue::Byte(b'\x0d'))
+    } else if ps.consume_lookahead("SO")   || ps.consume_lookahead("so") {
+        Ok(EscSeqValue::Byte(b'\x0e'))
+    } else if ps.consume_lookahead("SI")   || ps.consume_lookahead("si") {
+        Ok(EscSeqValue::Byte(b'\x0f'))
+    } else if ps.consume_lookahead("DLE")  || ps.consume_lookahead("dle") {
+        Ok(EscSeqValue::Byte(b'\x10'))
+    } else if ps.consume_lookahead("DC1")  || ps.consume_lookahead("dc1") {
+        Ok(EscSeqValue::Byte(b'\x11'))
+    } else if ps.consume_lookahead("DC2")  || ps.consume_lookahead("dc2") {
+        Ok(EscSeqValue::Byte(b'\x12'))
+    } else if ps.consume_lookahead("DC3")  || ps.consume_lookahead("dc3") {
+        Ok(EscSeqValue::Byte(b'\x13'))
+    } else if ps.consume_lookahead("DC4")  || ps.consume_lookahead("dc4") {
+        Ok(EscSeqValue::Byte(b'\x14'))
+    } else if ps.consume_lookahead("NAK")  || ps.consume_lookahead("nak") {
+        Ok(EscSeqValue::Byte(b'\x15'))
+    } else if ps.consume_lookahead("SYN")  || ps.consume_lookahead("syn") {
+        Ok(EscSeqValue::Byte(b'\x16'))
+    } else if ps.consume_lookahead("ETB")  || ps.consume_lookahead("etb") {
+        Ok(EscSeqValue::Byte(b'\x17'))
+    } else if ps.consume_lookahead("CAN")  || ps.consume_lookahead("can") {
+        Ok(EscSeqValue::Byte(b'\x18'))
+    } else if ps.consume_lookahead("EM")   || ps.consume_lookahead("em") {
+        Ok(EscSeqValue::Byte(b'\x19'))
+    } else if ps.consume_lookahead("SUB")  || ps.consume_lookahead("sub") {
+        Ok(EscSeqValue::Byte(b'\x1a'))
+    } else if ps.consume_lookahead("ESC")  || ps.consume_lookahead("esc") {
+        Ok(EscSeqValue::Byte(b'\x1b'))
+    } else if ps.consume_lookahead("FS")   || ps.consume_lookahead("fs") {
+        Ok(EscSeqValue::Byte(b'\x1c'))
+    } else if ps.consume_lookahead("GS")   || ps.consume_lookahead("gs") {
+        Ok(EscSeqValue::Byte(b'\x1d'))
+    } else if ps.consume_lookahead("RS")   || ps.consume_lookahead("rs") {
+        Ok(EscSeqValue::Byte(b'\x1e'))
+    } else if ps.consume_lookahead("US")   || ps.consume_lookahead("us") {
+        Ok(EscSeqValue::Byte(b'\x1f'))
+    } else if ps.consume_lookahead("DEL")  || ps.consume_lookahead("del") {
+        Ok(EscSeqValue::Byte(b'\x7f'))
+    } else if ps.consume_lookahead("SPACE")|| ps.consume_lookahead("space") {
+        Ok(EscSeqValue::Byte(b'\x20'))
+    } else if ps.consume_lookahead("NBSP")|| ps.consume_lookahead("nbsp") {
+        Ok(EscSeqValue::Byte(b'\xff'))
+    } else {
+        Err(ps.err(ParseErrorKind::BadEscape("Bad ascii character name escape")))
+    }
+}
+
 pub fn parse_str_backslash(ps: &mut State) -> Result<EscSeqValue, ParseError>
 {
     match ps.expect_some(ps.peek())? {
@@ -191,6 +267,14 @@ pub fn parse_str_backslash(ps: &mut State) -> Result<EscSeqValue, ParseError>
         '0' => { ps.consume(); Ok(EscSeqValue::Char('\0')) },
         'x' => { ps.consume(); Ok(EscSeqValue::Byte(parse_2hex(ps)?)) },
         'u' => { ps.consume(); Ok(EscSeqValue::Char(parse_unicode_hex(ps)?)) },
+        '<' => { ps.consume();
+            let ret = parse_ascii_char_name(ps);
+            if !ps.consume_if_eq('>') {
+                return Err(ps.err(ParseErrorKind::BadEscape(
+                    "Bad ascii character name escape, does not end with '>'")));
+            }
+            ret
+        },
         c   => { ps.consume(); Ok(EscSeqValue::Char(c)) },
     }
 }

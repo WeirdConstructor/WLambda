@@ -8689,6 +8689,20 @@ fn dir_entry_to_vval(env: &mut Env, path: &str, entry: Result<std::fs::DirEntry,
     Ok(ve)
 }
 
+fn find_bytes(needle: &[u8], start_idx: usize, data: &[u8]) -> VVal {
+    if needle.len() > (data.len() + start_idx) {
+        return VVal::None;
+    }
+
+    for i in start_idx..=(data.len() - needle.len()) {
+        if needle[..] == data[i..(i + needle.len())] {
+            return VVal::Int(i as i64);
+        }
+    }
+
+    VVal::None
+}
+
 /// Returns a SymbolTable with all WLambda standard library language symbols.
 pub fn std_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
@@ -8917,6 +8931,23 @@ pub fn std_symbol_table() -> SymbolTable {
                             Some(idx)   => Ok(VVal::Int((start_idx + idx) as i64)),
                             None        => Ok(VVal::None),
                         }
+                    }))
+            }
+        }, Some(2), Some(3), false);
+    func!(st, "bytes:find",
+        |env: &mut Env, argc: usize| {
+            if argc == 2 {
+                env.arg_ref(1).unwrap().with_bv_ref(|s|
+                    env.arg_ref(0).unwrap().with_bv_ref(|pat| {
+                        Ok(find_bytes(pat, 0, s))
+                    }))
+
+            } else {
+                let start_idx = env.arg(2).i() as usize;
+
+                env.arg_ref(1).unwrap().with_bv_ref(|s|
+                    env.arg_ref(0).unwrap().with_bv_ref(|pat| {
+                        Ok(find_bytes(pat, start_idx, s))
                     }))
             }
         }, Some(2), Some(3), false);
