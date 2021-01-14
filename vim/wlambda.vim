@@ -242,6 +242,8 @@ syn region wlString     start="\$[Qq]<"      end=">"
 syn region wlQSymbol    start=+:"+      skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 syn region wlString     start=+"+       skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
 syn region wlString     start=+\$b"+    skip=+\\\\\|\\"+  end=+"+ contains=wlStringSpec
+syn region wlString     start=+'+       skip=+\\\\\|\\'+  end=+'+ contains=wlStringSpec
+syn region wlString     start=+\$b'+    skip=+\\\\\|\\'+  end=+'+ contains=wlStringSpec
 
 " WLambda number vectors:
 syn region wlNumVec matchgroup=wlRefData start=+$[pif](+ end=+)+ contains=@wlExpr
