@@ -2633,11 +2633,40 @@ std:assert_rel_eq r.x h.x 0.0001;
 std:assert_rel_eq r.y h.y 0.0001;
 ```
 
+### - Characters and Bytes
+
+WLambda has a data type for single characters and bytes. The lexical syntax is
+a character or escape sequence delimited by `'`:
+
+```wlambda
+std:assert_eq (type 'a')   "char";
+std:assert_eq (type $b'a') "byte";
+
+std:assert_eq (type '\u{40}') "char";
+std:assert_eq (type $b'\x40') "byte";
+
+# You can use the unicode escapes up to the first 256 code points in bytes too:
+std:assert_eq (char $b'\u{40}') '\u{40}';
+
+# Beyond that, you will get the byte '?':
+std:assert_eq (char $b'\u{3131}') '?';
+```
+
+The can be used interchangeably almost everywhere. They can often also be used
+instead of a string, because they are handled like a single character long string.
+
+They are useful because they do not require an extra allocation in the background.
+They are not boxed like strings:
+
+```wlambda
+std:assert_eq ("foo" $p(0, 1))  "f"; # requires allocation
+std:assert_eq ("foo".0)         'f'; # requires NO allocation
+```
+
 ### <a name="39-strings"></a>3.9 - Strings
 
 Strings in WLambda are like Rust UTF-8 encoded immutable Unicode strings.
-There is no character data type however. There are two types of literal
-forms for strings:
+There are two types of literal forms for strings:
 
 ```wlambda
 "abc def \"foo\"";
@@ -2890,6 +2919,15 @@ std:assert_eq
 std:assert_eq
     (std:str:pad_start 8 "" "∑∑")
     "∑∑";
+
+# also works with characters
+std:assert_eq
+    (std:str:pad_start 3 'x' "0")
+    "xx0";
+# also works with bytes
+std:assert_eq
+    (std:str:pad_start 3 $b'x' "0")
+    "xx0";
 ```
 
 #### <a name="3915-stdstrpadend-len-pad-str-value"></a>3.9.15 - std:str:pad\_end _len_ _pad-str_ _value_
@@ -2914,6 +2952,15 @@ std:assert_eq
 std:assert_eq
     (std:str:pad_end 8 "" "∑∑")
     "∑∑";
+
+# also works with characters
+std:assert_eq
+    (std:str:pad_end 3 'x' "0")
+    "0xx";
+# also works with bytes
+std:assert_eq
+    (std:str:pad_end 3 $b'x' "0")
+    "0xx";
 ```
 
 #### <a name="3916-stdstrtobytes-string"></a>3.9.16 - std:str:to\_bytes _string_
@@ -3023,9 +3070,9 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 ```
 
-### <a name="310-bytes-or-byte-vectors"></a>3.10 - Bytes (or Byte Vectors)
+### <a name="310-bytes-or-byte-vectors"></a>3.10 - Byte Vectors
 
-Bytes are a vector of bytes. Unlike strings they don't have any encoding.
+Bytes (plural of Byte) are a vector of bytes. Unlike strings they don't have any encoding.
 Literal syntax however supports inserting unicode characters:
 
 
@@ -7774,7 +7821,7 @@ In the following grammar, white space and comments are omitted:
                   | "$", byte_string
                   | "$", code_string
                   ;
-    character     = "'", { "\\", string_escape | ?any character? - "\\" and "'" }, "'"
+    character     = "'", ( "\\", string_escape | ?any character? - "\\" and "'" ), "'"
                   ;
     string        = "\"", { "\\", string_escape | ?any character? - "\\" and "\"" },"\""
                   ;
