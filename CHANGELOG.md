@@ -1,4 +1,4 @@
-0.6.4 (unreleased)
+0.7.0 (unreleased)
 ==================
 
 * Feature: Implemented `std:sys:os` and `std:process:run`.

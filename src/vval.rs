@@ -3321,7 +3321,7 @@ impl VVal {
                                 } else if arg_int as usize >= vval_bytes.len() {
                                     Ok(VVal::None)
                                 } else {
-                                    Ok(VVal::new_byt(vec![vval_bytes[arg_int as usize]]))
+                                    Ok(VVal::Chr(VValChr::Byte(vval_bytes[arg_int as usize])))
                                 }
                             },
                             VVal::Fun(_) => {
@@ -3376,11 +3376,8 @@ impl VVal {
                                 } else {
                                     let r = vval_str.chars().nth(arg_int as usize);
                                     match r {
-                                        None    => Ok(VVal::new_str("")),
-                                        Some(c) => {
-                                            let mut b = [0; 4];
-                                            Ok(VVal::new_str(c.encode_utf8(&mut b)))
-                                        },
+                                        None    => Ok(VVal::None),
+                                        Some(c) => Ok(VVal::Chr(VValChr::Char(c))),
                                     }
                                 }
                             },
@@ -4471,7 +4468,7 @@ impl VVal {
     }
 
     pub fn is_byte(&self) -> bool {
-        match self { VVal::Chr(VValChr::Char(_)) => true, _ => false }
+        match self { VVal::Chr(VValChr::Byte(_)) => true, _ => false }
     }
 
     pub fn is_sym(&self) -> bool {
@@ -5319,7 +5316,7 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
     fn visit_u16<E>(self, value: u16) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
     fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Chr(VValChr::Byte(u8::from(value)))) }
+        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
 
     fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
         where E: serde::de::Error { Ok(VVal::Flt(value)) }

@@ -2004,12 +2004,12 @@ mod tests {
                     VVal::map2("X", VVal::Int(10), "Y", VVal::Int(20))));
 
         assert_eq!(pes("a",         &v1), "$[$[20,$p(2,4),\"F0O\"]]");
-        assert_eq!(pes("a/2/2",     &v1), "$[\"O\"]");
-        assert_eq!(pes("a/2/1",     &v1), "$[\"0\"]");
+        assert_eq!(pes("a/2/2",     &v1), "$['O']");
+        assert_eq!(pes("a/2/1",     &v1), "$['0']");
         assert_eq!(pes("ab/0",      &v1), "$[33]");
 
         assert_eq!(pes("a/?",       &v1), "$[$p(2,4),20,\"F0O\"]");
-        assert_eq!(pes("a/?/1",     &v1), "$[\"0\",4]");
+        assert_eq!(pes("a/?/1",     &v1), "$['0',4]");
 
         assert_eq!(pes("?/1",       &v1), "$[$p(2,4)]");
         assert_eq!(pes("?/2",       &v1), "$[\"F0O\"]");
@@ -2021,7 +2021,7 @@ mod tests {
         assert_eq!(pes("*/X",       &v1), "$[]");
         assert_eq!(pes("*/?/X",     &v1), "$[10]");
         assert_eq!(pes("*/*/X",     &v1), "$[10]");
-        assert_eq!(pes("*/2/2",     &v1), "$[\"O\"]");
+        assert_eq!(pes("*/2/2",     &v1), "$['O']");
 
         assert_eq!(pes("*ab/*/X",   &v1), "$[10]");
 

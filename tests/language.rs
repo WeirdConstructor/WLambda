@@ -890,8 +890,8 @@ fn check_string() {
     assert_eq!(ve("$q#foo#"),   "\"foo\"");
     assert_eq!(ve("$b\"foo\""), "$b\"foo\"");
 
-    assert_eq!(ve("\"foo\"(0)"),                       "\"f\"");
-    assert_eq!(ve("\"foo\" 0"),                        "\"f\"");
+    assert_eq!(ve("\"foo\"(0)"),                       "'f'");
+    assert_eq!(ve("\"foo\" 0"),                        "'f'");
     assert_eq!(ve("\"foobar\" 1 3"),                   "\"oob\"");
     assert_eq!(ve("\"foobar\"[1, 3]"),                 "\"oob\"");
     assert_eq!(ve("\"foobar\" $[1, 3]"),               "\"oob\"");
@@ -901,7 +901,7 @@ fn check_string() {
     assert_eq!(ve("\"foobar\" 2 -1"),                  "\"obar\"");
     assert_eq!(ve("\"\" 2 -1"),                        "\"\"");
     assert_eq!(ve("\"foobar\" 6 -1"),                  "\"\"");
-    assert_eq!(ve("\"foobar\" 6"),                     "\"\"");
+    assert_eq!(ve("\"foobar\" 6"),                     "$n");
 
     assert_eq!(ve("\"foo\" \"a\" :b $b\"c\""),         "\"fooabc\"");
 }
@@ -1659,7 +1659,7 @@ fn check_bytes_impl() {
     assert_eq!(ve("std:str:to_bytes_latin1 \"\\u{FE00}\""),          "$b\"?\"", "Bytes from latin1");
     assert_eq!(ve("std:str:to_bytes_latin1 \"\\u{FF}\\u{F0}\""),"$b\"\\xFF\\xF0\"", "Bytes from latin1");
     assert_eq!(ve("std:str:from_utf8 ~ std:str:to_bytes \"aäß\""),       "\"aäß\"", "Bytes from String as UTF8 into String again");
-    assert_eq!(ve("$b\"abc\" 1"),                                "$b\"b\"", "Get single byte from bytes");
+    assert_eq!(ve("$b\"abc\" 1"),                                "$b'b'", "Get single byte from bytes");
     assert_eq!(ve("$b\"abcdef\" 0 2"),                           "$b\"ab\"", "Substring bytes operation");
     assert_eq!(ve("$b\"abcdef\" 3 3"),                           "$b\"def\"", "Substring bytes operation");
     assert_eq!(ve("$b\"abcdef\" $[3, 3]"),                       "$b\"def\"", "Substring bytes operation");
@@ -1857,18 +1857,18 @@ fn check_cyclic_str_write() {
 
 #[test]
 fn check_byte_str_index() {
-    assert_eq!(ve("$q$abc$ 0"), "\"a\"");
-    assert_eq!(ve("$q$abc$ 2"), "\"c\"");
-    assert_eq!(ve("0 $q$abc$"), "\"a\"");
-    assert_eq!(ve("2 $q$abc$"), "\"c\"");
-    assert_eq!(ve("$q$abc$.0"), "\"a\"");
-    assert_eq!(ve("$q$abc$.2"), "\"c\"");
-    assert_eq!(ve("$Q$abc$ 0"), "$b\"a\"");
-    assert_eq!(ve("$Q$abc$ 2"), "$b\"c\"");
-    assert_eq!(ve("0 $Q$abc$"), "$b\"a\"");
-    assert_eq!(ve("2 $Q$abc$"), "$b\"c\"");
-    assert_eq!(ve("$Q$abc$.0"), "$b\"a\"");
-    assert_eq!(ve("$Q$abc$.2"), "$b\"c\"");
+    assert_eq!(ve("$q$abc$ 0"), "'a'");
+    assert_eq!(ve("$q$abc$ 2"), "'c'");
+    assert_eq!(ve("0 $q$abc$"), "'a'");
+    assert_eq!(ve("2 $q$abc$"), "'c'");
+    assert_eq!(ve("$q$abc$.0"), "'a'");
+    assert_eq!(ve("$q$abc$.2"), "'c'");
+    assert_eq!(ve("$Q$abc$ 0"), "$b'a'");
+    assert_eq!(ve("$Q$abc$ 2"), "$b'c'");
+    assert_eq!(ve("0 $Q$abc$"), "$b'a'");
+    assert_eq!(ve("2 $Q$abc$"), "$b'c'");
+    assert_eq!(ve("$Q$abc$.0"), "$b'a'");
+    assert_eq!(ve("$Q$abc$.2"), "$b'c'");
 }
 
 #[test]
@@ -4949,6 +4949,18 @@ fn check_tcp() {
     });
 
     assert_eq!(ve(r#"
+        !socket = $n;
+        iter _ (0 => 100) {
+            .socket = std:net:tcp:connect "127.0.0.1:19323";
+            ? is_err[socket] {
+                std:thread:sleep $p(:ms, 50);
+                next[];
+            };
+        };
+        std:io:read_some socket;
+    "#), "$o($b\"HELLO!\\r\\n\")");
+
+    assert_eq!(ve(r#"
         !socket = std:net:tcp:connect "127.0.0.1:19323";
         std:io:read_some socket;
     "#), "$o($b\"HELLO!\\r\\n\")");
@@ -5045,15 +5057,33 @@ fn check_chars_and_bytes() {
     assert_eq!("$@str iter b $b\"abcÄ\" ~ $+ b",    "");
     assert_eq!("$@str $+ '@'",                      "");
     assert_eq!("$@str $+ $b'@'",                    "");
-    assert_eq!("$@v iter c   \"ab\" ~ $+ ~ type c",   "");
-    assert_eq!("$@v iter c $b\"ab\" ~ $+ ~ type c",   "");
-    assert_eq!("\"foobar\"   $p($b'o', $b'x')",   "");
-    assert_eq!("\"foobar\"   $p('o', 'x')",   "");
-    assert_eq!("$b\"foobar\" $p($b'o', $b'x')",   "");
-    assert_eq!("$b\"foobar\" $p('o', 'x')",   "");
-    assert_eq!("str:str:len $b'\x42'",      "");
-    assert_eq!("std:char:to_uppercase 'x'", "");
-    assert_eq!("std:char:to_lowercase 'X'", "");
+    assert_eq!("$@v iter c   \"ab\" ~ $+ ~ type c", "");
+    assert_eq!("$@v iter c $b\"ab\" ~ $+ ~ type c", "");
+    assert_eq!("\"foobar\"   $p($b'o', $b'x')",     "");
+    assert_eq!("\"foobar\"   $p('o', 'x')",         "");
+    assert_eq!("$b\"foobar\" $p($b'o', $b'x')",     "");
+    assert_eq!("$b\"foobar\" $p('o', 'x')",         "");
+    assert_eq!("str:str:len $b'\x42'",              "");
+    assert_eq!("std:char:to_uppercase 'x'",         "");
+    assert_eq!("std:char:to_lowercase 'X'",         "");
+    assert_eq!("$p('a', 'z') 'm'",                  "");
+    assert_eq!("$p('a', 'z') 'A'",                  "");
+    assert_eq!("$p('a', 'z') $b'm'",                "");
+    assert_eq!("$p($b'a', $b'z') 'm'",              "");
+    assert_eq!("$p($b'a', $b'z') $b'm'",            "");
+    assert_eq!("$p($b'a', $b'z') $b'A'",            "");
+    assert_eq!("$p(0, 100) '\\x01'",                "");
+    assert_eq!("$p(0, 100) '\\xFF'",                "");
+    assert_eq!("$i(0, 100) '\\x01'",                "");
+    assert_eq!("$i(0, 100) '\\xFF'",                "");
+    assert_eq!("$f(0, 100) '\\x01'",                "");
+    assert_eq!("$f(0, 100) '\\xFF'",                "");
+    assert_eq!("$p(0, 100) $b'\\x01'",              "");
+    assert_eq!("$p(0, 100) $b'\\xFF'",              "");
+    assert_eq!("$i(0, 100) $b'\\x01'",              "");
+    assert_eq!("$i(0, 100) $b'\\xFF'",              "");
+    assert_eq!("$f(0, 100) $b'\\x01'",              "");
+    assert_eq!("$f(0, 100) $b'\\xFF'",              "");
 }
 
 #[test]
