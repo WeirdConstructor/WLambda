@@ -258,11 +258,11 @@ std:assert_eq m.b 12;
 ```wlambda
 !name = "Mr. X";
 
-std:assert_eq name.4 "X";           # index a character
+std:assert_eq name.4 'X';           # index a character
 std:assert_eq (name 0 3) "Mr.";     # substring
 
 !stuff = "日本人";
-std:assert_eq stuff.0 "日";         # Unicode support
+std:assert_eq stuff.0 '日';         # Unicode support
 ```
 
 ## Unicode identifiers:
