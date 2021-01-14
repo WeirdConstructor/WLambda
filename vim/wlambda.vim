@@ -94,8 +94,8 @@ syn keyword wlKeyword std:str:from_utf8
 syn keyword wlKeyword std:str:from_utf8_lossy
 syn keyword wlKeyword std:str:join
 syn keyword wlKeyword std:str:len
-syn keyword wlKeyword std:str:padl
-syn keyword wlKeyword std:str:padr
+syn keyword wlKeyword std:str:pad_end
+syn keyword wlKeyword std:str:pad_start
 syn keyword wlKeyword std:str:to_bytes
 syn keyword wlKeyword std:str:to_bytes_latin1
 syn keyword wlKeyword std:str:to_char_vec
