@@ -8510,6 +8510,12 @@ pub fn core_symbol_table() -> SymbolTable {
     func!(st, "int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).i())) },
         Some(1), Some(1), false);
+    func!(st, "char",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Chr(VValChr::Char(env.arg(0).c()))) },
+        Some(1), Some(1), false);
+    func!(st, "byte",
+        |env: &mut Env, _argc: usize| { Ok(VVal::Chr(VValChr::Byte(env.arg(0).byte()))) },
+        Some(1), Some(1), false);
     func!(st, "str",
         |env: &mut Env, _argc: usize| { Ok(VVal::new_str_mv(env.arg(0).s_raw())) },
         Some(1), Some(1), false);

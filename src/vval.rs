@@ -2362,6 +2362,30 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                 _ => VVal::None,
             }
         },
+        VVal::Chr(VValChr::Byte(c)) => {
+            match (a, b) {
+                (VVal::Chr(needle), VVal::Chr(replace)) => {
+                    if needle.byte() == *c {
+                        VVal::new_byte(replace.byte())
+                    } else {
+                        VVal::new_byte(*c)
+                    }
+                },
+                _ => VVal::None,
+            }
+        },
+        VVal::Chr(VValChr::Char(c)) => {
+            match (a, b) {
+                (VVal::Chr(needle), VVal::Chr(replace)) => {
+                    if needle.c() == *c {
+                        VVal::new_char(replace.c())
+                    } else {
+                        VVal::new_char(*c)
+                    }
+                },
+                _ => VVal::None,
+            }
+        },
         _ => VVal::None
     }
 }
@@ -2379,6 +2403,24 @@ fn vval_rc_ptr_eq(v: &VVal, l: &Rc<RefCell<VVal>>) -> bool {
     }
 }
 
+fn concat_operation(bytes: bool, first: &VVal, argc: usize, env: &mut Env) -> Result<VVal, StackAction> {
+    if bytes {
+        let mut buf = first.with_bv_ref(|bv| bv.to_vec());
+        for i in 0..argc {
+            env.arg_ref(i).unwrap().with_bv_ref(|bv|
+                buf.extend_from_slice(bv));
+        }
+        Ok(VVal::new_byt(buf))
+    } else {
+        let mut st = first.with_s_ref(|s: &str| String::from(s));
+        for i in 0..argc {
+            env.arg_ref(i).unwrap().with_s_ref(|s: &str| st += s);
+        }
+        Ok(VVal::new_str_mv(st))
+    }
+
+}
+
 #[allow(dead_code)]
 impl VVal {
     #[inline]
@@ -2389,6 +2431,16 @@ impl VVal {
     #[inline]
     pub fn new_str_mv(s: String) -> VVal {
         VVal::Str(Rc::new(s))
+    }
+
+    #[inline]
+    pub fn new_char(c: char) -> VVal {
+        VVal::Chr(VValChr::Char(c))
+    }
+
+    #[inline]
+    pub fn new_byte(b: u8) -> VVal {
+        VVal::Chr(VValChr::Byte(b))
     }
 
     #[inline]
@@ -2681,7 +2733,9 @@ impl VVal {
                             }
                             Ordering::Equal => {
                                 bv[i..(plen + i)].clone_from_slice(&repl[..plen]);
-                                i += plen;
+                                if plen > 0 {
+                                    i += plen - 1;
+                                }
                             }
                         }
                     }
@@ -2975,7 +3029,7 @@ impl VVal {
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     if idx >= b.len() { return None; }
-                    let r = Some((VVal::Chr(VValChr::Byte(b[idx])), None));
+                    let r = Some((VVal::new_byte(b[idx]), None));
                     idx += 1;
                     r
                 }))
@@ -2999,7 +3053,7 @@ impl VVal {
                     match s[idx..].chars().next() {
                         Some(chr) => {
                             idx += chr.len_utf8();
-                            Some((VVal::Chr(VValChr::Char(chr)), None))
+                            Some((VVal::new_char(chr), None))
                         },
                         None => None,
                     }
@@ -3277,37 +3331,43 @@ impl VVal {
                     Ok(ret)
                 })
             },
+            VVal::Chr(VValChr::Char(_)) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    if argc > 0 {
+                        let first_arg = e.arg(0);
+                        match first_arg {
+                            VVal::Pair(p) => {
+                                Ok(pair_extract(&p.0, &p.1, self))
+                            },
+                            _ => {
+                                concat_operation(false, self, argc, e)
+                            },
+                        }
+                    } else { Ok(self.clone()) }
+                })
+            },
+            VVal::Chr(VValChr::Byte(_)) => {
+                env.with_local_call_info(argc, |e: &mut Env| {
+                    if argc > 0 {
+                        let first_arg = e.arg(0);
+                        match first_arg {
+                            VVal::Pair(p) => {
+                                Ok(pair_extract(&p.0, &p.1, self))
+                            },
+                            _ => {
+                                concat_operation(true, self, argc, e)
+                            },
+                        }
+                    } else { Ok(self.clone()) }
+                })
+            },
             VVal::Byt(vval_bytes) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     if argc > 0 {
                         let first_arg = e.arg(0);
                         match first_arg {
-                            VVal::Byt(b2) => {
-                                if argc > 1 {
-                                    let mut accum = vval_bytes.as_ref().clone();
-                                    accum.extend_from_slice(b2.as_ref());
-                                    for i in 2..argc {
-                                        match e.arg(i) {
-                                            VVal::Byt(b3) =>
-                                                accum.extend_from_slice(
-                                                    b3.as_ref()),
-                                            _ =>
-                                                accum.extend_from_slice(
-                                                    &e.arg(i).as_bytes()),
-                                        }
-                                    }
-                                    Ok(VVal::new_byt(accum))
-                                } else {
-                                    let mut accum = vval_bytes.as_ref().clone();
-                                    accum.extend_from_slice(b2.as_ref());
-                                    Ok(VVal::new_byt(accum))
-                                }
-                            },
-                            VVal::Chr(_) => {
-                                let mut accum = vval_bytes.as_ref().clone();
-                                first_arg.with_bv_ref(
-                                    |b2| accum.extend_from_slice(b2));
-                                Ok(VVal::new_byt(accum))
+                            VVal::Chr(_) | VVal::Byt(_) | VVal::Str(_) => {
+                                concat_operation(true, self, argc, e)
                             },
                             VVal::Int(arg_int) => {
                                 if argc > 1 {
@@ -3321,7 +3381,7 @@ impl VVal {
                                 } else if arg_int as usize >= vval_bytes.len() {
                                     Ok(VVal::None)
                                 } else {
-                                    Ok(VVal::Chr(VValChr::Byte(vval_bytes[arg_int as usize])))
+                                    Ok(VVal::new_byte(vval_bytes[arg_int as usize]))
                                 }
                             },
                             VVal::Fun(_) => {
@@ -3377,7 +3437,7 @@ impl VVal {
                                     let r = vval_str.chars().nth(arg_int as usize);
                                     match r {
                                         None    => Ok(VVal::None),
-                                        Some(c) => Ok(VVal::Chr(VValChr::Char(c))),
+                                        Some(c) => Ok(VVal::new_char(c)),
                                     }
                                 }
                             },
@@ -3402,20 +3462,8 @@ impl VVal {
                                 let r : String = vval_str.chars().skip(from).take(cnt).collect();
                                 Ok(VVal::new_str_mv(r))
                             },
-                            VVal::Str(s2) => {
-                                if argc > 1 {
-                                    let mut accum = vval_str.as_ref().clone() + s2.as_ref();
-                                    for i in 1..argc {
-                                        e.arg_ref(i).unwrap().with_s_ref(|s: &str| accum += s);
-                                    }
-                                    Ok(VVal::new_str_mv(accum))
-                                } else {
-                                    Ok(VVal::new_str_mv(vval_str.as_ref().clone() + s2.as_ref()))
-                                }
-                            },
-                            VVal::Chr(_) => {
-                                first_arg.with_s_ref(|s|
-                                    Ok(VVal::new_str_mv(vval_str.as_ref().clone() + s)))
+                            VVal::Chr(_) | VVal::Byt(_) | VVal::Str(_) => {
+                                concat_operation(false, self, argc, e)
                             },
                             VVal::Map(_) => Ok(
                                 first_arg
@@ -3970,7 +4018,7 @@ impl VVal {
                 if index as usize >= vval_bytes.len() {
                     None
                 } else {
-                    Some(VVal::Chr(VValChr::Byte(vval_bytes[index as usize])))
+                    Some(VVal::new_byte(vval_bytes[index as usize]))
                 }
             },
             VVal::Str(vval_str) => {
@@ -3978,7 +4026,7 @@ impl VVal {
                 match opt_char {
                     None => None,
                     Some(char) => {
-                        Some(VVal::Chr(VValChr::Char(char)))
+                        Some(VVal::new_char(char))
                     },
                 }
             },
@@ -4611,8 +4659,8 @@ impl VVal {
         match self {
             VVal::Str(_)                 => "string",
             VVal::Byt(_)                 => "bytes",
-            VVal::Chr(VValChr::Char(_))  => "byte",
-            VVal::Chr(VValChr::Byte(_))  => "char",
+            VVal::Chr(VValChr::Char(_))  => "char",
+            VVal::Chr(VValChr::Byte(_))  => "byte",
             VVal::None                   => "none",
             VVal::Err(_)                 => "error",
             VVal::Bol(_)                 => "bool",
@@ -4706,7 +4754,7 @@ impl VVal {
     ///```
     /// let v = wlambda::VVal::vec();
     /// v.push(wlambda::VVal::Int(11));
-    /// assert_eq!(v.v_c(0),    11);
+    /// assert_eq!(v.v_c(0),    '\u{0b}');
     ///```
     pub fn v_c(&self, idx: usize)     -> char { self.v_(idx).c() }
     /// Quick access of the character at the given `key`.
@@ -4724,7 +4772,7 @@ impl VVal {
     ///```
     /// let v = wlambda::VVal::vec();
     /// v.push(wlambda::VVal::Int(11));
-    /// assert_eq!(v.v_byte(0), '\x0b');
+    /// assert_eq!(v.v_byte(0), b'\x0b');
     ///```
     pub fn v_byte(&self, idx: usize)     -> u8 { self.v_(idx).byte() }
     /// Quick access of the byte at the given `key`.
@@ -4732,8 +4780,8 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::map();
-    /// v.set_key_str("aaa", wlambda::VVal::new_byte('@'));
-    /// assert_eq!(v.v_bytek("aaa"), '@');
+    /// v.set_key_str("aaa", wlambda::VVal::new_byte(b'@'));
+    /// assert_eq!(v.v_bytek("aaa"), b'@');
     ///```
     pub fn v_bytek(&self, key: &str)     -> u8 { self.v_k(key).byte() }
     /// Quick access of a raw string at the given `idx`.
@@ -4887,13 +4935,13 @@ impl VVal {
             VVal::Str(s)     => { if (*s).len() > 0 { (*s).as_bytes()[0] } else { 0 } },
             VVal::Sym(s)     => { if (*s).len() > 0 { (*s).as_bytes()[0] } else { 0 } },
             VVal::Chr(c)     => c.byte(),
-            VVal::Byt(s)     => if s.len() > 0 { s[0] } else { b'\0' },
+            VVal::Byt(s)     => if s.len() > 0 { s[0] } else { b'0' },
             VVal::None       => b'\0',
             VVal::Err(_)     => b'\0',
             VVal::Bol(b)     => if *b { b'\x01' } else { b'\0' },
             VVal::Syn(s)     => s.syn.clone() as i64 as u32 as u8,
-            VVal::Int(i)     => *i as u8,
-            VVal::Flt(f)     => *f as u8,
+            VVal::Int(i)     => if *i <= 255 { *i as u8 } else { b'?' as u8 },
+            VVal::Flt(f)     => if (*f as u32) <= 255 { *f as u8 } else { b'?' as u8 },
             VVal::Pair(b)    => b.0.byte(),
             VVal::Lst(l)     => l.borrow().len() as u8,
             VVal::Map(l)     => l.borrow().len() as u8,
@@ -5185,7 +5233,7 @@ impl serde::ser::Serialize for VVal {
                         let mut buf = [0; 6];
                         serializer.serialize_str(c.encode_utf8(&mut buf))
                     },
-                    VValChr::Byte(b) => { serializer.serialize_bytes(&[*b]) },
+                    VValChr::Byte(b) => { serializer.serialize_u8(*b) },
                 },
             VVal::None       => serializer.serialize_none(),
             VVal::Iter(_)    => serializer.serialize_none(),

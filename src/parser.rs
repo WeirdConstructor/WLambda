@@ -19,7 +19,7 @@ to parse in this hand written parser.
 */
 
 
-use crate::vval::{VVal, VValChr};
+use crate::vval::{VVal};
 use crate::vval::Syntax;
 
 pub mod state;
@@ -297,17 +297,17 @@ fn parse_char(ps: &mut State, byte: bool) -> Result<VVal, ParseError> {
                         if byte {
                             let c = c as u32;
                             if c > 0xFF {
-                                VVal::Chr(VValChr::Byte('?' as u32 as u8))
+                                VVal::new_byte('?' as u32 as u8)
                             } else {
-                                VVal::Chr(VValChr::Byte(c as u8))
+                                VVal::new_byte(c as u8)
                             }
                         } else {
-                            VVal::Chr(VValChr::Char(c))
+                            VVal::new_char(c)
                         }
                     },
                     EscSeqValue::Byte(b) =>
-                        if byte { VVal::Chr(VValChr::Byte(b)) }
-                        else    { VVal::Chr(VValChr::Char(b as char)) },
+                        if byte { VVal::new_byte(b) }
+                        else    { VVal::new_char(b as char) },
                 }
             },
             _ => {
@@ -315,12 +315,12 @@ fn parse_char(ps: &mut State, byte: bool) -> Result<VVal, ParseError> {
                 if byte {
                     let c = c as u32;
                     if c > 0xFF {
-                        VVal::Chr(VValChr::Byte('?' as u32 as u8))
+                        VVal::new_byte('?' as u32 as u8)
                     } else {
-                        VVal::Chr(VValChr::Byte(c as u8))
+                        VVal::new_byte(c as u8)
                     }
                 } else {
-                    VVal::Chr(VValChr::Char(c))
+                    VVal::new_char(c)
                 }
             },
         };
