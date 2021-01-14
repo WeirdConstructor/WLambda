@@ -1908,6 +1908,14 @@ macro_rules! pair_key_to_iter {
 #[allow(clippy::while_let_on_iterator)]
 fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
     match val {
+        VVal::Chr(VValChr::Char(c)) => {
+            let c = *c as i64;
+            VVal::Bol(from <= c && cnt >= c)
+        },
+        VVal::Chr(VValChr::Byte(c)) => {
+            let c = *c as i64;
+            VVal::Bol(from <= c && cnt >= c)
+        },
         VVal::Byt(s) => {
             VVal::new_byt(
                 s.iter()
@@ -2329,6 +2337,10 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                         VVal::new_byte(*c)
                     }
                 },
+                (VVal::Int(a), VVal::Int(b)) => {
+                    let c = *c as i64;
+                    VVal::Bol(*a <= c && *b >= c)
+                },
                 _ => VVal::None,
             }
         },
@@ -2340,6 +2352,10 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                     } else {
                         VVal::new_char(*c)
                     }
+                },
+                (VVal::Int(a), VVal::Int(b)) => {
+                    let c = *c as i64;
+                    VVal::Bol(*a <= c && *b >= c)
                 },
                 _ => VVal::None,
             }
@@ -3104,7 +3120,7 @@ impl VVal {
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
                     let r = match s.chars().nth(idx) {
-                        Some(chr) => Some((VVal::new_str_mv(chr.to_string()), None)),
+                        Some(chr) => Some((VVal::new_char(chr), None)),
                         None      => None,
                     };
                     idx += 1;
