@@ -3169,6 +3169,13 @@ fn check_pairs() {
     assert_eq!(ve("$p($b\";;;\", $b\"_\")   $Q ;;;AB;;;C;;;DE;;;FG;;; "),   "$b\"_AB_C_DE_FG_\"");
     assert_eq!(ve("$p($b\";;\", $b\"____\") $Q AB;;C;;DE;;FG "),            "$b\"AB____C____DE____FG\"");
 
+    assert_eq!(ve("$p(\";;\", $b\"____\") $Q AB;;C;;DE;;FG "),            "$b\"AB____C____DE____FG\"");
+    assert_eq!(ve("$p(\";;\", $b\'_\')    $Q AB;;C;;DE;;FG "),            "$b\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p(\";;\", \'_\')      $Q AB;;C;;DE;;FG "),            "$b\"AB_C_DE_FG\"");
+    assert_eq!(ve("$p(\";;\", $b\"____\") $Q AB;;C;;DE;;FG "),            "$b\"AB____C____DE____FG\"");
+    assert_eq!(ve("$p(\';\', $b\'_\')     $Q AB;;C;;DE;;FG "),            "$b\"AB__C__DE__FG\"");
+    assert_eq!(ve("$p($b\';\', \'_\')     $Q AB;;C;;DE;;FG "),            "$b\"AB__C__DE__FG\"");
+
     assert_eq!(ve("$q AB;;C;;DE;;FG  $p(\";;\", \"____\")"),                "\"AB____C____DE____FG\"");
     assert_eq!(ve("$Q AB;;C;;DE;;FG  $p($b\";;\", $b\"____\")"),            "$b\"AB____C____DE____FG\"");
 
@@ -4474,6 +4481,61 @@ fn check_find() {
     assert_eq!(ve("std:str:find :xf :xfcxfc"),      "0");
     assert_eq!(ve("std:str:find :xf :xfcxfc 2"),    "3");
     assert_eq!(ve("std:str:find :xf :xfcxfc 20"),   "$n");
+
+    assert_eq!(ve("$q FOOBAR $p(0,   \'B\')"),  "3");
+    assert_eq!(ve("$Q FOOBAR $p(0,   \'B\')"),  "3");
+    assert_eq!(ve("$q FOOBAR $p(0, $b\'B\')"),  "3");
+    assert_eq!(ve("$Q FOOBAR $p(0, $b\'B\')"),  "3");
+    assert_eq!(ve("$Q FOOBAR $p(0,      :B)"),  "3");
+    assert_eq!(ve("$q FOOBAR $p(0,   \"BA\")"), "3");
+    assert_eq!(ve("$Q FOOBAR $p(0,   \"BA\")"), "3");
+    assert_eq!(ve("$q FOOBAR $p(0, $b\"BA\")"), "3");
+    assert_eq!(ve("$Q FOOBAR $p(0, $b\"BA\")"), "3");
+    assert_eq!(ve("$Q FOOBAR $p(0,      :B)"),  "3");
+
+    assert_eq!(ve("$q FOOBAR $p(3,   \'B\')"),  "3");
+    assert_eq!(ve("$Q FOOBAR $p(3,   \'B\')"),  "3");
+    assert_eq!(ve("$q FOOBAR $p(3, $b\'B\')"),  "3");
+    assert_eq!(ve("$Q FOOBAR $p(3, $b\'B\')"),  "3");
+    assert_eq!(ve("$Q FOOBAR $p(3,      :B)"),  "3");
+    assert_eq!(ve("$q FOOBAR $p(3,   \"BA\")"), "3");
+    assert_eq!(ve("$Q FOOBAR $p(3,   \"BA\")"), "3");
+    assert_eq!(ve("$q FOOBAR $p(3, $b\"BA\")"), "3");
+    assert_eq!(ve("$Q FOOBAR $p(3, $b\"BA\")"), "3");
+    assert_eq!(ve("$Q FOOBAR $p(3,      :B)"),  "3");
+
+    assert_eq!(ve("$q FOAOBAOR $p(3,   \'A\')"),  "5");
+    assert_eq!(ve("$Q FOAOBAOR $p(3,   \'A\')"),  "5");
+    assert_eq!(ve("$q FOAOBAOR $p(3, $b\'A\')"),  "5");
+    assert_eq!(ve("$Q FOAOBAOR $p(3, $b\'A\')"),  "5");
+    assert_eq!(ve("$Q FOAOBAOR $p(3,      :A)"),  "5");
+    assert_eq!(ve("$q FOAOBAOR $p(3,   \"AO\")"), "5");
+    assert_eq!(ve("$Q FOAOBAOR $p(3,   \"AO\")"), "5");
+    assert_eq!(ve("$q FOAOBAOR $p(3, $b\"AO\")"), "5");
+    assert_eq!(ve("$Q FOAOBAOR $p(3, $b\"AO\")"), "5");
+    assert_eq!(ve("$Q FOAOBAOR $p(3,      :A)"),  "5");
+
+    assert_eq!(ve("$q FOOBAR $p(0,   \'F\')"),  "0");
+    assert_eq!(ve("$Q FOOBAR $p(0,   \'F\')"),  "0");
+    assert_eq!(ve("$q FOOBAR $p(0, $b\'F\')"),  "0");
+    assert_eq!(ve("$Q FOOBAR $p(0, $b\'F\')"),  "0");
+    assert_eq!(ve("$Q FOOBAR $p(0,      :F)"),  "0");
+    assert_eq!(ve("$q FOOBAR $p(0,   \"FO\")"), "0");
+    assert_eq!(ve("$Q FOOBAR $p(0,   \"FO\")"), "0");
+    assert_eq!(ve("$q FOOBAR $p(0, $b\"FO\")"), "0");
+    assert_eq!(ve("$Q FOOBAR $p(0, $b\"FO\")"), "0");
+    assert_eq!(ve("$Q FOOBAR $p(0,      :F)"),  "0");
+
+    assert_eq!(ve("$q FOOBAR $p(0,   \'q\')"),  "$n");
+    assert_eq!(ve("$Q FOOBAR $p(0,   \'q\')"),  "$n");
+    assert_eq!(ve("$q FOOBAR $p(0, $b\'q\')"),  "$n");
+    assert_eq!(ve("$Q FOOBAR $p(0, $b\'q\')"),  "$n");
+    assert_eq!(ve("$Q FOOBAR $p(0,      :q)"),  "$n");
+    assert_eq!(ve("$q FOOBAR $p(0,   \"qA\")"), "$n");
+    assert_eq!(ve("$Q FOOBAR $p(0,   \"qA\")"), "$n");
+    assert_eq!(ve("$q FOOBAR $p(0, $b\"qA\")"), "$n");
+    assert_eq!(ve("$Q FOOBAR $p(0, $b\"qA\")"), "$n");
+    assert_eq!(ve("$Q FOOBAR $p(0,      :q)"),  "$n");
 
     assert_eq!(
         ve("!s = $q xfcxfc ; !i = std:str:find :xf s 2; i"),
