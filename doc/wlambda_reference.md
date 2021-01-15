@@ -4347,9 +4347,9 @@ Here is an overview of the data type calling semantics:
 | `$p(int_from, int_count)`     | iterator                    | Iterator result list slice operation. |
 | `$i(int_from, int_count)`     | iterator                    | Iterator result list slice operation. |
 | `$p(int_from, int_count)`     | string                      | Substring operation. (See also section about pairs) |
-| `$i(int_from, int_count, ...)´| string                      | Substring operation. |
-| `$p(int_from, int_count)´     | byte_vec                    | Substring operation. (See also section about pairs) |
-| `$i(int_from, int_count, ...)´| byte_vec                    | Substring operation on the byte vector. |
+| `$i(int_from, int_count, ...)`| string                      | Substring operation. |
+| `$p(int_from, int_count)`     | byte_vec                    | Substring operation. (See also section about pairs) |
+| `$i(int_from, int_count, ...)`| byte_vec                    | Substring operation on the byte vector. |
 | string                       |`$i(int_from, int_count, ...)`| Substring operation. |
 | byte_vec                     |`$i(int_from, int_count, ...)`| Substring operation on the byte vector. |
 |`$p(string, int)`             | string                       | Split operation. (See also section about pairs) |
