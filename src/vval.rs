@@ -2330,12 +2330,11 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
         },
         VVal::Chr(VValChr::Byte(c)) => {
             match (a, b) {
-                (VVal::Chr(needle), VVal::Chr(replace)) => {
-                    if needle.byte() == *c {
-                        VVal::new_byte(replace.byte())
-                    } else {
-                        VVal::new_byte(*c)
-                    }
+                (VVal::Chr(from), VVal::Chr(to)) => {
+                    let a = from.c() as u32;
+                    let b = to.c()   as u32;
+                    let c = *c       as u32;
+                    VVal::Bol(a <= c && b >= c)
                 },
                 (VVal::Int(a), VVal::Int(b)) => {
                     let c = *c as i64;
@@ -2346,12 +2345,11 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
         },
         VVal::Chr(VValChr::Char(c)) => {
             match (a, b) {
-                (VVal::Chr(needle), VVal::Chr(replace)) => {
-                    if needle.c() == *c {
-                        VVal::new_char(replace.c())
-                    } else {
-                        VVal::new_char(*c)
-                    }
+                (VVal::Chr(from), VVal::Chr(to)) => {
+                    let a = from.c() as u32;
+                    let b = to.c()   as u32;
+                    let c = *c       as u32;
+                    VVal::Bol(a <= c && b >= c)
                 },
                 (VVal::Int(a), VVal::Int(b)) => {
                     let c = *c as i64;
@@ -3566,6 +3564,27 @@ impl VVal {
             },
             VVal::Pair(p) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
+                    if argc == 0 {
+                        match (&p.0, &p.1) {
+                              (VVal::Chr(c), VVal::Int(cnt))
+                            | (VVal::Int(cnt), VVal::Chr(c)) => {
+                                let cnt = *cnt as usize;
+                                match c {
+                                    VValChr::Char(c) => {
+                                        let mut s = String::with_capacity(cnt);
+                                        for _ in 0..cnt { s.push(*c); }
+                                        return Ok(VVal::new_str_mv(s));
+                                    },
+                                    VValChr::Byte(b) => {
+                                        let mut v = Vec::with_capacity(cnt);
+                                        v.resize(cnt, *b);
+                                        return Ok(VVal::new_byt(v));
+                                    },
+                                }
+                            },
+                            _ => { return Ok(self.clone()); }
+                        }
+                    }
                     if argc != 1 { return Ok(self.clone()) }
                     Ok(pair_extract(&p.0, &p.1, e.arg_ref(0).unwrap()))
                 })

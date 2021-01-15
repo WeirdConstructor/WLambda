@@ -5129,14 +5129,22 @@ fn check_chars_and_bytes() {
     assert_eq!(ve("$@s $+ $b'@'"),                      "\"@\"");
     assert_eq!(ve("$@v iter c   \"ab\" ~ $+ ~ type c"), "$[\"char\",\"char\"]");
     assert_eq!(ve("$@v iter c $b\"ab\" ~ $+ ~ type c"), "$[\"byte\",\"byte\"]");
-    assert_eq!(ve("$p($b'o', $b'x') 'o'"),              "\'x\'");
-    assert_eq!(ve("$p('o', 'x')     'o'"),              "\'x\'");
-    assert_eq!(ve("$p($b'o', $b'x') $b'o'"),            "$b\'x\'");
-    assert_eq!(ve("$p('o', 'x')     $b'o'"),            "$b\'x\'");
-    assert_eq!(ve("'o'   $p($b'o', $b'x')"),            "\'x\'");
-    assert_eq!(ve("'o'   $p('o', 'x')"),                "\'x\'");
-    assert_eq!(ve("$b'o' $p($b'o', $b'x')"),            "$b\'x\'");
-    assert_eq!(ve("$b'o' $p('o', 'x')"),                "$b\'x\'");
+    assert_eq!(ve("$p($b'o', $b'x') 'o'"),              "$true");
+    assert_eq!(ve("$p('o', 'x')     'o'"),              "$true");
+    assert_eq!(ve("$p($b'o', $b'x') $b'o'"),            "$true");
+    assert_eq!(ve("$p('o', 'x')     $b'o'"),            "$true");
+    assert_eq!(ve("$p($b'o', $b'x') 'y'"),              "$false");
+    assert_eq!(ve("$p('o', 'x')     'y'"),              "$false");
+    assert_eq!(ve("$p($b'o', $b'x') $b'y'"),            "$false");
+    assert_eq!(ve("$p('o', 'x')     $b'y'"),            "$false");
+    assert_eq!(ve("'o'   $p($b'o', $b'x')"),            "$true");
+    assert_eq!(ve("'o'   $p('o', 'x')"),                "$true");
+    assert_eq!(ve("$b'o' $p($b'o', $b'x')"),            "$true");
+    assert_eq!(ve("$b'o' $p('o', 'x')"),                "$true");
+    assert_eq!(ve("'y'   $p($b'o', $b'x')"),            "$false");
+    assert_eq!(ve("'y'   $p('o', 'x')"),                "$false");
+    assert_eq!(ve("$b'y' $p($b'o', $b'x')"),            "$false");
+    assert_eq!(ve("$b'y' $p('o', 'x')"),                "$false");
     assert_eq!(ve("\"foobar\"   $p($b'o', $b'x')"),     "\"fxxbar\"");
     assert_eq!(ve("\"foobar\"   $p('o', 'x')"),         "\"fxxbar\"");
     assert_eq!(ve("$b\"foobar\" $p($b'o', $b'x')"),     "$b\"fxxbar\"");
@@ -5158,12 +5166,12 @@ fn check_chars_and_bytes() {
     assert_eq!(ve("$p(0, $b'z') $b\"abze\""),           "2");
     assert_eq!(ve("$p(2, $b'z') $b\"abze\""),           "2");
     assert_eq!(ve("$p(3, $b'z') $b\"abze\""),           "$n");
-    assert_eq!(ve("$p('a', 'z') 'a'"),                  "'z'");
-    assert_eq!(ve("$p('a', 'z') 'A'"),                  "'A'");
-    assert_eq!(ve("$p('a', 'z') $b'a'"),                "$b'z'");
-    assert_eq!(ve("$p($b'a', $b'z') 'm'"),              "'m'");
-    assert_eq!(ve("$p($b'a', $b'z') $b'm'"),            "$b'm'");
-    assert_eq!(ve("$p($b'a', $b'z') $b'a'"),            "$b'z'");
+    assert_eq!(ve("$p('a', 'z') 'a'"),                  "$true");
+    assert_eq!(ve("$p('a', 'z') 'A'"),                  "$false");
+    assert_eq!(ve("$p('a', 'z') $b'a'"),                "$true");
+    assert_eq!(ve("$p($b'a', $b'z') 'm'"),              "$true");
+    assert_eq!(ve("$p($b'a', $b'z') $b'm'"),            "$true");
+    assert_eq!(ve("$p($b'a', $b'z') $b'a'"),            "$true");
     assert_eq!(ve("$p(0, 100) '\\x01'"),                "$true");
     assert_eq!(ve("$p(0, 100) '\\xFF'"),                "$false");
     assert_eq!(ve("$i(0, 100) '\\x01'"),                "$true");
@@ -5172,6 +5180,14 @@ fn check_chars_and_bytes() {
     assert_eq!(ve("$p(0, 100) $b'\\xFF'"),              "$false");
     assert_eq!(ve("$i(0, 100) $b'\\x01'"),              "$true");
     assert_eq!(ve("$i(0, 100) $b'\\xFF'"),              "$false");
+    assert_eq!(ve("$p('a', 4)[]"),                      "\"aaaa\"");
+    assert_eq!(ve("$p('Ä', 4)[]"),                      "\"ÄÄÄÄ\"");
+    assert_eq!(ve("$p($b'a', 4)[]"),                    "$b\"aaaa\"");
+    assert_eq!(ve("$p($b'Ä', 4)[]"),                    "$b\"\\xC4\\xC4\\xC4\\xC4\"");
+    assert_eq!(ve("$p(4, 'a')[]"),                      "\"aaaa\"");
+    assert_eq!(ve("$p(4, 'Ä')[]"),                      "\"ÄÄÄÄ\"");
+    assert_eq!(ve("$p(4, $b'a')[]"),                    "$b\"aaaa\"");
+    assert_eq!(ve("$p(4, $b'Ä')[]"),                    "$b\"\\xC4\\xC4\\xC4\\xC4\"");
 }
 
 #[test]

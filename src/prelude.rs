@@ -4336,42 +4336,59 @@ std:assert   (not <& is_iter <& $p(1, 2));
 You can call almost all basic data types of WLambda.
 Here is an overview of the data type calling semantics:
 
-| Type      | Args              | Semantics |
-|-----------|-------------------|-----------|
-| `$none`   | -                 | Any call to `$none` will result in a panic. |
-| `$error`  | -                 | Any call to `$error` will result in a panic. |
-| function  | *                 | Will call the function with the specified arguments. |
-| `$true`   | `f1, f2`          | Will call `f1`.          |
-| `$false`  | `f1, f2`          | Will call `f2` or return `$n` if `f2` is not provided.          |
-| `$true`   | `$[1,2]`          | Will return the second element `2` of the list. |
-| `$false`  | `$[1,2]`          | Will return the first element `1` of the list. |
-| symbol    | map, userval      | Will retrieve the value in the map at the key equal to the symbol. |
-| map       | anything          | Will call `anything` for each value and key in the map and return a list with the return values. |
-| $p(int_from, int_count) | vector | Vector slice operation. |
-| $i(int_from, int_count) | vector | Vector slice operation. |
-| $p(int_from, int_count) | numeric vector | Creates a vector slice from a numeric vector. |
-| $i(int_from, int_count) | numeric vector | Creates a vector slice from a numeric vector. |
-| $p(int_from, int_count) | iterator | Iterator result list slice operation. |
-| $i(int_from, int_count) | iterator | Iterator result list slice operation. |
-| $p(int_from, int_count) | string | Substring operation. (See also section about pairs) |
-| $i(int_from, int_count, ...) | string | Substring operation. |
-| string | $i(int_from, int_count, ...) | Substring operation. |
-| $p(string, int)         | string | Split operation. (See also section about pairs) |
-| string | $p(string, int) | Split operation. |
-| $p(string, string)      | string | Replace all operation. (See also section about pairs) |
-| string | $p(string, string) | Replace all operation. |
-| $p(int_from, int_count) | byte_vec | Substring operation. (See also section about pairs) |
-| $i(int_from, int_count, ...) | byte_vec | Substring operation on the byte vector. |
-| byte_vec | $i(int_from, int_count, ...) | Substring operation on the byte vector. |
-| $p(byte_vec, int)       | byte_vec | Split operation. (See also section about pairs) |
-| byte_vec | $p(byte_vec, int) | Split operation. |
-| $p(byte_vec, byte_vec)  | byte_vec | Replace all operation. (See also section about pairs) |
-| byte_vec | $p(byte_vec, byte_vec) | Replace all operation. |
-| $o()      | -                 | Returns $none. |
-| $o(x)     | -                 | Returns _x_. |
-| $o()      | *                 | Calls $none with arguments, leading to a panic. |
-| $o(x)     | *                 | Calls _x_ with the given arguments. |
-|           |                   | |
+| Type                         | Args                         | Semantics |
+|------------------------------|------------------------------|-----------|
+| `$none`                      | -                            | Any call to `$none` will result in a panic. |
+| `$error`                     | -                            | Any call to `$error` will result in a panic. |
+| function                     | *                            | Will call the function with the specified arguments. |
+| `$true`                      | `f1, f2`                     | Will call `f1`.          |
+| `$false`                     | `f1, f2`                     | Will call `f2` or return `$n` if `f2` is not provided.          |
+| `$true`                      | `$[1,2]`                     | Will return the second element `2` of the list. |
+| `$false`                     | `$[1,2]`                     | Will return the first element `1` of the list. |
+| symbol                       | map, userval                 | Will retrieve the value in the map at the key equal to the symbol. |
+| map                          | anything                     | Will call `anything` for each value and key in the map and return a list with the return values. |
+| string                       | string, byte_vec, char or byte | Append operation, works with multiple arguments. |
+| byte_vec                     | string, byte_vec, char or byte | Append operation, works with multiple arguments. |
+| string                       | `$p(int_offs, string/byte_vec/char/byte)` | Find operation, search from int_offs for the given string, byte_vec, char or byte. See also `std:str:find` and `std:bytes:find`. |
+| byte_vec                     | `$p(int_offs, string/byte_vec/char/byte)` | Find operation, search from int_offs for the given string, byte_vec, char or byte. See also `std:str:find` and `std:bytes:find`. |
+| `$p(char or byte, int_count)`| -                            | Create a string or byte_vec containing int_count of copies. |
+| `$p(int_offs, string/byte_vec/char/byte)` | string          | Find operation, search from int_offs for the given string, byte_vec, char or byte. |
+| `$p(int_offs, string/byte_vec/char/byte)` | byte_vec        | Find operation, search from int_offs for the given string, byte_vec, char or byte. |
+| `$p(int_from, int_count)`     | vector                      | Vector slice operation. |
+| `$i(int_from, int_count)`     | vector                      | Vector slice operation. |
+| `$p(int_from, int_count)`     | numeric vector              | Creates a vector slice from a numeric vector. |
+| `$i(int_from, int_count)`     | numeric vector              | Creates a vector slice from a numeric vector. |
+| `$p(int_from, int_count)`     | iterator                    | Iterator result list slice operation. |
+| `$i(int_from, int_count)`     | iterator                    | Iterator result list slice operation. |
+| `$p(int_from, int_count)`     | string                      | Substring operation. (See also section about pairs) |
+| `$i(int_from, int_count, ...)´| string                      | Substring operation. |
+| `$p(int_from, int_count)´     | byte_vec                    | Substring operation. (See also section about pairs) |
+| `$i(int_from, int_count, ...)´| byte_vec                    | Substring operation on the byte vector. |
+| string                       |`$i(int_from, int_count, ...)`| Substring operation. |
+| byte_vec                     |`$i(int_from, int_count, ...)`| Substring operation on the byte vector. |
+|`$p(string, int)`             | string                       | Split operation. (See also section about pairs) |
+|`$p(byte_vec, int)`           | byte_vec                     | Split operation. (See also section about pairs) |
+| string                       |`$p(string, int)`             | Split operation. |
+| byte_vec                     |`$p(byte_vec, int)`           | Split operation. |
+| string                       |`$p(string, string)`          | Replace all operation. |
+| byte_vec                     |`$p(byte_vec, byte_vec)`      | Replace all operation. |
+| `$p(string, string)`         | string                       | Replace all operation. (See also section about pairs) |
+| `$p(byte_vec, byte_vec)`     | byte_vec                     | Replace all operation. (See also section about pairs) |
+| `$p(pat_char, repl_char)`    | string or byte_vec           | Replace all pat_char in string or byte_vec with repl_char. |
+| `$p(pat_byte, repl_byte)`    | string or byte_vec           | Replace all pat_char in string or byte_vec with repl_char. |
+| `$p(char, char)`             | char or byte                 | Range check operation, whether char or byte is inside to/from range. |
+| `$p(byte, byte)`             | char or byte                 | Range check operation, whether char or byte is inside to/from range. |
+| `$p(int_a, int_b)`           | char or byte                 | Range check operation, whether char or byte is inside to/from range. |
+| `$i(int_a, int_b)`           | char or byte                 | Range check operation, whether char or byte is inside to/from range. |
+| char or byte                 |`$p(char, char)`              | Range check operation, whether char or byte is inside to/from range. |
+| char or byte                 |`$p(byte, byte)`              | Range check operation, whether char or byte is inside to/from range. |
+| char or byte                 |`$p(int_a, int_b)`            | Range check operation, whether char or byte is inside to/from range. |
+| char or byte                 |`$i(int_a, int_b)`            | Range check operation, whether char or byte is inside to/from range. |
+| `$o()`                       | -                            | Returns $none. |
+| `$o(x)`                      | -                            | Returns _x_. |
+| `$o()`                       | *                            | Calls $none with arguments, leading to a panic. |
+| `$o(x)`                      | *                            | Calls _x_ with the given arguments. |
+|                              |                              | |
 
 ## <a name="4-conditional-execution---if--then--else"></a>4 - Conditional Execution - if / then / else
 
