@@ -123,6 +123,7 @@ Smalltalk, LISP and Perl.
     - [3.6.33](#3633-stdnumtrunc-float) std:num:trunc _float_
     - [3.6.34](#3634-stdnumlerp-a-b-x) std:num:lerp _a_ _b_ _x_
     - [3.6.35](#3635-stdnumsmoothstep-a-b-x) std:num:smoothstep _a_ _b_ _x_
+    - [3.6.36](#3636-stdnumfract-float) std:num:fract _float_
   - [3.7](#37-numeric-functions) Numeric Functions
     - [3.7.1](#371-stdnumabs-number) std:num:abs _number_
     - [3.7.2](#372-stdnumsignum-number) std:num:signum _number_
@@ -2028,6 +2029,14 @@ Interpolates smoothly from 0.0 to 1.0 where _x_ is in the range of `[a, b]`.
 !res = int ~ 1000.0 * (std:num:smoothstep 0.0 100.0 10.0);
 
 std:assert_eq res 28;
+```
+
+#### <a name="3636-stdnumfract-float"></a>3.6.36 - std:num:fract _float_
+
+Returns the fractional part of the floating point number _float_.
+
+```wlambda
+std:assert ((std:num:fract 4.25) - 0.25) < 0.00001
 ```
 
 ### <a name="37-numeric-functions"></a>3.7 - Numeric Functions
@@ -4361,9 +4370,9 @@ Here is an overview of the data type calling semantics:
 | `$p(int_from, int_count)`     | iterator                    | Iterator result list slice operation. |
 | `$i(int_from, int_count)`     | iterator                    | Iterator result list slice operation. |
 | `$p(int_from, int_count)`     | string                      | Substring operation. (See also section about pairs) |
-| `$i(int_from, int_count, ...)´| string                      | Substring operation. |
-| `$p(int_from, int_count)´     | byte_vec                    | Substring operation. (See also section about pairs) |
-| `$i(int_from, int_count, ...)´| byte_vec                    | Substring operation on the byte vector. |
+| `$i(int_from, int_count, ...)`| string                      | Substring operation. |
+| `$p(int_from, int_count)`     | byte_vec                    | Substring operation. (See also section about pairs) |
+| `$i(int_from, int_count, ...)`| byte_vec                    | Substring operation on the byte vector. |
 | string                       |`$i(int_from, int_count, ...)`| Substring operation. |
 | byte_vec                     |`$i(int_from, int_count, ...)`| Substring operation on the byte vector. |
 |`$p(string, int)`             | string                       | Split operation. (See also section about pairs) |
@@ -9502,6 +9511,11 @@ pub fn std_symbol_table() -> SymbolTable {
                 VVal::Flt(i) => VVal::Flt(i.abs()),
                 _ => VVal::Int(env.arg(0).i().abs())
             })
+        }, Some(1), Some(1), false);
+
+    func!(st, "num:fract",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::Flt(env.arg(0).f().fract()))
         }, Some(1), Some(1), false);
 
     func!(st, "num:lerp",

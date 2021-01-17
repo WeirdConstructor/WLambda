@@ -29,6 +29,7 @@ like `$b"\<STX>"` or `$b"\<DEL>"`.
 be able to convert bytes to/from ISO-8859-1 encoding in a more or less
 clean way. It allows better parsing of text protocols by converting
 them to strings directly.
+* Feature: Added `std:num:fract`.
 * Bugfix: `v.0 => v.1` did not parse correctly.
 * Bugfix: Calling `$i(...)` and `$p()` without any arguments did not yield the
 called value itself.
