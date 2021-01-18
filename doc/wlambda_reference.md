@@ -996,7 +996,7 @@ This operator has the highest precedence over all other operators
 and is used to be able to write this:
 
 ```wlambda
-? "foob" &> $r/f(^*)b/ {
+if "foob" &> $r/f(^*)b/ {
     std:assert_eq $\.1 "oo";
 } {
     std:assert $false;
@@ -1208,11 +1208,11 @@ and 1.0 (including 0.0 but not including 1.0) is returned.
 std:srand 1234567890;
 
 !zeros = $@i iter i 0 => 1000 {
-    ? std:rand[100] == 0 \$+ 1;
+    if std:rand[100] == 0 \$+ 1;
 };
 
 !count_100 = $@i iter i 0 => 1000 {
-    ? std:rand[100] == 100 \$+ 1;
+    if std:rand[100] == 100 \$+ 1;
 };
 
 std:assert zeros     >  0;
@@ -1313,7 +1313,7 @@ std:assert_eq $o()[]     $none;
 std:assert_eq $o(10)[]   10;
 
 !do_something = {
-    ? _ == 0 {
+    if _ == 0 {
         $o()
     } {
         $o(_ + 10)
@@ -1335,11 +1335,11 @@ std:assert ~ not ~ bool $o();
 std:assert ~ bool $o(10);
 
 !x = $o();
-!res1 = ? x "something" "nothing";
+!res1 = if x "something" "nothing";
 std:assert_eq res1 "nothing";
 
 .x = $o(30);
-!res2 = ? x "something" "nothing";
+!res2 = if x "something" "nothing";
 std:assert_eq res2 "something";
 ```
 
@@ -4308,7 +4308,7 @@ weird effects.
 !it = $iter v;
 
 iter i v {
-    ? i <= 3 {
+    if i <= 3 {
         std:push v i + 10;  # This is not recommended however...
     };
 };
@@ -4455,10 +4455,9 @@ Here is an overview of the data type calling semantics:
 
 ## <a name="4-conditional-execution---if--then--else"></a>4 - Conditional Execution - if / then / else
 
-### <a name="41-if-condition-then-expr-else-expr"></a>4.1 - ?/if _condition_ _then-expr_ [_else-expr_]
+### <a name="41-if-condition-then-expr-else-expr"></a>4.1 - if/? _condition_ _then-expr_ [_else-expr_]
 
 The keyword for conditional execution is either `if` or just the question mark `?`.
-Both are possible to use, while `?` is a bit more WLambda idiomatic.
 It takes 3 arguments: The first is an expression that will be evaluated
 and cast to a boolean. If the boolean is `$true`, the second argument is
 evaluated. If the boolean is `$false` the thrid argument is evaluated.
@@ -4468,7 +4467,7 @@ The third argument is optional.
 !x = 10;
 
 !msg = "x is ";
-? x > 4 {
+if x > 4 {
     .msg = std:str:cat msg "bigger than 4";
 } {
     .msg = std:str:cat msg "smaller than or equal to 4";
@@ -4488,7 +4487,7 @@ The _condition_ can also be a function block, which will be evaluated:
 
 ```wlambda
 !res =
-    ? { !x = 2; x > 1 } "x > 1";
+    if { !x = 2; x > 1 } "x > 1";
 
 std:assert_eq res "x > 1";
 ```
@@ -4898,7 +4897,7 @@ std:assert_eq sum 25;
 This is a jump table operation, it's a building block for the more
 sophisticated `match` operation. The first argument is an index into the table.
 If the index is outside the table the _last-branch_ is jumped to.  The branches
-are compiled like the bodies of `while`, `iter`, `match` and `?` into a runtime
+are compiled like the bodies of `while`, `iter`, `match` and `if` into a runtime
 evaluated block.
 
 ```wlambda
@@ -5811,7 +5810,7 @@ a data structure in an if statement:
 ```wlambda
 !some_struct = $[:TEST, ${ a = 10, b = 1442 }];
 
-? some_struct &> ($M $[sym, ${ a = 10, b = x }]) {
+if some_struct &> ($M $[sym, ${ a = 10, b = x }]) {
     std:assert_eq $\.sym :TEST;
     std:assert_eq $\.x   1442;
 } {
@@ -6010,7 +6009,7 @@ generating the structure pattern function at compile time.
 !runtime_name = "foo";
 !sel = std:selector (" * / " runtime_name);
 
-? sel <& $[${foo = 1}, ${foo = 2}, ${foo = 3}] {
+if sel <& $[${foo = 1}, ${foo = 2}, ${foo = 3}] {
     std:assert_str_eq $\ $[1,2,3];
 } {
     std:assert $false
@@ -6066,7 +6065,7 @@ the results of the latest match that was executed:
 ```wlambda
 # Notice the usage of the `<&` function call operator:
 !res =
-    ? "foo//\\/foo" &> $r| $<*? (^$+[\\/]) * | {
+    if "foo//\\/foo" &> $r| $<*? (^$+[\\/]) * | {
         std:assert_eq $\.0 "foo//\\/foo";
 
         $\.1
@@ -8202,7 +8201,7 @@ In the following grammar, white space and comments are omitted:
 
 There are certain calls that are handled by the compiler differently.
 
-- `? _condition_ _then-block-or-expr_ [_else-block-or-expr_]`
+- `if _condition_ _then-block-or-expr_ [_else-block-or-expr_]`
 - `while _condition_ _block-or-expr_`
 - `iter _var_ _value-expr_ _block-or-expr_`
 - `next _x_`

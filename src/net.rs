@@ -96,7 +96,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 let listener = {
                     use socket2::Socket;
                     let socket = Socket::from(listener);
-                    socket.set_reuse_address(true).is_ok();
+                    match socket.set_reuse_address(true) {
+                        Err(_) => {},
+                        Ok(_)  => {},
+                    }
                     #[cfg(unix)]
                     socket.set_reuse_port(true);
                     socket.into_tcp_listener()
