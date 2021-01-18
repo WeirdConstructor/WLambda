@@ -25,7 +25,7 @@ pub struct State {
     input:          Vec<char>,
     ch_ptr:         usize,
     line_no:        u32,
-    col_no:         u16,
+    col_no:         u32,
     indent:         Option<u32>,
     line_indent:    u32,
     last_tok_char:  char,
@@ -172,7 +172,7 @@ pub struct ParseError {
     /// A snip of the code that caused this error.
     snip: String,
     line: u32,
-    col: u16,
+    col:  u32,
     file: FileRef
 }
 
@@ -235,13 +235,7 @@ impl State {
 
     /// Creates a `VVal::Syn` annotated with the current parse head position.
     pub fn syn_raw(&self, s: Syntax) -> VVal {
-        VVal::Syn(SynPos {
-            syn:  s,
-            line: self.line_no,
-            col:  self.col_no,
-            file: self.file.clone(),
-            name: None,
-        })
+        VVal::Syn(SynPos::new(s, self.line_no, self.col_no, self.file.clone()))
     }
 
     /// Creates an syntactic AST node.

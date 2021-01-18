@@ -120,9 +120,7 @@ impl AVal {
                 let v = VVal::vec();
                 v.push(av.to_vval());
                 v.push(VVal::new_str(pos));
-                VVal::Err(Rc::new(RefCell::new((v,
-                     SynPos { syn: Syntax::Block, line: 0,
-                              col: 0, file: FileRef::new("?"), name: None }))))
+                VVal::Err(Rc::new(RefCell::new((v, SynPos::empty()))))
             },
             AVal::Bol(b)       => VVal::Bol(*b),
             AVal::Int(i)       => VVal::Int(*i),

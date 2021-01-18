@@ -785,7 +785,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
 fn is_var(expr: &VVal) -> bool {
     if let Some(ea) = expr.at(0) {
         if let VVal::Syn(s) = ea {
-            return s.syn == Syntax::Var;
+            return s.syn() == Syntax::Var;
         }
     }
     false
@@ -794,7 +794,7 @@ fn is_var(expr: &VVal) -> bool {
 fn is_call(expr: &VVal) -> bool {
     if let Some(ea) = expr.at(0) {
         if let VVal::Syn(s) = ea {
-            return s.syn == Syntax::Call;
+            return s.syn() == Syntax::Call;
         }
     }
     false
@@ -1220,7 +1220,7 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
 
     if is_apply {
         if let VVal::Syn(mut sp) = call.at(0).unwrap_or(VVal::None) {
-            sp.syn = Syntax::Apply;
+            sp.set_syn(Syntax::Apply);
             call.set_at(0, VVal::Syn(sp));
         }
         let call_argv = parse_expr(ps)?;

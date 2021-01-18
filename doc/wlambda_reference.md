@@ -146,6 +146,12 @@ Smalltalk, LISP and Perl.
     - [3.8.27](#3827-stdvvec2rad-vec) std:v:vec2rad _vec_
     - [3.8.28](#3828-stdvrad2vec-radians) std:v:rad2vec _radians_
   - [3.9](#39-characters-and-bytes) Characters and Bytes
+    - [3.9.1](#391-byte-value) byte _value_
+    - [3.9.2](#392-char-value) char _value_
+    - [3.9.3](#393-isbyte-value) is\_byte _value_
+    - [3.9.4](#394-ischar-value) is\_char _value_
+    - [3.9.5](#395-stdchartolowercase-value) std:char:to\_lowercase _value_
+    - [3.9.6](#396-stdchartouppercase-value) std:char:to\_uppercase _value_
   - [3.10](#310-strings) Strings
     - [3.10.1](#3101-string-literal-syntaxes) String Literal Syntaxes
     - [3.10.2](#3102-str-value) str _value_
@@ -230,7 +236,7 @@ Smalltalk, LISP and Perl.
     - [3.17.6](#3176-isiter-value) is\_iter _value_
   - [3.18](#318-calling-semantics-of-data-types) Calling Semantics of Data Types
 - [4](#4-conditional-execution---if--then--else) Conditional Execution - if / then / else
-  - [4.1](#41-if-condition-then-expr-else-expr) ?/if _condition_ _then-expr_ [_else-expr_]
+  - [4.1](#41-if-condition-then-expr-else-expr) if/? _condition_ _then-expr_ [_else-expr_]
   - [4.2](#42-using-booleans-for-conditional-execution) Using Booleans for Conditional Execution
     - [4.2.1](#421-pick-bool-a--b-) pick _bool_ _a_ -b-
     - [4.2.2](#422-indexing-by-booleans) Indexing by Booleans
@@ -344,6 +350,10 @@ Smalltalk, LISP and Perl.
     - [11.1.8](#1118-stdiostdoutflush) std:io:stdout:flush
     - [11.1.9](#1119-stdiostdoutprint-value) std:io:stdout:print _value_
     - [11.1.10](#11110-stdiostdoutwrite-value) std:io:stdout:write _value_
+    - [11.1.11](#11111-stdioflush-handle) std:io:flush _handle_
+    - [11.1.12](#11112-stdioreadsome-handle) std:io:read\_some _handle_
+    - [11.1.13](#11113-stdiowrite-handle-data-offs) std:io:write _handle_ _data_ [_offs_]
+    - [11.1.14](#11114-stdiowritesome-handle-data) std:io:write\_some _handle_ _data_
   - [11.2](#112-processes) Processes
     - [11.2.1](#1121-stdprocessrun-executable-path-arguments) std:process:run _executable-path_ [_arguments_]
   - [11.3](#113-file-system) File System
@@ -2673,7 +2683,7 @@ std:assert_eq ("foo" $p(0, 1))  "f"; # requires allocation
 std:assert_eq ("foo".0)         'f'; # requires NO allocation
 ```
 
-#### - byte _value_
+#### <a name="391-byte-value"></a>3.9.1 - byte _value_
 
 Converts the _value_ to a byte. If _value_ is a number, it must be
 below or equal to 255, otherwise it will result in the byte `'?'`.
@@ -2686,7 +2696,7 @@ std:assert_eq (byte $b"\xFF\xF0") $b'\xFF';
 std:assert_eq (byte "\xFF\xF0")   $b'\xC3'; # first byte of an utf-8 sequence!
 ```
 
-#### - char _value_
+#### <a name="392-char-value"></a>3.9.2 - char _value_
 
 Converts the _value_ to a Unicode character.
 
@@ -2696,7 +2706,7 @@ std:assert_eq (char 0x262F)   '☯';
 std:assert_eq (char "☯xyz")   '☯';
 ```
 
-#### - is\_byte _value_
+#### <a name="393-isbyte-value"></a>3.9.3 - is\_byte _value_
 
 Checks if _value_ is of the byte data type.
 
@@ -2709,7 +2719,7 @@ std:assert not[is_byte "abc".0];
 std:assert not[is_byte $b"abc"];
 ```
 
-#### - is\_char _value_
+#### <a name="394-ischar-value"></a>3.9.4 - is\_char _value_
 
 Check if _value_ is of the Unicode character data type.
 
@@ -2723,7 +2733,7 @@ std:assert not[is_char $b"abc"];
 std:assert not[is_char "abc"];
 ```
 
-#### - std:char:to\_lowercase _value_
+#### <a name="395-stdchartolowercase-value"></a>3.9.5 - std:char:to\_lowercase _value_
 
 Turns the _value_ into a lower case Unicode character.
 
@@ -2732,7 +2742,7 @@ std:assert_eq (std:char:to_lowercase 'A') 'a';
 std:assert_eq (std:char:to_lowercase 65)  'a';
 ```
 
-#### - std:char:to\_uppercase _value_
+#### <a name="396-stdchartouppercase-value"></a>3.9.6 - std:char:to\_uppercase _value_
 
 Turns the _value_ into an upper case Unicode character.
 
@@ -6762,7 +6772,7 @@ Returns an error if an error occured. `$true` if everything is fine.
 std:io:stdout:write "xxx"; # => Writes `"xxx"` to standard output
 ```
 
-#### - std:io:flush _handle_
+#### <a name="11111-stdioflush-handle"></a>11.1.11 - std:io:flush _handle_
 
 Flushes the internal buffers of _handle_. _handle_ can be any kind of IO handle,
 like a file handle or networking socket.
@@ -6774,7 +6784,7 @@ std:io:write socket $b"GET / HTTP/1.0\r\n\r\n";
 std:io:flush socket;
 ```
 
-#### - std:io:read\_some _handle_
+#### <a name="11112-stdioreadsome-handle"></a>11.1.12 - std:io:read\_some _handle_
 
 Reads some amount of data from _handle_. The default maximum amount
 of bytes read is 4096. This function returns `$o(bytes)` if something
@@ -6800,6 +6810,40 @@ while not[done] {
         $o()    => { .done = $t; }
         ($e _)  => { .done = $t; };
 };
+```
+
+#### <a name="11113-stdiowrite-handle-data-offs"></a>11.1.13 - std:io:write _handle_ _data_ [_offs_]
+
+Write all data as byte vector to the IO _handle_ (socket, file handle, ...),
+starting at _offs_ (0 default).
+Returns the number of bytes written, an error or `$none` if interrupted.
+Note: This function does not respect the underlying write timeout in _handle_ properly.
+
+```text
+!socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
+
+std:io:write socket $b"GET / HTTP/1.0\r\n\r\n";
+```
+
+#### <a name="11114-stdiowritesome-handle-data"></a>11.1.14 - std:io:write\_some _handle_ _data_
+
+Try to write some data as byte vector to the IO _handle_ (socket, file handle,
+...), starting at _offs_ (0 default).
+Returns the number of bytes written, an error or `$none` if a timeout or interrupt
+ended the write operation.
+
+```text
+!socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
+
+!bytes = $b"GET / HTTP/1.0\r\n\r\n";
+!written = 0;
+
+while len[bytes] > written {
+    match (std:io:write_some socket bytes written)
+        $o(n)  => { .written += n; }
+        $none  => {}
+        ($e _) => { break[] };
+}
 ```
 
 ### <a name="112-processes"></a>11.2 - Processes

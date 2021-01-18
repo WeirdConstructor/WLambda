@@ -7,6 +7,8 @@ used directly now. But only in the context of a single regex
 pattern like `$r(foo/bar)`. This makes it easier to process text.
 * Change: Decided it's more idiomatic to use `if` instead of `?`
 after all. `?` will of course remain.
+* Optimization: Boxed debugging information, which made some benchmarks
+faster by 15%.
 * Feature: Character and Byte literals `'c'` and `$b'c'` were added.
 With functions: `is_byte`, `is_char`.
 * Feature: Global regex matches with `$rg/.../`.

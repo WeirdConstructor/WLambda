@@ -101,7 +101,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                         Ok(_)  => {},
                     }
                     #[cfg(unix)]
-                    socket.set_reuse_port(true);
+                    match socket.set_reuse_port(true) {
+                        Err(_) => {},
+                        Ok(_)  => {},
+                    }
                     socket.into_tcp_listener()
                 };
 

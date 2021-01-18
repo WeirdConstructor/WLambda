@@ -2214,9 +2214,9 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let mut pws : std::vec::Vec<(bool, ProgWriter)> = vec![];
                     for (a, _) in ast.iter().skip(1) {
                         if a.is_vec() {
-                            if let VVal::Syn(SynPos { syn: Syntax::VecSplice, .. }) =
-                                a.at(0).unwrap_or_else(|| VVal::None)
-                            {
+                            if a.at(0).unwrap_or_else(|| VVal::None).syn().unwrap()
+                               == Syntax::VecSplice {
+
                                 let splice_pw = compile(&a.at(1).unwrap(), ce)?;
                                 pws.push((true, splice_pw));
                                 continue;
@@ -2283,7 +2283,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let k = e.at(0).unwrap();
                         let v = e.at(1).unwrap();
 
-                        if let VVal::Syn(SynPos { syn: Syntax::MapSplice, .. }) = k {
+                        if let Some(Syntax::MapSplice) = k.syn() {
                             let sc_pw = compile(&v, ce)?;
                             pws.push((sc_pw, None));
                             continue;
@@ -2330,9 +2330,8 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     })
                 },
                 Syntax::Func => {
-                    let last_def_varname = ce.borrow().recent_var.clone();
                     let mut fun_spos = spos.clone();
-                    fun_spos.name = Some(Rc::new(last_def_varname));
+                    fun_spos.set_name(&ce.borrow().recent_var);
 
                     let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
                     let ce_sub = func_ce.clone();
@@ -2832,7 +2831,12 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                             .map(String::from)
                             .collect();
 
-                    let import_file_path = if spos.file.s() == "?" { None } else { Some(spos.file.s()) };
+                    let import_file_path =
+                        if spos.filename() == "?" {
+                            None
+                        } else {
+                            Some(spos.filename())
+                        };
 
                     if let Some(resolver) = resolver {
 
@@ -2945,13 +2949,15 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
             }
         },
-        VVal::Syn(SynPos { syn: Syntax::OpColAddL, .. })
-        | VVal::Syn(SynPos { syn: Syntax::OpColAddR, .. }) => {
+        VVal::Syn(s)
+            if s.syn() == Syntax::OpColAddL
+            || s.syn() == Syntax::OpColAddR => {
+
             let col_add =
-                match ast {
-                    VVal::Syn(SynPos { syn: Syntax::OpColAddL, .. })
-                        => CollectionAdd::Unshift,
-                    _   => CollectionAdd::Push
+                if s.syn() == Syntax::OpColAddL {
+                    CollectionAdd::Unshift
+                } else {
+                    CollectionAdd::Push
                 };
 
             pw_provides_result_pos!(prog, {

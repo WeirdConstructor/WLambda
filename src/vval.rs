@@ -39,47 +39,80 @@ impl FileRef {
     pub fn s(&self) -> &str { &(*self.s) }
 }
 
+#[derive(Clone, PartialEq)]
+pub struct SynPosInfo {
+    pub line:       u32,
+    pub col:        u32,
+    pub file:       FileRef,
+    pub name:       Option<String>,
+}
+
 /// Structure for holding information about origin
 /// of an AST node.
 #[derive(Clone, PartialEq)]
 pub struct SynPos {
-    pub syn:        Syntax,
-    pub line:       u32,
-    pub col:        u16,
-    pub file:       FileRef,
-    pub name:       Option<std::rc::Rc<String>>,
+    pub syn:  Syntax,
+    pub info: Rc<SynPosInfo>,
 }
 
 impl SynPos {
     pub fn empty() -> Self {
         Self {
-            syn:     Syntax::Block,
-            line:    0,
-            col:     0,
-            file:    FileRef::new(""),
-            name:    None,
+            syn:  Syntax::Block,
+            info: Rc::new(SynPosInfo {
+                line: 0,
+                col:  0,
+                file: FileRef::new("?"),
+                name: None,
+            }),
         }
     }
 
+    pub fn new(syn: Syntax, line: u32, col: u32, file: FileRef) -> Self {
+        Self {
+            syn,
+            info: Rc::new(SynPosInfo { line, col, file, name: None, }),
+        }
+    }
+
+    pub fn line(&self) -> u32 { self.info.line }
+    pub fn col(&self) -> u32 { self.info.col }
+
+    pub fn filename(&self) -> &str {
+        self.info.file.s()
+    }
+
+    pub fn syn(&self) -> Syntax { self.syn }
+
+    pub fn set_syn(&mut self, syn: Syntax) {
+        self.syn = syn;
+    }
+
+    pub fn set_name(&mut self, name: &str) {
+        let mut new_info = (*self.info).clone();
+        new_info.name = Some(name.to_string());
+        self.info = Rc::new(new_info);
+    }
+
     pub fn s_short(&self) -> String {
-        format!("[{},{}({:?})]", self.line, self.col, self.syn)
+        format!("[{},{}({:?})]", self.info.line, self.info.col, self.syn)
     }
 
     pub fn s_only_pos(&self) -> String {
-        format!("[{},{}:{}]", self.line, self.col, self.file.s())
+        format!("[{},{}:{}]", self.info.line, self.info.col, self.info.file.s())
     }
 }
 
 impl Display for SynPos {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        if self.line > 0 {
-            if self.name.is_some() && !self.name.as_ref().unwrap().is_empty() {
+        if self.info.line > 0 {
+            if self.info.name.is_some() && !self.info.name.as_ref().unwrap().is_empty() {
                 write!(f, "[{},{}:{}({:?})@{}]",
-                       self.line, self.col, self.file.s(), self.syn,
-                       self.name.as_ref().unwrap())
+                       self.info.line, self.info.col, self.info.file.s(), self.syn,
+                       self.info.name.as_ref().unwrap())
             } else {
                 write!(f, "[{},{}:{}({:?})]",
-                       self.line, self.col, self.file.s(), self.syn)
+                       self.info.line, self.info.col, self.info.file.s(), self.syn)
             }
         } else {
             write!(f, "")
@@ -104,13 +137,13 @@ impl Display for CompileError {
         write!(
             f,
             "[{},{}:{}] Compilation Error: {}",
-            self.pos.line, self.pos.col, self.pos.file, self.msg)
+            self.pos.info.line, self.pos.info.col, self.pos.info.file, self.msg)
     }
 }
 
 
 /// Encodes the different types of AST nodes.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)]
 pub enum Syntax {
     Var,
@@ -995,9 +1028,7 @@ impl Env {
         VVal::err(
             VVal::new_str_mv(s),
             self.call_stack.last().unwrap().syn_pos.clone().or_else(
-                || Some(SynPos { syn: Syntax::Block, line: 0,
-                                 col: 0, file: FileRef::new("?"),
-                                 name: None })).unwrap())
+                || Some(SynPos::empty())).unwrap())
     }
 }
 
@@ -1481,6 +1512,7 @@ impl VValChr {
 /// It's used for the AST, for internal data and for runtime data structures.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
+#[repr(u8)]
 pub enum VVal {
     /// The none value, the default value of all non initialized data.
     None,
@@ -2437,9 +2469,7 @@ impl VVal {
 
     pub fn err_msg(s: &str) -> VVal {
         VVal::Err(Rc::new(RefCell::new(
-            (VVal::new_str(s),
-             SynPos { syn: Syntax::Block, line: 0,
-                      col: 0, file: FileRef::new("?"), name: None }))))
+            (VVal::new_str(s), SynPos::empty()))))
     }
 
     #[inline]
@@ -4631,18 +4661,21 @@ impl VVal {
         if let VVal::Syn(s) = self {
             s.clone()
         } else {
-            SynPos {
-                syn: Syntax::Block,
-                line: 0, col: 0,
-                file: FileRef::new("?"),
-                name: None,
-            }
+            SynPos::empty()
+        }
+    }
+
+    pub fn syn(&self) -> Option<Syntax> {
+        if let VVal::Syn(s) = self {
+            Some(s.syn())
+        } else {
+            None
         }
     }
 
     pub fn set_syn(&mut self, syn: Syntax) {
         if let VVal::Syn(s) = self {
-            s.syn = syn;
+            s.set_syn(syn);
         }
     }
 
@@ -4654,7 +4687,7 @@ impl VVal {
 
     pub fn get_syn(&self) -> Syntax {
         if let VVal::Syn(s) = self {
-            s.syn.clone()
+            s.syn()
         } else {
             Syntax::Block
         }
@@ -4989,7 +5022,7 @@ impl VVal {
             VVal::None       => 0.0,
             VVal::Err(_)     => 0.0,
             VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
-            VVal::Syn(s)     => (s.syn.clone() as i64) as f64,
+            VVal::Syn(s)     => (s.syn() as i64) as f64,
             VVal::Int(i)     => *i as f64,
             VVal::Flt(f)     => *f,
             VVal::Pair(b)    => b.0.f(),
@@ -5014,7 +5047,7 @@ impl VVal {
             VVal::None       => 0,
             VVal::Err(_)     => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
-            VVal::Syn(s)     => s.syn.clone() as i64,
+            VVal::Syn(s)     => s.syn() as i64,
             VVal::Int(i)     => *i,
             VVal::Flt(f)     => (*f as i64),
             VVal::Pair(b)    => b.0.i(),
@@ -5039,7 +5072,7 @@ impl VVal {
             VVal::None       => b'\0',
             VVal::Err(_)     => b'\0',
             VVal::Bol(b)     => if *b { b'\x01' } else { b'\0' },
-            VVal::Syn(s)     => s.syn.clone() as i64 as u32 as u8,
+            VVal::Syn(s)     => s.syn() as i64 as u32 as u8,
             VVal::Int(i)     => if *i <= 255 { *i as u8 } else { b'?' as u8 },
             VVal::Flt(f)     => if (*f as u32) <= 255 { *f as u8 } else { b'?' as u8 },
             VVal::Pair(b)    => b.0.byte(),
@@ -5065,7 +5098,7 @@ impl VVal {
             VVal::None       => '\0',
             VVal::Err(_)     => '\0',
             VVal::Bol(b)     => if *b { '\u{01}' } else { '\0' },
-            VVal::Syn(s)     => std::char::from_u32(s.syn.clone() as i64 as u32).unwrap_or('\0'),
+            VVal::Syn(s)     => std::char::from_u32(s.syn() as i64 as u32).unwrap_or('\0'),
             VVal::Int(i)     => std::char::from_u32(*i as u32).unwrap_or('\0'),
             VVal::Flt(f)     => std::char::from_u32(*f as u32).unwrap_or('\0'),
             VVal::Pair(b)    => b.0.c(),
@@ -5090,7 +5123,7 @@ impl VVal {
             VVal::None         => false,
             VVal::Err(_)       => false,
             VVal::Bol(b)       => *b,
-            VVal::Syn(s)       => (s.syn.clone() as i64) != 0,
+            VVal::Syn(s)       => (s.syn() as i64) != 0,
             VVal::Pair(b)      => b.0.b() || b.1.b(),
             VVal::Int(i)       => (*i) != 0,
             VVal::Flt(f)       => (*f as i64) != 0,
@@ -5173,7 +5206,7 @@ impl VVal {
             VVal::None       => "$n".to_string(),
             VVal::Err(e)     => format!("$e{} {}", (*e).borrow().1, (*e).borrow().0.s_cy(c)),
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
-            VVal::Syn(s)     => format!("&{:?}", s.syn),
+            VVal::Syn(s)     => format!("&{:?}", s.syn()),
             VVal::Chr(c)     => c.to_string(),
             VVal::Int(i)     => i.to_string(),
             VVal::Flt(f)     => f.to_string(),

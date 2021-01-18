@@ -160,6 +160,12 @@ Smalltalk, LISP and Perl.
     - [3.8.27](#3827-stdvvec2rad-vec) std:v:vec2rad _vec_
     - [3.8.28](#3828-stdvrad2vec-radians) std:v:rad2vec _radians_
   - [3.9](#39-characters-and-bytes) Characters and Bytes
+    - [3.9.1](#391-byte-value) byte _value_
+    - [3.9.2](#392-char-value) char _value_
+    - [3.9.3](#393-isbyte-value) is\_byte _value_
+    - [3.9.4](#394-ischar-value) is\_char _value_
+    - [3.9.5](#395-stdchartolowercase-value) std:char:to\_lowercase _value_
+    - [3.9.6](#396-stdchartouppercase-value) std:char:to\_uppercase _value_
   - [3.10](#310-strings) Strings
     - [3.10.1](#3101-string-literal-syntaxes) String Literal Syntaxes
     - [3.10.2](#3102-str-value) str _value_
@@ -244,7 +250,7 @@ Smalltalk, LISP and Perl.
     - [3.17.6](#3176-isiter-value) is\_iter _value_
   - [3.18](#318-calling-semantics-of-data-types) Calling Semantics of Data Types
 - [4](#4-conditional-execution---if--then--else) Conditional Execution - if / then / else
-  - [4.1](#41-if-condition-then-expr-else-expr) ?/if _condition_ _then-expr_ [_else-expr_]
+  - [4.1](#41-if-condition-then-expr-else-expr) if/? _condition_ _then-expr_ [_else-expr_]
   - [4.2](#42-using-booleans-for-conditional-execution) Using Booleans for Conditional Execution
     - [4.2.1](#421-pick-bool-a--b-) pick _bool_ _a_ -b-
     - [4.2.2](#422-indexing-by-booleans) Indexing by Booleans
@@ -358,6 +364,10 @@ Smalltalk, LISP and Perl.
     - [11.1.8](#1118-stdiostdoutflush) std:io:stdout:flush
     - [11.1.9](#1119-stdiostdoutprint-value) std:io:stdout:print _value_
     - [11.1.10](#11110-stdiostdoutwrite-value) std:io:stdout:write _value_
+    - [11.1.11](#11111-stdioflush-handle) std:io:flush _handle_
+    - [11.1.12](#11112-stdioreadsome-handle) std:io:read\_some _handle_
+    - [11.1.13](#11113-stdiowrite-handle-data-offs) std:io:write _handle_ _data_ [_offs_]
+    - [11.1.14](#11114-stdiowritesome-handle-data) std:io:write\_some _handle_ _data_
   - [11.2](#112-processes) Processes
     - [11.2.1](#1121-stdprocessrun-executable-path-arguments) std:process:run _executable-path_ [_arguments_]
   - [11.3](#113-file-system) File System
@@ -1010,7 +1020,7 @@ This operator has the highest precedence over all other operators
 and is used to be able to write this:
 
 ```wlambda
-? "foob" &> $r/f(^*)b/ {
+if "foob" &> $r/f(^*)b/ {
     std:assert_eq $\.1 "oo";
 } {
     std:assert $false;
@@ -1222,11 +1232,11 @@ and 1.0 (including 0.0 but not including 1.0) is returned.
 std:srand 1234567890;
 
 !zeros = $@i iter i 0 => 1000 {
-    ? std:rand[100] == 0 \$+ 1;
+    if std:rand[100] == 0 \$+ 1;
 };
 
 !count_100 = $@i iter i 0 => 1000 {
-    ? std:rand[100] == 100 \$+ 1;
+    if std:rand[100] == 100 \$+ 1;
 };
 
 std:assert zeros     >  0;
@@ -1327,7 +1337,7 @@ std:assert_eq $o()[]     $none;
 std:assert_eq $o(10)[]   10;
 
 !do_something = {
-    ? _ == 0 {
+    if _ == 0 {
         $o()
     } {
         $o(_ + 10)
@@ -1349,11 +1359,11 @@ std:assert ~ not ~ bool $o();
 std:assert ~ bool $o(10);
 
 !x = $o();
-!res1 = ? x "something" "nothing";
+!res1 = if x "something" "nothing";
 std:assert_eq res1 "nothing";
 
 .x = $o(30);
-!res2 = ? x "something" "nothing";
+!res2 = if x "something" "nothing";
 std:assert_eq res2 "something";
 ```
 
@@ -2685,6 +2695,74 @@ They are not boxed like strings:
 ```wlambda
 std:assert_eq ("foo" $p(0, 1))  "f"; # requires allocation
 std:assert_eq ("foo".0)         'f'; # requires NO allocation
+```
+
+#### <a name="391-byte-value"></a>3.9.1 - byte _value_
+
+Converts the _value_ to a byte. If _value_ is a number, it must be
+below or equal to 255, otherwise it will result in the byte `'?'`.
+
+```wlambda
+std:assert_eq (byte 64)           $b'@';
+std:assert_eq (byte 300)          $b'?';
+std:assert_eq (byte "ABC")        $b'A';
+std:assert_eq (byte $b"\xFF\xF0") $b'\xFF';
+std:assert_eq (byte "\xFF\xF0")   $b'\xC3'; # first byte of an utf-8 sequence!
+```
+
+#### <a name="392-char-value"></a>3.9.2 - char _value_
+
+Converts the _value_ to a Unicode character.
+
+```wlambda
+std:assert_eq (char $b'\xFF') 'ÿ';
+std:assert_eq (char 0x262F)   '☯';
+std:assert_eq (char "☯xyz")   '☯';
+```
+
+#### <a name="393-isbyte-value"></a>3.9.3 - is\_byte _value_
+
+Checks if _value_ is of the byte data type.
+
+```wlambda
+std:assert (is_byte $b'X');
+std:assert not[is_byte 'X'];
+std:assert not[is_byte 123];
+std:assert (is_byte $b"abc".0);
+std:assert not[is_byte "abc".0];
+std:assert not[is_byte $b"abc"];
+```
+
+#### <a name="394-ischar-value"></a>3.9.4 - is\_char _value_
+
+Check if _value_ is of the Unicode character data type.
+
+```wlambda
+std:assert (is_char 'X');
+std:assert not[is_char $b'X'];
+std:assert not[is_char 123];
+std:assert (is_char "abc".0);
+std:assert not[is_char $b"abc".0];
+std:assert not[is_char $b"abc"];
+std:assert not[is_char "abc"];
+```
+
+#### <a name="395-stdchartolowercase-value"></a>3.9.5 - std:char:to\_lowercase _value_
+
+Turns the _value_ into a lower case Unicode character.
+
+```wlambda
+std:assert_eq (std:char:to_lowercase 'A') 'a';
+std:assert_eq (std:char:to_lowercase 65)  'a';
+```
+
+#### <a name="396-stdchartouppercase-value"></a>3.9.6 - std:char:to\_uppercase _value_
+
+Turns the _value_ into an upper case Unicode character.
+
+```wlambda
+std:assert_eq (std:char:to_uppercase 'a') 'A';
+std:assert_eq (std:char:to_uppercase 97)  'A';
 ```
 
 ### <a name="310-strings"></a>3.10 - Strings
@@ -4254,7 +4332,7 @@ weird effects.
 !it = $iter v;
 
 iter i v {
-    ? i <= 3 {
+    if i <= 3 {
         std:push v i + 10;  # This is not recommended however...
     };
 };
@@ -4401,10 +4479,9 @@ Here is an overview of the data type calling semantics:
 
 ## <a name="4-conditional-execution---if--then--else"></a>4 - Conditional Execution - if / then / else
 
-### <a name="41-if-condition-then-expr-else-expr"></a>4.1 - ?/if _condition_ _then-expr_ [_else-expr_]
+### <a name="41-if-condition-then-expr-else-expr"></a>4.1 - if/? _condition_ _then-expr_ [_else-expr_]
 
 The keyword for conditional execution is either `if` or just the question mark `?`.
-Both are possible to use, while `?` is a bit more WLambda idiomatic.
 It takes 3 arguments: The first is an expression that will be evaluated
 and cast to a boolean. If the boolean is `$true`, the second argument is
 evaluated. If the boolean is `$false` the thrid argument is evaluated.
@@ -4414,7 +4491,7 @@ The third argument is optional.
 !x = 10;
 
 !msg = "x is ";
-? x > 4 {
+if x > 4 {
     .msg = std:str:cat msg "bigger than 4";
 } {
     .msg = std:str:cat msg "smaller than or equal to 4";
@@ -4434,7 +4511,7 @@ The _condition_ can also be a function block, which will be evaluated:
 
 ```wlambda
 !res =
-    ? { !x = 2; x > 1 } "x > 1";
+    if { !x = 2; x > 1 } "x > 1";
 
 std:assert_eq res "x > 1";
 ```
@@ -4844,7 +4921,7 @@ std:assert_eq sum 25;
 This is a jump table operation, it's a building block for the more
 sophisticated `match` operation. The first argument is an index into the table.
 If the index is outside the table the _last-branch_ is jumped to.  The branches
-are compiled like the bodies of `while`, `iter`, `match` and `?` into a runtime
+are compiled like the bodies of `while`, `iter`, `match` and `if` into a runtime
 evaluated block.
 
 ```wlambda
@@ -5757,7 +5834,7 @@ a data structure in an if statement:
 ```wlambda
 !some_struct = $[:TEST, ${ a = 10, b = 1442 }];
 
-? some_struct &> ($M $[sym, ${ a = 10, b = x }]) {
+if some_struct &> ($M $[sym, ${ a = 10, b = x }]) {
     std:assert_eq $\.sym :TEST;
     std:assert_eq $\.x   1442;
 } {
@@ -5956,7 +6033,7 @@ generating the structure pattern function at compile time.
 !runtime_name = "foo";
 !sel = std:selector (" * / " runtime_name);
 
-? sel <& $[${foo = 1}, ${foo = 2}, ${foo = 3}] {
+if sel <& $[${foo = 1}, ${foo = 2}, ${foo = 3}] {
     std:assert_str_eq $\ $[1,2,3];
 } {
     std:assert $false
@@ -6012,7 +6089,7 @@ the results of the latest match that was executed:
 ```wlambda
 # Notice the usage of the `<&` function call operator:
 !res =
-    ? "foo//\\/foo" &> $r| $<*? (^$+[\\/]) * | {
+    if "foo//\\/foo" &> $r| $<*? (^$+[\\/]) * | {
         std:assert_eq $\.0 "foo//\\/foo";
 
         $\.1
@@ -6707,6 +6784,80 @@ Returns an error if an error occured. `$true` if everything is fine.
 
 ```text
 std:io:stdout:write "xxx"; # => Writes `"xxx"` to standard output
+```
+
+#### <a name="11111-stdioflush-handle"></a>11.1.11 - std:io:flush _handle_
+
+Flushes the internal buffers of _handle_. _handle_ can be any kind of IO handle,
+like a file handle or networking socket.
+
+```text
+!socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
+
+std:io:write socket $b"GET / HTTP/1.0\r\n\r\n";
+std:io:flush socket;
+```
+
+#### <a name="11112-stdioreadsome-handle"></a>11.1.12 - std:io:read\_some _handle_
+
+Reads some amount of data from _handle_. The default maximum amount
+of bytes read is 4096. This function returns `$o(bytes)` if something
+was read. It returns `$o()` when EOF is encountered. `$none` is
+returned when the IO operation was interrupted or did timeout.
+An `$error` is returned if some kind of error happened, like loss of
+TCP connection.
+
+Here is an example how to read everything from a socket until EOF is
+encountered:
+
+```text
+!socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
+
+std:io:write socket $b"GET / HTTP/1.0\r\n\r\n";
+std:io:flush socket;
+
+!buf = $b"";
+!done = $f;
+while not[done] {
+    match std:io:read_some[socket]
+        $o(buf) => { .buf = buf +> $\.buf; }
+        $o()    => { .done = $t; }
+        ($e _)  => { .done = $t; };
+};
+```
+
+#### <a name="11113-stdiowrite-handle-data-offs"></a>11.1.13 - std:io:write _handle_ _data_ [_offs_]
+
+Write all data as byte vector to the IO _handle_ (socket, file handle, ...),
+starting at _offs_ (0 default).
+Returns the number of bytes written, an error or `$none` if interrupted.
+Note: This function does not respect the underlying write timeout in _handle_ properly.
+
+```text
+!socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
+
+std:io:write socket $b"GET / HTTP/1.0\r\n\r\n";
+```
+
+#### <a name="11114-stdiowritesome-handle-data"></a>11.1.14 - std:io:write\_some _handle_ _data_
+
+Try to write some data as byte vector to the IO _handle_ (socket, file handle,
+...), starting at _offs_ (0 default).
+Returns the number of bytes written, an error or `$none` if a timeout or interrupt
+ended the write operation.
+
+```text
+!socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
+
+!bytes = $b"GET / HTTP/1.0\r\n\r\n";
+!written = 0;
+
+while len[bytes] > written {
+    match (std:io:write_some socket bytes written)
+        $o(n)  => { .written += n; }
+        $none  => {}
+        ($e _) => { break[] };
+}
 ```
 
 ### <a name="112-processes"></a>11.2 - Processes
@@ -8108,7 +8259,7 @@ In the following grammar, white space and comments are omitted:
 
 There are certain calls that are handled by the compiler differently.
 
-- `? _condition_ _then-block-or-expr_ [_else-block-or-expr_]`
+- `if _condition_ _then-block-or-expr_ [_else-block-or-expr_]`
 - `while _condition_ _block-or-expr_`
 - `iter _var_ _value-expr_ _block-or-expr_`
 - `next _x_`
@@ -8532,9 +8683,9 @@ pub fn core_symbol_table() -> SymbolTable {
                 VVal::Err(err_v) => {
                     env.with_restore_sp(|e: &mut Env| {
                         e.push(err_v.borrow().0.clone());
-                        e.push(VVal::Int(err_v.borrow().1.line as i64));
-                        e.push(VVal::Int(err_v.borrow().1.col as i64));
-                        e.push(VVal::new_str(err_v.borrow().1.file.s()));
+                        e.push(VVal::Int(err_v.borrow().1.line() as i64));
+                        e.push(VVal::Int(err_v.borrow().1.col() as i64));
+                        e.push(VVal::new_str(err_v.borrow().1.filename()));
                         err_fn.call_internal(e, 4)
                     })
                 },
@@ -9918,11 +10069,14 @@ pub fn std_symbol_table() -> SymbolTable {
             sizeof_writeln!(write, Symbol);
             sizeof_writeln!(write, Option<Rc<VVal>>);
             sizeof_writeln!(write, crate::nvec::NVec<f64>);
+            sizeof_writeln!(write, Box<crate::nvec::NVec<f64>>);
             sizeof_writeln!(write, Result<VVal, StackAction>);
             sizeof_writeln!(write, StackAction);
             sizeof_writeln!(write, Box<String>);
             sizeof_writeln!(write, Box<Vec<VVal>>);
             sizeof_writeln!(write, Vec<VVal>);
+            sizeof_writeln!(write, Box<dyn VValUserData>);
+            sizeof_writeln!(write, std::rc::Weak<std::cell::RefCell<VVal>>);
             Ok(VVal::None)
         }, Some(0), Some(0), false);
 
