@@ -76,7 +76,7 @@ std:assert_eq x 6;
 ### If
 
 ```wlambda
-? $true {
+if $true {
     std:displayln "It's true!";
 } {
     std:displayln "It's false!";
@@ -86,7 +86,7 @@ std:assert_eq x 6;
 ```wlambda
 !x = 10 / 2;
 
-? x == 5 {
+if x == 5 {
     std:displayln "x == 5";
 };
 ```
@@ -112,7 +112,7 @@ while x > 0 {
 while x > 0 {
     std:displayln x;
 
-    ? x == 5 {
+    if x == 5 {
         # break is a function, first arg
         # is the return value for `while`:
         break[];
@@ -143,7 +143,7 @@ std:assert_eq sum 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9;
 while $true {
     std:displayln x;
     .x = x - 1;
-    ? x == 0 break[];
+    if x == 0 break[];
 };
 ```
 
@@ -187,7 +187,7 @@ std:displayln add5 <& 3;    # '<&' is the reverse argument pipe operator
 
     # an `if` is actually a call to another function, so we need to
     # dynamically jump upwards the call stack to the given label:
-    ? x > 10 {
+    if x > 10 {
         return :ret_label_a x * 2;
     };
 };
@@ -256,11 +256,11 @@ std:assert_eq m.b 12;
 ```wlambda
 !name = "Mr. X";
 
-std:assert_eq name.4 "X";           # index a character
+std:assert_eq name.4 'X';           # index a character
 std:assert_eq (name 0 3) "Mr.";     # substring
 
 !stuff = "日本人";
-std:assert_eq stuff.0 "日";         # Unicode support
+std:assert_eq stuff.0 '日';         # Unicode support
 ```
 
 ### Unicode identifiers:
@@ -275,7 +275,7 @@ std:assert_eq 人 "jin";
 
 ```wlambda
 !some_fun = {
-    ? _ == :fail {
+    if _ == :fail {
         $error :FAIL_HAVING_FUN
     } {
         :ok
@@ -314,7 +314,7 @@ captured.
     ${ y = 99 },
 ];
 
-? struct &> $S( *:{a=10} /b/1 ) {
+if struct &> $S( *:{a=10} /b/1 ) {
     std:assert_str_eq $\    $[2,5];
 } {
     panic "Should've matched!";
@@ -362,7 +362,7 @@ std:assert_str_eq res $[
 !crate  = $none;
 !domain = $none;
 
-? some_url &> $r{$^ (^$+[^:]) \:\/\/ (^$*[^/]) \/crates\/ (^$+[a-z]) } {
+if some_url &> $r{$^ (^$+[^:]) :// (^$*[^/]) /crates/ (^$+[a-z]) } {
     .domain = $\.2;
     .crate = $\.3;
 };
@@ -517,6 +517,7 @@ Current remaining goals for WLambda are:
 dependencies.
 - Improve and further document the VVal API for interacting with WLambda.
 - Improve [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) documentation.
+- DONE: Complete function reference documentation in [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 - DONE: Add proper module support (via `!@import` and `!@export`).
 - DONE: Add prototyped inheritance for OOP paradigm.
 - DONE: Add data structure matching/destructuring/selection primitives

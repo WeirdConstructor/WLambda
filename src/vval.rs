@@ -526,28 +526,6 @@ impl Env {
         ret
     }
 
-//    #[inline]
-//    pub fn with_fun_info<T>(&mut self, fu: Rc<VValFun>, argc: usize, f: T) -> Result<VVal, StackAction>
-//        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
-//        self.push_fun_call(fu);
-////        let local_size = fu.local_size;
-////        let old_argc = std::mem::replace(&mut self.argc, argc);
-//////        let old_fun  = std::mem::replace(&mut self.fun, fu.clone());
-////        self.call_stack.push(fu);
-////        let old_bp   = self.set_bp(local_size);
-////        //d// println!("OLD FUN: {:?}", old_fun.upvalues);
-//
-//        let ret = f(self);
-//
-//        self.unwind_one();
-////        self.reset_bp(local_size, old_bp);
-//////        self.fun  = old_fun;
-////        self.call_stack.pop();
-////        self.argc = old_argc;
-//
-//        ret
-//    }
-//
     #[inline]
     pub fn with_restore_sp<T>(&mut self, f: T) -> Result<VVal, StackAction>
         where T: Fn(&mut Env) -> Result<VVal, StackAction> {

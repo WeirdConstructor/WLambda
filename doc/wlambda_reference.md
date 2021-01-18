@@ -354,40 +354,43 @@ Smalltalk, LISP and Perl.
     - [11.1.12](#11112-stdioreadsome-handle) std:io:read\_some _handle_
     - [11.1.13](#11113-stdiowrite-handle-data-offs) std:io:write _handle_ _data_ [_offs_]
     - [11.1.14](#11114-stdiowritesome-handle-data) std:io:write\_some _handle_ _data_
-  - [11.2](#112-processes) Processes
-    - [11.2.1](#1121-stdprocessrun-executable-path-arguments) std:process:run _executable-path_ [_arguments_]
-  - [11.3](#113-file-system) File System
-    - [11.3.1](#1131-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
-    - [11.3.2](#1132-stdfscopy-src-file-path-dst-file-path) std:fs:copy _src-file-path_ _dst-file-path_
-    - [11.3.3](#1133-stdfsreaddir-path-function) std:fs:read\_dir _path_ _function_
-  - [11.4](#114-system) System
-    - [11.4.1](#1141-stdsysos) std:sys:os
-  - [11.5](#115-threading) Threading
-    - [11.5.1](#1151-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
-    - [11.5.2](#1152-stdthreadsleep-duration) std:thread:sleep _duration_
-    - [11.5.3](#1153-thread-handle-api) Thread Handle API
-      - [11.5.3.1](#11531-thdljoin) thdl.join
-      - [11.5.3.2](#11532-thdlrecvready) thdl.recv\_ready
-    - [11.5.4](#1154-atom-api) Atom API
-      - [11.5.4.1](#11541-stdsyncatomnew-value) std:sync:atom:new _value_
-      - [11.5.4.2](#11542-atomread) atom.read
-      - [11.5.4.3](#11543-atomwrite-value) atom.write _value_
-      - [11.5.4.4](#11544-atomswap-value) atom.swap _value_
-    - [11.5.5](#1155-atom-value-slot-api) Atom Value Slot API
-      - [11.5.5.1](#11551-stdsyncslotnew) std:sync:slot:new
-      - [11.5.5.2](#11552-atomslotsend-value) atom\_slot.send _value_
-      - [11.5.5.3](#11553-atomslotrecv) atom\_slot.recv
-      - [11.5.5.4](#11554-atomslottryrecv) atom\_slot.try\_recv
-      - [11.5.5.5](#11555-atomslotrecvtimeout-duration) atom\_slot.recv\_timeout _duration_
-      - [11.5.5.6](#11556-atomslotcheckempty) atom\_slot.check\_empty
-      - [11.5.5.7](#11557-atomslotwaitempty) atom\_slot.wait\_empty
-      - [11.5.5.8](#11558-atomslotwaitemptytimeout-duration) atom\_slot.wait\_empty\_timeout _duration_
-    - [11.5.6](#1156-channel-api) Channel API
-      - [11.5.6.1](#11561-stdsyncmpscnew) std:sync:mpsc:new
-      - [11.5.6.2](#11562-channelsend-value) channel.send _value_
-      - [11.5.6.3](#11563-channelrecv) channel.recv
-      - [11.5.6.4](#11564-channeltryrecv) channel.try\_recv
-      - [11.5.6.5](#11565-channelrecvtimeout-duration) channel.recv\_timeout _duration_
+  - [11.2](#112-networking) Networking
+    - [11.2.1](#1121-stdnettcpconnect-socket-addr-connect-timeout) std:net:tcp:connect _socket-addr_ [_connect-timeout_]
+    - [11.2.2](#1122-stdnettcplisten-socket-addr-function) std:net:tcp:listen _socket-addr_ _function_
+  - [11.3](#113-processes) Processes
+    - [11.3.1](#1131-stdprocessrun-executable-path-arguments) std:process:run _executable-path_ [_arguments_]
+  - [11.4](#114-file-system) File System
+    - [11.4.1](#1141-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
+    - [11.4.2](#1142-stdfscopy-src-file-path-dst-file-path) std:fs:copy _src-file-path_ _dst-file-path_
+    - [11.4.3](#1143-stdfsreaddir-path-function) std:fs:read\_dir _path_ _function_
+  - [11.5](#115-system) System
+    - [11.5.1](#1151-stdsysos) std:sys:os
+  - [11.6](#116-threading) Threading
+    - [11.6.1](#1161-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
+    - [11.6.2](#1162-stdthreadsleep-duration) std:thread:sleep _duration_
+    - [11.6.3](#1163-thread-handle-api) Thread Handle API
+      - [11.6.3.1](#11631-thdljoin) thdl.join
+      - [11.6.3.2](#11632-thdlrecvready) thdl.recv\_ready
+    - [11.6.4](#1164-atom-api) Atom API
+      - [11.6.4.1](#11641-stdsyncatomnew-value) std:sync:atom:new _value_
+      - [11.6.4.2](#11642-atomread) atom.read
+      - [11.6.4.3](#11643-atomwrite-value) atom.write _value_
+      - [11.6.4.4](#11644-atomswap-value) atom.swap _value_
+    - [11.6.5](#1165-atom-value-slot-api) Atom Value Slot API
+      - [11.6.5.1](#11651-stdsyncslotnew) std:sync:slot:new
+      - [11.6.5.2](#11652-atomslotsend-value) atom\_slot.send _value_
+      - [11.6.5.3](#11653-atomslotrecv) atom\_slot.recv
+      - [11.6.5.4](#11654-atomslottryrecv) atom\_slot.try\_recv
+      - [11.6.5.5](#11655-atomslotrecvtimeout-duration) atom\_slot.recv\_timeout _duration_
+      - [11.6.5.6](#11656-atomslotcheckempty) atom\_slot.check\_empty
+      - [11.6.5.7](#11657-atomslotwaitempty) atom\_slot.wait\_empty
+      - [11.6.5.8](#11658-atomslotwaitemptytimeout-duration) atom\_slot.wait\_empty\_timeout _duration_
+    - [11.6.6](#1166-channel-api) Channel API
+      - [11.6.6.1](#11661-stdsyncmpscnew) std:sync:mpsc:new
+      - [11.6.6.2](#11662-channelsend-value) channel.send _value_
+      - [11.6.6.3](#11663-channelrecv) channel.recv
+      - [11.6.6.4](#11664-channeltryrecv) channel.try\_recv
+      - [11.6.6.5](#11665-channelrecvtimeout-duration) channel.recv\_timeout _duration_
 - [12](#12-optional-standard-library) Optional Standard Library
   - [12.1](#121-serialization) serialization
     - [12.1.1](#1211-stdserwlambda-arg) std:ser:wlambda _arg_
@@ -6846,11 +6849,57 @@ while len[bytes] > written {
 }
 ```
 
-### <a name="112-processes"></a>11.2 - Processes
+### <a name="112-networking"></a>11.2 - Networking
+
+#### <a name="1121-stdnettcpconnect-socket-addr-connect-timeout"></a>11.2.1 - std:net:tcp:connect _socket-addr_ [_connect-timeout_]
+
+This tries to connect to _socket-addr_. If a _connect-timeout_ is given, it
+will try to connect within that time. Please note that the returned sockets are
+thread safe and can be passed to another thread via an _Atom_, _Atom Value
+Slot_ or _Channel_ for instance.
+
+_socket-addr_ can be:
+
+- A pair `$p(host, port)`
+- A string like "host:port".
+- A pair within a pair to specify whether to use IPv4 or IPv6
+addresses only:
+    - `$p(:v4, "host:port")`
+    - `$p(:v4, $p(host, port))`
+    - `$p(:v6, "host:port")`
+    - `$p(:v6, $p(host, port))`
+
+About _connect-timeout_ see std:thread:sleep.
+
+```test
+!socket =
+    match (std:net:tcp:connect "127.0.0.1:8328")
+        ($e err) => { panic ("Couldn't connect: " + str[$\.err]) }
+        socket   => $\.socket;
+```
+
+#### <a name="1122-stdnettcplisten-socket-addr-function"></a>11.2.2 - std:net:tcp:listen _socket-addr_ _function_
+
+Tries to bind a local port to _socket-addr_ (see std:net:tcp:connect about
+_socket-addr_.  Note: you can't use `$p(:v4 / :v6, ...)`).
+Returns an error if something bad happened.
+
+For every new connection _function_ is called with the socket
+as first argument:
+
+```text
+unwrap ~ std:net:tcp:listen "0.0.0.0:8292" {!(socket) = @;
+    std:io:write socket "Hello!\r\n";
+};
+```
+
+Please note that you can share the socket with other threads, see also std:net:tcp:connect.
+
+### <a name="113-processes"></a>11.3 - Processes
 
 This chapter documents how to execute new processes.
 
-#### <a name="1121-stdprocessrun-executable-path-arguments"></a>11.2.1 - std:process:run _executable-path_ [_arguments_]
+#### <a name="1131-stdprocessrun-executable-path-arguments"></a>11.3.1 - std:process:run _executable-path_ [_arguments_]
 
 Starts the given _executable-path_ with the given (but optional) _arguments_.
 _arguments_ can be a vector or an iterator. A data structure containing
@@ -6881,21 +6930,21 @@ std:assert_eq ret.stdout  $b"test\n";
 std:assert_eq ret.stderr  $b"";
 ```
 
-### <a name="113-file-system"></a>11.3 - File System
+### <a name="114-file-system"></a>11.4 - File System
 
-#### <a name="1131-stdfsrename-file-path-new-file-name"></a>11.3.1 - std:fs:rename _file-path_ _new-file-name_
+#### <a name="1141-stdfsrename-file-path-new-file-name"></a>11.4.1 - std:fs:rename _file-path_ _new-file-name_
 
 Renames the file at _file-path_ to the new name _new-file-name_. This
 usually does only work on a single file system.
 Returns `$true` if renaming was successful, and an error object if it was not
 successful.
 
-#### <a name="1132-stdfscopy-src-file-path-dst-file-path"></a>11.3.2 - std:fs:copy _src-file-path_ _dst-file-path_
+#### <a name="1142-stdfscopy-src-file-path-dst-file-path"></a>11.4.2 - std:fs:copy _src-file-path_ _dst-file-path_
 
 Copies the file _src-file-path_ to the _dst-file-path_.
 Returns an error if something went wrong.
 
-#### <a name="1133-stdfsreaddir-path-function"></a>11.3.3 - std:fs:read\_dir _path_ _function_
+#### <a name="1143-stdfsreaddir-path-function"></a>11.4.3 - std:fs:read\_dir _path_ _function_
 
 Calls _function_ with the first argument being the directory entry as map
 of this structure:
@@ -6921,11 +6970,11 @@ directory by returning a `$true` value.
 
 You can format the timestamps using `std:chrono:format_utc`.
 
-### <a name="114-system"></a>11.4 - System
+### <a name="115-system"></a>11.5 - System
 
 This chapter contains a few system as in _operating system_ related functions.
 
-#### <a name="1141-stdsysos"></a>11.4.1 - std:sys:os
+#### <a name="1151-stdsysos"></a>11.5.1 - std:sys:os
 
 Returns the name of the operating system. These are some possible
 values:
@@ -6945,7 +6994,7 @@ values:
 std:assert (len std:sys:os[]) > 0;
 ```
 
-### <a name="115-threading"></a>11.5 - Threading
+### <a name="116-threading"></a>11.6 - Threading
 
 WLambda leverages the `std::thread` implementation of Rust's standard library
 to provide safe threading. Threading works by spawning new threads that
@@ -6968,7 +7017,7 @@ implementing your algorithm in Rust instead. You can of course still manage
 thread orchestration in WLambda if you just provide a simple function
 API to your algorithms.
 
-#### <a name="1151-stdthreadspawn-string-globals-map"></a>11.5.1 - std:thread:spawn _string_ [_globals-map_]
+#### <a name="1161-stdthreadspawn-string-globals-map"></a>11.6.1 - std:thread:spawn _string_ [_globals-map_]
 
 This evaluates the given _string_ as WLambda code in a new thread.
 It returns a thread handle, that can be used to join the thread or
@@ -7032,7 +7081,7 @@ instance.
 std:assert_str_eq res 102;
 ```
 
-#### <a name="1152-stdthreadsleep-duration"></a>11.5.2 - std:thread:sleep _duration_
+#### <a name="1162-stdthreadsleep-duration"></a>11.6.2 - std:thread:sleep _duration_
 
 Lets the current thread sleep for the given _duration_.
 _duration_ can either be an integer that will be interpreted
@@ -7058,9 +7107,9 @@ thrd.join[];
 std:assert (after - before) >= 150;
 ```
 
-#### <a name="1153-thread-handle-api"></a>11.5.3 - Thread Handle API
+#### <a name="1163-thread-handle-api"></a>11.6.3 - Thread Handle API
 
-##### <a name="11531-thdljoin"></a>11.5.3.1 - thdl.join
+##### <a name="11631-thdljoin"></a>11.6.3.1 - thdl.join
 
 This method will wait for the thread to finish and return
 the return value of the thread.
@@ -7072,7 +7121,7 @@ std:assert_eq thdl.join[] 7;
 
 This method will return an error if the thread handle was already joined.
 
-##### <a name="11532-thdlrecvready"></a>11.5.3.2 - thdl.recv\_ready
+##### <a name="11632-thdlrecvready"></a>11.6.3.2 - thdl.recv\_ready
 
 Waits for the global `_READY` atomic value slot to be sent a value by the
 thread. This is useful for waiting until the thread has started without an
@@ -7101,7 +7150,7 @@ thdl.join[];
 This method might return an error if the thread provider
 made a handle without a ready slot.
 
-#### <a name="1154-atom-api"></a>11.5.4 - Atom API
+#### <a name="1164-atom-api"></a>11.6.4 - Atom API
 
 For threads a VVal (WLambda data value) is transformed into a value
 that can be shared between threads safely. For this the data values are cloned
@@ -7110,7 +7159,7 @@ deeply and transformed into a structure of atomic values.
 These values are then stored in a so called _Atom_. They can be safely changed
 by threads.
 
-##### <a name="11541-stdsyncatomnew-value"></a>11.5.4.1 - std:sync:atom:new _value_
+##### <a name="11641-stdsyncatomnew-value"></a>11.6.4.1 - std:sync:atom:new _value_
 
 Creates an Atom, containing the given _value_. The data types for _value_
 is limited to these:
@@ -7150,7 +7199,7 @@ std:assert_eq at.read[] 6;
 thdl.join[]
 ```
 
-##### <a name="11542-atomread"></a>11.5.4.2 - atom.read
+##### <a name="11642-atomread"></a>11.6.4.2 - atom.read
 
 Returns the value stored in the atom.
 
@@ -7162,7 +7211,7 @@ std:assert_eq at.read[] 99;
 
 This method might return an error if the internal mutex was poisoned.
 
-##### <a name="11543-atomwrite-value"></a>11.5.4.3 - atom.write _value_
+##### <a name="11643-atomwrite-value"></a>11.6.4.3 - atom.write _value_
 
 Overwrites the contents of the atom with the given _value_.
 
@@ -7176,7 +7225,7 @@ std:assert_eq at.read[] 100;
 
 This method might return an error if the internal mutex was poisoned.
 
-##### <a name="11544-atomswap-value"></a>11.5.4.4 - atom.swap _value_
+##### <a name="11644-atomswap-value"></a>11.6.4.4 - atom.swap _value_
 
 Returns the previous value of the atom and writes in
 the given _value_.
@@ -7191,7 +7240,7 @@ std:assert_eq at.read[] 100;
 
 This method might return an error if the internal mutex was poisoned.
 
-#### <a name="1155-atom-value-slot-api"></a>11.5.5 - Atom Value Slot API
+#### <a name="1165-atom-value-slot-api"></a>11.6.5 - Atom Value Slot API
 
 An Atom value slot offers more synchronization than a normal Atom value.
 It allows you to set the value of the slot, wait for it to be collected
@@ -7207,14 +7256,14 @@ starvation.
 Best recommendation here is to use a slot only from a single writer and
 a single reader.
 
-##### <a name="11551-stdsyncslotnew"></a>11.5.5.1 - std:sync:slot:new
+##### <a name="11651-stdsyncslotnew"></a>11.6.5.1 - std:sync:slot:new
 
 Constructs a new Atom slot and returns it.
 The slot has the initial status of being _empty_.
 If a value is sent to it, it will not be _empty_ anymore.
 After a value is received from the slot, the status is _empty_ again.
 
-##### <a name="11552-atomslotsend-value"></a>11.5.5.2 - atom\_slot.send _value_
+##### <a name="11652-atomslotsend-value"></a>11.6.5.2 - atom\_slot.send _value_
 
 This method sends the value into the slot, overwriting any previous
 set values. The slot can also ha
@@ -7236,7 +7285,7 @@ std:assert slot.check_empty[];
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="11553-atomslotrecv"></a>11.5.5.3 - atom\_slot.recv
+##### <a name="11653-atomslotrecv"></a>11.6.5.3 - atom\_slot.recv
 
 If the slot is empty, it will wait for a value to become available.
 Once a value is available it is returned and the slot is set to _empty_ again.
@@ -7256,7 +7305,7 @@ thrd.join[];
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="11554-atomslottryrecv"></a>11.5.5.4 - atom\_slot.try\_recv
+##### <a name="11654-atomslottryrecv"></a>11.6.5.4 - atom\_slot.try\_recv
 
 This method returns an optional value. It will provide an empty optional
 value if no value is stored in the slot. But if the slot contains
@@ -7290,7 +7339,7 @@ thrd.join[];
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="11555-atomslotrecvtimeout-duration"></a>11.5.5.5 - atom\_slot.recv\_timeout _duration_
+##### <a name="11655-atomslotrecvtimeout-duration"></a>11.6.5.5 - atom\_slot.recv\_timeout _duration_
 
 Acts like `atom_slot.recv`, but it will only wait for the given _duration_.  If
 no value was received in the given _duration_ (see std:thread:sleep), `$o()` is
@@ -7309,21 +7358,21 @@ std:assert_eq (slot.recv_timeout :ms => 100) $o(4);
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="11556-atomslotcheckempty"></a>11.5.5.6 - atom\_slot.check\_empty
+##### <a name="11656-atomslotcheckempty"></a>11.6.5.6 - atom\_slot.check\_empty
 
 Returns `$true` if the slot is empty.
 
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="11557-atomslotwaitempty"></a>11.5.5.7 - atom\_slot.wait\_empty
+##### <a name="11657-atomslotwaitempty"></a>11.6.5.7 - atom\_slot.wait\_empty
 
 Waits until the slot is empty and then returns `$true`.
 
 This method might return an error if there was an issue with locking
 the internal mutex or the mutex was poisoned.
 
-##### <a name="11558-atomslotwaitemptytimeout-duration"></a>11.5.5.8 - atom\_slot.wait\_empty\_timeout _duration_
+##### <a name="11658-atomslotwaitemptytimeout-duration"></a>11.6.5.8 - atom\_slot.wait\_empty\_timeout _duration_
 
 Waits a predefined timeout until the slot is empty. If it did become
 empty within the given _duration_ (see std:thread:sleep) it will return `$true`.
@@ -7332,7 +7381,7 @@ Otherwise it will return `$false`.
 This method might return an error if there was an issue with locking
 the interal mutex or the mutex was poisoned.
 
-#### <a name="1156-channel-api"></a>11.5.6 - Channel API
+#### <a name="1166-channel-api"></a>11.6.6 - Channel API
 
 A channel is a multiple sender, single consumer queue. It can be used to
 establish a message passing based communication between threads.
@@ -7365,7 +7414,7 @@ std:assert_eq sum 45;
 thdl.join[];
 ```
 
-##### <a name="11561-stdsyncmpscnew"></a>11.5.6.1 - std:sync:mpsc:new
+##### <a name="11661-stdsyncmpscnew"></a>11.6.6.1 - std:sync:mpsc:new
 
 This creates a new channel. You can safely send from multiple threads
 while reading from one thread at a time.
@@ -7382,7 +7431,7 @@ std:assert_eq chan.recv[] :b;
 std:assert_eq chan.recv[] :c;
 ```
 
-##### <a name="11562-channelsend-value"></a>11.5.6.2 - channel.send _value_
+##### <a name="11662-channelsend-value"></a>11.6.6.2 - channel.send _value_
 
 Sends the given _value_ to the channel queue.
 
@@ -7396,7 +7445,7 @@ std:assert_eq chan.recv[] :a;
 This method might return an error if the channel failed, for instance due
 to a poisoned internal mutex.
 
-##### <a name="11563-channelrecv"></a>11.5.6.3 - channel.recv
+##### <a name="11663-channelrecv"></a>11.6.6.3 - channel.recv
 
 Receives the next element from the channel. If no element is available
 this method will block the thread until an element becomes available.
@@ -7411,7 +7460,7 @@ std:assert_eq chan.recv[] :a;
 This method might return an error if the channel failed, for instance due
 to a poisoned internal mutex.
 
-##### <a name="11564-channeltryrecv"></a>11.5.6.4 - channel.try\_recv
+##### <a name="11664-channeltryrecv"></a>11.6.6.4 - channel.try\_recv
 
 Tries to receive the next element from the channel and return it wrapped
 into an optional. If no element is available an empty optional `$o()` is returned.
@@ -7429,7 +7478,7 @@ std:assert_eq chan.try_recv[] $o(:a);
 This method might return an error if the channel failed, for instance due
 to a poisoned internal mutex.
 
-##### <a name="11565-channelrecvtimeout-duration"></a>11.5.6.5 - channel.recv\_timeout _duration_
+##### <a name="11665-channelrecvtimeout-duration"></a>11.6.6.5 - channel.recv\_timeout _duration_
 
 Tries to receive the next element in the given _duration_ (see std:thread:sleep)
 and return it wrapped into an optional. If no element could be received
