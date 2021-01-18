@@ -4015,7 +4015,7 @@ impl VVal {
                 }
             },
             VVal::Str(_) => {
-                let mut out = String::new();
+                let mut out = collection.with_s_ref(|s| s.to_string());
                 for v in vals.iter() {
                     v.clone().with_value_or_iter_values(|v, _k| {
                         v.with_s_ref(|s| out.push_str(s));
@@ -4025,7 +4025,7 @@ impl VVal {
                 collection = VVal::new_str_mv(out);
             },
             VVal::Byt(_) => {
-                let mut out : Vec<u8> = vec![];
+                let mut out = collection.with_bv_ref(|b| b.to_vec());
                 for v in vals.iter() {
                     v.clone().with_value_or_iter_values(|v, _k| {
                         v.with_bv_ref(|b| out.extend_from_slice(b));

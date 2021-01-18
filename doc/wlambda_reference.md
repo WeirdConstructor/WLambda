@@ -2673,6 +2673,74 @@ std:assert_eq ("foo" $p(0, 1))  "f"; # requires allocation
 std:assert_eq ("foo".0)         'f'; # requires NO allocation
 ```
 
+#### - byte _value_
+
+Converts the _value_ to a byte. If _value_ is a number, it must be
+below or equal to 255, otherwise it will result in the byte `'?'`.
+
+```wlambda
+std:assert_eq (byte 64)           $b'@';
+std:assert_eq (byte 300)          $b'?';
+std:assert_eq (byte "ABC")        $b'A';
+std:assert_eq (byte $b"\xFF\xF0") $b'\xFF';
+std:assert_eq (byte "\xFF\xF0")   $b'\xC3'; # first byte of an utf-8 sequence!
+```
+
+#### - char _value_
+
+Converts the _value_ to a Unicode character.
+
+```wlambda
+std:assert_eq (char $b'\xFF') 'ÿ';
+std:assert_eq (char 0x262F)   '☯';
+std:assert_eq (char "☯xyz")   '☯';
+```
+
+#### - is\_byte _value_
+
+Checks if _value_ is of the byte data type.
+
+```wlambda
+std:assert (is_byte $b'X');
+std:assert not[is_byte 'X'];
+std:assert not[is_byte 123];
+std:assert (is_byte $b"abc".0);
+std:assert not[is_byte "abc".0];
+std:assert not[is_byte $b"abc"];
+```
+
+#### - is\_char _value_
+
+Check if _value_ is of the Unicode character data type.
+
+```wlambda
+std:assert (is_char 'X');
+std:assert not[is_char $b'X'];
+std:assert not[is_char 123];
+std:assert (is_char "abc".0);
+std:assert not[is_char $b"abc".0];
+std:assert not[is_char $b"abc"];
+std:assert not[is_char "abc"];
+```
+
+#### - std:char:to\_lowercase _value_
+
+Turns the _value_ into a lower case Unicode character.
+
+```wlambda
+std:assert_eq (std:char:to_lowercase 'A') 'a';
+std:assert_eq (std:char:to_lowercase 65)  'a';
+```
+
+#### - std:char:to\_uppercase _value_
+
+Turns the _value_ into an upper case Unicode character.
+
+```wlambda
+std:assert_eq (std:char:to_uppercase 'a') 'A';
+std:assert_eq (std:char:to_uppercase 97)  'A';
+```
+
 ### <a name="310-strings"></a>3.10 - Strings
 
 Strings in WLambda are like Rust UTF-8 encoded immutable Unicode strings.
@@ -6693,6 +6761,46 @@ Returns an error if an error occured. `$true` if everything is fine.
 
 ```text
 std:io:stdout:write "xxx"; # => Writes `"xxx"` to standard output
+```
+
+#### - std:io:flush _handle_
+
+Flushes the internal buffers of _handle_. _handle_ can be any kind of IO handle,
+like a file handle or networking socket.
+
+```text
+!socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
+
+std:io:write socket $b"GET / HTTP/1.0\r\n\r\n";
+std:io:flush socket;
+```
+
+#### - std:io:read\_some _handle_
+
+Reads some amount of data from _handle_. The default maximum amount
+of bytes read is 4096. This function returns `$o(bytes)` if something
+was read. It returns `$o()` when EOF is encountered. `$none` is
+returned when the IO operation was interrupted or did timeout.
+An `$error` is returned if some kind of error happened, like loss of
+TCP connection.
+
+Here is an example how to read everything from a socket until EOF is
+encountered:
+
+```text
+!socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
+
+std:io:write socket $b"GET / HTTP/1.0\r\n\r\n";
+std:io:flush socket;
+
+!buf = $b"";
+!done = $f;
+while not[done] {
+    match std:io:read_some[socket]
+        $o(buf) => { .buf = buf +> $\.buf; }
+        $o()    => { .done = $t; }
+        ($e _)  => { .done = $t; };
+};
 ```
 
 ### <a name="112-processes"></a>11.2 - Processes
