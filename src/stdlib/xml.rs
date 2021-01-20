@@ -12,6 +12,8 @@ use quick_xml::Reader;
 use quick_xml::Writer;
 #[cfg(feature="quick-xml")]
 use quick_xml::events::{Event, BytesStart, BytesEnd, BytesText, BytesDecl};
+use crate::compiler::*;
+use std::rc::Rc;
 
 #[allow(unused_macros)]
 macro_rules! unesc_val_to_vval_or_err {
@@ -494,4 +496,38 @@ impl VValBuilder {
     }
 
     pub fn result(&self) -> VVal { self.cur.clone() }
+}
+
+pub fn add_to_symtable(st: &mut SymbolTable) {
+    #[cfg(feature="quick-xml")]
+    st.fun("xml:read_sax", |env: &mut Env, _argc: usize| {
+        let input      = env.arg(0);
+        let event_func = env.arg(1);
+        let no_trim    = env.arg(2).b();
+
+        read_sax(env, input, event_func, !no_trim)
+    }, Some(2), Some(3), false);
+
+    #[cfg(feature="quick-xml")]
+    st.fun("xml:create_sax_writer", |env: &mut Env, _argc: usize| {
+        if env.arg(0).is_some() {
+            Ok(create_sax_writer(Some(env.arg(0).i() as usize)))
+        } else {
+            Ok(create_sax_writer(None))
+        }
+
+    }, Some(0), Some(1), false);
+
+    st.fun("xml:create_tree_builder", |_env: &mut Env, _argc: usize| {
+        let builder = Rc::new(std::cell::RefCell::new(VValBuilder::new()));
+
+        Ok(VValFun::new_fun(
+            move |env: &mut Env, argc: usize| {
+                if argc == 1 {
+                    builder.borrow_mut().event(env.arg_ref(0).unwrap());
+                }
+                Ok(builder.borrow_mut().result())
+            }, Some(0), Some(1), false))
+
+    }, Some(0), Some(1), false);
 }

@@ -10588,44 +10588,6 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(0), Some(1), false);
 
-    func!(st, "process:run",
-        |env: &mut Env, argc: usize| {
-            let cmd_exe = env.arg(0).deref();
-
-            let mut cmd =
-                cmd_exe.with_s_ref(|s| std::process::Command::new(s));
-
-            if argc > 1 {
-                let args = env.arg(1).deref();
-                for a in args.iter() {
-                    a.0.with_s_ref(|s| cmd.arg(s));
-                }
-            }
-
-            cmd.stdin(std::process::Stdio::null());
-
-            match cmd.output() {
-                Ok(out) => {
-                    let ret = VVal::map();
-                    ret.set_key_str("status", VVal::Int(out.status.code().unwrap_or(-1) as i64))
-                        .expect("single use");
-                    ret.set_key_str("success", VVal::Bol(out.status.success()))
-                        .expect("single use");
-                    ret.set_key_str("stdout", VVal::new_byt(out.stdout))
-                        .expect("single use");
-                    ret.set_key_str("stderr", VVal::new_byt(out.stderr))
-                        .expect("single use");
-
-                    Ok(ret)
-                },
-                Err(e) => {
-                    return Ok(env.new_err(
-                        format!("Error executing '{}': {}", cmd_exe.s(), e)));
-                },
-            }
-
-        }, Some(1), Some(2), false);
-
     func!(st, "sys:os",
         |_env: &mut Env, _argc: usize| {
             Ok(VVal::new_str(std::env::consts::OS))
@@ -10690,47 +10652,6 @@ pub fn std_symbol_table() -> SymbolTable {
             }
 
         }, Some(1), Some(2), false);
-
-    #[cfg(feature="quick-xml")]
-    func!(st, "xml:read_sax",
-        |env: &mut Env, _argc: usize| {
-            use crate::xml::read_sax;
-
-            let input      = env.arg(0);
-            let event_func = env.arg(1);
-            let no_trim    = env.arg(2).b();
-
-            read_sax(env, input, event_func, !no_trim)
-        }, Some(2), Some(3), false);
-
-    #[cfg(feature="quick-xml")]
-    func!(st, "xml:create_sax_writer",
-        |env: &mut Env, _argc: usize| {
-            use crate::xml::create_sax_writer;
-
-            if env.arg(0).is_some() {
-                Ok(create_sax_writer(Some(env.arg(0).i() as usize)))
-            } else {
-                Ok(create_sax_writer(None))
-            }
-
-        }, Some(0), Some(1), false);
-
-    func!(st, "xml:create_tree_builder",
-        |_env: &mut Env, _argc: usize| {
-            use crate::xml::VValBuilder;
-
-            let builder = Rc::new(std::cell::RefCell::new(VValBuilder::new()));
-
-            Ok(VValFun::new_fun(
-                move |env: &mut Env, argc: usize| {
-                    if argc == 1 {
-                        builder.borrow_mut().event(env.arg_ref(0).unwrap());
-                    }
-                    Ok(builder.borrow_mut().result())
-                }, Some(0), Some(1), false))
-
-        }, Some(0), Some(1), false);
 
     #[cfg(feature="serde_json")]
     func!(st, "ser:json",
@@ -11260,7 +11181,7 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(1), Some(2), false);
 
-    crate::net::add_to_symtable(&mut st);
+    crate::stdlib::add_to_symtable(&mut st);
 
     st
 }

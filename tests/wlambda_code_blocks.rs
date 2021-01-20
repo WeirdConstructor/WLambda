@@ -85,11 +85,47 @@ fn wlambda_code_blocks() {
             execute_script(&name, &snip);
         }
 
+        for (name, snip) in get_scripts_from_file("src/formatter.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/packer.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/struct_pattern.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/selector.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/rpc_helper.rs") {
+            execute_script(&name, &snip);
+        }
+
         for (name, snip) in get_scripts_from_file("src/util.rs") {
             execute_script(&name, &snip);
         }
 
-        for (name, snip) in get_scripts_from_file("src/csv.rs") {
+        for (name, snip) in get_scripts_from_file("src/stdlib/csv.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/stdlib/xml.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/stdlib/process.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/stdlib/mod.rs") {
+            execute_script(&name, &snip);
+        }
+
+        for (name, snip) in get_scripts_from_file("src/stdlib/net.rs") {
             execute_script(&name, &snip);
         }
     }
