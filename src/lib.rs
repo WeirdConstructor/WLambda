@@ -631,6 +631,7 @@ mod prog_writer;
 mod io;
 mod str_int;
 mod stdlib;
+pub mod rt_compiler;
 
 pub use stdlib::csv;
 pub use vval::VVal;
