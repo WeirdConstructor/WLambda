@@ -1138,6 +1138,9 @@ impl VValFun {
     /// Creates a new VVal containing the given closure with the given minimum
     /// and maximum parameters (see also [`add_func` of GlobalEnv](compiler/struct.GlobalEnv.html#method.add_func)).
     ///
+    /// There is also a new more convenient (because provided by VVal itself)
+    /// function: `VVal::new_fun` which has the same parameters.
+    ///
     /// The `err_arg_ok` parameter specifies whether the function accepts
     /// error values as arguments. If it doesn't, the program will panic
     /// once an error value is encountered. This makes programs more maintainable.
@@ -2606,6 +2609,36 @@ impl VVal {
 
     pub fn vec_mv(v: Vec<VVal>) -> VVal {
         VVal::Lst(Rc::new(RefCell::new(v)))
+    }
+
+    /// Creates a new WLambda function that wraps the given Rust
+    /// closure. See also `VValFun::new_fun`. For a more detailed
+    /// discussion of the parameters.
+    ///
+    ///```rust
+    /// use wlambda::compiler::EvalContext;
+    /// use wlambda::vval::{VVal, VValFun, Env};
+    ///
+    /// let mut ctx = wlambda::compiler::EvalContext::new_empty_global_env();
+    ///
+    /// ctx.set_global_var("xyz",
+    ///     &VVal::new_fun(
+    ///         move |env: &mut Env, argc: usize| {
+    ///             Ok(VVal::new_str("xyz"))
+    ///         }, None, None, false));
+    ///
+    /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
+    ///```
+    pub fn new_fun<T>(fun: T, min_args: Option<usize>,
+                      max_args: Option<usize>,
+                      err_arg_ok: bool) -> VVal
+        where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
+
+        VValFun::new_val(
+            Rc::new(RefCell::new(fun)),
+            Vec::new(),
+            0, min_args, max_args, err_arg_ok, None,
+            Rc::new(vec![]))
     }
 
     pub fn call(&self, env: &mut Env, args: &[VVal]) -> Result<VVal, StackAction> {

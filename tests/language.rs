@@ -1565,6 +1565,31 @@ fn check_eval() {
 }
 
 #[test]
+fn check_recursive_eval_ctx() {
+    let mut ctx = wlambda::EvalContext::new_default();
+    let ctx2 = RefCell::new(ctx.clone());
+
+    let called = Rc::new(RefCell::new(false));
+    let called_ = called.clone();
+    ctx.set_global_var("recall", &VVal::new_fun(move |_env, _argc| {
+        *called_.borrow_mut() = true;
+        let a = ctx2.borrow_mut().eval("!old = x; .x = 333; x").unwrap();
+        let b = ctx2.borrow_mut().eval("old").unwrap();
+        Ok(VVal::pair(a, b))
+    }, Some(0), Some(0), false));
+
+    let r1 = ctx.eval("!:global x = 32; !r = recall[]; !y = x; r").unwrap();
+    assert_eq!(r1.v_(0).i(), 333);
+    assert_eq!(r1.v_(1).i(), 32);
+    let ret = ctx.eval("x").unwrap().i();
+    assert_eq!(*called.borrow(), true);
+    assert_eq!(ret, 333);
+
+    let ret = ctx.eval("y").unwrap().i();
+    assert_eq!(ret, 333);
+}
+
+#[test]
 fn check_eval_ctx() {
     let mut ctx = wlambda::EvalContext::new_default();
     ctx.eval("!toplevel_var = 20").unwrap();

@@ -598,6 +598,7 @@ pub struct EvalContext {
     /// GlobalEnv.
     pub global:         GlobalEnvRef,
     local_compile:      Rc<RefCell<CompileEnv>>,
+    user:               Rc<RefCell<dyn std::any::Any>>,
     /// Holds the top level environment data accross multiple eval()
     /// invocations.
     pub local:          Rc<RefCell<Env>>,
@@ -701,6 +702,7 @@ impl EvalContext {
 
         EvalContext {
             global: global.clone(),
+            user:   user.clone(),
             local_compile: Rc::new(RefCell::new(CompileEnv {
                 parent:         None,
                 global:         global.clone(),
@@ -738,7 +740,20 @@ impl EvalContext {
         let prog = compile_vm_fun(ast, &mut self.local_compile);
         let locals_size = self.local_compile.borrow().get_local_space();
 
-        let env = self.local.borrow_mut();
+        let mut temporary_env = None;
+
+        let env =
+            match self.local.try_borrow_mut() {
+                Ok(env) => env,
+                Err(_) => {
+                    temporary_env =
+                        Some(Rc::new(RefCell::new(
+                            Env::new_with_user(
+                                self.global.clone(), self.user.clone()))));
+                    temporary_env.as_ref().unwrap().borrow_mut()
+                },
+            };
+
         let mut res = Ok(VVal::None);
 
         std::cell::RefMut::map(env, |l_env| {
@@ -755,6 +770,10 @@ impl EvalContext {
             };
             l_env
         });
+
+        if let Some(te) = temporary_env {
+            self.local = te;
+        }
 
         res
     }

@@ -1,3 +1,10 @@
+0.7.1 (unreleased)
+==================
+
+* Feature: Calling into EvalContext::eval\*() can now be done
+recursively.
+* Change: VVal::new_fun() added.
+
 0.7.0 (2021-01-18)
 ==================
 
