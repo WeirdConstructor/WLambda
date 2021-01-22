@@ -1,26 +1,48 @@
 use crate::vval::VVal;
+use crate::vval::VValChr;
 use crate::vval::Syntax;
 use crate::vval::SynPos;
 use crate::vval::CompileError;
 use crate::compiler::EvalError;
 use crate::parser::{self};
 
+#[derive(Debug, Clone)]
+pub enum RtVal {
+    Void,
+    Num(f64),
+    Chr(VValChr),
+    Bol(bool),
+    Opt(usize),
+    Arr(u32, u32),
+    NVec(u32, u32),
+    Str(u32, u32),
+    Byt(u32, u32),
+    Bltin(usize),
+    Fun(u32, u32),
+}
+
+#[derive(Debug, Clone)]
 enum RtType {
+    Void,
     Num,
+    Chr,
+    Bol,
+    Opt,
     Pair,
-    V2,
-    V3,
-    V4,
     Arr,
+    NVec,
     Str,
+    Byt,
 }
 
 #[derive(Debug, Clone)]
 pub struct RtProg {
+    result: RtVal,
 }
 
 impl RtProg {
-    fn call(args: &[f64]) -> f64 {
+    fn call(& mut self, args: &[RtVal]) -> &RtVal {
+        &self.result
     }
 }
 
