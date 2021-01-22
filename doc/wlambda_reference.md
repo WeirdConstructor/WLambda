@@ -551,8 +551,8 @@ Global variables however do not live beyond file or module boundaries.
 ### <a name="13-constants"></a>1.3 - Constants
 
 WLambda supports constant _variables_. These are global variables you can't
-assign to. They are resolved at compile time and offer a slight performance
-advantage (roughly 3-4%) over (global or local) variables.
+assign to. They are resolved and inserted at compile time and offer a slight
+performance advantage (roughly 3-4%) over (global or local) variables.
 
 ```wlambda
 !:const X = 11;
@@ -1408,7 +1408,7 @@ You can unwrap an optional with `unwrap`. It will panic if there is no value pro
 Otherwise it will return the contents.
 
 ```wlambda
-std:assert unwrap[$o(10)] 10;
+std:assert_eq unwrap[$o(10)] 10;
 ```
 
 ### <a name="33-error-values-e-expr-or-error-expr"></a>3.3 - Error values: `$e expr` or `$error expr`

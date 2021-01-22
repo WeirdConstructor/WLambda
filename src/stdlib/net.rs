@@ -116,9 +116,9 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                                     "Couldn't get client: {}", e)));
                         },
                         Ok(stream) => {
-                            let stream = VVal::Usr(Box::new(VTcpStream {
+                            let stream = VVal::new_usr(VTcpStream {
                                 stream: Rc::new(RefCell::new(stream)),
-                            }));
+                            });
                             env.push(stream);
                             match fun.call_internal(env, 1) {
                                 Ok(_) => {

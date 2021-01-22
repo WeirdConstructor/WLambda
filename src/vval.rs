@@ -1284,7 +1284,7 @@ impl VValFun {
 /// global_env.borrow_mut().add_func(
 ///     "new_mytype",
 ///     |_env: &mut Env, _argc: usize| {
-///         Ok(VVal::Usr(Box::new(MyType { x: Rc::new(RefCell::new((13, 42))) })))
+///         Ok(VVal::new_usr(MyType { x: Rc::new(RefCell::new((13, 42))) }))
 ///     }, Some(0), Some(0));
 ///
 /// global_env.borrow_mut().add_func(
@@ -1335,7 +1335,7 @@ impl VValFun {
 /// }
 ///
 /// impl Into<VVal> for ShipWlWrapper {
-///     fn into(self) -> VVal { VVal::Usr(Box::new(self)) }
+///     fn into(self) -> VVal { VVal::new_usr(self) }
 /// }
 ///
 /// impl VValUserData for ShipWlWrapper {
@@ -2451,6 +2451,10 @@ impl VVal {
     pub fn err_msg(s: &str) -> VVal {
         VVal::Err(Rc::new(RefCell::new(
             (VVal::new_str(s), SynPos::empty()))))
+    }
+
+    pub fn new_usr<T: VValUserData + 'static>(o: T) -> VVal {
+        VVal::Usr(Box::new(o))
     }
 
     #[inline]
