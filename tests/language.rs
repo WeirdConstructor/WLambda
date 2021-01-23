@@ -5220,3 +5220,10 @@ fn check_concat() {
 fn check_json_char_byte() {
     assert_eq!(ve("std:ser:json $['x',$b'x'] $t"), "\"[\\\"x\\\",120]\"");
 }
+
+#[test]
+fn check_mutate_point() {
+    assert_eq!(ve("$i(0,0).0 = 3"), "EXEC ERR: Caught  SA::Panic(\"Can\\\'t mutate integer vector\")");
+    assert_eq!(ve("$f(0,0).0 = 3"), "EXEC ERR: Caught  SA::Panic(\"Can\\\'t mutate float vector\")");
+    assert_eq!(ve("$p(0,0).0 = 3"), "EXEC ERR: Caught  SA::Panic(\"Can\\\'t mutate pair\")");
+}

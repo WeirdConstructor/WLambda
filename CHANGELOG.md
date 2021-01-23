@@ -3,6 +3,7 @@
 
 * **Feature:** Added `std:process:spawn` and `std:process:kill_wait`.
 * **Change:** Refactored the code base a bit.
+* **Bugfix:** Panic on pair mutation (like on integer/float vector mutation).
 
 0.7.0 (2021-01-18)
 ==================

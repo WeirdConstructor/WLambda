@@ -4427,6 +4427,9 @@ impl VVal {
             VVal::IVec(_) =>
                 Err(StackAction::panic_msg(
                     "Can't mutate integer vector".to_string())),
+            VVal::Pair(_) =>
+                Err(StackAction::panic_msg(
+                    "Can't mutate pair".to_string())),
             VVal::Usr(u) => u.set_key(key, val),
             v => v.with_deref(
                 |v| v.set_key(key, val),
