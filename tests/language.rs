@@ -3867,6 +3867,14 @@ fn check_regex_patterns() {
             };
         res
     "#), "\"//\\\\/\"");
+
+    assert_eq!(ve(r#"
+        $r/$+[a-z]/ &> "abz"
+    "#), "$[\"z\"]");
+
+    assert_eq!(ve(r#"
+        $r/$+[a-z]/ <& "abz"
+    "#), "$[\"abz\"]");
 }
 
 #[test]

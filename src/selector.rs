@@ -1832,6 +1832,7 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal, mode: RegexMode)
             let match_fun = create_regex_find(pat, result_ref)?;
             Ok(VValFun::new_fun(
                 move |env: &mut Env, _argc: usize| {
+                    println!("FIND: {}", env.arg(0).s_raw());
                     if let Some(s) = env.arg_ref(0) {
                         Ok(match_fun(&s))
                     } else {

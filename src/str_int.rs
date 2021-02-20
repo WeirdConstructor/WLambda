@@ -4,6 +4,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 
+#[allow(dead_code)]
 struct StringInterner {
     strmap: HashMap<String, Weak<String>>,
     fixed:  std::vec::Vec<Symbol>,
