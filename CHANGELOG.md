@@ -4,6 +4,8 @@
 * **Feature:** Added `std:process:spawn` and `std:process:kill_wait`.
 * **Feature**: Calling into EvalContext::eval\*() can now be done
 recursively.
+* **Feature:**: Added simple UDP networking via `std:net:udp:new`,
+`std:net:udp:send` and `std:net:udp:recv`.
 * **Change**: VVal::new\_fun() added.
 * **Change:** Refactored the code base a bit.
 * **Bugfix:** Panic on pair mutation (like on integer/float vector mutation).

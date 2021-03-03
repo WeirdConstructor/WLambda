@@ -5260,3 +5260,45 @@ fn check_mutate_point() {
     assert_eq!(ve("$f(0,0).0 = 3"), "EXEC ERR: Caught  SA::Panic(\"Can\\\'t mutate float vector\")");
     assert_eq!(ve("$p(0,0).0 = 3"), "EXEC ERR: Caught  SA::Panic(\"Can\\\'t mutate pair\")");
 }
+
+#[test]
+fn check_udp1() {
+    let thrd = std::thread::spawn(move || {
+        ve(r#"
+            !soc = std:net:udp:new "0.0.0.0:31889";
+
+            iter _ 0 => 10 {
+                std:net:udp:send soc $b"FOOBAR" "127.0.0.1:31888";
+                std:thread:sleep $p(:ms, 100);
+            };
+        "#);
+    });
+
+    assert_eq!(ve(r#"
+        !soc = std:net:udp:new "0.0.0.0:31888";
+        std:net:udp:recv soc;
+    "#), "$p($b\"FOOBAR\",\"127.0.0.1:31889\")");
+
+    thrd.join().unwrap();
+}
+
+#[test]
+fn check_udp2() {
+    let thrd = std::thread::spawn(move || {
+        ve(r#"
+            !soc = std:net:udp:new "0.0.0.0:31889" "127.0.0.1:31888";
+
+            iter _ 0 => 10 {
+                std:net:udp:send soc $b"FOOBAR";
+                std:thread:sleep $p(:ms, 100);
+            };
+        "#);
+    });
+
+    assert_eq!(ve(r#"
+        !soc = std:net:udp:new "0.0.0.0:31888";
+        std:net:udp:recv soc;
+    "#), "$p($b\"FOOBAR\",\"127.0.0.1:31889\")");
+
+    thrd.join().unwrap();
+}
