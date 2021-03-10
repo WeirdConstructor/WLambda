@@ -266,9 +266,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
         match op {
             Op::Mov(a, r) => op_a_r!(env, ret, retv, data, a, r, { a }),
             Op::NewPair(a, b, r) => op_a_b_r!(env, ret, retv, data, a, b, r, {
-                VVal::Pair(Rc::new((
+                VVal::pair(
                     handle_err!(b, "first pair element", retv),
-                    handle_err!(a, "second pair element", retv))))
+                    handle_err!(a, "second pair element", retv))
             }),
             Op::NewOpt(a, r) => op_r!(env, ret, retv, data, r, {
                 if let ResPos::Value(ResValue::OptNone) = a {
