@@ -4206,6 +4206,28 @@ fn check_struct_match() {
             m[$i(3,99,5)],
         ]
     "#), "$[$p(:b,3),:nothing,8]");
+    assert_eq!(ve(r#"
+        match '\<ACK>'
+            '\<ENQ>' => 10
+            $b'\<ENQ>' => 20
+            $b'\<ACK>' => 30
+            '\<ACK>' => 31;
+    "#), "31");
+    assert_eq!(ve(r#"
+        match '\<ENQ>'
+            '\<ENQ>' => 10
+            $b'\<ENQ>' => 20;
+    "#), "10");
+    assert_eq!(ve(r#"
+        match $b'\<ENQ>'
+            $b'\<ENQ>' => 10
+            $b'\<ACK>' => 20;
+    "#), "10");
+    assert_eq!(ve(r#"
+        match $b'\<ACK>'
+            $b'\<ENQ>' => 10
+            $b'\<ACK>' => 20;
+    "#), "20");
 }
 
 #[test]
