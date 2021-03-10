@@ -21,12 +21,12 @@ syn match wlMapKeyId    /[a-zA-Z_@?]\+[^[:space:]\.,;{}\[\]()~|=]*\s*\ze=/ conta
 syn match wlComment /#.*$/ contains=wlTodo
 syn keyword wlTodo TODO XXX FIXME   contained
 
-syn keyword wlRepeat    iter jump ? if for while range return break next match
+syn keyword wlRepeat    iter jump ? if for while map filter range return break next match
 
 syn keyword wlKeyword   panic not block unwrap unwrap_err error_to_str
 syn keyword wlKeyword   sym is_some is_none is_err is_map is_vec is_fun is_str is_sym
 syn keyword wlKeyword   is_ref is_wref is_bool is_bytes is_float is_int len type to_drop
-syn keyword wlKeyword   float bool int on_error
+syn keyword wlKeyword   float bool int on_error byte char is_byte is_char
 syn keyword wlKeyword   _?
 
 syn keyword wlKeyword std:append
@@ -62,6 +62,9 @@ syn keyword wlKeyword std:measure_time
 syn keyword wlKeyword std:neg
 syn keyword wlKeyword std:net:tcp:connect
 syn keyword wlKeyword std:net:tcp:listen
+syn keyword wlKeyword std:net:udp:send
+syn keyword wlKeyword std:net:udp:recv
+syn keyword wlKeyword std:net:udp:new
 syn keyword wlKeyword std:num:abs
 syn keyword wlKeyword std:num:int_to_closed_open01
 syn keyword wlKeyword std:num:int_to_open01
@@ -69,6 +72,7 @@ syn keyword wlKeyword std:num:int_to_open_closed01
 syn keyword wlKeyword std:pop
 syn keyword wlKeyword std:prepend
 syn keyword wlKeyword std:push
+syn keyword wlKeyword std:rand
 syn keyword wlKeyword std:rand:split_mix64_new
 syn keyword wlKeyword std:rand:split_mix64_new_from
 syn keyword wlKeyword std:rand:split_mix64_next
@@ -141,6 +145,7 @@ syn match wlRefData   '$@vec'
 syn match wlRefData   '$@m'
 syn match wlRefData   '$@map'
 syn match wlRefData   '$@@'
+syn match wlRefData   '$iter'
 syn match wlRefData   '$+'
 syn match wlRefData   '$&'
 syn match wlRefData   '$&&'
