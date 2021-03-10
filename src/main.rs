@@ -2,8 +2,8 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 
 use wlambda::vval::Env;
-use wlambda::vval::VVal;
-use wlambda::compiler::{GlobalEnv, EvalContext};
+use wlambda::vval::{StackAction, VVal};
+use wlambda::compiler::{GlobalEnv, EvalContext, EvalError};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -60,9 +60,18 @@ fn main() {
             v_argv.delete_key(&VVal::Int(0)).expect("file argument");
 
             match ctx.eval_file(&argv[1]) {
-                Ok(_) => (),
+                Ok(v) => {
+                    std::process::exit(v.i() as i32);
+                },
+                Err(EvalError::ExecError(StackAction::Break(v)))  => {
+                    std::process::exit(v.i() as i32);
+                },
+                Err(EvalError::ExecError(StackAction::Return(v)))  => {
+                    std::process::exit(v.1.i() as i32);
+                },
                 Err(e) => {
                     eprintln!("ERROR: {}", e);
+                    std::process::exit(1);
                 }
             }
         }

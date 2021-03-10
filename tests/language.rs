@@ -4206,6 +4206,28 @@ fn check_struct_match() {
             m[$i(3,99,5)],
         ]
     "#), "$[$p(:b,3),:nothing,8]");
+    assert_eq!(ve(r#"
+        match '\<ACK>'
+            '\<ENQ>' => 10
+            $b'\<ENQ>' => 20
+            $b'\<ACK>' => 30
+            '\<ACK>' => 31;
+    "#), "31");
+    assert_eq!(ve(r#"
+        match '\<ENQ>'
+            '\<ENQ>' => 10
+            $b'\<ENQ>' => 20;
+    "#), "10");
+    assert_eq!(ve(r#"
+        match $b'\<ENQ>'
+            $b'\<ENQ>' => 10
+            $b'\<ACK>' => 20;
+    "#), "10");
+    assert_eq!(ve(r#"
+        match $b'\<ACK>'
+            $b'\<ENQ>' => 10
+            $b'\<ACK>' => 20;
+    "#), "20");
 }
 
 #[test]
@@ -5286,7 +5308,7 @@ fn check_udp1() {
 fn check_udp2() {
     let thrd = std::thread::spawn(move || {
         ve(r#"
-            !soc = std:net:udp:new "0.0.0.0:31889" "127.0.0.1:31888";
+            !soc = std:net:udp:new "0.0.0.0:31819" "127.0.0.1:31818";
 
             iter _ 0 => 10 {
                 std:net:udp:send soc $b"FOOBAR";
@@ -5296,9 +5318,34 @@ fn check_udp2() {
     });
 
     assert_eq!(ve(r#"
-        !soc = std:net:udp:new "0.0.0.0:31888";
+        !soc = std:net:udp:new "0.0.0.0:31818";
         std:net:udp:recv soc;
-    "#), "$p($b\"FOOBAR\",\"127.0.0.1:31889\")");
+    "#), "$p($b\"FOOBAR\",\"127.0.0.1:31819\")");
 
     thrd.join().unwrap();
+}
+
+#[test]
+fn check_map() {
+    assert_eq!(ve("map { _ * 10 } $[1,2,3,4]"),         "$[10,20,30,40]");
+    assert_eq!(ve("map { _ * 10 } ~ $iter (1 => 5)"),   "$[10,20,30,40]");
+    assert_eq!(ve("map { _ 'x' } \"abcdef\""),          "$[\"ax\",\"bx\",\"cx\",\"dx\",\"ex\",\"fx\"]");
+}
+
+#[test]
+fn check_filter() {
+    assert_eq!(ve("filter { _ % 2 == 0 } $[1,2,3,4]"),      "$[2,4]");
+    assert_eq!(ve("filter { _ % 2 == 0 } ~ $iter 0 => 10"), "$[0,2,4,6,8]");
+    assert_eq!(ve("filter { _ >= 'e' } \"abcdef\""),        "$['e','f']");
+    assert_eq!(ve("map { _ * 10 } ~ filter { _ % 2 == 0 } 0 => 10"),
+                  "$[0,20,40,60,80]");
+}
+
+#[test]
+fn check_iter_arg_bug() {
+    assert_eq!(ve("std:str:from_char_vec $iter $b\"abc\""), "\"abc\"");
+    assert_eq!(ve("std:fold 1 { _ + _1 } $iter 1 => 5"),    "11");
+    assert_eq!(ve("map { _ * 2 } ~ $iter 0 => 4"),          "$[0,2,4,6]");
+    assert_eq!(ve("filter { _ % 2 == 0 } ~ $iter 1 => 10"), "$[2,4,6,8]");
+    assert_eq!(ve("$@vec for ($iter 4 => 7) { $+ _ }"),     "$[4,5,6]");
 }

@@ -2591,9 +2591,15 @@ impl VVal {
         }
     }
 
+    /// Creates a pair from two VVals.
     #[inline]
     pub fn pair(a: VVal, b: VVal) -> VVal {
         VVal::Pair(Rc::new((a, b)))
+    }
+
+    /// Returns an iterator of the current value.
+    pub fn as_iter(&self) -> VVal {
+        VVal::Iter(Rc::new(RefCell::new(self.iter())))
     }
 
     pub fn to_vec(&self) -> Vec<VVal> {
@@ -3105,6 +3111,12 @@ impl VVal {
     /// It will iterate over data such as VVal::Str, VVal::Sym, VVal::Lst,
     /// VVal::Map and VVal::Byt.
     ///
+    /// **See also:** [VVal::with_iter] which is the better option for iterating
+    /// over a VVal, because it catches the special case when the VVal itself
+    /// is an iterator already.
+    /// This function will not return the same iterator again when called
+    /// on an VVal iterator value!
+    ///
     /// This functionality provides the `for` keyword/function in WLambda.
     ///
     /// ```
@@ -3259,6 +3271,41 @@ impl VVal {
                 } else {
                     std::iter::from_fn(Box::new(move || { None }))
                 })
+        }
+    }
+
+    /// Calls the given callback with an iterator through
+    /// the vval. It catches the special case when the VVal itself
+    /// is an iterator.
+    ///
+    /// ```
+    /// use wlambda::VVal;
+    /// use std::rc::Rc;
+    /// use std::cell::RefCell;
+    ///
+    /// let x = VVal::vec();
+    /// x.push(VVal::Int(10));
+    /// x.push(VVal::Int(20));
+    ///
+    /// let it = x.as_iter();
+    ///
+    /// let mut sum = 0;
+    /// it.with_iter(|iter| {
+    ///     for (v, _) in iter {
+    ///         sum += v.i();
+    ///     }
+    /// });
+    ///
+    /// assert_eq!(sum, 30);
+    /// ```
+    pub fn with_iter<F,R>(&self, mut f: F) -> R
+        where F: FnMut(&mut VValIter) -> R
+    {
+        if let VVal::Iter(i) = self {
+            f(&mut *i.borrow_mut())
+        } else {
+            let mut iter = self.iter();
+            f(&mut iter)
         }
     }
 
