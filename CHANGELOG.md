@@ -6,9 +6,12 @@
 recursively.
 * **Feature:**: Added simple UDP networking via `std:net:udp:new`,
 `std:net:udp:send` and `std:net:udp:recv`.
+* **Feature:** Added `map` and `filter` to the core language keywords.
 * **Change**: VVal::new\_fun() added.
 * **Change:** Refactored the code base a bit.
 * **Bugfix:** Panic on pair mutation (like on integer/float vector mutation).
+* **Bugfix:** `$iter` iterators did not work with functions like
+`for`, `filter`, `map` and `std:fold`.
 
 0.7.0 (2021-01-18)
 ==================

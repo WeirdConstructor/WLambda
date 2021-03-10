@@ -3262,6 +3262,17 @@ impl VVal {
         }
     }
 
+    pub fn with_iter<F,R>(&self, mut f: F) -> R
+        where F: FnMut(&mut VValIter) -> R
+    {
+        if let VVal::Iter(i) = self {
+            f(&mut *i.borrow_mut())
+        } else {
+            let mut iter = self.iter();
+            f(&mut iter)
+        }
+    }
+
     pub fn with_value_or_iter_values<T>(self, mut f: T)
         where T: FnMut(VVal, Option<VVal>) -> bool
     {

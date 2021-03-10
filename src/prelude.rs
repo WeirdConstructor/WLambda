@@ -8895,27 +8895,87 @@ pub fn core_symbol_table() -> SymbolTable {
             Ok(VVal::pair(env.arg(0), env.arg(1)))
         }, Some(2), Some(2), true);
 
+    func!(st, "filter",
+        |env: &mut Env, _argc: usize| {
+            let f   = env.arg(0);
+            let val = env.arg(1);
+
+            val.with_iter(move |iter| {
+
+                let ret = VVal::vec();
+
+                for (v, k) in iter {
+                    env.push(v.clone());
+                    let n =
+                        if let Some(k) = k { env.push(k); 2 }
+                        else               { 1 };
+                    match f.call_internal(env, n) {
+                        Ok(test) => {
+                            if test.b() {
+                                ret.push(v);
+                            }
+                        },
+                        Err(StackAction::Break(v)) => { env.popn(n); return Ok(*v); },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { env.popn(n); return Err(e); }
+                    }
+                    env.popn(n);
+                }
+
+                Ok(ret)
+            })
+        }, Some(2), Some(2), false);
+
+    func!(st, "map",
+        |env: &mut Env, _argc: usize| {
+            let f   = env.arg(0);
+            let val = env.arg(1);
+
+            val.with_iter(move |iter| {
+                let ret = VVal::vec();
+
+                for (v, k) in iter {
+                    env.push(v);
+                    let n =
+                        if let Some(k) = k { env.push(k); 2 }
+                        else               { 1 };
+                    match f.call_internal(env, n) {
+                        Ok(v)                      => { ret.push(v); },
+                        Err(StackAction::Break(v)) => { env.popn(n); return Ok(*v); },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { env.popn(n); return Err(e); }
+                    }
+                    env.popn(n);
+                }
+
+                Ok(ret)
+            })
+        }, Some(2), Some(2), false);
+
     func!(st, "for",
         |env: &mut Env, _argc: usize| {
             let val = env.arg(0);
             let f   = env.arg(1);
 
-            let mut ret = VVal::None;
-            for (v, k) in val.iter() {
-                env.push(v);
-                let n =
-                    if let Some(k) = k { env.push(k); 2 }
-                    else               { 1 };
-                match f.call_internal(env, n) {
-                    Ok(v)                      => { ret = v; },
-                    Err(StackAction::Break(v)) => { env.popn(n); return Ok(*v); },
-                    Err(StackAction::Next)     => { },
-                    Err(e)                     => { env.popn(n); return Err(e); }
-                }
-                env.popn(n);
-            }
+            val.with_iter(move |iter| {
+                let mut ret = VVal::None;
 
-            Ok(ret)
+                for (v, k) in iter {
+                    env.push(v);
+                    let n =
+                        if let Some(k) = k { env.push(k); 2 }
+                        else               { 1 };
+                    match f.call_internal(env, n) {
+                        Ok(v)                      => { ret = v; },
+                        Err(StackAction::Break(v)) => { env.popn(n); return Ok(*v); },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { env.popn(n); return Err(e); }
+                    }
+                    env.popn(n);
+                }
+
+                Ok(ret)
+            })
         }, Some(2), Some(2), false);
 
     func!(st, "range",
@@ -9438,11 +9498,15 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "str:from_char_vec",
         |env: &mut Env, _argc: usize| {
-            let mut s = String::new();
-            for (vc, _) in env.arg(0).iter() {
-                s.push(std::char::from_u32(vc.i() as u32).unwrap_or('?'));
-            }
-            Ok(VVal::new_str_mv(s))
+            env.arg(0).with_iter(move |iter| {
+                let mut s = String::new();
+
+                for (vc, _) in iter {
+                    s.push(std::char::from_u32(vc.i() as u32).unwrap_or('?'));
+                }
+
+                Ok(VVal::new_str_mv(s))
+            })
         }, Some(1), Some(1), false);
 
     func!(st, "str:to_bytes_latin1",
@@ -9616,25 +9680,28 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "fold",
         |env: &mut Env, _argc: usize| {
-            let mut acc = env.arg(0);
             let f       = env.arg(1);
             let lst     = env.arg(2);
 
-            for (i, _) in lst.iter() {
-                env.push(i);
-                env.push(acc.clone());
-                let rv = f.call_internal(env, 2);
-                env.popn(2);
+            lst.with_iter(move |iter| {
+                let mut acc = env.arg(0);
 
-                match rv {
-                    Ok(v)                      => { acc = v;  },
-                    Err(StackAction::Break(v)) => { acc = *v; break; },
-                    Err(StackAction::Next)     => { },
-                    Err(e)                     => { return Err(e); },
+                for (i, _) in iter {
+                    env.push(i);
+                    env.push(acc.clone());
+                    let rv = f.call_internal(env, 2);
+                    env.popn(2);
+
+                    match rv {
+                        Ok(v)                      => { acc = v;  },
+                        Err(StackAction::Break(v)) => { acc = *v; break; },
+                        Err(StackAction::Next)     => { },
+                        Err(e)                     => { return Err(e); },
+                    }
                 }
-            }
 
-            Ok(acc)
+                Ok(acc)
+            })
         }, Some(3), Some(3), false);
 
     func!(st, "enumerate",
