@@ -62,6 +62,9 @@ syn keyword wlKeyword std:measure_time
 syn keyword wlKeyword std:neg
 syn keyword wlKeyword std:net:tcp:connect
 syn keyword wlKeyword std:net:tcp:listen
+syn keyword wlKeyword std:net:udp:new
+syn keyword wlKeyword std:net:udp:recv
+syn keyword wlKeyword std:net:udp:send
 syn keyword wlKeyword std:num:abs
 syn keyword wlKeyword std:num:int_to_closed_open01
 syn keyword wlKeyword std:num:int_to_open01

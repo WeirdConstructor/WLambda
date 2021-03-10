@@ -314,13 +314,15 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     with_first_addr!(dest, env, daddr, {
                         match vus.socket.borrow_mut().send_to(bytes, daddr) {
                             Ok(n)  => Ok(VVal::Int(n as i64)),
-                            Err(e) => Ok(env.new_err(format!("std:net:udp:send_to: {}", e))),
+                            Err(e) => Ok(env.new_err(
+                                format!("std:net:udp:send_to: {}", e))),
                         }
                     })
                 } else {
                     match vus.socket.borrow_mut().send(bytes) {
                         Ok(n)  => Ok(VVal::Int(n as i64)),
-                        Err(e) => Ok(env.new_err(format!("std:net:udp:send: {}", e))),
+                        Err(e) => Ok(env.new_err(
+                            format!("std:net:udp:send: {}", e))),
                     }
                 }
             })

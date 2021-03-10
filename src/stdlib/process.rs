@@ -59,6 +59,27 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         Ok(VVal::new_usr(VChildProcess { child, id }))
     }, Some(1), Some(3), false);
 
+    st.fun("process:wait", |env: &mut Env, _argc: usize| {
+        let mut chld = env.arg(0);
+        chld.with_usr_ref(|vts: &mut VChildProcess| {
+            match vts.child.borrow_mut().wait() {
+                Ok(st) => {
+                    let ret = VVal::map();
+                    ret.set_key_str("status", VVal::Int(st.code().unwrap_or(-1) as i64))
+                        .expect("single use");
+                    ret.set_key_str("success", VVal::Bol(st.success()))
+                        .expect("single use");
+                    Ok(ret)
+                },
+                Err(e) => {
+                    Ok(env.new_err(
+                        format!("Error wait pid={}: {}",
+                            vts.id, e)))
+                }
+            }
+        }).unwrap_or(Ok(VVal::None))
+    }, Some(1), Some(1), false);
+
     st.fun("process:kill_wait", |env: &mut Env, _argc: usize| {
         let mut chld = env.arg(0);
         chld.with_usr_ref(|vts: &mut VChildProcess| {
