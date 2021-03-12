@@ -1307,7 +1307,6 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
                 pw_null!(prog, {
                     let gp = prog.global_pos(r.clone());
-                    prog.dump();
                     val_pw.eval_to(prog, gp);
                 })
             } else {
