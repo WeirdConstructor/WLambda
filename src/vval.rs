@@ -584,7 +584,7 @@ impl Env {
     #[inline]
     pub fn pop(&mut self) -> VVal {
         if self.sp < 1 {
-            panic!(format!("Stack pointer underflow {} {}", self.sp, 1));
+            panic!("Stack pointer underflow {} {}", self.sp, 1);
         }
         self.sp -= 1;
         std::mem::replace(&mut self.args[self.sp], VVal::None)
@@ -600,7 +600,7 @@ impl Env {
     #[inline]
     pub fn popn(&mut self, n: usize) {
         if self.sp < n {
-            panic!(format!("Stack pointer underflow {} {}", self.sp, n));
+            panic!("Stack pointer underflow {} {}", self.sp, n);
         }
         if n > 0 {
             //d// println!("SP={}, N={}", self.sp, n);

@@ -603,8 +603,8 @@ fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) {
         VarPos::Global(_)
         | VarPos::Const(_)
         | VarPos::NoPos
-            => panic!(format!(
-                "Fatal error in WLambda, can't destructure to {:?}", pos)),
+            => panic!(
+                "Fatal error in WLambda, can't destructure to {:?}", pos),
     }
 }
 
@@ -617,8 +617,8 @@ fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, rv: &VVal) {
         VarPos::Global(_)
         | VarPos::Const(_)
         | VarPos::NoPos
-            => panic!(format!(
-                "Fatal error in WLambda, can't ref destructure to {:?}", pos)),
+            => panic!(
+                "Fatal error in WLambda, can't ref destructure to {:?}", pos),
     }
 }
 
