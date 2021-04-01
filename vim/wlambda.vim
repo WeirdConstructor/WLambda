@@ -172,17 +172,18 @@ syn match wlValue     '[-+]\?[0-9]\+r[0-9a-zA-Z]\+\(\.[0-9a-zA-Z]\+\)\?'
 
 syn match wlFuncCombinators '|'
 syn match wlFuncCombinators '||'
-syn match wlFuncCombinators '|\?[>~]'
+syn match wlFuncCombinators '|>'
+syn match wlFuncCombinators '[~]'
 syn match wlFuncCombinators '&>'
 syn match wlFuncCombinators '<&'
 
 " WLambda Regex Patterns
 
-syn region wlRxPattern     matchgroup=wlString start="\$r\z(.\)"       matchgroup=wlRxPattern end="\z1"   keepend contains=@wlPattern
-syn region wlRxPattern     matchgroup=wlString start="\$r\["           matchgroup=wlRxPattern end="\]"    keepend contains=@wlPattern
-syn region wlRxPattern     matchgroup=wlString start="\$r("            matchgroup=wlRxPattern end=")"     keepend contains=@wlPattern
-syn region wlRxPattern     matchgroup=wlString start="\$r{"            matchgroup=wlRxPattern end="}"     keepend contains=@wlPattern
-syn region wlRxPattern     matchgroup=wlString start="\$r<"            matchgroup=wlRxPattern end=">"     keepend contains=@wlPattern
+syn region wlRxPattern     matchgroup=wlString start="\$r[gs]\?\z(.\)"       matchgroup=wlRxPattern end="\z1"   keepend contains=@wlPattern
+syn region wlRxPattern     matchgroup=wlString start="\$r[gs]\?\["           matchgroup=wlRxPattern end="\]"    keepend contains=@wlPattern
+syn region wlRxPattern     matchgroup=wlString start="\$r[gs]\?("            matchgroup=wlRxPattern end=")"     keepend contains=@wlPattern
+syn region wlRxPattern     matchgroup=wlString start="\$r[gs]\?{"            matchgroup=wlRxPattern end="}"     keepend contains=@wlPattern
+syn region wlRxPattern     matchgroup=wlString start="\$r[gs]\?<"            matchgroup=wlRxPattern end=">"     keepend contains=@wlPattern
 
 syn cluster wlPattern contains=wlPatternFun,wlPatternRx,wlPatternRxAtom,wlPatternRxErr,wlStringSpec,wlPatternRxEsc,wlPatternGroup
 
