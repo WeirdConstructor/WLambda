@@ -13,6 +13,8 @@ recursively.
 * **Bugfix:** Panic on pair mutation (like on integer/float vector mutation).
 * **Bugfix:** `$iter` iterators did not work with functions like
 `for`, `filter`, `map` and `std:fold`.
+* **Bugfix:** Fixed a crash in `std:fs:read_dir`.
+* **Change:** Improved vim syntax file.
 
 0.7.0 (2021-01-18)
 ==================

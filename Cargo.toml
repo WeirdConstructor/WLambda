@@ -27,7 +27,7 @@ serde_json = { version = "1.0.53",  optional = true }
 rmp-serde  = { version = "0.14.3",  optional = true }
 mint       = { version = "0.5.5",   optional = true }
 quick-xml  = { version = "0.20.0",  optional = true }
-socket2    = { version = "0.3.19",  optional = true, features = ["reuseport"] }
+socket2    = { version = "0.3.11",  optional = true, features = ["reuseport"] }
 
 [dev-dependencies]
 regex-syntax = { version = "0.6.18" }

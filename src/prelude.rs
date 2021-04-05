@@ -9819,8 +9819,17 @@ pub fn std_symbol_table() -> SymbolTable {
                         Ok(iter) => {
                             for entry in iter {
                                 let ve = dir_entry_to_vval(env, &path, entry)?;
-                                let is_dir     = ve.get_key("type").unwrap().with_s_ref(|s| s == "d");
-                                let entry_path = if is_dir { Some(ve.get_key("path").unwrap().s_raw()) } else { None };
+                                let is_dir =
+                                    ve.get_key("type")
+                                      .unwrap_or(VVal::None)
+                                      .with_s_ref(|s| s == "d");
+                                let entry_path =
+                                    if is_dir {
+                                        Some(
+                                            ve.get_key("path")
+                                              .unwrap_or(VVal::None)
+                                              .s_raw())
+                                    } else { None };
                                 env.push(ve);
                                 match f.call_internal(env, 1) {
                                     Ok(v)                      => { ret = v; },
@@ -9831,7 +9840,9 @@ pub fn std_symbol_table() -> SymbolTable {
                                 env.popn(1);
 
                                 if is_dir && ret.b() {
-                                    stack.push(entry_path.unwrap());
+                                    if let Some(ep) = entry_path {
+                                        stack.push(ep);
+                                    }
                                 }
                             }
                         },
