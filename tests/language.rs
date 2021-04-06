@@ -5349,3 +5349,11 @@ fn check_iter_arg_bug() {
     assert_eq!(ve("filter { _ % 2 == 0 } ~ $iter 1 => 10"), "$[2,4,6,8]");
     assert_eq!(ve("$@vec for ($iter 4 => 7) { $+ _ }"),     "$[4,5,6]");
 }
+
+#[test]
+fn parser_crash_bad_op() {
+    assert_eq!(
+        ve("!foo = { } !@export foo = foo;"),
+        "PARSE ERROR: error[1,12:<compiler:s_eval>] Expected literal value, \
+         sub expression, block, key or identifier at code \'!@export foo = foo;\'");
+}

@@ -3,17 +3,18 @@
 
 * **Feature:** Added `std:process:spawn` and `std:process:kill_wait`.
 * **Feature:** Added `std:process:wait` for waiting it to exit.
-* **Feature**: Calling into EvalContext::eval\*() can now be done
+* **Feature:** Calling into EvalContext::eval\*() can now be done
 recursively.
-* **Feature:**: Added simple UDP networking via `std:net:udp:new`,
+* **Feature:** Added simple UDP networking via `std:net:udp:new`,
 `std:net:udp:send` and `std:net:udp:recv`.
 * **Feature:** Added `map` and `filter` to the core language keywords.
-* **Change**: VVal::new\_fun() added.
+* **Change:** VVal::new\_fun() added.
 * **Change:** Refactored the code base a bit.
 * **Bugfix:** Panic on pair mutation (like on integer/float vector mutation).
 * **Bugfix:** `$iter` iterators did not work with functions like
 `for`, `filter`, `map` and `std:fold`.
 * **Bugfix:** Fixed a crash in `std:fs:read_dir`.
+* **Bugfix:** panic in parser when a ';' was missed at the wrong place.
 * **Change:** Improved vim syntax file.
 
 0.7.0 (2021-01-18)

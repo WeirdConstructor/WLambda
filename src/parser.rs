@@ -1254,36 +1254,39 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
     Ok(call)
 }
 
-fn get_op_binding_power(op: StrPart) -> (i32, i32) {
+fn get_op_binding_power(ps: &State, op: StrPart) -> Result<(i32, i32), ParseError> {
     if       op == "&>"
-          || op == "&@>"  { (54, 55) }
+          || op == "&@>"  { Ok((54, 55)) }
     else if  op == "<&"
-          || op == "<@&"  { (53, 52) }
-    else if  op == "^"    { (50, 51) }
+          || op == "<@&"  { Ok((53, 52)) }
+    else if  op == "^"    { Ok((50, 51)) }
     else if  op == "*"
           || op == "/"
-          || op == "%"    { (48, 49) }
+          || op == "%"    { Ok((48, 49)) }
     else if  op == "+"
-          || op == "-"    { (46, 47) }
+          || op == "-"    { Ok((46, 47)) }
     else if  op == "<<"
-          || op == ">>"   { (44, 45) }
+          || op == ">>"   { Ok((44, 45)) }
     else if  op == "<"
           || op == ">"
           || op == ">="
-          || op == "<="   { (42, 43) }
+          || op == "<="   { Ok((42, 43)) }
     else if  op == "=="
-          || op == "!="   { (40, 41) }
-    else if  op == "&"    { (29, 30) }
-    else if  op == "&^"   { (27, 28) }
-    else if  op == "&|"   { (25, 26) }
-    else if  op == "&and" { (23, 24) }
-    else if  op == "&or"  { (21, 22) }
-    else if  op == "=>"   { (20, 19) }
-    else if  op == "+>"   { (10, 11) }
-    else if  op == "<+"   { ( 9,  8) }
-    else if  op == "%>"   { ( 6,  7) }
-    else if  op == "<%"   { ( 5,  4) }
-    else { panic!("Bad op: {}", op.to_string()) }
+          || op == "!="   { Ok((40, 41)) }
+    else if  op == "&"    { Ok((29, 30)) }
+    else if  op == "&^"   { Ok((27, 28)) }
+    else if  op == "&|"   { Ok((25, 26)) }
+    else if  op == "&and" { Ok((23, 24)) }
+    else if  op == "&or"  { Ok((21, 22)) }
+    else if  op == "=>"   { Ok((20, 19)) }
+    else if  op == "+>"   { Ok((10, 11)) }
+    else if  op == "<+"   { Ok(( 9,  8)) }
+    else if  op == "%>"   { Ok(( 6,  7)) }
+    else if  op == "<%"   { Ok(( 5,  4)) }
+    else {
+        let c = op.to_string().chars().next().unwrap_or(' ');
+        Err(ps.err(ParseErrorKind::UnexpectedToken(c, "Operator")))
+    }
 }
 
 fn reform_binop(op: VVal) -> VVal {
@@ -1371,7 +1374,7 @@ fn parse_binop(left: Option<VVal>, ps: &mut State, bind_pow: i32)
         else { parse_call(ps, true)? };
 
     while let Some(op) = ps.peek_op() {
-        let (l_bp, r_bp) = get_op_binding_power(op);
+        let (l_bp, r_bp) = get_op_binding_power(ps, op)?;
         if l_bp < bind_pow {
             break;
         }

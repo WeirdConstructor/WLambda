@@ -379,7 +379,7 @@ impl State {
                     { return Some(s); }
                 }
 
-                if ch != '=' {
+                if ch != '=' && ch != '!' {
                     Some(self.spart_ptr(1))
                 } else {
                     None
