@@ -63,7 +63,6 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         let mut chld = env.arg(0);
         chld.with_usr_ref(|vts: &mut VChildProcess| {
             match vts.child.borrow_mut().try_wait() {
-                Ok(None) => Ok(VVal::None),
                 Ok(Some(st)) => {
                     let ret = VVal::map();
                     ret.set_key_str("status", VVal::Int(st.code().unwrap_or(-1) as i64))
@@ -72,9 +71,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                         .expect("single use");
                     Ok(ret)
                 },
+                Ok(None) => Ok(VVal::None),
                 Err(e) => {
                     Ok(env.new_err(
-                        format!("Error wait pid={}: {}",
+                        format!("Error try_wait pid={}: {}",
                             vts.id, e)))
                 }
             }
