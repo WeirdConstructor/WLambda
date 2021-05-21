@@ -7,6 +7,105 @@ use wlambda::compiler::{GlobalEnv, EvalContext, EvalError};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const DOCUMENTATION_JSON: &str = include_str!("cmdline_doc.json");
+
+struct DocSection {
+    title:  String,
+    body:   Vec<String>,
+}
+
+impl DocSection {
+    fn print_title(&self) {
+        println!("*** {}", self.title);
+    }
+
+    fn print(&self) {
+        println!("*** {}", self.title);
+        for l in self.body.iter() {
+            println!("    {}", l);
+        }
+    }
+}
+
+struct Doc {
+    sections: Vec<DocSection>,
+}
+
+impl Doc {
+    fn new(doc: VVal) -> Self {
+        let mut sections = vec![];
+        doc.for_each(|v| {
+            let title = v.v_s_raw(0);
+
+            let mut body = vec![];
+            v.v_(1).for_each(|l| {
+                l.with_s_ref(|s|{
+                    body.push(s.to_string());
+                });
+            });
+
+            sections.push(DocSection {
+                title,
+                body,
+            });
+        });
+
+        Self {
+            sections
+        }
+    }
+
+    fn print_sections_by_title(&self, parts: &[&str], with_body: bool) {
+        for section in self.sections.iter() {
+            let mut all_found = true;
+            for p in parts {
+                if !section.title.to_lowercase().contains(&p.to_lowercase()) {
+                    all_found = false;
+                }
+            }
+
+            if all_found {
+                if with_body {
+                    section.print();
+                } else {
+                    section.print_title();
+                }
+            }
+        }
+    }
+
+    fn print_sections_by_title_or_body(&self, parts: &[&str], with_body: bool) {
+        for section in self.sections.iter() {
+            let mut all_found = true;
+            for p in parts {
+                if !section.title.to_lowercase().contains(&p.to_lowercase()) {
+                    all_found = false;
+                }
+            }
+
+            if !all_found {
+                all_found = true;
+
+                for p in parts {
+                    for l in section.body.iter() {
+                        if !l.to_lowercase().contains(&p.to_lowercase()) {
+                            all_found = false;
+                        }
+                    }
+                }
+            }
+
+            if all_found {
+                if with_body {
+                    section.print();
+                } else {
+                    section.print_title();
+                }
+            }
+        }
+    }
+}
+
 fn main() {
 //    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
 //    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
@@ -23,6 +122,8 @@ fn main() {
 //    let r = crate::vm::gen(&contents);
 //    println!("R: {}", r);
 //    return;
+    let doc = VVal::from_json(DOCUMENTATION_JSON).unwrap();
+    let doc = Doc::new(doc);
 
     let argv : Vec<String> = std::env::args().collect();
 
@@ -78,6 +179,36 @@ fn main() {
         return;
     }
 
+    fn handle_doc_commands(doc: &Doc, line: &str) -> bool {
+        let cmd = line.split_whitespace().collect::<Vec<&str>>();
+        if cmd.len() > 1 {
+            match cmd[0] {
+                "?#" | "?" => {
+                    doc.print_sections_by_title(
+                        &cmd[1..], cmd[0] != "?#");
+                    return true;
+                },
+                "?#*" | "?*" => {
+                    doc.print_sections_by_title_or_body(
+                        &cmd[1..], cmd[0] != "?#");
+                    return true;
+                },
+                _ => {}
+            }
+        } else if cmd.len() == 1 {
+            if cmd[0] == "?" {
+                println!("REPL Usage:");
+                println!("?   <term1> <term2> ... - Search in section headers");
+                println!("?#  <term1> <term2> ... - Search in section headers, display only headers");
+                println!("?*  <term1> <term2> ... - Search in section bodies too");
+                println!("?*# <term1> <term2> ... - Search in section bodies too, display only headers");
+            }
+            return true;
+        }
+
+        false
+    }
+
     #[cfg(feature="rustyline")]
     {
         let mut rl = rustyline::Editor::<()>::new();
@@ -91,6 +222,11 @@ fn main() {
             match readline {
                 Ok(line) => {
                     rl.add_history_entry(line.as_str());
+
+                    if handle_doc_commands(&doc, &line) {
+                        continue;
+                    }
+
                     match ctx.eval(&line) {
                         Ok(v)  => {
                             println!("> {}", v.s());
@@ -114,6 +250,10 @@ fn main() {
             use std::io::{self, BufRead};
             for line in io::stdin().lock().lines() {
                 let l = line.unwrap();
+
+                if handle_doc_commands(&doc, &l) {
+                    continue;
+                }
 
                 match ctx.eval(&l) {
                     Ok(v)  => {

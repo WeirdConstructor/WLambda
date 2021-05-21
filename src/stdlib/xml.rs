@@ -2,9 +2,9 @@
 // This is a part of WLambda. See README.md and COPYING for details.
 
 use crate::VVal;
-#[cfg(feature="quick-xml")]
+#[allow(unused_imports)]
 use crate::{Env, StackAction};
-#[cfg(feature="quick-xml")]
+#[allow(unused_imports)]
 use crate::vval::VValFun;
 #[cfg(feature="quick-xml")]
 use quick_xml::Reader;

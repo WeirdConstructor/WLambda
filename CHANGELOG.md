@@ -8,6 +8,8 @@ recursively.
 * **Feature:** Added simple UDP networking via `std:net:udp:new`,
 `std:net:udp:send` and `std:net:udp:recv`.
 * **Feature:** Added `map` and `filter` to the core language keywords.
+* **Feature:** The command line REPL can now search and display contents
+of the reference manual with the `?` command.
 * **Change:** VVal::new\_fun() added.
 * **Change:** Refactored the code base a bit.
 * **Bugfix:** Panic on pair mutation (like on integer/float vector mutation).
