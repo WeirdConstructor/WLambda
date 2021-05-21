@@ -202,8 +202,8 @@ fn main() {
                 println!("?#  <term1> <term2> ... - Search in section headers");
                 println!("?*  <term1> <term2> ... - Search in section bodies too, display only headers");
                 println!("?#* <term1> <term2> ... - Search in section bodies too");
+                return true;
             }
-            return true;
         }
 
         false
