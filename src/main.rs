@@ -185,12 +185,12 @@ fn main() {
             match cmd[0] {
                 "?#" | "?" => {
                     doc.print_sections_by_title(
-                        &cmd[1..], cmd[0] != "?#");
+                        &cmd[1..], cmd[0] == "?#");
                     return true;
                 },
                 "?#*" | "?*" => {
                     doc.print_sections_by_title_or_body(
-                        &cmd[1..], cmd[0] != "?#");
+                        &cmd[1..], cmd[0] == "?#");
                     return true;
                 },
                 _ => {}
@@ -198,10 +198,10 @@ fn main() {
         } else if cmd.len() == 1 {
             if cmd[0] == "?" {
                 println!("REPL Usage:");
-                println!("?   <term1> <term2> ... - Search in section headers");
-                println!("?#  <term1> <term2> ... - Search in section headers, display only headers");
-                println!("?*  <term1> <term2> ... - Search in section bodies too");
-                println!("?*# <term1> <term2> ... - Search in section bodies too, display only headers");
+                println!("?   <term1> <term2> ... - Search in section headers, display only headers");
+                println!("?#  <term1> <term2> ... - Search in section headers");
+                println!("?*  <term1> <term2> ... - Search in section bodies too, display only headers");
+                println!("?*# <term1> <term2> ... - Search in section bodies too");
             }
             return true;
         }
