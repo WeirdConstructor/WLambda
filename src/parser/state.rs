@@ -589,6 +589,10 @@ impl State {
 
     /// The constructor for the `parser::State`.
     ///
+    /// If you need to have a parser state for a syntax that
+    /// with different white space and comment rules as WLambda
+    /// please use [State::new_verbatim].
+    ///
     /// ```rust
     /// use wlambda::parser::State;
     ///
@@ -599,7 +603,24 @@ impl State {
     /// // ...
     /// ```
     pub fn new(code: &str, filename: &str) -> State {
-        let mut ps = State {
+        let mut ps = Self::new_verbatim(code, filename);
+        ps.skip_ws_and_comments();
+        ps
+    }
+
+    /// A constructor for the `parser::State` that does not
+    /// imply white space and comment rules of the WLambda syntax.
+    ///
+    /// ```rust
+    /// use wlambda::parser::State;
+    ///
+    /// let code    = "  { 123 }";
+    /// let mut ps  = State::new_verbatim(code, "filenamehere");
+    /// // ...
+    /// assert_eq!(ps.peek().unwrap(), ' ');
+    /// ```
+    pub fn new_verbatim(code: &str, filename: &str) -> State {
+        State {
             input:          code.chars().collect(),
             ch_ptr:         0,
             line_no:        1,
@@ -609,9 +630,7 @@ impl State {
             last_tok_char:  ' ',
             file:           FileRef::new(filename),
             ident_mode:     IdentMode::IdentSelector,
-        };
-        ps.skip_ws_and_comments();
-        ps
+        }
     }
 
     pub fn is_pattern_ident_mode(&self) -> bool {

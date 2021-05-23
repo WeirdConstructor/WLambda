@@ -276,7 +276,7 @@ fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, Pars
 }
 
 fn parse_formatter(s: &str) -> Result<VVal, ParseError> {
-    let mut ps = State::new(s, "<selector>");
+    let mut ps = State::new_verbatim(s, "<selector>");
 
     let fmt = VVal::vec();
 

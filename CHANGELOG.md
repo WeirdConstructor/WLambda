@@ -18,6 +18,8 @@ of the reference manual with the `?` command.
 `for`, `filter`, `map` and `std:fold`.
 * **Bugfix:** Fixed a crash in `std:fs:read_dir`.
 * **Bugfix:** panic in parser when a ';' was missed at the wrong place.
+* **Bugfix:** `$F` formatters did eat whitespace and wlambda comments, which
+was and is not intended.
 * **Change:** Improved vim syntax file.
 
 0.7.0 (2021-01-18)
