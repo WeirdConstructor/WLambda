@@ -1822,15 +1822,15 @@ mod tests {
         let mut ps = State::new(s, "<parser_test>");
         match parse_block(&mut ps, false, false, true) {
             Ok(v)  => v.s(),
-            Err(e) => panic!(format!("Parse error: {}", e)),
+            Err(e) => panic!("Parse error: {}", e),
         }
     }
 
     fn parse_error(s: &str) -> String {
         let mut ps = State::new(s,"<parser_test>");
         match parse_block(&mut ps, false, false, true) {
-            Ok(v)  => panic!(format!("Expected error but got result: {} for input '{}'",
-                                     v.s(), s)),
+            Ok(v)  => panic!("Expected error but got result: {} for input '{}'",
+                             v.s(), s),
             Err(e) => format!("Parse error: {}", e),
         }
     }

@@ -10,6 +10,7 @@ recursively.
 * **Feature:** Added `map` and `filter` to the core language keywords.
 * **Feature:** The command line REPL can now search and display contents
 of the reference manual with the `?` command.
+* **Feature:** Implemented `std:str:edit_distance` utility function.
 * **Change:** VVal::new\_fun() added.
 * **Change:** Refactored the code base a bit.
 * **Bugfix:** Panic on pair mutation (like on integer/float vector mutation).

@@ -2135,6 +2135,8 @@ fn check_sort() {
     assert_eq!(ve("std:sort std:cmp:str:desc $[3, 2, 5, 9, 0, -1]"), "$[9,5,3,2,0,-1]");
     assert_eq!(ve("std:sort std:cmp:num:asc  $[3, 2, 5, 9, 0, -1]"), "$[-1,0,2,3,5,9]");
     assert_eq!(ve("std:sort std:cmp:num:desc $[3, 2, 5, 9, 0, -1]"), "$[9,5,3,2,0,-1]");
+
+    assert_eq!(ve("std:sort std:cmp:num:asc $[16 => 100, 16 => 90]"),"$[$p(16,100),$p(16,90)]");
 }
 
 #[test]
@@ -5339,6 +5341,11 @@ fn check_filter() {
     assert_eq!(ve("filter { _ >= 'e' } \"abcdef\""),        "$['e','f']");
     assert_eq!(ve("map { _ * 10 } ~ filter { _ % 2 == 0 } 0 => 10"),
                   "$[0,20,40,60,80]");
+
+    assert_eq!(ve("filter { @.0 % 2 == 0 } ${a = 4}"),         "$[$p(4,\"a\")]");
+    assert_eq!(ve("filter { @.1 == \"a\" } ${b = 3, a = 2}"),  "$[$p(2,\"a\")]");
+    assert_eq!(ve("map { @.0 * 3 } ${a = 2}"),                 "$[6]");
+    assert_eq!(ve("map { @.1 }     ${a = 2}"),                 "$[\"a\"]");
 }
 
 #[test]
@@ -5356,4 +5363,18 @@ fn parser_crash_bad_op() {
         ve("!foo = { } !@export foo = foo;"),
         "PARSE ERROR: error[1,12:<compiler:s_eval>] Expected literal value, \
          sub expression, block, key or identifier at code \'!@export foo = foo;\'");
+}
+
+#[test]
+fn check_edit_distance() {
+    // Adapted from https://github.com/febeling/edit-distance/blob/master/tests/tests.rs
+    // APL-2.0 License
+    assert_eq!(ve("std:str:edit_distance $q AAA $q ABA "),        "1");
+    assert_eq!(ve("std:str:edit_distance $q  $q kitten "),        "6");
+    assert_eq!(ve("std:str:edit_distance $q sitting $q  "),       "7");
+    assert_eq!(ve("std:str:edit_distance $q kitten $q sitting "), "3");
+    assert_eq!(ve("std:str:edit_distance $q Tier $q Tor "),       "2");
+    assert_eq!(ve("std:str:edit_distance $q ☀☂☃☄ $q ☀☂☃☄ "),      "0");
+    assert_eq!(ve("std:str:edit_distance $q ☀☂☃☄ $q X☂☃☄ "),      "1");
+    assert_eq!(ve("std:str:edit_distance $q[ฎ ฏ ฐ] $q[a b c]"),   "3");
 }

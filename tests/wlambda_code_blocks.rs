@@ -47,7 +47,7 @@ fn execute_script(name: &str, snippet: &str) {
     match ctx.eval(snippet) {
         Ok(v) => { println!("  result: {}", v.s()); },
         Err(e) => {
-            panic!(format!("   FAILED code snippet '{}': {}", name, e));
+            panic!("   FAILED code snippet '{}': {}", name, e);
         }
     }
 }

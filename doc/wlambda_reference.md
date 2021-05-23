@@ -177,6 +177,7 @@ Smalltalk, LISP and Perl.
     - [3.10.22](#31022-stdstrfromcharvec-vector) std:str:from\_char\_vec _vector_
     - [3.10.23](#31023-stdstrtolowercase-string) std:str:to\_lowercase _string_
     - [3.10.24](#31024-stdstrtouppercase-string) std:str:to\_uppercase _string_
+    - [3.10.25](#31025-stdstreditdistance-str-a-strb) std:str:edit\_distance _str-a_ _str\_b
   - [3.11](#311-byte-vectors) Byte Vectors
     - [3.11.1](#3111-call-properties-of-bytes) Call Properties of Bytes
     - [3.11.2](#3112-byte-conversion-functions) Byte Conversion Functions
@@ -257,6 +258,8 @@ Smalltalk, LISP and Perl.
     - [5.2.1](#521-iteration-over-vectors) Iteration over vectors
     - [5.2.2](#522-iteration-over-maps) Iteration over maps
     - [5.2.3](#523-for-iteratable-value-function) for _iteratable-value_ _function_
+    - [5.2.4](#524-map-function-iterable) map _function_ _iterable_
+    - [5.2.5](#525-filter-function-iterable) filter _function_ _iterable_
   - [5.3](#53-accumulation-and-collection) Accumulation and Collection
     - [5.3.1](#531-transforming-a-vector) Transforming a vector
     - [5.3.2](#532-example-of-) Example of `$@@`
@@ -3161,6 +3164,14 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 ```
 
+#### <a name="31025-stdstreditdistance-str-a-strb"></a>3.10.25 - std:str:edit\_distance _str-a_ _str\_b
+
+Calculates the Levenshtein distance between two (Unicode) strings.
+
+```wlambda
+std:assert_eq (std:str:edit_distance "aaa" "aba") 1;
+```
+
 ### <a name="311-byte-vectors"></a>3.11 - Byte Vectors
 
 Bytes (plural of Byte) are a vector of bytes. Unlike strings they don't have any encoding.
@@ -5046,6 +5057,96 @@ for :abc {
 
 std:assert_eq (str str_chars) (str $['a', 'b', 'c']);
 ```
+
+#### <a name="524-map-function-iterable"></a>5.2.4 - map _function_ _iterable_
+
+Maps anything that is _iterable_ by calling _function_ with each item as
+first argument and collecting the return values in a vector.
+
+If a map is passed as _iterable_ then _function_ is called with two arguments,
+the first being the map entry value and the second the key.
+Note: When iterating over maps, don't assume any order.
+
+It is very similar to `$@vec iter i <iterable> { $+ ... }`.
+
+```wlambda
+# Lists:
+
+std:assert_str_eq
+    (map { float[_] / 2.0 } $[1,2,3,4,5])
+    $[0.5, 1, 1.5, 2, 2.5];
+
+std:assert_str_eq
+    (map { _ * 10 } $[$b'a', $b'b', $b'c', 10, 20])
+    ($@vec
+        iter i $[$b'a', $b'b', $b'c', 10, 20] {
+            $+ i * 10
+        });
+
+# Great for working with strings too:
+
+std:assert_str_eq
+    (map std:str:to_uppercase
+        $["abc", "bcbc", "aaad", "afoo", "foo"])
+    $["ABC", "BCBC", "AAAD", "AFOO", "FOO"];
+
+# Maps:
+
+std:assert_str_eq
+    (std:sort ~ map { @ } ${a = 10, b = 20})
+    $[$[10, "a"], $[20, "b"]];
+
+# Generally anything that you can pass into `$iter`:
+
+std:assert_str_eq
+    (map { _ * 2 } 0 => 10)
+    $[0,2,4,6,8,10,12,14,16,18];
+
+```
+
+#### <a name="525-filter-function-iterable"></a>5.2.5 - filter _function_ _iterable_
+
+Filters anything that is _iterable_ by the given _function_.
+The _function_ is called with each item and if it returns a `$true` value,
+the item will be collected into a vector that is returned later.
+
+If a map is passed as _iterable_ then _function_ is called with two arguments,
+the first being the map entry value and the second the key.
+
+It is very similar to `$@vec iter i <iterable> { if some_function[_] { $+ ... } }`.
+
+```wlambda
+# Lists:
+
+std:assert_str_eq
+    (filter { (_ 0 1) == "a" } $["abc", "bcbc", "aaad", "afoo", "foo"])
+    $["abc","aaad","afoo"];
+
+# Good in combination with `map` too:
+
+std:assert_str_eq
+    (map std:str:to_uppercase
+        ~ filter { (_ 0 1) == "a" }
+            $["abc", "bcbc", "aaad", "afoo", "foo"])
+    $["ABC","AAAD","AFOO"];
+
+# Also like `map` works fine with maps, but the function
+# needs to take two arguments and returns a pair:
+
+std:assert_str_eq
+    (std:sort
+        ~ filter { @.0 % 2 == 0 }
+            ${a = 2, b = 43, c = 16, d = 13 })
+    $[16 => "c", 2 => "a"];
+
+# Generally anything that you can pass into `$iter`:
+
+std:assert_str_eq
+    (filter { _ % 2 == 0 } 0 => 10)
+    $[0,2,4,6,8];
+
+```
+
 
 ### <a name="53-accumulation-and-collection"></a>5.3 - Accumulation and Collection
 

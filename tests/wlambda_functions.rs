@@ -75,10 +75,10 @@ fn wlambda_functions() {
         for s in missing {
             eprintln!("MISSING: {}", s);
         }
-        panic!(format!(
+        panic!(
             "Found {}/{} undocumented functions!",
             count_missing,
-            total));
+            total);
     } else {
         println!("Found {} functions!", total);
     }
