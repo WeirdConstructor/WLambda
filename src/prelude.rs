@@ -374,12 +374,18 @@ Smalltalk, LISP and Perl.
   - [11.2](#112-networking) Networking
     - [11.2.1](#1121-stdnettcpconnect-socket-addr-connect-timeout) std:net:tcp:connect _socket-addr_ [_connect-timeout_]
     - [11.2.2](#1122-stdnettcplisten-socket-addr-function) std:net:tcp:listen _socket-addr_ _function_
+    - [11.2.3](#1123-stdnetudpnew-socket-addr-connect-addr) std:net:udp:new _socket-addr_ [_connect-addr_]
+    - [11.2.4](#1124-stdnetudpsend-socket-data-socket-addr) std:net:udp:send _socket_ _data_ [_socket-addr_]
+    - [11.2.5](#1125-stdnetudprecv-socket-byte-count) std:net:udp:recv _socket_ [_byte-count_]
   - [11.3](#113-processes) Processes
     - [11.3.1](#1131-stdprocessrun-executable-path-arguments) std:process:run _executable-path_ [_arguments_]
   - [11.4](#114-file-system) File System
     - [11.4.1](#1141-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
     - [11.4.2](#1142-stdfscopy-src-file-path-dst-file-path) std:fs:copy _src-file-path_ _dst-file-path_
     - [11.4.3](#1143-stdfsreaddir-path-function) std:fs:read\_dir _path_ _function_
+    - [11.4.4](#1144-stdfsremovefile-file-path) std:fs:remove\_file _file-path_
+    - [11.4.5](#1145-stdfsremovedir-dir-path) std:fs:remove\_dir _dir-path_
+    - [11.4.6](#1146-stdfsremovedirall-dir-path) std:fs:remove\_dir\_all _dir-path_
   - [11.5](#115-system) System
     - [11.5.1](#1151-stdsysos) std:sys:os
   - [11.6](#116-threading) Threading
@@ -7008,7 +7014,80 @@ unwrap ~ std:net:tcp:listen "0.0.0.0:8292" {!(socket) = @;
 };
 ```
 
-Please note that you can share the socket with other threads, see also std:net:tcp:connect.
+Please note that you can share the socket with other threads, see also `std:net:tcp:connect`.
+
+#### <a name="1123-stdnetudpnew-socket-addr-connect-addr"></a>11.2.3 - std:net:udp:new _socket-addr_ [_connect-addr_]
+
+Creates a new UDP socket and binds it to an endpoint.  The arguments
+_socket-addr_ and _connect-addr_ have the same properties as the _socket-addr_
+that `std:net:tcp:connect` receives.
+
+If _connect-addr_ is given, a connected UDP port is created and
+`std:net:udp:send` does not need to pass a _socket-addr_.
+
+Returns a socket or an error.
+
+The socket can be shared between threads, so you can have a receiving
+thread and a sending one.
+
+```wlambda
+!socket = std:net:udp:new "0.0.0.0:31889";
+
+std:net:udp:send socket $b"TEST" "127.0.0.1:31888";
+```
+
+Here is a more elaborate example using threads:
+
+```wlambda
+!hdl = std:thread:spawn $code {
+    !socket = std:net:udp:new "0.0.0.0:31889";
+    _READY.send :ok;
+
+    !(data, addr) = std:net:udp:recv socket;
+    std:displayln "PING" data;
+    unwrap ~ std:net:udp:send socket ("Test:" data) addr;
+};
+
+hdl.recv_ready[];
+
+!socket = std:net:udp:new "0.0.0.0:31888" "127.0.0.1:31889";
+unwrap ~ std:net:udp:send socket $b"XYB123";
+
+!(data, addr) = unwrap ~ std:net:udp:recv socket;
+
+std:displayln "PONG" data;
+
+std:assert_eq data $b"Test:XYB123";
+
+hdl.join[];
+```
+
+#### <a name="1124-stdnetudpsend-socket-data-socket-addr"></a>11.2.4 - std:net:udp:send _socket_ _data_ [_socket-addr_]
+
+Sends the _data_ to the given _socket-addr_ or to the connected
+address of the _socket_.
+
+Returns the number of bytes sent or an error.
+
+```wlambda
+!socket = std:net:udp:new "0.0.0.0:31889";
+
+std:net:udp:send socket $b"TEST" "127.0.0.1:31888";
+```
+
+#### <a name="1125-stdnetudprecv-socket-byte-count"></a>11.2.5 - std:net:udp:recv _socket_ [_byte-count_]
+
+Receives _byte-count_ number of bytes from the given _socket_.
+If _byte-count_ is omitted 512 is assumed.
+
+Returns the byte vector with the data and the endpoint address
+that it was received from. Or an error.
+
+```text
+!socket = std:net:udp:new "0.0.0.0:31889";
+
+!(buf, addr) = std:net:udp:recv socket;
+```
 
 ### <a name="113-processes"></a>11.3 - Processes
 
@@ -7084,6 +7163,22 @@ If the _function_ is called with a directory, you can recurse into that
 directory by returning a `$true` value.
 
 You can format the timestamps using `std:chrono:format_utc`.
+
+#### <a name="1144-stdfsremovefile-file-path"></a>11.4.4 - std:fs:remove\_file _file-path_
+
+Removes the file at the given _file-path_.
+Returns an error if the file is missing or some other error occured.
+
+#### <a name="1145-stdfsremovedir-dir-path"></a>11.4.5 - std:fs:remove\_dir _dir-path_
+
+Removes the dir at the given _dir-path_.
+Returns an error if the dir is missing, is not empty
+or some other error occured.
+
+#### <a name="1146-stdfsremovedirall-dir-path"></a>11.4.6 - std:fs:remove\_dir\_all _dir-path_
+
+Removes the given _dir-path_ recursively. Use with care!
+Returns an error if the directory does not exist.
 
 ### <a name="115-system"></a>11.5 - System
 
@@ -10005,6 +10100,51 @@ pub fn std_symbol_table() -> SymbolTable {
                 Ok(VVal::Bol(true))
             }))
         }, Some(2), Some(2), false);
+
+    func!(st, "fs:remove_file",
+        |env: &mut Env, _argc: usize| {
+            let path = env.arg(0);
+            path.with_s_ref(|path| {
+                if let Err(e) = std::fs::remove_file(&path) {
+                    return Ok(env.new_err(
+                        format!(
+                            "Couldn't remove file '{}': {}",
+                            path, e)));
+                }
+
+                Ok(VVal::Bol(true))
+            })
+        }, Some(1), Some(1), false);
+
+    func!(st, "fs:remove_dir",
+        |env: &mut Env, _argc: usize| {
+            let path = env.arg(0);
+            path.with_s_ref(|path| {
+                if let Err(e) = std::fs::remove_dir(&path) {
+                    return Ok(env.new_err(
+                        format!(
+                            "Couldn't remove dir '{}': {}",
+                            path, e)));
+                }
+
+                Ok(VVal::Bol(true))
+            })
+        }, Some(1), Some(1), false);
+
+    func!(st, "fs:remove_dir_all",
+        |env: &mut Env, _argc: usize| {
+            let path = env.arg(0);
+            path.with_s_ref(|path| {
+                if let Err(e) = std::fs::remove_dir_all(&path) {
+                    return Ok(env.new_err(
+                        format!(
+                            "Couldn't remove dir (recursively) '{}': {}",
+                            path, e)));
+                }
+
+                Ok(VVal::Bol(true))
+            })
+        }, Some(1), Some(1), false);
 
     func!(st, "io:line",
         |env: &mut Env, _argc: usize| {

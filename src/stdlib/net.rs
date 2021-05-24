@@ -326,7 +326,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     }
                 }
             })
-        }).unwrap_or(Ok(VVal::None))
+        }).unwrap_or(
+            Ok(env.new_err(format!(
+                "std:net:udp:send: First argument not a socket! {}",
+                socket.s()))))
     }, Some(2), Some(3), false);
 
     st.fun("net:udp:recv", |env: &mut Env, argc: usize| {
@@ -349,7 +352,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 },
                 Err(e) => env.new_err(format!("std:net:udp:recv: {}", e)),
             }
-        }).unwrap_or(VVal::None))
+        }).unwrap_or(
+            env.new_err(format!(
+                "std:net:udp:recv: First argument not a socket! {}",
+                socket.s()))))
     }, Some(1), Some(2), false);
 
     st.fun("io:flush", |env: &mut Env, _argc: usize| {
@@ -361,7 +367,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 Ok(_)  => VVal::Bol(true),
                 Err(e) => env.new_err(format!("std:io:flush: {}", e)),
             }
-        }).unwrap_or(VVal::None))
+        }).unwrap_or(
+            env.new_err(format!(
+                "std:io:flush: First argument not an IO handle! {}",
+                fd.s()))))
     }, Some(1), Some(1), false);
 
     st.fun("io:write", |env: &mut Env, _argc: usize| {
@@ -393,7 +402,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     }
                 }
             })
-        }).unwrap_or(VVal::None))
+        }).unwrap_or(
+            env.new_err(format!(
+                "std:io:write: First argument not an IO handle! {}",
+                fd.s()))))
     }, Some(2), Some(3), false);
 
     st.fun("io:write_some", |env: &mut Env, _argc: usize| {
@@ -433,7 +445,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     }
                 }
             })
-        }).unwrap_or(VVal::None))
+        }).unwrap_or(
+            env.new_err(format!(
+                "std:io:write_some: First argument not an IO handle! {}",
+                fd.s()))))
     }, Some(2), Some(3), false);
 
     st.fun("io:read_some", |env: &mut Env, _argc: usize| {
@@ -464,7 +479,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     }
                 }
             }
-        }).unwrap_or(VVal::None))
+        }).unwrap_or(
+            env.new_err(format!(
+                "std:io:read_some: First argument not an IO handle! {}",
+                fd.s()))))
     }, Some(1), Some(1), false);
 }
 

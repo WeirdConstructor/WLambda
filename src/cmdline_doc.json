@@ -7911,7 +7911,92 @@
       "};",
       "```",
       "",
-      "Please note that you can share the socket with other threads, see also std:net:tcp:connect.",
+      "Please note that you can share the socket with other threads, see also `std:net:tcp:connect`.",
+      ""
+    ]
+  ],
+  [
+    "11.2.3 - std:net:udp:new _socket-addr_ [_connect-addr_]",
+    [
+      "",
+      "Creates a new UDP socket and binds it to an endpoint.  The arguments",
+      "_socket-addr_ and _connect-addr_ have the same properties as the _socket-addr_",
+      "that `std:net:tcp:connect` receives.",
+      "",
+      "If _connect-addr_ is given, a connected UDP port is created and",
+      "`std:net:udp:send` does not need to pass a _socket-addr_.",
+      "",
+      "Returns a socket or an error.",
+      "",
+      "The socket can be shared between threads, so you can have a receiving",
+      "thread and a sending one.",
+      "",
+      "```wlambda",
+      "!socket = std:net:udp:new \"0.0.0.0:31889\";",
+      "",
+      "std:net:udp:send socket $b\"TEST\" \"127.0.0.1:31888\";",
+      "```",
+      "",
+      "Here is a more elaborate example using threads:",
+      "",
+      "```wlambda",
+      "!hdl = std:thread:spawn $code {",
+      "    !socket = std:net:udp:new \"0.0.0.0:31889\";",
+      "    _READY.send :ok;",
+      "",
+      "    !(data, addr) = std:net:udp:recv socket;",
+      "    std:displayln \"PING\" data;",
+      "    unwrap ~ std:net:udp:send socket (\"Test:\" data) addr;",
+      "};",
+      "",
+      "hdl.recv_ready[];",
+      "",
+      "!socket = std:net:udp:new \"0.0.0.0:31888\" \"127.0.0.1:31889\";",
+      "unwrap ~ std:net:udp:send socket $b\"XYB123\";",
+      "",
+      "!(data, addr) = unwrap ~ std:net:udp:recv socket;",
+      "",
+      "std:displayln \"PONG\" data;",
+      "",
+      "std:assert_eq data $b\"Test:XYB123\";",
+      "",
+      "hdl.join[];",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "11.2.4 - std:net:udp:send _socket_ _data_ [_socket-addr_]",
+    [
+      "",
+      "Sends the _data_ to the given _socket-addr_ or to the connected",
+      "address of the _socket_.",
+      "",
+      "Returns the number of bytes sent or an error.",
+      "",
+      "```wlambda",
+      "!socket = std:net:udp:new \"0.0.0.0:31889\";",
+      "",
+      "std:net:udp:send socket $b\"TEST\" \"127.0.0.1:31888\";",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "11.2.5 - std:net:udp:recv _socket_ [_byte-count_]",
+    [
+      "",
+      "Receives _byte-count_ number of bytes from the given _socket_.",
+      "If _byte-count_ is omitted 512 is assumed.",
+      "",
+      "Returns the byte vector with the data and the endpoint address",
+      "that it was received from. Or an error.",
+      "",
+      "```text",
+      "!socket = std:net:udp:new \"0.0.0.0:31889\";",
+      "",
+      "!(buf, addr) = std:net:udp:recv socket;",
+      "```",
       ""
     ]
   ],
@@ -8011,6 +8096,34 @@
       "directory by returning a `$true` value.",
       "",
       "You can format the timestamps using `std:chrono:format_utc`.",
+      ""
+    ]
+  ],
+  [
+    "11.4.4 - std:fs:remove_file _file-path_",
+    [
+      "",
+      "Removes the file at the given _file-path_.",
+      "Returns an error if the file is missing or some other error occured.",
+      ""
+    ]
+  ],
+  [
+    "11.4.5 - std:fs:remove_dir _dir-path_",
+    [
+      "",
+      "Removes the dir at the given _dir-path_.",
+      "Returns an error if the dir is missing, is not empty",
+      "or some other error occured.",
+      ""
+    ]
+  ],
+  [
+    "11.4.6 - std:fs:remove_dir_all _dir-path_",
+    [
+      "",
+      "Removes the given _dir-path_ recursively. Use with care!",
+      "Returns an error if the directory does not exist.",
       ""
     ]
   ],

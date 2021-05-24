@@ -11,6 +11,8 @@ recursively.
 * **Feature:** The command line REPL can now search and display contents
 of the reference manual with the `?` command.
 * **Feature:** Implemented `std:str:edit_distance` utility function.
+* **Feature:** Added more filesystem related functions: `std:fs:remove_file`,
+`std:fs:remove_dir` and `std:fs:remove_dir_all`.
 * **Change:** VVal::new\_fun() added.
 * **Change:** Refactored the code base a bit.
 * **Bugfix:** Panic on pair mutation (like on integer/float vector mutation).

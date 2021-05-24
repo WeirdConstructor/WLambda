@@ -987,10 +987,11 @@ impl<A> ThreadCreator for DefaultThreadCreator<A> where A: ThreadGlobalEnvCreato
                 match ctx.eval(&code) {
                     Ok(v) => AVal::from_vval(&v),
                     Err(e) => {
+                        eprintln!("Error in thread: {}", e);
                         let ret =
                             AVal::Err(
                                 Box::new(
-                                    AVal::Str(format!("Error in Thread: {}", e))),
+                                    AVal::Str(format!("Error in thread: {}", e))),
                                 String::from("?"));
                         trdy.send(&ret.to_vval());
                         ret

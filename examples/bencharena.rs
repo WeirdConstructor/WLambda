@@ -1,13 +1,13 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use std::time::{Duration, Instant};
-use std::thread::sleep;
+use std::time::Instant;
 
 thread_local! {
     static ARENA_INTERN: RefCell<Arena1> = RefCell::new(Arena1::new());
 }
 
+#[allow(dead_code)]
 struct XXX {
     u: f64,
     a: f64,
@@ -22,6 +22,7 @@ enum Val {
     X(XXX),
 }
 
+#[allow(dead_code)]
 enum Val2 {
     None,
     N(Rc<(Val2, Val2)>),
@@ -113,12 +114,12 @@ impl Drop for AR1 {
 fn t1(n: usize) {
     let mut v = vec![];
     let now = Instant::now();
-    for i in 0..10000 {
-        for i in 0..n {
+    for _ in 0..10000 {
+        for _ in 0..n {
             v.push(Val::n(Val::x(21.32), Val::x(22.1)));
         }
         v.clear();
-        for i in 0..n {
+        for _ in 0..n {
             v.push(Val::n(Val::x(21.32), Val::x(22.1)));
         }
         v.clear();
@@ -129,12 +130,12 @@ fn t1(n: usize) {
 fn t2(n: usize) {
     let mut v = vec![];
     let now = Instant::now();
-    for i in 0..10000 {
-        for i in 0..n {
+    for _ in 0..10000 {
+        for _ in 0..n {
             v.push(Val2::n(Val2::x(21.32), Val2::x(22.1)));
         }
         v.clear();
-        for i in 0..n {
+        for _ in 0..n {
             v.push(Val2::n(Val2::x(21.32), Val2::x(22.1)));
         }
         v.clear();
