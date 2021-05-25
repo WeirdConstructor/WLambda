@@ -5381,3 +5381,57 @@ fn check_edit_distance() {
     assert_eq!(ve("std:str:edit_distance $q ☀☂☃☄ $q X☂☃☄ "),      "1");
     assert_eq!(ve("std:str:edit_distance $q[ฎ ฏ ฐ] $q[a b c]"),   "3");
 }
+
+#[test]
+fn check_process_wait() {
+    assert_eq!(ve(r#"
+        !hdl = unwrap ~ std:process:spawn "bash" $[
+            "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
+        ];
+
+        !res = std:process:wait hdl;
+
+        std:assert ~ not res.success;
+        std:assert_eq res.status 20;
+    "#), "$true");
+}
+
+
+#[test]
+fn check_process_kill_wait() {
+    assert_eq!(ve(r#"
+        !hdl = unwrap ~ std:process:spawn "bash" $[
+            "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
+        ];
+
+        !res = std:process:kill_wait hdl;
+
+        std:assert ~ not res.success;
+        std:assert_eq res.status -1;
+    "#), "$true");
+}
+
+#[test]
+fn check_process_try_wait() {
+    assert_eq!(ve(r#"
+        !hdl = unwrap ~ std:process:spawn "bash" $[
+            "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
+        ];
+
+        !counter = 0;
+        !ret = $none;
+        while $true {
+            std:thread:sleep :ms => 250;
+            .counter += 1;
+
+            .ret = unwrap ~ std:process:try_wait hdl;
+            if ret {
+                break ret;
+            };
+        };
+
+        std:assert counter > 0;
+        std:assert ~ not ret.success;
+        std:assert ret.status == 20;
+    "#), "$true");
+}

@@ -1,8 +1,9 @@
-0.7.1 (unreleased)
+0.7.1 (2021-05-25)
 ==================
 
 * **Feature:** Added `std:process:spawn` and `std:process:kill_wait`.
-* **Feature:** Added `std:process:wait` for waiting it to exit.
+* **Feature:** Added `std:process:wait` and `std:process:try_wait`
+for waiting it to exit.
 * **Feature:** Calling into EvalContext::eval\*() can now be done
 recursively.
 * **Feature:** Added simple UDP networking via `std:net:udp:new`,

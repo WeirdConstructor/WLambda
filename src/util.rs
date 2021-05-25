@@ -324,14 +324,6 @@ pub fn hex2rgba(s: &str) -> (u8, u8, u8, u8) {
 ///
 /// The runtime complexity is `O(m*n)`, where `m` and `n` are the
 /// strings' lengths.
-///
-/// # Examples
-///
-/// ```
-/// use edit_distance::edit_distance;
-///
-/// edit_distance("kitten", "sitting"); // => 3
-/// ```
 pub fn edit_distance(a: &str, b: &str) -> usize {
     let len_a = a.chars().count();
     let len_b = b.chars().count();
