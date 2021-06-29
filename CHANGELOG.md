@@ -4,6 +4,7 @@
 * **Bugfix:** Code generation for direct blocks `if $true { !x = 3; x } $n`
 was broken. It unwound the locals while the return value was still referencing
 those locals. No crash, just wrong results. Code became slightly faster too.
+* **Bugfix:** Catch `x % 0` and make a WLambda panic of that.
 
 0.7.1 (2021-05-25)
 ==================

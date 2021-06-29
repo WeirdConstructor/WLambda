@@ -5457,3 +5457,15 @@ fn check_process_try_wait() {
         std:assert ret.status == 20;
     "#), "$true");
 }
+
+#[test]
+fn check_div_zero() {
+    assert_eq!(ve("1 % 0"),
+        "EXEC ERR: Caught [1,3:<compiler:s_eval>(BinOpMod)] SA::Panic(\"Remainder with divisor of 0: 1%0\")");
+    assert_eq!(ve("1.0 % 0.0"),
+        "NaN");
+    assert_eq!(ve("1 / 0"),
+        "EXEC ERR: Caught [1,3:<compiler:s_eval>(BinOpDiv)] SA::Panic(\"Division by 0: 1/0\")");
+    assert_eq!(ve("1.0 / 0.0"),
+        "inf");
+}

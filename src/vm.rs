@@ -497,6 +497,15 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 if let VVal::Flt(f) = a {
                     VVal::Flt(f % b.f())
                 } else {
+                    if b.i() == 0 {
+                        env.unwind_to_depth(uw_depth);
+                        retv =
+                            Err(StackAction::panic_str(
+                                format!("Remainder with divisor of 0: {}%{}", a.i(), b.i()),
+                                prog.debug[pc].clone()));
+                        break;
+                    }
+
                     VVal::Int(a.i().wrapping_rem(b.i()))
                 }
             }),
