@@ -3214,12 +3214,12 @@ fn check_pairs() {
 
 #[test]
 fn check_if() {
-//assert_eq!(ve(r"
-//!res =
-//    ? { !x = 2; x > 1 } 39;
-//
-//std:assert_eq res 39;
-//"), "");
+    assert_eq!(ve(r"
+    !res =
+        ? { !x = 2; x > 1 } 39;
+
+    std:assert_eq res 39;
+    "), "$true");
     assert_eq!(v("? { !x = 10; x > 1 } 99 49"), "99");
     assert_eq!(v("if { !x = 10; x > 1 } 99 49"), "99");
     assert_eq!(v("? { !x = 10; x > 1 } 99"),    "99");
@@ -3275,6 +3275,28 @@ fn check_if() {
         "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
     assert_eq!(ve("? 1 2 3 4"),
         "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
+}
+
+#[test]
+fn check_syntax_ret_val_direct_block() {
+    assert_eq!(ve("$@v iter i { !x = $[1,2,3]; x } { $+ i }"), "$[1,2,3]");
+    assert_eq!(ve("block { !x = 33; x }"), "33");
+    assert_eq!(ve("std:str:cat 55 (? {!x = $true; x } 99) 66"), "\"559966\"");
+    assert_eq!(ve("std:str:cat (? $true {!x = 23; x }) (? $true {!x = 99; x }) 66"), "\"239966\"");
+    assert!(false);
+    assert_eq!(ve("? {!x = $true; x }[] 99"), "99");
+    assert_eq!(ve("? {!x = $true; x } 99"), "99");
+    assert_eq!(ve("? $true { !x = 1; x }"), "1");
+    assert_eq!(ve("? {!x = $true; x }[] { !x = 1; x }"), "1");
+    assert_eq!(ve("!f = ? $true  { !x = 1; x } { !y = 2; y }; f"), "1");
+    assert_eq!(ve("!f = ? $false { !x = 1; x } { !y = 2; y }; f"), "2");
+    assert_eq!(ve("match 3 3 => { !x = 5; x }"), "5");
+    assert_eq!(ve("match 3 3 => { !x = 5; x } { !f = 6; f }"), "5");
+    assert_eq!(ve("match 4 3 => { !x = 5; x } { !f = 6; f }"), "6");
+    assert_eq!(ve("jump 0 { !x = 5; x }"), "5");
+    assert_eq!(ve("jump 1 $n { !x = 6; x }"), "6");
+    assert_eq!(ve("? $true { !x = 1; x } { !y = 2; y }"), "1");
+    assert_eq!(ve("? $false { !x = 1; x } { !y = 2; y }"), "2");
 }
 
 #[test]

@@ -1521,9 +1521,19 @@ fn compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) 
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
 
     pw!(prog, store, {
-        var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
-            stmts.eval_proxy(prog, store)
-        })
+        match store {
+            ResultSink::WantResult => {
+                var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
+                    stmts.eval_to(prog, ResPos::Stack(0))
+                });
+                ResPos::Stack(0)
+            },
+            _ => {
+                var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
+                    stmts.eval_proxy(prog, store)
+                })
+            }
+        }
     })
 }
 
@@ -1761,10 +1771,8 @@ pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 store.if_must_store(|store_pos| {
                     let mut then_body_prog = Prog::new();
                     let mut else_body_prog = Prog::new();
-                    let tbp = then_body.eval(&mut then_body_prog);
-                    let ebp = else_body.eval(&mut else_body_prog);
-                    else_body_prog.op_mov(&spos, ebp, store_pos);
-                    then_body_prog.op_mov(&spos, tbp, store_pos);
+                    then_body.eval_to(&mut then_body_prog, store_pos);
+                    else_body.eval_to(&mut else_body_prog, store_pos);
                     then_body_prog.op_jmp(&spos, else_body_prog.op_count() as i32);
 
                     let condval = cond.eval(prog);
@@ -1944,8 +1952,7 @@ pub(crate) fn generate_jump_table(spos: SynPos, value: ProgWriter, blocks: Vec<P
                     for b in blocks.iter().rev() {
                         let mut b_prog = Prog::new();
 
-                        let block_val = b.eval(&mut b_prog);
-                        b_prog.op_mov(&spos, block_val, store_pos);
+                        b.eval_to(&mut b_prog, store_pos);
                         if end_offs > 0 {
                             b_prog.op_jmp(&spos, end_offs);
                         }
@@ -3035,6 +3042,8 @@ pub fn test_eval_to_string(s: &str) -> String {
                     e.argc = 2;
                     e.set_bp(0);
                     e.push_sp(local_space);
+
+                    println!("PROG: {:?}", p);
 
                     match crate::vm::vm(&p, &mut e) {
                         Ok(v) => v.s(),

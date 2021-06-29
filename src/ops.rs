@@ -14,7 +14,6 @@ pub struct Prog {
     pub nxt_debug: Option<SynPos>,
 }
 
-
 fn patch_respos_data(rp: &mut ResPos, idx: u16) {
     match rp {
         ResPos::Data(i)         => { *i += idx; },
@@ -585,6 +584,20 @@ impl Prog {
         for (i, o) in self.data.iter().enumerate() {
             println!("    [{:>3}] {:?}", i, o);
         }
+    }
+}
+
+impl Debug for Prog {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "PROG:")?;
+        for (i, o) in self.ops.iter().enumerate() {
+            writeln!(f, "    [{:>3}] {:?}", i, o)?;
+        }
+        writeln!(f, "  DATA:")?;
+        for (i, o) in self.data.iter().enumerate() {
+            writeln!(f, "    [{:>3}] {:?}", i, o)?;
+        }
+        Ok(())
     }
 }
 

@@ -1,3 +1,10 @@
+0.8.0 (2021-06-29)
+==================
+
+* **Bugfix:** Code generation for direct blocks `if $true { !x = 3; x } $n`
+was broken. It unwound the locals while the return value was still referencing
+those locals. No crash, just wrong results. Code became slightly faster too.
+
 0.7.1 (2021-05-25)
 ==================
 
