@@ -3043,8 +3043,6 @@ pub fn test_eval_to_string(s: &str) -> String {
                     e.set_bp(0);
                     e.push_sp(local_space);
 
-                    println!("PROG: {:?}", p);
-
                     match crate::vm::vm(&p, &mut e) {
                         Ok(v) => v.s(),
                         Err(je) => {

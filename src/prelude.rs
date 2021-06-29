@@ -8740,6 +8740,32 @@ macro_rules! add_multi_op {
     }
 }
 
+macro_rules! add_multi_op_zero {
+    ($g: ident, $op: tt, $err: expr) => {
+        add_func!($g, $op, env, argc, {
+            if argc <= 0 { return Ok(VVal::None); }
+            if let VVal::Flt(f) = env.arg(0) {
+                let mut accum = f;
+                for i in 1..argc { accum = accum $op env.arg(i).f() }
+                Ok(VVal::Flt(accum))
+
+            } else {
+                let mut accum = env.arg(0).i();
+                for i in 1..argc {
+                    let v = env.arg(i).i();
+                    if v == 0 {
+                        return
+                            Err(StackAction::panic_str(
+                                format!("{}", $err), None));
+                    }
+                    accum = accum $op v;
+                }
+                Ok(VVal::Int(accum))
+            }
+        }, Some(2), None, false)
+    }
+}
+
 macro_rules! add_bool_bin_op {
     ($g: ident, $op: tt) => {
         add_func!($g, $op, env, argc, {
@@ -8919,8 +8945,8 @@ pub fn core_symbol_table() -> SymbolTable {
     }, Some(1), None, false);
 
     add_multi_op!(st, *);
-    add_multi_op!(st, /);
-    add_multi_op!(st, %);
+    add_multi_op_zero!(st, /, "Division by 0");
+    add_multi_op_zero!(st, %, "Remainder with divisor by 0");
 
     add_bool_bin_op!(st, <);
     add_bool_bin_op!(st, >);

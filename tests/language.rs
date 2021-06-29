@@ -5468,4 +5468,8 @@ fn check_div_zero() {
         "EXEC ERR: Caught [1,3:<compiler:s_eval>(BinOpDiv)] SA::Panic(\"Division by 0: 1/0\")");
     assert_eq!(ve("1.0 / 0.0"),
         "inf");
+    assert_eq!(ve("`%` 1 0"),
+        "EXEC ERR: Caught [?]=>[1,5:<compiler:s_eval>(Call)] SA::Panic(\"Remainder with divisor by 0\")");
+    assert_eq!(ve("`/` 1 0"),
+        "EXEC ERR: Caught [?]=>[1,5:<compiler:s_eval>(Call)] SA::Panic(\"Division by 0\")");
 }
