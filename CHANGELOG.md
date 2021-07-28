@@ -1,4 +1,4 @@
-0.8.0 (2021-06-29)
+0.8.0 (2021-07-28)
 ==================
 
 * **Bugfix:** Code generation for direct blocks `if $true { !x = 3; x } $n`
