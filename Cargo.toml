@@ -7,7 +7,7 @@ edition      = "2018"
 description  = "WLambda is an embeddable scripting language for Rust"
 repository   = "https://github.com/WeirdConstructor/WLambda"
 readme       = "README.md"
-keywords     = ["simple","scripting","language","embeddable","embedded","lisp"]
+keywords     = ["scripting","language","embeddable","embedded","lisp"]
 categories   = ["parsing","compilers","game-development","config","parser-implementations"]
 exclude      = ["res/*"]
 
