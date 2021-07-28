@@ -5,13 +5,15 @@
 WLambda - Embeddable Scripting Language for Rust
 ================================================
 
-WLambda is an embeddable dynamic scripting language for Rust, where every value
+WLambda is a dynamic scripting language for Rust, where every value
 can be called and the syntax is a blend of Perl, Lua, JavaScript and LISP/Scheme/Clojure.
+It can be used as embedded scripting language or standalone with the
+provided REPL.
 
 Here are some of its properties:
 
 - Simple but unique syntax. For a reference look at the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
-- Easily embeddable into Rust programs due to a simple API.
+- An easily embeddable scripting language for Rust programs due to a simple API.
 - The language is about getting things done quickly, so performance is not a main priority.
   Current performance is roughly in the ball park of (C)Python or Perl, which means
   the language is quite possibly too slow where speed is the focus, but fast enough if
