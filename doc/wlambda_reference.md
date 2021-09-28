@@ -4442,6 +4442,7 @@ Here is an overview of the data type calling semantics:
 | `$false`                     | `f1, f2`                     | Will call `f2` or return `$n` if `f2` is not provided.          |
 | `$true`                      | `$[1,2]`                     | Will return the second element `2` of the list. |
 | `$false`                     | `$[1,2]`                     | Will return the first element `1` of the list. |
+| integer                      | vector, string, byte_vec, iterator | Will return the element at the given integer index. |
 | symbol                       | map, userval                 | Will retrieve the value in the map at the key equal to the symbol. |
 | map                          | anything                     | Will call `anything` for each value and key in the map and return a list with the return values. |
 | string                       | string, byte_vec, char or byte | Append operation, works with multiple arguments. |
