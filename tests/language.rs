@@ -3283,7 +3283,6 @@ fn check_syntax_ret_val_direct_block() {
     assert_eq!(ve("block { !x = 33; x }"), "33");
     assert_eq!(ve("std:str:cat 55 (? {!x = $true; x } 99) 66"), "\"559966\"");
     assert_eq!(ve("std:str:cat (? $true {!x = 23; x }) (? $true {!x = 99; x }) 66"), "\"239966\"");
-    assert!(false);
     assert_eq!(ve("? {!x = $true; x }[] 99"), "99");
     assert_eq!(ve("? {!x = $true; x } 99"), "99");
     assert_eq!(ve("? $true { !x = 1; x }"), "1");

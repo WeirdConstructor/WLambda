@@ -30,7 +30,10 @@ Smalltalk, LISP and Perl.
   - [2.3](#23-function-arity-checks) Function arity checks
     - [2.3.1](#231-stdtonoarity-function) std:to\_no\_arity _function_
   - [2.4](#24-calling-fields--method-calling) Calling fields / Method calling
-    - [2.4.1](#241-object-oriented-programming-with-prototypes) Object Oriented Programming with Prototypes
+    - [2.4.1](#241-the-self-and-data-special-variables) The $self and $data special variables
+    - [2.4.2](#242-object-oriented-programming-with-prototypes) Object Oriented Programming with Prototypes
+    - [2.4.3](#243-object-oriented-with-prototypes-and-inheritance) Object Oriented with Prototypes and Inheritance
+    - [2.4.4](#244-object-oriented-with-prototypes-and-self-references-and-data-references) Object Oriented with Prototypes and $self References and $data References
   - [2.5](#25-function-call-composition) Function call composition
     - [2.5.1](#251--tail-argument-function-chaninig) '|' Tail Argument Function Chaninig
     - [2.5.2](#252--left-hand-function-chaining) '|>' Left Hand Function Chaining
@@ -849,7 +852,47 @@ You can also use a vector/list as object, in that case the `_proto`
 field that holds the class method map is the first element of the
 vector. The second element of the vector can be accessed using `$data`.
 
-#### <a name="241-object-oriented-programming-with-prototypes"></a>2.4.1 - Object Oriented Programming with Prototypes
+#### <a name="241-the-self-and-data-special-variables"></a>2.4.1 - The $self and $data special variables
+
+If you call a method using the dot `.`, and the value on the left
+side is a map or vector, you will get the map or vector by `$self`.
+However, if you define a `_data` key on the map, or put something in
+the second element of the vector, you can refer to it using `$data`.
+
+You can use this to refer to the members and other functions of a structure:
+
+```wlambda
+!new_ab_struct = {
+    ${
+        _data = ${ a = 1, b = 2 },
+        inc_a = { $data.a += 1; },
+        inc_b = { $data.b += 1; },
+        a = { $data.a },
+        b = { $data.b },
+        inc_both = {
+            $self.inc_a[];
+            $self.inc_b[];
+        },
+    }
+};
+
+!ab = new_ab_struct[];
+
+ab.inc_a[];
+std:assert_eq ab.a[] 2;
+
+ab.inc_b[];
+std:assert_eq ab.b[] 3;
+
+ab.inc_both[];
+std:assert_eq ab.a[] 3;
+std:assert_eq ab.b[] 4;
+```
+
+The next seconds show how this can be used to do prototyped object
+oriented programming.
+
+#### <a name="242-object-oriented-programming-with-prototypes"></a>2.4.2 - Object Oriented Programming with Prototypes
 
 Instead of using closures for OOP the preferred way is to use
 maps of functions as classes and form an inheritance hierarchy
@@ -917,6 +960,126 @@ vector index lookup instead of an array lookup.
 std:assert_eq inst.gen[3] 30;
 std:assert_eq inst.gen2[4] 40;
 ```
+
+#### <a name="243-object-oriented-with-prototypes-and-inheritance"></a>2.4.3 - Object Oriented with Prototypes and Inheritance
+
+You can inherit functionality from a different class by assigning
+it to the prototype of the class itself.
+
+```wlambda
+!SuperClass = ${
+    init_super_class = {
+        $data.inc = 0;
+    },
+    inc = {
+        $data.inc += 1;
+        $data.inc
+    },
+};
+```
+
+Please notice, that _SuperClass_ does not have it's own constructor,
+instead you should define a custom init function like `init_super_class`,
+to define the used fields. The _SuperClass_ will refer to the
+`$data` of the object that is going to be created by _MyClass_ in the next
+step.
+
+```wlambda
+!SuperClass = ${
+    init_super_class = {
+        $data.inc = 0;
+    },
+    inc = {
+        $data.inc += 1;
+        $data.inc
+    },
+};
+
+!MyClass = ${
+    _proto = SuperClass,
+    new = {
+        !self = ${
+            _proto = $self,
+            _data = ${ other = 10 },
+        };
+        self.init_super_class[];
+        self
+    },
+    get_other = { $data.other },
+    get_inc = { $data.inc },
+};
+
+!my_obj = MyClass.new[];
+
+std:assert_eq my_obj.get_other[] 10;
+std:assert_eq my_obj.inc[] 1;
+std:assert_eq my_obj.inc[] 2;
+std:assert_eq my_obj.inc[] 3;
+
+std:assert_eq my_obj._data.other 10;
+std:assert_eq my_obj._data.inc   3;
+```
+
+#### <a name="244-object-oriented-with-prototypes-and-self-references-and-data-references"></a>2.4.4 - Object Oriented with Prototypes and $self References and $data References
+
+There might come a time, when you want to pass a reference of your
+object around, but you want to prevent cyclic references.
+For this you will need to return a strong reference `$&&` from your
+constructor as `$self` and if you want to refer to `$data` from callback
+functions, you are advised to also wrap it into a strong reference.
+
+```wlambda
+!destroyed = $false;
+
+!MyClass = ${
+    new = {
+        $&& ${
+            _proto = $self,
+            _data  = $&& ${
+                x = 1
+            },
+            dropper = std:to_drop { .destroyed = $t; },
+        }
+    },
+    inc_x = { $data.x += 1 },
+    install_on = {!(callchain) = @;
+        !self = $w& $self;
+        std:push callchain { self.inc_x[]; };
+    },
+    install_getter = {!(callchain) = @;
+        !data = $w& $data;
+        std:push callchain { data.x };
+    },
+};
+
+# Create instance:
+!my_obj = MyClass.new[];
+
+my_obj.inc_x[];
+
+!chain = $[];
+my_obj.install_on     chain;
+my_obj.install_getter chain;
+
+# There are now 3 references to 'my_obj':
+# - my_obj variable
+# - first callback in chain
+# - second callback in chain
+
+std:assert_eq my_obj._data.x 2;
+chain.0[]; # calls my_ocj.inc_x[];
+std:assert_eq my_obj._data.x 3;
+
+# Second callback gets x:
+std:assert_eq chain.1[] 3;
+
+!my_obj = $n; # destroy only strong reference
+std:assert destroyed;
+```
+
+Of course the callbacks now refer to `$none` to call `inc_x`, a more
+sophisticated way of cleanup is of course necessary. But this is just an
+example.
 
 ### <a name="25-function-call-composition"></a>2.5 - Function call composition
 
