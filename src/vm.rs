@@ -50,7 +50,8 @@ macro_rules! out_reg {
                     $retv =
                         Err(StackAction::panic_str(
                             format!("Dropped error value: {}", ev.borrow().0.s()),
-                            Some(ev.borrow().1.clone())));
+                            Some(ev.borrow().1.clone()),
+                            ev.borrow().0.clone()));
                     break;
                 }
             },
@@ -110,7 +111,8 @@ macro_rules! handle_err {
                         Err(StackAction::panic_str(
                             format!("Error value in {}: {}",
                                     $msg, ev.borrow().0.s()),
-                            Some(ev.borrow().1.clone())));
+                            Some(ev.borrow().1.clone()),
+                            ev.borrow().0.clone()));
                     break;
                 },
                 v => v,
@@ -151,23 +153,30 @@ macro_rules! call_ud_method {
             let call_ret =
                 $env.with_local_call_info(
                     $argc, |env| $ud.call_method($key, env));
-            $env.popn($argc);
             match call_ret {
-                Ok($call_ret) => $cont,
+                Ok($call_ret) => {
+                    $env.popn($argc);
+                    $cont
+                },
                 Err(StackAction::Return(ret)) => {
+                    $env.popn($argc);
                     $env.unwind_to_depth($uw_depth);
                     $retv = Err(StackAction::Return(ret));
                     break;
                 },
                 Err(StackAction::Next) => {
+                    $env.popn($argc);
                     handle_next!($env, $pc, $uw_depth, $retv);
                 },
                 Err(StackAction::Break(v)) => {
+                    $env.popn($argc);
                     handle_break!($env, $pc, v, $uw_depth, $retv);
                 },
                 Err(sa) => {
+                    let args = $env.stk2vec($argc);
+                    $env.popn($argc);
                     $env.unwind_to_depth($uw_depth);
-                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone(), args));
                     break;
                 },
             }
@@ -175,28 +184,34 @@ macro_rules! call_ud_method {
     }
 }
 
-
 macro_rules! call_func {
     ($f: ident, $argc: ident, $popc: expr, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident, $call_ret: ident, $cont: block) => {
         {
             let call_ret = $f.call_internal($env, $argc);
-            $env.popn($popc); // + 1 for the function
             match call_ret {
-                Ok($call_ret) => $cont,
+                Ok($call_ret) => {
+                    $env.popn($popc);
+                    $cont
+                },
                 Err(StackAction::Return(ret)) => {
+                    $env.popn($popc);
                     $env.unwind_to_depth($uw_depth);
                     $retv = Err(StackAction::Return(ret));
                     break;
                 },
                 Err(StackAction::Next) => {
+                    $env.popn($popc);
                     handle_next!($env, $pc, $uw_depth, $retv);
                 },
                 Err(StackAction::Break(v)) => {
+                    $env.popn($popc);
                     handle_break!($env, $pc, v, $uw_depth, $retv);
                 },
                 Err(sa) => {
+                    let args = $env.stk2vec($argc);
+                    $env.popn($popc);
                     $env.unwind_to_depth($uw_depth);
-                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                    $retv = Err(sa.wrap_panic($prog.debug[$pc].clone(), args));
                     break;
                 },
             }
@@ -218,9 +233,10 @@ macro_rules! get_key {
                 match call_ret {
                     Ok(v) => v,
                     Err(sa) => {
+                        let args = $env.argv();
                         $env.unwind_to_depth($uw_depth);
                         $retv =
-                            Err(sa.wrap_panic($prog.debug[$pc].clone()));
+                            Err(sa.wrap_panic($prog.debug[$pc].clone(), args));
                         break;
                     },
                 }
@@ -454,7 +470,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         retv =
                             Err(StackAction::panic_str(
                                 format!("Division by 0: {}/{}", a, b.i()),
-                                prog.debug[pc].clone()));
+                                prog.debug[pc].clone(),
+                                VVal::vec2(VVal::Int(a), b)));
                         break;
                     }
 
@@ -466,16 +483,17 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         (VVal::IVec(ln), re) => VVal::IVec(Box::new(*ln / re.i())),
                         (VVal::FVec(ln), re) => VVal::FVec(Box::new(*ln / re.f())),
                         (le, re)             => {
-                            let re = re.i();
-                            if re == 0 {
+                            let rei = re.i();
+                            if rei == 0 {
                                 env.unwind_to_depth(uw_depth);
                                 retv =
                                     Err(StackAction::panic_str(
-                                        format!("Division by 0: {}/{}", le.i(), re),
-                                        prog.debug[pc].clone()));
+                                        format!("Division by 0: {}/{}", le.i(), rei),
+                                        prog.debug[pc].clone(),
+                                        VVal::vec2(le, re)));
                                 break;
                             }
-                            VVal::Int(le.i().wrapping_div(re))
+                            VVal::Int(le.i().wrapping_div(rei))
                         },
                     }
                 }
@@ -501,8 +519,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         env.unwind_to_depth(uw_depth);
                         retv =
                             Err(StackAction::panic_str(
-                                format!("Remainder with divisor of 0: {}%{}", a.i(), b.i()),
-                                prog.debug[pc].clone()));
+                                format!("Remainder with divisor of 0: {}%{}",
+                                        a.i(), b.i()),
+                                prog.debug[pc].clone(),
+                                VVal::vec2(a, b)));
                         break;
                     }
 
@@ -613,11 +633,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         if let Some(k) = k {
                             match m.set_key(&k, e) {
                                 Ok(_) => (),
-                                Err(e) => {
+                                Err(er) => {
                                     retv =
                                         Err(StackAction::panic_str(
-                                            format!("map set key errro: {}", e),
-                                            prog.debug[pc].clone()));
+                                            format!("map set key error: {}", er),
+                                            prog.debug[pc].clone(),
+                                            k));
                                 }
                             }
                         }
@@ -626,11 +647,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     for (e, k) in s.iter() {
                         match m.set_key(&k.unwrap_or_else(|| VVal::None), e) {
                             Ok(_) => (),
-                            Err(e) => {
+                            Err(er) => {
                                 retv =
                                     Err(StackAction::panic_str(
-                                        format!("map set key errro: {}", e),
-                                        prog.debug[pc].clone()));
+                                        format!("map set key errro: {}", er),
+                                        prog.debug[pc].clone(),
+                                        VVal::None));
                             }
                         }
                     }
@@ -724,18 +746,22 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
 
                 let call_ret = func.call_internal(env, argc);
-                env.popn(argc);
-
                 match call_ret {
-                    Ok(v) => { out_reg!(env, ret, retv, data, r, v); },
+                    Ok(v) => {
+                        env.popn(argc);
+                        out_reg!(env, ret, retv, data, r, v);
+                    },
                     Err(StackAction::Return(ret)) => {
+                        env.popn(argc);
                         env.unwind_to_depth(uw_depth);
                         retv = Err(StackAction::Return(ret));
                         break;
                     },
                     Err(sa) => {
+                        let args = env.argv();
+                        env.popn(argc);
                         env.unwind_to_depth(uw_depth);
-                        retv = Err(sa.wrap_panic(prog.debug[pc].clone()));
+                        retv = Err(sa.wrap_panic(prog.debug[pc].clone(), args));
                         break;
                     },
                 }

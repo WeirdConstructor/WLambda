@@ -8920,7 +8920,9 @@ macro_rules! add_multi_op_zero {
                     if v == 0 {
                         return
                             Err(StackAction::panic_str(
-                                format!("{}", $err), None));
+                                format!("{}", $err),
+                                None,
+                                env.argv()));
                     }
                     accum = accum $op v;
                 }
@@ -9154,7 +9156,7 @@ pub fn core_symbol_table() -> SymbolTable {
 
     func!(st, "panic",
         |env: &mut Env, _argc: usize| {
-            Err(StackAction::panic(env.arg(0), None))
+            Err(env.new_panic(env.arg(0)))
         }, Some(1), Some(1), true);
 
     func!(st, "block",
@@ -9204,11 +9206,13 @@ pub fn core_symbol_table() -> SymbolTable {
                 VVal::Err(err_v) => {
                     Err(StackAction::panic_str(
                         format!("unwrap error: {}", err_v.borrow().0.s()),
-                        Some(err_v.borrow().1.clone())))
+                        Some(err_v.borrow().1.clone()),
+                        err_v.borrow().0.clone()))
                 },
                 VVal::Opt(None) => {
                     Err(StackAction::panic_str(
-                        "unwrap empty option!".to_string(), None))
+                        "unwrap empty option!".to_string(), None,
+                        VVal::None))
                 },
                 VVal::Opt(Some(v)) => Ok((*v).clone()),
                 v => Ok(v)
@@ -11795,14 +11799,16 @@ pub fn std_symbol_table() -> SymbolTable {
                     Err(e) => {
                         Err(StackAction::panic_str(
                             format!("Couldn't create thread: {}", e),
-                            None))
+                            None,
+                            env.argv()))
                     },
                 }
 
             } else {
                 Err(StackAction::panic_str(
                     "This global environment does not provide threads.".to_string(),
-                    None))
+                    None,
+                    env.argv()))
             }
         }, Some(1), Some(2), false);
 

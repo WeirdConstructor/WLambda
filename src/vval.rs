@@ -641,6 +641,16 @@ impl Env {
     }
 
     #[inline]
+    pub fn stk2vec(&self, count: usize) -> VVal {
+        let v = VVal::vec();
+        for i in 0..count {
+            v.push(self.args[self.sp - (count - i)].clone());
+        }
+        v
+    }
+
+
+    #[inline]
     pub fn argv(&self) -> VVal {
         VVal::vec_from(&self.args[(self.bp - self.argc)..self.bp])
     }
@@ -1016,6 +1026,32 @@ impl Env {
             self.call_stack.last().unwrap().syn_pos.clone().or_else(
                 || Some(SynPos::empty())).unwrap())
     }
+
+    pub fn new_panic(&self, val: VVal) -> StackAction {
+        for i in self.call_stack.iter().rev() {
+            if i.syn_pos.is_some() {
+                return StackAction::panic(val, i.syn_pos.clone(), VVal::None);
+            }
+        };
+
+        StackAction::panic(val,
+            self.call_stack.last().unwrap().syn_pos.clone().or_else(
+                || Some(SynPos::empty())),
+            VVal::None)
+    }
+
+    pub fn new_panic_argv(&self, val: VVal, args: VVal) -> StackAction {
+        for i in self.call_stack.iter().rev() {
+            if i.syn_pos.is_some() {
+                return StackAction::panic(val, i.syn_pos.clone(), args);
+            }
+        };
+
+        StackAction::panic(val,
+            self.call_stack.last().unwrap().syn_pos.clone().or_else(
+                || Some(SynPos::empty())),
+            args)
+    }
 }
 
 /// Encodes all kinds of jumps up the call stack, like `break` and `next` in Loops.
@@ -1024,7 +1060,7 @@ impl Env {
 /// closure call tree to handle jumping up the stack.
 #[derive(Clone)]
 pub enum StackAction {
-    Panic(Box<(VVal, Vec<Option<SynPos>>)>),
+    Panic(Box<(VVal, Vec<(Option<SynPos>, VVal)>)>),
     Return(Box<(VVal, VVal)>),
     Break(Box<VVal>),
     Next,
@@ -1036,8 +1072,8 @@ impl Display for StackAction {
             StackAction::Panic(panic) => {
                 let stk : Vec<String> =
                     panic.1.iter().map(|s|
-                        if let Some(p) = s { format!("{}", p) }
-                        else { String::from("[?]") })
+                        if let (Some(p), v) = s { format!("{} {}", p, v.s()) }
+                        else { s.1.s() })
                     .collect();
 
                 if stk.is_empty() {
@@ -1065,23 +1101,24 @@ impl StackAction {
     }
 
     pub fn panic_msg(err: String) -> Self {
-        let v = Vec::new();
-        StackAction::Panic(Box::new((VVal::new_str_mv(err), v)))
+        StackAction::Panic(Box::new(
+            (VVal::new_str_mv(err), vec![])))
     }
-    pub fn panic_str(err: String, sp: Option<SynPos>) -> Self {
-        let mut v = Vec::new();
-        v.push(sp);
-        StackAction::Panic(Box::new((VVal::new_str_mv(err), v)))
+
+    pub fn panic_str(err: String, sp: Option<SynPos>, args: VVal) -> Self {
+        StackAction::Panic(Box::new(
+            (VVal::new_str_mv(err), vec![(sp, args)])))
     }
-    pub fn panic(err: VVal, sp: Option<SynPos>) -> Self {
-        let mut v = Vec::new();
-        v.push(sp);
-        StackAction::Panic(Box::new((err, v)))
+
+    pub fn panic(err: VVal, sp: Option<SynPos>, args: VVal) -> Self {
+        StackAction::Panic(Box::new(
+            (err, vec![(sp, args)])))
     }
-    pub fn wrap_panic(self, sp: Option<SynPos>) -> Self {
+
+    pub fn wrap_panic(self, sp: Option<SynPos>, args: VVal) -> Self {
         match self {
             StackAction::Panic(mut panic) => {
-                panic.as_mut().1.push(sp);
+                panic.as_mut().1.push((sp, args));
                 StackAction::Panic(panic)
             },
             _ => self,
@@ -1091,7 +1128,7 @@ impl StackAction {
 
 impl From<VVal> for StackAction {
     fn from(v: VVal) -> StackAction {
-        StackAction::panic(v, None)
+        StackAction::panic(v, None, VVal::None)
     }
 }
 
@@ -3373,9 +3410,11 @@ impl VVal {
 
     pub(crate) fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         match self {
-            VVal::None => {
-                Err(StackAction::panic_msg("Calling $none is invalid".to_string()))
-            },
+            VVal::None =>
+                return Err(StackAction::panic_str(
+                    "Calling $none is invalid".to_string(),
+                    None,
+                    env.stk2vec(argc))),
             VVal::Fun(fu) => {
                 if let Some(i) = fu.min_args {
                     if argc < i {
@@ -3383,7 +3422,8 @@ impl VVal {
                             format!(
                                 "function expects at least {} arguments, got {}",
                                 i, argc),
-                            fu.syn_pos.clone()));
+                            fu.syn_pos.clone(),
+                            env.stk2vec(argc)));
                     }
                 }
 
@@ -3393,7 +3433,8 @@ impl VVal {
                             format!(
                                 "function expects at most {} arguments, got {}",
                                 i, argc),
-                            fu.syn_pos.clone()));
+                            fu.syn_pos.clone(),
+                            env.stk2vec(argc)));
                     }
                 }
 
@@ -3405,7 +3446,8 @@ impl VVal {
                                 Err(StackAction::panic_str(
                                     format!("Error value in parameter list: {}",
                                             ev.borrow().0.s()),
-                                    Some(ev.borrow().1.clone())));
+                                    Some(ev.borrow().1.clone()),
+                                    env.argv()));
                         }
                     }
                 }
@@ -3424,7 +3466,9 @@ impl VVal {
                                     }
                                 },
                                 Err(e) => {
-                                    Err(e.wrap_panic(fu.syn_pos.clone()))
+                                    Err(e.wrap_panic(
+                                        fu.syn_pos.clone(),
+                                        env.argv()))
                                 },
                             }
                         },

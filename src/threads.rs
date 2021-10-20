@@ -472,7 +472,8 @@ impl VValUserData for AtomicAValSlot {
                     return
                         Err(StackAction::panic_str(
                             "recv_timeout method expects 1 argument".to_string(),
-                            None))
+                            None,
+                            env.argv()))
                 }
 
                 Ok(self.recv_timeout(Some(argv[0].to_duration()?)))
@@ -482,7 +483,8 @@ impl VValUserData for AtomicAValSlot {
                     return
                         Err(StackAction::panic_str(
                             "send method expects 1 argument".to_string(),
-                            None))
+                            None,
+                            env.argv()))
                 }
 
                 Ok(self.send(&argv[0]))
@@ -494,7 +496,8 @@ impl VValUserData for AtomicAValSlot {
                     return
                         Err(StackAction::panic_str(
                             "wait_empty_timeout method expects 1 argument".to_string(),
-                            None))
+                            None,
+                            env.argv()))
                 }
 
                 Ok(self.wait_empty(Some(argv[0].to_duration()?)))
@@ -502,7 +505,8 @@ impl VValUserData for AtomicAValSlot {
             _ => {
                 Err(StackAction::panic_str(
                     format!("unknown method called: {}", key),
-                    None))
+                    None,
+                    env.argv()))
             },
         }
     }
@@ -630,7 +634,8 @@ impl VValUserData for AValChannel {
                     return
                         Err(StackAction::panic_str(
                             "recv_timeout method expects 1 argument".to_string(),
-                            None))
+                            None,
+                            env.argv()))
                 }
 
                 Ok(self.recv_timeout(Some(argv[0].to_duration()?)))
@@ -640,7 +645,8 @@ impl VValUserData for AValChannel {
                     return
                         Err(StackAction::panic_str(
                             "send method expects 1 argument".to_string(),
-                            None))
+                            None,
+                            env.argv()))
                 }
 
                 Ok(self.send(&argv[0]))
@@ -648,7 +654,8 @@ impl VValUserData for AValChannel {
             _ => {
                 Err(StackAction::panic_str(
                     format!("unknown method called: {}", key),
-                    None))
+                    None,
+                    env.argv()))
             },
         }
     }
@@ -726,7 +733,8 @@ impl VValUserData for AtomicAVal {
             _ => {
                 Err(StackAction::panic_str(
                     format!("Unknown method called: {}", key),
-                    None))
+                    None,
+                    env.argv()))
             },
         }
     }
@@ -941,7 +949,8 @@ impl VValUserData for DefaultThreadHandle {
             _ => {
                 Err(StackAction::panic_str(
                     format!("Unknown method called: {}", key),
-                    None))
+                    None,
+                    env.argv()))
             },
         }
     }
