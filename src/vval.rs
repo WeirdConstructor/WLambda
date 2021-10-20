@@ -75,6 +75,8 @@ impl SynPos {
         }
     }
 
+    pub fn has_info(&self) -> bool { self.info.line > 0 }
+
     pub fn line(&self) -> u32 { self.info.line }
     pub fn col(&self) -> u32 { self.info.col }
 
@@ -95,24 +97,30 @@ impl SynPos {
     }
 
     pub fn s_short(&self) -> String {
-        format!("[{},{}({:?})]", self.info.line, self.info.col, self.syn)
+        format!("({:?}[{}:{}])", self.syn, self.info.line, self.info.col)
     }
 
     pub fn s_only_pos(&self) -> String {
-        format!("[{},{}:{}]", self.info.line, self.info.col, self.info.file.s())
+        format!("({}:[{}:{}])", self.info.file.s(), self.info.line, self.info.col)
     }
 }
 
 impl Display for SynPos {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        if self.info.line > 0 {
+        if self.has_info() {
             if self.info.name.is_some() && !self.info.name.as_ref().unwrap().is_empty() {
-                write!(f, "[{},{}:{}({:?})@{}]",
-                       self.info.line, self.info.col, self.info.file.s(), self.syn,
+                write!(f, "{}:{}:{} {:?}[{}]",
+                       self.info.file.s(),
+                       self.info.line,
+                       self.info.col,
+                       self.syn,
                        self.info.name.as_ref().unwrap())
             } else {
-                write!(f, "[{},{}:{}({:?})]",
-                       self.info.line, self.info.col, self.info.file.s(), self.syn)
+                write!(f, "{}:{}:{} {:?}",
+                       self.info.file.s(),
+                       self.info.line,
+                       self.info.col,
+                       self.syn)
             }
         } else {
             write!(f, "")
@@ -1031,11 +1039,16 @@ impl Display for StackAction {
                         if let Some(p) = s { format!("{}", p) }
                         else { String::from("[?]") })
                     .collect();
-                write!(f, "{} SA::Panic({})", stk.join("=>"), panic.0.s())
+
+                if stk.is_empty() {
+                    write!(f, "Panic: {}", panic.0.s())
+                } else {
+                    write!(f, "Panic: {}\n    {}", panic.0.s(), stk.join("\n    "))
+                }
             },
-            StackAction::Return(ret) => write!(f, "SA::Return(lbl={},{})", ret.0.s(), ret.1.s()),
-            StackAction::Break(v) => write!(f, "SA::Break({})", v.s()),
-            StackAction::Next     => write!(f, "SA::Next"),
+            StackAction::Return(ret) => write!(f, "Return[lbl={}] {}", ret.0.s(), ret.1.s()),
+            StackAction::Break(v) => write!(f, "Break: {}", v.s()),
+            StackAction::Next     => write!(f, "Next"),
         }
     }
 }
@@ -5269,7 +5282,12 @@ impl VVal {
             VVal::Sym(s)     => VVal::dump_sym(&*s),
             VVal::Byt(s)     => format!("$b{}", format_vval_byt(s.as_ref())),
             VVal::None       => "$n".to_string(),
-            VVal::Err(e)     => format!("$e{} {}", (*e).borrow().1, (*e).borrow().0.s_cy(c)),
+            VVal::Err(e)     =>
+                if (*e).borrow().1.has_info() {
+                    format!("$e {} [@ {}]", (*e).borrow().0.s_cy(c), (*e).borrow().1)
+                } else {
+                    format!("$e {}", (*e).borrow().0.s_cy(c))
+                },
             VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
             VVal::Syn(s)     => format!("&{:?}", s.syn()),
             VVal::Chr(c)     => c.to_string(),

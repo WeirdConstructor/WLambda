@@ -539,7 +539,7 @@ impl Display for EvalError {
             EvalError::IOError(file, e) => write!(f, "IO error: file '{}': {} ", file, e),
             EvalError::ParseError(e)    => write!(f, "Parse error: {}", e),
             EvalError::CompileError(e)  => write!(f, "Compile error: {}", e),
-            EvalError::ExecError(s)     => write!(f, "Execution error: Jumped out of execution: {:?}", s),
+            EvalError::ExecError(s)     => write!(f, "Runtime error: {:?}", s),
         }
     }
 }

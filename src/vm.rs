@@ -980,7 +980,8 @@ mod tests {
 
     #[test]
     fn vm_func() {
-        assert_eq!(gen("!x = 10; { x; 20 }"), "&F{@[1,10:<compiler:s_eval>(Func)@x],amin=0,amax=0,locals=0,upvalues=$[$&10]}");
+        assert_eq!(gen("!x = 10; { x; 20 }"),
+            "&F{@<compiler:s_eval>:1:10 Func[x],amin=0,amax=0,locals=0,upvalues=$[$&10]}");
         assert_eq!(gen("!x = 10; { x }[]"), "10");
         assert_eq!(gen("!x = 10; { !y = 4; !k = 5; y + k + x }[]"), "19");
         assert_eq!(gen(r"

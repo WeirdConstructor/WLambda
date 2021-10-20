@@ -5,6 +5,9 @@
 was broken. It unwound the locals while the return value was still referencing
 those locals. No crash, just wrong results. Code became slightly faster too.
 * **Bugfix:** Catch `x % 0` and make a WLambda panic of that.
+* **Change:** Error messages and stack traces more readable and with line feeds.
+* **Change:** Vim Syntax file now does not define ':'
+as keyword character anymore.
 
 0.7.1 (2021-05-25)
 ==================
