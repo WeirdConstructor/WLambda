@@ -178,15 +178,18 @@ pub struct ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "error[{},{}:{}] {} at code '{}'",
+        write!(f, "{}:{}:{} {}\n",
+            self.file.s(),
             self.line,
             self.col,
-            self.file.s(),
-            self.kind,
-            self.snip
-        )
+            self.kind)?;
+
+        write!(f, "at code:\n")?;
+        for (i, line) in self.snip.split('\n').enumerate() {
+            write!(f, "{:<4}| {}\n", self.line as usize + i, line)?
+        }
+
+        Ok(())
     }
 }
 

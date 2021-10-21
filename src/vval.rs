@@ -144,8 +144,11 @@ impl Display for CompileError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "[{},{}:{}] Compilation Error: {}",
-            self.pos.info.line, self.pos.info.col, self.pos.info.file, self.msg)
+            "{}:{}:{} Compilation Error: {}",
+            self.pos.info.file,
+            self.pos.info.line,
+            self.pos.info.col,
+            self.msg)
     }
 }
 
