@@ -1,11 +1,13 @@
 0.8.0 (2021-07-28)
 ==================
 
+* **Feature:** Stack traces now also contain the function arguments.
 * **Bugfix:** Code generation for direct blocks `if $true { !x = 3; x } $n`
 was broken. It unwound the locals while the return value was still referencing
 those locals. No crash, just wrong results. Code became slightly faster too.
 * **Bugfix:** Catch `x % 0` and make a WLambda panic of that.
 * **Change:** Error messages and stack traces more readable and with line feeds.
+* **Change:** Improved parse and compile error output readability.
 * **Change:** Vim Syntax file now does not define ':'
 as keyword character anymore.
 
