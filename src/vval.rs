@@ -1069,20 +1069,77 @@ pub enum StackAction {
     Next,
 }
 
+fn fmt_shorten_ellipses(f: &mut Formatter, len: &mut usize, s: String) -> std::fmt::Result {
+    if *len > 250 { return Ok(()); }
+
+    if s.len() > 35 { *len += 35 + 3;  write!(f, "{}...", &s[0..35]) }
+    else            { *len += s.len(); write!(f, "{}", s) }
+}
+
+fn fmt_argv(f: &mut Formatter, v: &VVal) -> std::fmt::Result {
+    let mut cur_len = 0;
+
+    if !v.is_map()
+       && v.iter_over_vvals()
+    {
+        write!(f, "[")?;
+        v.with_iter(|it| {
+            let mut first = true;
+            for (v, _) in it {
+                if cur_len > 250 {
+                    break;
+                }
+
+                if first {
+                    first = false;
+                } else {
+                    cur_len += 2;
+                    write!(f, ", ")?;
+                }
+
+                fmt_shorten_ellipses(f, &mut cur_len, v.s())?;
+            }
+
+            Ok(())
+        })?;
+
+        if cur_len > 250 {
+            write!(f, "...")?
+        }
+
+        write!(f, "]")?;
+
+    } else {
+        fmt_shorten_ellipses(f, &mut cur_len, v.s())?
+    }
+
+    Ok(())
+}
+
 impl Display for StackAction {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             StackAction::Panic(panic) => {
-                let stk : Vec<String> =
-                    panic.1.iter().map(|s|
-                        if let (Some(p), v) = s { format!("{} {}", p, v.s()) }
-                        else { s.1.s() })
-                    .collect();
-
-                if stk.is_empty() {
+                if panic.1.is_empty() {
                     write!(f, "Panic: {}", panic.0.s())
                 } else {
-                    write!(f, "Panic: {}\n    {}", panic.0.s(), stk.join("\n    "))
+                    write!(f, "Panic: {}\n", panic.0.s())?;
+
+                    for t in panic.1.iter() {
+                        write!(f, "    ")?;
+
+                        if let (Some(p), v) = t {
+                            write!(f, "{} ", p)?;
+                            fmt_argv(f, &v)?;
+                        } else {
+                            write!(f, "    ")?;
+                            fmt_argv(f, &t.1)?;
+                        }
+
+                        write!(f, "\n")?;
+                    }
+
+                    Ok(())
                 }
             },
             StackAction::Return(ret) => write!(f, "Return[lbl={}] {}", ret.0.s(), ret.1.s()),
