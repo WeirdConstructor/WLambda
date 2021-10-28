@@ -84,7 +84,7 @@ fn check_trivial() {
     assert_eq!(ve("10; 20; 30"),              "30");
     assert_eq!(ve("!x = 10; x"),              "10");
     assert_eq!(ve("!x = $true; x"),           "$true");
-    assert_eq!(ve("{ 10 }"),                  "&F{@[1,1:<compiler:s_eval>(Func)],amin=0,amax=0,locals=0,upvalues=$[]}");
+    assert_eq!(ve("{ 10 }"),                  "&F{@<compiler:s_eval>:1:1 Func,amin=0,amax=0,locals=0,upvalues=$[]}");
     assert_eq!(ve("{ 10 }[]"),                "10");
     assert_eq!(ve("{ 10; 20 }[]"),            "20");
     assert_eq!(ve("!x = $&11; { 12; x }[]"),                   "11");
@@ -5471,4 +5471,27 @@ fn check_div_zero() {
         "EXEC ERR: Caught [?]=>[1,5:<compiler:s_eval>(Call)] SA::Panic(\"Remainder with divisor by 0\")");
     assert_eq!(ve("`/` 1 0"),
         "EXEC ERR: Caught [?]=>[1,5:<compiler:s_eval>(Call)] SA::Panic(\"Division by 0\")");
+}
+
+#[test]
+fn check_std_wlambda_parse() {
+    assert_eq!(
+        ve("std:wlambda:parse $code{ 1 + 2 }"),
+        "$[$%:Block,$[$%:BinOpAdd,1,2]]");
+    assert_eq!(
+        ve("std:syn:pos ~ 0 ~ 2 ~ 1 ~ std:wlambda:parse $code{ !f = { 1 + 2 } } :x"),
+        "$[\"x\",1,6]");
+    assert_eq!(
+        ve("std:syn:type ~ 0 ~ 2 ~ 1 ~ std:wlambda:parse $code{ !f = { 1 + 2 } } :x"),
+        ":Func");
+    assert_eq!(ve("$%:Func"), "$%:Func");
+    assert_eq!(ve("std:syn:pos $%:Func"), "$[\"<compiler:s_eval>\",1,14]");
+    assert_eq!(ve("std:syn:type $%:Func"), ":Func");
+
+    assert_eq!(ve(r#"
+        match (std:wlambda:parse $code{ o 1 2 })
+            $[$%:Block, $[$%:Call, fun, arg1, arg2]] => {
+                $[$\.fun, $\.arg1, $\.arg2]
+            };
+    "#), "$[$[$%:Var,:o],1,2]");
 }

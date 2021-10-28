@@ -10765,6 +10765,44 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::new_str(VERSION))
         }, Some(0), Some(0), false);
 
+    func!(st, "wlambda:parse",
+        |env: &mut Env, argc: usize| {
+            let filename =
+                if argc == 2 { env.arg(1).s_raw() }
+                else { "<wlambda:parse:input>".to_string() };
+            let res =
+                env.arg(0).with_s_ref(|s| { crate::parser::parse(s, &filename) });
+            match res {
+                Ok(ast) => Ok(ast),
+                Err(e)  => Ok(env.new_err(e))
+            }
+        }, Some(1), Some(2), false);
+
+    func!(st, "syn:type",
+        |env: &mut Env, _argc: usize| {
+            Ok(VVal::new_sym(env.arg(0).syntax_type()))
+        }, Some(1), Some(1), false);
+
+    func!(st, "syn:pos",
+        |env: &mut Env, _argc: usize| {
+            if let VVal::Syn(sp) = env.arg(0) {
+                if let Some(name) = sp.info.name.as_ref() {
+                    Ok(VVal::vec4(
+                        VVal::new_str(sp.info.file.s()),
+                        VVal::Int(sp.info.line as i64),
+                        VVal::Int(sp.info.col as i64),
+                        VVal::new_str(name)))
+                } else {
+                    Ok(VVal::vec3(
+                        VVal::new_str(sp.info.file.s()),
+                        VVal::Int(sp.info.line as i64),
+                        VVal::Int(sp.info.col as i64)))
+                }
+            } else {
+                Ok(VVal::None)
+            }
+        }, Some(1), Some(1), false);
+
     func!(st, "measure_time",
         |env: &mut Env, _argc: usize| {
             let t = std::time::Instant::now();

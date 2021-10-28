@@ -705,7 +705,10 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                         && p2(&v.v_(1), f),
                         &v, &var, f)
                 }))
-            } else if ast.is_int() || ast.is_float() || ast.is_none() || ast.is_sym() || ast.is_bool() || ast.is_byte() || ast.is_char() {
+            } else if ast.is_int() || ast.is_float() || ast.is_none()
+                   || ast.is_sym() || ast.is_bool() || ast.is_byte()
+                   || ast.is_char() || ast.is_syn()
+            {
                 let ast = ast.clone();
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                     store_var_if(ast.eqv(&v.deref()), v, &var, f)

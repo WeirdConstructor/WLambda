@@ -235,10 +235,14 @@ impl State {
         }
     }
 
+    /// Creates a `SynPos` annotated with the current parse head position.
+    pub fn syn_pos(&self, s: Syntax) -> SynPos {
+        SynPos::new(s, self.line_no, self.col_no, self.file.clone())
+    }
 
     /// Creates a `VVal::Syn` annotated with the current parse head position.
     pub fn syn_raw(&self, s: Syntax) -> VVal {
-        VVal::Syn(SynPos::new(s, self.line_no, self.col_no, self.file.clone()))
+        VVal::Syn(self.syn_pos(s))
     }
 
     /// Creates an syntactic AST node.

@@ -8605,6 +8605,12 @@ In the following grammar, white space and comments are omitted:
                   ;
     ref_weak      = ("w&" | "weak&"), value
                   ;
+    syntax        = "%:", {? any possible Syntax Type Identifier
+                             eg. "Block", "Call", ... ?}
+                    (* A syntax VVal, the possible identifiers are one of the
+                       possible result symbols of std:syn:type. This also
+                       saves the current parser position. *)
+                  ;
     accumulator   = "@", ("i" | "int"
                          |"s" | "string"
                          |"f" | "float"
