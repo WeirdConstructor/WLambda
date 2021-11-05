@@ -117,12 +117,17 @@ pub trait ModuleResolver {
 /// This structure implements the ModuleResolver trait and is
 /// responsible for loading modules on `!@import` for WLambda.
 #[derive(Debug, Clone, Default)]
-pub struct LocalFileModuleResolver { }
+pub struct LocalFileModuleResolver {
+    loaded_modules: Rc<RefCell<std::collections::HashMap<String, Rc<SymbolTable>>>>,
+}
 
 #[allow(dead_code)]
 impl LocalFileModuleResolver {
     pub fn new() -> LocalFileModuleResolver {
-        LocalFileModuleResolver { }
+        LocalFileModuleResolver {
+            loaded_modules:
+                Rc::new(RefCell::new(std::collections::HashMap::new())),
+        }
     }
 }
 
@@ -229,7 +234,12 @@ impl ModuleResolver for LocalFileModuleResolver {
 
         let mut ctx = EvalContext::new(genv);
         let pth = format!("{}.wl", path.join("/"));
-        let mut check_paths = vec![pth];
+
+        if let Some(st) = self.loaded_modules.borrow().get(&pth) {
+            return Ok((**st).clone());
+        }
+
+        let mut check_paths = vec![pth.clone()];
 
         if let Some(ifp) = import_file_path {
             let impfp = std::path::Path::new(ifp);
@@ -251,11 +261,17 @@ impl ModuleResolver for LocalFileModuleResolver {
             }
         }
 
-        for pth in check_paths.iter() {
-            if std::path::Path::new(pth).exists() {
-                return match ctx.eval_file(pth) {
+        for p in check_paths.iter() {
+            if std::path::Path::new(p).exists() {
+                return match ctx.eval_file(p) {
                     Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
-                    Ok(_v) => Ok(ctx.get_exports()),
+                    Ok(_v) => {
+                        let exports = Rc::new(ctx.get_exports());
+                        self.loaded_modules
+                            .borrow_mut()
+                            .insert(pth, exports.clone());
+                        Ok(ctx.get_exports())
+                    },
                 }
             }
         }
@@ -472,6 +488,7 @@ impl GlobalEnv {
             self.set_resolver(
                 parent_global_env.resolver.as_ref().unwrap().clone());
         }
+
         for (mod_name, symtbl) in parent_global_env.mem_modules.borrow().iter() {
             self.set_module(mod_name, symtbl.clone());
         }

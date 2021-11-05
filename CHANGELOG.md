@@ -1,7 +1,12 @@
 0.8.1 (unreleased)
 ==================
 
+* **Feature:** The LocalFileModuleResolver now does keep around the
+loaded symbol table and does not re-evaluate the module source on every
+import. This makes it possible to define global stuff inside the modules
+and keep that around.
 * **Feature:** Stack traces now also contain the function arguments.
+* **Feature:** Added `v_b` and `v_bk` to the wlambda::VVal API.
 * **Change:** Error messages and stack traces more readable and with line feeds.
 * **Change:** Improved parse and compile error output readability.
 * **Change:** Vim Syntax file now does not define ':'

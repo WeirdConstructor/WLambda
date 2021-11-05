@@ -5186,7 +5186,7 @@ impl VVal {
 
     /// Quick access method for retrieving the VVal at key `idx`.
     /// Returns VVal::None if the VVal is not a VVal::Map or no such index exists.
-    /// See also the shorthands `v_ik`, `v_fk`, `v_sk` and `v_s_rawk`.
+    /// See also the shorthands `v_ik`, `v_fk`, `v_sk`, `v_bk` and `v_s_rawk`.
     ///
     ///```
     /// use wlambda::VVal;
@@ -5218,6 +5218,24 @@ impl VVal {
     /// assert_eq!(v.v_ik("aaa"), 10);
     ///```
     pub fn v_ik(&self, key: &str)     -> i64 { self.v_k(key).i() }
+    /// Quick access of an bool at the given `idx`.
+    /// See also `v_`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::vec();
+    /// v.push(wlambda::VVal::Bool(true));
+    /// assert_eq!(v.v_b(0),    true);
+    ///```
+    pub fn v_b(&self, idx: usize)     -> bool { self.v_(idx).b() }
+    /// Quick access of the integer at the given `key`.
+    /// See also `v_k`.
+    ///
+    ///```
+    /// let v = wlambda::VVal::map();
+    /// v.set_key_str("aaa", wlambda::VVal::Bol(true));
+    /// assert_eq!(v.v_bk("aaa"), true);
+    ///```
+    pub fn v_bk(&self, key: &str)     -> bool { self.v_k(key).b() }
     /// Quick access of a character at the given `idx`.
     /// See also `v_`.
     ///
