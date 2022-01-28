@@ -56,7 +56,7 @@ macro_rules! out_reg {
                 }
             },
             ResPos::Value(_)        => (),
-        };
+        }
     }
 }
 

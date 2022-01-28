@@ -1177,7 +1177,7 @@ fn fmt_argv(f: &mut Formatter, v: &VVal) -> std::fmt::Result {
                 fmt_shorten_ellipses(f, &mut cur_len, v.s())?;
             }
 
-            Ok(())
+            Ok(()) as std::fmt::Result
         })?;
 
         if cur_len > 250 {
@@ -5223,7 +5223,7 @@ impl VVal {
     ///
     ///```
     /// let v = wlambda::VVal::vec();
-    /// v.push(wlambda::VVal::Bool(true));
+    /// v.push(wlambda::VVal::Bol(true));
     /// assert_eq!(v.v_b(0),    true);
     ///```
     pub fn v_b(&self, idx: usize)     -> bool { self.v_(idx).b() }

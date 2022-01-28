@@ -902,6 +902,10 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
 }
 
 fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
+    if ps.peek().is_none() {
+        return Err(ps.err(ParseErrorKind::EOF("identifier")));
+    }
+
     if ps.peek().unwrap() == '`' {
         let mut identifier = "".to_string();
         ps.consume();

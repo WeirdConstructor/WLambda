@@ -5385,8 +5385,7 @@ fn check_iter_arg_bug() {
 fn parser_crash_bad_op() {
     assert_eq!(
         ve("!foo = { } !@export foo = foo;"),
-        "PARSE ERROR: error[1,12:<compiler:s_eval>] Expected literal value, \
-         sub expression, block, key or identifier at code \'!@export foo = foo;\'");
+        "PARSE ERROR: <compiler:s_eval>:1:12 Expected literal value, sub expression, block, key or identifier\nat code:\n1   | !@export foo = foo;\n");
 }
 
 #[test]
@@ -5494,4 +5493,9 @@ fn check_std_wlambda_parse() {
                 $[$\.fun, $\.arg1, $\.arg2]
             };
     "#), "$[$[$%:Var,:o],1,2]");
+}
+
+#[test]
+fn check_parse_error_sym_start() {
+    assert_eq!(ve(":"), "PARSE ERROR: <compiler:s_eval>:1:2 EOF while parsing: identifier\nat code:\n1   | \n");
 }

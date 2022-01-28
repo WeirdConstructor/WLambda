@@ -14,7 +14,7 @@ exclude      = ["res/*"]
 [features]
 default = [
     "rustyline", "regex", "chrono", "serde", "serde_json",
-    "rmp-serde", "quick-xml", "socket2"
+    "rmp-serde", "quick-xml", "socket2", "base64"
 ]
 
 [dependencies]
@@ -28,6 +28,8 @@ rmp-serde  = { version = "0.14.3",  optional = true }
 mint       = { version = "0.5.5",   optional = true }
 quick-xml  = { version = "0.20.0",  optional = true }
 socket2    = { version = "0.3.11",  optional = true, features = ["reuseport"] }
+reqwest    = { version = "0.11.9",  optional = true, features = ["blocking"] }
+base64     = { version = "0.13.0",  optional = true }
 
 [dev-dependencies]
 regex-syntax = { version = "0.6.18" }

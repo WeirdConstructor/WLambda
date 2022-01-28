@@ -789,7 +789,7 @@ pub(crate) fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                         v.with_s_ref(|s| {
                             fs.write_str(s)?;
                             len = s.len();
-                            Ok(())
+                            Ok(()) as std::fmt::Result
                         })?;
                     }
 
