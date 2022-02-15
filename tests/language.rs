@@ -338,9 +338,9 @@ fn check_while() {
     "#), "$[$p(1,3),$p(1,2),$p(3,3),$p(3,2)]");
 
 //    assert_eq!(ve("while 1"),
-//        "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: while takes exactly 2 arguments (condition and expression)");
+//        "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: while takes exactly 2 arguments (condition and expression)");
 //    assert_eq!(ve("while 1 2 3"),
-//        "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: while takes exactly 2 arguments (condition and expression)");
+//        "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: while takes exactly 2 arguments (condition and expression)");
 }
 
 #[test]
@@ -1012,8 +1012,7 @@ fn check_return() {
 #[test]
 fn check_arity() {
     assert_eq!(ve("{}[1,2,3]"),
-        "EXEC ERR: Caught [1,1:<compiler:s_eval>(Func)]=>\
-        [1,3:<compiler:s_eval>(Call)] SA::Panic(\"function expects at most 0 arguments, got 3\")");
+        "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 3\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3]\n    <compiler:s_eval>:1:3 Call [1, 2, 3]\n");
     assert_eq!(ve("{|3| _1 }[1,2,3]"), "2");
     assert_eq!(ve("{|3| _1 }[2,3]"),
         "EXEC ERR: Caught [1,1:<compiler:s_eval>(Func)]=>\
@@ -1337,7 +1336,7 @@ fn check_prelude_str() {
 #[test]
 fn check_prelude_chrono() {
     if cfg!(feature="chrono") {
-        assert_eq!(ve("std:chrono:timestamp $q$%Y$ | int"), "2021");
+        assert_eq!(ve("std:chrono:timestamp $q$%Y$ | int"), "2022");
     }
 }
 
@@ -2153,8 +2152,7 @@ fn check_borrow_error() {
         !x = $[1,2,3];
         x { x.1 = _; }
     "),
-    "EXEC ERR: Caught [3,11:<compiler:s_eval>(Func)@x]=>\
-    [3,11:<compiler:s_eval>(Call)] SA::Panic(\"Can\\\'t mutate borrowed value: $[1,2,3]\")");
+    "EXEC ERR: Caught Panic: \"Can\\'t mutate borrowed value: $[1,2,3]\"\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
 
     assert_eq!(ve(r"
         !x = ${a=1};
@@ -3272,9 +3270,9 @@ fn check_if() {
         $[x, y, k[]]
     "), "$[10,1,30]");
     assert_eq!(ve("? 1"),
-        "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
+        "COMPILE ERROR: <compiler:s_eval>:1:3 Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
     assert_eq!(ve("? 1 2 3 4"),
-        "COMPILE ERROR: [1,3:<compiler:s_eval>] Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
+        "COMPILE ERROR: <compiler:s_eval>:1:3 Compilation Error: ?/if takes 1 or 2 arguments (condition and expression)");
 }
 
 #[test]
@@ -3823,7 +3821,7 @@ fn check_code_string_literals() {
             !x = 
         };
         code
-    "#), "PARSE ERROR: error[6,9:<compiler:s_eval>] Expected literal value, sub expression, block, key or identifier at code \'};\n        code\n    \'");
+    "#), "PARSE ERROR: error<compiler:s_eval>:6:9 Expected literal value, sub expression, block, key or identifier at code \'};\n        code\n    \'");
 }
 
 #[test]
@@ -3850,7 +3848,7 @@ fooooob b fewif wifw
 #[test]
 fn check_regex_patterns() {
     assert_eq!(ve("type $r(a)"),   "\"function\"");
-    assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: bad pattern: error[1,3:<pattern>] EOF while parsing: Unexpected EOF at code \'\'");
+    assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: bad pattern: error[1,3:<pattern>] EOF while parsing: Unexpected EOF at code \'\'");
 
     assert_eq!(ve("$r{(^$+a)rba} $q foobaaarba "),             "$[\"aaarba\",\"aaa\"]");
     assert_eq!(ve("$r($+a)       $q foobaaarba "),             "$[\"aaa\"]");
@@ -3904,9 +3902,11 @@ fn check_regex_patterns() {
 fn check_tree_match() {
     assert_eq!(ve("type $S(a/b)"), "\"function\"");
 
-    assert_eq!(ve("$S(a/b)  ${a = ${b = 20}}"),               "$[20]");
-    assert_eq!(ve("$S(a/b]) ${a = ${b = 20}}"),               "COMPILE ERROR: [1,10:<compiler:s_eval>] Compilation Error: bad selector: error[1,4:<selector>] Unexpected token \']\'. At end of selector at code \']\'");
-    assert_eq!(ve("unwrap_err ~ std:selector $q a/b] "),      "\"bad selector: error[1,4:<selector>] Unexpected token \\\']\\\'. At end of selector at code \\\']\\\', selector was: /a/b]/\"");
+    assert_eq!(ve("$S(a/b)  ${a = ${b = 20}}"), "$[20]");
+    assert_eq!(ve("$S(a/b]) ${a = ${b = 20}}"),
+        "COMPILE ERROR: <compiler:s_eval>:1:10 Compilation Error: bad selector: <selector>:1:4 Unexpected token ']'. At end of selector\nat code:\n1   | ]\n");
+    assert_eq!(ve("unwrap_err ~ std:selector $q a/b] "),
+        "\"bad selector: <selector>:1:4 Unexpected token \\']\\'. At end of selector\\nat code:\\n1   | ]\\n, selector was: /a/b]/\"");
     assert_eq!(ve("(std:selector $q a/b ) ${a = ${b = 20}}"), "$[20]");
     assert_eq!(ve(r#"
         $S(*/a/^*/^c) $[
@@ -3971,14 +3971,14 @@ fn check_struct_patterns() {
     assert_eq!(ve("($M $false)          $true"),          "$n");
     assert_eq!(ve("($M $false)          $false"),         "${}");
 
-    assert_eq!(ve("($M _type :integer)              10"),       "COMPILE ERROR: [1,11:<compiler:s_eval>] Compilation Error: invalid test function in structure pattern: _type");
+    assert_eq!(ve("($M _type :integer)              10"),       "COMPILE ERROR: <compiler:s_eval>:1:11 Compilation Error: invalid test function in structure pattern: _type");
     assert_eq!(ve("($M _type? :integer)             10"),       "${}");
     assert_eq!(ve("($M _type? :integer :string)     10"),       "${}");
     assert_eq!(ve("($M _type? :integer :string)     (str 10)"), "${}");
     assert_eq!(ve("($M x ~ _type? :integer)         10"),       "${x=10}");
     assert_eq!(ve("($M x ~ _type? :integer :string) 10 &> str"),"${x=\"10\"}");
 
-    assert_eq!(ve("($M 3 4)             4"),            "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: invalid variable binding in structure pattern: 3");
+    assert_eq!(ve("($M 3 4)             4"),            "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: invalid variable binding in structure pattern: 3");
     assert_eq!(ve("($M x 4)             4"),            "${x=4}");
     assert_eq!(ve("($M x 4 5 6)         5"),            "${x=5}");
     assert_eq!(ve("($M x 4 5 :x => 6)   :x => 6"),      "${x=$p(:x,6)}");
@@ -4011,8 +4011,8 @@ fn check_struct_patterns() {
     assert_eq!(ve("($M $error 20)        $error 20"),   "${}");
     assert_eq!(ve("($M $error 20)        $error 21"),   "$n");
     assert_eq!(ve("($M $error ?)         $error 22"),   "${}");
-    assert_eq!(ve("($M x $error ?)       $error 23"),   "${x=$e[1,20:<compiler:s_eval>(Err)] 23}");
-    assert_eq!(ve("($M x $error (y ?))   $error 24"),   "${x=$e[1,20:<compiler:s_eval>(Err)] 24,y=24}");
+    assert_eq!(ve("($M x $error ?)       $error 23"),   "${x=$e 23 [@ <compiler:s_eval>:1:20 Err]}");
+    assert_eq!(ve("($M x $error (y ?))   $error 24"),   "${x=$e 24 [@ <compiler:s_eval>:1:20 Err],y=24}");
 
     assert_eq!(ve("($M x 10)        $o(10)"),     "${x=$o(10)}");
     assert_eq!(ve("($M x 10)        $o(11)"),     "$n");
@@ -4177,9 +4177,9 @@ fn check_struct_patterns() {
     assert_eq!(ve("($M x $[a ~ _? 4, b ~ _*]) $[4, 3]"),   "${a=4,b=$[3],x=$[4,3]}");
     assert_eq!(ve("($M x $[a ~ _? 5, b ~ _*]) $[4, 3]"),   "${b=$[4,3],x=$[4,3]}");
 
-    assert_eq!(ve("($M $[_* 1 2]) $[4, 3]"),                "COMPILE ERROR: [1,10:<compiler:s_eval>] Compilation Error: _* takes only 1 argument in list structure pattern: $[&Call,$[&Var,:\"_*\"],1,2]");
-    assert_eq!(ve("($M $[_+ 1 2]) $[4, 3]"),                "COMPILE ERROR: [1,10:<compiler:s_eval>] Compilation Error: _* takes only 1 argument in list structure pattern: $[&Call,$[&Var,:_+],1,2]");
-    assert_eq!(ve("($M $[_? 1 2]) $[4, 3]"),                "COMPILE ERROR: [1,10:<compiler:s_eval>] Compilation Error: _* takes only 1 argument in list structure pattern: $[&Call,$[&Var,:\"_?\"],1,2]");
+    assert_eq!(ve("($M $[_* 1 2]) $[4, 3]"),                "COMPILE ERROR: <compiler:s_eval>:1:10 Compilation Error: _* takes only 1 argument in list structure pattern: $[$%:Call,$[$%:Var,:\"_*\"],1,2]");
+    assert_eq!(ve("($M $[_+ 1 2]) $[4, 3]"),                "COMPILE ERROR: <compiler:s_eval>:1:10 Compilation Error: _* takes only 1 argument in list structure pattern: $[$%:Call,$[$%:Var,:_+],1,2]");
+    assert_eq!(ve("($M $[_? 1 2]) $[4, 3]"),                "COMPILE ERROR: <compiler:s_eval>:1:10 Compilation Error: _* takes only 1 argument in list structure pattern: $[$%:Call,$[$%:Var,:\"_?\"],1,2]");
 
     assert_eq!(ve("($M x $[:a, $S& */a &])    $[:a, $[${a=2},${a=3},${a=4}]]"),   "${x=$[:a,$[${a=2},${a=3},${a=4}]]}");
     assert_eq!(ve("($M x $[:a, o $S& */a &])  $[:a, $[${a=2},${a=3},${a=4}]]"),   "${o=$[2,3,4],x=$[:a,$[${a=2},${a=3},${a=4}]]}");
@@ -4191,9 +4191,9 @@ fn check_struct_patterns() {
 
 #[test]
 fn check_struct_match() {
-    assert_eq!(ve("match $i(1,2,3,4)"),                             "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match takes at least 2 arguments");
-    assert_eq!(ve("match $i(1,2,3,4) 20 30"),                       "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match argument 2 is not a pair: 20");
-    assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) { $[z,w] };"),     "COMPILE ERROR: [1,7:<compiler:s_eval>] Compilation Error: match argument 2 is not a pair: $[&IVec,1,2,$[&Var,:z],$[&Var,:w]]");
+    assert_eq!(ve("match $i(1,2,3,4)"),                             "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: match takes at least 2 arguments");
+    assert_eq!(ve("match $i(1,2,3,4) 20 30"),                       "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: match argument 2 is not a pair: 20");
+    assert_eq!(ve("match $i(1,2,3,4) $i(1,2,z,w) { $[z,w] };"),     "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: match argument 2 is not a pair: $[$%:IVec,1,2,$[$%:Var,:z],$[$%:Var,:w]]");
 
     assert_eq!(ve("match $i(1,2) $i(1,:s) => 11 0 => 42;"),          "$n");
     assert_eq!(ve("match $i(1,2) $i(1,:s) => 11 0 => 42 55;"),       "55");
