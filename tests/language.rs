@@ -1503,8 +1503,7 @@ fn check_prelude_regex() {
         assert_eq!(ve("
             std:re:replace_all $q/ar/ { \"mak\" } $q/foobarbarfoobararar/
         "),
-        "EXEC ERR: Caught [2,39:<compiler:s_eval>(Func)]=>\
-        [2,32:<compiler:s_eval>(Call)] SA::Panic(\"function expects at most 0 arguments, got 1\")");
+        "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 1\"\n    <compiler:s_eval>:2:39 Func [$[\"ar\"]]\n    <compiler:s_eval>:2:32 Call [\"ar\", &F{@<compiler:s_eval>:2:39 Func,ami..., \"foobarbarfoobararar\"]\n");
         assert_eq!(ve("
             std:re:replace_all $q/a+r/ { std:str:cat \"mak\" ~ std:str:len _.0 } $q/foobarbaaaarfoobaararar/
         "),
@@ -3768,7 +3767,7 @@ fn check_optionals() {
     assert_eq!(ve("$o(10)[]"),              "10");
     assert_eq!(ve("$o()[]"),                "$n");
 
-    assert_eq!(ve("$o() 340"),                   "EXEC ERR: Caught [1,6:<compiler:s_eval>(Call)] SA::Panic(\"Calling $none is invalid\")");
+    assert_eq!(ve("$o() 340"), "EXEC ERR: Caught Panic: \"Calling $none is invalid\"\n        [340]\n    <compiler:s_eval>:1:6 Call [340]\n");
     assert_eq!(ve("$o(\"f\") \"a\" 340 4 :vvv"), "\"fa3404vvv\"");
 
     assert_eq!(ve(r"
@@ -3848,7 +3847,7 @@ fooooob b fewif wifw
 #[test]
 fn check_regex_patterns() {
     assert_eq!(ve("type $r(a)"),   "\"function\"");
-    assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: bad pattern: error[1,3:<pattern>] EOF while parsing: Unexpected EOF at code \'\'");
+    assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: bad pattern: <pattern>:1:3 EOF while parsing: Unexpected EOF\nat code:\n1   | \n");
 
     assert_eq!(ve("$r{(^$+a)rba} $q foobaaarba "),             "$[\"aaarba\",\"aaa\"]");
     assert_eq!(ve("$r($+a)       $q foobaaarba "),             "$[\"aaa\"]");
@@ -4775,10 +4774,10 @@ fn check_regex_pattern_global() {
     assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $+ $\\ }"), "$[$[\"fff\"],$[\"ffff\"],$[\"f\"],$[\"f\"]]");
     assert_eq!(ve("$rg $+f  $q fffooffffofof { ? len[_.0] > 3 { break _.0; } }"), "\"ffff\"");
     assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { ? len[_.0] > 3 { next[]; } { $+ _.0 } }"), "$[\"fff\",\"f\",\"f\"]");
-    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught [1,34:<compiler:s_eval>(Err)] SA::Panic(\"Dropped error value: 11\")");
+    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught Panic: \"Dropped error value: 11\"\n    <compiler:s_eval>:1:34 Err 11\n");
 
     assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { ? len[_.0] > 3 { next[]; } { $+ _.0 } }"), "$[\"fff\",\"f\",\"f\"]");
-    assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught [1,49:<compiler:s_eval>(Err)] SA::Panic(\"Dropped error value: 11\")");
+    assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught Panic: \"Dropped error value: 11\"\n    <compiler:s_eval>:1:49 Err 11\n");
 
     assert_eq!(ve("$@v $rg\"$^$+f\" \"ffooofffofo\" \\$+ _.0"), "$[\"ff\"]");
 
@@ -5304,9 +5303,9 @@ fn check_json_char_byte() {
 
 #[test]
 fn check_mutate_point() {
-    assert_eq!(ve("$i(0,0).0 = 3"), "EXEC ERR: Caught  SA::Panic(\"Can\\\'t mutate integer vector\")");
-    assert_eq!(ve("$f(0,0).0 = 3"), "EXEC ERR: Caught  SA::Panic(\"Can\\\'t mutate float vector\")");
-    assert_eq!(ve("$p(0,0).0 = 3"), "EXEC ERR: Caught  SA::Panic(\"Can\\\'t mutate pair\")");
+    assert_eq!(ve("$i(0,0).0 = 3"), "EXEC ERR: Caught Panic: \"Can\\\'t mutate integer vector\"");
+    assert_eq!(ve("$f(0,0).0 = 3"), "EXEC ERR: Caught Panic: \"Can\\\'t mutate float vector\"");
+    assert_eq!(ve("$p(0,0).0 = 3"), "EXEC ERR: Caught Panic: \"Can\\\'t mutate pair\"");
 }
 
 #[test]
