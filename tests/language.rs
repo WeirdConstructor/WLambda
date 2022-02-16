@@ -1025,8 +1025,7 @@ fn check_arity() {
     assert_eq!(ve("(\\|0<4| _1)[1,2,3]"), "2");
     assert_eq!(ve("{|0<4| _1 }[1,2,3,4]"), "2");
     assert_eq!(ve("{|0<4| _1 }[1,2,3,4,5]"),
-        "EXEC ERR: Caught [1,1:<compiler:s_eval>(Func)]=>\
-        [1,12:<compiler:s_eval>(Call)] SA::Panic(\"function expects at most 4 arguments, got 5\")");
+        "EXEC ERR: Caught Panic: \"function expects at most 4 arguments, got 5\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:12 Call [1, 2, 3, 4, 5]\n");
     assert_eq!(ve("{ @ }[1,2,3,4,5]"), "$[1,2,3,4,5]");
     assert_eq!(ve("{|2| @ }[1,2]"), "$[1,2]");
     assert_eq!(ve("{|2| @ }[1]"),
@@ -2161,9 +2160,7 @@ fn check_borrow_error() {
         !x = $[1,2,3];
         x { std:prepend x $[_] }
     "),
-    "EXEC ERR: Caught [3,25:<compiler:s_eval>(Call)]=>\
-    [3,11:<compiler:s_eval>(Func)@x]=>\
-    [3,11:<compiler:s_eval>(Call)] SA::Panic(\"Can\\\'t mutate borrowed value: $[1,2,3]\")");
+    "EXEC ERR: Caught Panic: \"Can\\'t mutate borrowed value: $[1,2,3]\"\n    <compiler:s_eval>:3:25 Call [$[1,2,3], $[1]]\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
 
     assert_eq!(ve(r"
         !x = $[1,2,3];
