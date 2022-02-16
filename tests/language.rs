@@ -25,13 +25,13 @@ fn ve(s: &str) -> String {
 #[test]
 fn check_function_string_rep() {
     assert_eq!(ve("!upv1 = \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
-               "\"&F{@[1,21:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&\\\"lol!\\\"]}\"");
+               "\"&F{@<compiler:s_eval>:1:21 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&\\\"lol!\\\"]}\"");
     assert_eq!(ve("!upv1 = $&& \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
-               "\"&F{@[1,23:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&$&&\\\"lol!\\\"]}\"");
+               "\"&F{@<compiler:s_eval>:1:23 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&$&&\\\"lol!\\\"]}\"");
     assert_eq!(ve("!upv1 = \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
-               "&F{@[1,17:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&\"lol!\"]}");
+               "&F{@<compiler:s_eval>:1:17 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&\"lol!\"]}");
     assert_eq!(ve("!upv1 = $&& \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
-               "&F{@[1,19:<compiler:s_eval>(Func)@upv1],amin=1,amax=3,locals=2,upvalues=$[$&$&&\"lol!\"]}");
+               "&F{@<compiler:s_eval>:1:19 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&$&&\"lol!\"]}");
 }
 
 #[test]
@@ -1015,11 +1015,9 @@ fn check_arity() {
         "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 3\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3]\n    <compiler:s_eval>:1:3 Call [1, 2, 3]\n");
     assert_eq!(ve("{|3| _1 }[1,2,3]"), "2");
     assert_eq!(ve("{|3| _1 }[2,3]"),
-        "EXEC ERR: Caught [1,1:<compiler:s_eval>(Func)]=>\
-        [1,10:<compiler:s_eval>(Call)] SA::Panic(\"function expects at least 3 arguments, got 2\")");
+        "EXEC ERR: Caught Panic: \"function expects at least 3 arguments, got 2\"\n    <compiler:s_eval>:1:1 Func [2, 3]\n    <compiler:s_eval>:1:10 Call [2, 3]\n");
     assert_eq!(ve("{|3| _1 }[2,3,4,5]"),
-        "EXEC ERR: Caught [1,1:<compiler:s_eval>(Func)]=>\
-        [1,10:<compiler:s_eval>(Call)] SA::Panic(\"function expects at most 3 arguments, got 4\")");
+        "EXEC ERR: Caught Panic: \"function expects at most 3 arguments, got 4\"\n    <compiler:s_eval>:1:1 Func [2, 3, 4, 5]\n    <compiler:s_eval>:1:10 Call [2, 3, 4, 5]\n");
     assert_eq!(ve("{|0<4| _1 }[]"), "$n");
     assert_eq!(ve("{|0<4| _1 }[1]"), "$n");
     assert_eq!(ve("{|0<4| _1 }[1,2]"), "2");
@@ -1066,7 +1064,7 @@ fn check_error_fn_pos() {
         !l = { x 10 };
         l[];
     "#),
-    "EXEC ERR: Caught [3,14:<compiler:s_eval>(Func)@x]=>\
+    "EXEC ERR: Caught <compiler:s_eval>:3:14 Func[x]=>\
      [7,18:<compiler:s_eval>(Call)]=>\
      [7,14:<compiler:s_eval>(Func)@l]=>\
      [8,10:<compiler:s_eval>(Call)] SA::Panic(\"function expects at most 0 arguments, got 1\")");
@@ -1868,14 +1866,14 @@ fn check_cyclic_str_write() {
         x.f = { x_.b };
         $[x.f, $:x]
     "#),
-    "$[$<1=>&F{@[4,15:<compiler:s_eval>(Func)@f],amin=0,amax=0,locals=0,upvalues=$[$<2=>$w&${f=$<1>}]},$<2>]");
+    "$[$<1=>&F{@<compiler:s_eval>:4:15 Func[f],amin=0,amax=0,locals=0,upvalues=$[$<2=>$w&${f=$<1>}]},$<2>]");
 
     assert_eq!(ve(r#"
         !x = $[];
         std:push x ~ $&$e x;
         x
     "#),
-    "$<1=>$[$&$e[3,27:<compiler:s_eval>(Err)] $<1>]");
+    "$<1=>$[$&$e $<1> [@ <compiler:s_eval>:3:27 Err]]");
 }
 
 #[test]
@@ -2085,7 +2083,7 @@ fn check_for() {
         "\"ZYX1\"");
     assert_eq!(
         ve("!o = $&$q 1 ; for (std:to_drop {||}) \\.o = _ o; $*o"),
-        "std:to_drop[&F{@[1,32:<compiler:s_eval>(Func)@o],amin=any,amax=any,locals=0,upvalues=$[]}]");
+        "std:to_drop[&F{@<compiler:s_eval>:1:32 Func[o],amin=any,amax=any,locals=0,upvalues=$[]}]");
     assert_eq!(
         ve("!o = $&$q 1 ; for \"XYZ\" \\.o = _ o; $*o"),
         "\"ZYX1\"");
@@ -2157,8 +2155,7 @@ fn check_borrow_error() {
         !x = ${a=1};
         x { x.a = $[_, _1]; }
     "),
-    "EXEC ERR: Caught [3,11:<compiler:s_eval>(Func)@a]=>\
-    [3,11:<compiler:s_eval>(Call)] SA::Panic(\"Can\\\'t mutate borrowed value: ${a=1}\")");
+    "EXEC ERR: Caught Panic: \"Can\\'t mutate borrowed value: ${a=1}\"\n    <compiler:s_eval>:3:11 Func[a] [1, \"a\"]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[a],...]\n");
 
     assert_eq!(ve(r"
         !x = $[1,2,3];
@@ -3551,7 +3548,7 @@ fn check_iter() {
     assert_eq!(v(r"
         !it = $iter $i(0,5);
         $@v it \$+ $p(_, unwrap it[]);
-    "), "Execution error: Jumped out of execution: [?]=>[3,31:<wlambda::eval>(Call)]=>[3,15:<wlambda::eval>(Func)@it]=>[3,14:<wlambda::eval>(Call)] SA::Panic(\"unwrap empty option!\")");
+    "), "Runtime error: Panic: \"unwrap empty option!\"\n        $n\n    <wlambda::eval>:3:31 Call [$o()]\n    <wlambda::eval>:3:15 Func[it] [4]\n    <wlambda::eval>:3:14 Call [&F{@<wlambda::eval>:3:15 Func[it],a...]\n");
 }
 
 #[test]
@@ -4277,7 +4274,7 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{}x\" 10"),                        "a10x");
     assert_eq!(v2s("$F\"a{1}{0}x\" 10 22"),                 "a2210x");
     assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22"),               format!("a{1}{0}{}x", 10, 22));
-    assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22 33"),            "Execution error: Jumped out of execution: [?]=>[1,16:<wlambda::eval>(Call)] SA::Panic(\"function expects at most 2 arguments, got 3\")");
+    assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22 33"),            "Runtime error: Panic: \"function expects at most 2 arguments, got 3\"\n        [10, 22, 33]\n    <wlambda::eval>:1:16 Call [10, 22, 33]\n");
     assert_eq!(v2s("$F\"a{1}{0}{}{}x\" 10 22"),             format!("a{1}{0}{}{}x", 10, 22));
     assert_eq!(v2s("$F\"a{x}{y}x\" $i(3, 4, 5, 6)"),        "a34x");
     assert_eq!(v2s("$F\"a{zx}{xx}x\" $i(3, 4, 5, 6)"),      "a(5,3)(3,3)x");
