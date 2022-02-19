@@ -232,7 +232,7 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
                     Ok(v)                      => { ret = v; },
                     Err(StackAction::Break(v)) => { ret = *v; break; },
                     Err(StackAction::Next)     => { },
-                    Err(e)                     => { return Err(e); },
+                    Err(e)                     => { env.popn(1); return Err(e); },
                 };
                 env.popn(1);
             }
