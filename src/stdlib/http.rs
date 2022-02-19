@@ -141,7 +141,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     },
                 }
             })
-        }).unwrap_or(
+        }).unwrap_or_else(||
             Ok(env.new_err(format!(
                 "http:get: First argument not a HttpClient handle! {}",
                 cl.s()))))
