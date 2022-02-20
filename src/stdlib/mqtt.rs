@@ -144,7 +144,25 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
     st.fun("mqtt:client:connection:run", |env: &mut Env, _argc: usize| {
         let mut con = env.arg(0);
-        let cb = env.arg(1);
+        let mut cb = env.arg(1);
+
+        let chan = cb.with_usr_ref(|chan: &mut crate::threads::AValChannel| {
+            chan.fork_sender_direct()
+        });
+
+        let chan =
+            if let Some(chan) = chan {
+               match chan {
+                    Ok(chan) => Some(chan),
+                    Err(err) => {
+                        return
+                            Ok(VVal::err_msg(
+                                &format!("Failed to fork sender, can't get lock: {}", err)));
+                    },
+               }
+            } else {
+                None
+            };
 
         con.with_usr_ref(|con: &mut VMQTTConn| {
             for notification in con.con.borrow_mut().iter() {
@@ -161,15 +179,23 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     Event::Incoming(inc) => {
                         match inc {
                             Packet::Publish(pubpkt) => {
-                                env.push(VVal::new_str_mv(pubpkt.topic));
-                                env.push(VVal::new_byt(pubpkt.payload.as_ref().to_vec()));
-                                match cb.call_internal(env, 2) {
-                                    Ok(_)                      => { },
-                                    Err(StackAction::Break(_)) => { break; },
-                                    Err(StackAction::Next)     => { },
-                                    Err(e)                     => { env.popn(2); return Err(e); },
-                                };
-                                env.popn(2);
+                                if let Some(chan) = &chan {
+                                    chan.send(&VVal::pair(
+                                        VVal::new_str_mv(pubpkt.topic),
+                                        VVal::new_byt(
+                                            pubpkt.payload.as_ref().to_vec())));
+
+                                } else {
+                                    env.push(VVal::new_str_mv(pubpkt.topic));
+                                    env.push(VVal::new_byt(pubpkt.payload.as_ref().to_vec()));
+                                    match cb.call_internal(env, 2) {
+                                        Ok(_)                      => { },
+                                        Err(StackAction::Break(_)) => { break; },
+                                        Err(StackAction::Next)     => { },
+                                        Err(e)                     => { env.popn(2); return Err(e); },
+                                    };
+                                    env.popn(2);
+                                }
                             },
                             _ => { },
                         }

@@ -524,6 +524,12 @@ pub struct AValChannel {
 #[derive(Clone, Debug)]
 pub struct ForkSenderError(String);
 
+impl std::fmt::Display for ForkSenderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Failed to fork sender, can't get lock: {}", self.0)
+    }
+}
+
 impl AValChannel {
     pub(crate) fn new_direct() -> AValChannel {
         let (send, recv) = std::sync::mpsc::channel();
