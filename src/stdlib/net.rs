@@ -7,7 +7,7 @@ use std::cell::RefCell;
 
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 
-fn vv2socketaddr(vv: &VVal) -> Result<Box<dyn std::iter::Iterator<Item = SocketAddr>>, String> {
+pub fn vv2socketaddr(vv: &VVal) -> Result<Box<dyn std::iter::Iterator<Item = SocketAddr>>, String> {
     let addr =
         if vv.is_pair() {
             let port = vv.v_i(1) as u16;
@@ -155,13 +155,38 @@ macro_rules! try_addresses {
     }
 }
 
+#[macro_export]
+macro_rules! first_addr {
+    ($arg: expr, $env: expr) => {
+        {
+            let vaddr = $arg;
+
+            let mut addr =
+                match crate::stdlib::net::vv2socketaddr(&vaddr) {
+                    Ok(addr) => addr,
+                    Err(e) => { return Err($env.new_err(e)) },
+                };
+
+            let first = addr.next();
+            if first.is_none() {
+                return Err($env.new_err(format!(
+                    "Couldn't get socket address from '{}'",
+                    vaddr.s_raw())));
+            }
+
+            Ok(first.unwrap())
+        }
+    }
+}
+
+#[macro_export]
 macro_rules! with_first_addr {
     ($arg: expr, $env: expr, $addr: ident, $block: tt) => {
         {
             let vaddr = $arg;
 
             let mut addr =
-                match vv2socketaddr(&vaddr) {
+                match crate::stdlib::net::vv2socketaddr(&vaddr) {
                     Ok(addr) => addr,
                     Err(e) => { return Ok($env.new_err(e)) },
                 };

@@ -1,6 +1,9 @@
 // Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
+use crate::with_first_addr;
+use crate::first_addr;
+
 #[cfg(feature="rumqttc")]
 use crate::VVal;
 #[allow(unused_imports)]
@@ -9,6 +12,8 @@ use crate::{Env, StackAction};
 use crate::vval::{VValFun, VValUserData};
 #[cfg(feature="rumqttc")]
 use rumqttc::{MqttOptions, Client, QoS, Connection, Event, Packet};
+#[cfg(feature="rumqttd")]
+use librumqttd::{Broker, Config};
 use crate::compiler::*;
 #[cfg(feature="rumqttc")]
 use std::rc::Rc;
@@ -66,27 +71,6 @@ struct DetachedMQTTClient {
     chan:        crate::threads::AValChannel,
     client:      Arc<Mutex<ThreadClientHandle>>,
 }
-
-/*
-
-!client = std:mqtt:client:detached:new :myclid "localhost" 1883;
-
-client.publish "test/me" $b"foobar";
-
-!chan = client.channel;
-
-while $t {
-    !msg = chan.recv[];
-    if msg.0 == "test/me" {
-        client.publish "test/me" "next!";
-    };
-    if msg.0 == "$SYS/connect" {
-        std:displayln "Reconnected!";
-        client.publish "my/history" (std:ser:json $[1,2,3]);
-    };
-};
-
-*/
 
 #[cfg(feature="rumqttc")]
 impl DetachedMQTTClient {
@@ -274,56 +258,99 @@ impl crate::threads::ThreadSafeUsr for DetachedMQTTClient {
     }
 }
 
-
-#[cfg(feature="rumqttc")]
+#[cfg(feature="rumqttd")]
 #[derive(Clone)]
-struct VMQTTClient {
-    client: Client,
+struct MQTTBroker {
 }
 
-#[cfg(feature="rumqttc")]
-impl VMQTTClient {
-    pub fn new(client: Client) -> Self {
-        Self {
-            client: client,
-        }
+#[cfg(feature="rumqttd")]
+fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal>  {
+//    let servers_cfg = cfg.v_k("servers");
+
+//    servers_cfg.with_iter(|it| {
+//        let mut i = 0;
+//        for (v, k) in it {
+//            i += 1;
+
+    let mut servers = std::collections::HashMap::new();
+    let listen = first_addr!(cfg.v_k("listen"), env)?;
+    let mut srv = librumqttd::ServerSettings {
+        listen,
+        next_connection_delay_ms: 1,
+        connections: librumqttd::ConnectionSettings {
+            connection_timeout_ms: 100,
+            max_client_id_len:     256,
+            throttle_delay_ms:     0,
+            max_payload_size:      10240,
+            max_inflight_count:    500,
+            max_inflight_size:     10240,
+            login_credentials: None,
+        },
+        cert: None,
+    };
+
+    servers.insert(format!("{}", 1), srv);
+
+    let cons_listen = first_addr!(cfg.v_k("console_listen"), env)?;
+
+    let mut config = Config {
+        id: cfg.v_ik("id") as usize,
+        servers,
+        cluster: None,
+        replicator: None,
+        console: librumqttd::ConsoleSettings {
+            listen: cons_listen,
+        },
+        router: Default::default(),
+    };
+
+    Ok(config)
+}
+
+#[cfg(feature="rumqttd")]
+impl MQTTBroker {
+    pub fn setup(env: &mut Env, cfg: VVal) -> Result<Self, VVal> {
+        let config = cfg2broker_config(env, cfg)?;
+        let mut broker = Broker::new(config);
+
+        std::thread::spawn(move || {
+            broker.start().unwrap();
+            println!("BROKER STRATED");
+        });
+
+        Ok(Self {
+        })
     }
 }
 
-#[cfg(feature="rumqttc")]
-impl VValUserData for VMQTTClient {
+#[cfg(feature="rumqttd")]
+impl VValUserData for MQTTBroker {
     fn s(&self) -> String {
-        format!("$<MQTTClient>")
+        format!("$<MQTTBroker>")
     }
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
         Box::new(self.clone())
     }
-
-    fn as_thread_safe_usr(&mut self) -> Option<Box<dyn crate::threads::ThreadSafeUsr>> {
-        Some(Box::new(VMQTTClient {
-            client: self.client.clone()
-        }))
-    }
 }
 
-#[cfg(feature="rumqttc")]
-impl crate::threads::ThreadSafeUsr for VMQTTClient {
-    fn to_vval(&self) -> VVal {
-        VVal::Usr(Box::new(VMQTTClient {
-            client: self.client.clone()
-        }))
-    }
-}
+//#[cfg(feature="rumqttd")]
+//impl crate::threads::ThreadSafeUsr for MQTTBroker {
+//    fn to_vval(&self) -> VVal {
+//        VVal::Usr(Box::new(VMQTTClient {
+//            client: self.client.clone()
+//        }))
+//    }
+//}
 
-#[cfg(feature="rumqttc")]
+#[cfg(feature="rumqttd")]
 #[derive(Clone)]
-struct VMQTTConn {
+struct MQTTLink {
     con: Rc<RefCell<Connection>>,
 }
 
-#[cfg(feature="rumqttc")]
-impl VMQTTConn {
+#[cfg(feature="rumqttd")]
+impl MQTTLink {
     pub fn new(con: Connection) -> Self {
         Self {
             con: Rc::new(RefCell::new(con)),
@@ -331,10 +358,10 @@ impl VMQTTConn {
     }
 }
 
-#[cfg(feature="rumqttc")]
-impl VValUserData for VMQTTConn {
+#[cfg(feature="rumqttd")]
+impl VValUserData for MQTTLink {
     fn s(&self) -> String {
-        format!("$<MQTTConnection>")
+        format!("$<MQTTBrokerLink>")
     }
     fn as_any(&mut self) -> &mut dyn std::any::Any { self }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
@@ -342,24 +369,20 @@ impl VValUserData for VMQTTConn {
     }
 }
 
+//#[cfg(feature="rumqttd")]
+//impl crate::threads::ThreadSafeUsr for MQTTLink {
+//    fn to_vval(&self) -> VVal {
+//        VVal::Usr(Box::new(MQTTLink {
+//            client: self.client.clone()
+//        }))
+//    }
+//}
+
+
 #[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {
     #[cfg(feature="rumqttc")]
     st.fun("mqtt:client:new", |env: &mut Env, _argc: usize| {
-        let mut opts =
-            MqttOptions::new(
-                env.arg(0).s_raw(),
-                env.arg(1).s_raw(),
-                env.arg(2).i() as u16);
-        opts.set_keep_alive(std::time::Duration::from_secs(5));
-        let (client, connection) = Client::new(opts, 25);
-        Ok(VVal::pair(
-            VVal::new_usr(VMQTTClient::new(client)),
-            VVal::new_usr(VMQTTConn::new(connection))))
-    }, Some(3), Some(3), false);
-
-    #[cfg(feature="rumqttc")]
-    st.fun("mqtt:client:detached:new", |env: &mut Env, _argc: usize| {
         let mut chan = env.arg(0);
         let chan =
             chan.with_usr_ref(|chan: &mut crate::threads::AValChannel| {
@@ -393,141 +416,30 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         Ok(VVal::new_usr(cl))
     }, Some(4), Some(4), false);
 
-    #[cfg(feature="rumqttc")]
-    st.fun("mqtt:client:publish", |env: &mut Env, _argc: usize| {
-        let mut cl = env.arg(0);
-        let topic = env.arg(1);
-        let msg = env.arg(2);
-        let res = cl.with_usr_ref(|cl: &mut VMQTTClient| -> Result<VVal, rumqttc::ClientError> {
+    #[cfg(feature="rumqttd")]
+    st.fun("mqtt:broker:new", |env: &mut Env, _argc: usize| {
+        let mut config = env.arg(0);
 
-            topic.with_s_ref(|s|
-                msg.with_bv_ref(|bv|
-                    cl.client.publish(s, QoS::AtLeastOnce, false, bv)))?;
-
-            Ok(VVal::Bol(true))
-        }).unwrap_or_else(||
-            Ok(env.new_err(format!(
-                "mqtt:client:publish: First argument not a VMQTTClient handle! {}",
-                cl.s()))));
-
-        match res {
-            Err(e) =>
-                Ok(env.new_err(
-                    format!("MQTT Publish Error: {}", e))),
-            Ok(v) => Ok(v),
+        match MQTTBroker::setup(env, config) {
+            Ok(broker) => Ok(VVal::new_usr(broker)),
+            Err(ev)    => Ok(ev),
         }
-    }, Some(3), Some(3), false);
-
-    #[cfg(feature="rumqttc")]
-    st.fun("mqtt:client:subscribe", |env: &mut Env, _argc: usize| {
-        let mut cl = env.arg(0);
-        let res = cl.with_usr_ref(
-            |cl: &mut VMQTTClient| -> Result<VVal, rumqttc::ClientError> {
-
-                env.arg(1).with_s_ref(|s|
-                    cl.client.subscribe(s, QoS::AtMostOnce))?;
-
-                Ok(VVal::Bol(true))
-            }).unwrap_or_else(||
-                Ok(env.new_err(format!(
-                    "mqtt:client:subscribe: First argument not a VMQTTClient handle! {}",
-                    cl.s()))));
-
-        match res {
-            Err(e) =>
-                Ok(env.new_err(
-                    format!("MQTT Publish Error: {}", e))),
-            Ok(v) => Ok(v),
-        }
-    }, Some(2), Some(2), false);
-
-    #[cfg(feature="rumqttc")]
-    st.fun("mqtt:client:connection:run", |env: &mut Env, _argc: usize| {
-        let mut con = env.arg(0);
-        let mut cb = env.arg(1);
-
-        let chan = cb.with_usr_ref(|chan: &mut crate::threads::AValChannel| {
-            chan.fork_sender_direct()
-        });
-
-        let chan =
-            if let Some(chan) = chan {
-               match chan {
-                    Ok(chan) => Some(chan),
-                    Err(err) => {
-                        return
-                            Ok(VVal::err_msg(
-                                &format!("Failed to fork sender, can't get lock: {}", err)));
-                    },
-               }
-            } else {
-                None
-            };
-
-        con.with_usr_ref(|con: &mut VMQTTConn| {
-            for notification in con.con.borrow_mut().iter() {
-                let notification =
-                    match notification {
-                        Err(e) => {
-                            return Ok(env.new_err(
-                                format!("MQTT Connection Run Error: {}", e)));
-                        },
-                        Ok(n) => n,
-                    };
-
-                match notification {
-                    Event::Incoming(inc) => {
-                        match inc {
-                            Packet::Publish(pubpkt) => {
-                                if let Some(chan) = &chan {
-                                    chan.send(&VVal::pair(
-                                        VVal::new_str_mv(pubpkt.topic),
-                                        VVal::new_byt(
-                                            pubpkt.payload.as_ref().to_vec())));
-
-                                } else {
-                                    env.push(VVal::new_str_mv(pubpkt.topic));
-                                    env.push(VVal::new_byt(pubpkt.payload.as_ref().to_vec()));
-                                    match cb.call_internal(env, 2) {
-                                        Ok(_)                      => { },
-                                        Err(StackAction::Break(_)) => { break; },
-                                        Err(StackAction::Next)     => { },
-                                        Err(e)                     => { env.popn(2); return Err(e); },
-                                    };
-                                    env.popn(2);
-                                }
-                            },
-                            _ => { },
-                        }
-                    },
-                    _ => {}
-                }
-            }
-
-            Ok(VVal::Bol(true))
-        }).unwrap_or_else(||
-            Ok(env.new_err(format!(
-                "mqtt:client:connection:run: First argument not a VMQTTConn handle! {}",
-                con.s()))))
-    }, Some(2), Some(2), false);
+    }, Some(1), Some(1), false);
 }
 
-//#[cfg(feature="reqwest")]
-//#[derive(Debug)]
-//enum VHttpClError {
-//    ReqwestError(reqwest::Error),
-//    InvalidHeaderName,
-//    InvalidHeaderValue,
-//}
-//
-//#[cfg(feature="reqwest")]
-//impl std::fmt::Display for VHttpClError {
-//    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//        match self {
-//            VHttpClError::ReqwestError(e)    => write!(f, "{}", e),
-//            VHttpClError::InvalidHeaderName  => write!(f, "InvalidHeaderName"),
-//            VHttpClError::InvalidHeaderValue => write!(f, "InvalidHeaderValue"),
-//        }
-//    }
-//}
-//
+/*
+
+
+!chan = std:sync:mpsc:new[];
+
+!broker = std:mqtt:broker:new ${ ... config here ... };
+!link = broker.link chan;
+link.subscribe "test/me";
+link.publish "test/me" $b"payload";
+
+while $t {
+    std:displayln chan.recv[];
+}
+
+
+*/
