@@ -106,6 +106,16 @@ impl Doc {
     }
 }
 
+#[cfg(feature="reqwest")]
+fn get_doc() -> VVal {
+    VVal::from_json(DOCUMENTATION_JSON).unwrap();
+}
+
+#[cfg(not(feature="reqwest"))]
+fn get_doc() -> VVal {
+    VVal::None
+}
+
 fn main() {
 //    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
 //    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
@@ -122,7 +132,7 @@ fn main() {
 //    let r = crate::vm::gen(&contents);
 //    println!("R: {}", r);
 //    return;
-    let doc = VVal::from_json(DOCUMENTATION_JSON).unwrap();
+    let doc = get_doc();
     let doc = Doc::new(doc);
 
     let argv : Vec<String> = std::env::args().collect();
