@@ -24,7 +24,7 @@ struct ThreadClientHandle {
     subscribe:   Vec<String>,
 }
 
-
+#[cfg(feature="rumqttc")]
 impl ThreadClientHandle {
     fn with_client<F: FnMut(&mut Client) -> Result<(), rumqttc::ClientError>>(&mut self, mut fun: F) -> Result<(), DetClientError> {
         if let Some(client) = self.client.as_mut() {
@@ -38,12 +38,14 @@ impl ThreadClientHandle {
     }
 }
 
+#[cfg(feature="rumqttc")]
 #[derive(Debug)]
 pub enum DetClientError {
     NotConnected,
     ClientError(rumqttc::ClientError),
 }
 
+#[cfg(feature="rumqttc")]
 impl std::fmt::Display for DetClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -53,7 +55,6 @@ impl std::fmt::Display for DetClientError {
         }
     }
 }
-
 
 #[cfg(feature="rumqttc")]
 #[derive(Clone)]
@@ -86,6 +87,7 @@ while $t {
 
 */
 
+#[cfg(feature="rumqttc")]
 impl DetachedMQTTClient {
     pub fn new(id: &str, host: &str, port: u16) -> Self {
         let mut options = MqttOptions::new(id, host, port);
@@ -205,6 +207,7 @@ impl VValUserData for VMQTTClient {
     }
 }
 
+#[cfg(feature="rumqttc")]
 impl crate::threads::ThreadSafeUsr for VMQTTClient {
     fn to_vval(&self) -> VVal {
         VVal::Usr(Box::new(VMQTTClient {
@@ -239,6 +242,7 @@ impl VValUserData for VMQTTConn {
     }
 }
 
+#[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {
     #[cfg(feature="rumqttc")]
     st.fun("mqtt:client:new", |env: &mut Env, _argc: usize| {
@@ -254,6 +258,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
             VVal::new_usr(VMQTTConn::new(connection))))
     }, Some(3), Some(3), false);
 
+    #[cfg(feature="rumqttc")]
     st.fun("mqtt:client:publish", |env: &mut Env, _argc: usize| {
         let mut cl = env.arg(0);
         let topic = env.arg(1);
@@ -278,6 +283,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         }
     }, Some(3), Some(3), false);
 
+    #[cfg(feature="rumqttc")]
     st.fun("mqtt:client:subscribe", |env: &mut Env, _argc: usize| {
         let mut cl = env.arg(0);
         let res = cl.with_usr_ref(
@@ -300,6 +306,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         }
     }, Some(2), Some(2), false);
 
+    #[cfg(feature="rumqttc")]
     st.fun("mqtt:client:connection:run", |env: &mut Env, _argc: usize| {
         let mut con = env.arg(0);
         let mut cb = env.arg(1);

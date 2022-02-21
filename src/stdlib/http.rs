@@ -85,6 +85,7 @@ impl VValUserData for VHttpClient {
     }
 }
 
+#[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {
     #[cfg(feature="reqwest")]
     st.fun("http:client:new", |_env: &mut Env, _argc: usize| {
