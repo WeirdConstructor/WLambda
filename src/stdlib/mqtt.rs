@@ -63,6 +63,7 @@ struct DetachedMQTTClient {
     broker_host: String,
     broker_port: u16,
     options:     MqttOptions,
+    chan:        crate::threads::AValChannel,
     client:      Arc<Mutex<ThreadClientHandle>>,
 }
 
@@ -89,7 +90,7 @@ while $t {
 
 #[cfg(feature="rumqttc")]
 impl DetachedMQTTClient {
-    pub fn new(id: &str, host: &str, port: u16) -> Self {
+    pub fn new(chan: crate::threads::AValChannel, id: &str, host: &str, port: u16) -> Self {
         let mut options = MqttOptions::new(id, host, port);
         options.set_keep_alive(std::time::Duration::from_secs(5));
         Self {
@@ -97,6 +98,7 @@ impl DetachedMQTTClient {
             broker_host:    host.to_string(),
             broker_port:    port,
             options,
+            chan,
             client: Arc::new(Mutex::new(ThreadClientHandle {
                 client:    None,
                 subscribe: vec![],
@@ -126,7 +128,8 @@ impl DetachedMQTTClient {
     }
 
     pub fn start(&mut self) {
-        let client = self.client.clone();
+        let chan    = self.chan.clone();
+        let client  = self.client.clone();
         let options = self.options.clone();
 
         std::thread::spawn(move || {
@@ -146,7 +149,9 @@ impl DetachedMQTTClient {
                                 .unwrap()
                                 .subscribe(topic, QoS::AtMostOnce)
                         {
-                            // TODO: Write error to channel!
+                            chan.send(&VVal::pair(
+                                VVal::new_sym("$WL/error/subscribe"),
+                                VVal::new_str_mv(format!("{}", e))));
                             retry = true;
                             break;
                         }
@@ -161,13 +166,16 @@ impl DetachedMQTTClient {
                 }
 
                 if let Some(mut connection) = con {
-                    // TODO: Write connected message!
+                    chan.send(&VVal::pair(
+                        VVal::new_sym("$WL/connected"), VVal::None));
 
                     for noti in connection.iter() {
                         let noti =
                             match noti {
                                 Err(e) => {
-                                    // TODO: Write error to channel!
+                                    chan.send(&VVal::pair(
+                                        VVal::new_sym("$WL/error"),
+                                        VVal::new_str_mv(format!("{}", e))));
                                     break;
                                 },
                                 Ok(noti) => noti,
@@ -177,15 +185,15 @@ impl DetachedMQTTClient {
                             Event::Incoming(inc) => {
                                 match inc {
                                     Packet::Publish(pubpkt) => {
-                                        // chan.send(&VVal::pair(
-                                        //     VVal::new_str_mv(pubpkt.topic),
-                                        //     VVal::new_byt(
-                                        //         pubpkt.payload.as_ref().to_vec())));
+                                        chan.send(&VVal::pair(
+                                            VVal::new_str_mv(pubpkt.topic),
+                                            VVal::new_byt(
+                                                pubpkt.payload.as_ref().to_vec())));
                                     },
                                     _ => { },
                                 }
                             },
-                            _ => {}
+                            _ => { }
                         }
                     }
                 }
@@ -242,7 +250,7 @@ impl VValUserData for DetachedMQTTClient {
                             self.publish(topic, payload)));
                 match ret {
                     Ok(_)  => Ok(VVal::Bol(true)),
-                    Err(e) => Ok(env.new_err(format!("subscribe Error: {}", e)))
+                    Err(e) => Ok(env.new_err(format!("publish Error: {}", e)))
                 }
             },
             _ => {
@@ -352,14 +360,38 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
     #[cfg(feature="rumqttc")]
     st.fun("mqtt:client:detached:new", |env: &mut Env, _argc: usize| {
+        let mut chan = env.arg(0);
+        let chan =
+            chan.with_usr_ref(|chan: &mut crate::threads::AValChannel| {
+                chan.fork_sender_direct()
+            });
+
+        let chan =
+            if let Some(chan) = chan {
+               match chan {
+                    Ok(chan) => Some(chan),
+                    Err(err) => {
+                        return
+                            Ok(VVal::err_msg(
+                                &format!("Failed to fork sender, can't get lock: {}", err)));
+                    },
+               }
+            } else {
+                return
+                    Ok(env.new_err(format!(
+                        "mqtt:client:detached:new: First argument not a std:sync:mpsc handle! {}",
+                        env.arg(0).s())));
+            };
+
         let mut cl =
             DetachedMQTTClient::new(
-                &env.arg(0).s_raw(),
+                chan.unwrap(),
                 &env.arg(1).s_raw(),
-                env.arg(2).i() as u16);
+                &env.arg(2).s_raw(),
+                env.arg(3).i() as u16);
         cl.start();
         Ok(VVal::new_usr(cl))
-    }, Some(3), Some(3), false);
+    }, Some(4), Some(4), false);
 
     #[cfg(feature="rumqttc")]
     st.fun("mqtt:client:publish", |env: &mut Env, _argc: usize| {
