@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
+// Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
 use wlambda::vval::Env;
@@ -108,7 +108,7 @@ impl Doc {
 
 #[cfg(feature="reqwest")]
 fn get_doc() -> VVal {
-    VVal::from_json(DOCUMENTATION_JSON).unwrap();
+    VVal::from_json(DOCUMENTATION_JSON).unwrap()
 }
 
 #[cfg(not(feature="reqwest"))]

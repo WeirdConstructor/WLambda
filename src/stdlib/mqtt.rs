@@ -1,4 +1,4 @@
-// Copyright (c) 2020 Weird Constructor <weirdconstructor@gmail.com>
+// Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
 #[cfg(feature="rumqttc")]
@@ -104,7 +104,18 @@ impl DetachedMQTTClient {
         }
     }
 
-    pub fn subscribe(&mut self, topic: &str) -> Result<(), DetClientError> {
+    pub fn publish(&self, topic: &str, payload: &[u8]) -> Result<(), DetClientError> {
+        if let Ok(mut hdl) = self.client.lock() {
+            hdl.with_client(|cl| {
+                cl.publish(topic, QoS::AtLeastOnce, false, payload)
+            })
+
+        } else {
+            Err(DetClientError::NotConnected)
+        }
+    }
+
+    pub fn subscribe(&self, topic: &str) -> Result<(), DetClientError> {
         if let Ok(mut hdl) = self.client.lock() {
             hdl.subscribe.push(topic.to_string());
             hdl.with_client(|cl| cl.subscribe(topic, QoS::AtMostOnce))
@@ -115,65 +126,146 @@ impl DetachedMQTTClient {
     }
 
     pub fn start(&mut self) {
-        loop {
-            if let Ok(mut hdl) = self.client.lock() {
-                let (client, mut connection) = Client::new(self.options.clone(), 25);
-                hdl.client = Some(client);
+        let client = self.client.clone();
+        let options = self.options.clone();
 
-                let mut retry = false;
-                let topics = hdl.subscribe.clone();
-                for topic in topics.iter() {
-                    if let Err(e) =
-                        hdl.client
-                            .as_mut()
-                            .unwrap()
-                            .subscribe(topic, QoS::AtMostOnce)
-                    {
-                        // TODO: Write error to channel!
-                        retry = true;
+        std::thread::spawn(move || {
+            loop {
+                let mut con = None;
+
+                if let Ok(mut hdl) = client.lock() {
+                    let (client, connection) = Client::new(options.clone(), 25);
+                    hdl.client = Some(client);
+
+                    let mut retry = false;
+                    let topics = hdl.subscribe.clone();
+                    for topic in topics.iter() {
+                        if let Err(e) =
+                            hdl.client
+                                .as_mut()
+                                .unwrap()
+                                .subscribe(topic, QoS::AtMostOnce)
+                        {
+                            // TODO: Write error to channel!
+                            retry = true;
+                            break;
+                        }
+                    }
+
+                    if retry {
+                        hdl.client = None;
                         break;
                     }
+
+                    con = Some(connection);
                 }
 
-                if retry {
-                    hdl.client = None;
-                    break;
-                }
+                if let Some(mut connection) = con {
+                    // TODO: Write connected message!
 
-                // TODO: Write connected message!
-
-                for noti in connection.iter() {
-                    let noti =
-                        match noti {
-                            Err(e) => {
-                                hdl.client = None;
-                                // TODO: Write error to channel!
-                                break;
-                            },
-                            Ok(noti) => noti,
-                        };
-
-                    match noti {
-                        Event::Incoming(inc) => {
-                            match inc {
-                                Packet::Publish(pubpkt) => {
-                                    // chan.send(&VVal::pair(
-                                    //     VVal::new_str_mv(pubpkt.topic),
-                                    //     VVal::new_byt(
-                                    //         pubpkt.payload.as_ref().to_vec())));
+                    for noti in connection.iter() {
+                        let noti =
+                            match noti {
+                                Err(e) => {
+                                    // TODO: Write error to channel!
+                                    break;
                                 },
-                                _ => { },
-                            }
-                        },
-                        _ => {}
+                                Ok(noti) => noti,
+                            };
+
+                        match noti {
+                            Event::Incoming(inc) => {
+                                match inc {
+                                    Packet::Publish(pubpkt) => {
+                                        // chan.send(&VVal::pair(
+                                        //     VVal::new_str_mv(pubpkt.topic),
+                                        //     VVal::new_byt(
+                                        //         pubpkt.payload.as_ref().to_vec())));
+                                    },
+                                    _ => { },
+                                }
+                            },
+                            _ => {}
+                        }
                     }
                 }
-            }
 
-            std::thread::sleep(std::time::Duration::from_secs(5));
-        }
+                if let Ok(mut hdl) = client.lock() {
+                    hdl.client = None;
+                }
+                std::thread::sleep(std::time::Duration::from_secs(5));
+            }
+        });
     }
 }
+
+#[cfg(feature="rumqttc")]
+impl VValUserData for DetachedMQTTClient {
+    fn s(&self) -> String {
+        format!("$<DetachedMQTTClient>")
+    }
+    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
+    }
+
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv_ref();
+        match key {
+            "subscribe" => {
+                if argv.len() != 1 {
+                    return
+                        Err(StackAction::panic_str(
+                            "subscribe method expects 1 argument".to_string(),
+                            None,
+                            env.argv()))
+                }
+
+                let ret = argv[0].with_s_ref(|s| self.subscribe(s));
+                match ret {
+                    Ok(_)  => Ok(VVal::Bol(true)),
+                    Err(e) => Ok(env.new_err(format!("subscribe Error: {}", e)))
+                }
+            },
+            "publish" => {
+                if argv.len() != 2 {
+                    return
+                        Err(StackAction::panic_str(
+                            "publish method expects 2 argument".to_string(),
+                            None,
+                            env.argv()))
+                }
+
+                let ret =
+                    argv[0].with_s_ref(|topic|
+                        argv[1].with_bv_ref(|payload|
+                            self.publish(topic, payload)));
+                match ret {
+                    Ok(_)  => Ok(VVal::Bol(true)),
+                    Err(e) => Ok(env.new_err(format!("subscribe Error: {}", e)))
+                }
+            },
+            _ => {
+                Err(StackAction::panic_str(
+                    format!("unknown method called: {}", key),
+                    None,
+                    env.argv()))
+            },
+        }
+    }
+
+    fn as_thread_safe_usr(&mut self) -> Option<Box<dyn crate::threads::ThreadSafeUsr>> {
+        Some(Box::new(self.clone()))
+    }
+}
+
+#[cfg(feature="rumqttc")]
+impl crate::threads::ThreadSafeUsr for DetachedMQTTClient {
+    fn to_vval(&self) -> VVal {
+        VVal::Usr(Box::new(self.clone()))
+    }
+}
+
 
 #[cfg(feature="rumqttc")]
 #[derive(Clone)]
@@ -256,6 +348,17 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         Ok(VVal::pair(
             VVal::new_usr(VMQTTClient::new(client)),
             VVal::new_usr(VMQTTConn::new(connection))))
+    }, Some(3), Some(3), false);
+
+    #[cfg(feature="rumqttc")]
+    st.fun("mqtt:client:detached:new", |env: &mut Env, _argc: usize| {
+        let mut cl =
+            DetachedMQTTClient::new(
+                &env.arg(0).s_raw(),
+                &env.arg(1).s_raw(),
+                env.arg(2).i() as u16);
+        cl.start();
+        Ok(VVal::new_usr(cl))
     }, Some(3), Some(3), false);
 
     #[cfg(feature="rumqttc")]

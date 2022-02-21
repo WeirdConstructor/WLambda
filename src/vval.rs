@@ -1101,10 +1101,14 @@ impl Env {
             }
         };
 
-        VVal::err(
-            VVal::new_str_mv(s),
-            self.call_stack.last().unwrap().syn_pos.clone().or_else(
-                || Some(SynPos::empty())).unwrap())
+        if self.call_stack.last().is_some() {
+            VVal::err(
+                VVal::new_str_mv(s),
+                self.call_stack.last().unwrap().syn_pos.clone().or_else(
+                    || Some(SynPos::empty())).unwrap())
+        } else {
+            VVal::err(VVal::new_str_mv(s), SynPos::empty())
+        }
     }
 
     pub fn new_panic(&self, val: VVal) -> StackAction {
