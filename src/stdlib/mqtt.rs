@@ -16,6 +16,164 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 #[cfg(feature="rumqttc")]
+use std::sync::{Arc, Mutex};
+
+#[cfg(feature="rumqttc")]
+struct ThreadClientHandle {
+    client:      Option<Client>,
+    subscribe:   Vec<String>,
+}
+
+
+impl ThreadClientHandle {
+    fn with_client<F: FnMut(&mut Client) -> Result<(), rumqttc::ClientError>>(&mut self, mut fun: F) -> Result<(), DetClientError> {
+        if let Some(client) = self.client.as_mut() {
+            match fun(client) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(DetClientError::ClientError(e)),
+            }
+        } else {
+            Err(DetClientError::NotConnected)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum DetClientError {
+    NotConnected,
+    ClientError(rumqttc::ClientError),
+}
+
+impl std::fmt::Display for DetClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DetClientError::NotConnected => write!(f, "Not Connected"),
+            DetClientError::ClientError(err) =>
+                write!(f, "MQTT Client Error: {}", err),
+        }
+    }
+}
+
+
+#[cfg(feature="rumqttc")]
+#[derive(Clone)]
+struct DetachedMQTTClient {
+    id:          String,
+    broker_host: String,
+    broker_port: u16,
+    options:     MqttOptions,
+    client:      Arc<Mutex<ThreadClientHandle>>,
+}
+
+/*
+
+!client = std:mqtt:client:detached:new :myclid "localhost" 1883;
+
+client.publish "test/me" $b"foobar";
+
+!chan = client.channel;
+
+while $t {
+    !msg = chan.recv[];
+    if msg.0 == "test/me" {
+        client.publish "test/me" "next!";
+    };
+    if msg.0 == "$SYS/connect" {
+        std:displayln "Reconnected!";
+        client.publish "my/history" (std:ser:json $[1,2,3]);
+    };
+};
+
+*/
+
+impl DetachedMQTTClient {
+    pub fn new(id: &str, host: &str, port: u16) -> Self {
+        let mut options = MqttOptions::new(id, host, port);
+        options.set_keep_alive(std::time::Duration::from_secs(5));
+        Self {
+            id:             id.to_string(),
+            broker_host:    host.to_string(),
+            broker_port:    port,
+            options,
+            client: Arc::new(Mutex::new(ThreadClientHandle {
+                client:    None,
+                subscribe: vec![],
+            })),
+        }
+    }
+
+    pub fn subscribe(&mut self, topic: &str) -> Result<(), DetClientError> {
+        if let Ok(mut hdl) = self.client.lock() {
+            hdl.subscribe.push(topic.to_string());
+            hdl.with_client(|cl| cl.subscribe(topic, QoS::AtMostOnce))
+
+        } else {
+            Err(DetClientError::NotConnected)
+        }
+    }
+
+    pub fn start(&mut self) {
+        loop {
+            if let Ok(mut hdl) = self.client.lock() {
+                let (client, mut connection) = Client::new(self.options.clone(), 25);
+                hdl.client = Some(client);
+
+                let mut retry = false;
+                let topics = hdl.subscribe.clone();
+                for topic in topics.iter() {
+                    if let Err(e) =
+                        hdl.client
+                            .as_mut()
+                            .unwrap()
+                            .subscribe(topic, QoS::AtMostOnce)
+                    {
+                        // TODO: Write error to channel!
+                        retry = true;
+                        break;
+                    }
+                }
+
+                if retry {
+                    hdl.client = None;
+                    break;
+                }
+
+                // TODO: Write connected message!
+
+                for noti in connection.iter() {
+                    let noti =
+                        match noti {
+                            Err(e) => {
+                                hdl.client = None;
+                                // TODO: Write error to channel!
+                                break;
+                            },
+                            Ok(noti) => noti,
+                        };
+
+                    match noti {
+                        Event::Incoming(inc) => {
+                            match inc {
+                                Packet::Publish(pubpkt) => {
+                                    // chan.send(&VVal::pair(
+                                    //     VVal::new_str_mv(pubpkt.topic),
+                                    //     VVal::new_byt(
+                                    //         pubpkt.payload.as_ref().to_vec())));
+                                },
+                                _ => { },
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+            }
+
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        }
+    }
+}
+
+#[cfg(feature="rumqttc")]
 #[derive(Clone)]
 struct VMQTTClient {
     client: Client,
