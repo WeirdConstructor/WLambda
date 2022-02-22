@@ -8576,11 +8576,13 @@ Support for MQTT has to be explicitly compiled into WLambda by selecting the
 This function sets up an embedded MQTT broker. You can configure it's endpoints
 via the _config_. The _config_ offers following keys:
 
-    ${
-        id             = 0,                 # Broker ID
-        listen         = "0.0.0.0:1883",    # Broker server endpoint
-        console_listen = "0.0.0.0:18088",   # An extra HTTP console endpoint
-    }
+```text
+${
+    id             = 0,                 # Broker ID
+    listen         = "0.0.0.0:1883",    # Broker server endpoint
+    console_listen = "0.0.0.0:18088",   # An extra HTTP console endpoint
+}
+```
 
 The default maximum MQTT payload the broker is setup to support is 10240 bytes
 (10 kb).
