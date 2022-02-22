@@ -5460,3 +5460,66 @@ fn check_std_wlambda_parse() {
 fn check_parse_error_sym_start() {
     assert_eq!(ve(":"), "PARSE ERROR: <compiler:s_eval>:1:2 EOF while parsing: identifier\nat code:\n1   | \n");
 }
+
+#[test]
+#[cfg(feature="mqtt")]
+fn check_mqtt() {
+    assert_eq!(ve(r#"
+        !broker = std:mqtt:broker:new ${
+            listen         = "0.0.0.0:1883",
+            console_listen = "0.0.0.0:18080",
+        };
+
+        # sleep a bit until the broker is initialized:
+        std:thread:sleep :ms => 500;
+
+        !chan = std:sync:mpsc:new[];
+        !cl = std:mqtt:client:new chan "test1" "localhost" 1883;
+
+        # let it connect:
+        std:thread:sleep :ms => 200;
+
+        !_ = cl.subscribe "test/me";
+        !_ = cl.publish "test/me" $b"test123\xFF";
+
+        std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
+        std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
+        1
+    "#),
+    "1");
+}
+
+#[test]
+#[cfg(feature="mqtt")]
+fn check_mqtt_client_loop() {
+    assert_eq!(ve(r#"
+        !broker = std:mqtt:broker:new ${
+            listen         = "0.0.0.0:1883",
+            console_listen = "0.0.0.0:18080",
+        };
+
+        # sleep a bit until the broker is initialized:
+        std:thread:sleep :ms => 500;
+
+        !chan = std:sync:mpsc:new[];
+        !cl = std:mqtt:client:new chan "test1" "localhost" 1883;
+
+        # let it connect:
+        std:thread:sleep :ms => 200;
+
+        !_ = cl.subscribe "test/me";
+        !_ = cl.publish "test/me" $b"test123\xFF";
+        !_ = cl.publish "test/me" $b"quit";
+
+        !got_some_stuff = $n;
+
+        while $t {
+            match chan.recv[]
+                $p(topic, $b"quit") => { break[]; }
+                $p(topic, data)     => { .got_some_stuff = std:copy $\; }; # std:copy because $\ is changing!
+        };
+
+        $p(got_some_stuff.topic, got_some_stuff.data)
+    "#),
+    "$p(\"test/me\",$b\"test123\\xFF\")");
+}

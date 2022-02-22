@@ -1,7 +1,6 @@
 // Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
-use crate::with_first_addr;
 use crate::first_addr;
 
 #[cfg(feature="rumqttc")]
@@ -64,9 +63,6 @@ impl std::fmt::Display for DetClientError {
 #[cfg(feature="rumqttc")]
 #[derive(Clone)]
 struct DetachedMQTTClient {
-    id:          String,
-    broker_host: String,
-    broker_port: u16,
     options:     MqttOptions,
     chan:        crate::threads::AValChannel,
     client:      Arc<Mutex<ThreadClientHandle>>,
@@ -78,9 +74,6 @@ impl DetachedMQTTClient {
         let mut options = MqttOptions::new(id, host, port);
         options.set_keep_alive(std::time::Duration::from_secs(5));
         Self {
-            id:             id.to_string(),
-            broker_host:    host.to_string(),
-            broker_port:    port,
             options,
             chan,
             client: Arc::new(Mutex::new(ThreadClientHandle {
@@ -104,7 +97,7 @@ impl DetachedMQTTClient {
     pub fn subscribe(&self, topic: &str) -> Result<(), DetClientError> {
         if let Ok(mut hdl) = self.client.lock() {
             hdl.subscribe.push(topic.to_string());
-            hdl.with_client(|cl| cl.subscribe(topic, QoS::AtMostOnce))
+            hdl.with_client(|cl| cl.subscribe(topic, QoS::AtLeastOnce))
 
         } else {
             Err(DetClientError::NotConnected)
@@ -274,7 +267,7 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal>  {
 
     let mut servers = std::collections::HashMap::new();
     let listen = first_addr!(cfg.v_k("listen"), env)?;
-    let mut srv = librumqttd::ServerSettings {
+    let srv = librumqttd::ServerSettings {
         listen,
         next_connection_delay_ms: 1,
         connections: librumqttd::ConnectionSettings {
@@ -293,7 +286,7 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal>  {
 
     let cons_listen = first_addr!(cfg.v_k("console_listen"), env)?;
 
-    let mut config = Config {
+    let config = Config {
         id: cfg.v_ik("id") as usize,
         servers,
         cluster: None,
@@ -315,11 +308,11 @@ impl MQTTBroker {
 
         std::thread::spawn(move || {
             broker.start().unwrap();
+            // TODO: Log errors?!
             println!("BROKER STRATED");
         });
 
-        Ok(Self {
-        })
+        Ok(Self { })
     }
 }
 
@@ -418,7 +411,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
     #[cfg(feature="rumqttd")]
     st.fun("mqtt:broker:new", |env: &mut Env, _argc: usize| {
-        let mut config = env.arg(0);
+        let config = env.arg(0);
 
         match MQTTBroker::setup(env, config) {
             Ok(broker) => Ok(VVal::new_usr(broker)),

@@ -456,6 +456,9 @@ Smalltalk, LISP and Perl.
     - [12.8.2](#1282-stdwlambdaversion) std:wlambda:version
     - [12.8.3](#1283-stdwlambdasizes) std:wlambda:sizes
     - [12.8.4](#1284-stdwlambdaparse-string) std:wlambda:parse _string_
+  - [12.9](#129-mqtt-messaging) MQTT Messaging
+    - [12.9.1](#1291-stdmqttbrokernew-config) std:mqtt:broker:new _config_
+    - [12.9.2](#1292-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -8543,6 +8546,103 @@ Parses _string_ as if it was a piece of WLambda code and returns an abstract syn
 std:assert_str_eq
     (std:wlambda:parse "1 + 2")
     $[$%:Block,$[$%:BinOpAdd,1,2]]
+```
+
+### <a name="129-mqtt-messaging"></a>12.9 - MQTT Messaging
+
+WLambda offers an optional support for the MQTT protocol. You can setup a MQTT client
+as well as an embedded MQTT broker. The very simple integration offers you a very
+easy way to setup inter process communication between WLambda applications.
+
+Support for MQTT has to be explicitly compiled into WLambda by selecting the
+`mqtt` feature.
+
+#### <a name="1291-stdmqttbrokernew-config"></a>12.9.1 - std:mqtt:broker:new _config_
+
+This function sets up an embedded MQTT broker. You can configure it's endpoints
+via the _config_. The _config_ offers following keys:
+
+    ${
+        id             = 0,                 # Broker ID
+        listen         = "0.0.0.0:1883",    # Broker server endpoint
+        console_listen = "0.0.0.0:18088",   # An extra HTTP console endpoint
+    }
+
+The default maximum MQTT payload the broker is setup to support is 10240 bytes
+(10 kb).
+
+Here is an example:
+
+```wlambda
+!broker = std:mqtt:broker:new ${
+    listen         = "0.0.0.0:1883",
+    console_listen = "0.0.0.0:18080",
+};
+
+# sleep a bit until the broker is initialized:
+std:thread:sleep :ms => 500;
+
+!chan = std:sync:mpsc:new[];
+!cl = std:mqtt:client:new chan "test1" "localhost" 1883;
+
+# let it connect:
+std:thread:sleep :ms => 200;
+
+!_ = cl.subscribe "test/me";
+!_ = cl.publish "test/me" $b"test123\xFF";
+
+std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
+std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
+```
+
+#### <a name="1292-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.9.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
+
+This sets up a MQTT client that connects to the given _broker-host_ and _broker-port_.
+It will connect and reconnect upon connection failure in the background automatically
+for you. So you don't have to manage the connection yourself.
+
+The _client-id_ should be a unique ID to identify your MQTT client.
+
+The _channel_ must be a `std:sync:mpsc` channel that you can create using `std:sync:mpsc:new`.
+It's the source of incoming messages and connection control information.
+It will send you following possible message data:
+
+- `$p(:"$WL/connected", $n)`    - When the client connection was setup
+- `$p(:"$WL/error", "some message here...")` - When an error occurred in the connection handling.
+- `$p(topic, payload_bytes)` - An incoming MQTT message that belongs to the _topic_.
+
+Here is an example of a common client setup:
+
+```wlambda
+!broker = std:mqtt:broker:new ${
+    listen         = "0.0.0.0:1883",
+    console_listen = "0.0.0.0:18080",
+};
+
+# sleep a bit until the broker is initialized:
+std:thread:sleep :ms => 500;
+
+!chan = std:sync:mpsc:new[];
+!cl = std:mqtt:client:new chan "test1" "localhost" 1883;
+
+# let it connect:
+std:thread:sleep :ms => 200;
+
+!_ = cl.subscribe "test/me";
+!_ = cl.publish "test/me" $b"test";
+!_ = cl.publish "test/me" $b"quit";
+
+!got_some_stuff = $n;
+
+while $t {
+    !msg = chan.recv[];
+    match msg
+        $p(topic, $b"quit") => { break[]; }
+        $p(topic, data)     => { .got_some_stuff = std:copy $\; }; # std:copy because $\ is changing!
+};
+
+std:assert_eq got_some_stuff.topic "test/me";
+std:assert_eq got_some_stuff.data  $b"test";
 ```
 
 ## <a name="13-wlambda-lexical-syntax-and-grammar"></a>13 - WLambda Lexical Syntax and Grammar

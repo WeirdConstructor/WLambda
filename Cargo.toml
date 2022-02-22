@@ -16,6 +16,7 @@ default = [
     "rustyline", "regex", "chrono", "serde", "serde_json",
     "rmp-serde", "quick-xml", "socket2", "base64"
 ]
+mqtt = ["rumqttd", "rumqttc"]
 
 [dependencies]
 fnv        = "1.0.7"
