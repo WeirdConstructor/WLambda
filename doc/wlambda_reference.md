@@ -459,6 +459,8 @@ Smalltalk, LISP and Perl.
   - [12.9](#129-mqtt-messaging) MQTT Messaging
     - [12.9.1](#1291-stdmqttbrokernew-config) std:mqtt:broker:new _config_
     - [12.9.2](#1292-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
+      - [12.9.2.1](#12921-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
+      - [12.9.2.2](#12922-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -8603,6 +8605,8 @@ This sets up a MQTT client that connects to the given _broker-host_ and _broker-
 It will connect and reconnect upon connection failure in the background automatically
 for you. So you don't have to manage the connection yourself.
 
+This function returns a client handle that is describe a little bit further below.
+
 The _client-id_ should be a unique ID to identify your MQTT client.
 
 The _channel_ must be a `std:sync:mpsc` channel that you can create using `std:sync:mpsc:new`.
@@ -8646,6 +8650,19 @@ while $t {
 std:assert_eq got_some_stuff.topic "test/me";
 std:assert_eq got_some_stuff.data  $b"test";
 ```
+
+The returned client handle understands the following methods:
+
+##### <a name="12921-mqttclientpublish-topic-string-payload-bytes"></a>12.9.2.1 - mqtt\_client.publish _topic-string_ _payload-bytes_
+
+Publishes the _payload-bytes_ under the _topic-string_. Returns an error
+if something went wrong (client not connected, or some other error). It might
+block.
+
+##### <a name="12922-mqttclientsubscribe-topic-string"></a>12.9.2.2 - mqtt\_client.subscribe _topic-string_
+
+Subscribes to the _topic-string_. Returns an error if something went wrong.
+It might block.
 
 ## <a name="13-wlambda-lexical-syntax-and-grammar"></a>13 - WLambda Lexical Syntax and Grammar
 
