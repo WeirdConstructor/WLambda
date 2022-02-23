@@ -17,6 +17,8 @@ default = [
     "rmp-serde", "quick-xml", "socket2", "base64"
 ]
 mqtt = ["rumqttd", "rumqttc"]
+http = ["reqwest"]
+all = ["mqtt", "http"]
 
 [dependencies]
 fnv        = "1.0.7"

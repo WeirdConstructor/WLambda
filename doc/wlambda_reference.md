@@ -456,11 +456,14 @@ Smalltalk, LISP and Perl.
     - [12.8.2](#1282-stdwlambdaversion) std:wlambda:version
     - [12.8.3](#1283-stdwlambdasizes) std:wlambda:sizes
     - [12.8.4](#1284-stdwlambdaparse-string) std:wlambda:parse _string_
-  - [12.9](#129-mqtt-messaging) MQTT Messaging
-    - [12.9.1](#1291-stdmqttbrokernew-config) std:mqtt:broker:new _config_
-    - [12.9.2](#1292-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
-      - [12.9.2.1](#12921-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
-      - [12.9.2.2](#12922-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
+  - [12.9](#129-http-client) HTTP Client
+    - [12.9.1](#1291-stdhttpclientnew) std:http:client:new
+    - [12.9.2](#1292-stdhttpget-http-client-url-string-headers-map) std:http:get _http-client_ _url-string_ [_headers-map_]
+  - [12.10](#1210-mqtt-messaging) MQTT Messaging
+    - [12.10.1](#12101-stdmqttbrokernew-config) std:mqtt:broker:new _config_
+    - [12.10.2](#12102-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
+      - [12.10.2.1](#121021-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
+      - [12.10.2.2](#121022-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -8550,7 +8553,60 @@ std:assert_str_eq
     $[$%:Block,$[$%:BinOpAdd,1,2]]
 ```
 
-### <a name="129-mqtt-messaging"></a>12.9 - MQTT Messaging
+### <a name="129-http-client"></a>12.9 - HTTP Client
+
+WLambda offers an optional integrated HTTP client by enabling the `reqwest`
+feature at compile time. With this you can create a new client using `std:http:client:new`
+and make HTTP requests using `std:http:get`.
+
+#### <a name="1291-stdhttpclientnew"></a>12.9.1 - std:http:client:new
+
+Creates a new HTTP client instance and returns it. You can use it to make
+HTTP requests afterwards.
+
+```wlambda
+!client = std:http:client:new[];
+!response = std:http:get client "https://duckduckgo.com/";
+
+!body = std:str:from_utf8_lossy response.body;
+std:assert ($p(0, "</html>") body) > 0;
+std:assert_eq response.status 200;
+std:assert_eq response.headers.content-type "text/html; charset=UTF-8";
+```
+
+See also `std:http:get` for a more elaborate example with providing headers.
+
+#### <a name="1292-stdhttpget-http-client-url-string-headers-map"></a>12.9.2 - std:http:get _http-client_ _url-string_ [_headers-map_]
+
+Performs a HTTP GET request to the given _url-string_ using the _http-client_.
+You can optionally provide a _headers-map_. The client will return
+a response map with following keys:
+
+- `status` contains the HTTP response code (usually `200` if everything went fine).
+- `body` contains the byte vector with the body data.
+- `headers` contains a map of all headers, where the keys are the lower case
+header names.
+
+Here is an example on how to use this while providing HTTP Headers:
+
+```wlambda
+!client = std:http:client:new[];
+!response =
+    std:http:get client "https://crates.io/api/v1/crates?page=1&per_page=10&q=wlambda" ${
+        Accept        = "application/json",
+        Cache-Control = "no-cache",
+        DNT           = 1,
+        User-Agent    = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:97.0) Gecko/20100101 Firefox/97.0",
+    };
+
+!body = std:deser:json ~ std:str:from_utf8_lossy response.body;
+# std:displayln ~ std:ser:json body $f;
+std:assert_eq body.crates.0.name            "wlambda";
+std:assert_eq response.headers.content-type "application/json; charset=utf-8";
+std:assert_eq response.status               200;
+```
+
+### <a name="1210-mqtt-messaging"></a>12.10 - MQTT Messaging
 
 WLambda offers an optional support for the MQTT protocol. You can setup a MQTT client
 as well as an embedded MQTT broker. The very simple integration offers you a very
@@ -8559,7 +8615,7 @@ easy way to setup inter process communication between WLambda applications.
 Support for MQTT has to be explicitly compiled into WLambda by selecting the
 `mqtt` feature.
 
-#### <a name="1291-stdmqttbrokernew-config"></a>12.9.1 - std:mqtt:broker:new _config_
+#### <a name="12101-stdmqttbrokernew-config"></a>12.10.1 - std:mqtt:broker:new _config_
 
 This function sets up an embedded MQTT broker. You can configure it's endpoints
 via the _config_. The _config_ offers following keys:
@@ -8599,7 +8655,7 @@ std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
 std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
 ```
 
-#### <a name="1292-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.9.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
+#### <a name="12102-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.10.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
 
 This sets up a MQTT client that connects to the given _broker-host_ and _broker-port_.
 It will connect and reconnect upon connection failure in the background automatically
@@ -8653,13 +8709,13 @@ std:assert_eq got_some_stuff.data  $b"test";
 
 The returned client handle understands the following methods:
 
-##### <a name="12921-mqttclientpublish-topic-string-payload-bytes"></a>12.9.2.1 - mqtt\_client.publish _topic-string_ _payload-bytes_
+##### <a name="121021-mqttclientpublish-topic-string-payload-bytes"></a>12.10.2.1 - mqtt\_client.publish _topic-string_ _payload-bytes_
 
 Publishes the _payload-bytes_ under the _topic-string_. Returns an error
 if something went wrong (client not connected, or some other error). It might
 block.
 
-##### <a name="12922-mqttclientsubscribe-topic-string"></a>12.9.2.2 - mqtt\_client.subscribe _topic-string_
+##### <a name="121022-mqttclientsubscribe-topic-string"></a>12.10.2.2 - mqtt\_client.subscribe _topic-string_
 
 Subscribes to the _topic-string_. Returns an error if something went wrong.
 It might block.

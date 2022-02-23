@@ -108,7 +108,8 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                         for (key, value) in resp.headers().iter() {
                             let res =
                                 if let Ok(s) = value.to_str() {
-                                    headers.set_key_str(key.as_str(), VVal::new_str(s))
+                                    headers.set_key_str(
+                                        key.as_str(), VVal::new_str(s))
                                 } else {
                                     headers.set_key_str(
                                         key.as_str(),
@@ -131,7 +132,6 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                                     format!("HTTP Body Error: {}", e)))
                             },
                             Ok(body) => {
-
                                 Ok(VVal::map3(
                                     "body",    VVal::new_byt(body.as_ref().to_vec()),
                                     "status",  VVal::Int(status.as_u16() as i64),

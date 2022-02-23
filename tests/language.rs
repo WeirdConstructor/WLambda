@@ -1,3 +1,6 @@
+// Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
+// This is a part of WLambda. See README.md and COPYING for details.
+
 use wlambda::*;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -5523,3 +5526,38 @@ fn check_mqtt_client_loop() {
     "#),
     "$p(\"test/me\",$b\"test123\\xFF\")");
 }
+
+#[test]
+#[cfg(feature="http")]
+fn check_http_get() {
+    assert_eq!(ve(r#"
+        (std:thread:spawn $code{
+            _READY.send $t;
+
+            unwrap ~ std:net:tcp:listen "0.0.0.0:9292" {!(socket) = @;
+                !buf = $b"";
+                !done = $f;
+                while not[done] {
+                    match std:io:read_some[socket]
+                        $o(buf) => { .buf = buf +> $\.buf; std:displayln "BUF" buf; }
+                        $o()    => { .done = $t; }
+                        ($e _)  => { .done = $t; };
+                    if buf &> $r%GET\ \/\ HTTP\/1.1% {
+                        .done = $t;
+                    };
+                };
+
+                std:io:write socket "HTTP/1.1 200 OK\r\n\r\nTest 123";
+            };
+        }).recv_ready[];
+
+        !client = std:http:client:new[];
+        !response = std:http:get client "http://127.0.0.1:9292";
+
+        !body = std:str:from_utf8_lossy response.body;
+        std:assert_eq response.status 200;
+        body
+    "#),
+    "\"Test 123\"");
+}
+

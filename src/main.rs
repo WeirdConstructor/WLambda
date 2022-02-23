@@ -106,12 +106,12 @@ impl Doc {
     }
 }
 
-#[cfg(feature="reqwest")]
+#[cfg(feature="serde_json")]
 fn get_doc() -> VVal {
     VVal::from_json(DOCUMENTATION_JSON).unwrap()
 }
 
-#[cfg(not(feature="reqwest"))]
+#[cfg(not(feature="serde_json"))]
 fn get_doc() -> VVal {
     VVal::None
 }

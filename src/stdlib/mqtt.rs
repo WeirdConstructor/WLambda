@@ -1,6 +1,7 @@
 // Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
+#[cfg(feature="rumqttd")]
 use crate::first_addr;
 
 #[cfg(feature="rumqttc")]

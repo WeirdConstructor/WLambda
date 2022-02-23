@@ -42,6 +42,21 @@ made of [VVal](https://docs.rs/wlambda/newest/wlambda/vval/index.html) nodes.
 
 Here you can find the [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 
+## Compiling WLambda
+
+If you want to compile WLambda with all features enabled you need
+to run:
+
+```
+    cargo build --features mqtt,http
+```
+
+or just:
+
+```
+    cargo build --features all
+```
+
 ## API Hello World
 
 ```rust
@@ -515,10 +530,10 @@ assert_eq!(r.s(), "42");
 Current remaining goals for WLambda are:
 
 - Fix remaining bugs.
-- Add missing standard library functions without dragging in more
+- DONE: Add missing standard library functions without dragging in more
 dependencies.
 - Improve and further document the VVal API for interacting with WLambda.
-- Improve [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) documentation.
+- DONE: Improve [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference) documentation.
 - DONE: Complete function reference documentation in [WLambda Language Reference](https://docs.rs/wlambda/newest/wlambda/prelude/index.html#wlambda-reference).
 - DONE: Add proper module support (via `!@import` and `!@export`).
 - DONE: Add prototyped inheritance for OOP paradigm.
