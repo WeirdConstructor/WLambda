@@ -473,6 +473,7 @@ Smalltalk, LISP and Perl.
   - [12.9](#129-http-client) HTTP Client
     - [12.9.1](#1291-stdhttpclientnew) std:http:client:new
     - [12.9.2](#1292-stdhttpget-http-client-url-string-headers-map) std:http:get _http-client_ _url-string_ [_headers-map_]
+    - [12.9.3](#1293-stdhttprequest-http-client-method-string-url-string-body-headers-and-options-map) std:http:request _http-client_ _method-string_ _url-string_ [_body_ [_headers-and-options-map_]]
   - [12.10](#1210-mqtt-messaging) MQTT Messaging
     - [12.10.1](#12101-stdmqttbrokernew-config) std:mqtt:broker:new _config_
     - [12.10.2](#12102-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
@@ -8619,6 +8620,17 @@ std:assert_eq body.crates.0.name            "wlambda";
 std:assert_eq response.headers.content-type "application/json; charset=utf-8";
 std:assert_eq response.status               200;
 ```
+
+#### <a name="1293-stdhttprequest-http-client-method-string-url-string-body-headers-and-options-map"></a>12.9.3 - std:http:request _http-client_ _method-string_ _url-string_ [_body_ [_headers-and-options-map_]]
+
+The _headers-and-options-map_ can contain following special keys apart from the
+headers themself:
+
+- `@basic-auth` with `$[user, $none]` or `$[user, password]` as value.
+- `@bearer-auth` with `token` as value.
+- `@timeout` with a timeout duration as value. (See also `std:thread:sleep`).
+- `@query` with a map of query parameters and their values to modify the
+query string of the _url-string_. This properly encodes the strings.
 
 ### <a name="1210-mqtt-messaging"></a>12.10 - MQTT Messaging
 

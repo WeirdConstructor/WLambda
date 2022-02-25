@@ -9895,6 +9895,21 @@
     ]
   ],
   [
+    "12.9.3 - std:http:request _http-client_ _method-string_ _url-string_ [_body_ [_headers-and-options-map_]]",
+    [
+      "",
+      "The _headers-and-options-map_ can contain following special keys apart from the",
+      "headers themself:",
+      "",
+      "- `@basic-auth` with `$[user, $none]` or `$[user, password]` as value.",
+      "- `@bearer-auth` with `token` as value.",
+      "- `@timeout` with a timeout duration as value. (See also `std:thread:sleep`).",
+      "- `@query` with a map of query parameters and their values to modify the",
+      "query string of the _url-string_. This properly encodes the strings.",
+      ""
+    ]
+  ],
+  [
     "12.10 - MQTT Messaging",
     [
       "",

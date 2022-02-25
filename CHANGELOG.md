@@ -6,6 +6,7 @@ communication across WLambda applications. See that you compile in the
 `mqtt` feature and check out `std:mqtt:broker:new` and `std:mqtt:client:new`.
 * **Feature:** (Optional) HTTP Client API that supports GET for now. See
 `std:http:client:new` and `std:http:get`.
+And also `std:http:post` and `std:http:request`.
 * **Feature:** The LocalFileModuleResolver now does keep around the
 loaded symbol table and does not re-evaluate the module source on every
 import. This makes it possible to define global stuff inside the modules

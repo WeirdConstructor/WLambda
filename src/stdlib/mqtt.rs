@@ -326,6 +326,34 @@ impl VValUserData for MQTTBroker {
     fn clone_ud(&self) -> Box<dyn VValUserData> {
         Box::new(self.clone())
     }
+
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv_ref();
+        match key {
+            "get_link" => {
+                if argv.len() != 0 {
+                    return
+                        Err(StackAction::panic_str(
+                            "link method expects no argument".to_string(),
+                            None,
+                            env.argv()))
+                }
+
+//                let ret = argv[0].with_s_ref(|s| self.link.clone()(s));
+//                match ret {
+//                    Ok(_)  => Ok(VVal::Bol(true)),
+//                    Err(e) => Ok(env.new_err(format!("subscribe Error: {}", e)))
+//                }
+                Ok(VVal::None)
+            },
+            _ => {
+                Err(StackAction::panic_str(
+                    format!("unknown method called: {}", key),
+                    None,
+                    env.argv()))
+            },
+        }
+    }
 }
 
 //#[cfg(feature="rumqttd")]
@@ -426,8 +454,8 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
 !chan = std:sync:mpsc:new[];
 
-!broker = std:mqtt:broker:new ${ ... config here ... };
-!link = broker.link chan;
+!broker = std:mqtt:broker:new ${ ... config here ..., link = "client_id" };
+!link = broker.get_link[];
 link.subscribe "test/me";
 link.publish "test/me" $b"payload";
 
