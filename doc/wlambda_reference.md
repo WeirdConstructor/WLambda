@@ -8612,8 +8612,8 @@ std:assert_eq response.status               200;
 The _headers-and-options-map_ can contain following special keys apart from the
 headers themself:
 
-- `@basic-auth` with `$[user, $none]` or `$[user, password]` as value.
-- `@bearer-auth` with `token` as value.
+- `@basic_auth` with `$[user, $none]` or `$[user, password]` as value.
+- `@bearer_auth` with `token` as value.
 - `@timeout` with a timeout duration as value. (See also `std:thread:sleep`).
 - `@query` with a map of query parameters and their values to modify the
 query string of the _url-string_. This properly encodes the strings.

@@ -5608,12 +5608,12 @@ fn check_http_get() {
         (std:thread:spawn $code{
             _READY.send $t;
 
-            unwrap ~ std:net:tcp:listen "0.0.0.0:9292" {!(socket) = @;
+            unwrap ~ std:net:tcp:listen "0.0.0.0:9291" {!(socket) = @;
                 !buf = $b"";
                 !done = $f;
                 while not[done] {
                     match std:io:read_some[socket]
-                        $o(buf) => { .buf = buf +> $\.buf; std:displayln "BUF" buf; }
+                        $o(buf) => { .buf = buf +> $\.buf; }
                         $o()    => { .done = $t; }
                         ($e _)  => { .done = $t; };
                     if buf &> $r%GET\ \/\ HTTP\/1.1% {
@@ -5626,7 +5626,7 @@ fn check_http_get() {
         }).recv_ready[];
 
         !client = std:http:client:new[];
-        !response = std:http:get client "http://127.0.0.1:9292";
+        !response = std:http:get client "http://127.0.0.1:9291";
 
         !body = std:str:from_utf8_lossy response.body;
         std:assert_eq response.status 200;
@@ -5635,3 +5635,141 @@ fn check_http_get() {
     "\"Test 123\"");
 }
 
+
+#[test]
+#[cfg(feature="http")]
+fn check_http_post() {
+    assert_eq!(ve(r#"
+        (std:thread:spawn $code{
+            _READY.send $t;
+
+            unwrap ~ std:net:tcp:listen "0.0.0.0:9292" {!(socket) = @;
+                !buf = $b"";
+                !done = $f;
+                while not[done] {
+                    match std:io:read_some[socket]
+                        $o(buf) => { .buf = buf +> $\.buf; }
+                        $o()    => { .done = $t; }
+                        ($e _)  => { .done = $t; };
+                    if buf &> $r%XXX% {
+                        .done = $t;
+                    };
+                };
+
+                std:io:write socket ("HTTP/1.1 200 OK\r\n\r\nTest 567" buf);
+            };
+        }).recv_ready[];
+
+        !client = std:http:client:new[];
+        !response = std:http:post client "http://127.0.0.1:9292" "XXX";
+
+        !body = std:str:from_utf8_lossy response.body;
+        std:assert_eq response.status 200;
+        body
+    "#),
+    "\"Test 567POST / HTTP/1.1\\r\\ncontent-length: 3\\r\\naccept: */*\\r\\nhost: 127.0.0.1:9292\\r\\n\\r\\nXXX\"");
+}
+
+
+#[test]
+#[cfg(feature="http")]
+fn check_http_request() {
+    assert_eq!(ve(r#"
+        (std:thread:spawn $code{
+            _READY.send $t;
+
+            unwrap ~ std:net:tcp:listen "0.0.0.0:9295" {!(socket) = @;
+                !buf = $b"";
+                !done = $f;
+                while not[done] {
+                    match std:io:read_some[socket]
+                        $o(buf) => { .buf = buf +> $\.buf; }
+                        $o()    => { .done = $t; }
+                        ($e _)  => { .done = $t; };
+                    if buf &> $r%YYY% {
+                        .done = $t;
+                    };
+                };
+
+                std:io:write socket ("HTTP/1.1 200 OK\r\n\r\nTest 567" buf);
+            };
+        }).recv_ready[];
+
+        !client = std:http:client:new[];
+        !response = std:http:request client :PUT "http://127.0.0.1:9295" "YYY" ${
+            @basic_auth  = $["USER", "PW"],
+            @query = ${
+                fo = "foo/?&BAR",
+            },
+        };
+
+        !body = std:str:from_utf8_lossy response.body;
+        std:assert_eq response.status 200;
+        body
+    "#),
+    "\"Test 567PUT /?fo=foo%2F%3F%26BAR HTTP/1.1\\r\\nauthorization: Basic VVNFUjpQVw==\\r\\ncontent-length: 3\\r\\naccept: */*\\r\\nhost: 127.0.0.1:9295\\r\\n\\r\\nYYY\"");
+
+    assert_eq!(ve(r#"
+        (std:thread:spawn $code{
+            _READY.send $t;
+
+            unwrap ~ std:net:tcp:listen "0.0.0.0:9299" {!(socket) = @;
+                !buf = $b"";
+                !done = $f;
+                while not[done] {
+                    match std:io:read_some[socket]
+                        $o(buf) => { .buf = buf +> $\.buf; }
+                        $o()    => { .done = $t; }
+                        ($e _)  => { .done = $t; };
+                    if buf &> $r%YYY% {
+                        .done = $t;
+                    };
+                };
+
+                std:io:write socket ("HTTP/1.1 200 OK\r\n\r\nTest 567" buf);
+            };
+        }).recv_ready[];
+
+        !client = std:http:client:new[];
+        !response = std:http:request client :PUT "http://127.0.0.1:9299" "YYY" ${
+            @bearer_auth = "TOKEN",
+        };
+
+        !body = std:str:from_utf8_lossy response.body;
+        std:assert_eq response.status 200;
+        body
+    "#),
+    "\"Test 567PUT / HTTP/1.1\\r\\nauthorization: Bearer TOKEN\\r\\ncontent-length: 3\\r\\naccept: */*\\r\\nhost: 127.0.0.1:9299\\r\\n\\r\\nYYY\"");
+
+    assert_eq!(ve(r#"
+        (std:thread:spawn $code{
+            _READY.send $t;
+
+            unwrap ~ std:net:tcp:listen "0.0.0.0:9294" {!(socket) = @;
+                !buf = $b"";
+                !done = $f;
+                while not[done] {
+                    match std:io:read_some[socket]
+                        $o(buf) => { .buf = buf +> $\.buf; }
+                        $o()    => { .done = $t; }
+                        ($e _)  => { .done = $t; };
+                    if buf &> $r%YYY% {
+                        .done = $t;
+                    };
+                };
+
+                std:io:write socket ("HTTP/1.1 200 OK\r\n\r\nTest 567" buf);
+            };
+        }).recv_ready[];
+
+        !client = std:http:client:new[];
+        !response = std:http:request client :PUT "http://127.0.0.1:9294" "YYY" ${
+            XXX = 123,
+        };
+
+        !body = std:str:from_utf8_lossy response.body;
+        std:assert_eq response.status 200;
+        body
+    "#),
+    "\"Test 567PUT / HTTP/1.1\\r\\nxxx: 123\\r\\ncontent-length: 3\\r\\naccept: */*\\r\\nhost: 127.0.0.1:9294\\r\\n\\r\\nYYY\"");
+}

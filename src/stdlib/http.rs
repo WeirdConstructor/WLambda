@@ -68,7 +68,7 @@ impl VHttpClient {
 
                 if name.starts_with("@") {
                     match &name.as_str()[..] {
-                        "@basic-auth" => {
+                        "@basic_auth" => {
                             let user = v.v_s_raw(0);
 
                             let mut password = None;
@@ -93,8 +93,11 @@ impl VHttpClient {
                                 let name = k.unwrap_or(VVal::None);
                                 rq_build =
                                     name.with_s_ref(|name|
-                                        v.with_s_ref(|value|
-                                            rq_build.query(&[name, value])));
+                                        v.with_s_ref(|value| {
+                                            println!("PAIR {} {}", name, value);
+                                            rq_build.query(&[[name, value]])
+
+                                            }));
                             }
                         },
                         _ => {
