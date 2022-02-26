@@ -472,10 +472,12 @@ Smalltalk, LISP and Perl.
     - [12.8.4](#1284-stdwlambdaparse-string) std:wlambda:parse _string_
   - [12.9](#129-http-client) HTTP Client
     - [12.9.1](#1291-stdhttpclientnew) std:http:client:new
-    - [12.9.2](#1292-stdhttpget-http-client-url-string-headers-map) std:http:get _http-client_ _url-string_ [_headers-map_]
-    - [12.9.3](#1293-stdhttprequest-http-client-method-string-url-string-body-headers-and-options-map) std:http:request _http-client_ _method-string_ _url-string_ [_body_ [_headers-and-options-map_]]
+    - [12.9.2](#1292-stdhttpget-http-client-url-string-headers-and-options-map) std:http:get _http-client_ _url-string_ [_headers-and-options-map_]
+    - [12.9.3](#1293-stdhttppost-http-client-url-string-body-bytes-headers-and-options-map) std:http:post _http-client_ _url-string_ _body-bytes_ [_headers-and-options-map_]
+    - [12.9.4](#1294-stdhttprequest-http-client-method-string-url-string-body-bytes-headers-and-options-map) std:http:request _http-client_ _method-string_ _url-string_ [_body-bytes_ [_headers-and-options-map_]]
   - [12.10](#1210-mqtt-messaging) MQTT Messaging
     - [12.10.1](#12101-stdmqttbrokernew-config) std:mqtt:broker:new _config_
+      - [12.10.1.1](#121011-brokerpublish-topic-string-payload-bytes) broker.publish _topic-string_ _payload-bytes_
     - [12.10.2](#12102-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
       - [12.10.2.1](#121021-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
       - [12.10.2.2](#121022-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
@@ -8571,8 +8573,8 @@ std:assert_str_eq
 ### <a name="129-http-client"></a>12.9 - HTTP Client
 
 WLambda offers an optional integrated HTTP client by enabling the `reqwest`
-feature at compile time. With this you can create a new client using `std:http:client:new`
-and make HTTP requests using `std:http:get`.
+feature at compile time. With this you can create a new client using `std:http:client:new` and make HTTP requests using `std:http:get`, `std:http:post` and `std:http:request`. Also support for basic authentication and token based bearer authentication
+is there.
 
 #### <a name="1291-stdhttpclientnew"></a>12.9.1 - std:http:client:new
 
@@ -8591,13 +8593,22 @@ std:assert_eq response.headers.content-type "text/html; charset=UTF-8";
 
 See also `std:http:get` for a more elaborate example with providing headers.
 
-#### <a name="1292-stdhttpget-http-client-url-string-headers-map"></a>12.9.2 - std:http:get _http-client_ _url-string_ [_headers-map_]
+#### <a name="1292-stdhttpget-http-client-url-string-headers-and-options-map"></a>12.9.2 - std:http:get _http-client_ _url-string_ [_headers-and-options-map_]
 
 Performs a HTTP GET request to the given _url-string_ using the _http-client_.
-You can optionally provide a _headers-map_. The client will return
-a response map with following keys:
+The _headers-and-options-map_ can contain following special keys apart from your
+custom HTTP headers themself:
+
+- `@basic_auth` with `$[user, $none]` or `$[user, password]` as value.
+- `@bearer_auth` with `token` as value.
+- `@timeout` with a timeout duration as value. (See also `std:thread:sleep`).
+- `@query` with a map of query parameters and their values to modify the
+query string of the _url-string_. This properly encodes the strings.
+
+The client will either return an error or a response map with following keys:
 
 - `status` contains the HTTP response code (usually `200` if everything went fine).
+- `reason` contains a human readable canonical reason string for the status.
 - `body` contains the byte vector with the body data.
 - `headers` contains a map of all headers, where the keys are the lower case
 header names.
@@ -8621,16 +8632,60 @@ std:assert_eq response.headers.content-type "application/json; charset=utf-8";
 std:assert_eq response.status               200;
 ```
 
-#### <a name="1293-stdhttprequest-http-client-method-string-url-string-body-headers-and-options-map"></a>12.9.3 - std:http:request _http-client_ _method-string_ _url-string_ [_body_ [_headers-and-options-map_]]
+#### <a name="1293-stdhttppost-http-client-url-string-body-bytes-headers-and-options-map"></a>12.9.3 - std:http:post _http-client_ _url-string_ _body-bytes_ [_headers-and-options-map_]
 
-The _headers-and-options-map_ can contain following special keys apart from the
-headers themself:
+This call is like `std:http:get` but makes a HTTP POST request with the given payload _body_. For HTTP requests with other methods please look at `std:http:request`. The rest of the options are the same as `std:http:get`. But here is an example how to
+transmit a piece of JSON easily:
 
-- `@basic-auth` with `$[user, $none]` or `$[user, password]` as value.
-- `@bearer-auth` with `token` as value.
-- `@timeout` with a timeout duration as value. (See also `std:thread:sleep`).
-- `@query` with a map of query parameters and their values to modify the
-query string of the _url-string_. This properly encodes the strings.
+```wlambda
+!client = std:http:client:new[];
+!response =
+    std:http:post client "http://httpbin.org/post"
+        (std:str:to_bytes ~ std:ser:json $[
+            :x => 10,
+            ${ y = 20 },
+        ]);
+
+!body = std:deser:json ~ std:str:from_utf8_lossy response.body;
+
+std:assert_eq body.url "http://httpbin.org/post";
+std:assert_str_eq body.json  $[ $["x", 10], ${ y = 20 } ];
+std:assert_eq response.status 200;
+```
+
+#### <a name="1294-stdhttprequest-http-client-method-string-url-string-body-bytes-headers-and-options-map"></a>12.9.4 - std:http:request _http-client_ _method-string_ _url-string_ [_body-bytes_ [_headers-and-options-map_]]
+
+This call is like `std:http:post` but makes HTTP requests with an almost
+arbitrary method with the optional given payload _body_. The rest of the
+options are the same as `std:http:get`.
+
+
+```wlambda
+!client = std:http:client:new[];
+!response =
+    std:http:request client :GET "http://httpbin.org/get";
+
+!body = std:deser:json ~ std:str:from_utf8_lossy response.body;
+std:assert_eq body.url "http://httpbin.org/get";
+```
+
+Or a POST request:
+
+```wlambda
+!client = std:http:client:new[];
+!response =
+    std:http:request client :POST "http://httpbin.org/post"
+        (std:str:to_bytes ~ std:ser:json $[
+            :x => 10,
+            ${ y = 20 },
+        ]);
+
+!body = std:deser:json ~ std:str:from_utf8_lossy response.body;
+
+std:assert_eq body.url "http://httpbin.org/post";
+std:assert_str_eq body.json  $[ $["x", 10], ${ y = 20 } ];
+std:assert_eq response.status 200;
+```
 
 ### <a name="1210-mqtt-messaging"></a>12.10 - MQTT Messaging
 
@@ -8643,14 +8698,23 @@ Support for MQTT has to be explicitly compiled into WLambda by selecting the
 
 #### <a name="12101-stdmqttbrokernew-config"></a>12.10.1 - std:mqtt:broker:new _config_
 
-This function sets up an embedded MQTT broker. You can configure it's endpoints
-via the _config_. The _config_ offers following keys:
+This function sets up an embedded MQTT broker. A handle is returned that you can use
+to publish messages using the locally connected client link.
+You can configure it's endpoints via the _config_.
+The _config_ offers following keys:
 
 ```text
 ${
     id             = 0,                 # Broker ID
     listen         = "0.0.0.0:1883",    # Broker server endpoint
     console_listen = "0.0.0.0:18088",   # An extra HTTP console endpoint
+    link = ${                           # Configure the local link
+        client_id = "some_id",          # Link client ID, default is 'wl_local'
+        recv = <std:sync:mpsc channel>, # Channel to receive messages for the
+                                        # subscribed topics.
+        # Topics to subscribe to, if not given, '#' will be used:
+        topics = $["test/me", "another/topic", ...]
+    },
 }
 ```
 
@@ -8680,6 +8744,12 @@ std:thread:sleep :ms => 200;
 std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
 std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
 ```
+
+##### <a name="121011-brokerpublish-topic-string-payload-bytes"></a>12.10.1.1 - broker.publish _topic-string_ _payload-bytes_
+
+Publishes the _payload-bytes_ under the _topic-string_. Returns an error
+if something went wrong (client not connected, or some other error). It might
+block.
 
 #### <a name="12102-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.10.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
 
