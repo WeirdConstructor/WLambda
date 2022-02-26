@@ -91,7 +91,6 @@ impl VHttpClient {
                         "@query" => {
                             for (v, k) in v.iter() {
                                 let name = k.unwrap_or(VVal::None);
-                                let value = v.s_raw();
                                 rq_build =
                                     name.with_s_ref(|name|
                                         v.with_s_ref(|value|

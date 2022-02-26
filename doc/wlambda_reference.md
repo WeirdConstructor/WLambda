@@ -8629,14 +8629,23 @@ Support for MQTT has to be explicitly compiled into WLambda by selecting the
 
 #### <a name="12101-stdmqttbrokernew-config"></a>12.10.1 - std:mqtt:broker:new _config_
 
-This function sets up an embedded MQTT broker. You can configure it's endpoints
-via the _config_. The _config_ offers following keys:
+This function sets up an embedded MQTT broker. A handle is returned that you can use
+to publish messages using the locally connected client link.
+You can configure it's endpoints via the _config_.
+The _config_ offers following keys:
 
 ```text
 ${
     id             = 0,                 # Broker ID
     listen         = "0.0.0.0:1883",    # Broker server endpoint
     console_listen = "0.0.0.0:18088",   # An extra HTTP console endpoint
+    link = ${                           # Configure the local link
+        client_id = "some_id",          # Link client ID, default is 'wl_local'
+        recv = <std:sync:mpsc channel>, # Channel to receive messages for the
+                                        # subscribed topics.
+        # Topics to subscribe to, if not given, '#' will be used:
+        topics = $["test/me", "another/topic", ...]
+    },
 }
 ```
 
@@ -8666,6 +8675,12 @@ std:thread:sleep :ms => 200;
 std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
 std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
 ```
+
+##### - broker.publish _topic-string_ _payload-bytes_
+
+Publishes the _payload-bytes_ under the _topic-string_. Returns an error
+if something went wrong (client not connected, or some other error). It might
+block.
 
 #### <a name="12102-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.10.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
 

@@ -210,7 +210,7 @@ impl VValUserData for DetachedMQTTClient {
                 let ret = argv[0].with_s_ref(|s| self.subscribe(s));
                 match ret {
                     Ok(_)  => Ok(VVal::Bol(true)),
-                    Err(e) => Ok(env.new_err(format!("subscribe Error: {}", e)))
+                    Err(e) => Ok(env.new_err(format!("subscribe error: {}", e)))
                 }
             },
             "publish" => {
@@ -228,7 +228,7 @@ impl VValUserData for DetachedMQTTClient {
                             self.publish(topic, payload)));
                 match ret {
                     Ok(_)  => Ok(VVal::Bol(true)),
-                    Err(e) => Ok(env.new_err(format!("publish Error: {}", e)))
+                    Err(e) => Ok(env.new_err(format!("publish error: {}", e)))
                 }
             },
             _ => {
@@ -255,6 +255,7 @@ impl crate::threads::ThreadSafeUsr for DetachedMQTTClient {
 #[cfg(feature="rumqttd")]
 #[derive(Clone)]
 struct MQTTBroker {
+    link_tx: Arc<Mutex<librumqttd::LinkTx>>,
 }
 
 #[cfg(feature="rumqttd")]
@@ -304,16 +305,124 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal>  {
 #[cfg(feature="rumqttd")]
 impl MQTTBroker {
     pub fn setup(env: &mut Env, cfg: VVal) -> Result<Self, VVal> {
-        let config = cfg2broker_config(env, cfg)?;
+        let link_cfg = cfg.v_k("link");
+        let config   = cfg2broker_config(env, cfg)?;
+
         let mut broker = Broker::new(config);
+
+        let client_id =
+            if link_cfg.v_k("client_id").is_some() {
+                link_cfg.v_s_rawk("client_id")
+            } else {
+                "wl_local".to_string()
+            };
+
+        let mut link =
+            match broker.link(&client_id) {
+                Ok(link) => link,
+                Err(e) => {
+                    return Err(env.new_err(format!(
+                        "mqtt:broker:setup: Could not create local client link: {}",
+                        e)));
+                }
+            };
+
+        if link_cfg.v_k("recv").is_some() {
+            let mut chan = link_cfg.v_k("recv");
+            let chan =
+                chan.with_usr_ref(|chan: &mut crate::threads::AValChannel| {
+                    chan.fork_sender_direct()
+                });
+
+            let chan =
+                if let Some(chan) = chan {
+                   match chan {
+                        Ok(chan) => chan,
+                        Err(err) => {
+                            return
+                                Err(VVal::err_msg(
+                                    &format!("Failed to fork sender, can't get lock: {}", err)));
+                        }
+                   }
+                } else {
+                    return
+                        Err(env.new_err(format!(
+                            "mqtt:broker:setup: config.link.recv not a std:sync:mpsc handle! {}",
+                            env.arg(0).s())));
+                };
+
+            if link_cfg.v_k("topics").is_some() {
+                if let Some(err) = link_cfg.v_k("topics").with_iter(|it| {
+                        for (v, _) in it {
+                            if let Err(e) = link.subscribe(&v.s_raw()) {
+                                return
+                                    Some(env.new_err(format!(
+                                        "mqtt:broker:setup: config.link.topics could not subscribe to '#': {}",
+                                        e)));
+                            }
+                        }
+                        None
+                    })
+                {
+                    return Err(err);
+                }
+
+            } else {
+                if let Err(e) = link.subscribe("#") {
+                    return
+                        Err(env.new_err(format!(
+                            "mqtt:broker:setup: config.link.topics could not subscribe to '#': {}",
+                            e)));
+                }
+            }
+
+            let mut link_rx =
+                match link.connect(100) {
+                    Ok(link_rx) => link_rx,
+                    Err(e) => {
+                    return
+                        Err(env.new_err(format!(
+                            "mqtt:broker:setup: config.link.recv could not setup a receiver link: {}",
+                            e)));
+                    },
+                };
+
+            std::thread::spawn(move || {
+                loop {
+                    chan.send(&VVal::pair(
+                        VVal::new_sym("$WL/connected"), VVal::None));
+
+                    match link_rx.recv() {
+                        Ok(Some(msg)) => {
+                            let mut out_payl = vec![];
+                            for payl in msg.payload.iter() {
+                                out_payl.extend_from_slice(payl.as_ref());
+                            }
+
+                            chan.send(&VVal::pair(
+                                VVal::new_str_mv(msg.topic),
+                                VVal::new_byt(out_payl)));
+                        },
+                        Ok(None) => (),
+                        Err(e) => {
+                            chan.send(&VVal::pair(
+                                VVal::new_sym("$WL/error"),
+                                VVal::new_str_mv(format!("{}", e))));
+                            break;
+                        },
+                    }
+                }
+            });
+        }
 
         std::thread::spawn(move || {
             broker.start().unwrap();
             // TODO: Log errors?!
-            println!("BROKER STRATED");
         });
 
-        Ok(Self { })
+        Ok(Self {
+            link_tx: Arc::new(Mutex::new(link)),
+        })
     }
 }
 
@@ -326,25 +435,34 @@ impl VValUserData for MQTTBroker {
     fn clone_ud(&self) -> Box<dyn VValUserData> {
         Box::new(self.clone())
     }
+    fn as_thread_safe_usr(&mut self) -> Option<Box<dyn crate::threads::ThreadSafeUsr>> {
+        Some(Box::new(self.clone()))
+    }
 
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         let argv = env.argv_ref();
         match key {
-            "get_link" => {
-                if argv.len() != 0 {
+            "publish" => {
+                if argv.len() != 2 {
                     return
                         Err(StackAction::panic_str(
-                            "link method expects no argument".to_string(),
+                            "publish method expects 2 arguments: (topic, payload)".to_string(),
                             None,
                             env.argv()))
                 }
 
-//                let ret = argv[0].with_s_ref(|s| self.link.clone()(s));
-//                match ret {
-//                    Ok(_)  => Ok(VVal::Bol(true)),
-//                    Err(e) => Ok(env.new_err(format!("subscribe Error: {}", e)))
-//                }
-                Ok(VVal::None)
+                if let Ok(mut link) = self.link_tx.lock() {
+                    let ret =
+                        env.arg(0).with_s_ref(|topic|
+                            env.arg(1).with_bv_ref(|payload|
+                                link.publish(topic, false, payload)));
+                    match ret {
+                        Ok(_)  => Ok(VVal::Bol(true)),
+                        Err(e) => Ok(env.new_err(format!("publish error: {}", e))),
+                    }
+                } else {
+                    Ok(env.new_err(format!("publish error: can't lock mutex!")))
+                }
             },
             _ => {
                 Err(StackAction::panic_str(
@@ -356,14 +474,14 @@ impl VValUserData for MQTTBroker {
     }
 }
 
-//#[cfg(feature="rumqttd")]
-//impl crate::threads::ThreadSafeUsr for MQTTBroker {
-//    fn to_vval(&self) -> VVal {
-//        VVal::Usr(Box::new(VMQTTClient {
-//            client: self.client.clone()
-//        }))
-//    }
-//}
+#[cfg(feature="rumqttd")]
+impl crate::threads::ThreadSafeUsr for MQTTBroker {
+    fn to_vval(&self) -> VVal {
+        VVal::Usr(Box::new(MQTTBroker {
+            link_tx: self.link_tx.clone()
+        }))
+    }
+}
 
 #[cfg(feature="rumqttd")]
 #[derive(Clone)]
