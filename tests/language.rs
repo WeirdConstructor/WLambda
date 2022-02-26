@@ -5494,6 +5494,80 @@ fn check_mqtt() {
 
 #[test]
 #[cfg(feature="mqtt")]
+fn check_mqtt_broker_link1() {
+    assert_eq!(ve(r#"
+        !broker = std:mqtt:broker:new ${
+            listen         = "0.0.0.0:1884",
+            console_listen = "0.0.0.0:18081",
+        };
+
+        # sleep a bit until the broker is initialized:
+        std:thread:sleep :ms => 900;
+
+        !chan = std:sync:mpsc:new[];
+        !cl = std:mqtt:client:new chan "test1" "localhost" 1884;
+
+        # let it connect:
+        std:thread:sleep :ms => 500;
+
+        !_ = cl.subscribe "test/me";
+
+        # let it subscribe:
+        std:thread:sleep :ms => 500;
+        !_ = broker.publish "test/me" $b"test123\xFF";
+
+        std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
+        std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
+        1
+    "#),
+    "1");
+}
+
+#[test]
+#[cfg(feature="mqtt")]
+fn check_mqtt_broker_link2() {
+    assert_eq!(ve(r#"
+        !chan = std:sync:mpsc:new[];
+        !broker = std:mqtt:broker:new ${
+            listen         = "0.0.0.0:1885",
+            console_listen = "0.0.0.0:18082",
+            link = ${
+                recv   = chan,
+                topics = $["foo", "x"],
+            },
+        };
+
+        # sleep a bit until the broker is initialized:
+        std:thread:sleep :ms => 900;
+
+        !cl = std:mqtt:client:new chan "test1" "localhost" 1885;
+
+        # let it connect:
+        std:thread:sleep :ms => 500;
+        !_ = cl.publish "foo" $b"a";
+        !_ = cl.publish "x" $b"b";
+        !_ = cl.publish "y" $b"c";
+        !_ = cl.publish "x" $b"d";
+
+        !next_non_wl = {
+            !(topic, payload) = chan.recv[];
+            while ($p(0, 1) (str topic)) == "$" {
+                .(topic, payload) = chan.recv[];
+            };
+            $p(topic, payload)
+        };
+
+        std:assert_str_eq next_non_wl[] $p("foo", $b"a");
+        std:assert_str_eq next_non_wl[] $p("x",   $b"b");
+        std:assert_str_eq next_non_wl[] $p("x",   $b"d");
+        1
+    "#),
+    "1");
+}
+
+
+#[test]
+#[cfg(feature="mqtt")]
 fn check_mqtt_client_loop() {
     assert_eq!(ve(r#"
         !broker = std:mqtt:broker:new ${

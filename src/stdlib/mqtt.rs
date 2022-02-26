@@ -327,17 +327,22 @@ impl MQTTBroker {
                 }
             };
 
-        if link_cfg.v_k("recv").is_some() {
-            let mut chan = link_cfg.v_k("recv");
-            let chan =
-                chan.with_usr_ref(|chan: &mut crate::threads::AValChannel| {
-                    chan.fork_sender_direct()
-                });
+        std::thread::spawn(move || {
+            broker.start().unwrap();
+            // TODO: Log errors?!
+        });
 
-            let chan =
+        let chan =
+            if link_cfg.v_k("recv").is_some() {
+                let mut chan = link_cfg.v_k("recv");
+                let chan =
+                    chan.with_usr_ref(|chan: &mut crate::threads::AValChannel| {
+                        chan.fork_sender_direct()
+                    });
+
                 if let Some(chan) = chan {
                    match chan {
-                        Ok(chan) => chan,
+                        Ok(chan) => Some(chan),
                         Err(err) => {
                             return
                                 Err(VVal::err_msg(
@@ -348,9 +353,24 @@ impl MQTTBroker {
                     return
                         Err(env.new_err(format!(
                             "mqtt:broker:setup: config.link.recv not a std:sync:mpsc handle! {}",
-                            env.arg(0).s())));
-                };
+                            link_cfg.v_k("recv").s())));
+                }
+            } else {
+                None
+            };
 
+        let mut link_rx =
+            match link.connect(100) {
+                Ok(link_rx) => link_rx,
+                Err(e) => {
+                    return
+                        Err(env.new_err(format!(
+                            "mqtt:broker:setup: config.link.recv could not setup a receiver link: {}",
+                            e)));
+                },
+            };
+
+        if let Some(chan) = chan {
             if link_cfg.v_k("topics").is_some() {
                 if let Some(err) = link_cfg.v_k("topics").with_iter(|it| {
                         for (v, _) in it {
@@ -376,17 +396,6 @@ impl MQTTBroker {
                 }
             }
 
-            let mut link_rx =
-                match link.connect(100) {
-                    Ok(link_rx) => link_rx,
-                    Err(e) => {
-                    return
-                        Err(env.new_err(format!(
-                            "mqtt:broker:setup: config.link.recv could not setup a receiver link: {}",
-                            e)));
-                    },
-                };
-
             std::thread::spawn(move || {
                 loop {
                     chan.send(&VVal::pair(
@@ -394,14 +403,13 @@ impl MQTTBroker {
 
                     match link_rx.recv() {
                         Ok(Some(msg)) => {
-                            let mut out_payl = vec![];
-                            for payl in msg.payload.iter() {
-                                out_payl.extend_from_slice(payl.as_ref());
+                            let topic = VVal::new_str_mv(msg.topic);
+                            for payl in msg.payload {
+                                chan.send(&VVal::pair(
+                                    topic.clone(),
+                                    VVal::new_byt(payl.as_ref().to_vec())));
                             }
 
-                            chan.send(&VVal::pair(
-                                VVal::new_str_mv(msg.topic),
-                                VVal::new_byt(out_payl)));
                         },
                         Ok(None) => (),
                         Err(e) => {
@@ -413,12 +421,16 @@ impl MQTTBroker {
                     }
                 }
             });
+        } else {
+            std::thread::spawn(move || {
+                loop {
+                    match link_rx.recv() {
+                        Ok(_) => (),
+                        Err(_) => { break; },
+                    }
+                }
+            });
         }
-
-        std::thread::spawn(move || {
-            broker.start().unwrap();
-            // TODO: Log errors?!
-        });
 
         Ok(Self {
             link_tx: Arc::new(Mutex::new(link)),
