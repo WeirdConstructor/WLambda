@@ -722,9 +722,9 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
     }
 }
 
-pub type StructPatBuildFun = Box<dyn Fn(Box<FnVarAssign>, Box<FnVarReset>) -> DirectFun>;
+pub(crate) type StructPatBuildFun = Box<dyn Fn(Box<FnVarAssign>, Box<FnVarReset>) -> DirectFun>;
 
-pub fn create_struct_patterns_direct_fun(patterns: &[VVal], var_map: &VVal)
+pub(crate) fn create_struct_patterns_direct_fun(patterns: &[VVal], var_map: &VVal)
     -> Result<StructPatBuildFun, CompileError>
 {
     let mut pat_funs = Vec::new();

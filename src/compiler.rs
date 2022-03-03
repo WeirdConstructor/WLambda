@@ -902,7 +902,7 @@ impl EvalContext {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ArityParam {
+pub(crate) enum ArityParam {
     Undefined,
     Limit(usize),
     Infinite,
@@ -915,7 +915,7 @@ struct BlockEnv {
 }
 
 #[derive(Debug,Clone,Copy,PartialEq)]
-pub enum ResValue {
+pub(crate) enum ResValue {
     None,
     OptNone,
     Ret,
@@ -926,7 +926,7 @@ pub enum ResValue {
 }
 
 #[derive(Debug,Clone,Copy,PartialEq)]
-pub enum ResPos {
+pub(crate) enum ResPos {
     Local(u16),
     LocalRef(u16),
     Arg(u16),
@@ -1016,7 +1016,7 @@ impl BlockEnv {
 /// scope that they are passed through until they are needed.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct CompileEnv {
+pub(crate) struct CompileEnv {
     /// Reference to the global environment
     pub global:    GlobalEnvRef,
     /// Reference to the environment of the _parent_ function.
@@ -1043,6 +1043,8 @@ pub struct CompileEnv {
 type CompileEnvRef = Rc<RefCell<CompileEnv>>;
 
 impl CompileEnv {
+    /// Creates a new compilation environment that references symbols in the
+    /// given [GlobalEnv]. 
     pub fn new(g: GlobalEnvRef) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(CompileEnv {
             parent:         None,
@@ -1195,7 +1197,7 @@ impl CompileEnv {
     }
 }
 
-pub fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
+fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
     let min = ce.borrow().implicit_arity.0.clone();
     match min {
         ArityParam::Undefined => { ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i); },
@@ -1215,7 +1217,7 @@ pub fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
     }
 }
 
-pub fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal,
+fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal,
                           ce: &mut Rc<RefCell<CompileEnv>>, vars: &VVal)
 {
     // If we have an destructuring assignment directly from "@", then we conclude
@@ -1235,7 +1237,7 @@ pub fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal,
     }
 }
 
-pub fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
+fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
     let syn = ast.v_(0).get_syn();
     match syn {
         Syntax::GetKey => {
@@ -1272,7 +1274,7 @@ pub fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
     }
 }
 
-pub fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
+pub(crate) fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::Vec<VVal>) {
     for u in upvs.iter() {
         match u {
             VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
@@ -2112,52 +2114,9 @@ pub(crate) fn compile_match(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         })?;
 
     generate_jump_table(spos, jump_value, blocks)
-//                    let variable_map = VVal::map();
-//
-//                    let fun =
-//                        struct_pattern::create_struct_pattern_function(
-//                            &ast.at(1).unwrap(), &variable_map)?;
-//
-//    if ast.len() != 4 {
-//        return Err(ast.compile_err(
-//            "while takes exactly 2 arguments (condition and expression)"
-//            .to_string()));
-//    }
-//
-//    let cond =
-//        compile_direct_block(
-//            &ast.at(2).unwrap_or_else(|| VVal::None), ce)?;
-//
-//    let body =
-//        compile_direct_block(
-//            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
-
-//    return pw_null!(prog, {
-//        // Create the OPs for the body:
-//        let mut body_prog = Prog::new();
-//        body.eval_nul(&mut body_prog);
-//        let body_op_count = body_prog.op_count();
-//
-//        let mut cond_prog = Prog::new();
-//        let cond_val = cond.eval(&mut cond_prog);
-//
-//        prog.op_push_loop_info(
-//            &spos, (cond_prog.op_count() + body_op_count + 2) as u16);
-//
-//        let cond_op_count1 = prog.op_count();
-//        cond_prog.op_jmp_ifn(
-//            &spos, cond_val, body_op_count as i32 + 1);
-//        prog.append(cond_prog);
-//
-//        let cond_offs =
-//            body_op_count + (prog.op_count() - cond_op_count1);
-//        body_prog.op_jmp(&spos, -(cond_offs as i32 + 1));
-//        prog.append(body_prog);
-//        prog.op_unwind(&spos);
-//    });
 }
 
-pub fn collection_add(env: &mut Env, argc: usize, col_add: CollectionAdd) -> Result<VVal, StackAction> {
+pub(crate) fn collection_add(env: &mut Env, argc: usize, col_add: CollectionAdd) -> Result<VVal, StackAction> {
     let args = env.argv_ref();
     if args[0].is_fun() {
         let fun = args[0].clone();
@@ -3028,7 +2987,9 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     }
 }
 
-pub fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
+/// Compiles a WLambda AST into an [EvalNode] in the given CompileEnv.
+/// This is an internal function.
+fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<EvalNode, CompileError>
 {
     let prog = compile_stmts(&ast, 1, ce)?;
@@ -3040,6 +3001,13 @@ pub fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     Ok(Box::new(move |e: &mut Env| { crate::vm::vm(&p, e) }))
 }
 
+/// This is a function to help evaluating a piece of WLambda code and
+/// receive a text representation of the result. It's primarily used
+/// by the WLambda test suite.
+///
+///```
+/// std::assert_eq(wlambda::test_eval_to_string("1 + 2"), "3");
+///```
 pub fn test_eval_to_string(s: &str) -> String {
     let global = GlobalEnv::new_default();
     match parser::parse(s, "<compiler:s_eval>") {
