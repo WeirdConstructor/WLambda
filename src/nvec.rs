@@ -3,12 +3,15 @@ use std::ops::{Neg, Add, Sub, Div, Mul};
 
 
 /// WLambda supports Integer and Float vectors in two, three, and four dimensions.
+/// See also [VVal::nvec] and functions like [VVal::ivec2], [VVal::fvec2], ...
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum NVec<N: NVecNum> {
     Vec2(N, N),
     Vec3(N, N, N),
     Vec4(N, N, N, N),
 }
+
+/// Dimensionality of a numeric vector ([NVec])
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum NVecDim {
     Two   = 2,
@@ -18,6 +21,7 @@ pub enum NVecDim {
 
 #[allow(clippy::len_without_is_empty)]
 impl NVecDim {
+    /// The number of dimensions, either 2, 3 or 4.
     pub fn len(self) -> usize {
         match self {
             NVecDim::Two   => 2,
@@ -38,6 +42,7 @@ impl<N: NVecNum> PartialEq for NVec<N> {
 }*/
 use NVec::*;
 
+/// Number vector trait for type conversions.
 pub trait NVecNum: Sized + Copy + Clone + PartialEq {
     /// Returns a letter representing this type
     fn sign() -> char;
@@ -189,11 +194,13 @@ impl AsRef<VVal> for VVal {
 }
 
 impl<N: NVecNum> NVec<N> {
+    /// The x component of the number vector as [VVal].
     #[inline]
     pub fn x(&self) -> VVal {
         self.x_raw().into_vval()
     }
 
+    /// The x component of the number vector as faw integer/float type.
     #[inline]
     pub fn x_raw(&self) -> N {
         match self {
@@ -203,11 +210,13 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// The y component of the number vector as [VVal].
     #[inline]
     pub fn y(&self) -> VVal {
         self.y_raw().into_vval()
     }
 
+    /// The y component of the number vector as faw integer/float type.
     #[inline]
     pub fn y_raw(&self) -> N {
         match self {
@@ -217,11 +226,13 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// The z component of the number vector as [VVal].
     #[inline]
     pub fn z(&self) -> Option<VVal> {
         self.z_raw().map(|v| v.into_vval())
     }
 
+    /// The z component of the number vector as faw integer/float type.
     #[inline]
     pub fn z_raw(&self) -> Option<N> {
         match self {
@@ -231,11 +242,13 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// The w component of the number vector as [VVal].
     #[inline]
     pub fn w(&self) -> Option<VVal> {
         self.w_raw().map(|v| v.into_vval())
     }
 
+    /// The w component of the number vector as faw integer/float type.
     #[inline]
     pub fn w_raw(&self) -> Option<N> {
         match self {
@@ -245,6 +258,7 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// Returns the dimensionality of this number vector.
     #[inline]
     pub fn dims(&self) -> NVecDim {
         match self {
@@ -254,6 +268,8 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// Convert this numeric vector into a tuple of raw integer/float types.
+    /// All vectors contain x and y components. The z and w components are optional.
     #[inline]
     pub fn into_tpl(self) -> (N, N, Option<N>, Option<N>) {
         match self {
@@ -275,6 +291,8 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// Convert this numeric vector into a tuple of [VVal].
+    /// All vectors contain x and y components. The z and w components are optional.
     #[inline]
     pub fn into_vval_tpl(self) -> (VVal, VVal, Option<VVal>, Option<VVal>) {
         match self {
@@ -284,6 +302,7 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// Convert a tuple of raw integer/float types into an NVec.
     #[inline]
     pub fn from_tpl(tpl: (N, N, Option<N>, Option<N>)) -> Option<Self> {
         Some(match tpl {
@@ -294,6 +313,7 @@ impl<N: NVecNum> NVec<N> {
         })
     }
 
+    /// Convert a tuple of [VVal] into an NVec.
     #[inline]
     pub fn from_vval_tpl<W: AsRef<VVal>>((x, y, z, w): (W, W, Option<W>, Option<W>)) -> Option<Self> {
         Some(match (x.as_ref(), y.as_ref(), z, w) {
@@ -307,6 +327,7 @@ impl<N: NVecNum> NVec<N> {
         })
     }
 
+    /// Returns a string representation of this numeric vector.
     #[inline]
     pub fn s(&self) -> String {
         match self.into_vval_tpl() {
@@ -350,7 +371,8 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
-
+    /// Returns the squared magnitude of this vector like `x^2 + y^2`.
+    /// See also [NVec::mag].
     #[inline]
     pub fn mag2(&self) -> f64 {
         match self {
@@ -363,11 +385,15 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// Returns the magnitude of this vector also known as the mathematical
+    /// length of the vector: `sqrt(x^2 + y^2)` for instance for a 2 dimensional
+    /// vector.
     #[inline]
     pub fn mag(&self) -> f64 {
         self.mag2().sqrt()
     }
 
+    /// Convert this NVec into a normalized (unit length) vector.
     #[inline]
     pub fn norm(self) -> Self {
         let m = N::from_f64(self.mag());
@@ -378,6 +404,7 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// Calculates the dot product of two numerical vectors.
     #[inline]
     pub fn dot(self, o: NVec<N>) -> N {
         let max_dims = self.dims().max(o.dims());
@@ -391,6 +418,7 @@ impl<N: NVecNum> NVec<N> {
         }
     }
 
+    /// Calculates the cross product of two numerical vectors.
     #[inline]
     pub fn cross(self, o: NVec<N>) -> Self {
         let a = self.into_zero_tpl();
@@ -403,6 +431,8 @@ impl<N: NVecNum> NVec<N> {
         )
     }
 
+    /// Linear interpolation from this vector to the given vector \a o.
+    /// The parameter \a t should be between 0.0 and 1.0.
     #[inline]
     pub fn lerp(self, o: NVec<N>, t: f64) -> Self {
         N::from_fvec_round(
