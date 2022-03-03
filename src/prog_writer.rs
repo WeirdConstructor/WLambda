@@ -76,6 +76,11 @@ pub(crate) fn pw(f: ProgWriteNode) -> ProgWriter {
     }
 }
 
+/// Internal helper macro for the code generator. It creates a `ProgWriter`
+/// instance from the given code block.
+/// `$prog` is the variable of the
+/// [Prog] and `$store` is the supplied store type that is requested
+/// by the parent of this AST node.
 #[macro_export]
 macro_rules! pw {
     ($prog: ident, $store: ident, $b: block) => {
@@ -85,6 +90,10 @@ macro_rules! pw {
     }
 }
 
+/// Internal helper macro for the code generator. It creates a `ProgWriter`
+/// instance from the given code block. `pw_null` is used in cases where
+/// there are only side effects and no return values to be stored anywhere.
+/// `$prog` is the variable of the [Prog].
 #[macro_export]
 macro_rules! pw_null {
     ($prog: ident, $b: block) => {
@@ -95,6 +104,12 @@ macro_rules! pw_null {
     }
 }
 
+/// Internal helper macro for the code generator. It creates a `ProgWriter`
+/// instance from the given code block. It's used in cases where the `ProgWriter`
+/// code in the code block `$b` defines the storage position where it wrote
+/// the results to. The calling parent then has to take care to store
+/// the value in some reasonable place or not store it at all.
+/// `$prog` is the variable of the [Prog].
 #[macro_export]
 macro_rules! pw_provides_result_pos {
     ($prog: ident, $b: block) => {
@@ -119,6 +134,11 @@ macro_rules! pw_provides_result_pos {
     }
 }
 
+/// Internal helper macro for the code generator. It creates a `ProgWriter`
+/// instance from the given code block. It's used where the `ProgWriter`
+/// needs it's parent to define a place to put it's result to, but it's not
+/// required to be stored.
+/// `$prog` is the variable of the [Prog].
 #[macro_export]
 macro_rules! pw_store_if_needed {
     ($prog: ident, $pos: ident, $b: block) => {
@@ -137,6 +157,10 @@ macro_rules! pw_store_if_needed {
 }
 
 
+/// Internal helper macro for the code generator. It creates a `ProgWriter`
+/// instance from the given code block. It's used where the `ProgWriter`
+/// needs it's parent to define a place to put it's result to.
+/// `$prog` is the variable of the [Prog].
 #[macro_export]
 macro_rules! pw_needs_storage {
     ($prog: ident, $pos: ident, $b: block) => {
