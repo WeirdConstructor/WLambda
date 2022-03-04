@@ -299,6 +299,7 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal>  {
 }
 
 #[cfg(feature="rumqttd")]
+#[allow(clippy::collapsible_else_if)]
 impl MQTTBroker {
     pub fn setup(env: &mut Env, cfg: VVal) -> Result<Self, VVal> {
         let link_cfg = cfg.v_k("link");

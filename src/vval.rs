@@ -228,79 +228,81 @@ pub enum Syntax {
     Formatter,
 }
 
-impl Syntax {
-    pub fn from_str(s: &str) -> Option<Syntax> {
-        match &s[..] {
-            "Var"            => Some(Syntax::Var),
-            "Key"            => Some(Syntax::Key),
-            "SetKey"         => Some(Syntax::SetKey),
-            "GetKey"         => Some(Syntax::GetKey),
-            "GetKey2"        => Some(Syntax::GetKey2),
-            "GetKey3"        => Some(Syntax::GetKey3),
-            "GetSym"         => Some(Syntax::GetSym),
-            "GetSym2"        => Some(Syntax::GetSym2),
-            "GetSym3"        => Some(Syntax::GetSym3),
-            "GetIdx"         => Some(Syntax::GetIdx),
-            "GetIdx2"        => Some(Syntax::GetIdx2),
-            "GetIdx3"        => Some(Syntax::GetIdx3),
-            "BinOpAdd"       => Some(Syntax::BinOpAdd),
-            "BinOpSub"       => Some(Syntax::BinOpSub),
-            "BinOpMul"       => Some(Syntax::BinOpMul),
-            "BinOpDiv"       => Some(Syntax::BinOpDiv),
-            "BinOpMod"       => Some(Syntax::BinOpMod),
-            "BinOpLe"        => Some(Syntax::BinOpLe),
-            "BinOpLt"        => Some(Syntax::BinOpLt),
-            "BinOpGe"        => Some(Syntax::BinOpGe),
-            "BinOpGt"        => Some(Syntax::BinOpGt),
-            "BinOpEq"        => Some(Syntax::BinOpEq),
-            "OpNewPair"      => Some(Syntax::OpNewPair),
-            "OpCallLwR"      => Some(Syntax::OpCallLwR),
-            "OpCallRwL"      => Some(Syntax::OpCallRwL),
-            "OpCallApplyLwR" => Some(Syntax::OpCallApplyLwR),
-            "OpCallApplyRwL" => Some(Syntax::OpCallApplyRwL),
-            "OpColAddL"      => Some(Syntax::OpColAddL),
-            "OpColAddR"      => Some(Syntax::OpColAddR),
-            "Str"            => Some(Syntax::Str),
-            "Lst"            => Some(Syntax::Lst),
-            "IVec"           => Some(Syntax::IVec),
-            "FVec"           => Some(Syntax::FVec),
-            "Opt"            => Some(Syntax::Opt),
-            "Iter"           => Some(Syntax::Iter),
-            "Map"            => Some(Syntax::Map),
-            "Expr"           => Some(Syntax::Expr),
-            "Func"           => Some(Syntax::Func),
-            "Block"          => Some(Syntax::Block),
-            "Err"            => Some(Syntax::Err),
-            "Call"           => Some(Syntax::Call),
-            "Apply"          => Some(Syntax::Apply),
-            "And"            => Some(Syntax::And),
-            "Or"             => Some(Syntax::Or),
-            "Assign"         => Some(Syntax::Assign),
-            "Def"            => Some(Syntax::Def),
-            "Ref"            => Some(Syntax::Ref),
-            "HRef"           => Some(Syntax::HRef),
-            "WRef"           => Some(Syntax::WRef),
-            "Deref"          => Some(Syntax::Deref),
-            "CaptureRef"     => Some(Syntax::CaptureRef),
-            "AssignRef"      => Some(Syntax::AssignRef),
-            "DefGlobRef"     => Some(Syntax::DefGlobRef),
-            "DefConst"       => Some(Syntax::DefConst),
-            "SelfObj"        => Some(Syntax::SelfObj),
-            "SelfData"       => Some(Syntax::SelfData),
-            "Import"         => Some(Syntax::Import),
-            "Export"         => Some(Syntax::Export),
-            "DumpStack"      => Some(Syntax::DumpStack),
-            "DumpVM"         => Some(Syntax::DumpVM),
-            "DebugPrint"     => Some(Syntax::DebugPrint),
-            "MapSplice"      => Some(Syntax::MapSplice),
-            "VecSplice"      => Some(Syntax::VecSplice),
-            "Accum"          => Some(Syntax::Accum),
-            "GlobVar"        => Some(Syntax::GlobVar),
-            "Selector"       => Some(Syntax::Selector),
-            "Pattern"        => Some(Syntax::Pattern),
-            "StructPattern"  => Some(Syntax::StructPattern),
-            "Formatter"      => Some(Syntax::Formatter),
-            _ => None,
+impl std::str::FromStr for Syntax {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Syntax, ()> {
+        match s {
+            "Var"            => Ok(Syntax::Var),
+            "Key"            => Ok(Syntax::Key),
+            "SetKey"         => Ok(Syntax::SetKey),
+            "GetKey"         => Ok(Syntax::GetKey),
+            "GetKey2"        => Ok(Syntax::GetKey2),
+            "GetKey3"        => Ok(Syntax::GetKey3),
+            "GetSym"         => Ok(Syntax::GetSym),
+            "GetSym2"        => Ok(Syntax::GetSym2),
+            "GetSym3"        => Ok(Syntax::GetSym3),
+            "GetIdx"         => Ok(Syntax::GetIdx),
+            "GetIdx2"        => Ok(Syntax::GetIdx2),
+            "GetIdx3"        => Ok(Syntax::GetIdx3),
+            "BinOpAdd"       => Ok(Syntax::BinOpAdd),
+            "BinOpSub"       => Ok(Syntax::BinOpSub),
+            "BinOpMul"       => Ok(Syntax::BinOpMul),
+            "BinOpDiv"       => Ok(Syntax::BinOpDiv),
+            "BinOpMod"       => Ok(Syntax::BinOpMod),
+            "BinOpLe"        => Ok(Syntax::BinOpLe),
+            "BinOpLt"        => Ok(Syntax::BinOpLt),
+            "BinOpGe"        => Ok(Syntax::BinOpGe),
+            "BinOpGt"        => Ok(Syntax::BinOpGt),
+            "BinOpEq"        => Ok(Syntax::BinOpEq),
+            "OpNewPair"      => Ok(Syntax::OpNewPair),
+            "OpCallLwR"      => Ok(Syntax::OpCallLwR),
+            "OpCallRwL"      => Ok(Syntax::OpCallRwL),
+            "OpCallApplyLwR" => Ok(Syntax::OpCallApplyLwR),
+            "OpCallApplyRwL" => Ok(Syntax::OpCallApplyRwL),
+            "OpColAddL"      => Ok(Syntax::OpColAddL),
+            "OpColAddR"      => Ok(Syntax::OpColAddR),
+            "Str"            => Ok(Syntax::Str),
+            "Lst"            => Ok(Syntax::Lst),
+            "IVec"           => Ok(Syntax::IVec),
+            "FVec"           => Ok(Syntax::FVec),
+            "Opt"            => Ok(Syntax::Opt),
+            "Iter"           => Ok(Syntax::Iter),
+            "Map"            => Ok(Syntax::Map),
+            "Expr"           => Ok(Syntax::Expr),
+            "Func"           => Ok(Syntax::Func),
+            "Block"          => Ok(Syntax::Block),
+            "Err"            => Ok(Syntax::Err),
+            "Call"           => Ok(Syntax::Call),
+            "Apply"          => Ok(Syntax::Apply),
+            "And"            => Ok(Syntax::And),
+            "Or"             => Ok(Syntax::Or),
+            "Assign"         => Ok(Syntax::Assign),
+            "Def"            => Ok(Syntax::Def),
+            "Ref"            => Ok(Syntax::Ref),
+            "HRef"           => Ok(Syntax::HRef),
+            "WRef"           => Ok(Syntax::WRef),
+            "Deref"          => Ok(Syntax::Deref),
+            "CaptureRef"     => Ok(Syntax::CaptureRef),
+            "AssignRef"      => Ok(Syntax::AssignRef),
+            "DefGlobRef"     => Ok(Syntax::DefGlobRef),
+            "DefConst"       => Ok(Syntax::DefConst),
+            "SelfObj"        => Ok(Syntax::SelfObj),
+            "SelfData"       => Ok(Syntax::SelfData),
+            "Import"         => Ok(Syntax::Import),
+            "Export"         => Ok(Syntax::Export),
+            "DumpStack"      => Ok(Syntax::DumpStack),
+            "DumpVM"         => Ok(Syntax::DumpVM),
+            "DebugPrint"     => Ok(Syntax::DebugPrint),
+            "MapSplice"      => Ok(Syntax::MapSplice),
+            "VecSplice"      => Ok(Syntax::VecSplice),
+            "Accum"          => Ok(Syntax::Accum),
+            "GlobVar"        => Ok(Syntax::GlobVar),
+            "Selector"       => Ok(Syntax::Selector),
+            "Pattern"        => Ok(Syntax::Pattern),
+            "StructPattern"  => Ok(Syntax::StructPattern),
+            "Formatter"      => Ok(Syntax::Formatter),
+            _ => Err(()),
         }
     }
 }
@@ -1143,6 +1145,7 @@ impl Env {
 /// As WLambda is not using a VM, it uses return values of the
 /// closure call tree to handle jumping up the stack.
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub enum StackAction {
     Panic(Box<(VVal, Vec<(Option<SynPos>, VVal)>)>),
     Return(Box<(VVal, VVal)>),
@@ -1211,7 +1214,7 @@ impl Display for StackAction {
 
                         if let (Some(p), v) = t {
                             write!(f, "{} ", p)?;
-                            fmt_argv(f, &v)?;
+                            fmt_argv(f, v)?;
                         } else {
                             write!(f, "    ")?;
                             fmt_argv(f, &t.1)?;
@@ -1648,17 +1651,19 @@ pub enum VValChr {
     Byte(u8),
 }
 
-impl VValChr {
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for VValChr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            VValChr::Char(c) => format!("'{}'", format_escape_char(*c, false)),
-            VValChr::Byte(b) => format!("$b'{}'",
+            VValChr::Char(c) => write!(f, "'{}'", format_escape_char(*c, false)),
+            VValChr::Byte(b) => write!(f, "$b'{}'",
                 format_escape_char(
                     std::char::from_u32(*b as u32).unwrap_or('?'),
                     true)),
         }
     }
+}
 
+impl VValChr {
     pub fn byte(&self) -> u8 {
         match self {
             VValChr::Char(c) => {
@@ -1826,7 +1831,7 @@ impl CycleCheck {
                 for v in l.borrow().iter() { self.touch_walk(v); }
             },
             VVal::Map(l) => {
-                for (_k, v) in l.borrow().iter() { self.touch_walk(&v); }
+                for (_k, v) in l.borrow().iter() { self.touch_walk(v); }
             },
             VVal::DropFun(f) => {
                 if let VVal::Fun(f) = &f.fun {
@@ -2444,25 +2449,25 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                     range_extract(*from, *cnt, val)
                 },
                 (VVal::Int(start_idx), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.find(&b, *start_idx as usize, true)
+                    val.find(b, *start_idx as usize, true)
                 },
                 (VVal::Chr(_splitstr), VVal::Int(max)) => {
-                    val.split(&a, *max as usize, true)
+                    val.split(a, *max as usize, true)
                 },
                 (VVal::Str(_splitstr), VVal::Int(max)) => {
-                    val.split(&a, *max as usize, true)
+                    val.split(a, *max as usize, true)
                 },
                 (VVal::Byt(_splitstr), VVal::Int(max)) => {
-                    val.split(&a, *max as usize, true)
+                    val.split(a, *max as usize, true)
                 },
                 (VVal::Str(_needle), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.bytes_replace(&a, &b)
+                    val.bytes_replace(a, b)
                 },
                 (VVal::Byt(_needle), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.bytes_replace(&a, &b)
+                    val.bytes_replace(a, b)
                 },
                 (VVal::Chr(_needle), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.bytes_replace(&a, &b)
+                    val.bytes_replace(a, b)
                 },
                 _ => VVal::None
             }
@@ -2473,16 +2478,16 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
                     range_extract(*from, *cnt, val)
                 },
                 (VVal::Int(start_idx), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.find(&b, *start_idx as usize, false)
+                    val.find(b, *start_idx as usize, false)
                 },
                 (VVal::Chr(_splitstr), VVal::Int(max)) => {
-                    val.split(&a, *max as usize, false)
+                    val.split(a, *max as usize, false)
                 },
                 (VVal::Byt(_splitstr), VVal::Int(max)) => {
-                    val.split(&a, *max as usize, false)
+                    val.split(a, *max as usize, false)
                 },
                 (VVal::Str(_splitstr), VVal::Int(max)) => {
-                    val.split(&a, *max as usize, false)
+                    val.split(a, *max as usize, false)
                 },
                 (VVal::Chr(needle), VVal::Chr(replace)) => {
                     let mut buf = [0; 6];
@@ -3032,7 +3037,7 @@ impl VVal {
                 let plen = pat.len();
                 let rlen = repl.len();
                 while i < len {
-                    if bv[i..].starts_with(&pat[..]) {
+                    if bv[i..].starts_with(pat) {
                         match plen.cmp(&rlen) {
                             Ordering::Less => {
                                 let len_delta = rlen - plen;
@@ -3280,22 +3285,8 @@ impl VVal {
     /// string characters.
     pub fn iter_over_vvals(&self) -> bool {
         self.with_deref(
-            |v| {
-                match v {
-                    VVal::Lst(_) => true,
-                    VVal::Map(_) => true,
-                    VVal::Opt(_) => true,
-                    _            => false,
-                }
-            },
-            |v| {
-                match v {
-                    Some(VVal::Lst(_)) => true,
-                    Some(VVal::Map(_)) => true,
-                    Some(VVal::Opt(_)) => true,
-                    _                  => false,
-                }
-            })
+            |v| matches!(v, VVal::Lst(_) | VVal::Map(_) | VVal::Opt(_)),
+            |v| matches!(v, Some(VVal::Lst(_)) | Some(VVal::Map(_)) | Some(VVal::Opt(_))))
     }
 
     /// This function returns you an iterator over the VVal.

@@ -620,6 +620,7 @@ pub(crate) fn compile_align_fun(fill: String, width: Option<CountNode>, align: i
 }
 
 #[allow(clippy::collapsible_if)]
+#[allow(clippy::collapsible_else_if)]
 pub(crate) fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
     let width = fmt.get_key("width");
     let width : Option<CountNode> =
@@ -748,22 +749,20 @@ pub(crate) fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
                     }
                 }
 
-            } else {
-                if let Some(prec) = prec {
-                    Box::new(move |fs: &mut FormatState, args: &[VVal]| {
-                        let prec = (*prec)(fs, args);
+            } else if let Some(prec) = prec {
+                Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                    let prec = (*prec)(fs, args);
 
-                        with_format_arg_write(&arg, args, fs, cast_type, |fs, v| {
-                            write!(fs, "{0:.1$}", v.f(), prec)
-                        })
+                    with_format_arg_write(&arg, args, fs, cast_type, |fs, v| {
+                        write!(fs, "{0:.1$}", v.f(), prec)
                     })
-                } else {
-                    Box::new(move |fs: &mut FormatState, args: &[VVal]| {
-                        with_format_arg_write(&arg, args, fs, cast_type, |fs, v| {
-                            write!(fs, "{}", v.f())
-                        })
+                })
+            } else {
+                Box::new(move |fs: &mut FormatState, args: &[VVal]| {
+                    with_format_arg_write(&arg, args, fs, cast_type, |fs, v| {
+                        write!(fs, "{}", v.f())
                     })
-                }
+                })
             }
         }
         CastType::Written => {

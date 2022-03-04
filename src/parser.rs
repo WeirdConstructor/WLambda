@@ -19,6 +19,7 @@ to parse in this hand written parser.
 */
 
 
+use std::str::FromStr;
 use crate::vval::{VVal};
 use crate::vval::Syntax;
 
@@ -732,7 +733,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
 
             if ps.consume_lookahead(":") {
                 let syntax_name = parse_identifier(ps)?;
-                if let Some(syn) = Syntax::from_str(&syntax_name) {
+                if let Ok(syn) = Syntax::from_str(&syntax_name) {
                     ps.skip_ws_and_comments();
                     sp.syn = syn;
                     Ok(VVal::Syn(sp))
@@ -1551,6 +1552,7 @@ fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 #[allow(clippy::unnecessary_unwrap)]
+#[allow(clippy::collapsible_else_if)]
 fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     if ps.at_end() {
         return Err(ps.err(ParseErrorKind::EOF("assignment")));

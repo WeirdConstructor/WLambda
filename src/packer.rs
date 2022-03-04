@@ -98,11 +98,9 @@ pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
     let mut i = 0;
 
     while !ps.at_end() {
-        let v = if data.is_vec() {
-            data.v_(i)
-        } else {
-            if i == 0 { data.clone() } else { VVal::None }
-        };
+        let v = if data.is_vec() { data.v_(i) }
+            else if i == 0       { data.clone() }
+            else                 { VVal::None };
 
         match ps.expect_some(ps.peek())? {
             '<' => { ps.consume(); endian = Endian::LE; }

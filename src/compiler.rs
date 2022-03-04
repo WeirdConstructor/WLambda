@@ -1447,7 +1447,7 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool)
             prog.op_destr(&spos, vp, DestructureInfo {
                 vars:   vars.clone(),
                 poses:  poses.clone(),
-                is_ref: is_ref,
+                is_ref,
             });
         })
     } else {
@@ -2216,14 +2216,14 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 Syntax::Lst => {
                     let mut pws : std::vec::Vec<(bool, ProgWriter)> = vec![];
                     for (a, _) in ast.iter().skip(1) {
-                        if a.is_vec() {
-                            if a.at(0).unwrap_or_else(|| VVal::None).syn().unwrap()
-                               == Syntax::VecSplice {
+                        if a.is_vec()
+                           && a.at(0).unwrap_or_else(|| VVal::None).syn().unwrap()
+                              == Syntax::VecSplice
+                        {
 
-                                let splice_pw = compile(&a.at(1).unwrap(), ce)?;
-                                pws.push((true, splice_pw));
-                                continue;
-                            }
+                            let splice_pw = compile(&a.at(1).unwrap(), ce)?;
+                            pws.push((true, splice_pw));
+                            continue;
                         }
 
                         let val_pw = compile(&a, ce)?;
