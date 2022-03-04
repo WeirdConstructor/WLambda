@@ -1,3 +1,10 @@
+// Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
+// This is a part of WLambda. See README.md and COPYING for details.
+
+/*!
+Implements the VM program and ops data structures for WLambda.
+*/
+
 use crate::vval::*;
 use crate::compiler::*;
 use crate::nvec::NVec;
@@ -602,7 +609,7 @@ impl Debug for Prog {
 }
 
 #[derive(Debug, Clone)]
-pub struct DestructureInfo {
+pub(crate) struct DestructureInfo {
     pub vars:   VVal,
     pub poses:  std::vec::Vec<VarPos>,
     pub is_ref: bool,

@@ -1,4 +1,7 @@
 /*!
+Implements a data querying algorithm that is used
+by the WLambda `$S(...)` syntax and by WLambda `std:selector`. It's a recursive
+searching, matching and capturing algorithm.
 */
 
 use crate::vval::{VVal, Env, VValFun, StackAction};
@@ -543,7 +546,7 @@ fn parse_selector(s: &str) -> Result<VVal, ParseError> {
 
 /// State for evaluating patterns and selectors.
 #[derive(Debug, Clone)]
-pub struct SelectorState {
+pub(crate) struct SelectorState {
     orig_string_len:   usize,
     captures:          Vec<(usize, usize)>,
     selector_captures: Vec<VVal>,
@@ -601,7 +604,7 @@ impl SelectorState {
 
 /// A parse buffer, storing the current offset into the input string.
 #[derive(Debug, Clone, Copy)]
-pub struct RxBuf<'a> {
+pub(crate) struct RxBuf<'a> {
     s:          &'a str,
     offs:       usize,
     orig_len:   usize,
@@ -641,7 +644,7 @@ impl<'a> RxBuf<'a> {
 
 /// Stores the position of a captured part of the input string of a pattern.
 #[derive(Debug, Clone)]
-pub struct CaptureNode {
+pub(crate) struct CaptureNode {
     idx:  usize,
     len:  usize,
     next: Option<Box<CaptureNode>>,
@@ -684,7 +687,7 @@ fn append_capture(cap_idx: usize, v: &mut Vec<Option<Box<CaptureNode>>>, cap: &(
 /// Stores the result of a pattern match, including the captured parts of the
 /// input string.
 #[derive(Debug, Clone)]
-pub struct PatResult {
+pub(crate) struct PatResult {
     matched:        bool,
     match_len:      usize,
     offs:           usize,
@@ -798,9 +801,9 @@ impl PatResult {
 }
 
 /// A function type for the evaluation node of a regex pattern.
-pub type PatternNode = Box<dyn Fn(RxBuf, &mut SelectorState) -> PatResult>;
+pub(crate) type PatternNode = Box<dyn Fn(RxBuf, &mut SelectorState) -> PatResult>;
 /// A function type for the evaluation node of a data structure selector.
-pub type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal) -> bool>;
+pub(crate) type SelNode     = Box<dyn Fn(&VVal, &mut SelectorState, &VVal) -> bool>;
 
 macro_rules! while_shorten_str {
     ($s: ident, $try_len: ident, $b: block) => {

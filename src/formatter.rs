@@ -1,3 +1,13 @@
+// Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
+// This is a part of WLambda. See README.md and COPYING for details.
+
+/*!
+This is a string formatter for WLambda.
+
+It provides the [create_formatter_fun]. It's syntax supports most of the
+Rust string formatting functionality.
+*/
+
 use crate::vval::{VVal, Env, VValFun};
 
 use crate::parser::state::State;

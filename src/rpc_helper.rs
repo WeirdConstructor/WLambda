@@ -1,3 +1,19 @@
+// Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
+// This is a part of WLambda. See README.md and COPYING for details.
+
+/*!
+Provides a helper to create a WLambda evaluation worker thread in your program.
+
+This is helpful if you want to provide a main thread that defines and evaluates
+a WLambda program in a multi threaded Rust program.
+
+For instance it's used by a HTTP server I wrote that used worker threads to
+handle requests. In that environment the central WLambda main thread was then
+queried for executing the requests. This of course makes WLambda the bottle
+neck for request responses. But if WLambda decided to just serve a file, the
+file I/O could be done outside the WLambda control flow.
+*/
+
 use crate::vval::*;
 use crate::threads::*;
 use crate::compiler::*;
