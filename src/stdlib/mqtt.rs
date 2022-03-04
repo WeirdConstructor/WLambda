@@ -11,14 +11,10 @@ use crate::{Env, StackAction};
 #[allow(unused_imports)]
 use crate::vval::{VValFun, VValUserData};
 #[cfg(feature="rumqttc")]
-use rumqttc::{MqttOptions, Client, QoS, Connection, Event, Packet};
+use rumqttc::{MqttOptions, Client, QoS, Event, Packet};
 #[cfg(feature="rumqttd")]
 use librumqttd::{Broker, Config};
 use crate::compiler::*;
-#[cfg(feature="rumqttc")]
-use std::rc::Rc;
-#[cfg(feature="rumqttc")]
-use std::cell::RefCell;
 
 #[cfg(feature="rumqttc")]
 use std::sync::{Arc, Mutex};
@@ -494,42 +490,6 @@ impl crate::threads::ThreadSafeUsr for MQTTBroker {
         }))
     }
 }
-
-#[cfg(feature="rumqttd")]
-#[derive(Clone)]
-struct MQTTLink {
-    con: Rc<RefCell<Connection>>,
-}
-
-#[cfg(feature="rumqttd")]
-impl MQTTLink {
-    pub fn new(con: Connection) -> Self {
-        Self {
-            con: Rc::new(RefCell::new(con)),
-        }
-    }
-}
-
-#[cfg(feature="rumqttd")]
-impl VValUserData for MQTTLink {
-    fn s(&self) -> String {
-        format!("$<MQTTBrokerLink>")
-    }
-    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
-    fn clone_ud(&self) -> Box<dyn VValUserData> {
-        Box::new(self.clone())
-    }
-}
-
-//#[cfg(feature="rumqttd")]
-//impl crate::threads::ThreadSafeUsr for MQTTLink {
-//    fn to_vval(&self) -> VVal {
-//        VVal::Usr(Box::new(MQTTLink {
-//            client: self.client.clone()
-//        }))
-//    }
-//}
-
 
 #[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {

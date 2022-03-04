@@ -1204,7 +1204,7 @@ impl Display for StackAction {
                 if panic.1.is_empty() {
                     write!(f, "Panic: {}", panic.0.s())
                 } else {
-                    write!(f, "Panic: {}\n", panic.0.s())?;
+                    writeln!(f, "Panic: {}", panic.0.s())?;
 
                     for t in panic.1.iter() {
                         write!(f, "    ")?;
@@ -1217,7 +1217,7 @@ impl Display for StackAction {
                             fmt_argv(f, &t.1)?;
                         }
 
-                        write!(f, "\n")?;
+                        writeln!(f)?;
                     }
 
                     Ok(())
@@ -3534,7 +3534,7 @@ impl VVal {
     /// This function is an internal function that clones a function reference
     /// and assigns new upvalues to it for making a new closure instance.
     pub fn clone_and_rebind_upvalues<T>(&self, f: T) -> VVal
-        where T: FnOnce(&std::vec::Vec<VarPos>, &mut std::vec::Vec<VVal>) -> ()
+        where T: FnOnce(&std::vec::Vec<VarPos>, &mut std::vec::Vec<VVal>)
     {
         if let VVal::Fun(fu) = self {
             let mut new_fu = fu.as_ref().clone();
@@ -5358,14 +5358,16 @@ impl VVal {
     pub fn v_fk(&self, key: &str)     -> f64 { self.v_k(key).f() }
 
     pub fn for_each<T>(&self, mut op: T)
-        where T: FnMut(&VVal) -> () {
+        where T: FnMut(&VVal)
+    {
         if let VVal::Lst(b) = &self {
             for i in b.borrow().iter() { op(i); }
         }
     }
 
     pub fn for_eachk<T>(&self, mut op: T)
-        where T: FnMut(&str, &VVal) -> () {
+        where T: FnMut(&str, &VVal)
+    {
         if let VVal::Map(b) = &self {
             for (k, v) in b.borrow().iter() { op(&k, v); }
         }

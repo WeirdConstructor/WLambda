@@ -29,7 +29,7 @@ enum VHttpClError {
     ReqwestError(reqwest::Error),
     InvalidHeaderName,
     InvalidHeaderValue,
-    InvalidQueryValue,
+    // InvalidQueryValue,
 }
 
 #[cfg(feature="reqwest")]
@@ -39,7 +39,7 @@ impl std::fmt::Display for VHttpClError {
             VHttpClError::ReqwestError(e)    => write!(f, "{}", e),
             VHttpClError::InvalidHeaderName  => write!(f, "InvalidHeaderName"),
             VHttpClError::InvalidHeaderValue => write!(f, "InvalidHeaderValue"),
-            VHttpClError::InvalidQueryValue  => write!(f, "InvalidQueryValue"),
+            // VHttpClError::InvalidQueryValue  => write!(f, "InvalidQueryValue"),
         }
     }
 }

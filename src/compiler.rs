@@ -947,6 +947,7 @@ impl BlockEnv {
         }
     }
 
+    #[allow(dead_code)]
     fn env_size(&self) -> usize {
         self.locals.len()
     }
@@ -1148,6 +1149,7 @@ impl CompileEnv {
         poses
     }
 
+    #[allow(dead_code)]
     pub fn local_env_size(&self) -> usize {
         self.block_env.env_size()
     }

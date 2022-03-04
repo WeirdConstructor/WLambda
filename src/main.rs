@@ -150,7 +150,7 @@ fn main() {
 
     let v_argv = VVal::vec();
     for a in argv.iter().skip(1) {
-        v_argv.push(VVal::new_str(&a));
+        v_argv.push(VVal::new_str(a));
     }
     ctx.set_global_var("@@", &v_argv);
 
@@ -205,15 +205,14 @@ fn main() {
                 },
                 _ => {}
             }
-        } else if cmd.len() == 1 {
-            if cmd[0] == "?" {
-                println!("REPL Usage:");
-                println!("?   <term1> <term2> ... - Search in section headers, display only headers");
-                println!("?#  <term1> <term2> ... - Search in section headers");
-                println!("?*  <term1> <term2> ... - Search in section bodies too, display only headers");
-                println!("?#* <term1> <term2> ... - Search in section bodies too");
-                return true;
-            }
+
+        } else if cmd.len() == 1 && cmd[0] == "?" {
+            println!("REPL Usage:");
+            println!("?   <term1> <term2> ... - Search in section headers, display only headers");
+            println!("?#  <term1> <term2> ... - Search in section headers");
+            println!("?*  <term1> <term2> ... - Search in section bodies too, display only headers");
+            println!("?#* <term1> <term2> ... - Search in section bodies too");
+            return true;
         }
 
         false

@@ -378,6 +378,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
     Ok(vec)
 }
 
+#[allow(clippy::collapsible_else_if)]
 #[allow(clippy::cast_lossless)]
 fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
     if ps.at_end() { return Err(ps.err(ParseErrorKind::EOF("number"))); }
@@ -1084,6 +1085,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
     }
 }
 
+#[allow(clippy::collapsible_else_if)]
 fn optimize_get_key(ps: &mut State, obj: VVal, value: VVal) -> VVal {
     let mut first_syn = obj.v_(0);
 

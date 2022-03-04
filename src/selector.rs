@@ -643,6 +643,7 @@ impl<'a> RxBuf<'a> {
 }
 
 /// Stores the position of a captured part of the input string of a pattern.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct CaptureNode {
     idx:  usize,
@@ -663,6 +664,7 @@ impl CaptureNode {
         input[self.idx..(self.idx + self.len)].to_string()
     }
 
+    #[allow(dead_code)]
     fn to_test_string(&self, input: &str) -> String {
         if let Some(n) = &self.next {
             input[self.idx..(self.idx + self.len)].to_string()
@@ -778,6 +780,7 @@ impl PatResult {
         v
     }
 
+    #[allow(dead_code)]
     pub fn to_test_string(&self, input: &str) -> String {
         if !self.matched { return "-nomatch-".to_string() }
 

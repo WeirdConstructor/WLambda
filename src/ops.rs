@@ -873,7 +873,7 @@ impl Debug for DirectFun {
     }
 }
 
-#[allow(clippy::box_vec)]
+#[allow(clippy::box_collection)]
 #[derive(Debug,Clone)]
 pub(crate) enum Op {
     Mov(ResPos, ResPos),
