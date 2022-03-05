@@ -529,44 +529,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     VVal::Int(a.i().wrapping_rem(b.i()))
                 }
             }),
-            Op::SNOr(b, a, r, mode) => op_a_b_r!(env, ret, retv, data, b, a, r, {
-                match *mode {
-                    1 => { // SomeOr
-                        match a {
-                            VVal::Opt(Some(a)) => a.as_ref().clone(),
-                            VVal::Opt(None)    => b,
-                            VVal::None         => b,
-                            _                  => a,
-                        }
-                    },
-                    4 => { // ExtSomeOr
-                        match a {
-                            VVal::Opt(Some(a)) => a.as_ref().clone(),
-                            VVal::Opt(None)    => b,
-                            VVal::None         => b,
-                            VVal::Err(_)       => b,
-                            _                  => a,
-                        }
-                    },
-                    2 => { // ErrOr
-                        match a {
-                            VVal::Err(_) => b,
-                            _            => a,
-                        }
-                    },
-                    3 => { // OptOr
-                        match a {
-                            VVal::Opt(Some(a)) => a.as_ref().clone(),
-                            VVal::Opt(None)    => b,
-                            _                  => a,
-                        }
-                    },
-                    0 | _ => {
-                        if let VVal::None = a { b }
-                        else                  { a }
-                    }
-                }
-            }),
             Op::Le(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
                 else { VVal::Bol(a.i() <= b.i()) }
@@ -811,11 +773,112 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 in_reg!(env, ret, data, a);
                 if !a.b() { pc = (pc as i32 + *jmp_offs) as usize; }
             },
-            Op::OrJmp(a, jmp_offs, r) => {
+
+//            Op::SNOr(b, a, r, mode) => op_a_b_r!(env, ret, retv, data, b, a, r, {
+//                match *mode {
+//                    1 => { // SomeOr
+//                        match a {
+//                            VVal::Opt(Some(a)) => a.as_ref().clone(),
+//                            VVal::Opt(None)    => b,
+//                            VVal::None         => b,
+//                            _                  => a,
+//                        }
+//                    },
+//                    4 => { // ExtSomeOr
+//                        match a {
+//                            VVal::Opt(Some(a)) => a.as_ref().clone(),
+//                            VVal::Opt(None)    => b,
+//                            VVal::None         => b,
+//                            VVal::Err(_)       => b,
+//                            _                  => a,
+//                        }
+//                    },
+//                    2 => { // ErrOr
+//                        match a {
+//                            VVal::Err(_) => b,
+//                            _            => a,
+//                        }
+//                    },
+//                    3 => { // OptOr
+//                        match a {
+//                            VVal::Opt(Some(a)) => a.as_ref().clone(),
+//                            VVal::Opt(None)    => b,
+//                            _                  => a,
+//                        }
+//                    },
+//                    0 | _ => {
+//                        if let VVal::None = a { b }
+//                        else                  { a }
+//                    }
+//                }
+//            }),
+            Op::OrJmp(a, jmp_offs, r, mode) => {
                 in_reg!(env, ret, data, a);
-                if a.b() {
-                    pc = (pc as i32 + *jmp_offs) as usize;
-                    out_reg!(env, ret, retv, data, r, a);
+                match mode {
+                    OrMode::Bool => if a.b() {
+                        pc = (pc as i32 + *jmp_offs) as usize;
+                        out_reg!(env, ret, retv, data, r, a);
+                    },
+                    OrMode::SomeOp => {
+                        match a {
+                            VVal::Opt(None)    => {},
+                            VVal::None         => {},
+                            VVal::Opt(Some(a)) => {
+                                pc = (pc as i32 + *jmp_offs) as usize;
+                                out_reg!(env, ret, retv, data, r, a.as_ref().clone());
+                            },
+                            _ => {
+                                pc = (pc as i32 + *jmp_offs) as usize;
+                                out_reg!(env, ret, retv, data, r, a);
+                            }
+                        }
+                    },
+                    OrMode::ExtSomeOp => {
+                        match a {
+                            VVal::Opt(None)    => {},
+                            VVal::None         => {},
+                            VVal::Err(_)       => {},
+                            VVal::Opt(Some(a)) => {
+                                pc = (pc as i32 + *jmp_offs) as usize;
+                                out_reg!(env, ret, retv, data, r, a.as_ref().clone());
+                            },
+                            _ => {
+                                pc = (pc as i32 + *jmp_offs) as usize;
+                                out_reg!(env, ret, retv, data, r, a);
+                            }
+                        }
+                    },
+                    OrMode::NoneOp => {
+                        match a {
+                            VVal::None => {},
+                            _ => {
+                                pc = (pc as i32 + *jmp_offs) as usize;
+                                out_reg!(env, ret, retv, data, r, a);
+                            }
+                        }
+                    },
+                    OrMode::ErrOp => {
+                        match a {
+                            VVal::Err(_) => {},
+                            _ => {
+                                pc = (pc as i32 + *jmp_offs) as usize;
+                                out_reg!(env, ret, retv, data, r, a);
+                            }
+                        }
+                    },
+                    OrMode::OptOp => {
+                        match a {
+                            VVal::Opt(None)    => {},
+                            VVal::Opt(Some(a)) => {
+                                pc = (pc as i32 + *jmp_offs) as usize;
+                                out_reg!(env, ret, retv, data, r, a.as_ref().clone());
+                            },
+                            _ => {
+                                pc = (pc as i32 + *jmp_offs) as usize;
+                                out_reg!(env, ret, retv, data, r, a);
+                            }
+                        }
+                    },
                 }
             },
             Op::AndJmp(a, jmp_offs, r) => {

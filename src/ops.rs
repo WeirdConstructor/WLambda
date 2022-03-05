@@ -93,11 +93,6 @@ impl Prog {
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                 },
-                Op::SNOr(p1, p2, p3, _) => {
-                    patch_respos_data(p1, self_data_next_idx);
-                    patch_respos_data(p2, self_data_next_idx);
-                    patch_respos_data(p3, self_data_next_idx);
-                },
                 Op::NewPair(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
@@ -187,7 +182,7 @@ impl Prog {
                 Op::JmpIfN(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                 },
-                Op::OrJmp(p1, _, p2) => {
+                Op::OrJmp(p1, _, p2, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 },
@@ -343,9 +338,9 @@ impl Prog {
         self.push_op(Op::AndJmp(a, jmp, r));
     }
 
-    pub(crate) fn op_or_jmp(&mut self, sp: &SynPos, a: ResPos, jmp: i32, r: ResPos) {
+    pub(crate) fn op_or_jmp_mode(&mut self, sp: &SynPos, a: ResPos, jmp: i32, r: ResPos, mode: OrMode) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::OrJmp(a, jmp, r));
+        self.push_op(Op::OrJmp(a, jmp, r, mode));
     }
 
     pub(crate) fn op_jmp_tbl(&mut self, sp: &SynPos, a: ResPos, tbl: Vec<i32>) {
@@ -794,11 +789,6 @@ pub(crate) enum BinOp {
     Ge,
     Gt,
     Eq,
-    SomeOr,
-    ExtSomeOr,
-    NoneOr,
-    ErrOr,
-    OptOr,
 }
 
 impl BinOp {
@@ -814,11 +804,6 @@ impl BinOp {
             BinOp::Ge        => Op::Ge(a, b, out),
             BinOp::Gt        => Op::Gt(a, b, out),
             BinOp::Eq        => Op::Eq(a, b, out),
-            BinOp::NoneOr    => Op::SNOr(a, b, out, 0),
-            BinOp::SomeOr    => Op::SNOr(a, b, out, 1),
-            BinOp::ErrOr     => Op::SNOr(a, b, out, 2),
-            BinOp::OptOr     => Op::SNOr(a, b, out, 3),
-            BinOp::ExtSomeOr => Op::SNOr(a, b, out, 4),
         }
     }
 }
@@ -888,6 +873,17 @@ impl Debug for DirectFun {
     }
 }
 
+#[derive(Debug,Clone,Copy)]
+#[repr(u8)]
+pub(crate) enum OrMode {
+    Bool,
+    SomeOp,
+    ExtSomeOp,
+    NoneOp,
+    ErrOp,
+    OptOp,
+}
+
 #[allow(clippy::box_collection)]
 #[derive(Debug,Clone)]
 pub(crate) enum Op {
@@ -911,7 +907,6 @@ pub(crate) enum Op {
     Ge(ResPos, ResPos, ResPos),
     Gt(ResPos, ResPos, ResPos),
     Eq(ResPos, ResPos, ResPos),
-    SNOr(ResPos, ResPos, ResPos, u8),
     NewErr(ResPos, ResPos),
     NewList(ResPos),
     ListPush(ResPos, ResPos, ResPos),
@@ -935,7 +930,7 @@ pub(crate) enum Op {
     Apply(ResPos, ResPos, ResPos),
     Jmp(i32),
     JmpIfN(ResPos, i32),
-    OrJmp(ResPos, i32, ResPos),
+    OrJmp(ResPos, i32, ResPos, OrMode),
     AndJmp(ResPos, i32, ResPos),
     JmpTbl(ResPos, Box<Vec<i32>>),
     CtrlFlow(CtrlFlow),

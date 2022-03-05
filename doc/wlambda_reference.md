@@ -1504,7 +1504,8 @@ searched for), or return that nothing was found.
 
 Note that there are two operators that interact with this type in a convenient
 way. The optional or operator `/$o` and the default value operator `//` can be
-used to provide default values and unwrap optionals.
+used to provide default values and unwrap optionals. These operators also support
+short circuit, that means you can write `x // return[$none]`.
 
 The functions `is_none` and `is_some` like stated above work for these
 optional values too:
@@ -1687,8 +1688,9 @@ std:assert_eq res 100;
 ```
 
 There is also the error or operator `/$e` and the extended default value
-operator `/?` that helps to shortcut any errors, but use this with care,
-it hides errors all to easily:
+operator `/?` that helps to shortcut any errors. These operators also support short
+circuit, that means you can do `func_might_return_err[] // return[$n]`.
+But use this with care, it hides errors all to easily!
 
 ```wlambda
 std:assert_eq ($e 30) /$e 20    20;
@@ -1705,6 +1707,12 @@ std:assert_eq $f      /? 10    $false;
 # You can combine this operator with the some or operator `//` or even `/?`:
 std:assert_eq ($e 30) /$e 10 // 20   10;
 std:assert_eq $n      /$e 10 // 20   20;
+
+# To demonstrate short circuit:
+!res = 0;
+!x = ($e 10) /$e { .res = 10 }[];
+std:assert_eq res 10;
+std:assert_eq x   $none;
 ```
 
 Most functions don't accept errors in their arguments.
@@ -1744,6 +1752,7 @@ a few functions that accept error values in their arguments:
 - std:to_ref
 - std:ref_id
 - std:ser:wlambda
+- `//`, `/?`, `/$n`, `/$e`, `/$o`
 
 All other functions don't accept errors as their argument.
 
@@ -6114,10 +6123,33 @@ an alternative value in case `$none` or `$o()` is provided and even unwraps
 optional values like `$o(10)`.  It does not do anything if an `$error` value is
 encountered.
 
+```wlambda
+!mul = {|1<2| !(a, b) = @;
+    a * b // 1
+};
+
+std:assert_eq mul[10]     10;
+std:assert_eq mul[10, 20] 200;
+```
+
 For handling the error value case you can either explicitly combine it with
 a `/$e` operator, which is the most explicit thing to use. Or use
 the extended default value operator `/?` which also provides the default
 value if an error is encountered.
+
+Please note that the operator versions (in contrast to the function versions
+in backticks) is short circuit just like the `&or` operator:
+
+```wlambda
+!mul = {|1<2| !(a, b) = @;
+    a   // return[-1]
+    * b // return[-1]
+};
+
+std:assert_eq mul[10]        -1;
+std:assert_eq mul[$none, 20] -1;
+std:assert_eq mul[10, 20]    200;
+```
 
 For more details see the following sections.
 
@@ -6129,6 +6161,16 @@ unwraps optional values like `$o(10)`.  It does not do anything if an `$error`
 value is encountered. For an operator that also defaults `$error` values see
 the extended default value operator `/?`.
 
+```wlambda
+std:assert_eq   $n     // 10           10;
+std:assert_eq   $o()   // 10           10;
+std:assert_eq   $o(20) // 10           20;
+std:assert_eq   $false // 10           $false;
+std:assert_eq   (is_err ($e 1) // 10)  $true;
+```
+
+Please note you can combine and chain these operators: `a_func[] /$e -1 // 10`.
+
 #### - /? _a_ _default-b_
 
 The extended default value operator is the `/?` operator, which returns an
@@ -6136,10 +6178,28 @@ alternative value in case `$none`, `$error` or `$o()` is provided on the left
 hand side and even unwraps optional values like `$o(10)`. It's the extended
 version of the default value operator `//`.
 
+```wlambda
+std:assert_eq   $n     /? 10  10;
+std:assert_eq   $o()   /? 10  10;
+std:assert_eq   $o(20) /? 10  20;
+std:assert_eq   $false /? 10  $false;
+std:assert_eq   ($e 1) /? 10  10;
+```
+
 #### - /$n _a_ _default-b_
 
 The `$none` default value operator returns it's right hand side if the
 left hand side is a `$none` value.
+
+```wlambda
+std:assert_eq   $n     /$n 10           10;
+std:assert_eq   $o()   /$n 10           $o();
+std:assert_eq   $o(20) /$n 10           $o(20);
+std:assert_eq   $false /$n 10           $false;
+std:assert_eq   (is_err ($e 1) /$n 10)  $true;
+```
+
+Please note you can combine and chain these operators: `a_func[] /$n -1 /$o -2`.
 
 #### - /$o _a_ _default-b_
 
@@ -6147,12 +6207,32 @@ The optionals default value operator returns it's right hand side if the
 left hand side is a `$o()` value. And it unwraps it's left hand side
 if it is an non empty optional value like eg. `$o(10)`.
 
+```wlambda
+std:assert_eq   $n     /$o 10           $n;
+std:assert_eq   $o()   /$o 10           10;
+std:assert_eq   $o(20) /$o 10           20;
+std:assert_eq   $false /$o 10           $false;
+std:assert_eq   (is_err ($e 1) /$o 10)  $true;
+```
+
+Please note you can combine and chain these operators: `a_func[] /$e -1 /$n -2 /$o -3`.
+
 #### - /$e _a_ _default-b_
 
 The error default value operator returns it's right hand side if the
 left hand side is an `$error` value. It's convenient to provide default
 values only in case an error is returned. It can also be used
 to ignore errors more conveniently.
+
+```wlambda
+std:assert_eq   $n     /$e 10           $n;
+std:assert_eq   $o()   /$e 10           $o();
+std:assert_eq   $o(20) /$e 10           $o(20);
+std:assert_eq   $false /$e 10           $false;
+std:assert_eq   (is_err ($e 1) /$e 10)  $false;
+```
+
+Please note you can combine and chain these operators: `a_func[] /$e -1 /$o -2 // 0`.
 
 ## <a name="7-string-and-byte-vector-formatting"></a>7 - String and Byte Vector Formatting
 

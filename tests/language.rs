@@ -5848,3 +5848,36 @@ fn check_some_none_err_or() {
     assert_eq!(ve("`/$e` $false 10"),         "$false");
     assert_eq!(ve("`/$e` ($e 1) 10"),         "10");
 }
+
+#[test]
+fn check_some_none_err_or_short_circuit() {
+    assert_eq!(ve("!x = 99; !r = { .x = $n     // return[-1]; 2 }[]; $p(r, x)"),            "$p(-1,99)");
+    assert_eq!(ve("!x = 99; !r = { .x = $o()   // return[-1]; 2 }[]; $p(r, x)"),            "$p(-1,99)");
+    assert_eq!(ve("!x = 99; !r = { .x = $o(20) // return[-1]; 2 }[]; $p(r, x)"),            "$p(2,20)");
+    assert_eq!(ve("!x = 99; !r = { .x = ($e 1) // return[-1]; 2 }[]; $p(r, is_err x)"),     "$p(2,$true)");
+    assert_eq!(ve("!x = 99; !r = { .x = 200    // return[-1]; 2 }[]; $p(r, x)"),            "$p(2,200)");
+
+    assert_eq!(ve("!x = 99; !r = { .x = $n     /? return[-1]; 2 }[]; $p(r, x)"),            "$p(-1,99)");
+    assert_eq!(ve("!x = 99; !r = { .x = $o()   /? return[-1]; 2 }[]; $p(r, x)"),            "$p(-1,99)");
+    assert_eq!(ve("!x = 99; !r = { .x = $o(20) /? return[-1]; 2 }[]; $p(r, x)"),            "$p(2,20)");
+    assert_eq!(ve("!x = 99; !r = { .x = ($e 1) /? return[-1]; 2 }[]; $p(r, is_err x)"),     "$p(-1,$false)");
+    assert_eq!(ve("!x = 99; !r = { .x = 200    /? return[-1]; 2 }[]; $p(r, x)"),            "$p(2,200)");
+
+    assert_eq!(ve("!x = 99; !r = { .x = $n     /$n return[-1]; 2 }[]; $p(r, x)"),           "$p(-1,99)");
+    assert_eq!(ve("!x = 99; !r = { .x = $o()   /$n return[-1]; 2 }[]; $p(r, x)"),           "$p(2,$o())");
+    assert_eq!(ve("!x = 99; !r = { .x = $o(20) /$n return[-1]; 2 }[]; $p(r, x)"),           "$p(2,$o(20))");
+    assert_eq!(ve("!x = 99; !r = { .x = ($e 1) /$n return[-1]; 2 }[]; $p(r, is_err x)"),    "$p(2,$true)");
+    assert_eq!(ve("!x = 99; !r = { .x = 200    /$n return[-1]; 2 }[]; $p(r, x)"),           "$p(2,200)");
+
+    assert_eq!(ve("!x = 99; !r = { .x = $n     /$e return[-1]; 2 }[]; $p(r, x)"),           "$p(2,$n)");
+    assert_eq!(ve("!x = 99; !r = { .x = $o()   /$e return[-1]; 2 }[]; $p(r, x)"),           "$p(2,$o())");
+    assert_eq!(ve("!x = 99; !r = { .x = $o(20) /$e return[-1]; 2 }[]; $p(r, x)"),           "$p(2,$o(20))");
+    assert_eq!(ve("!x = 99; !r = { .x = ($e 1) /$e return[-1]; 2 }[]; $p(r, is_err x)"),    "$p(-1,$false)");
+    assert_eq!(ve("!x = 99; !r = { .x = 200    /$e return[-1]; 2 }[]; $p(r, x)"),           "$p(2,200)");
+
+    assert_eq!(ve("!x = 99; !r = { .x = $n     /$o return[-1]; 2 }[]; $p(r, x)"),           "$p(2,$n)");
+    assert_eq!(ve("!x = 99; !r = { .x = $o()   /$o return[-1]; 2 }[]; $p(r, x)"),           "$p(-1,99)");
+    assert_eq!(ve("!x = 99; !r = { .x = $o(20) /$o return[-1]; 2 }[]; $p(r, x)"),           "$p(2,20)");
+    assert_eq!(ve("!x = 99; !r = { .x = ($e 1) /$o return[-1]; 2 }[]; $p(r, is_err x)"),    "$p(2,$true)");
+    assert_eq!(ve("!x = 99; !r = { .x = 200    /$o return[-1]; 2 }[]; $p(r, x)"),           "$p(2,200)");
+}

@@ -2185,11 +2185,6 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 Syntax::BinOpLe     => compile_binop(ast, BinOp::Le,  ce),
                 Syntax::BinOpLt     => compile_binop(ast, BinOp::Lt,  ce),
                 Syntax::BinOpEq     => compile_binop(ast, BinOp::Eq,  ce),
-                Syntax::BinOpSomeOr => compile_binop(ast, BinOp::SomeOr, ce),
-                Syntax::BinOpNoneOr => compile_binop(ast, BinOp::NoneOr, ce),
-                Syntax::BinOpErrOr  => compile_binop(ast, BinOp::ErrOr,  ce),
-                Syntax::BinOpOptOr  => compile_binop(ast, BinOp::OptOr,  ce),
-                Syntax::BinOpExtSomeOr => compile_binop(ast, BinOp::ExtSomeOr, ce),
                 Syntax::Ref => {
                     let ref_pw = compile(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
@@ -2752,9 +2747,25 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         prog.op_map_set_key(&spos, val, sym, map, store);
                     })
                 },
-                Syntax::Or => {
+                  Syntax::Or
+                | Syntax::BinOpSomeOr
+                | Syntax::BinOpNoneOr
+                | Syntax::BinOpErrOr
+                | Syntax::BinOpOptOr
+                | Syntax::BinOpExtSomeOr => {
+
                     let a = compile(&ast.at(1).unwrap(), ce)?;
                     let b = compile(&ast.at(2).unwrap(), ce)?;
+
+                    let mode =
+                        match syn {
+                            Syntax::BinOpSomeOr    => OrMode::SomeOp,
+                            Syntax::BinOpNoneOr    => OrMode::NoneOp,
+                            Syntax::BinOpErrOr     => OrMode::ErrOp,
+                            Syntax::BinOpOptOr     => OrMode::OptOp,
+                            Syntax::BinOpExtSomeOr => OrMode::ExtSomeOp,
+                            _                      => OrMode::Bool,
+                        };
 
                     pw_needs_storage!(prog, store, {
                         let mut aprog = Prog::new();
@@ -2764,8 +2775,8 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let bp = b.eval(&mut bprog);
 
                         bprog.op_mov(&spos, bp, store);
-                        aprog.op_or_jmp(
-                            &spos, ap, bprog.op_count() as i32, store);
+                        aprog.op_or_jmp_mode(
+                            &spos, ap, bprog.op_count() as i32, store, mode);
                         prog.append(aprog);
                         prog.append(bprog);
                     })
