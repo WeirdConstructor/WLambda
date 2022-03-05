@@ -1,4 +1,4 @@
-0.8.1 (unreleased)
+0.8.1 (2022-03-05)
 ==================
 
 * **Feature:** (Optional) Embedded MQTT broker and client API for inter process
@@ -18,8 +18,9 @@ circumstances.
 * **Feature:** Added `v_b` and `v_bk` to the wlambda::VVal API.
 * **Change:** Error messages and stack traces more readable and with line feeds.
 * **Change:** Improved parse and compile error output readability.
-* **Change:** Vim Syntax file now does not define ':'
-as keyword character anymore.
+* **Change:** Vim syntax file does not define ':' as keyword character anymore.
+* **Change:** Vim syntax file extended by more function combinators and
+special operators like `//`, `/?`, ...
 
 0.8.0 (2021-07-28)
 ==================

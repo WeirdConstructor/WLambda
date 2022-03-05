@@ -177,6 +177,17 @@ syn match wlFuncCombinators '|>'
 syn match wlFuncCombinators '[~]'
 syn match wlFuncCombinators '&>'
 syn match wlFuncCombinators '<&'
+syn match wlFuncCombinators '+>'
+syn match wlFuncCombinators '<+'
+syn match wlFuncCombinators '&@>'
+syn match wlFuncCombinators '<@&'
+syn match wlFuncCombinators '&or'
+syn match wlFuncCombinators '&and'
+syn match wlFuncCombinators '//'
+syn match wlFuncCombinators '/?'
+syn match wlFuncCombinators '/$n'
+syn match wlFuncCombinators '/$e'
+syn match wlFuncCombinators '/$o'
 
 " WLambda Regex Patterns
 
