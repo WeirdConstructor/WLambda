@@ -62,7 +62,6 @@ impl VHttpClient {
                 .request(method, url);
 
         if headers.is_some() {
-            use std::convert::TryInto;
             for (v, k) in headers.iter() {
                 let name = k.unwrap_or(VVal::None).s_raw();
 

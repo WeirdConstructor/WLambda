@@ -1784,7 +1784,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 /// // Parse a bare block without '{' ... '}' delimiters:
 /// match parse_block(&mut ps, false, false, false) {
 ///     Ok(v)  => { println!("Result: {}", v.s()); },
-///     Err(e) => { panic!(format!("ERROR: {}", e)); },
+///     Err(e) => { panic!("ERROR: {}", e); },
 /// }
 /// ```
 ///
@@ -1845,7 +1845,7 @@ pub fn parse_block(ps: &mut State, with_arity: bool, delimited: bool, end_delim:
 ///
 /// match parse("123; 456", "filenamehere") {
 ///     Ok(ast)  => println!("AST: {}", ast.s()),
-///     Err(e) => { panic!(format!("ERROR: {}", e)); },
+///     Err(e) => { panic!("ERROR: {}", e); },
 /// }
 /// ```
 pub fn parse(s: &str, filename: &str) -> Result<VVal, String> {

@@ -884,7 +884,7 @@ pub(crate) fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
 ///                .unwrap();
 ///         assert_eq!(ret.s_raw(), "a b in   43.294");
 ///     },
-///     Err(e) => { panic!(format!("Bad formatter: {}", e)); }
+///     Err(e) => { panic!("Bad formatter: {}", e); }
 /// }
 ///```
 pub fn create_formatter_fun(fmt: &VVal) -> Result<VVal, ParseError> {
