@@ -287,7 +287,7 @@ pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
 
             let elem = env.arg(0);
             elem.v_with_s_ref(0, |s| {
-                match &s[..] {
+                match s {
                     "start" => {
                         elem.v_with_s_ref(1, |name| {
                             let mut bytes =
@@ -428,7 +428,7 @@ impl VValBuilder {
     //
     pub fn event(&mut self, elem: &VVal) {
         elem.v_with_s_ref(0, |s| {
-            match &s[..] {
+            match s {
                 "start" => {
                     self.stack.push(std::mem::replace(&mut self.cur,
                         VVal::vec4(

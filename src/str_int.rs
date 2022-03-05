@@ -14,21 +14,21 @@ struct StringInterner {
 impl StringInterner {
     fn new() -> Self {
         let mut s = Self { strmap: HashMap::new(), fixed: vec![], allocated_since_gc: 0 };
-        let mut v = vec![];
-        v.push(s.s2sym("x"));
-        v.push(s.s2sym("y"));
-        v.push(s.s2sym("z"));
-        v.push(s.s2sym("w"));
-        v.push(s.s2sym("_data"));
-        v.push(s.s2sym("_proto"));
-        v.push(s.s2sym("r"));
-        v.push(s.s2sym("g"));
-        v.push(s.s2sym("b"));
-        v.push(s.s2sym("a"));
-        v.push(s.s2sym("h"));
-        v.push(s.s2sym("s"));
-        v.push(s.s2sym("v"));
-        s.fixed = v;
+        s.fixed = vec![
+            s.s2sym("x"),
+            s.s2sym("y"),
+            s.s2sym("z"),
+            s.s2sym("w"),
+            s.s2sym("_data"),
+            s.s2sym("_proto"),
+            s.s2sym("r"),
+            s.s2sym("g"),
+            s.s2sym("b"),
+            s.s2sym("a"),
+            s.s2sym("h"),
+            s.s2sym("s"),
+            s.s2sym("v"),
+        ];
         s
     }
 

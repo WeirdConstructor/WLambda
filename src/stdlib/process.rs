@@ -78,7 +78,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                             vts.id, e)))
                 }
             }
-        }).unwrap_or(
+        }).unwrap_or_else(||
             Ok(env.new_err(format!(
                 "std:process:try_wait: First argument not an IO handle! {}",
                 chld.s()))))
@@ -102,7 +102,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                             vts.id, e)))
                 }
             }
-        }).unwrap_or(
+        }).unwrap_or_else(||
             Ok(env.new_err(format!(
                 "std:process:wait: First argument not an IO handle! {}",
                 chld.s()))))
@@ -135,7 +135,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                         format!("Error killing pid={}: {}",
                             vts.id, e))),
             }
-        }).unwrap_or(
+        }).unwrap_or_else(||
             Ok(env.new_err(format!(
                 "std:process:kill_wait: First argument not an IO handle! {}",
                 chld.s()))))

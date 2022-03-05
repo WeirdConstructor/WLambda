@@ -219,7 +219,7 @@ pub fn to_csv(delim: char, row_sep: &str, escape_all: bool, table: VVal) -> Stri
                     }
                     ret.push('"');
                 } else {
-                    ret += &field;
+                    ret += field;
                 }
             })
         }

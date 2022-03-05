@@ -666,7 +666,7 @@ impl DestructureInfo {
             VVal::Map(m) => {
                 for (i, pos) in self.poses.iter().enumerate() {
                     let sym = self.vars.at(i).unwrap().to_sym();
-                    let val = m.borrow().get(&sym).cloned().unwrap_or_else(|| VVal::None);
+                    let val = m.borrow().get(&sym).cloned().unwrap_or(VVal::None);
 
                     set_at_varpos!(self, env, pos, &val);
                 }
@@ -675,11 +675,11 @@ impl DestructureInfo {
                 let (lv, rv) = &*p;
 
                 if let Some(pos) = self.poses.get(0) {
-                    set_at_varpos!(self, env, pos, &lv);
+                    set_at_varpos!(self, env, pos, lv);
                 }
 
                 if let Some(pos) = self.poses.get(1) {
-                    set_at_varpos!(self, env, pos, &rv);
+                    set_at_varpos!(self, env, pos, rv);
                 }
             },
             VVal::IVec(vb) => {
@@ -828,6 +828,7 @@ pub(crate) enum ToRefType {
 }
 
 #[derive(Debug,Clone)]
+#[allow(clippy::box_collection)]
 pub(crate) enum Builtin {
     Export(Box<String>, ResPos),
     DumpStack(Box<SynPos>),

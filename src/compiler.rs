@@ -269,7 +269,7 @@ impl ModuleResolver for LocalFileModuleResolver {
                         let exports = Rc::new(ctx.get_exports());
                         self.loaded_modules
                             .borrow_mut()
-                            .insert(pth, exports.clone());
+                            .insert(pth, exports);
                         Ok(ctx.get_exports())
                     },
                 }
@@ -364,10 +364,7 @@ impl GlobalEnv {
     /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
     #[allow(dead_code)]
     pub fn get_var(&self, var: &str) -> Option<VVal> {
-        match self.env.get(var) {
-            Some(v) => Some(v.deref()),
-            None    => None,
-        }
+        self.env.get(var).map(|v| v.deref())
     }
 
     /// Returns the reference to the value of a global variable.
@@ -377,10 +374,7 @@ impl GlobalEnv {
     /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
     #[allow(dead_code)]
     pub fn get_var_ref(&self, var: &str) -> Option<VVal> {
-        match self.env.get(var) {
-            Some(v) => Some(v.clone()),
-            None    => None,
-        }
+        self.env.get(var).cloned()
     }
 
     /// Sets a symbol table for a module before a module asks for it.
@@ -413,7 +407,7 @@ impl GlobalEnv {
 
         if let Some(st) = self.mem_modules.borrow_mut().get(mod_name) {
             for (k, v) in &st.symbols {
-                self.env.insert(prefix.clone() + &k, v.clone());
+                self.env.insert(prefix.clone() + k, v.clone());
             }
             true
         } else {
@@ -512,7 +506,7 @@ impl GlobalEnv {
             Some(Arc::new(Mutex::new(
                 DefaultThreadCreator::new(
                     FunctionGlobalEnvCreator::from(
-                        Box::new(|| GlobalEnv::new_default())))))));
+                        Box::new(GlobalEnv::new_default)))))));
         g.borrow_mut().set_resolver(
             Rc::new(RefCell::new(LocalFileModuleResolver::new())));
         g.borrow_mut().set_var("\\", &VVal::None);
@@ -909,6 +903,7 @@ pub(crate) enum ArityParam {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::box_collection)]
 struct BlockEnv {
     local_map_stack: std::vec::Vec<(usize, Box<std::collections::HashMap<String, VarPos>>)>,
     locals:          std::vec::Vec<(String, CompileLocal)>,
@@ -1289,14 +1284,14 @@ pub(crate) fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::V
 }
 
 fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
     let vars    = ast.at(1).unwrap();
     let value   = ast.at(2).unwrap();
-    let destr   = ast.at(3).unwrap_or_else(|| VVal::None);
+    let destr   = ast.at(3).unwrap_or(VVal::None);
 
     //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
@@ -1363,7 +1358,7 @@ pub(crate) fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, Compile
 }
 
 fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     let var = ast.at(1).unwrap();
@@ -1428,12 +1423,12 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool)
 {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     let vars          = ast.at(1).unwrap();
     let value         = ast.at(2).unwrap();
-    let destr         = ast.at(3).unwrap_or_else(|| VVal::None);
+    let destr         = ast.at(3).unwrap_or(VVal::None);
 
     if destr.b() {
         let val_pw = compile(&value, ce)?;
@@ -1534,7 +1529,7 @@ macro_rules! var_env_clear_locals {
 }
 
 fn compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     ce.borrow_mut().push_block_env();
@@ -1563,7 +1558,7 @@ fn compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 {
     match ast {
         VVal::Lst(_) => {
-            let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+            let syn  = ast.at(0).unwrap_or(VVal::None);
             let syn  = syn.get_syn();
 
             match syn {
@@ -1598,7 +1593,7 @@ fn compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 fn compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     let a_pw = compile(&ast.at(1).unwrap(), ce)?;
@@ -1713,7 +1708,7 @@ fn compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub(crate) fn compile_break(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() > 3 {
@@ -1737,7 +1732,7 @@ pub(crate) fn compile_break(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub(crate) fn compile_next(ast: &VVal, _ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() > 2 {
@@ -1752,7 +1747,7 @@ pub(crate) fn compile_next(ast: &VVal, _ce: &mut Rc<RefCell<CompileEnv>>)
 pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 4 && ast.len() != 5 {
@@ -1762,11 +1757,11 @@ pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     let cond =
         compile_direct_block(
-            &ast.at(2).unwrap_or_else(|| VVal::None), ce)?;
+            &ast.at(2).unwrap_or(VVal::None), ce)?;
 
     let then_body =
         compile_direct_block(
-            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
+            &ast.at(3).unwrap_or(VVal::None), ce)?;
 
     if let Some(else_body) = ast.at(4) {
         let else_body = compile_direct_block(&else_body, ce)?;
@@ -1840,7 +1835,7 @@ pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub(crate) fn compile_while(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 4 {
@@ -1851,11 +1846,11 @@ pub(crate) fn compile_while(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     let cond =
         compile_direct_block(
-            &ast.at(2).unwrap_or_else(|| VVal::None), ce)?;
+            &ast.at(2).unwrap_or(VVal::None), ce)?;
 
     let body =
         compile_direct_block(
-            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
+            &ast.at(3).unwrap_or(VVal::None), ce)?;
 
     return pw_null!(prog, {
         // Create the OPs for the body:
@@ -1885,7 +1880,7 @@ pub(crate) fn compile_while(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 pub(crate) fn compile_iter(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<ProgWriter, CompileError>
 {
-    let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+    let syn  = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 5 {
@@ -1895,11 +1890,11 @@ pub(crate) fn compile_iter(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
              iteration expression)".to_string()));
     }
 
-    let var = ast.at(2).unwrap_or_else(|| VVal::None);
+    let var = ast.at(2).unwrap_or(VVal::None);
 
     let varname =
         match var.at(0).unwrap().get_syn() {
-            Syntax::Var => var.at(1).unwrap_or_else(|| VVal::None).s_raw(),
+            Syntax::Var => var.at(1).unwrap_or(VVal::None).s_raw(),
             _ => {
                 return Err(ast.compile_err(
                     "iter takes an identifier as first argument".to_string()));
@@ -1911,13 +1906,13 @@ pub(crate) fn compile_iter(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     let iterable =
         compile_direct_block(
-            &ast.at(3).unwrap_or_else(|| VVal::None), ce)?;
+            &ast.at(3).unwrap_or(VVal::None), ce)?;
 
     ce.borrow_mut().def_local(&varname, iter_var);
 
     let expr =
         compile_direct_block(
-            &ast.at(4).unwrap_or_else(|| VVal::None), ce)?;
+            &ast.at(4).unwrap_or(VVal::None), ce)?;
 
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
 
@@ -2088,7 +2083,7 @@ pub(crate) fn compile_match(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     let res_ref =
         ce.borrow_mut().global.borrow_mut()
           .get_var_ref("\\")
-          .unwrap_or_else(|| VVal::None);
+          .unwrap_or(VVal::None);
 
     let dfun =
         if map.is_empty() {
@@ -2162,7 +2157,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 {
     match ast {
         VVal::Lst(_) => {
-            let syn  = ast.at(0).unwrap_or_else(|| VVal::None);
+            let syn  = ast.at(0).unwrap_or(VVal::None);
             let spos = syn.get_syn_pos();
             let syn  = syn.get_syn();
 
@@ -2217,7 +2212,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let mut pws : std::vec::Vec<(bool, ProgWriter)> = vec![];
                     for (a, _) in ast.iter().skip(1) {
                         if a.is_vec()
-                           && a.at(0).unwrap_or_else(|| VVal::None).syn().unwrap()
+                           && a.at(0).unwrap_or(VVal::None).syn().unwrap()
                               == Syntax::VecSplice
                         {
 
@@ -2351,14 +2346,14 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let func_prog = Rc::new(func_prog);
 
                     ce_sub.borrow_mut().explicit_arity.0 =
-                        match explicit_arity.at(0).unwrap_or_else(|| VVal::None) {
+                        match explicit_arity.at(0).unwrap_or(VVal::None) {
                             VVal::Int(i) => ArityParam::Limit(i as usize),
                             VVal::Bol(true) => ArityParam::Limit(0),
                             _ => ArityParam::Undefined,
                         };
 
                     ce_sub.borrow_mut().explicit_arity.1 =
-                        match explicit_arity.at(1).unwrap_or_else(|| VVal::None) {
+                        match explicit_arity.at(1).unwrap_or(VVal::None) {
                             VVal::Int(i) => ArityParam::Limit(i as usize),
                             VVal::Bol(true) => ArityParam::Infinite,
                             _ => ArityParam::Undefined,
@@ -2419,7 +2414,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let mut compiled_args = vec![];
                         let mut argc = 0;
                         for e in args.iter() {
-                            compiled_args.push(compile(&e, ce)?);
+                            compiled_args.push(compile(e, ce)?);
                             argc += 1;
                         }
 
@@ -2463,7 +2458,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         }
                     } else {
                         let symbol =
-                            if let Syntax::Var = ast.at(1).unwrap_or_else(|| VVal::None).at(0).unwrap_or_else(|| VVal::None).get_syn() {
+                            if let Syntax::Var = ast.at(1).unwrap_or(VVal::None).at(0).unwrap_or(VVal::None).get_syn() {
                                 let var = ast.at(1).unwrap().at(1).unwrap();
                                 Some(var.s_raw())
                             } else {
@@ -2492,7 +2487,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let mut compiled_args = vec![];
                         let mut argc = 0;
                         for e in args.iter() {
-                            compiled_args.push(compile(&e, ce)?);
+                            compiled_args.push(compile(e, ce)?);
                             argc += 1;
                         }
 
@@ -2890,13 +2885,13 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let res_ref =
                         ce.borrow_mut().global.borrow_mut()
                           .get_var_ref("\\")
-                          .unwrap_or_else(|| VVal::None);
+                          .unwrap_or(VVal::None);
 
                     let regex_mode =
                         ast.at(2)
                            .unwrap()
                            .with_s_ref(
-                               |mode_s| selector::RegexMode::from_str(mode_s));
+                               selector::RegexMode::from_str);
 
                     ast.at(1).unwrap().with_s_ref(|pat_src| {
                         match selector::create_regex_find_function(
@@ -2918,7 +2913,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let res_ref =
                         ce.borrow_mut().global.borrow_mut()
                           .get_var_ref("\\")
-                          .unwrap_or_else(|| VVal::None);
+                          .unwrap_or(VVal::None);
 
                     ast.at(1).unwrap().with_s_ref(|sel_src| {
                         match selector::create_selector_function(sel_src, res_ref) {
@@ -2938,7 +2933,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let res_ref =
                         ce.borrow_mut().global.borrow_mut()
                           .get_var_ref("\\")
-                          .unwrap_or_else(|| VVal::None);
+                          .unwrap_or(VVal::None);
 
                     let variable_map = VVal::map();
 
@@ -3010,7 +3005,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     -> Result<EvalNode, CompileError>
 {
-    let prog = compile_stmts(&ast, 1, ce)?;
+    let prog = compile_stmts(ast, 1, ce)?;
 
     let mut p = Prog::new();
     prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));

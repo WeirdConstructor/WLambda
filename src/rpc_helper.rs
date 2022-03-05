@@ -171,10 +171,10 @@ pub fn rpc_handler_step(
         Err(RPCHandlerError::Disconnected)
 
     } else if let VVal::Opt(Some(m)) = res {
-        let cmd  = m.at(0).unwrap_or_else(|| VVal::None).i();
-        let resp = m.at(1).unwrap_or_else(|| VVal::None);
-        let name = m.at(2).unwrap_or_else(|| VVal::None);
-        let args = m.at(3).unwrap_or_else(|| VVal::None);
+        let cmd  = m.at(0).unwrap_or(VVal::None).i();
+        let resp = m.at(1).unwrap_or(VVal::None);
+        let name = m.at(2).unwrap_or(VVal::None);
+        let args = m.at(3).unwrap_or(VVal::None);
 
         match cmd {
             RPC_MSG_CALL => {
@@ -213,7 +213,7 @@ pub fn rpc_handler_step(
                         let arg =
                             if args.is_none() { vec![] }
                             else { args.to_vec() };
-                        let ret = ctx.call(&v, &arg).unwrap_or_else(|_| VVal::None);
+                        let ret = ctx.call(&v, &arg).unwrap_or(VVal::None);
                         if ret.is_err() {
                             handle.error_channel.send(
                                 &VVal::err_msg(&format!("Error on send: {}", ret.s())));

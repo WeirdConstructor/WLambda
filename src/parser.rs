@@ -122,7 +122,7 @@ fn parse_nvec_body(ps: &mut State, kind: NVecKind) -> Result<VVal, ParseError> {
 
             if !ps.consume_if_eq_wsc(')') {
                 Err(ps.err(ParseErrorKind::ExpectedToken(')', "numerical vector end")))
-            } else if dim > 4 || dim < 1 {
+            } else if !(1..=4).contains(&dim) {
                 Err(ps.err(ParseValueError::VectorLength))
             } else {
                 Ok(vec)
@@ -408,13 +408,8 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
     let radix_or_num = ps.take_while(|c| c.is_digit(10)).to_string();
 
     let (radix, num) = if ps.consume_if_eq('r') {
-        let radix = if let Ok(r) = u8::from_str_radix(&radix_or_num, 10) {
-            r
-        } else {
-            10
-        };
-
-        if radix < 2 || radix > 36 {
+        let radix = radix_or_num.parse::<u8>().unwrap_or(10);
+        if !(2..=36).contains(&radix) {
             return Err(ps.err(ParseNumberError::UnsupportedRadix(radix)));
         }
 
@@ -805,19 +800,15 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
 
 #[allow(dead_code)]
 fn is_var(expr: &VVal) -> bool {
-    if let Some(ea) = expr.at(0) {
-        if let VVal::Syn(s) = ea {
-            return s.syn() == Syntax::Var;
-        }
+    if let Some(VVal::Syn(s)) = expr.at(0) {
+        return s.syn() == Syntax::Var;
     }
     false
 }
 
 fn is_call(expr: &VVal) -> bool {
-    if let Some(ea) = expr.at(0) {
-        if let VVal::Syn(s) = ea {
-            return s.syn() == Syntax::Call;
-        }
+    if let Some(VVal::Syn(s)) = expr.at(0) {
+        return s.syn() == Syntax::Call;
     }
     false
 }
@@ -1186,7 +1177,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
         let value =
             if c.is_digit(10) {
                 let idx = ps.take_while(|c| c.is_digit(10)).to_string();
-                if let Ok(idx_num) = i64::from_str_radix(&idx, 10) {
+                if let Ok(idx_num) = idx.parse::<i64>() {
                     ps.skip_ws_and_comments();
                     VVal::Int(idx_num)
                 } else {
@@ -1225,7 +1216,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     return Ok(field_set);
                 },
                 '=' => {
-                    if let None = ps.peek_op() {
+                    if ps.peek_op().is_none() {
                         ps.consume_wsc();
                         let field_set = ps.syn(Syntax::SetKey);
                         field_set.push(obj);

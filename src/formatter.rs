@@ -52,7 +52,7 @@ fn parse_count(ps: &mut State) -> Result<VVal, ParseError> {
         parse_argument(ps)
     } else {
         let integer = ps.take_while(|c| c.is_digit(10));
-        if let Ok(idx) = u32::from_str_radix(&integer.to_string(), 10) {
+        if let Ok(idx) = integer.to_string().parse::<u32>() {
             Ok(VVal::vec2(VVal::new_sym("count"), VVal::Int(idx as i64)))
         } else {
             Err(ps.err(
@@ -266,9 +266,9 @@ fn parse_format(ps: &mut State, implicit_index: &mut usize) -> Result<VVal, Pars
     if c == ':' {
         ps.consume();
 
-        let arg_idx_prev = arg.at(1).unwrap_or_else(|| VVal::None);
+        let arg_idx_prev = arg.at(1).unwrap_or(VVal::None);
         fmt = parse_format_spec(ps, &arg)?;
-        let arg_idx_after = arg.at(1).unwrap_or_else(|| VVal::None);
+        let arg_idx_after = arg.at(1).unwrap_or(VVal::None);
 
         // There is some magic patching going on in parse_format_spec.
         // Not entirely clean. But it might get the job done for now.
@@ -423,7 +423,7 @@ pub(crate) fn write_vval<F>(arg: &VVal, fs: &mut FormatState, ct: CastType, mut 
     use crate::nvec::NVec;
 
     if let CastType::Written = ct {
-        return f(fs, &arg);
+        return f(fs, arg);
     }
 
     match arg {
@@ -514,7 +514,7 @@ pub(crate) fn write_vval<F>(arg: &VVal, fs: &mut FormatState, ct: CastType, mut 
 
                 let v = hm.get(k).unwrap();
                 write!(fs, "{}:", k.as_ref())?;
-                f(fs, &v)?;
+                f(fs, v)?;
             }
 
             write!(fs, "}}")?;
@@ -532,7 +532,7 @@ pub(crate) fn with_format_arg_write<F>(arg: &FormatArg, args: &[VVal], fs: &mut 
         FormatArg::Key(k) => {
             let val =
                 k.with_s_ref(|ks|
-                    args[0].get_key(ks).unwrap_or_else(|| VVal::None));
+                    args[0].get_key(ks).unwrap_or(VVal::None));
             write_vval(&val, fs, ct, f)
         },
     }
@@ -640,7 +640,7 @@ pub(crate) fn compile_format(arg: FormatArg, fmt: &VVal) -> FormatNode {
 
     let align = fmt.v_ik("align");
     let mut fill  = fmt.v_s_rawk("fill");
-    if fill == "" {
+    if fill.is_empty() {
         fill = String::from(" ");
     }
 
@@ -816,9 +816,9 @@ pub(crate) fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
 
     let mut max_argc = 0;
     for (item, _) in fmt.iter() {
-        let arg = item.at(1).unwrap_or_else(|| VVal::None);
+        let arg = item.at(1).unwrap_or(VVal::None);
         item.at(0).unwrap().with_s_ref(|syn| {
-            match &syn[..] {
+            match syn {
                 "text" => {
                     fmts.push(Box::new(move |fs: &mut FormatState, _args: &[VVal]| {
                         arg.with_s_ref(|s| fs.write_str(s))
@@ -827,7 +827,7 @@ pub(crate) fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
                 _ => {
                     let arg =
                         arg.at(0).unwrap().with_s_ref(|arg_syn| {
-                            match &arg_syn[..] {
+                            match arg_syn {
                                 "index" => {
                                     if max_argc < arg.v_i(1) + 1 {
                                         max_argc = arg.v_i(1) + 1;
@@ -846,7 +846,7 @@ pub(crate) fn compile_formatter(fmt: &VVal) -> (FormatNode, usize) {
                     fmts.push(
                         compile_format(
                             arg,
-                            &item.at(2).unwrap_or_else(|| VVal::None)));
+                            &item.at(2).unwrap_or(VVal::None)));
 //                    panic!(format!("Unknown format spec: {}", item.s()));
 //                    fmts.push(Box::new(|fs: &mut FormatState| {
 //                        fs.add_char('?');

@@ -79,7 +79,7 @@ macro_rules! endian_bytes {
 fn parse_size(ps: &mut State) -> Result<usize, ParseError> {
     let uh = ps.take_while(|c| c.is_digit(10));
 
-    if let Ok(cn) = usize::from_str_radix(&uh.to_string(), 10) {
+    if let Ok(cn) = uh.to_string().parse::<usize>() {
         ps.skip_ws();
         Ok(cn)
     } else {
@@ -87,6 +87,7 @@ fn parse_size(ps: &mut State) -> Result<usize, ParseError> {
     }
 }
 
+#[allow(clippy::same_item_push)]
 pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
     let mut ps = State::new(pak_str, "<pack string>");
     ps.skip_ws();
@@ -111,14 +112,14 @@ pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
                 ps.consume();
 
                 i += 1;
-                v.with_bv_ref(|s| byts.extend_from_slice(&s[..]));
+                v.with_bv_ref(|s| byts.extend_from_slice(s));
                 byts.push(0x00);
             },
             'y' => {
                 ps.consume();
 
                 i += 1;
-                v.with_bv_ref(|s| byts.extend_from_slice(&s[..]));
+                v.with_bv_ref(|s| byts.extend_from_slice(s));
             },
             'c' => {
                 ps.consume();
@@ -127,7 +128,7 @@ pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
                 i += 1;
                 v.with_bv_ref(|s| {
                     if len > s.len() {
-                        byts.extend_from_slice(&s[..]);
+                        byts.extend_from_slice(s);
                         for _ in 0..(len - s.len()) {
                             byts.push(0x00);
                         }
@@ -140,7 +141,7 @@ pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
                 ps.consume();
                 i += 1;
                 v.with_bv_ref(|s| {
-                    if s.len() == 0 {
+                    if s.is_empty() {
                         byts.push(0x00)
                     } else {
                         byts.push(s[0])
@@ -174,7 +175,7 @@ pub(crate) fn do_pack(pak_str: &str, data: &VVal) -> Result<VVal, ParseError> {
                                 "unknown size in s<n> pack string".to_string())));
                     }
 
-                    byts.extend_from_slice(&s[..]);
+                    byts.extend_from_slice(s);
                     Ok(())
                 })?;
             },

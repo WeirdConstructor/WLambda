@@ -16,7 +16,7 @@ fn store_var_if(b: bool, v: &VVal, var: &Option<Symbol>, f: &FnVarAssign) -> boo
 
 fn store_var(v: &VVal, var: &Option<Symbol>, f: &FnVarAssign) {
     if let Some(sym) = var {
-        f(&sym, v);
+        f(sym, v);
     }
 }
 
@@ -538,7 +538,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                             for (k, v) in m.borrow().iter() {
                                 let k = VVal::Sym(k.clone());
                                 if    (kv_match.0)(&k, f)
-                                   && (kv_match.1)(&v, f)
+                                   && (kv_match.1)(v, f)
                                 {
                                     matched_kv = true;
                                     break;
@@ -562,7 +562,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
             if ast.len() == 1 {
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                     if let VVal::Opt(None) = v {
-                        store_var(&v, &var, f);
+                        store_var(v, &var, f);
                         true
                     } else {
                         false
@@ -574,7 +574,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                     let matched =
                         if let VVal::Opt(Some(ov)) = &v { cond(&*ov, f) }
                         else                            { false };
-                    store_var_if(matched, &v, &var, f)
+                    store_var_if(matched, v, &var, f)
                 }))
             }
         },
@@ -597,7 +597,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
         Syntax::Pattern => {
             let res_ref = (VVal::None).to_ref();
 
-            let mode = ast.at(2).unwrap().with_s_ref(|s| selector::RegexMode::from_str(s));
+            let mode = ast.at(2).unwrap().with_s_ref(selector::RegexMode::from_str);
 
             if mode == selector::RegexMode::FindAll {
                 match ast.at(1).unwrap().with_s_ref(|pat_src|
@@ -610,7 +610,7 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
                             fun(&v.deref(), Box::new(move |v, _pos| {
                                 matches.push(v);
                             }));
-                            if matches_o.len() > 0 {
+                            if !matches_o.is_empty() {
                                 store_var(&matches_o, &var, f);
                                 true
                             } else {
@@ -673,9 +673,9 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
 
             Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                 store_var_if(
-                       variant_a(&v, f)
-                    && variant_b(&v, f),
-                    &v, &var, f)
+                       variant_a(v, f)
+                    && variant_b(v, f),
+                    v, &var, f)
             }))
         },
         Syntax::Or => {
@@ -684,9 +684,9 @@ pub fn compile_struct_pattern(ast: &VVal, var_map: &VVal, var: Option<Symbol>)
 
             Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                 store_var_if(
-                       variant_a(&v, f)
-                    || variant_b(&v, f),
-                    &v, &var, f)
+                       variant_a(v, f)
+                    || variant_b(v, f),
+                    v, &var, f)
             }))
         },
         _ => {

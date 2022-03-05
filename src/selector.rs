@@ -297,7 +297,7 @@ pub fn parse_pattern(ps: &mut State) -> Result<VVal, ParseError> {
 fn parse_index(ps: &mut State) -> Result<VVal, ParseError> {
     let uh = ps.take_while(|c| c.is_digit(10));
 
-    if let Ok(cn) = i64::from_str_radix(&uh.to_string(), 10) {
+    if let Ok(cn) = uh.to_string().parse::<i64>() {
         ps.skip_ws();
         Ok(VVal::Int(cn as i64))
     } else {
@@ -831,7 +831,7 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
 
     if p.is_pair() {
         let pair_type = p.at(0).unwrap().to_sym();
-        let pair_val  = p.at(1).unwrap_or_else(|| VVal::None);
+        let pair_val  = p.at(1).unwrap_or(VVal::None);
 
         if pair_type == s2sym("I") {
             let key_str = pair_val.clone();
@@ -1161,7 +1161,7 @@ fn compile_pattern_branch(pat: &VVal, next: PatternNode) -> PatternNode {
 fn compile_pattern(pat: &VVal, next: PatternNode) -> PatternNode {
     //d// println!("COMPILE PATTERN [{}]", pat.s());
 
-    let first = pat.at(0).unwrap_or_else(|| VVal::None);
+    let first = pat.at(0).unwrap_or(VVal::None);
     if first.is_sym() && first.to_sym() == s2sym("Alt") {
         let next_a : Rc<PatternNode> = Rc::from(next);
         let next_b : Rc<PatternNode> = next_a.clone();
@@ -1192,9 +1192,9 @@ fn compile_pattern(pat: &VVal, next: PatternNode) -> PatternNode {
 }
 
 fn match_pattern(pat: &PatternNode, s: &str, st: &mut SelectorState) -> bool {
-    let old_str = st.set_str(&s[..]);
+    let old_str = st.set_str(s);
 
-    let rb  = RxBuf::new(&s[..]);
+    let rb  = RxBuf::new(s);
     let res = (*pat)(rb, st);
 
     st.restore_str(old_str);
@@ -1215,11 +1215,11 @@ fn compile_key(k: &VVal, sn: SelNode) -> SelNode {
             }
         })
     } else {
-        let pat = k.at(0).unwrap_or_else(|| VVal::None);
-        let pat_type = k.at(0).unwrap_or_else(|| VVal::None).at(0).unwrap_or_else(|| VVal::None);
+        let pat = k.at(0).unwrap_or(VVal::None);
+        let pat_type = k.at(0).unwrap_or(VVal::None).at(0).unwrap_or(VVal::None);
 
         if k.len() == 1 && pat.is_pair() && pat_type.to_sym() == s2sym("I") {
-            let key = pat.at(1).unwrap_or_else(|| VVal::None).to_sym();
+            let key = pat.at(1).unwrap_or(VVal::None).to_sym();
 
             return
                 Box::new(move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
@@ -1317,7 +1317,7 @@ fn compile_node_cond(n: &VVal) -> SelNode {
     let node_type = n.at(0).expect("proper node condition").to_sym();
 
     if node_type == s2sym("KV") {
-        compile_kv_match(&n)
+        compile_kv_match(n)
 
     } else if node_type == s2sym("LA") {
         let subsel = compile_selector(&n.at(1).expect("sub selector"), true);
@@ -1392,11 +1392,11 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
 
     if node_type == s2sym("NK") {
         compile_key(
-            &n.at(1).unwrap_or_else(|| VVal::None), sn)
+            &n.at(1).unwrap_or(VVal::None), sn)
 
     } else if node_type == s2sym("RecGlob") {
-        let rec_cond    = n.at(1).unwrap_or_else(|| VVal::None);
-        let recval_cond = n.at(3).unwrap_or_else(|| VVal::None);
+        let rec_cond    = n.at(1).unwrap_or(VVal::None);
+        let recval_cond = n.at(3).unwrap_or(VVal::None);
 
         let key_cond =
             if let Some(cond) = rec_cond.at(0) {
@@ -1477,7 +1477,7 @@ fn compile_selector(sel: &VVal, no_capture: bool) -> SelNode {
     //d// println!("***** COM SELECTOR: {}", sel.s());
     if let VVal::Lst(_) = sel {
 
-        let first = sel.at(0).unwrap_or_else(|| VVal::None);
+        let first = sel.at(0).unwrap_or(VVal::None);
         if first.to_sym() == s2sym("Path") {
             let mut next : Option<SelNode> = Some(Box::new(
                 move |v: &VVal, st: &mut SelectorState, capts: &VVal| {
@@ -1556,8 +1556,8 @@ fn check_pattern_start_anchor(pattern: &VVal) -> bool {
             return true;
         } else if first.is_pair() {
             if let Some(pair_type) = first.at(0) {
-                let pair_val     = first.at(1).unwrap_or_else(|| VVal::None);
-                let branch_first = pair_val.at(0).unwrap_or_else(|| VVal::None);
+                let pair_val     = first.at(1).unwrap_or(VVal::None);
+                let branch_first = pair_val.at(0).unwrap_or(VVal::None);
 
                 if    pair_type.to_sym() == s2sym("PatSub")
                    || pair_type.to_sym() == s2sym("PatCap")
@@ -1695,12 +1695,14 @@ impl<'a, 'b> FindAllState<'a, 'b> {
     }
 }
 
+pub type RegexFindAllFunc = Box<dyn Fn(&VVal, Box<dyn Fn(VVal, (usize, usize))>)>;
+
 /// Creates a function that takes a string slice and tries to
 /// find the compiled regular expression in it.
 /// The returned function then returns a `PatResult` which stores
 /// the captures and whether the pattern matched.
 pub fn create_regex_find_all(pat: &str, result_ref: VVal)
-    -> Result<Box<dyn Fn(&VVal, Box<dyn Fn(VVal, (usize, usize))>)>, ParseError>
+    -> Result<RegexFindAllFunc, ParseError>
 {
     let comp_pat = parse_and_compile_regex(pat)?;
 
@@ -1723,6 +1725,7 @@ pub enum RegexMode {
     Substitute
 }
 
+#[allow(clippy::should_implement_trait)]
 impl RegexMode {
     pub fn from_str(s: &str) -> Self {
         match s {
@@ -1838,7 +1841,7 @@ pub fn create_regex_find_function(pat: &str, result_ref: VVal, mode: RegexMode)
             Ok(VValFun::new_fun(
                 move |env: &mut Env, _argc: usize| {
                     if let Some(s) = env.arg_ref(0) {
-                        Ok(match_fun(&s))
+                        Ok(match_fun(s))
                     } else {
                         rref2.set_ref(VVal::None);
                         Ok(VVal::None)

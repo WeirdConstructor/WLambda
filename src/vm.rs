@@ -222,10 +222,10 @@ macro_rules! call_func {
 macro_rules! get_key {
     ($o: ident, $k: ident, $method: ident, $env: ident, $retv: ident, $uw_depth: ident, $prog: ident, $pc: ident) => {
         match $k {
-            VVal::Int(i)  => $o.at(i as usize).unwrap_or_else(|| VVal::None),
-            VVal::Bol(b)  => $o.at(b as usize).unwrap_or_else(|| VVal::None),
-            VVal::Sym(sy) => $o.$method(sy.as_ref()).unwrap_or_else(|| VVal::None),
-            VVal::Str(sy) => $o.$method(sy.as_ref()).unwrap_or_else(|| VVal::None),
+            VVal::Int(i)  => $o.at(i as usize).unwrap_or(VVal::None),
+            VVal::Bol(b)  => $o.at(b as usize).unwrap_or(VVal::None),
+            VVal::Sym(sy) => $o.$method(sy.as_ref()).unwrap_or(VVal::None),
+            VVal::Str(sy) => $o.$method(sy.as_ref()).unwrap_or(VVal::None),
             _ => {
                 $env.push($o.clone());
                 let call_ret = $k.call_internal($env, 1);
@@ -576,33 +576,33 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
             }),
             Op::GetIdx(o, idx, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .at(*idx as usize).unwrap_or_else(|| VVal::None)
+                .at(*idx as usize).unwrap_or(VVal::None)
             }),
             Op::GetIdx2(o, idx, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .at(idx.0 as usize).unwrap_or_else(|| VVal::None)
-                .at(idx.1 as usize).unwrap_or_else(|| VVal::None)
+                .at(idx.0 as usize).unwrap_or(VVal::None)
+                .at(idx.1 as usize).unwrap_or(VVal::None)
             }),
             Op::GetIdx3(o, idx, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .at(idx.0 as usize).unwrap_or_else(|| VVal::None)
-                .at(idx.1 as usize).unwrap_or_else(|| VVal::None)
-                .at(idx.2 as usize).unwrap_or_else(|| VVal::None)
+                .at(idx.0 as usize).unwrap_or(VVal::None)
+                .at(idx.1 as usize).unwrap_or(VVal::None)
+                .at(idx.2 as usize).unwrap_or(VVal::None)
             }),
             Op::GetSym(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key_sym(&sym).unwrap_or_else(|| VVal::None)
+                .get_key_sym(sym).unwrap_or(VVal::None)
             }),
             Op::GetSym2(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key_sym(&sym.0).unwrap_or_else(|| VVal::None)
-                .get_key_sym(&sym.1).unwrap_or_else(|| VVal::None)
+                .get_key_sym(&sym.0).unwrap_or(VVal::None)
+                .get_key_sym(&sym.1).unwrap_or(VVal::None)
             }),
             Op::GetSym3(o, sym, r) => op_a_r!(env, ret, retv, data, o, r, {
                 handle_err!(o, "map/list", retv)
-                .get_key_sym(&sym.0).unwrap_or_else(|| VVal::None)
-                .get_key_sym(&sym.1).unwrap_or_else(|| VVal::None)
-                .get_key_sym(&sym.2).unwrap_or_else(|| VVal::None)
+                .get_key_sym(&sym.0).unwrap_or(VVal::None)
+                .get_key_sym(&sym.1).unwrap_or(VVal::None)
+                .get_key_sym(&sym.2).unwrap_or(VVal::None)
             }),
             Op::GetKey(o, k, r) => {
                 in_reg!(env, ret, data, k);
@@ -645,7 +645,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     }
                 } else {
                     for (e, k) in s.iter() {
-                        match m.set_key(&k.unwrap_or_else(|| VVal::None), e) {
+                        match m.set_key(&k.unwrap_or(VVal::None), e) {
                             Ok(_) => (),
                             Err(er) => {
                                 retv =
@@ -700,7 +700,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     })
 
                 } else {
-                    let f = o.proto_lookup(&*k).unwrap_or_else(|| VVal::None);
+                    let f = o.proto_lookup(&*k).unwrap_or(VVal::None);
                     env.push_unwind_self(o);
                     call_func!(f, argc, argc, env, retv, uw_depth, prog, pc, v, {
                         env.unwind_one();
@@ -741,7 +741,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     };
 
                 for i in 0..argc {
-                    let v = argv.at(i).unwrap_or_else(|| VVal::None);
+                    let v = argv.at(i).unwrap_or(VVal::None);
                     env.push(v);
                 }
 

@@ -9945,7 +9945,7 @@ pub fn core_symbol_table() -> SymbolTable {
 fn systime_to_unix(syst: &std::time::SystemTime, unit: &str) -> Result<VVal, StackAction> {
     match syst.duration_since(std::time::SystemTime::UNIX_EPOCH) {
         Ok(n) => {
-            Ok(duration_to_vval(n, &unit[..]))
+            Ok(duration_to_vval(n, unit))
         },
         Err(_) =>
             Err(StackAction::panic_msg(
@@ -10024,6 +10024,7 @@ fn dir_entry_to_vval(env: &mut Env, path: &str, entry: Result<std::fs::DirEntry,
 }
 
 /// Returns a SymbolTable with all WLambda standard library language symbols.
+#[allow(clippy::question_mark)]
 pub fn std_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
 
@@ -10448,13 +10449,13 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "char:to_lowercase",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Chr(VValChr::Char(
-                env.arg(0).c().to_lowercase().nth(0).unwrap_or('\0'))))
+                env.arg(0).c().to_lowercase().next().unwrap_or('\0'))))
         }, Some(1), Some(1), false);
 
     func!(st, "char:to_uppercase",
         |env: &mut Env, _argc: usize| {
             Ok(VVal::Chr(VValChr::Char(
-                env.arg(0).c().to_uppercase().nth(0).unwrap_or('\0'))))
+                env.arg(0).c().to_uppercase().next().unwrap_or('\0'))))
         }, Some(1), Some(1), false);
 
     func!(st, "bytes:replace",
@@ -11347,12 +11348,12 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "pattern",
         |env: &mut Env, _argc: usize| {
-            let pat_src = env.arg_ref(0).cloned().unwrap_or_else(|| VVal::None);
+            let pat_src = env.arg_ref(0).cloned().unwrap_or(VVal::None);
             let res_ref =
                 env.global.borrow_mut()
                    .get_var_ref("\\")
-                   .unwrap_or_else(|| VVal::None);
-            let mode = env.arg(1).with_s_ref(|s| RegexMode::from_str(s));
+                   .unwrap_or(VVal::None);
+            let mode = env.arg(1).with_s_ref(RegexMode::from_str);
             pat_src.with_s_ref(|pat_src|
                 match create_regex_find_function(pat_src, res_ref, mode) {
                     Ok(fun) => Ok(fun),
@@ -11366,11 +11367,11 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(st, "selector",
         |env: &mut Env, _argc: usize| {
-            let pat_src = env.arg_ref(0).cloned().unwrap_or_else(|| VVal::None);
+            let pat_src = env.arg_ref(0).cloned().unwrap_or(VVal::None);
             let res_ref =
                 env.global.borrow_mut()
                    .get_var_ref("\\")
-                   .unwrap_or_else(|| VVal::None);
+                   .unwrap_or(VVal::None);
             pat_src.with_s_ref(|sel_src|
                 match create_selector_function(sel_src, res_ref) {
                     Ok(fun) => Ok(fun),
@@ -11465,7 +11466,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let f    = env.arg(1);
             let text = env.arg(2);
 
-            let rx = re.with_s_ref(|re: &str| Regex::new(&re));
+            let rx = re.with_s_ref(Regex::new);
             if let Err(e) = rx {
                 return Ok(env.new_err(
                     format!("Regex '{}' did not compile: {}", re.s_raw(), e)));
@@ -11476,7 +11477,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let mut ret = Ok(VVal::None);
             let ret_str = text.with_s_ref(|text: &str| {
                 VVal::new_str_mv(String::from(
-                    rx.replace_all(&text, |capts: &regex::Captures| {
+                    rx.replace_all(text, |capts: &regex::Captures| {
                         let captures = VVal::vec();
                         for cap in capts.iter() {
                             match cap {
@@ -11516,7 +11517,7 @@ pub fn std_symbol_table() -> SymbolTable {
             use regex::Regex;
             let re   = env.arg(0);
 
-            let rx = re.with_s_ref(|re: &str| Regex::new(&re));
+            let rx = re.with_s_ref(Regex::new);
             if let Err(e) = rx {
                 return Ok(env.new_err(
                     format!("Regex '{}' did not compile: {}", re.s_raw(), e)));
@@ -11561,7 +11562,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let text = env.arg(1);
             let f    = env.arg(2);
 
-            let rx = re.with_s_ref(|re: &str| Regex::new(&re));
+            let rx = re.with_s_ref(Regex::new);
             if let Err(e) = rx {
                 return Ok(env.new_err(
                     format!("Regex '{}' did not compile: {}", re.s_raw(), e)));
@@ -11600,7 +11601,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let f    = env.arg(1);
             let text = env.arg(2);
 
-            let rx = re.with_s_ref(|re: &str| Regex::new(&re));
+            let rx = re.with_s_ref(Regex::new);
             if let Err(e) = rx {
                 return Ok(env.new_err(
                     format!("Regex '{}' did not compile: {}", re.s_raw(), e)));
@@ -11680,7 +11681,7 @@ pub fn std_symbol_table() -> SymbolTable {
             match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(n) => {
                     Ok(env.arg(0).with_s_ref(|unit|
-                        duration_to_vval(n, &unit[..])))
+                        duration_to_vval(n, unit)))
                 },
                 Err(_) =>
                     Err(StackAction::panic_msg(
@@ -11786,7 +11787,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let mut cfg = base64::STANDARD;
             let config = env.arg(1);
             if config.is_some() {
-                cfg = config.with_s_ref(|s| match &s[..] {
+                cfg = config.with_s_ref(|s| match s {
                     "url"        => base64::URL_SAFE,
                     "url_no_pad" => base64::URL_SAFE_NO_PAD,
                     "std"        => base64::STANDARD,
@@ -11806,7 +11807,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let mut cfg = base64::STANDARD;
             let config = env.arg(1);
             if config.is_some() {
-                cfg = config.with_s_ref(|s| match &s[..] {
+                cfg = config.with_s_ref(|s| match s {
                     "url"        => base64::URL_SAFE,
                     "url_no_pad" => base64::URL_SAFE_NO_PAD,
                     "std"        => base64::STANDARD,
@@ -11949,7 +11950,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let hsvaf =
                 env.arg_ref(0)
                    .unwrap()
-                   .with_s_ref(|hex| util::hex2hsvaf(hex));
+                   .with_s_ref(util::hex2hsvaf);
             Ok(VVal::ivec4(
                 hsvaf.0.round() as i64,
                 hsvaf.1.round() as i64,
@@ -11962,7 +11963,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let hsvaf =
                 env.arg_ref(0)
                    .unwrap()
-                   .with_s_ref(|hex| util::hex2hsvaf(hex));
+                   .with_s_ref(util::hex2hsvaf);
             Ok(VVal::fvec4(
                 hsvaf.0,
                 hsvaf.1,
@@ -11973,14 +11974,14 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "v:hex2rgba_i",
         |env: &mut Env, _argc: usize| {
             let (r, g, b, a) =
-                env.arg(0).with_s_ref(|s| util::hex2rgba(s));
+                env.arg(0).with_s_ref(util::hex2rgba);
             Ok(VVal::ivec_from_tpl4((r as i64, g as i64, b as i64, a as i64)))
         }, Some(1), Some(1), false);
 
     func!(st, "v:hex2rgba_f",
         |env: &mut Env, _argc: usize| {
             let (r, g, b, a) =
-                env.arg(0).with_s_ref(|s| util::hex2rgbaf(s));
+                env.arg(0).with_s_ref(util::hex2rgbaf);
             Ok(VVal::fvec_from_tpl4((r, g, b, a)))
         }, Some(1), Some(1), false);
 
@@ -12120,7 +12121,7 @@ pub fn std_symbol_table() -> SymbolTable {
                     VVal::Flt(f) => hash.write_f64(f),
                     _ => {
                         env.arg(i).with_s_ref(|s: &str|
-                            hash.write(&s.as_bytes()[..]));
+                            hash.write(s.as_bytes()));
                     }
                 }
             }

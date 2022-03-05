@@ -94,7 +94,7 @@ pub fn u64_to_open01(u: u64) -> f64 {
     use core::f64::EPSILON;
     let float_size         = std::mem::size_of::<f64>() as u32 * 8;
     let fraction           = u >> (float_size - 52);
-    let exponent_bits: u64 = (1023 as u64) << 52;
+    let exponent_bits: u64 = 1023_u64 << 52;
     f64::from_bits(fraction | exponent_bits) - (1.0 - EPSILON / 2.0)
 }
 
@@ -107,7 +107,7 @@ pub fn u64_to_closed_open01(u: u64) -> f64 {
     // those are usually more random.
     let float_size = std::mem::size_of::<f64>() as u32 * 8;
     let precision = 52 + 1;
-    let scale = 1.0 / (((1 as u64) << precision) as f64);
+    let scale = 1.0 / ((1_u64 << precision) as f64);
 
     let value = u >> (float_size - precision);
     scale * (value as f64)
@@ -122,7 +122,7 @@ pub fn u64_to_open_closed01(u: u64) -> f64 {
     // those are usually more random.
     let float_size = std::mem::size_of::<f64>() as u32 * 8;
     let precision = 52 + 1;
-    let scale = 1.0 / (((1 as u64) << precision) as f64);
+    let scale = 1.0 / ((1_u64 << precision) as f64);
 
     let value = u >> (float_size - precision);
     scale * ((value + 1) as f64)
@@ -225,15 +225,15 @@ pub fn hsv2rgb(hue: f64, sat: f64, val: f64) -> (f64, f64, f64) {
     let x = c * (1.0 - ((hue / 60.0) % 2.0 - 1.0).abs());
     let m = val - c;
     let (r_, g_, b_) =
-        if        hue >= 0.0   && hue < 60.0 {
+        if        (0.0..60.0).contains(&hue) {
             (c, x, 0.0)
-        } else if hue >= 60.0  && hue < 120.0 {
+        } else if (60.0..120.0).contains(&hue) {
             (x, c, 0.0)
-        } else if hue >= 120.0 && hue < 180.0 {
+        } else if (120.0..180.0).contains(&hue) {
             (0.0, c, x)
-        } else if hue >= 180.0 && hue < 240.0 {
+        } else if (180.0..240.0).contains(&hue) {
             (0.0, x, c)
-        } else if hue >= 240.0 && hue < 300.0 {
+        } else if (240.0..300.0).contains(&hue) {
             (x, 0.0, c)
         } else { // if hue >= 300.0 && hue < 360.0 {
             (c, 0.0, x)
@@ -324,6 +324,7 @@ pub fn hex2rgba(s: &str) -> (u8, u8, u8, u8) {
 ///
 /// The runtime complexity is `O(m*n)`, where `m` and `n` are the
 /// strings' lengths.
+#[allow(clippy::needless_range_loop)]
 pub fn edit_distance(a: &str, b: &str) -> usize {
     let len_a = a.chars().count();
     let len_b = b.chars().count();

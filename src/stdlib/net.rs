@@ -53,7 +53,7 @@ impl VValUserData for VTcpStream {
             "$<TcpStream:local={}/remote={}>",
             self.stream.borrow().local_addr()
                 .map(|a| a.to_string())
-                .map_or_else(|_| String::from("?"), |a| a.to_string()),
+                .map_or_else(|_| String::from("?"), |a| a),
             self.stream.borrow().peer_addr()
                 .map_or_else(|_| String::from("?"), |a| a.to_string()))
     }
@@ -101,7 +101,7 @@ impl VValUserData for VUdpSocket {
             "$<UdpSocket:local={}/remote={}>",
             self.socket.borrow().local_addr()
                 .map(|a| a.to_string())
-                .map_or_else(|_| String::from("?"), |a| a.to_string()),
+                .map_or_else(|_| String::from("?"), |a| a),
             self.socket.borrow().peer_addr()
                 .map_or_else(|_| String::from("?"), |a| a.to_string()))
     }
@@ -215,15 +215,9 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     let listener = {
                         use socket2::Socket;
                         let socket = Socket::from(listener);
-                        match socket.set_reuse_address(true) {
-                            Err(_) => {},
-                            Ok(_)  => {},
-                        }
+                        let _ = socket.set_reuse_address(true);
                         #[cfg(unix)]
-                        match socket.set_reuse_port(true) {
-                            Err(_) => {},
-                            Ok(_)  => {},
-                        }
+                        let _ = socket.set_reuse_port(true);
                         socket.into_tcp_listener()
                     };
 
@@ -351,7 +345,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     }
                 }
             })
-        }).unwrap_or(
+        }).unwrap_or_else(||
             Ok(env.new_err(format!(
                 "std:net:udp:send: First argument not a socket! {}",
                 socket.s()))))
@@ -377,7 +371,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 },
                 Err(e) => env.new_err(format!("std:net:udp:recv: {}", e)),
             }
-        }).unwrap_or(
+        }).unwrap_or_else(||
             env.new_err(format!(
                 "std:net:udp:recv: First argument not a socket! {}",
                 socket.s()))))
@@ -392,7 +386,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 Ok(_)  => VVal::Bol(true),
                 Err(e) => env.new_err(format!("std:io:flush: {}", e)),
             }
-        }).unwrap_or(
+        }).unwrap_or_else(||
             env.new_err(format!(
                 "std:io:flush: First argument not an IO handle! {}",
                 fd.s()))))
@@ -409,7 +403,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
             data.with_bv_ref(|bytes| {
                 if offs >= bytes.len() {
                     return env.new_err(
-                        format!("std:io:write_some: bad buffer offset"));
+                        "std:io:write_some: bad buffer offset".to_string());
                 }
 
                 let r = vts.stream.borrow_mut().write_all(&bytes[offs..]);
@@ -427,7 +421,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     }
                 }
             })
-        }).unwrap_or(
+        }).unwrap_or_else(||
             env.new_err(format!(
                 "std:io:write: First argument not an IO handle! {}",
                 fd.s()))))
@@ -444,7 +438,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
             data.with_bv_ref(|bytes| {
                 if offs >= bytes.len() {
                     return env.new_err(
-                        format!("std:io:write_some: bad buffer offset"));
+                        "std:io:write_some: bad buffer offset".to_string());
                 }
 
                 let r = vts.stream.borrow_mut().write(&bytes[offs..]);
@@ -470,7 +464,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     }
                 }
             })
-        }).unwrap_or(
+        }).unwrap_or_else(||
             env.new_err(format!(
                 "std:io:write_some: First argument not an IO handle! {}",
                 fd.s()))))
@@ -504,7 +498,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                     }
                 }
             }
-        }).unwrap_or(
+        }).unwrap_or_else(||
             env.new_err(format!(
                 "std:io:read_some: First argument not an IO handle! {}",
                 fd.s()))))
