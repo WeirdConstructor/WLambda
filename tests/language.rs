@@ -5773,3 +5773,78 @@ fn check_http_request() {
     "#),
     "\"Test 567PUT / HTTP/1.1\\r\\nxxx: 123\\r\\ncontent-length: 3\\r\\naccept: */*\\r\\nhost: 127.0.0.1:9294\\r\\n\\r\\nYYY\"");
 }
+
+#[test]
+fn check_some_none_err_or() {
+    assert_eq!(ve("$n     // 10"),          "10");
+    assert_eq!(ve("$o()   // 10"),          "10");
+    assert_eq!(ve("$o(20) // 10"),          "20");
+    assert_eq!(ve("$false // 10"),          "$false");
+    assert_eq!(ve("is_err ~ ($e 1) // 10"), "$true");
+
+    assert_eq!(ve("$n     /? 10"),          "10");
+    assert_eq!(ve("$o()   /? 10"),          "10");
+    assert_eq!(ve("$o(20) /? 10"),          "20");
+    assert_eq!(ve("$false /? 10"),          "$false");
+    assert_eq!(ve("($e 1) /? 10"),          "10");
+
+    assert_eq!(ve("$n     /$n 10"),          "10");
+    assert_eq!(ve("$o()   /$n 10"),          "$o()");
+    assert_eq!(ve("$o(20) /$n 10"),          "$o(20)");
+    assert_eq!(ve("$false /$n 10"),          "$false");
+    assert_eq!(ve("is_err ~ ($e 1) /$n 10"), "$true");
+
+    assert_eq!(ve("$n     /$o 10"),          "$n");
+    assert_eq!(ve("$o()   /$o 10"),          "10");
+    assert_eq!(ve("$o(20) /$o 10"),          "20");
+    assert_eq!(ve("$false /$o 10"),          "$false");
+    assert_eq!(ve("is_err ~ ($e 1) /$o 10"), "$true");
+
+    assert_eq!(ve("$n     /$e 10"),         "$n");
+    assert_eq!(ve("$o()   /$e 10"),         "$o()");
+    assert_eq!(ve("$o(20) /$e 10"),         "$o(20)");
+    assert_eq!(ve("$false /$e 10"),         "$false");
+    assert_eq!(ve("($e 1) /$e 10"),         "10");
+
+    assert_eq!(ve("$n     /$e 10 // 33"),   "33");
+    assert_eq!(ve("$o()   /$e 10 // 33"),   "33");
+    assert_eq!(ve("$o(20) /$e 10 // 33"),   "20");
+    assert_eq!(ve("$false /$e 10 // 33"),   "$false");
+    assert_eq!(ve("($e 1) /$e 10 // 33"),   "10");
+
+    assert_eq!(ve("$n     /$e 10 /? 33"),   "33");
+    assert_eq!(ve("$o()   /$e 10 /? 33"),   "33");
+    assert_eq!(ve("$o(20) /$e 10 /? 33"),   "20");
+    assert_eq!(ve("$false /$e 10 /? 33"),   "$false");
+    assert_eq!(ve("($e 1) /$e 10 /? 33"),   "10");
+
+    assert_eq!(ve("`//` $n     10"),          "10");
+    assert_eq!(ve("`//` $o()   10"),          "10");
+    assert_eq!(ve("`//` $o(20) 10"),          "20");
+    assert_eq!(ve("`//` $false 10"),          "$false");
+    assert_eq!(ve("is_err ~ `//` ($e 1) 10"), "$true");
+
+    assert_eq!(ve("`/?` $n     10"),          "10");
+    assert_eq!(ve("`/?` $o()   10"),          "10");
+    assert_eq!(ve("`/?` $o(20) 10"),          "20");
+    assert_eq!(ve("`/?` $false 10"),          "$false");
+    assert_eq!(ve("`/?` ($e 1) 10"),          "10");
+
+    assert_eq!(ve("`/$n` $n     10"),          "10");
+    assert_eq!(ve("`/$n` $o()   10"),          "$o()");
+    assert_eq!(ve("`/$n` $o(20) 10"),          "$o(20)");
+    assert_eq!(ve("`/$n` $false 10"),          "$false");
+    assert_eq!(ve("is_err ~ `/$n` ($e 1) 10"), "$true");
+
+    assert_eq!(ve("`/$o` $n     10"),          "$n");
+    assert_eq!(ve("`/$o` $o()   10"),          "10");
+    assert_eq!(ve("`/$o` $o(20) 10"),          "20");
+    assert_eq!(ve("`/$o` $false 10"),          "$false");
+    assert_eq!(ve("is_err ~ `/$o` ($e 1) 10"), "$true");
+
+    assert_eq!(ve("`/$e` $n     10"),         "$n");
+    assert_eq!(ve("`/$e` $o()   10"),         "$o()");
+    assert_eq!(ve("`/$e` $o(20) 10"),         "$o(20)");
+    assert_eq!(ve("`/$e` $false 10"),         "$false");
+    assert_eq!(ve("`/$e` ($e 1) 10"),         "10");
+}

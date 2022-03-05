@@ -349,8 +349,16 @@ impl State {
                 },
             '*' | '/' | '%' | '^'
                 => {
+                    if let Some(s) = self.peek3() {
+                        if    s == "/$e"
+                           || s == "/$n"
+                           || s == "/$o" { return Some(s); }
+                    }
                     if let Some(s) = self.peek2() {
-                        if s == "%>" {
+                        if    s == "%>"
+                           || s == "//"
+                           || s == "/?"
+                        {
                             Some(s)
                         } else {
                             Some(self.spart_ptr(1))

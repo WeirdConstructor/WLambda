@@ -1502,6 +1502,10 @@ Optional values were introduced for functions that lookup stuff and either
 return _something_ that might be `$none` (eg. if some element in a vector is
 searched for), or return that nothing was found.
 
+Note that there are two operators that interact with this type in a convenient
+way. The optional or operator `/$o` and the default value operator `//` can be
+used to provide default values and unwrap optionals.
+
 The functions `is_none` and `is_some` like stated above work for these
 optional values too:
 
@@ -1510,6 +1514,28 @@ std:assert ~ is_none $o();
 std:assert ~ is_some $o(10);
 std:assert ~ is_some $o($none);
 std:assert ~ is_some $o($o());
+```
+
+Here is a demonstration of the very convenient optionals or operator
+and the default value operator:
+
+```wlambda
+std:assert_eq $o()   /$o 11   11;
+std:assert_eq $o(22) /$o 11   22;
+std:assert_eq $none  /$o 11   $none;
+std:assert (is_err ($e 10) /$o 20);
+
+std:assert_eq $o()   // 11   11;
+std:assert_eq $o(22) // 11   22;
+std:assert_eq $none  // 11   11;
+std:assert_eq 123    // 11   123;
+std:assert (is_err ($e 10) // 20);
+
+std:assert_eq $o()    /? 11   11;
+std:assert_eq $o(22)  /? 11   22;
+std:assert_eq $none   /? 11   11;
+std:assert_eq 123     /? 11   123;
+std:assert_eq ($e 10) /? 11   11;
 ```
 
 Calling an optional value will return it's contents or `$none`:
@@ -1599,9 +1625,20 @@ std:assert ~ not ~ is_optional 303;
 
 You can unwrap an optional with `unwrap`. It will panic if there is no value provided.
 Otherwise it will return the contents.
+Alternatively you can use the optional or operator `/$o`
+or even the default value operator `//`
+for accessing the potentially wrapped value while providing a default value.
 
 ```wlambda
 std:assert_eq unwrap[$o(10)] 10;
+
+std:assert_eq $o(10) /$o 20  10;
+std:assert_eq $o()   /$o 20  20;
+std:assert_eq $none  /$o 20  $none;
+
+std:assert_eq $o(10) //  20  10;
+std:assert_eq $o()   //  20  20;
+std:assert_eq $none  //  20  20;
 ```
 
 ### <a name="33-error-values-e-expr-or-error-expr"></a>3.3 - Error values: `$e expr` or `$error expr`
@@ -1630,6 +1667,45 @@ an panic if an error value was passed to it. All other values
 will be passed through. And `unwrap_err` unwraps an error value, it's
 the opposite of `unwrap` because it will cause a panic if you don't pass
 an error value.
+
+You can also use the `match` statement to check return types of
+functions:
+
+```wlambda
+!res = match (std:str:join "," "foo")
+    ($e err) => { $\.err }
+    r        => { $\.r };
+
+std:assert_eq (res 0 8) "str:join";
+
+# As comparison, the positive case for this construct:
+
+!res = match 100
+    ($e err) => { $\.err }
+    r        => { $\.r };
+std:assert_eq res 100;
+```
+
+There is also the error or operator `/$e` and the extended default value
+operator `/?` that helps to shortcut any errors, but use this with care,
+it hides errors all to easily:
+
+```wlambda
+std:assert_eq ($e 30) /$e 20    20;
+std:assert_eq $n      /$e 10    $n;
+
+# The extended default value operator also hides errors:
+std:assert_eq ($e 30) /? 20    20;
+std:assert_eq $n      /? 10    10;
+std:assert_eq $o()    /? 10    10;
+std:assert_eq $o(22)  /? 10    22;
+std:assert_eq 22      /? 10    22;
+std:assert_eq $f      /? 10    $false;
+
+# You can combine this operator with the some or operator `//` or even `/?`:
+std:assert_eq ($e 30) /$e 10 // 20   10;
+std:assert_eq $n      /$e 10 // 20   20;
+```
 
 Most functions don't accept errors in their arguments.
 If an error is encountered, a panic will occur. There are only
@@ -6019,6 +6095,65 @@ reversed to the order in an operator expression.
 std:assert_str_eq v v2;
 ```
 
+### - Call Operators &>, \<&, &@> and \<@&
+
+See also:
+
+- [Forward Argument Pipe `arg &> fun`](#253-forward-argument-pipe-arg--fun)
+- [Forward Argument Apply Pipe `list &@> fun`](254-forward-argument-apply-pipe-list--fun)
+- [Reverse Argument Pipe `fun <& arg`](#255-reverse-argument-pipe-fun--arg)
+- [Reverse Argument Apply Pipe `list &@> fun`](#256-reverse-argument-apply-pipe-list--fun)
+
+### - Default Value Operators //, /?, /$n, /$o and /$e
+
+There is a set of convenient default value operators that allow quick unwrapping
+of optional value, `$none` and even `$error` values.
+
+The most safe to use default value operator is the `//` operator, which returns
+an alternative value in case `$none` or `$o()` is provided and even unwraps
+optional values like `$o(10)`.  It does not do anything if an `$error` value is
+encountered.
+
+For handling the error value case you can either explicitly combine it with
+a `/$e` operator, which is the most explicit thing to use. Or use
+the extended default value operator `/?` which also provides the default
+value if an error is encountered.
+
+For more details see the following sections.
+
+#### - // _a_ _default-b_
+
+The default value operator is the `//` operator, which returns an alternative
+value in case `$none` or `$o()` is provided on the left hand side and even
+unwraps optional values like `$o(10)`.  It does not do anything if an `$error`
+value is encountered. For an operator that also defaults `$error` values see
+the extended default value operator `/?`.
+
+#### - /? _a_ _default-b_
+
+The extended default value operator is the `/?` operator, which returns an
+alternative value in case `$none`, `$error` or `$o()` is provided on the left
+hand side and even unwraps optional values like `$o(10)`. It's the extended
+version of the default value operator `//`.
+
+#### - /$n _a_ _default-b_
+
+The `$none` default value operator returns it's right hand side if the
+left hand side is a `$none` value.
+
+#### - /$o _a_ _default-b_
+
+The optionals default value operator returns it's right hand side if the
+left hand side is a `$o()` value. And it unwraps it's left hand side
+if it is an non empty optional value like eg. `$o(10)`.
+
+#### - /$e _a_ _default-b_
+
+The error default value operator returns it's right hand side if the
+left hand side is an `$error` value. It's convenient to provide default
+values only in case an error is returned. It can also be used
+to ignore errors more conveniently.
+
 ## <a name="7-string-and-byte-vector-formatting"></a>7 - String and Byte Vector Formatting
 
 WLambda comes with a built in functionality for string (and byte vector)
@@ -9031,6 +9166,7 @@ In the following grammar, white space and comments are omitted:
                        their precedence, top to bottom *)
                     "&>" | "&@>"      (* call rhs with lhs operator *)
                   | "<&" | "<@&"      (* call lhs with rhs operator *)
+                  | "//" | "/?" | "/$n" | "/$o" | "/$e" (* default value operators *)
                   | "^"
                   | "*" | "/" | "%"
                   | "-" | "+"

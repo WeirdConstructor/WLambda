@@ -93,6 +93,11 @@ impl Prog {
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                 },
+                Op::SNOr(p1, p2, p3, _) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                    patch_respos_data(p2, self_data_next_idx);
+                    patch_respos_data(p3, self_data_next_idx);
+                },
                 Op::NewPair(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
@@ -789,21 +794,31 @@ pub(crate) enum BinOp {
     Ge,
     Gt,
     Eq,
+    SomeOr,
+    ExtSomeOr,
+    NoneOr,
+    ErrOr,
+    OptOr,
 }
 
 impl BinOp {
     pub(crate) fn to_op(self, a: ResPos, b: ResPos, out: ResPos) -> Op {
         match self {
-            BinOp::Add => Op::Add(a, b, out),
-            BinOp::Sub => Op::Sub(a, b, out),
-            BinOp::Mul => Op::Mul(a, b, out),
-            BinOp::Div => Op::Div(a, b, out),
-            BinOp::Mod => Op::Mod(a, b, out),
-            BinOp::Le  => Op::Le(a, b, out),
-            BinOp::Lt  => Op::Lt(a, b, out),
-            BinOp::Ge  => Op::Ge(a, b, out),
-            BinOp::Gt  => Op::Gt(a, b, out),
-            BinOp::Eq  => Op::Eq(a, b, out),
+            BinOp::Add       => Op::Add(a, b, out),
+            BinOp::Sub       => Op::Sub(a, b, out),
+            BinOp::Mul       => Op::Mul(a, b, out),
+            BinOp::Div       => Op::Div(a, b, out),
+            BinOp::Mod       => Op::Mod(a, b, out),
+            BinOp::Le        => Op::Le(a, b, out),
+            BinOp::Lt        => Op::Lt(a, b, out),
+            BinOp::Ge        => Op::Ge(a, b, out),
+            BinOp::Gt        => Op::Gt(a, b, out),
+            BinOp::Eq        => Op::Eq(a, b, out),
+            BinOp::NoneOr    => Op::SNOr(a, b, out, 0),
+            BinOp::SomeOr    => Op::SNOr(a, b, out, 1),
+            BinOp::ErrOr     => Op::SNOr(a, b, out, 2),
+            BinOp::OptOr     => Op::SNOr(a, b, out, 3),
+            BinOp::ExtSomeOr => Op::SNOr(a, b, out, 4),
         }
     }
 }
@@ -896,6 +911,7 @@ pub(crate) enum Op {
     Ge(ResPos, ResPos, ResPos),
     Gt(ResPos, ResPos, ResPos),
     Eq(ResPos, ResPos, ResPos),
+    SNOr(ResPos, ResPos, ResPos, u8),
     NewErr(ResPos, ResPos),
     NewList(ResPos),
     ListPush(ResPos, ResPos, ResPos),

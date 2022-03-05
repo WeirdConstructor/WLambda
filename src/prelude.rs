@@ -9491,6 +9491,67 @@ pub fn core_symbol_table() -> SymbolTable {
         Ok(VVal::Flt(a.f().powf(b.f()))),
         Ok(VVal::Int(a.i().pow(b.i() as u32))));
 
+    func!(st, "//",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0);
+            let b = env.arg(1);
+
+            Ok(match a {
+                VVal::Opt(Some(a)) => a.as_ref().clone(),
+                VVal::Opt(None)    => b,
+                VVal::None         => b,
+                _                  => a,
+            })
+        }, Some(2), Some(2), true);
+
+    func!(st, "/?",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0);
+            let b = env.arg(1);
+
+            Ok(match a {
+                VVal::Opt(Some(a)) => a.as_ref().clone(),
+                VVal::Opt(None)    => b,
+                VVal::Err(_)       => b,
+                VVal::None         => b,
+                _                  => a,
+            })
+        }, Some(2), Some(2), true);
+
+    func!(st, "/$n",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0);
+            let b = env.arg(1);
+
+            Ok(match a {
+                VVal::None => b,
+                _          => a,
+            })
+        }, Some(2), Some(2), true);
+
+    func!(st, "/$o",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0);
+            let b = env.arg(1);
+
+            Ok(match a {
+                VVal::Opt(Some(a)) => a.as_ref().clone(),
+                VVal::Opt(None)    => b,
+                _                  => a,
+            })
+        }, Some(2), Some(2), true);
+
+    func!(st, "/$e",
+        |env: &mut Env, _argc: usize| {
+            let a = env.arg(0);
+            let b = env.arg(1);
+
+            Ok(match a {
+                VVal::Err(_) => b,
+                _            => a,
+            })
+        }, Some(2), Some(2), true);
+
     func!(st, "+>",
         |env: &mut Env, argc: usize| {
             use crate::compiler::collection_add;

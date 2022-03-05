@@ -11,6 +11,9 @@ And also `std:http:post` and `std:http:request`.
 loaded symbol table and does not re-evaluate the module source on every
 import. This makes it possible to define global stuff inside the modules
 and keep that around.
+* **Feature:** Default value operators `//`, `/?`, `/$n`, `/$o` and `/$e`
+added. Which can be conveniently used to provide default values in many useful
+circumstances.
 * **Feature:** Stack traces now also contain the function arguments.
 * **Feature:** Added `v_b` and `v_bk` to the wlambda::VVal API.
 * **Change:** Error messages and stack traces more readable and with line feeds.

@@ -2167,24 +2167,29 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
             let syn  = syn.get_syn();
 
             match syn {
-                Syntax::Block      => compile_block(ast, 1, ce),
-                Syntax::Assign     => compile_assign(ast, ce, false),
-                Syntax::AssignRef  => compile_assign(ast, ce, true),
-                Syntax::Var        => compile_var(ast, ce, false),
-                Syntax::CaptureRef => compile_var(ast, ce, true),
-                Syntax::Def        => compile_def(ast, ce, false),
-                Syntax::DefGlobRef => compile_def(ast, ce, true),
-                Syntax::DefConst   => compile_const(ast, ce),
-                Syntax::BinOpAdd   => compile_binop(ast, BinOp::Add, ce),
-                Syntax::BinOpSub   => compile_binop(ast, BinOp::Sub, ce),
-                Syntax::BinOpDiv   => compile_binop(ast, BinOp::Div, ce),
-                Syntax::BinOpMod   => compile_binop(ast, BinOp::Mod, ce),
-                Syntax::BinOpMul   => compile_binop(ast, BinOp::Mul, ce),
-                Syntax::BinOpGe    => compile_binop(ast, BinOp::Ge,  ce),
-                Syntax::BinOpGt    => compile_binop(ast, BinOp::Gt,  ce),
-                Syntax::BinOpLe    => compile_binop(ast, BinOp::Le,  ce),
-                Syntax::BinOpLt    => compile_binop(ast, BinOp::Lt,  ce),
-                Syntax::BinOpEq    => compile_binop(ast, BinOp::Eq,  ce),
+                Syntax::Block       => compile_block(ast, 1, ce),
+                Syntax::Assign      => compile_assign(ast, ce, false),
+                Syntax::AssignRef   => compile_assign(ast, ce, true),
+                Syntax::Var         => compile_var(ast, ce, false),
+                Syntax::CaptureRef  => compile_var(ast, ce, true),
+                Syntax::Def         => compile_def(ast, ce, false),
+                Syntax::DefGlobRef  => compile_def(ast, ce, true),
+                Syntax::DefConst    => compile_const(ast, ce),
+                Syntax::BinOpAdd    => compile_binop(ast, BinOp::Add, ce),
+                Syntax::BinOpSub    => compile_binop(ast, BinOp::Sub, ce),
+                Syntax::BinOpDiv    => compile_binop(ast, BinOp::Div, ce),
+                Syntax::BinOpMod    => compile_binop(ast, BinOp::Mod, ce),
+                Syntax::BinOpMul    => compile_binop(ast, BinOp::Mul, ce),
+                Syntax::BinOpGe     => compile_binop(ast, BinOp::Ge,  ce),
+                Syntax::BinOpGt     => compile_binop(ast, BinOp::Gt,  ce),
+                Syntax::BinOpLe     => compile_binop(ast, BinOp::Le,  ce),
+                Syntax::BinOpLt     => compile_binop(ast, BinOp::Lt,  ce),
+                Syntax::BinOpEq     => compile_binop(ast, BinOp::Eq,  ce),
+                Syntax::BinOpSomeOr => compile_binop(ast, BinOp::SomeOr, ce),
+                Syntax::BinOpNoneOr => compile_binop(ast, BinOp::NoneOr, ce),
+                Syntax::BinOpErrOr  => compile_binop(ast, BinOp::ErrOr,  ce),
+                Syntax::BinOpOptOr  => compile_binop(ast, BinOp::OptOr,  ce),
+                Syntax::BinOpExtSomeOr => compile_binop(ast, BinOp::ExtSomeOr, ce),
                 Syntax::Ref => {
                     let ref_pw = compile(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
@@ -3008,7 +3013,7 @@ fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 /// by the WLambda test suite.
 ///
 ///```
-/// std::assert_eq(wlambda::test_eval_to_string("1 + 2"), "3");
+/// assert_eq!(wlambda::compiler::test_eval_to_string("1 + 2"), "3");
 ///```
 pub fn test_eval_to_string(s: &str) -> String {
     let global = GlobalEnv::new_default();

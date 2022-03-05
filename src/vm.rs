@@ -529,6 +529,44 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     VVal::Int(a.i().wrapping_rem(b.i()))
                 }
             }),
+            Op::SNOr(b, a, r, mode) => op_a_b_r!(env, ret, retv, data, b, a, r, {
+                match *mode {
+                    1 => { // SomeOr
+                        match a {
+                            VVal::Opt(Some(a)) => a.as_ref().clone(),
+                            VVal::Opt(None)    => b,
+                            VVal::None         => b,
+                            _                  => a,
+                        }
+                    },
+                    4 => { // ExtSomeOr
+                        match a {
+                            VVal::Opt(Some(a)) => a.as_ref().clone(),
+                            VVal::Opt(None)    => b,
+                            VVal::None         => b,
+                            VVal::Err(_)       => b,
+                            _                  => a,
+                        }
+                    },
+                    2 => { // ErrOr
+                        match a {
+                            VVal::Err(_) => b,
+                            _            => a,
+                        }
+                    },
+                    3 => { // OptOr
+                        match a {
+                            VVal::Opt(Some(a)) => a.as_ref().clone(),
+                            VVal::Opt(None)    => b,
+                            _                  => a,
+                        }
+                    },
+                    0 | _ => {
+                        if let VVal::None = a { b }
+                        else                  { a }
+                    }
+                }
+            }),
             Op::Le(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, {
                 if let VVal::Flt(f) = a { VVal::Bol(f <= b.f()) }
                 else { VVal::Bol(a.i() <= b.i()) }

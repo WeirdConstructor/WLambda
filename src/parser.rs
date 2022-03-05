@@ -847,6 +847,21 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
     } else if op == "&or" {
         ps.syn(Syntax::Or)
 
+    } else if op == "//" {
+        ps.syn(Syntax::BinOpSomeOr)
+
+    } else if op == "/?" {
+        ps.syn(Syntax::BinOpExtSomeOr)
+
+    } else if op == "/$e" {
+        ps.syn(Syntax::BinOpErrOr)
+
+    } else if op == "/$o" {
+        ps.syn(Syntax::BinOpOptOr)
+
+    } else if op == "/$n" {
+        ps.syn(Syntax::BinOpNoneOr)
+
     } else if op == "+" {
         ps.syn(Syntax::BinOpAdd)
 
@@ -1283,9 +1298,14 @@ fn parse_arg_list<'a, 'b>(call: &'a mut VVal, ps: &'b mut State) -> Result<&'a m
 
 fn get_op_binding_power(ps: &State, op: StrPart) -> Result<(i32, i32), ParseError> {
     if       op == "&>"
-          || op == "&@>"  { Ok((54, 55)) }
+          || op == "&@>"  { Ok((56, 57)) }
     else if  op == "<&"
-          || op == "<@&"  { Ok((53, 52)) }
+          || op == "<@&"  { Ok((55, 54)) }
+    else if  op == "//"
+          || op == "/?"
+          || op == "/$n"
+          || op == "/$e"
+          || op == "/$o"  { Ok((52, 53)) }
     else if  op == "^"    { Ok((50, 51)) }
     else if  op == "*"
           || op == "/"
@@ -2015,6 +2035,11 @@ mod tests {
         assert_eq!(parse("20 < 10"),                "$[$%:Block,$[$%:BinOpLt,20,10]]");
         assert_eq!(parse("20 <= 10"),               "$[$%:Block,$[$%:BinOpLe,20,10]]");
         assert_eq!(parse("20 >= 10"),               "$[$%:Block,$[$%:BinOpGe,20,10]]");
+        assert_eq!(parse("20 //  10"),              "$[$%:Block,$[$%:BinOpSomeOr,20,10]]");
+        assert_eq!(parse("20 /?  10"),              "$[$%:Block,$[$%:BinOpExtSomeOr,20,10]]");
+        assert_eq!(parse("20 /$e 10"),              "$[$%:Block,$[$%:BinOpErrOr,20,10]]");
+        assert_eq!(parse("20 /$o 10"),              "$[$%:Block,$[$%:BinOpOptOr,20,10]]");
+        assert_eq!(parse("20 /$n 10"),              "$[$%:Block,$[$%:BinOpNoneOr,20,10]]");
         assert_eq!(parse("40 20 * 10"),             "$[$%:Block,$[$%:Call,40,$[$%:BinOpMul,20,10]]]");
         assert_eq!(parse("40 20 * 10 30"),          "$[$%:Block,$[$%:Call,40,$[$%:BinOpMul,20,10],30]]");
         assert_eq!(parse("40 20 * 10[]"),           "$[$%:Block,$[$%:Call,40,$[$%:BinOpMul,20,$[$%:Call,10]]]]");
@@ -2033,6 +2058,7 @@ mod tests {
         assert_eq!(parse("$t &and $f &or $f &and $f"), "$[$%:Block,$[$%:Or,$[$%:And,$true,$false],$[$%:And,$false,$false]]]");
 
         assert_eq!(parse("20 & 10"),                "$[$%:Block,$[$%:Call,$[$%:Var,:&],20,10]]");
+
     }
 
     #[test]

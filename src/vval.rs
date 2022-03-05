@@ -179,6 +179,11 @@ pub enum Syntax {
     BinOpGe,
     BinOpGt,
     BinOpEq,
+    BinOpSomeOr,
+    BinOpExtSomeOr,
+    BinOpNoneOr,
+    BinOpErrOr,
+    BinOpOptOr,
     OpNewPair,
     OpCallLwR,
     OpCallRwL,
@@ -255,6 +260,11 @@ impl std::str::FromStr for Syntax {
             "BinOpGe"        => Ok(Syntax::BinOpGe),
             "BinOpGt"        => Ok(Syntax::BinOpGt),
             "BinOpEq"        => Ok(Syntax::BinOpEq),
+            "BinOpSomeOr"    => Ok(Syntax::BinOpSomeOr),
+            "BinOpExtSomeOr" => Ok(Syntax::BinOpExtSomeOr),
+            "BinOpNoneOr"    => Ok(Syntax::BinOpNoneOr),
+            "BinOpErrOr"     => Ok(Syntax::BinOpErrOr),
+            "BinOpOptOr"     => Ok(Syntax::BinOpOptOr),
             "OpNewPair"      => Ok(Syntax::OpNewPair),
             "OpCallLwR"      => Ok(Syntax::OpCallLwR),
             "OpCallRwL"      => Ok(Syntax::OpCallRwL),
@@ -2779,6 +2789,7 @@ impl VVal {
     #[inline]
     pub fn opt_none() -> VVal { VVal::Opt(None) }
 
+    #[inline]
     pub fn unwrap_opt(&self) -> VVal {
         if let VVal::Opt(Some(o)) = self {
             o.as_ref().clone()
@@ -5067,6 +5078,11 @@ impl VVal {
                 Syntax::BinOpGe        => "BinOpGe",
                 Syntax::BinOpGt        => "BinOpGt",
                 Syntax::BinOpEq        => "BinOpEq",
+                Syntax::BinOpSomeOr    => "BinOpSomeOr",
+                Syntax::BinOpExtSomeOr => "BinOpExtSomeOr",
+                Syntax::BinOpNoneOr    => "BinOpNoneOr",
+                Syntax::BinOpErrOr     => "BinOpErrOr",
+                Syntax::BinOpOptOr     => "BinOpOptOr",
                 Syntax::OpNewPair      => "OpNewPair",
                 Syntax::OpCallLwR      => "OpCallLwR",
                 Syntax::OpCallRwL      => "OpCallRwL",
