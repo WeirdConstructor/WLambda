@@ -3343,12 +3343,10 @@ impl VVal {
                 let m = m.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    let r = match m.borrow().iter().nth(idx) {
-                        Some((k, v)) => {
-                            Some((v.clone(), Some(VVal::new_str(k.as_ref()))))
-                        },
-                        None => None,
-                    };
+                    let r =
+                        m.borrow().iter().nth(idx)
+                         .map(|(k, v)|
+                            (v.clone(), Some(VVal::new_str(k.as_ref()))));
                     idx += 1;
                     r
                 }))
@@ -3367,10 +3365,9 @@ impl VVal {
                 let s = s.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    let r = match s.chars().nth(idx) {
-                        Some(chr) => Some((VVal::new_char(chr), None)),
-                        None      => None,
-                    };
+                    let r =
+                        s.chars().nth(idx)
+                         .map(|chr| (VVal::new_char(chr), None));
                     idx += 1;
                     r
                 }))
@@ -3554,7 +3551,7 @@ impl VVal {
     pub(crate) fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         match self {
             VVal::None =>
-                return Err(StackAction::panic_str(
+                Err(StackAction::panic_str(
                     "Calling $none is invalid".to_string(),
                     None,
                     env.stk2vec(argc))),
@@ -4063,7 +4060,7 @@ impl VVal {
         if let VVal::Sym(s) = self {
             s.clone()
         } else {
-            self.with_s_ref(|s: &str| s2sym(s))
+            self.with_s_ref(s2sym)
         }
     }
 
@@ -4097,7 +4094,7 @@ impl VVal {
 
     pub fn eqv(&self, v: &VVal) -> bool {
         match self {
-            VVal::None    => { if let VVal::None = v { true } else { false } },
+            VVal::None    => { matches!(v, VVal::None) },
             VVal::Bol(ia) => { if let VVal::Bol(ib) = v { ia == ib } else { false } },
             VVal::Int(ia) => { if let VVal::Int(ib) = v { ia == ib } else { false } },
             VVal::Chr(ca) => { if let VVal::Chr(cb) = v { ca == cb } else { false } },
@@ -4160,7 +4157,7 @@ impl VVal {
             },
             VVal::Usr(u)  => {
                 if let VVal::Usr(u2) = v {
-                    u.eqv(&u2)
+                    u.eqv(u2)
                 } else {
                     false
                 }
@@ -4414,13 +4411,7 @@ impl VVal {
                 }
             },
             VVal::Str(vval_str) => {
-                let opt_char = vval_str.chars().nth(index as usize);
-                match opt_char {
-                    None => None,
-                    Some(char) => {
-                        Some(VVal::new_char(char))
-                    },
-                }
+                vval_str.chars().nth(index as usize).map(VVal::new_char)
             },
             VVal::Pair(b) => {
                 Some(if index % 2 == 0 { b.0.clone() } else { b.1.clone() })
@@ -4554,22 +4545,22 @@ impl VVal {
                     "1" | "key"   | "k" | "cdr" | "tail" | "second" => 1,
                     _ => {
                         if !key.chars().all(|c| c.is_digit(10)) { return None; }
-                        usize::from_str_radix(key, 10).unwrap_or(0)
+                        key.parse::<usize>().unwrap_or(0)
                     }
                 })
             },
             VVal::Iter(i) => {
                 if !key.chars().all(|c| c.is_digit(10)) { return None; }
 
-                let index = usize::from_str_radix(key, 10).unwrap_or(0);
+                let idx = key.parse::<usize>().unwrap_or(0);
                 let mut i = i.borrow_mut();
-                for _ in 0..index { i.next(); }
+                for _ in 0..idx { i.next(); }
                 iter_next_value!(i, v, { Some(v) }, None)
             },
             VVal::Lst(l) => {
                 if !key.chars().all(|c| c.is_digit(10)) { return None; }
 
-                let idx = usize::from_str_radix(key, 10).unwrap_or(0);
+                let idx = key.parse::<usize>().unwrap_or(0);
                 if idx < l.borrow().len() {
                     Some(l.borrow()[idx].clone())
                 } else {
@@ -4637,7 +4628,7 @@ impl VVal {
             VVal::Map(m) => {
                 let ks = key.to_sym();
                 match m.try_borrow_mut() {
-                    Ok(mut r)  => Ok(r.remove(&ks).unwrap_or_else(|| VVal::None)),
+                    Ok(mut r)  => Ok(r.remove(&ks).unwrap_or(VVal::None)),
                     Err(_)     => Err(StackAction::panic_borrow(self)),
                 }
             },
@@ -4899,27 +4890,27 @@ impl VVal {
     }
 
     pub fn is_float(&self) -> bool {
-        match self { VVal::Flt(_) => true, _ => false }
+        matches!(self, VVal::Flt(_))
     }
 
     pub fn is_int(&self) -> bool {
-        match self { VVal::Int(_) => true, _ => false }
+        matches!(self, VVal::Int(_))
     }
 
     pub fn is_char(&self) -> bool {
-        match self { VVal::Chr(VValChr::Char(_)) => true, _ => false }
+        matches!(self, VVal::Chr(VValChr::Char(_)))
     }
 
     pub fn is_byte(&self) -> bool {
-        match self { VVal::Chr(VValChr::Byte(_)) => true, _ => false }
+        matches!(self, VVal::Chr(VValChr::Byte(_)))
     }
 
     pub fn is_sym(&self) -> bool {
-        match self { VVal::Sym(_) => true, _ => false }
+        matches!(self, VVal::Sym(_))
     }
 
     pub fn is_syn(&self) -> bool {
-        match self { VVal::Syn(_) => true, _ => false }
+        matches!(self, VVal::Syn(_))
     }
 
     pub fn get_syn_pos(&self) -> SynPos {
@@ -4970,55 +4961,55 @@ impl VVal {
     }
 
     pub fn is_pair(&self) -> bool {
-        match self { VVal::Pair(_) => true, _ => false }
+        matches!(self, VVal::Pair(_))
     }
 
     pub fn is_iter(&self) -> bool {
-        if let VVal::Iter(_) = self { true } else { false }
+        matches!(self, VVal::Iter(_))
     }
 
     pub fn is_optional(&self) -> bool {
-        if let VVal::Opt(_) = self { true } else { false }
+        matches!(self, VVal::Opt(_))
     }
 
     pub fn is_ref(&self) -> bool {
-        match self { VVal::Ref(_) => true, VVal::HRef(_) => true, VVal::WWRef(_) => true, _ => false }
+        matches!(self, VVal::Ref(_) | VVal::HRef(_) | VVal::WWRef(_))
     }
 
     pub fn is_wref(&self) -> bool {
-        match self { VVal::WWRef(_) => true, _ => false }
+        matches!(self, VVal::WWRef(_))
     }
 
     pub fn is_bool(&self) -> bool {
-        match self { VVal::Bol(_) => true, _ => false }
+        matches!(self, VVal::Bol(_))
     }
 
     pub fn is_bytes(&self) -> bool {
-        match self { VVal::Byt(_) => true, _ => false }
+        matches!(self, VVal::Byt(_))
     }
 
     pub fn is_str(&self) -> bool {
-        match self { VVal::Str(_) => true, _ => false }
+        matches!(self, VVal::Str(_))
     }
 
     pub fn is_fun(&self) -> bool {
-        match self { VVal::Fun(_) => true, _ => false }
+        matches!(self, VVal::Fun(_))
     }
 
     pub fn is_vec(&self) -> bool {
-        match self { VVal::Lst(_) => true, _ => false }
+        matches!(self, VVal::Lst(_))
     }
 
     pub fn is_nvec(&self) -> bool {
-        match self { VVal::FVec(_) => true, VVal::IVec(_) => true, _ => false }
+        matches!(self, VVal::FVec(_) | VVal::IVec(_))
     }
 
     pub fn is_ivec(&self) -> bool {
-        match self { VVal::IVec(_) => true, _ => false }
+        matches!(self, VVal::IVec(_))
     }
 
     pub fn is_fvec(&self) -> bool {
-        match self { VVal::FVec(_) => true, _ => false }
+        matches!(self, VVal::FVec(_))
     }
 
     pub fn nvec_len(&self) -> usize {
@@ -5030,27 +5021,19 @@ impl VVal {
     }
 
     pub fn is_map(&self) -> bool {
-        match self { VVal::Map(_) => true, _ => false }
+        matches!(self, VVal::Map(_))
     }
 
     pub fn is_some(&self) -> bool {
-        match self {
-            VVal::None      => false,
-            VVal::Opt(None) => false,
-            _ => true
-        }
+        !matches!(self, VVal::Opt(None) | VVal::None)
     }
 
     pub fn is_none(&self) -> bool {
-        match self {
-            VVal::None      => true,
-            VVal::Opt(None) => true,
-            _ => false,
-        }
+        matches!(self, VVal::Opt(None) | VVal::None)
     }
 
     pub fn is_err(&self) -> bool {
-        match self { VVal::Err(_) => true, _ => false }
+        matches!(self, VVal::Err(_))
     }
 
     pub fn syntax_type(&self) -> &str {
@@ -5170,11 +5153,7 @@ impl VVal {
     pub fn with_usr_ref<T: 'static, F, X>(&mut self, f: F) -> Option<X>
         where F: FnOnce(&mut T) -> X {
         if let VVal::Usr(bx) = self {
-            if let Some(ud) = bx.as_any().downcast_mut::<T>() {
-                Some(f(ud))
-            } else {
-                None
-            }
+            bx.as_any().downcast_mut::<T>().map(f)
         } else {
             None
         }
@@ -5193,7 +5172,7 @@ impl VVal {
     /// assert_eq!(v.v_(1).i(), 11);
     /// assert_eq!(v.v_i(1),    11);
     ///```
-    pub fn v_(&self, idx: usize) -> VVal { self.at(idx).unwrap_or_else(|| VVal::None) }
+    pub fn v_(&self, idx: usize) -> VVal { self.at(idx).unwrap_or(VVal::None) }
 
     /// Quick access method for retrieving the VVal at key `idx`.
     /// Returns VVal::None if the VVal is not a VVal::Map or no such index exists.
@@ -5376,7 +5355,7 @@ impl VVal {
         where T: FnMut(&str, &VVal)
     {
         if let VVal::Map(b) = &self {
-            for (k, v) in b.borrow().iter() { op(&k, v); }
+            for (k, v) in b.borrow().iter() { op(k, v); }
         }
     }
 
@@ -5411,7 +5390,7 @@ impl VVal {
             VVal::Str(s)     => (*s).parse::<i64>().unwrap_or(0),
             VVal::Sym(s)     => (*s).parse::<i64>().unwrap_or(0),
             VVal::Chr(c)     => c.c() as u32 as i64,
-            VVal::Byt(s)     => if s.len() > 0 { s[0] as i64 } else { 0 as i64 },
+            VVal::Byt(s)     => if s.len() > 0 { s[0] as i64 } else { 0 },
             VVal::None       => 0,
             VVal::Err(_)     => 0,
             VVal::Bol(b)     => if *b { 1 } else { 0 },
@@ -5441,8 +5420,8 @@ impl VVal {
             VVal::Err(_)     => b'\0',
             VVal::Bol(b)     => if *b { b'\x01' } else { b'\0' },
             VVal::Syn(s)     => s.syn() as i64 as u32 as u8,
-            VVal::Int(i)     => if *i <= 255 { *i as u8 } else { b'?' as u8 },
-            VVal::Flt(f)     => if (*f as u32) <= 255 { *f as u8 } else { b'?' as u8 },
+            VVal::Int(i)     => if *i <= 255 { *i as u8 } else { b'?' },
+            VVal::Flt(f)     => if (*f as u32) <= 255 { *f as u8 } else { b'?' },
             VVal::Pair(b)    => b.0.byte(),
             VVal::Lst(l)     => l.borrow().len() as u8,
             VVal::Map(l)     => l.borrow().len() as u8,
@@ -5459,8 +5438,8 @@ impl VVal {
     #[allow(clippy::cast_lossless)]
     pub fn c(&self) -> char {
         match self {
-            VVal::Str(s)     => (*s).chars().nth(0).unwrap_or('\0'),
-            VVal::Sym(s)     => (*s).chars().nth(0).unwrap_or('\0'),
+            VVal::Str(s)     => (*s).chars().next().unwrap_or('\0'),
+            VVal::Sym(s)     => (*s).chars().next().unwrap_or('\0'),
             VVal::Chr(c)     => c.c(),
             VVal::Byt(s)     => if s.len() > 0 { s[0] as char } else { '\0' },
             VVal::None       => '\0',
@@ -5487,7 +5466,7 @@ impl VVal {
             VVal::Str(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
             VVal::Sym(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
             VVal::Chr(c)       => (c.c() as u32) > 0,
-            VVal::Byt(s)       => (if s.len() > 0 { s[0] as i64 } else { 0 as i64 }) != 0,
+            VVal::Byt(s)       => (if s.len() > 0 { s[0] as i64 } else { 0 }) != 0,
             VVal::None         => false,
             VVal::Err(_)       => false,
             VVal::Bol(b)       => *b,
@@ -5632,7 +5611,7 @@ impl VVal {
             v => v.with_deref(
                 |v| v.as_bytes(),
                 |v| v.map_or_else(
-                    || vec![],
+                    Vec::new,
                     |v| v.with_s_ref(|s: &str| s.as_bytes().to_vec()))),
         }
     }
@@ -5716,7 +5695,7 @@ impl VVal {
     /// Creates a VVal structure from a JSON string.
     #[cfg(feature="serde_json")]
     pub fn from_json(s: &str) -> Result<VVal, String> {
-        match serde_json::from_str(&s) {
+        match serde_json::from_str(s) {
             Ok(v) => Ok(v),
             Err(e) => Err(format!("from_json failed: {}", e)),
         }

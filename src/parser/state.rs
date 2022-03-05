@@ -125,9 +125,10 @@ impl fmt::Display for ParseValueError {
         }
     }
 }
-impl Into<ParseErrorKind> for ParseValueError {
-    fn into(self) -> ParseErrorKind {
-        ParseErrorKind::BadValue(self)
+
+impl From<ParseValueError> for ParseErrorKind {
+    fn from(p: ParseValueError) -> ParseErrorKind {
+        ParseErrorKind::BadValue(p)
     }
 }
 
@@ -160,9 +161,10 @@ impl fmt::Display for ParseNumberError {
         }
     }
 }
-impl Into<ParseErrorKind> for ParseNumberError {
-    fn into(self) -> ParseErrorKind {
-        ParseErrorKind::BadNumber(self)
+
+impl From<ParseNumberError> for ParseErrorKind {
+    fn from(p: ParseNumberError) -> ParseErrorKind {
+        ParseErrorKind::BadNumber(p)
     }
 }
 

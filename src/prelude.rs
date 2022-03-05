@@ -9954,7 +9954,6 @@ fn systime_to_unix(syst: &std::time::SystemTime, unit: &str) -> Result<VVal, Sta
 }
 
 fn duration_to_vval(dur: std::time::Duration, unit: &str) -> VVal {
-    use std::convert::TryFrom;
     match unit {
         "s"  => { VVal::Int(i64::try_from(dur.as_secs())  .unwrap_or(0)) },
         "ms" => { VVal::Int(i64::try_from(dur.as_millis()).unwrap_or(0)) },

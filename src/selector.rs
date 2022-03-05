@@ -120,7 +120,6 @@ fn parse_glob_cclass(ps: &mut State) -> Result<VVal, ParseError> {
             };
 
         if find_range_end {
-            use std::convert::TryFrom;
             let start = last.unwrap() as u32 + 1;
             let end   = c as u32;
             for c_idx in start..end {

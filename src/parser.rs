@@ -54,7 +54,7 @@ fn parse_q_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 
     if bytes {
         vec.push(VVal::new_byt(
-            parse_quoted(ps, Vec::new(), |v, c| add_c_to_vec(v, c))?));
+            parse_quoted(ps, Vec::new(), add_c_to_vec)?));
     } else {
         vec.push(VVal::new_str_mv(
             parse_quoted(ps, String::new(), |v, c| v.push(c))?));
