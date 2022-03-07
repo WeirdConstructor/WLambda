@@ -116,6 +116,17 @@ fn get_doc() -> VVal {
     VVal::None
 }
 
+fn print_info() {
+    eprintln!("WLambda Version {}", VERSION);
+    eprintln!("Copyright (C) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>");
+    eprintln!("License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.");
+    eprintln!("This is free software: you are free to change and redistribute it.");
+    eprintln!("There is NO WARRANTY, to the extent permitted by law.");
+    eprintln!("");
+    eprintln!("For documentation visit: <http://wlambda.m8geil.de>.");
+    eprintln!("");
+}
+
 fn main() {
 //    println!("sizeof {} Result<> bytes", std::mem::size_of::<Result<VVal, crate::vval::StackAction>>());
 //    println!("sizeof {} SynPos bytes", std::mem::size_of::<crate::vval::SynPos>());
@@ -225,7 +236,7 @@ fn main() {
             println!("Loaded history from 'wlambda.history' file.");
         }
 
-        eprintln!("WLambda Version {}", VERSION);
+        print_info();
         loop {
             let readline = rl.readline(">> ");
             match readline {
@@ -254,7 +265,7 @@ fn main() {
 
     #[cfg(not (feature="rustyline"))]
     {
-        eprintln!("WLambda Version {}", VERSION);
+        print_info();
         loop {
             use std::io::{self, BufRead};
             for line in io::stdin().lock().lines() {
