@@ -93,10 +93,8 @@ impl VHttpClient {
                                 rq_build =
                                     name.with_s_ref(|name|
                                         v.with_s_ref(|value| {
-                                            println!("PAIR {} {}", name, value);
                                             rq_build.query(&[[name, value]])
-
-                                            }));
+                                        }));
                             }
                         },
                         _ => {
