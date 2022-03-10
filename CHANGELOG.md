@@ -1,3 +1,9 @@
+0.8.2 (unreleased)
+==================
+
+* **Feature:** Extended `std:http:*` requests with `@dump` option to dump
+the resulting request and response information.
+
 0.8.1 (2022-03-05)
 ==================
 
