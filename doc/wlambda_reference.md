@@ -4642,6 +4642,26 @@ iter i it {
 std:assert_eq sum 6;
 ```
 
+By passing an iterator function to `$iter` or `iter` you can
+iterate over returned values from a WLambda function/closure:
+
+```wlambda
+!counter = 0;
+!generator = {
+    .c = c + 1;
+    if c > 10
+        { $o() }
+        { $o(c) }
+};
+
+!sum = 0;
+iter i generator {
+    .sum = sum + i;
+};
+
+std:assert_eq sum 55;
+```
+
 #### <a name="3181-iterator-kinds"></a>3.18.1 - Iterator Kinds
 
 Here is a table of the behaviour of iterators created from WLambda data.
@@ -4653,6 +4673,7 @@ Here is a table of the behaviour of iterators created from WLambda data.
 | `$none`   | Returns nothing  |
 | optional | Returns the optional value on first invocation. |
 | `$o()` | Returns nothing. |
+| function | Treats the given function as generator: The function should return a value wrapped in an optional value `$o(...)`. If no further values can be generated `$o()` should be returned. |
 | int  | Returns the integer value on first invocation. |
 | float  | Returns the integer value on first invocation. |
 | string | Returns the individual characters as string. |
@@ -4669,7 +4690,7 @@ Here is a table of the behaviour of iterators created from WLambda data.
 | `$p(:keys, map)`  | Returns the keys of the _map_ in undefined order. |
 | `$p(int_a, int_b)` | The same as `$i(a, b)`. This makes it possible to write `$iter 0 => 10`. |
 | `$p(iterator_a, iterator_b)` | Returns a zip operation of the elements returned by the iterator_a and iterator_b until one of both returns `$o()`. |
-| `$p(iterator, x)` | Returns a zip operation of the elements returned by the iterator and the newly created iterator`$iter x`. |
+| `$p(iterator, x)` | Returns a zip operation of the elements returned by the iterator and the newly created iterator `$iter x`. |
 
 #### <a name="3182-iterators-on-mutated-data"></a>3.18.2 - Iterators on mutated data
 

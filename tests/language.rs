@@ -5346,6 +5346,34 @@ fn check_iter_arg_bug() {
 }
 
 #[test]
+fn check_iter_function_gen() {
+    assert_eq!(ve(r#"
+        !c = 0;
+        !f = { .c = c + 1; if c > 10 { $o() } { $o(c) } };
+        $@v iter i f { $+ i }
+    "#), "$[1,2,3,4,5,6,7,8,9,10]");
+
+    assert_eq!(ve(r#"
+        !c = 0;
+        !f = { .c = c + 1; if c > 10 { $o() } { $o(c) } };
+        ($iter f)[]
+    "#), "$o(1)");
+
+    assert_eq!(ve(r#"
+        !c = 0;
+        !f = { .c = c + 1; if c > 10 { $o() } { $o(c) } };
+        $@v iter x $p(($iter 1 => 11), f) { $+ x }
+    "#), "$[$p(1,1),$p(2,2),$p(3,3),$p(4,4),$p(5,5),$p(6,6),$p(7,7),$p(8,8),$p(9,9),$p(10,10)]");
+
+    assert_eq!(ve(r#"
+        !c = 0;
+        !f = { .c = c + 1; if c > 10 { $o() } { $o(c) } };
+        $@v iter i ($iter f) { $+ i }
+    "#), "$[1,2,3,4,5,6,7,8,9,10]");
+}
+
+
+#[test]
 fn parser_crash_bad_op() {
     assert_eq!(
         ve("!foo = { } !@export foo = foo;"),

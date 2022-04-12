@@ -1,3 +1,9 @@
+0.8.2 (unreleased)
+==================
+
+* **Feature:** `$iter` and `iter` are now accepting functions as arguments
+and can create an iterator over a WLambda generator function from that.
+
 0.8.1 (2022-03-05)
 ==================
 

@@ -496,6 +496,16 @@ impl Env {
         e
     }
 
+    /// Derives a new clean environment from the current one. Things like the
+    /// Stdio and the global/user data will be cloned from the current environment.
+    /// This is useful for cases where you want to store the Env inside a
+    /// pure Rust closure to call WLambda functions later.
+    pub fn derive(&self) -> Self {
+        let mut e = Self::new_with_user(self.global.clone(), self.user.clone());
+        e.set_stdio(self.stdio.clone());
+        e
+    }
+
     /// Sets a custom stdio procedure. This can be used to redirect the
     /// standard input/output operations of WLambda to other sinks and sources.
     /// For instance writing and reading from a Buffer when using WASM
@@ -2025,7 +2035,7 @@ macro_rules! iter_int_a_to_b {
 }
 
 macro_rules! pair_key_to_iter {
-    ($p: ident) => {
+    ($p: ident, $iter2: block) => {
         if let VVal::Iter(ai) = &$p.0 {
             let ai = ai.clone();
 
@@ -2060,7 +2070,7 @@ macro_rules! pair_key_to_iter {
                     }
                 }))
             } else {
-                let mut bi = $p.1.iter();
+                let mut bi = $iter2;
                 std::iter::from_fn(Box::new(move || {
                     let a = ai.borrow_mut().next();
                     if let Some((a, ak)) = a {
@@ -3310,6 +3320,10 @@ impl VVal {
     /// This function will not return the same iterator again when called
     /// on an VVal iterator value!
     ///
+    /// **Attention:** Iterators from WLambda functions can only be
+    /// created with [VVal::iter_env]. This is because we need a proper
+    /// WLambda [Env] environment to derive the Rust iterator from.
+    ///
     /// This functionality provides the `for` keyword/function in WLambda.
     ///
     /// ```
@@ -3389,7 +3403,7 @@ impl VVal {
                 std::iter::from_fn(Box::new(move || { None }))
             },
             VVal::Pair(p) => {
-                pair_key_to_iter!(p)
+                pair_key_to_iter!(p, { p.1.iter() })
             },
             VVal::IVec(b) => {
                 match b.as_ref() {
@@ -3463,6 +3477,42 @@ impl VVal {
                 })
         }
     }
+
+    /// This function is like [VVal::iter] but it also can create an iterator
+    /// from a WLambda function. Where the function is interpreted as generator
+    /// and called until it yields `$o()`.
+    pub fn iter_env(&self, env: &mut Env) -> VValIter {
+        match self {
+            VVal::Pair(p) => {
+                pair_key_to_iter!(p, { p.1.iter_env(env) })
+            },
+            VVal::Fun(_) => {
+                let fu = self.clone();
+                let mut e = env.derive();
+                std::iter::from_fn(Box::new(move || {
+                    match fu.call(&mut e, &[]) {
+                        Err(err) => {
+                            let _ =
+                                write!(
+                                    *e.stdio.write.borrow_mut(),
+                                    "Error in iter function: {}",
+                                    err);
+                            None
+                        },
+                        Ok(v) => {
+                            match v {
+                                VVal::Opt(None)    => None,
+                                VVal::Opt(Some(v)) => Some((v.as_ref().clone(), None)),
+                                _                  => Some((v, None))
+                            }
+                        }
+                    }
+                }))
+            },
+            _ => { self.iter() },
+        }
+    }
+
 
     /// Calls the given callback with an iterator through
     /// the vval. It catches the special case when the VVal itself

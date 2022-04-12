@@ -295,7 +295,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
             }),
             Op::NewIter(a, r) => op_a_r!(env, ret, retv, data, a, r, {
-                VVal::Iter(Rc::new(RefCell::new(a.iter())))
+                VVal::Iter(Rc::new(RefCell::new(a.iter_env(env))))
             }),
             Op::NewNVec(vp, r) => {
                 match vp.as_ref() {
@@ -403,7 +403,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 if let VVal::Iter(i) = iterable {
                     env.push_iter(i);
                 } else {
-                    env.push_iter(Rc::new(RefCell::new(iterable.iter())));
+                    let it = iterable.iter_env(env);
+                    env.push_iter(Rc::new(RefCell::new(it)));
                 }
             },
             Op::IterNext(ivar) => {
@@ -561,7 +562,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         b.push(v);
                     }
                 } else {
-                    for (e, _) in a.iter() {
+                    for (e, _) in a.iter_env(env) {
                         b.push(e);
                     }
                 }
@@ -644,7 +645,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         }
                     }
                 } else {
-                    for (e, k) in s.iter() {
+                    for (e, k) in s.iter_env(env) {
                         match m.set_key(&k.unwrap_or(VVal::None), e) {
                             Ok(_) => (),
                             Err(er) => {
