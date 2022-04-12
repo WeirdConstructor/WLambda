@@ -8,7 +8,7 @@ use crate::{Env, StackAction};
 #[allow(unused_imports)]
 use crate::vval::{VValFun, VValUserData};
 #[cfg(feature="reqwest")]
-use reqwest::blocking::{Client, Response};
+use reqwest::blocking::Client;
 #[cfg(feature="reqwest")]
 use reqwest::header::{HeaderName, HeaderValue};
 use crate::compiler::*;
@@ -52,7 +52,11 @@ impl VHttpClient {
         }
     }
 
-    pub fn request(&self, method: &str, url: &str, body: Option<&[u8]>, headers: VVal) -> Result<Response, VHttpClError> {
+    pub fn request(
+        &self, method: &str, url: &str, body: Option<&[u8]>,
+        headers: VVal, dump_output: &mut VVal)
+        -> Result<VVal, VHttpClError>
+    {
         let method =
             reqwest::Method::from_bytes(method.as_bytes())
                 .unwrap_or(reqwest::Method::POST);
@@ -60,6 +64,8 @@ impl VHttpClient {
         let mut rq_build =
             self.cl.borrow_mut()
                 .request(method, url);
+
+        let mut dump = false;
 
         if headers.is_some() {
             for (v, k) in headers.iter() {
@@ -93,11 +99,12 @@ impl VHttpClient {
                                 rq_build =
                                     name.with_s_ref(|name|
                                         v.with_s_ref(|value| {
-                                            println!("PAIR {} {}", name, value);
                                             rq_build.query(&[[name, value]])
-
-                                            }));
+                                        }));
                             }
+                        },
+                        "@dump" => {
+                            dump = true;
                         },
                         _ => {
                             return Err(VHttpClError::InvalidHeaderName);
@@ -121,7 +128,21 @@ impl VHttpClient {
             rq_build = rq_build.body(body.to_vec());
         }
 
-        rq_build.send().map_err(|e| VHttpClError::ReqwestError(e))
+        if dump {
+            let rq =
+                rq_build.build().map_err(|e| VHttpClError::ReqwestError(e))?;
+            *dump_output = req2vv(&rq);
+            let resp =
+                self.cl.borrow_mut().execute(rq)
+                    .map_err(|e| VHttpClError::ReqwestError(e))?;
+
+            let resp = resp2vv(resp);
+            *dump_output = VVal::pair((*dump_output).clone(), resp.clone());
+
+            Ok(resp)
+        } else {
+            Ok(resp2vv(rq_build.send().map_err(|e| VHttpClError::ReqwestError(e))?))
+        }
     }
 }
 
@@ -137,10 +158,10 @@ impl VValUserData for VHttpClient {
 }
 
 #[cfg(feature="reqwest")]
-pub fn resp2vv(env: &mut Env, resp: reqwest::blocking::Response) -> VVal {
+pub fn req2vv(req: &reqwest::blocking::Request) -> VVal {
     let headers = VVal::map();
-    for (key, value) in resp.headers().iter() {
-        let res =
+    for (key, value) in req.headers().iter() {
+        let _ =
             if let Ok(s) = value.to_str() {
                 headers.set_key_str(
                     key.as_str(), VVal::new_str(s))
@@ -150,19 +171,43 @@ pub fn resp2vv(env: &mut Env, resp: reqwest::blocking::Response) -> VVal {
                     VVal::new_byt(
                         value.as_bytes().as_ref().to_vec()))
             };
+    }
 
-        if let Err(e) = res {
-            return
-                env.new_err(
-                    format!("HTTP Header Set Error: {}", e));
+    let out = VVal::map();
+
+    let _ = out.set_key_str("method",  VVal::new_str(req.method().as_str()));
+    let _ = out.set_key_str("url",     VVal::new_str(req.url().as_str()));
+    let _ = out.set_key_str("headers", headers);
+    if let Some(body) = req.body() {
+        if let Some(bytes) = body.as_bytes() {
+            let _ = out.set_key_str("body", VVal::new_byt(bytes.to_vec()));
         }
+    }
+
+    out
+}
+
+#[cfg(feature="reqwest")]
+pub fn resp2vv(resp: reqwest::blocking::Response) -> VVal {
+    let headers = VVal::map();
+    for (key, value) in resp.headers().iter() {
+        let _ =
+            if let Ok(s) = value.to_str() {
+                headers.set_key_str(
+                    key.as_str(), VVal::new_str(s))
+            } else {
+                headers.set_key_str(
+                    key.as_str(),
+                    VVal::new_byt(
+                        value.as_bytes().as_ref().to_vec()))
+            };
     }
 
     let status = resp.status();
 
     match resp.bytes() {
         Err(e) => {
-            env.new_err(format!("HTTP Body Error: {}", e))
+            VVal::err_msg(&format!("HTTP Body Error: {}", e))
         },
         Ok(body) => {
             let map =
@@ -181,6 +226,16 @@ pub fn resp2vv(env: &mut Env, resp: reqwest::blocking::Response) -> VVal {
     }
 }
 
+#[cfg(feature="reqwest")]
+fn add_dump(out: VVal, dump: VVal) -> VVal {
+    if dump.is_some() {
+        VVal::pair(out, dump)
+    } else {
+        out
+    }
+}
+
+
 #[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {
     #[cfg(feature="reqwest")]
@@ -194,12 +249,14 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         let url     = env.arg(1);
         let headers = env.arg(2);
 
+        let mut dump_out = VVal::None;
+
         cl.with_usr_ref(|cl: &mut VHttpClient| {
             url.with_s_ref(|url| {
-                match cl.request("GET", url, None, headers) {
+                match cl.request("GET", url, None, headers, &mut dump_out) {
                     Err(e) =>
                         Ok(env.new_err(format!("HTTP Request Error: {}", e))),
-                    Ok(resp) => { Ok(resp2vv(env, resp)) },
+                    Ok(resp) => { Ok(add_dump(resp, dump_out)) },
                 }
             })
         }).unwrap_or_else(||
@@ -216,13 +273,15 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         let body    = env.arg(2);
         let headers = env.arg(3);
 
+        let mut dump_out = VVal::None;
+
         cl.with_usr_ref(|cl: &mut VHttpClient| {
             body.with_bv_ref(|body| {
                 url.with_s_ref(|url| {
-                    match cl.request("POST", url, Some(body), headers) {
+                    match cl.request("POST", url, Some(body), headers, &mut dump_out) {
                         Err(e) =>
                             Ok(env.new_err(format!("HTTP Request Error: {}", e))),
-                        Ok(resp) => { Ok(resp2vv(env, resp)) },
+                        Ok(resp) => { Ok(add_dump(resp, dump_out)) },
                     }
                 })
             })
@@ -241,23 +300,25 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         let body    = env.arg(3);
         let headers = env.arg(4);
 
+        let mut dump_out = VVal::None;
+
         cl.with_usr_ref(|cl: &mut VHttpClient| {
             method.with_s_ref(|method| {
                 if body.is_none() {
                     url.with_s_ref(|url| {
-                        match cl.request(method, url, None, headers) {
+                        match cl.request(method, url, None, headers, &mut dump_out) {
                             Err(e) =>
                                 Ok(env.new_err(format!("HTTP Request Error: {}", e))),
-                            Ok(resp) => { Ok(resp2vv(env, resp)) },
+                            Ok(resp) => { Ok(add_dump(resp, dump_out)) },
                         }
                     })
                 } else {
                     body.with_bv_ref(|body| {
                         url.with_s_ref(|url| {
-                            match cl.request(method, url, Some(body), headers) {
+                            match cl.request(method, url, Some(body), headers, &mut dump_out) {
                                 Err(e) =>
                                     Ok(env.new_err(format!("HTTP Request Error: {}", e))),
-                                Ok(resp) => { Ok(resp2vv(env, resp)) },
+                                Ok(resp) => { Ok(add_dump(resp, dump_out)) },
                             }
                         })
                     })

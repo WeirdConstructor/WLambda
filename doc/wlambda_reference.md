@@ -8824,6 +8824,9 @@ custom HTTP headers themself:
 - `@basic_auth` with `$[user, $none]` or `$[user, password]` as value.
 - `@bearer_auth` with `token` as value.
 - `@timeout` with a timeout duration as value. (See also `std:thread:sleep`).
+- `@dump` will dump the HTTP Request information and response information
+in an extra data structure. The return value of the `std:http:get` (and others)
+will then be a pair of `$p(response, $p(request_dump, response))`.
 - `@query` with a map of query parameters and their values to modify the
 query string of the _url-string_. This properly encodes the strings.
 
