@@ -5,6 +5,8 @@
 and can create an iterator over a WLambda generator function from that.
 * **Feature:** Extended `std:http:*` requests with `@dump` option to dump
 the resulting request and response information.
+* **Feature:** Added `std:ser:toml` and `std:deser:toml` for reading and writing
+TOML configuration files.
 
 0.8.1 (2022-03-05)
 ==================

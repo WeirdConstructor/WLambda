@@ -547,7 +547,7 @@ impl AValChannel {
     ///
     /// Here is an example on how to get a sender from an std:sync:mpsc handle
     /// from the WLambda side of an API function:
-    ///```
+    ///```text
     ///   let chan = if env.arg(2).is_some() {
     ///       let mut chan = env.arg(2);
     ///       let chan =
@@ -555,7 +555,7 @@ impl AValChannel {
     ///               chan.fork_sender_direct()
     ///           });
     ///
-    ///       if let Some(chan) = chan {
+    ///       if let Ok(chan) = chan {
     ///          match chan {
     ///               Ok(chan) => Some(chan),
     ///               Err(err) => {

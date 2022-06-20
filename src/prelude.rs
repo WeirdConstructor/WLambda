@@ -318,6 +318,13 @@ Smalltalk, LISP and Perl.
   - [6.5](#65-collection-addition-operators--and-) Collection Addition Operators +> and <+
     - [6.5.1](#651--collection-a-) +> _collection_ _a_ ...
     - [6.5.2](#652--collection-a-) <+ _collection_ _a_ ...
+  - [6.6](#66-call-operators----and-) Call Operators &>, \<&, &@> and \<@&
+  - [6.7](#67-default-value-operators---n-o-and-e) Default Value Operators //, /?, /$n, /$o and /$e
+    - [6.7.1](#671--a-default-b) // _a_ _default-b_
+    - [6.7.2](#672--a-default-b) /? _a_ _default-b_
+    - [6.7.3](#673-n-a-default-b) /$n _a_ _default-b_
+    - [6.7.4](#674-o-a-default-b) /$o _a_ _default-b_
+    - [6.7.5](#675-e-a-default-b) /$e _a_ _default-b_
 - [7](#7-string-and-byte-vector-formatting) String and Byte Vector Formatting
     - [7.0.1](#701-stdformatter-format-string) std:formatter _format-string_
   - [7.1](#71-formatting-numbers) Formatting Numbers
@@ -431,10 +438,12 @@ Smalltalk, LISP and Perl.
     - [12.1.1](#1211-stdserwlambda-arg) std:ser:wlambda _arg_
     - [12.1.2](#1212-stdserjson-data-nopretty) std:ser:json _data_ \[_no\_pretty_]
     - [12.1.3](#1213-stddeserjson-string) std:deser:json _string_
-    - [12.1.4](#1214-stdsercsv-fielddelim-rowseparator-escapeall-table) std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
-    - [12.1.5](#1215-stddesercsv-fielddelim-rowseparator-data) std:deser:csv _field\_delim_ _row\_separator_ _data_
-    - [12.1.6](#1216-stdsermsgpack-data) std:ser:msgpack _data_
-    - [12.1.7](#1217-stddesermsgpack-bytes) std:deser:msgpack _bytes_
+    - [12.1.4](#1214-stdsertoml-data-nopretty) std:ser:toml _data_ \[no\_pretty\]
+    - [12.1.5](#1215-stddesertoml-string) std:deser:toml _string_
+    - [12.1.6](#1216-stdsercsv-fielddelim-rowseparator-escapeall-table) std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
+    - [12.1.7](#1217-stddesercsv-fielddelim-rowseparator-data) std:deser:csv _field\_delim_ _row\_separator_ _data_
+    - [12.1.8](#1218-stdsermsgpack-data) std:ser:msgpack _data_
+    - [12.1.9](#1219-stddesermsgpack-bytes) std:deser:msgpack _bytes_
   - [12.2](#122-regular-expressions-more-classic-syntax) Regular Expressions (more classic syntax)
     - [12.2.1](#1221-stdrematch-regex-string-input-string-function) std:re:match _regex-string_ _input-string_ _function_
     - [12.2.2](#1222-stdrematchcompile-regex-string) std:re:match\_compile _regex-string_
@@ -1516,6 +1525,11 @@ Optional values were introduced for functions that lookup stuff and either
 return _something_ that might be `$none` (eg. if some element in a vector is
 searched for), or return that nothing was found.
 
+Note that there are two operators that interact with this type in a convenient
+way. The optional or operator `/$o` and the default value operator `//` can be
+used to provide default values and unwrap optionals. These operators also support
+short circuit, that means you can write `x // return[$none]`.
+
 The functions `is_none` and `is_some` like stated above work for these
 optional values too:
 
@@ -1524,6 +1538,28 @@ std:assert ~ is_none $o();
 std:assert ~ is_some $o(10);
 std:assert ~ is_some $o($none);
 std:assert ~ is_some $o($o());
+```
+
+Here is a demonstration of the very convenient optionals or operator
+and the default value operator:
+
+```wlambda
+std:assert_eq $o()   /$o 11   11;
+std:assert_eq $o(22) /$o 11   22;
+std:assert_eq $none  /$o 11   $none;
+std:assert (is_err ($e 10) /$o 20);
+
+std:assert_eq $o()   // 11   11;
+std:assert_eq $o(22) // 11   22;
+std:assert_eq $none  // 11   11;
+std:assert_eq 123    // 11   123;
+std:assert (is_err ($e 10) // 20);
+
+std:assert_eq $o()    /? 11   11;
+std:assert_eq $o(22)  /? 11   22;
+std:assert_eq $none   /? 11   11;
+std:assert_eq 123     /? 11   123;
+std:assert_eq ($e 10) /? 11   11;
 ```
 
 Calling an optional value will return it's contents or `$none`:
@@ -1613,9 +1649,20 @@ std:assert ~ not ~ is_optional 303;
 
 You can unwrap an optional with `unwrap`. It will panic if there is no value provided.
 Otherwise it will return the contents.
+Alternatively you can use the optional or operator `/$o`
+or even the default value operator `//`
+for accessing the potentially wrapped value while providing a default value.
 
 ```wlambda
 std:assert_eq unwrap[$o(10)] 10;
+
+std:assert_eq $o(10) /$o 20  10;
+std:assert_eq $o()   /$o 20  20;
+std:assert_eq $none  /$o 20  $none;
+
+std:assert_eq $o(10) //  20  10;
+std:assert_eq $o()   //  20  20;
+std:assert_eq $none  //  20  20;
 ```
 
 ### <a name="33-error-values-e-expr-or-error-expr"></a>3.3 - Error values: `$e expr` or `$error expr`
@@ -1644,6 +1691,52 @@ an panic if an error value was passed to it. All other values
 will be passed through. And `unwrap_err` unwraps an error value, it's
 the opposite of `unwrap` because it will cause a panic if you don't pass
 an error value.
+
+You can also use the `match` statement to check return types of
+functions:
+
+```wlambda
+!res = match (std:str:join "," "foo")
+    ($e err) => { $\.err }
+    r        => { $\.r };
+
+std:assert_eq (res 0 8) "str:join";
+
+# As comparison, the positive case for this construct:
+
+!res = match 100
+    ($e err) => { $\.err }
+    r        => { $\.r };
+std:assert_eq res 100;
+```
+
+There is also the error or operator `/$e` and the extended default value
+operator `/?` that helps to shortcut any errors. These operators also support short
+circuit, that means you can do `func_might_return_err[] // return[$n]`.
+But use this with care, it hides errors all to easily!
+
+```wlambda
+std:assert_eq ($e 30) /$e 20    20;
+std:assert_eq $n      /$e 10    $n;
+
+# The extended default value operator also hides errors:
+std:assert_eq ($e 30) /? 20    20;
+std:assert_eq $n      /? 10    10;
+std:assert_eq $o()    /? 10    10;
+std:assert_eq $o(22)  /? 10    22;
+std:assert_eq 22      /? 10    22;
+std:assert_eq $f      /? 10    $false;
+
+# You can combine this operator with the some or operator `//` or even `/?`:
+std:assert_eq ($e 30) /$e 10 // 20   10;
+std:assert_eq $n      /$e 10 // 20   20;
+
+# To demonstrate short circuit:
+!res = 0;
+!x = ($e 10) /$e { .res = 10 }[];
+std:assert_eq res 10;
+std:assert_eq x   $none;
+```
 
 Most functions don't accept errors in their arguments.
 If an error is encountered, a panic will occur. There are only
@@ -1682,6 +1775,7 @@ a few functions that accept error values in their arguments:
 - std:to_ref
 - std:ref_id
 - std:ser:wlambda
+- `//`, `/?`, `/$n`, `/$e`, `/$o`
 
 All other functions don't accept errors as their argument.
 
@@ -4571,6 +4665,26 @@ iter i it {
 std:assert_eq sum 6;
 ```
 
+By passing an iterator function to `$iter` or `iter` you can
+iterate over returned values from a WLambda function/closure:
+
+```wlambda
+!counter = 0;
+!generator = {
+    .counter = counter + 1;
+    if counter > 10
+        { $o() }
+        { $o(counter) }
+};
+
+!sum = 0;
+iter i generator {
+    .sum = sum + i;
+};
+
+std:assert_eq sum 55;
+```
+
 #### <a name="3181-iterator-kinds"></a>3.18.1 - Iterator Kinds
 
 Here is a table of the behaviour of iterators created from WLambda data.
@@ -4582,6 +4696,7 @@ Here is a table of the behaviour of iterators created from WLambda data.
 | `$none`   | Returns nothing  |
 | optional | Returns the optional value on first invocation. |
 | `$o()` | Returns nothing. |
+| function | Treats the given function as generator: The function should return a value wrapped in an optional value `$o(...)`. If no further values can be generated `$o()` should be returned. |
 | int  | Returns the integer value on first invocation. |
 | float  | Returns the integer value on first invocation. |
 | string | Returns the individual characters as string. |
@@ -4598,7 +4713,7 @@ Here is a table of the behaviour of iterators created from WLambda data.
 | `$p(:keys, map)`  | Returns the keys of the _map_ in undefined order. |
 | `$p(int_a, int_b)` | The same as `$i(a, b)`. This makes it possible to write `$iter 0 => 10`. |
 | `$p(iterator_a, iterator_b)` | Returns a zip operation of the elements returned by the iterator_a and iterator_b until one of both returns `$o()`. |
-| `$p(iterator, x)` | Returns a zip operation of the elements returned by the iterator and the newly created iterator`$iter x`. |
+| `$p(iterator, x)` | Returns a zip operation of the elements returned by the iterator and the newly created iterator `$iter x`. |
 
 #### <a name="3182-iterators-on-mutated-data"></a>3.18.2 - Iterators on mutated data
 
@@ -6032,6 +6147,136 @@ reversed to the order in an operator expression.
 
 std:assert_str_eq v v2;
 ```
+
+### <a name="66-call-operators----and-"></a>6.6 - Call Operators &>, \<&, &@> and \<@&
+
+See also:
+
+- [Forward Argument Pipe `arg &> fun`](#253-forward-argument-pipe-arg--fun)
+- [Forward Argument Apply Pipe `list &@> fun`](254-forward-argument-apply-pipe-list--fun)
+- [Reverse Argument Pipe `fun <& arg`](#255-reverse-argument-pipe-fun--arg)
+- [Reverse Argument Apply Pipe `list &@> fun`](#256-reverse-argument-apply-pipe-list--fun)
+
+### <a name="67-default-value-operators---n-o-and-e"></a>6.7 - Default Value Operators //, /?, /$n, /$o and /$e
+
+There is a set of convenient default value operators that allow quick unwrapping
+of optional value, `$none` and even `$error` values.
+
+The most safe to use default value operator is the `//` operator, which returns
+an alternative value in case `$none` or `$o()` is provided and even unwraps
+optional values like `$o(10)`.  It does not do anything if an `$error` value is
+encountered.
+
+```wlambda
+!mul = {|1<2| !(a, b) = @;
+    a * b // 1
+};
+
+std:assert_eq mul[10]     10;
+std:assert_eq mul[10, 20] 200;
+```
+
+For handling the error value case you can either explicitly combine it with
+a `/$e` operator, which is the most explicit thing to use. Or use
+the extended default value operator `/?` which also provides the default
+value if an error is encountered.
+
+Please note that the operator versions (in contrast to the function versions
+in backticks) is short circuit just like the `&or` operator:
+
+```wlambda
+!mul = {|1<2| !(a, b) = @;
+    a   // return[-1]
+    * b // return[-1]
+};
+
+std:assert_eq mul[10]        -1;
+std:assert_eq mul[$none, 20] -1;
+std:assert_eq mul[10, 20]    200;
+```
+
+For more details see the following sections.
+
+#### <a name="671--a-default-b"></a>6.7.1 - // _a_ _default-b_
+
+The default value operator is the `//` operator, which returns an alternative
+value in case `$none` or `$o()` is provided on the left hand side and even
+unwraps optional values like `$o(10)`.  It does not do anything if an `$error`
+value is encountered. For an operator that also defaults `$error` values see
+the extended default value operator `/?`.
+
+```wlambda
+std:assert_eq   $n     // 10           10;
+std:assert_eq   $o()   // 10           10;
+std:assert_eq   $o(20) // 10           20;
+std:assert_eq   $false // 10           $false;
+std:assert_eq   (is_err ($e 1) // 10)  $true;
+```
+
+Please note you can combine and chain these operators: `a_func[] /$e -1 // 10`.
+
+#### <a name="672--a-default-b"></a>6.7.2 - /? _a_ _default-b_
+
+The extended default value operator is the `/?` operator, which returns an
+alternative value in case `$none`, `$error` or `$o()` is provided on the left
+hand side and even unwraps optional values like `$o(10)`. It's the extended
+version of the default value operator `//`.
+
+```wlambda
+std:assert_eq   $n     /? 10  10;
+std:assert_eq   $o()   /? 10  10;
+std:assert_eq   $o(20) /? 10  20;
+std:assert_eq   $false /? 10  $false;
+std:assert_eq   ($e 1) /? 10  10;
+```
+
+#### <a name="673-n-a-default-b"></a>6.7.3 - /$n _a_ _default-b_
+
+The `$none` default value operator returns it's right hand side if the
+left hand side is a `$none` value.
+
+```wlambda
+std:assert_eq   $n     /$n 10           10;
+std:assert_eq   $o()   /$n 10           $o();
+std:assert_eq   $o(20) /$n 10           $o(20);
+std:assert_eq   $false /$n 10           $false;
+std:assert_eq   (is_err ($e 1) /$n 10)  $true;
+```
+
+Please note you can combine and chain these operators: `a_func[] /$n -1 /$o -2`.
+
+#### <a name="674-o-a-default-b"></a>6.7.4 - /$o _a_ _default-b_
+
+The optionals default value operator returns it's right hand side if the
+left hand side is a `$o()` value. And it unwraps it's left hand side
+if it is an non empty optional value like eg. `$o(10)`.
+
+```wlambda
+std:assert_eq   $n     /$o 10           $n;
+std:assert_eq   $o()   /$o 10           10;
+std:assert_eq   $o(20) /$o 10           20;
+std:assert_eq   $false /$o 10           $false;
+std:assert_eq   (is_err ($e 1) /$o 10)  $true;
+```
+
+Please note you can combine and chain these operators: `a_func[] /$e -1 /$n -2 /$o -3`.
+
+#### <a name="675-e-a-default-b"></a>6.7.5 - /$e _a_ _default-b_
+
+The error default value operator returns it's right hand side if the
+left hand side is an `$error` value. It's convenient to provide default
+values only in case an error is returned. It can also be used
+to ignore errors more conveniently.
+
+```wlambda
+std:assert_eq   $n     /$e 10           $n;
+std:assert_eq   $o()   /$e 10           $o();
+std:assert_eq   $o(20) /$e 10           $o(20);
+std:assert_eq   $false /$e 10           $false;
+std:assert_eq   (is_err ($e 1) /$e 10)  $false;
+```
+
+Please note you can combine and chain these operators: `a_func[] /$e -1 /$o -2 // 0`.
 
 ## <a name="7-string-and-byte-vector-formatting"></a>7 - String and Byte Vector Formatting
 
@@ -8108,7 +8353,27 @@ std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
 ```
 
-#### <a name="1214-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.4 - std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
+#### <a name="1214-stdsertoml-data-nopretty"></a>12.1.4 - std:ser:toml _data_ \[no\_pretty\]
+
+Serializes the _data_ and returns a TOML formatted string. Pretty printing does
+not much, as white spaces belongs to the TOML format anyways.
+
+```wlambda
+!str = std:ser:toml ${main = ${some_option = 100}};
+std:assert_eq str "[main]\nsome_option = 100\n";
+```
+
+#### <a name="1215-stddesertoml-string"></a>12.1.5 - std:deser:toml _string_
+
+Deserializes/parses a TOML formatted _string_ and returns a data structure.
+This is super useful for parsing/reading configuration files.
+
+```wlambda
+# Quick example how to read TOML config files:
+!config = std:deser:toml ~ std:io:file:read_text "Cargo.toml";
+```
+
+#### <a name="1216-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.6 - std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
 
 This serializes the _table_ as CSV with the given _field_delim_
 and _row_separator_. If _escape_all_ is `$true` all fields will be
@@ -8130,7 +8395,7 @@ std:assert_eq
     "a;\";\";\"|\";\" \"|";
 ```
 
-#### <a name="1215-stddesercsv-fielddelim-rowseparator-data"></a>12.1.5 - std:deser:csv _field\_delim_ _row\_separator_ _data_
+#### <a name="1217-stddesercsv-fielddelim-rowseparator-data"></a>12.1.7 - std:deser:csv _field\_delim_ _row\_separator_ _data_
 
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
@@ -8142,7 +8407,7 @@ std:assert_eq table.0.1 "bar";
 std:assert_eq table.1.1 "y";
 ```
 
-#### <a name="1216-stdsermsgpack-data"></a>12.1.6 - std:ser:msgpack _data_
+#### <a name="1218-stdsermsgpack-data"></a>12.1.8 - std:ser:msgpack _data_
 
 Serializes the _data_ and returns a msgpack bytes value.
 
@@ -8150,7 +8415,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
-#### <a name="1217-stddesermsgpack-bytes"></a>12.1.7 - std:deser:msgpack _bytes_
+#### <a name="1219-stddesermsgpack-bytes"></a>12.1.9 - std:deser:msgpack _bytes_
 
 Deserializes the msgpack bytes value into a data structure.
 
@@ -8602,6 +8867,9 @@ custom HTTP headers themself:
 - `@basic_auth` with `$[user, $none]` or `$[user, password]` as value.
 - `@bearer_auth` with `token` as value.
 - `@timeout` with a timeout duration as value. (See also `std:thread:sleep`).
+- `@dump` will dump the HTTP Request information and response information
+in an extra data structure. The return value of the `std:http:get` (and others)
+will then be a pair of `$p(response, $p(request_dump, response))`.
 - `@query` with a map of query parameters and their values to modify the
 query string of the _url-string_. This properly encodes the strings.
 
@@ -9045,6 +9313,7 @@ In the following grammar, white space and comments are omitted:
                        their precedence, top to bottom *)
                     "&>" | "&@>"      (* call rhs with lhs operator *)
                   | "<&" | "<@&"      (* call lhs with rhs operator *)
+                  | "//" | "/?" | "/$n" | "/$o" | "/$e" (* default value operators *)
                   | "^"
                   | "*" | "/" | "%"
                   | "-" | "+"

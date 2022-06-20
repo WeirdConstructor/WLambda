@@ -5283,7 +5283,6 @@ fn check_toml() {
         x = 1.2
     }"), "${foo=${x=1.2}}");
 
-
     assert_eq!(ve("std:deser:toml $q{\
         [foo]
         x = \"XXXX\"

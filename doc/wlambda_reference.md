@@ -304,6 +304,13 @@ Smalltalk, LISP and Perl.
   - [6.5](#65-collection-addition-operators--and-) Collection Addition Operators +> and <+
     - [6.5.1](#651--collection-a-) +> _collection_ _a_ ...
     - [6.5.2](#652--collection-a-) <+ _collection_ _a_ ...
+  - [6.6](#66-call-operators----and-) Call Operators &>, \<&, &@> and \<@&
+  - [6.7](#67-default-value-operators---n-o-and-e) Default Value Operators //, /?, /$n, /$o and /$e
+    - [6.7.1](#671--a-default-b) // _a_ _default-b_
+    - [6.7.2](#672--a-default-b) /? _a_ _default-b_
+    - [6.7.3](#673-n-a-default-b) /$n _a_ _default-b_
+    - [6.7.4](#674-o-a-default-b) /$o _a_ _default-b_
+    - [6.7.5](#675-e-a-default-b) /$e _a_ _default-b_
 - [7](#7-string-and-byte-vector-formatting) String and Byte Vector Formatting
     - [7.0.1](#701-stdformatter-format-string) std:formatter _format-string_
   - [7.1](#71-formatting-numbers) Formatting Numbers
@@ -417,10 +424,12 @@ Smalltalk, LISP and Perl.
     - [12.1.1](#1211-stdserwlambda-arg) std:ser:wlambda _arg_
     - [12.1.2](#1212-stdserjson-data-nopretty) std:ser:json _data_ \[_no\_pretty_]
     - [12.1.3](#1213-stddeserjson-string) std:deser:json _string_
-    - [12.1.4](#1214-stdsercsv-fielddelim-rowseparator-escapeall-table) std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
-    - [12.1.5](#1215-stddesercsv-fielddelim-rowseparator-data) std:deser:csv _field\_delim_ _row\_separator_ _data_
-    - [12.1.6](#1216-stdsermsgpack-data) std:ser:msgpack _data_
-    - [12.1.7](#1217-stddesermsgpack-bytes) std:deser:msgpack _bytes_
+    - [12.1.4](#1214-stdsertoml-data-nopretty) std:ser:toml _data_ \[no\_pretty\]
+    - [12.1.5](#1215-stddesertoml-string) std:deser:toml _string_
+    - [12.1.6](#1216-stdsercsv-fielddelim-rowseparator-escapeall-table) std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
+    - [12.1.7](#1217-stddesercsv-fielddelim-rowseparator-data) std:deser:csv _field\_delim_ _row\_separator_ _data_
+    - [12.1.8](#1218-stdsermsgpack-data) std:ser:msgpack _data_
+    - [12.1.9](#1219-stddesermsgpack-bytes) std:deser:msgpack _bytes_
   - [12.2](#122-regular-expressions-more-classic-syntax) Regular Expressions (more classic syntax)
     - [12.2.1](#1221-stdrematch-regex-string-input-string-function) std:re:match _regex-string_ _input-string_ _function_
     - [12.2.2](#1222-stdrematchcompile-regex-string) std:re:match\_compile _regex-string_
@@ -4648,10 +4657,10 @@ iterate over returned values from a WLambda function/closure:
 ```wlambda
 !counter = 0;
 !generator = {
-    .c = c + 1;
-    if c > 10
+    .counter = counter + 1;
+    if counter > 10
         { $o() }
-        { $o(c) }
+        { $o(counter) }
 };
 
 !sum = 0;
@@ -6125,7 +6134,7 @@ reversed to the order in an operator expression.
 std:assert_str_eq v v2;
 ```
 
-### - Call Operators &>, \<&, &@> and \<@&
+### <a name="66-call-operators----and-"></a>6.6 - Call Operators &>, \<&, &@> and \<@&
 
 See also:
 
@@ -6134,7 +6143,7 @@ See also:
 - [Reverse Argument Pipe `fun <& arg`](#255-reverse-argument-pipe-fun--arg)
 - [Reverse Argument Apply Pipe `list &@> fun`](#256-reverse-argument-apply-pipe-list--fun)
 
-### - Default Value Operators //, /?, /$n, /$o and /$e
+### <a name="67-default-value-operators---n-o-and-e"></a>6.7 - Default Value Operators //, /?, /$n, /$o and /$e
 
 There is a set of convenient default value operators that allow quick unwrapping
 of optional value, `$none` and even `$error` values.
@@ -6174,7 +6183,7 @@ std:assert_eq mul[10, 20]    200;
 
 For more details see the following sections.
 
-#### - // _a_ _default-b_
+#### <a name="671--a-default-b"></a>6.7.1 - // _a_ _default-b_
 
 The default value operator is the `//` operator, which returns an alternative
 value in case `$none` or `$o()` is provided on the left hand side and even
@@ -6192,7 +6201,7 @@ std:assert_eq   (is_err ($e 1) // 10)  $true;
 
 Please note you can combine and chain these operators: `a_func[] /$e -1 // 10`.
 
-#### - /? _a_ _default-b_
+#### <a name="672--a-default-b"></a>6.7.2 - /? _a_ _default-b_
 
 The extended default value operator is the `/?` operator, which returns an
 alternative value in case `$none`, `$error` or `$o()` is provided on the left
@@ -6207,7 +6216,7 @@ std:assert_eq   $false /? 10  $false;
 std:assert_eq   ($e 1) /? 10  10;
 ```
 
-#### - /$n _a_ _default-b_
+#### <a name="673-n-a-default-b"></a>6.7.3 - /$n _a_ _default-b_
 
 The `$none` default value operator returns it's right hand side if the
 left hand side is a `$none` value.
@@ -6222,7 +6231,7 @@ std:assert_eq   (is_err ($e 1) /$n 10)  $true;
 
 Please note you can combine and chain these operators: `a_func[] /$n -1 /$o -2`.
 
-#### - /$o _a_ _default-b_
+#### <a name="674-o-a-default-b"></a>6.7.4 - /$o _a_ _default-b_
 
 The optionals default value operator returns it's right hand side if the
 left hand side is a `$o()` value. And it unwraps it's left hand side
@@ -6238,7 +6247,7 @@ std:assert_eq   (is_err ($e 1) /$o 10)  $true;
 
 Please note you can combine and chain these operators: `a_func[] /$e -1 /$n -2 /$o -3`.
 
-#### - /$e _a_ _default-b_
+#### <a name="675-e-a-default-b"></a>6.7.5 - /$e _a_ _default-b_
 
 The error default value operator returns it's right hand side if the
 left hand side is an `$error` value. It's convenient to provide default
@@ -8330,7 +8339,27 @@ std:assert_eq data.1 2.3;
 std:assert_eq data.(2).a 4;
 ```
 
-#### <a name="1214-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.4 - std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
+#### <a name="1214-stdsertoml-data-nopretty"></a>12.1.4 - std:ser:toml _data_ \[no\_pretty\]
+
+Serializes the _data_ and returns a TOML formatted string. Pretty printing does
+not much, as white spaces belongs to the TOML format anyways.
+
+```wlambda
+!str = std:ser:toml ${main = ${some_option = 100}};
+std:assert_eq str "[main]\nsome_option = 100\n";
+```
+
+#### <a name="1215-stddesertoml-string"></a>12.1.5 - std:deser:toml _string_
+
+Deserializes/parses a TOML formatted _string_ and returns a data structure.
+This is super useful for parsing/reading configuration files.
+
+```wlambda
+# Quick example how to read TOML config files:
+!config = std:deser:toml ~ std:io:file:read_text "Cargo.toml";
+```
+
+#### <a name="1216-stdsercsv-fielddelim-rowseparator-escapeall-table"></a>12.1.6 - std:ser:csv _field\_delim_ _row\_separator_ _escape\_all_ _table_
 
 This serializes the _table_ as CSV with the given _field_delim_
 and _row_separator_. If _escape_all_ is `$true` all fields will be
@@ -8352,7 +8381,7 @@ std:assert_eq
     "a;\";\";\"|\";\" \"|";
 ```
 
-#### <a name="1215-stddesercsv-fielddelim-rowseparator-data"></a>12.1.5 - std:deser:csv _field\_delim_ _row\_separator_ _data_
+#### <a name="1217-stddesercsv-fielddelim-rowseparator-data"></a>12.1.7 - std:deser:csv _field\_delim_ _row\_separator_ _data_
 
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
@@ -8364,7 +8393,7 @@ std:assert_eq table.0.1 "bar";
 std:assert_eq table.1.1 "y";
 ```
 
-#### <a name="1216-stdsermsgpack-data"></a>12.1.6 - std:ser:msgpack _data_
+#### <a name="1218-stdsermsgpack-data"></a>12.1.8 - std:ser:msgpack _data_
 
 Serializes the _data_ and returns a msgpack bytes value.
 
@@ -8372,7 +8401,7 @@ Serializes the _data_ and returns a msgpack bytes value.
 std:assert_eq (std:ser:msgpack $b"abc") $b"\xC4\x03abc";
 ```
 
-#### <a name="1217-stddesermsgpack-bytes"></a>12.1.7 - std:deser:msgpack _bytes_
+#### <a name="1219-stddesermsgpack-bytes"></a>12.1.9 - std:deser:msgpack _bytes_
 
 Deserializes the msgpack bytes value into a data structure.
 
