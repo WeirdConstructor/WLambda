@@ -5266,6 +5266,32 @@ fn check_json_char_byte() {
 }
 
 #[test]
+#[cfg(feature="toml")]
+fn check_toml() {
+    assert_eq!(ve("std:ser:toml ${a = $[1,2,3]}"), "\"a = [\\n    1,\\n    2,\\n    3,\\n]\\n\"");
+    assert_eq!(ve("std:ser:toml ${a = $[\"fooo\"]}"), "\"a = [\\'fooo\\']\\n\"");
+    assert_eq!(ve("std:ser:toml ${x=${a = $[1,2,3]}}"), "\"[x]\\na = [\\n    1,\\n    2,\\n    3,\\n]\\n\"");
+    assert_eq!(ve("std:ser:toml ${x=${c = $[123, $true]}}"), "\"[x]\\nc = [\\n    123,\\n    true,\\n]\\n\"");
+
+    assert_eq!(ve("std:deser:toml $q{\
+        [foo]
+        x = true
+    }"), "${foo=${x=$true}}");
+
+    assert_eq!(ve("std:deser:toml $q{\
+        [foo]
+        x = 1.2
+    }"), "${foo=${x=1.2}}");
+
+
+    assert_eq!(ve("std:deser:toml $q{\
+        [foo]
+        x = \"XXXX\"
+    }"), "${foo=${x=\"XXXX\"}}");
+}
+
+
+#[test]
 fn check_mutate_point() {
     assert_eq!(ve("$i(0,0).0 = 3"), "EXEC ERR: Caught Panic: \"Can\\\'t mutate integer vector\"");
     assert_eq!(ve("$f(0,0).0 = 3"), "EXEC ERR: Caught Panic: \"Can\\\'t mutate float vector\"");
