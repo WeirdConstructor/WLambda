@@ -14,7 +14,7 @@ exclude      = ["res/*"]
 [features]
 default = [
     "rustyline", "regex", "chrono", "serde", "serde_json",
-    "rmp-serde", "quick-xml", "socket2", "base64"
+    "rmp-serde", "toml", "quick-xml", "socket2", "base64"
 ]
 mqtt = ["rumqttd", "rumqttc"]
 http = ["reqwest"]
@@ -28,6 +28,7 @@ chrono     = { version = "0.4.11",  optional = true }
 serde      = { version = "1.0.111", optional = true, features = ["derive"] }
 serde_json = { version = "1.0.53",  optional = true }
 rmp-serde  = { version = "0.14.3",  optional = true }
+toml       = { version = "0.5.9",   optional = true }
 mint       = { version = "0.5.5",   optional = true }
 quick-xml  = { version = "0.20.0",  optional = true }
 socket2    = { version = "0.3.11",  optional = true, features = ["reuseport"] }

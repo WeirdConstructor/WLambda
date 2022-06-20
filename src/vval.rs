@@ -5750,6 +5750,31 @@ impl VVal {
             Err(e) => Err(format!("from_json failed: {}", e)),
         }
     }
+
+    /// Serializes the VVal (non cyclic) structure to a JSON string.
+    #[cfg(feature="toml")]
+    pub fn to_toml(&self, not_pretty: bool) -> Result<String, String> {
+        if not_pretty {
+            match toml::to_string(self) {
+                Ok(s) => Ok(s),
+                Err(e) => Err(format!("to_toml failed: {}", e))
+            }
+        } else {
+            match toml::to_string_pretty(self) {
+                Ok(s) => Ok(s),
+                Err(e) => Err(format!("to_toml failed: {}", e))
+            }
+        }
+    }
+
+    /// Creates a VVal structure from a JSON string.
+    #[cfg(feature="toml")]
+    pub fn from_toml(s: &str) -> Result<VVal, String> {
+        match toml::from_str(s) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(format!("from_toml failed: {}", e)),
+        }
+    }
 }
 
 #[cfg(feature="serde")]

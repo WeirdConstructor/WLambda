@@ -543,7 +543,47 @@ impl AValChannel {
         VVal::Usr(Box::new(Self::new_direct()))
     }
 
-    pub(crate) fn fork_sender_direct(&self) -> Result<Self, ForkSenderError> {
+    /// Fork a sender without having it wrapped into a [VVal::Usr].
+    ///
+    /// Here is an example on how to get a sender from an std:sync:mpsc handle
+    /// from the WLambda side of an API function:
+    ///```
+    ///   let chan = if env.arg(2).is_some() {
+    ///       let mut chan = env.arg(2);
+    ///       let chan =
+    ///           chan.with_usr_ref(|chan: &mut AValChannel| {
+    ///               chan.fork_sender_direct()
+    ///           });
+    ///
+    ///       if let Some(chan) = chan {
+    ///          match chan {
+    ///               Ok(chan) => Some(chan),
+    ///               Err(err) => {
+    ///                   return
+    ///                       Ok(VVal::err_msg(
+    ///                           &format!("Failed to fork sender, \
+    ///                                     can't get lock: {}", err)));
+    ///               }
+    ///          }
+    ///       } else {
+    ///           return
+    ///               Ok(env.new_err(format!(
+    ///                   "bta:spawn_port_for_address: \
+    ///                    channel not a std:sync:mpsc handle! {}",
+    ///                   env.arg(2).s())));
+    ///       }
+    ///   } else {
+    ///       None
+    ///   };
+    ///
+    ///   // further in the code:
+    ///
+    ///   if Some(chan) = chan {
+    ///       chan.send(
+    ///          &VVal::pair(VVal::new_sym("$WL/connected"), VVal::None));
+    ///   }
+    ///```
+    pub fn fork_sender_direct(&self) -> Result<Self, ForkSenderError> {
         match self.sender.lock() {
             Ok(guard) => {
                 let receiver = self.receiver.clone();
@@ -557,6 +597,8 @@ impl AValChannel {
         }
     }
 
+    /// Fork a sender and wrap it into an [VVal].
+    /// If an error occurs, an error [VVal] will be returned.
     pub fn fork_sender(&self) -> VVal {
         match self.fork_sender_direct() {
             Ok(channel) => VVal::Usr(Box::new(channel)),

@@ -11758,6 +11758,29 @@ pub fn std_symbol_table() -> SymbolTable {
                     })
         }, Some(1), Some(1), false);
 
+    #[cfg(feature="toml")]
+    func!(st, "ser:toml",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            let pp = env.arg(1).b();
+
+            match v.to_toml(pp) {
+                Ok(s) => Ok(VVal::new_str_mv(s)),
+                Err(e) => Ok(env.new_err(e)),
+            }
+        }, Some(1), Some(2), false);
+
+    #[cfg(feature="toml")]
+    func!(st, "deser:toml",
+        |env: &mut Env, _argc: usize| {
+            env.arg_ref(0).unwrap().with_s_ref(
+                |toml_txt: &str|
+                    match VVal::from_toml(toml_txt) {
+                        Ok(v) => Ok(v),
+                        Err(e) => Ok(env.new_err(e)),
+                    })
+        }, Some(1), Some(1), false);
+
     #[cfg(feature="rmp-serde")]
     func!(st, "ser:msgpack",
         |env: &mut Env, _argc: usize| {
