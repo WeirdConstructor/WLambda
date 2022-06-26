@@ -7,6 +7,9 @@ and can create an iterator over a WLambda generator function from that.
 the resulting request and response information.
 * **Feature:** Added `std:ser:toml` and `std:deser:toml` for reading and writing
 TOML configuration files.
+* **Feature:** The `LocalFileModuleResolver` can now preload files. This is useful
+for adding WLambda sources at Rust compile time, for easier deploying of the
+Rust binary later.
 
 0.8.1 (2022-03-05)
 ==================

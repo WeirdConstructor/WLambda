@@ -118,6 +118,7 @@ pub trait ModuleResolver {
 /// responsible for loading modules on `!@import` for WLambda.
 #[derive(Debug, Clone, Default)]
 pub struct LocalFileModuleResolver {
+    preloaded_files: Option<Rc<RefCell<std::collections::HashMap<String, String>>>>,
     loaded_modules: Rc<RefCell<std::collections::HashMap<String, Rc<SymbolTable>>>>,
 }
 
@@ -125,9 +126,39 @@ pub struct LocalFileModuleResolver {
 impl LocalFileModuleResolver {
     pub fn new() -> LocalFileModuleResolver {
         LocalFileModuleResolver {
+            preloaded_files: None,
             loaded_modules:
                 Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
+    }
+
+    /// You can preload files here, so that they won't be fetched from
+    /// harddisk anymore. This is useful if you want to link in files
+    /// at compile time, so that you only have to deploy the Rust binary.
+    ///
+    ///```text
+    /// use std::rc::Rc;
+    /// use std::cell::RefCell;
+    ///
+    /// let global = wlambda::compiler::GlobalEnv::new_default();
+    ///
+    /// let lfmr = Rc::new(RefCell::new(
+    ///     wlambda::compiler::LocalFileModuleResolver::new()));
+    ///
+    /// lfmr.borrow_mut().preload(
+    ///     "some/dir/myfile.wl",
+    ///     include_str!("static_wl/myfile.wl").to_string());
+    ///
+    /// global.borrow_mut().set_resolver(lfmr);
+    ///```
+    pub fn preload(&mut self, filepath: &str, contents: String) {
+        if self.preloaded_files.is_none() {
+            self.preloaded_files =
+                Some(Rc::new(RefCell::new(std::collections::HashMap::new())));
+        }
+
+        self.preloaded_files.as_ref().unwrap().borrow_mut()
+            .insert(filepath.to_string(), contents);
     }
 }
 
@@ -262,6 +293,24 @@ impl ModuleResolver for LocalFileModuleResolver {
         }
 
         for p in check_paths.iter() {
+            println!("PPP CHEK {}", p);
+
+            if let Some(prel) = self.preloaded_files.as_ref() {
+                println!("CHEK {}", p);
+                if let Some(content) = prel.borrow().get(p) {
+                    return match ctx.eval_string(content, p) {
+                        Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
+                        Ok(_v) => {
+                            let exports = Rc::new(ctx.get_exports());
+                            self.loaded_modules
+                                .borrow_mut()
+                                .insert(pth, exports);
+                            Ok(ctx.get_exports())
+                        },
+                    };
+                }
+            }
+
             if std::path::Path::new(p).exists() {
                 return match ctx.eval_file(p) {
                     Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
@@ -434,6 +483,11 @@ impl GlobalEnv {
     ///```
     pub fn set_resolver(&mut self, res: Rc<RefCell<dyn ModuleResolver>>) {
         self.resolver = Some(res.clone());
+    }
+
+    /// Retrieves the module resolver that is currently used.
+    pub fn get_resolver(&self) -> Option<Rc<RefCell<dyn ModuleResolver>>> {
+        self.resolver.clone()
     }
 
     /// Creates a new completely empty GlobalEnv.
@@ -2856,7 +2910,8 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     if let Some(resolver) = resolver {
 
                         let r = resolver.borrow();
-                        let exports = r.resolve(glob_ref.clone(), &path, import_file_path);
+                        let exports = r.resolve(
+                            glob_ref.clone(), &path, import_file_path);
                         match exports {
                             Err(ModuleLoadError::NoSuchModule(p)) => {
                                 Err(ast.compile_err(
