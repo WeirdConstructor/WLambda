@@ -293,10 +293,7 @@ impl ModuleResolver for LocalFileModuleResolver {
         }
 
         for p in check_paths.iter() {
-            println!("PPP CHEK {}", p);
-
             if let Some(prel) = self.preloaded_files.as_ref() {
-                println!("CHEK {}", p);
                 if let Some(content) = prel.borrow().get(p) {
                     return match ctx.eval_string(content, p) {
                         Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
@@ -1278,7 +1275,6 @@ fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal,
 
         if let VVal::Lst(l) = vars {
             let llen = l.borrow().len();
-            println!("LI: {:?}", l.borrow());
 
             let var = ast.at(2).unwrap().at(1).unwrap();
             if var.with_s_ref(|var: &str| var == "@") {
