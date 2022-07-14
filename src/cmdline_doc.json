@@ -10798,5 +10798,34 @@
       "```",
       ""
     ]
+  ],
+  [
+    "13.3 - Format String Syntax for std:bytes:pack and std:bytes:unpack",
+    [
+      "",
+      "This syntax describes the accepted format strigns for the `std:bytes:pack` and",
+      "`std:bytes:unpack`. The format is loosely adapted from the Lua syntax for",
+      "`string.pack` and `string.unpack`.",
+      "",
+      "| Syntax | Semantics |",
+      "|-|-|",
+      "| `<` | Sets little endian |",
+      "| `>` | Sets big endian |",
+      "| `=` | Sets native endian |",
+      "| `x` | One zero byte of padding |",
+      "| `y` | Byte content with unspecified length. On `unpack` this reads to the end of the input.  |",
+      "| `z` | A zero-terminated string of bytes. |",
+      "| `c<n>` | An `n` long field of bytes. |",
+      "| `b` | A single byte. |",
+      "| `s<bits>` | A string of bytes that is prefixed with a `<bits>` wide binary length field. |",
+      "| `u<bits>` | A `<bits>` wide unsigned integer field. |",
+      "| `i<bits>` | A `<bits>` wide signed integer field. |",
+      "| `f` | A float field (32 bits). |",
+      "| `d` | A double field (64 bits). |",
+      "",
+      "- `<n>` can be any number.",
+      "- `<bits>` can be 8, 16, 32, 64 or 128.",
+      ""
+    ]
   ]
 ]

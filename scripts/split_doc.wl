@@ -9,11 +9,7 @@ std:fs:copy "doc/wlambda_reference.md" "doc/wlambda_reference.bak";
 iter line (ref_doc_md "\n" => 0) {
     if line &> $r/$^(^$+#)*(<a*<?a>)$*$s(^*)$$/ {
         if cur_section &> is_some {
-            # std:displayln ">>> " cur_section;
             std:push sections $[cur_section, cur_section_lines];
-            # iter l cur_section_lines {
-            #     std:displayln " : " l;
-            # };
         };
 
         .cur_section_lines = $[];
@@ -22,6 +18,10 @@ iter line (ref_doc_md "\n" => 0) {
     } {
         std:push cur_section_lines line;
     };
+};
+
+if cur_section &> is_some {
+    std:push sections $[cur_section, cur_section_lines];
 };
 
 !documentation = std:ser:json sections;
