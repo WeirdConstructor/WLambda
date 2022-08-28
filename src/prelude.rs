@@ -406,7 +406,8 @@ Smalltalk, LISP and Perl.
     - [11.4.5](#1145-stdfsremovedir-dir-path) std:fs:remove\_dir _dir-path_
     - [11.4.6](#1146-stdfsremovedirall-dir-path) std:fs:remove\_dir\_all _dir-path_
   - [11.5](#115-system) System
-    - [11.5.1](#1151-stdsysos) std:sys:os
+    - [11.5.1](#1151-stdsysvar-variable-name) std:sys:var _variable-name_
+    - [11.5.2](#1152-stdsysos) std:sys:os
   - [11.6](#116-threading) Threading
     - [11.6.1](#1161-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
     - [11.6.2](#1162-stdthreadsleep-duration) std:thread:sleep _duration_
@@ -7789,7 +7790,16 @@ Returns an error if the directory does not exist.
 
 This chapter contains a few system as in _operating system_ related functions.
 
-#### <a name="1151-stdsysos"></a>11.5.1 - std:sys:os
+#### <a name="1151-stdsysvar-variable-name"></a>11.5.1 - std:sys:var _variable-name_
+
+Returns the variable contents of the environment variable _variable-name_.
+If any error occurs, this returns an error.
+
+```wlambda
+std:assert (len (std:sys:env:var "HOME")) > 0;
+```
+
+#### <a name="1152-stdsysos"></a>11.5.2 - std:sys:os
 
 Returns the name of the operating system. These are some possible
 values:
@@ -11943,6 +11953,18 @@ pub fn std_symbol_table() -> SymbolTable {
         |_env: &mut Env, _argc: usize| {
             Ok(VVal::new_str(std::env::consts::OS))
         }, Some(0), Some(0), false);
+
+    func!(st, "sys:env:var",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_s_ref(|s|
+                match std::env::var(s) {
+                    Ok(val) => Ok(VVal::new_str_mv(val)),
+                    Err(e) => {
+                        Ok(env.new_err(
+                            format!("Couldn't get env var '{}': {}", s, e)))
+                    }
+                })
+        }, Some(1), Some(1), false);
 
     func!(st, "time:now",
         |env: &mut Env, _argc: usize| {

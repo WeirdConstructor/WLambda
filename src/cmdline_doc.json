@@ -8784,7 +8784,20 @@
     ]
   ],
   [
-    "11.5.1 - std:sys:os",
+    "11.5.1 - std:sys:var _variable-name_",
+    [
+      "",
+      "Returns the variable contents of the environment variable _variable-name_.",
+      "If any error occurs, this returns an error.",
+      "",
+      "```wlambda",
+      "std:assert (len (std:sys:env:var \"HOME\")) > 0;",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "11.5.2 - std:sys:os",
     [
       "",
       "Returns the name of the operating system. These are some possible",
