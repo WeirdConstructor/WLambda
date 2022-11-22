@@ -10428,6 +10428,50 @@
     ]
   ],
   [
+    "12.11 - Cursive Console/Terminal Text User Interface",
+    [
+      "",
+      "WLambda comes with a text based user interface library binding to the `cursive` crate.",
+      "You will need to enable the feature `cursive` when compiling WLambda. It's not included",
+      "in the default feature set of WLambda.",
+      ""
+    ]
+  ],
+  [
+    "12.11.1 - std:cursive:new",
+    [
+      "",
+      "Create a new Cursive instance. You can call the following functions on it:",
+      "",
+      "```wlambda",
+      "!c = std:cursive:new[];",
+      "c.add_layer :panel => ${} =>",
+      "    :button => ${",
+      "        label = \"Hello World!\",",
+      "        cb = \\_.quit[],",
+      "    };",
+      "c.run[];",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "12.11.1.1 - $\\<Cursive\\>.run",
+    [
+      "",
+      "Start the event loop. You can only exit this event loop using `$<CursiveAPI>.quit[]`.",
+      ""
+    ]
+  ],
+  [
+    "12.11.1.2 - $\\<CursiveAPI\\>.quit",
+    [
+      "",
+      "Quit the main event loop.",
+      ""
+    ]
+  ],
+  [
     "13 - WLambda Lexical Syntax and Grammar",
     [
       "",

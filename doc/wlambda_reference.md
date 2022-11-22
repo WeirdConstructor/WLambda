@@ -477,6 +477,10 @@ Smalltalk, LISP and Perl.
     - [12.10.2](#12102-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
       - [12.10.2.1](#121021-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
       - [12.10.2.2](#121022-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
+  - [12.11](#1211-cursive-consoleterminal-text-user-interface) Cursive Console/Terminal Text User Interface
+    - [12.11.1](#12111-stdcursivenew) std:cursive:new
+      - [12.11.1.1](#121111-cursiverun) $\<Cursive\>.run
+      - [12.11.1.2](#121112-cursiveapiquit) $\<CursiveAPI\>.quit
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -9079,6 +9083,34 @@ block.
 
 Subscribes to the _topic-string_. Returns an error if something went wrong.
 It might block.
+
+### <a name="1211-cursive-consoleterminal-text-user-interface"></a>12.11 - Cursive Console/Terminal Text User Interface
+
+WLambda comes with a text based user interface library binding to the `cursive` crate.
+You will need to enable the feature `cursive` when compiling WLambda. It's not included
+in the default feature set of WLambda.
+
+#### <a name="12111-stdcursivenew"></a>12.11.1 - std:cursive:new
+
+Create a new Cursive instance. You can call the following functions on it:
+
+```wlambda
+!c = std:cursive:new[];
+c.add_layer :panel => ${} =>
+    :button => ${
+        label = "Hello World!",
+        cb = \_.quit[],
+    };
+c.run[];
+```
+
+##### <a name="121111-cursiverun"></a>12.11.1.1 - $\<Cursive\>.run
+
+Start the event loop. You can only exit this event loop using `$<CursiveAPI>.quit[]`.
+
+##### <a name="121112-cursiveapiquit"></a>12.11.1.2 - $\<CursiveAPI\>.quit
+
+Quit the main event loop.
 
 ## <a name="13-wlambda-lexical-syntax-and-grammar"></a>13 - WLambda Lexical Syntax and Grammar
 
