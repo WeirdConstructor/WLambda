@@ -15,7 +15,9 @@ use std::rc::Rc;
 #[cfg(feature = "cursive")]
 use cursive::view::IntoBoxedView;
 #[cfg(feature = "cursive")]
-use cursive::views::{BoxedView, Button, Dialog, LinearLayout, Panel, TextView};
+use cursive::views::{
+    BoxedView, Button, Dialog, LinearLayout, Panel, StackView, TextView, ViewRef,
+};
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
 
@@ -96,11 +98,40 @@ impl VValUserData for CursiveAPI {
                 let denv = Rc::new(RefCell::new(env.derive()));
 
                 let cursive: &mut Cursive = unsafe { &mut **self.ptr };
-                cursive.add_layer(Dialog::around(TextView::new(&text.s_raw())).button("Ok", move |s| {
-                    s.pop_layer();
-                    call_callback!(s, cb, denv);
-                }));
+                cursive.add_layer(Dialog::around(TextView::new(&text.s_raw())).button(
+                    "Ok",
+                    move |s| {
+                        s.pop_layer();
+                        call_callback!(s, cb, denv);
+                    },
+                ));
                 Ok(VVal::None)
+            }
+            "named" => {
+                if argv.len() != 2 {
+                    return Err(StackAction::panic_str(
+                        "$<CursiveAPI>.named[name, type] expects 2 arguments".to_string(),
+                        None,
+                        env.argv(),
+                    ));
+                }
+
+                let viewtype = match &argv.v_s_raw(1)[..] {
+                    "stack" => ViewType::StackView,
+                    _ => {
+                        return Err(StackAction::panic_str(
+                            format!("$<CursiveAPI>.named[name, type] unknown type: {}", argv.v_s(1)),
+                            None,
+                            env.argv(),
+                        ));
+                    }
+                };
+
+                Ok(VVal::new_usr(NamedViewHandle::new(
+                    self.ptr.clone(),
+                    &argv.v_s_raw(0)[..],
+                    viewtype,
+                )))
             }
             "quit" => {
                 if argv.len() != 0 {
@@ -134,6 +165,114 @@ struct CursiveHandle {
 impl CursiveHandle {
     pub fn new() -> Self {
         Self { cursive: Rc::new(RefCell::new(Cursive::new())) }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ViewType {
+    StackView,
+}
+
+#[cfg(feature = "cursive")]
+#[derive(Clone)]
+struct NamedViewHandle {
+    ptr: Rc<*mut Cursive>,
+    name: String,
+    typ: ViewType,
+}
+
+impl NamedViewHandle {
+    pub fn new(ptr: Rc<*mut Cursive>, name: &str, typ: ViewType) -> Self {
+        Self { ptr, name: name.to_string(), typ }
+    }
+}
+
+macro_rules! access_named_view {
+    ($self: ident, $name: ident, $env: ident, $block: tt) => {{
+        let cursive: &mut Cursive = unsafe { &mut **$self.ptr };
+        let view: Option<ViewRef<StackView>> = cursive.find_name(&$self.name);
+        match view {
+            Some(mut $name) => {
+                $block;
+                ()
+            }
+            None => {
+                return Err(StackAction::panic_str(
+                    format!("$<NamedView:{}:{:?}> no such view", $self.name, $self.typ),
+                    None,
+                    $env.argv(),
+                ));
+            }
+        }
+    }};
+}
+
+macro_rules! expect_view {
+    ($argv: expr, $what: expr, $name: ident, $env: ident, $block: tt) => {
+        match vv2view($argv, $env) {
+            Ok($name) => {
+                $block
+            }
+            Err(e) => return Err(StackAction::panic_str(
+                format!("{} expects proper view definition: {}", $what, e),
+                None,
+                $env.argv(),
+            ))
+        }
+    }
+}
+
+#[cfg(feature = "cursive")]
+impl VValUserData for NamedViewHandle {
+    fn s(&self) -> String {
+        format!("$<NamedView:{}:{:?}>", self.name, self.typ)
+    }
+    fn as_any(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
+    }
+
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv();
+
+        match self.typ {
+            ViewType::StackView => match key {
+                "pop_layer" => {
+                    if argv.len() != 0 {
+                        return Err(StackAction::panic_str(
+                            "$<NamedViewHandle>.pop_layer[] expects 0 arguments".to_string(),
+                            None,
+                            env.argv(),
+                        ));
+                    }
+
+                    access_named_view!(self, view, env, { view.pop_layer() });
+
+                    Ok(VVal::None)
+                }
+                "add_layer" => {
+                    if argv.len() != 1 {
+                        return Err(StackAction::panic_str(
+                            "$<NamedViewHandle>.add_layer[view] expects 1 arguments".to_string(),
+                            None,
+                            env.argv(),
+                        ));
+                    }
+
+                    expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, env, {
+                        access_named_view!(self, view, env, { view.add_layer(new_view) });
+                        Ok(VVal::None)
+                    })
+                }
+                _ => Err(StackAction::panic_str(
+                    format!("$<CursiveAPI> unknown method called: {}", key),
+                    None,
+                    env.argv(),
+                )),
+            },
+        }
     }
 }
 
@@ -183,7 +322,18 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
             if define.v_k("title").is_some() {
                 pnl.set_title(define.v_s_rawk("title"));
             }
-            Ok(pnl.into_boxed_view())
+            Ok(wrap_named!(pnl, define))
+        }
+        "stack" => {
+            let mut stk = StackView::new();
+            define.v_k("layers").with_iter(|it| {
+                for (v, _) in it {
+                    stk.add_fullscreen_layer(vv2view(&v, env)?);
+                }
+                Ok::<(), String>(())
+            })?;
+
+            Ok(wrap_named!(stk, define))
         }
         "button" => {
             let cb = define.v_k("cb");
@@ -222,17 +372,10 @@ impl VValUserData for CursiveHandle {
                     ));
                 }
 
-                match vv2view(&argv.v_(0), env) {
-                    Ok(v) => {
-                        self.cursive.borrow_mut().add_layer(v);
-                        Ok(VVal::None)
-                    }
-                    Err(e) => Err(StackAction::panic_str(
-                        format!("$<Cursive>.add_layer(view) expects proper view definition: {}", e),
-                        None,
-                        env.argv(),
-                    )),
-                }
+                expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, env, {
+                    self.cursive.borrow_mut().add_layer(new_view);
+                    Ok(VVal::None)
+                })
             }
             "run" => {
                 if argv.len() != 0 {
