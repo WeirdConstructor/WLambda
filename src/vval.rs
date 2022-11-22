@@ -982,15 +982,15 @@ impl Env {
                     UnwindAction::RestoreLoopInfo(li) =>
                         format!("loinf(uws:{},sp:{})", li.uw_depth, li.sp),
                     UnwindAction::RestoreAccum(_fun, _val) =>
-                        ("raccm".to_string()),
+                        "raccm".to_string(),
                     UnwindAction::RestoreSelf(_slf) =>
-                        ("rslf".to_string()),
+                        "rslf".to_string(),
                     UnwindAction::RestoreIter(_i) =>
-                        ("ritr".to_string()),
+                        "ritr".to_string(),
                     UnwindAction::FunctionCall(argc, old_bp, local_size) =>
                         format!("fcal({},{},{})", argc, old_bp, local_size),
                     UnwindAction::Null =>
-                        ("nul".to_string()),
+                        "nul".to_string(),
                 };
 
             if !s.is_empty() {
@@ -5446,7 +5446,7 @@ impl VVal {
             VVal::Bol(b)     => if *b { 1 } else { 0 },
             VVal::Syn(s)     => s.syn() as i64,
             VVal::Int(i)     => *i,
-            VVal::Flt(f)     => (*f as i64),
+            VVal::Flt(f)     => *f as i64,
             VVal::Pair(b)    => b.0.i(),
             VVal::Lst(l)     => l.borrow().len() as i64,
             VVal::Map(l)     => l.borrow().len() as i64,
