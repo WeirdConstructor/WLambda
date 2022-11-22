@@ -120,7 +120,10 @@ impl VValUserData for CursiveAPI {
                     "stack" => ViewType::StackView,
                     _ => {
                         return Err(StackAction::panic_str(
-                            format!("$<CursiveAPI>.named[name, type] unknown type: {}", argv.v_s(1)),
+                            format!(
+                                "$<CursiveAPI>.named[name, type] unknown type: {}",
+                                argv.v_s(1)
+                            ),
                             None,
                             env.argv(),
                         ));
@@ -171,6 +174,7 @@ impl CursiveHandle {
 #[derive(Debug, Clone)]
 enum ViewType {
     StackView,
+    Button,
 }
 
 #[cfg(feature = "cursive")]
@@ -188,9 +192,9 @@ impl NamedViewHandle {
 }
 
 macro_rules! access_named_view {
-    ($self: ident, $name: ident, $env: ident, $block: tt) => {{
+    ($self: ident, $type: ident, $name: ident, $env: ident, $block: tt) => {{
         let cursive: &mut Cursive = unsafe { &mut **$self.ptr };
-        let view: Option<ViewRef<StackView>> = cursive.find_name(&$self.name);
+        let view: Option<ViewRef<$type>> = cursive.find_name(&$self.name);
         match view {
             Some(mut $name) => {
                 $block;
@@ -210,16 +214,16 @@ macro_rules! access_named_view {
 macro_rules! expect_view {
     ($argv: expr, $what: expr, $name: ident, $env: ident, $block: tt) => {
         match vv2view($argv, $env) {
-            Ok($name) => {
-                $block
+            Ok($name) => $block,
+            Err(e) => {
+                return Err(StackAction::panic_str(
+                    format!("{} expects proper view definition: {}", $what, e),
+                    None,
+                    $env.argv(),
+                ))
             }
-            Err(e) => return Err(StackAction::panic_str(
-                format!("{} expects proper view definition: {}", $what, e),
-                None,
-                $env.argv(),
-            ))
         }
-    }
+    };
 }
 
 #[cfg(feature = "cursive")]
@@ -238,6 +242,26 @@ impl VValUserData for NamedViewHandle {
         let argv = env.argv();
 
         match self.typ {
+            ViewType::Button => match key {
+                "set_label" => {
+                    if argv.len() != 0 {
+                        return Err(StackAction::panic_str(
+                            "$<NamedViewHandle>.set_label[text] expects 1 arguments".to_string(),
+                            None,
+                            env.argv(),
+                        ));
+                    }
+
+                    access_named_view!(self, Button, view, env, {
+                        view.set_label(argv.v_s_raw(0))
+                    });
+                }
+                _ => Err(StackAction::panic_str(
+                    format!("$<NamedView:{}:{:?}> unknown method called: {}", self.name, self.type, key),
+                    None,
+                    env.argv(),
+                )),
+            },
             ViewType::StackView => match key {
                 "pop_layer" => {
                     if argv.len() != 0 {
@@ -248,7 +272,7 @@ impl VValUserData for NamedViewHandle {
                         ));
                     }
 
-                    access_named_view!(self, view, env, { view.pop_layer() });
+                    access_named_view!(self, StackView, view, env, { view.pop_layer() });
 
                     Ok(VVal::None)
                 }
@@ -262,12 +286,14 @@ impl VValUserData for NamedViewHandle {
                     }
 
                     expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, env, {
-                        access_named_view!(self, view, env, { view.add_layer(new_view) });
+                        access_named_view!(self, StackView, view, env, {
+                            view.add_layer(new_view)
+                        });
                         Ok(VVal::None)
                     })
                 }
                 _ => Err(StackAction::panic_str(
-                    format!("$<CursiveAPI> unknown method called: {}", key),
+                    format!("$<NamedView:{}:{:?}> unknown method called: {}", self.name, self.type, key),
                     None,
                     env.argv(),
                 )),
