@@ -21,6 +21,18 @@ use cursive::views::{
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
 
+macro_rules! assert_arg_count {
+    ($self: ident, $argv: expr, $count: expr, $function: expr, $env: ident) => {
+        if $argv.len() != $count {
+            return Err(StackAction::panic_str(
+                format!("{}.{} expects {} arguments", $self.s(), $function, $count),
+                None,
+                $env.argv(),
+            ));
+        }
+    }
+}
+
 macro_rules! call_callback {
     ($cursive: ident, $cb: ident, $env: ident) => {{
         let cursive_ptr: *mut Cursive = $cursive;
@@ -108,16 +120,11 @@ impl VValUserData for CursiveAPI {
                 Ok(VVal::None)
             }
             "named" => {
-                if argv.len() != 2 {
-                    return Err(StackAction::panic_str(
-                        "$<CursiveAPI>.named[name, type] expects 2 arguments".to_string(),
-                        None,
-                        env.argv(),
-                    ));
-                }
+                assert_arg_count!(self, argv, 2, "named[name, type]", env);
 
                 let viewtype = match &argv.v_s_raw(1)[..] {
                     "stack" => ViewType::StackView,
+                    "button" => ViewType::Button,
                     _ => {
                         return Err(StackAction::panic_str(
                             format!(
@@ -137,13 +144,7 @@ impl VValUserData for CursiveAPI {
                 )))
             }
             "quit" => {
-                if argv.len() != 0 {
-                    return Err(StackAction::panic_str(
-                        "$<CursiveAPI>.quit() expects 0 arguments".to_string(),
-                        None,
-                        env.argv(),
-                    ));
-                }
+                assert_arg_count!(self, argv, 0, "quit[]", env);
 
                 unsafe { (**self.ptr).quit() }
 
@@ -197,8 +198,7 @@ macro_rules! access_named_view {
         let view: Option<ViewRef<$type>> = cursive.find_name(&$self.name);
         match view {
             Some(mut $name) => {
-                $block;
-                ()
+                $block
             }
             None => {
                 return Err(StackAction::panic_str(
@@ -244,56 +244,36 @@ impl VValUserData for NamedViewHandle {
         match self.typ {
             ViewType::Button => match key {
                 "set_label" => {
-                    if argv.len() != 0 {
-                        return Err(StackAction::panic_str(
-                            "$<NamedViewHandle>.set_label[text] expects 1 arguments".to_string(),
-                            None,
-                            env.argv(),
-                        ));
-                    }
-
+                    assert_arg_count!(self, argv, 1, "set_label[text]", env);
                     access_named_view!(self, Button, view, env, {
-                        view.set_label(argv.v_s_raw(0))
-                    });
+                        view.set_label(argv.v_s_raw(0));
+                        Ok(VVal::None)
+                    })
                 }
                 _ => Err(StackAction::panic_str(
-                    format!("$<NamedView:{}:{:?}> unknown method called: {}", self.name, self.type, key),
+                    format!("$<NamedView:{}:{:?}> unknown method called: {}", self.name, self.typ, key),
                     None,
                     env.argv(),
                 )),
             },
             ViewType::StackView => match key {
                 "pop_layer" => {
-                    if argv.len() != 0 {
-                        return Err(StackAction::panic_str(
-                            "$<NamedViewHandle>.pop_layer[] expects 0 arguments".to_string(),
-                            None,
-                            env.argv(),
-                        ));
-                    }
-
-                    access_named_view!(self, StackView, view, env, { view.pop_layer() });
-
-                    Ok(VVal::None)
-                }
-                "add_layer" => {
-                    if argv.len() != 1 {
-                        return Err(StackAction::panic_str(
-                            "$<NamedViewHandle>.add_layer[view] expects 1 arguments".to_string(),
-                            None,
-                            env.argv(),
-                        ));
-                    }
-
-                    expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, env, {
-                        access_named_view!(self, StackView, view, env, {
-                            view.add_layer(new_view)
-                        });
+                    assert_arg_count!(self, argv, 0, "pop_layer[]", env);
+                    access_named_view!(self, StackView, view, env, { view.pop_layer();
                         Ok(VVal::None)
                     })
                 }
+                "add_layer" => {
+                    assert_arg_count!(self, argv, 1, "add_layer[view]", env);
+                    expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, env, {
+                        access_named_view!(self, StackView, view, env, {
+                            view.add_layer(new_view);
+                            Ok(VVal::None)
+                        })
+                    })
+                }
                 _ => Err(StackAction::panic_str(
-                    format!("$<NamedView:{}:{:?}> unknown method called: {}", self.name, self.type, key),
+                    format!("$<NamedView:{}:{:?}> unknown method called: {}", self.name, self.typ, key),
                     None,
                     env.argv(),
                 )),
@@ -390,28 +370,14 @@ impl VValUserData for CursiveHandle {
 
         match key {
             "add_layer" => {
-                if argv.len() != 1 {
-                    return Err(StackAction::panic_str(
-                        "$<Cursive>.add_layer(view) expects 1 argument".to_string(),
-                        None,
-                        env.argv(),
-                    ));
-                }
-
+                assert_arg_count!(self, argv, 1, "add_layer[view]", env);
                 expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, env, {
                     self.cursive.borrow_mut().add_layer(new_view);
                     Ok(VVal::None)
                 })
             }
             "run" => {
-                if argv.len() != 0 {
-                    return Err(StackAction::panic_str(
-                        "$<Cursive>.run() expects 0 arguments".to_string(),
-                        None,
-                        env.argv(),
-                    ));
-                }
-
+                assert_arg_count!(self, argv, 0, "run[]", env);
                 self.cursive.borrow_mut().run();
                 Ok(VVal::None)
             }
