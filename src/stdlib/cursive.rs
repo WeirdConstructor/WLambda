@@ -13,7 +13,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 #[cfg(feature = "cursive")]
-use cursive::view::IntoBoxedView;
+use cursive::view::{IntoBoxedView, Resizable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
     BoxedView, Button, Dialog, LinearLayout, Panel, StackView, TextView, ViewRef,
@@ -30,7 +30,7 @@ macro_rules! assert_arg_count {
                 $env.argv(),
             ));
         }
-    }
+    };
 }
 
 macro_rules! call_callback {
@@ -197,9 +197,7 @@ macro_rules! access_named_view {
         let cursive: &mut Cursive = unsafe { &mut **$self.ptr };
         let view: Option<ViewRef<$type>> = cursive.find_name(&$self.name);
         match view {
-            Some(mut $name) => {
-                $block
-            }
+            Some(mut $name) => $block,
             None => {
                 return Err(StackAction::panic_str(
                     format!("$<NamedView:{}:{:?}> no such view", $self.name, $self.typ),
@@ -251,7 +249,10 @@ impl VValUserData for NamedViewHandle {
                     })
                 }
                 _ => Err(StackAction::panic_str(
-                    format!("$<NamedView:{}:{:?}> unknown method called: {}", self.name, self.typ, key),
+                    format!(
+                        "$<NamedView:{}:{:?}> unknown method called: {}",
+                        self.name, self.typ, key
+                    ),
                     None,
                     env.argv(),
                 )),
@@ -259,7 +260,8 @@ impl VValUserData for NamedViewHandle {
             ViewType::StackView => match key {
                 "pop_layer" => {
                     assert_arg_count!(self, argv, 0, "pop_layer[]", env);
-                    access_named_view!(self, StackView, view, env, { view.pop_layer();
+                    access_named_view!(self, StackView, view, env, {
+                        view.pop_layer();
                         Ok(VVal::None)
                     })
                 }
@@ -273,7 +275,10 @@ impl VValUserData for NamedViewHandle {
                     })
                 }
                 _ => Err(StackAction::panic_str(
-                    format!("$<NamedView:{}:{:?}> unknown method called: {}", self.name, self.typ, key),
+                    format!(
+                        "$<NamedView:{}:{:?}> unknown method called: {}",
+                        self.name, self.typ, key
+                    ),
                     None,
                     env.argv(),
                 )),
@@ -282,12 +287,63 @@ impl VValUserData for NamedViewHandle {
     }
 }
 
-macro_rules! wrap_named {
+fn vv2size_const(v: &VVal) -> Option<SizeConstraint> {
+    let topkind = v.s_raw();
+
+    if topkind == "free" {
+        return Some(SizeConstraint::Free);
+    } else if topkind == "full" {
+        return Some(SizeConstraint::Full);
+    } else {
+        let kind = v.v_s_raw(0);
+        let size = v.v_i(1);
+        match &kind[..] {
+            "fixed" => {
+                return Some(SizeConstraint::Fixed(size as usize));
+            }
+            "max" => {
+                return Some(SizeConstraint::AtMost(size as usize));
+            }
+            "min" => {
+                return Some(SizeConstraint::AtLeast(size as usize));
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+macro_rules! auto_wrap_view {
     ($view: expr, $define: ident) => {
-        if $define.v_k("name").is_some() {
-            $view.with_name($define.v_s_rawk("name")).into_boxed_view()
-        } else {
-            $view.into_boxed_view()
+        {
+            let size_w = vv2size_const(&$define.v_k("width"));
+            let size_h = vv2size_const(&$define.v_k("height"));
+
+            if $define.v_k("name").is_some() {
+                if size_w.is_some() || size_h.is_some() {
+                    $view
+                        .with_name($define.v_s_rawk("name"))
+                        .resized(
+                            size_w.unwrap_or(SizeConstraint::Free),
+                            size_h.unwrap_or(SizeConstraint::Free),
+                        )
+                        .into_boxed_view()
+                } else {
+                    $view.with_name($define.v_s_rawk("name")).into_boxed_view()
+                }
+            } else {
+                if size_w.is_some() || size_h.is_some() {
+                    $view
+                        .resized(
+                            size_w.unwrap_or(SizeConstraint::Free),
+                            size_h.unwrap_or(SizeConstraint::Free),
+                        )
+                        .into_boxed_view()
+                } else {
+                    $view.into_boxed_view()
+                }
+            }
         }
     };
 }
@@ -328,7 +384,7 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
             if define.v_k("title").is_some() {
                 pnl.set_title(define.v_s_rawk("title"));
             }
-            Ok(wrap_named!(pnl, define))
+            Ok(auto_wrap_view!(pnl, define))
         }
         "stack" => {
             let mut stk = StackView::new();
@@ -339,7 +395,7 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
                 Ok::<(), String>(())
             })?;
 
-            Ok(wrap_named!(stk, define))
+            Ok(auto_wrap_view!(stk, define))
         }
         "button" => {
             let cb = define.v_k("cb");
@@ -347,7 +403,7 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
 
             let view = Button::new(define.v_s_rawk("label"), move |s| call_callback!(s, cb, denv));
 
-            Ok(wrap_named!(view, define))
+            Ok(auto_wrap_view!(view, define))
         }
         _ => Err(format!("Unknown view type: '{}'", typ.s())),
     }
