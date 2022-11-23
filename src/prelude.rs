@@ -12032,13 +12032,21 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "chrono:format_utc",
         |env: &mut Env, _argc: usize| {
             use chrono::prelude::*;
-            let dt = Utc.timestamp(env.arg(0).i(), 0);
-            let fmt = env.arg(1);
-            if fmt.is_str() {
-                fmt.with_s_ref(|fmt: &str|
-                    Ok(VVal::new_str_mv(dt.format(fmt).to_string())))
-            } else {
-                Ok(VVal::new_str_mv(dt.format("%Y-%m-%d %H:%M:%S.%f").to_string()))
+            use chrono::offset::*;
+            match Utc.timestamp_opt(env.arg(0).i(), 0) {
+                LocalResult::Single(dt) | LocalResult::Ambiguous(dt, _) => {
+                    let fmt = env.arg(1);
+                    if fmt.is_str() {
+                        fmt.with_s_ref(|fmt: &str|
+                            Ok(VVal::new_str_mv(dt.format(fmt).to_string())))
+                    } else {
+                        Ok(VVal::new_str_mv(dt.format("%Y-%m-%d %H:%M:%S.%f").to_string()))
+                    }
+                }
+                LocalResult::None => {
+                    Err(StackAction::panic_msg(
+                        format!("Can't get Timestamp!")))
+                }
             }
 
         }, Some(1), Some(2), false);
@@ -12047,15 +12055,22 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(st, "chrono:format_local",
         |env: &mut Env, _argc: usize| {
             use chrono::prelude::*;
-            let dt = Local.timestamp(env.arg(0).i(), 0);
-            let fmt = env.arg(1);
-            if fmt.is_str() {
-                fmt.with_s_ref(|fmt: &str|
-                    Ok(VVal::new_str_mv(dt.format(fmt).to_string())))
-            } else {
-                Ok(VVal::new_str_mv(dt.format("%Y-%m-%d %H:%M:%S.%f").to_string()))
+            use chrono::offset::*;
+            match Local.timestamp_opt(env.arg(0).i(), 0) {
+                LocalResult::Single(dt) | LocalResult::Ambiguous(dt, _) => {
+                    let fmt = env.arg(1);
+                    if fmt.is_str() {
+                        fmt.with_s_ref(|fmt: &str|
+                            Ok(VVal::new_str_mv(dt.format(fmt).to_string())))
+                    } else {
+                        Ok(VVal::new_str_mv(dt.format("%Y-%m-%d %H:%M:%S.%f").to_string()))
+                    }
+                }
+                LocalResult::None => {
+                    Err(StackAction::panic_msg(
+                        format!("Can't get Timestamp")))
+                }
             }
-
         }, Some(1), Some(2), false);
 
     #[cfg(feature="serde_json")]
