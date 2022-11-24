@@ -10434,6 +10434,8 @@
       "WLambda comes with a text based user interface library binding to the `cursive` crate.",
       "You will need to enable the feature `cursive` when compiling WLambda. It's not included",
       "in the default feature set of WLambda.",
+      "",
+      "The `view-def` view definition format is defined in an extra section of this reference at the end.",
       ""
     ]
   ],
@@ -10464,7 +10466,15 @@
     ]
   ],
   [
-    "12.11.1.2 - $\\<CursiveAPI\\>.quit",
+    "12.11.1.2 - $\\<Cursive\\>.add_layer view-def",
+    [
+      "",
+      "Adds the `view-def` view as layer to the TUI.",
+      ""
+    ]
+  ],
+  [
+    "12.11.1.3 - $\\<CursiveAPI\\>.quit",
     [
       "",
       "Quit the main event loop.",
@@ -10882,6 +10892,84 @@
       "",
       "- `<n>` can be any number.",
       "- `<bits>` can be 8, 16, 32, 64 or 128.",
+      ""
+    ]
+  ],
+  [
+    "13.4 - Cursive View Definition",
+    [
+      "",
+      "The `Cursive` TUI view definition describes the data structure layout",
+      "for defining `Cursive` views. You can specify the layout, the properties",
+      "and the callbacks in this definition.",
+      ""
+    ]
+  ],
+  [
+    "13.4.1 - size-def Cursive Width/Height Size Definition",
+    [
+      "",
+      "There are the following size specifications possible:",
+      "",
+      "- `:free`",
+      "- `:full` makes the view use the available space",
+      "- `:fixed => characters` makes the view the specified amount of characters wide/high",
+      "- `:min => characters` makes the view the at least as big as the amount of characters specified",
+      "- `:max => characters` makes the view the at most as big as the amount of characters specified",
+      ""
+    ]
+  ],
+  [
+    "13.4.2 - view-def `panel` Grouping Views in a Panel",
+    [
+      "",
+      "A panel is usually for visual separation and grouping of other views.",
+      "",
+      "```text",
+      "    :panel => ${",
+      "        title = \"title of the panel\", # Can be left out for no title.",
+      "",
+      "        # auto wrap properties:",
+      "        name  = \"view name\",    # Assign a name for $<CursiveAPI>.named",
+      "        scrollable = $true,     # Make the view scrollable",
+      "        width = :free,          # Width size definition, see above under size-def",
+      "        height = :free,         # Height size definition, see above under size-def",
+      "    }",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "13.4.3 - view-def `hbox` Horizontal Layout",
+    [
+      "",
+      "This horizontal box is a short hand form to define a horizontal layout of",
+      "other views. There are no auto wrap properties definable here.",
+      "",
+      "```text",
+      "    :hbox => $[",
+      "        view-def1,",
+      "        view-def2,",
+      "        ...",
+      "    ]",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "13.4.4 - view-def `vbox` Vertical Layout",
+    [
+      "",
+      "This vertical box is a short hand form to define a vertical layout of",
+      "other views. There are no auto wrap properties definable here.",
+      "",
+      "```text",
+      "    :vbox => $[",
+      "        view-def1,",
+      "        view-def2,",
+      "        ...",
+      "    ]",
+      "```",
       ""
     ]
   ]

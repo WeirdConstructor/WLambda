@@ -180,10 +180,11 @@ fn main() {
                 && buf[i + 3] == b'A'
                 && buf[i + 4] == b'I'
                 && buf[i + 5] == b'L'
-                && buf[i + 6] == b'x'
+                && buf[i + 6] == b'~'
             {
                 exe_part = &buf[0..i];
                 tail = Some(buf[i + 7..].to_vec());
+                break;
             }
         }
 
@@ -191,7 +192,8 @@ fn main() {
             let input_zip = std::fs::read(&argv[2]).expect("Can read input file");
             let output_file = argv[3].clone();
             let mut outfile_data = exe_part.to_vec();
-            outfile_data.extend_from_slice(b"WLTAILx");
+            outfile_data.extend_from_slice(b"WLT");
+            outfile_data.extend_from_slice(b"AIL~");
             outfile_data.extend_from_slice(&input_zip);
             std::fs::write(&output_file, outfile_data).expect("Can read output file");
             println!("Written '{}'", output_file);
@@ -265,7 +267,7 @@ fn main() {
                             std::process::exit(v.1.i() as i32);
                         }
                         Err(e) => {
-                            eprintln!("WLTAIL main.wl ERROR: {}", e);
+                            eprintln!("Appended main.wl ERROR: {}", e);
                             std::process::exit(1);
                         }
                     }
@@ -290,7 +292,7 @@ fn main() {
                         std::process::exit(v.1.i() as i32);
                     }
                     Err(e) => {
-                        eprintln!("WLTAIL ERROR: {}", e);
+                        eprintln!("APPENDED CODE ERROR: {}", e);
                         std::process::exit(1);
                     }
                 }

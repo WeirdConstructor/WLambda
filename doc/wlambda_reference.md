@@ -480,11 +480,17 @@ Smalltalk, LISP and Perl.
   - [12.11](#1211-cursive-consoleterminal-text-user-interface) Cursive Console/Terminal Text User Interface
     - [12.11.1](#12111-stdcursivenew) std:cursive:new
       - [12.11.1.1](#121111-cursiverun) $\<Cursive\>.run
-      - [12.11.1.2](#121112-cursiveapiquit) $\<CursiveAPI\>.quit
+      - [12.11.1.2](#121112-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer view-def
+      - [12.11.1.3](#121113-cursiveapiquit) $\<CursiveAPI\>.quit
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
   - [13.3](#133-format-string-syntax-for-stdbytespack-and-stdbytesunpack) Format String Syntax for std:bytes:pack and std:bytes:unpack
+  - [13.4](#134-cursive-view-definition) Cursive View Definition
+    - [13.4.1](#1341-size-def-cursive-widthheight-size-definition) size-def Cursive Width/Height Size Definition
+    - [13.4.2](#1342-view-def-panel-grouping-views-in-a-panel) view-def `panel` Grouping Views in a Panel
+    - [13.4.3](#1343-view-def-hbox-horizontal-layout) view-def `hbox` Horizontal Layout
+    - [13.4.4](#1344-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
 
 -----
 
@@ -9090,6 +9096,8 @@ WLambda comes with a text based user interface library binding to the `cursive` 
 You will need to enable the feature `cursive` when compiling WLambda. It's not included
 in the default feature set of WLambda.
 
+The `view-def` view definition format is defined in an extra section of this reference at the end.
+
 #### <a name="12111-stdcursivenew"></a>12.11.1 - std:cursive:new
 
 Create a new Cursive instance. You can call the following functions on it:
@@ -9108,7 +9116,11 @@ c.run[];
 
 Start the event loop. You can only exit this event loop using `$<CursiveAPI>.quit[]`.
 
-##### <a name="121112-cursiveapiquit"></a>12.11.1.2 - $\<CursiveAPI\>.quit
+##### <a name="121112-cursiveaddlayer-view-def"></a>12.11.1.2 - $\<Cursive\>.add\_layer view-def
+
+Adds the `view-def` view as layer to the TUI.
+
+##### <a name="121113-cursiveapiquit"></a>12.11.1.3 - $\<CursiveAPI\>.quit
 
 Quit the main event loop.
 
@@ -9509,3 +9521,61 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
 
 - `<n>` can be any number.
 - `<bits>` can be 8, 16, 32, 64 or 128.
+
+### <a name="134-cursive-view-definition"></a>13.4 - Cursive View Definition
+
+The `Cursive` TUI view definition describes the data structure layout
+for defining `Cursive` views. You can specify the layout, the properties
+and the callbacks in this definition.
+
+#### <a name="1341-size-def-cursive-widthheight-size-definition"></a>13.4.1 - size-def Cursive Width/Height Size Definition
+
+There are the following size specifications possible:
+
+- `:free`
+- `:full` makes the view use the available space
+- `:fixed => characters` makes the view the specified amount of characters wide/high
+- `:min => characters` makes the view the at least as big as the amount of characters specified
+- `:max => characters` makes the view the at most as big as the amount of characters specified
+
+#### <a name="1342-view-def-panel-grouping-views-in-a-panel"></a>13.4.2 - view-def `panel` Grouping Views in a Panel
+
+A panel is usually for visual separation and grouping of other views.
+
+```text
+    :panel => ${
+        title = "title of the panel", # Can be left out for no title.
+
+        # auto wrap properties:
+        name  = "view name",    # Assign a name for $<CursiveAPI>.named
+        scrollable = $true,     # Make the view scrollable
+        width = :free,          # Width size definition, see above under size-def
+        height = :free,         # Height size definition, see above under size-def
+    }
+```
+
+#### <a name="1343-view-def-hbox-horizontal-layout"></a>13.4.3 - view-def `hbox` Horizontal Layout
+
+This horizontal box is a short hand form to define a horizontal layout of
+other views. There are no auto wrap properties definable here.
+
+```text
+    :hbox => $[
+        view-def1,
+        view-def2,
+        ...
+    ]
+```
+
+#### <a name="1344-view-def-vbox-vertical-layout"></a>13.4.4 - view-def `vbox` Vertical Layout
+
+This vertical box is a short hand form to define a vertical layout of
+other views. There are no auto wrap properties definable here.
+
+```text
+    :vbox => $[
+        view-def1,
+        view-def2,
+        ...
+    ]
+```
