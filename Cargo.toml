@@ -18,11 +18,12 @@ default = [
 ]
 mqtt = ["rumqttd", "rumqttc"]
 http = ["reqwest"]
-all = ["mqtt", "http", "cursive"]
+all = ["mqtt", "http", "cursive", "zip"]
 
 [dependencies]
 fnv        = "1.0.7"
 rustyline  = { version = "6.1.2",   optional = true }
+zip        = { version = "0.6.3",   optional = true, features = ["deflate"], default-features = false }
 regex      = { version = "1.3.9",   optional = true }
 chrono     = { version = "0.4.11",  optional = true }
 serde      = { version = "1.0.111", optional = true, features = ["derive"] }
