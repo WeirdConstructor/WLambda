@@ -10,6 +10,8 @@ use crate::{Env, StackAction, VVal};
 #[allow(unused_imports)]
 use std::cell::RefCell;
 #[allow(unused_imports)]
+use std::collections::HashMap;
+#[allow(unused_imports)]
 use std::rc::Rc;
 
 #[cfg(feature = "cursive")]
@@ -34,13 +36,13 @@ macro_rules! assert_arg_count {
 }
 
 macro_rules! call_callback {
-    ($cursive: ident, $cb: ident, $env: ident) => {{
+    ($cursive: ident, $cb: ident, $env: ident $(,$args: ident)*) => {{
         let cursive_ptr: *mut Cursive = $cursive;
 
         let api = CursiveAPI::new(cursive_ptr);
         {
             if $cb.is_some() {
-                match $cb.call(&mut $env.borrow_mut(), &[VVal::new_usr(api.clone())]) {
+                match $cb.call(&mut $env.borrow_mut(), &[VVal::new_usr(api.clone()) $(,$args)*]) {
                     Ok(_) => (),
                     Err(e) => {
                         $cursive.add_layer(
@@ -160,6 +162,17 @@ impl VValUserData for CursiveAPI {
 }
 
 #[cfg(feature = "cursive")]
+struct WLambdaCursiveContext {
+    callbacks: HashMap<String, Option<Box<dyn FnMut(&mut Cursive, VVal)>>>,
+}
+
+impl WLambdaCursiveContext {
+    pub fn new() -> Self {
+        Self { callbacks: HashMap::new() }
+    }
+}
+
+#[cfg(feature = "cursive")]
 #[derive(Clone)]
 struct CursiveHandle {
     cursive: Rc<RefCell<Cursive>>,
@@ -168,7 +181,9 @@ struct CursiveHandle {
 #[cfg(feature = "cursive")]
 impl CursiveHandle {
     pub fn new() -> Self {
-        Self { cursive: Rc::new(RefCell::new(Cursive::new())) }
+        let cursive = Rc::new(RefCell::new(Cursive::new()));
+        cursive.borrow_mut().set_user_data(WLambdaCursiveContext::new());
+        Self { cursive }
     }
 }
 
@@ -315,37 +330,35 @@ fn vv2size_const(v: &VVal) -> Option<SizeConstraint> {
 }
 
 macro_rules! auto_wrap_view {
-    ($view: expr, $define: ident) => {
-        {
-            let size_w = vv2size_const(&$define.v_k("width"));
-            let size_h = vv2size_const(&$define.v_k("height"));
+    ($view: expr, $define: ident) => {{
+        let size_w = vv2size_const(&$define.v_k("width"));
+        let size_h = vv2size_const(&$define.v_k("height"));
 
-            if $define.v_k("name").is_some() {
-                if size_w.is_some() || size_h.is_some() {
-                    $view
-                        .with_name($define.v_s_rawk("name"))
-                        .resized(
-                            size_w.unwrap_or(SizeConstraint::Free),
-                            size_h.unwrap_or(SizeConstraint::Free),
-                        )
-                        .into_boxed_view()
-                } else {
-                    $view.with_name($define.v_s_rawk("name")).into_boxed_view()
-                }
+        if $define.v_k("name").is_some() {
+            if size_w.is_some() || size_h.is_some() {
+                $view
+                    .with_name($define.v_s_rawk("name"))
+                    .resized(
+                        size_w.unwrap_or(SizeConstraint::Free),
+                        size_h.unwrap_or(SizeConstraint::Free),
+                    )
+                    .into_boxed_view()
             } else {
-                if size_w.is_some() || size_h.is_some() {
-                    $view
-                        .resized(
-                            size_w.unwrap_or(SizeConstraint::Free),
-                            size_h.unwrap_or(SizeConstraint::Free),
-                        )
-                        .into_boxed_view()
-                } else {
-                    $view.into_boxed_view()
-                }
+                $view.with_name($define.v_s_rawk("name")).into_boxed_view()
+            }
+        } else {
+            if size_w.is_some() || size_h.is_some() {
+                $view
+                    .resized(
+                        size_w.unwrap_or(SizeConstraint::Free),
+                        size_h.unwrap_or(SizeConstraint::Free),
+                    )
+                    .into_boxed_view()
+            } else {
+                $view.into_boxed_view()
             }
         }
-    };
+    }};
 }
 
 #[cfg(feature = "cursive")]
@@ -437,12 +450,101 @@ impl VValUserData for CursiveHandle {
                 self.cursive.borrow_mut().run();
                 Ok(VVal::None)
             }
+            "sender" => {
+                assert_arg_count!(self, argv, 0, "sender[]", env);
+                Ok(VVal::new_usr(SendMessageHandle { cb: self.cursive.borrow_mut().cb_sink().clone() }))
+            },
+            "register_cb" => {
+                assert_arg_count!(self, argv, 2, "register_cb[event_tag, callback_fun]", env);
+                let tag = argv.v_s_raw(0);
+                let cb = argv.v_(1);
+                let denv = Rc::new(RefCell::new(env.derive()));
+
+                if let Some(ud) = self.cursive.borrow_mut().user_data::<WLambdaCursiveContext>() {
+                    ud.callbacks.insert(
+                        tag,
+                        Some(Box::new(move |s: &mut Cursive, v: VVal| {
+                            call_callback!(s, cb, denv, v);
+                        })),
+                    );
+                }
+
+                Ok(VVal::None)
+            }
             _ => Err(StackAction::panic_str(
                 format!("$<Cursive> unknown method called: {}", key),
                 None,
                 env.argv(),
             )),
         }
+    }
+}
+
+#[cfg(feature = "cursive")]
+#[derive(Clone)]
+struct SendMessageHandle {
+    cb: cursive::CbSink,
+}
+
+#[cfg(feature="cursive")]
+impl crate::threads::ThreadSafeUsr for SendMessageHandle {
+    fn to_vval(&self) -> VVal {
+        VVal::Usr(Box::new(self.clone()))
+    }
+}
+
+#[cfg(feature = "cursive")]
+impl VValUserData for SendMessageHandle {
+    fn s(&self) -> String {
+        format!("$<Cursive:SendMsgCb>")
+    }
+    fn as_any(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
+    }
+
+    fn call(&self, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv_ref();
+        if argv.len() != 2 {
+            return Err(StackAction::panic_str(
+                "$<Cursive:SendMsgCb>[event_tag, value] called with incorrect number of arguments"
+                    .to_string(),
+                None,
+                env.argv(),
+            ));
+        }
+
+        let tag = argv[0].s_raw();
+        let value = crate::AVal::from_vval(&argv[1]);
+
+        let res = self.cb.send(Box::new(move |s: &mut Cursive| {
+            let mut cb = if let Some(ud) = s.user_data::<WLambdaCursiveContext>() {
+                ud.callbacks.get_mut(&tag).map(|t| t.take()).flatten()
+            } else {
+                None
+            };
+
+            if let Some(cb) = cb.as_mut() {
+                (cb)(s, value.to_vval());
+            }
+
+            if let Some(ud) = s.user_data::<WLambdaCursiveContext>() {
+                if let Some(map_cb) = ud.callbacks.get_mut(&tag) {
+                    std::mem::swap(map_cb, &mut cb);
+                }
+            }
+        }));
+
+        match res {
+            Ok(()) => Ok(VVal::Bol(true)),
+            Err(e) => Ok(env.new_err(format!("$<Cursive:SendMsgCb error: {}", e))),
+        }
+    }
+
+    fn as_thread_safe_usr(&mut self) -> Option<Box<dyn crate::threads::ThreadSafeUsr>> {
+        Some(Box::new(self.clone()))
     }
 }
 
