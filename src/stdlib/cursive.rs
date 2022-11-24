@@ -15,10 +15,10 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[cfg(feature = "cursive")]
-use cursive::view::{IntoBoxedView, Resizable, SizeConstraint};
+use cursive::view::{IntoBoxedView, Resizable, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Dialog, LinearLayout, Panel, StackView, TextView, ViewRef,
+    BoxedView, Button, Dialog, EditView, LinearLayout, Panel, StackView, TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
@@ -36,7 +36,7 @@ macro_rules! assert_arg_count {
 }
 
 macro_rules! call_callback {
-    ($cursive: ident, $cb: ident, $env: ident $(,$args: ident)*) => {{
+    ($cursive: ident, $cb: ident, $env: ident $(,$args: expr)*) => {{
         let cursive_ptr: *mut Cursive = $cursive;
 
         let api = CursiveAPI::new(cursive_ptr);
@@ -127,6 +127,7 @@ impl VValUserData for CursiveAPI {
                 let viewtype = match &argv.v_s_raw(1)[..] {
                     "stack" => ViewType::StackView,
                     "button" => ViewType::Button,
+                    "edit" => ViewType::EditView,
                     _ => {
                         return Err(StackAction::panic_str(
                             format!(
@@ -190,6 +191,7 @@ impl CursiveHandle {
 #[derive(Debug, Clone)]
 enum ViewType {
     StackView,
+    EditView,
     Button,
 }
 
@@ -207,10 +209,11 @@ impl NamedViewHandle {
     }
 }
 
-macro_rules! access_named_view {
-    ($self: ident, $type: ident, $name: ident, $env: ident, $block: tt) => {{
-        let cursive: &mut Cursive = unsafe { &mut **$self.ptr };
-        let view: Option<ViewRef<$type>> = cursive.find_name(&$self.name);
+macro_rules! access_named_view_ctx {
+    ($self: ident, $cursive: ident, $type: ident, $name: ident, $env: ident, $block: tt) => {{
+        let $cursive: &mut Cursive = unsafe { &mut **$self.ptr };
+        let view: Option<ViewRef<$type>> = $cursive.find_name(&$self.name);
+        #[allow(unused_mut)]
         match view {
             Some(mut $name) => $block,
             None => {
@@ -221,7 +224,13 @@ macro_rules! access_named_view {
                 ));
             }
         }
-    }};
+    }}
+}
+
+macro_rules! access_named_view {
+    ($self: ident, $type: ident, $name: ident, $env: ident, $block: tt) => {
+        access_named_view_ctx!($self, cursive, $type, $name, $env, $block)
+    }
 }
 
 macro_rules! expect_view {
@@ -261,6 +270,29 @@ impl VValUserData for NamedViewHandle {
                     access_named_view!(self, Button, view, env, {
                         view.set_label(argv.v_s_raw(0));
                         Ok(VVal::None)
+                    })
+                }
+                _ => Err(StackAction::panic_str(
+                    format!(
+                        "$<NamedView:{}:{:?}> unknown method called: {}",
+                        self.name, self.typ, key
+                    ),
+                    None,
+                    env.argv(),
+                )),
+            },
+            ViewType::EditView => match key {
+                "set_content" => {
+                    assert_arg_count!(self, argv, 1, "set_content[new_text]", env);
+                    access_named_view_ctx!(self, cursive, EditView, view, env, {
+                        (view.set_content(argv.v_s_raw(0)))(cursive);
+                        Ok(VVal::None)
+                    })
+                }
+                "content" => {
+                    assert_arg_count!(self, argv, 0, "content[]", env);
+                    access_named_view_ctx!(self, cursive, EditView, view, env, {
+                        Ok(VVal::new_str(&view.get_content()))
                     })
                 }
                 _ => Err(StackAction::panic_str(
@@ -334,28 +366,59 @@ macro_rules! auto_wrap_view {
         let size_w = vv2size_const(&$define.v_k("width"));
         let size_h = vv2size_const(&$define.v_k("height"));
 
+        let scrollable = $define.v_bk("scrollable");
+
         if $define.v_k("name").is_some() {
             if size_w.is_some() || size_h.is_some() {
-                $view
-                    .with_name($define.v_s_rawk("name"))
-                    .resized(
-                        size_w.unwrap_or(SizeConstraint::Free),
-                        size_h.unwrap_or(SizeConstraint::Free),
-                    )
-                    .into_boxed_view()
+                if scrollable {
+                    $view
+                        .with_name($define.v_s_rawk("name"))
+                        .resized(
+                            size_w.unwrap_or(SizeConstraint::Free),
+                            size_h.unwrap_or(SizeConstraint::Free),
+                        )
+                        .scrollable()
+                        .into_boxed_view()
+                } else {
+                    $view
+                        .with_name($define.v_s_rawk("name"))
+                        .resized(
+                            size_w.unwrap_or(SizeConstraint::Free),
+                            size_h.unwrap_or(SizeConstraint::Free),
+                        )
+                        .into_boxed_view()
+                }
             } else {
-                $view.with_name($define.v_s_rawk("name")).into_boxed_view()
+                if scrollable {
+                    $view.with_name($define.v_s_rawk("name")).scrollable().into_boxed_view()
+                } else {
+                    $view.with_name($define.v_s_rawk("name")).into_boxed_view()
+                }
             }
         } else {
             if size_w.is_some() || size_h.is_some() {
-                $view
-                    .resized(
-                        size_w.unwrap_or(SizeConstraint::Free),
-                        size_h.unwrap_or(SizeConstraint::Free),
-                    )
-                    .into_boxed_view()
+                if scrollable {
+                    $view
+                        .resized(
+                            size_w.unwrap_or(SizeConstraint::Free),
+                            size_h.unwrap_or(SizeConstraint::Free),
+                        )
+                        .scrollable()
+                        .into_boxed_view()
+                } else {
+                    $view
+                        .resized(
+                            size_w.unwrap_or(SizeConstraint::Free),
+                            size_h.unwrap_or(SizeConstraint::Free),
+                        )
+                        .into_boxed_view()
+                }
             } else {
-                $view.into_boxed_view()
+                if scrollable {
+                    $view.scrollable().into_boxed_view()
+                } else {
+                    $view.into_boxed_view()
+                }
             }
         }
     }};
@@ -398,6 +461,37 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
                 pnl.set_title(define.v_s_rawk("title"));
             }
             Ok(auto_wrap_view!(pnl, define))
+        }
+        "edit" => {
+            let mut edit = EditView::new();
+
+            if define.v_k("maxlen").is_some() {
+                edit.set_max_content_width(Some(define.v_ik("maxlen") as usize));
+            }
+
+            if define.v_bk("secret") {
+                edit.set_secret(true);
+            }
+
+            if define.v_k("filler").is_some() {
+                edit.set_filler(define.v_s_rawk("filler"));
+            }
+
+            if define.v_k("on_edit").is_some() {
+                let cb = define.v_k("on_edit");
+                let denv = Rc::new(RefCell::new(env.derive()));
+                edit.set_on_edit(move |s, text, cursor| {
+                    call_callback!(s, cb, denv, VVal::new_str(text), VVal::Int(cursor as i64))
+                });
+            }
+
+            if define.v_k("on_submit").is_some() {
+                let cb = define.v_k("on_submit");
+                let denv = Rc::new(RefCell::new(env.derive()));
+                edit.set_on_submit(move |s, text| call_callback!(s, cb, denv, VVal::new_str(text)));
+            }
+
+            Ok(auto_wrap_view!(edit, define))
         }
         "stack" => {
             let mut stk = StackView::new();
@@ -452,8 +546,10 @@ impl VValUserData for CursiveHandle {
             }
             "sender" => {
                 assert_arg_count!(self, argv, 0, "sender[]", env);
-                Ok(VVal::new_usr(SendMessageHandle { cb: self.cursive.borrow_mut().cb_sink().clone() }))
-            },
+                Ok(VVal::new_usr(SendMessageHandle {
+                    cb: self.cursive.borrow_mut().cb_sink().clone(),
+                }))
+            }
             "register_cb" => {
                 assert_arg_count!(self, argv, 2, "register_cb[event_tag, callback_fun]", env);
                 let tag = argv.v_s_raw(0);
@@ -486,7 +582,7 @@ struct SendMessageHandle {
     cb: cursive::CbSink,
 }
 
-#[cfg(feature="cursive")]
+#[cfg(feature = "cursive")]
 impl crate::threads::ThreadSafeUsr for SendMessageHandle {
     fn to_vval(&self) -> VVal {
         VVal::Usr(Box::new(self.clone()))
