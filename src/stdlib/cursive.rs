@@ -121,30 +121,39 @@ impl VValUserData for CursiveAPI {
                 ));
                 Ok(VVal::None)
             }
-            "named" => {
-                assert_arg_count!(self, argv, 2, "named[name, type]", env);
+            "get" => {
+                assert_arg_count!(self, argv, 1, "get[name]", env);
 
-                let viewtype = match &argv.v_s_raw(1)[..] {
-                    "stack" => ViewType::StackView,
-                    "button" => ViewType::Button,
-                    "edit" => ViewType::EditView,
-                    _ => {
-                        return Err(StackAction::panic_str(
-                            format!(
-                                "$<CursiveAPI>.named[name, type] unknown type: {}",
-                                argv.v_s(1)
-                            ),
-                            None,
-                            env.argv(),
-                        ));
+                let cursive: &mut Cursive = unsafe { &mut **self.ptr };
+                let ud = cursive
+                    .user_data::<WLambdaCursiveContext>()
+                    .expect("Userdata must be WLambdaCursiveContext!");
+                let reg = ud.get_registry();
+
+                let name = argv.v_s_raw(0);
+
+                let viewtype = if let Some(typ) = reg.borrow().get(&name) {
+                    match &typ[..] {
+                        "stack" => ViewType::StackView,
+                        "button" => ViewType::Button,
+                        "edit" => ViewType::EditView,
+                        "panel" => ViewType::Panel,
+                        _ => {
+                            panic!(
+                                "Unknown viewtype encountered, fatal error in programming: {}",
+                                typ
+                            );
+                        }
                     }
+                } else {
+                    return Err(StackAction::panic_str(
+                        format!("$<CursiveAPI>.get unknown name: '{}'", name),
+                        None,
+                        env.argv(),
+                    ));
                 };
 
-                Ok(VVal::new_usr(NamedViewHandle::new(
-                    self.ptr.clone(),
-                    &argv.v_s_raw(0)[..],
-                    viewtype,
-                )))
+                Ok(VVal::new_usr(NamedViewHandle::new(self.ptr.clone(), &name[..], viewtype)))
             }
             "quit" => {
                 assert_arg_count!(self, argv, 0, "quit[]", env);
@@ -165,11 +174,18 @@ impl VValUserData for CursiveAPI {
 #[cfg(feature = "cursive")]
 struct WLambdaCursiveContext {
     callbacks: HashMap<String, Option<Box<dyn FnMut(&mut Cursive, VVal)>>>,
+    reg: ViewNameRegistry,
 }
 
 impl WLambdaCursiveContext {
     pub fn new() -> Self {
-        Self { callbacks: HashMap::new() }
+        let reg = Rc::new(RefCell::new(HashMap::new()));
+
+        Self { callbacks: HashMap::new(), reg }
+    }
+
+    pub fn get_registry(&self) -> ViewNameRegistry {
+        self.reg.clone()
     }
 }
 
@@ -177,14 +193,17 @@ impl WLambdaCursiveContext {
 #[derive(Clone)]
 struct CursiveHandle {
     cursive: Rc<RefCell<Cursive>>,
+    reg: ViewNameRegistry,
 }
 
 #[cfg(feature = "cursive")]
 impl CursiveHandle {
     pub fn new() -> Self {
         let cursive = Rc::new(RefCell::new(Cursive::new()));
-        cursive.borrow_mut().set_user_data(WLambdaCursiveContext::new());
-        Self { cursive }
+        let ud = WLambdaCursiveContext::new();
+        let reg = ud.get_registry();
+        cursive.borrow_mut().set_user_data(ud);
+        Self { cursive, reg }
     }
 }
 
@@ -193,19 +212,29 @@ enum ViewType {
     StackView,
     EditView,
     Button,
+    Panel,
 }
+
+type ViewNameRegistry = Rc<RefCell<HashMap<String, String>>>;
 
 #[cfg(feature = "cursive")]
 #[derive(Clone)]
 struct NamedViewHandle {
     ptr: Rc<*mut Cursive>,
+    reg: ViewNameRegistry,
     name: String,
     typ: ViewType,
 }
 
 impl NamedViewHandle {
     pub fn new(ptr: Rc<*mut Cursive>, name: &str, typ: ViewType) -> Self {
-        Self { ptr, name: name.to_string(), typ }
+        let cursive: &mut Cursive = unsafe { &mut **ptr };
+        let ud = cursive
+            .user_data::<WLambdaCursiveContext>()
+            .expect("Userdata must be WLambdaCursiveContext!");
+        let reg = ud.get_registry();
+
+        Self { ptr, name: name.to_string(), typ, reg }
     }
 }
 
@@ -224,18 +253,18 @@ macro_rules! access_named_view_ctx {
                 ));
             }
         }
-    }}
+    }};
 }
 
 macro_rules! access_named_view {
     ($self: ident, $type: ident, $name: ident, $env: ident, $block: tt) => {
         access_named_view_ctx!($self, cursive, $type, $name, $env, $block)
-    }
+    };
 }
 
 macro_rules! expect_view {
-    ($argv: expr, $what: expr, $name: ident, $env: ident, $block: tt) => {
-        match vv2view($argv, $env) {
+    ($argv: expr, $what: expr, $name: ident, $reg: expr, $env: ident, $block: tt) => {
+        match vv2view($argv, $env, &$reg) {
             Ok($name) => $block,
             Err(e) => {
                 return Err(StackAction::panic_str(
@@ -245,6 +274,16 @@ macro_rules! expect_view {
                 ))
             }
         }
+    };
+}
+
+macro_rules! named_view_error {
+    ($self: ident, $env: ident, $key: ident) => {
+        Err(StackAction::panic_str(
+            format!("$<NamedView:{}:{:?}> unknown method called: {}", $self.name, $self.typ, $key),
+            None,
+            $env.argv(),
+        ))
     };
 }
 
@@ -264,6 +303,9 @@ impl VValUserData for NamedViewHandle {
         let argv = env.argv();
 
         match self.typ {
+            ViewType::Panel => match key {
+                _ => named_view_error!(self, env, key),
+            },
             ViewType::Button => match key {
                 "set_label" => {
                     assert_arg_count!(self, argv, 1, "set_label[text]", env);
@@ -272,14 +314,7 @@ impl VValUserData for NamedViewHandle {
                         Ok(VVal::None)
                     })
                 }
-                _ => Err(StackAction::panic_str(
-                    format!(
-                        "$<NamedView:{}:{:?}> unknown method called: {}",
-                        self.name, self.typ, key
-                    ),
-                    None,
-                    env.argv(),
-                )),
+                _ => named_view_error!(self, env, key),
             },
             ViewType::EditView => match key {
                 "set_content" => {
@@ -295,14 +330,7 @@ impl VValUserData for NamedViewHandle {
                         Ok(VVal::new_str(&view.get_content()))
                     })
                 }
-                _ => Err(StackAction::panic_str(
-                    format!(
-                        "$<NamedView:{}:{:?}> unknown method called: {}",
-                        self.name, self.typ, key
-                    ),
-                    None,
-                    env.argv(),
-                )),
+                _ => named_view_error!(self, env, key),
             },
             ViewType::StackView => match key {
                 "pop_layer" => {
@@ -314,21 +342,21 @@ impl VValUserData for NamedViewHandle {
                 }
                 "add_layer" => {
                     assert_arg_count!(self, argv, 1, "add_layer[view]", env);
-                    expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, env, {
-                        access_named_view!(self, StackView, view, env, {
-                            view.add_layer(new_view);
-                            Ok(VVal::None)
-                        })
-                    })
+                    expect_view!(
+                        &argv.v_(0),
+                        "$<NamedViewHandle>.add_layer",
+                        new_view,
+                        self.reg,
+                        env,
+                        {
+                            access_named_view!(self, StackView, view, env, {
+                                view.add_layer(new_view);
+                                Ok(VVal::None)
+                            })
+                        }
+                    )
                 }
-                _ => Err(StackAction::panic_str(
-                    format!(
-                        "$<NamedView:{}:{:?}> unknown method called: {}",
-                        self.name, self.typ, key
-                    ),
-                    None,
-                    env.argv(),
-                )),
+                _ => named_view_error!(self, env, key),
             },
         }
     }
@@ -362,13 +390,15 @@ fn vv2size_const(v: &VVal) -> Option<SizeConstraint> {
 }
 
 macro_rules! auto_wrap_view {
-    ($view: expr, $define: ident) => {{
+    ($view: expr, $define: ident, $type: ident, $reg: expr) => {{
         let size_w = vv2size_const(&$define.v_k("width"));
         let size_h = vv2size_const(&$define.v_k("height"));
 
         let scrollable = $define.v_bk("scrollable");
 
         if $define.v_k("name").is_some() {
+            $reg.borrow_mut().insert($define.v_s_rawk("name"), stringify!($type).to_string());
+
             if size_w.is_some() || size_h.is_some() {
                 if scrollable {
                     $view
@@ -425,7 +455,11 @@ macro_rules! auto_wrap_view {
 }
 
 #[cfg(feature = "cursive")]
-fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>, String> {
+fn vv2view(
+    v: &VVal,
+    env: &mut Env,
+    reg: &ViewNameRegistry,
+) -> Result<Box<(dyn cursive::View + 'static)>, String> {
     let typ = v.v_(0);
     let define = v.v_(1);
 
@@ -434,7 +468,7 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
             let mut ll = LinearLayout::new(Orientation::Horizontal);
             define.with_iter(|it| {
                 for (v, _) in it {
-                    ll.add_child(vv2view(&v, env)?);
+                    ll.add_child(vv2view(&v, env, reg)?);
                 }
 
                 Ok::<(), String>(())
@@ -446,7 +480,7 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
             let mut ll = LinearLayout::new(Orientation::Vertical);
             define.with_iter(|it| {
                 for (v, _) in it {
-                    ll.add_child(vv2view(&v, env)?);
+                    ll.add_child(vv2view(&v, env, reg)?);
                 }
 
                 Ok::<(), String>(())
@@ -456,11 +490,11 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
         }
         "panel" => {
             let (define, child) = (define.v_(0), define.v_(1));
-            let mut pnl = Panel::new(BoxedView::new(vv2view(&child, env)?));
+            let mut pnl = Panel::new(BoxedView::new(vv2view(&child, env, reg)?));
             if define.v_k("title").is_some() {
                 pnl.set_title(define.v_s_rawk("title"));
             }
-            Ok(auto_wrap_view!(pnl, define))
+            Ok(auto_wrap_view!(pnl, define, panel, reg))
         }
         "edit" => {
             let mut edit = EditView::new();
@@ -491,18 +525,18 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
                 edit.set_on_submit(move |s, text| call_callback!(s, cb, denv, VVal::new_str(text)));
             }
 
-            Ok(auto_wrap_view!(edit, define))
+            Ok(auto_wrap_view!(edit, define, edit, reg))
         }
         "stack" => {
             let mut stk = StackView::new();
             define.v_k("layers").with_iter(|it| {
                 for (v, _) in it {
-                    stk.add_fullscreen_layer(vv2view(&v, env)?);
+                    stk.add_fullscreen_layer(vv2view(&v, env, reg)?);
                 }
                 Ok::<(), String>(())
             })?;
 
-            Ok(auto_wrap_view!(stk, define))
+            Ok(auto_wrap_view!(stk, define, stack, reg))
         }
         "button" => {
             let cb = define.v_k("cb");
@@ -510,7 +544,7 @@ fn vv2view(v: &VVal, env: &mut Env) -> Result<Box<(dyn cursive::View + 'static)>
 
             let view = Button::new(define.v_s_rawk("label"), move |s| call_callback!(s, cb, denv));
 
-            Ok(auto_wrap_view!(view, define))
+            Ok(auto_wrap_view!(view, define, button, reg))
         }
         _ => Err(format!("Unknown view type: '{}'", typ.s())),
     }
@@ -534,10 +568,17 @@ impl VValUserData for CursiveHandle {
         match key {
             "add_layer" => {
                 assert_arg_count!(self, argv, 1, "add_layer[view]", env);
-                expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, env, {
-                    self.cursive.borrow_mut().add_layer(new_view);
-                    Ok(VVal::None)
-                })
+                expect_view!(
+                    &argv.v_(0),
+                    "$<NamedViewHandle>.add_layer",
+                    new_view,
+                    self.reg,
+                    env,
+                    {
+                        self.cursive.borrow_mut().add_layer(new_view);
+                        Ok(VVal::None)
+                    }
+                )
             }
             "run" => {
                 assert_arg_count!(self, argv, 0, "run[]", env);
