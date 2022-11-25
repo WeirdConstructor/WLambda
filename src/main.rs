@@ -172,6 +172,7 @@ fn main() {
 
         let mut exe_part = &buf[..];
         let mut tail = None;
+        let mut no_print_info = false;
         for i in 0..buf.len() {
             if (i + 7) < buf.len()
                 && buf[i] == b'W'
@@ -180,20 +181,28 @@ fn main() {
                 && buf[i + 3] == b'A'
                 && buf[i + 4] == b'I'
                 && buf[i + 5] == b'L'
-                && buf[i + 6] == b'~'
+                && (buf[i + 6] == b'~' || buf[i + 6] == b'#')
             {
+                no_print_info = buf[i + 6] != b'~';
+
                 exe_part = &buf[0..i];
                 tail = Some(buf[i + 7..].to_vec());
                 break;
             }
         }
 
-        if argv.len() > 3 && argv[1] == "-p" {
+        if argv.len() > 3 && (argv[1] == "-p" || argv[1] == "-P") {
             let input_zip = std::fs::read(&argv[2]).expect("Can read input file");
             let output_file = argv[3].clone();
             let mut outfile_data = exe_part.to_vec();
-            outfile_data.extend_from_slice(b"WLT");
-            outfile_data.extend_from_slice(b"AIL~");
+            let mut tag = b"VKSAHK".to_vec();
+            for ch in tag.iter_mut() {
+                if *ch != b'A' {
+                    *ch += 1;
+                }
+            }
+            outfile_data.extend_from_slice(&tag[..]);
+            outfile_data.extend_from_slice(if argv[1] == "-P" { b"#" } else { b"~" });
             outfile_data.extend_from_slice(&input_zip);
             std::fs::write(&output_file, outfile_data).expect("Can read output file");
             println!("Written '{}'", output_file);
@@ -251,7 +260,9 @@ fn main() {
                     }
 
                     if let Some(main_code) = main_file {
-                        print_info();
+                        if !no_print_info {
+                            print_info();
+                        }
 
                         match ctx.eval(&main_code) {
                             Ok(v) => {
@@ -279,7 +290,9 @@ fn main() {
 
             if !handled_zip {
                 let code = std::str::from_utf8(&tail).expect("Tail is proper UTF-8");
-                print_info();
+                if !no_print_info {
+                    print_info();
+                }
 
                 match ctx.eval(code) {
                     Ok(v) => {

@@ -1,6 +1,8 @@
 // Copyright (c) 2022 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
+#![allow(unused_macros)]
+
 #[allow(unused_imports)]
 use crate::compiler::*;
 #[allow(unused_imports)]
@@ -72,6 +74,7 @@ struct CursiveAPI {
     ptr: Rc<*mut Cursive>,
 }
 
+#[cfg(feature = "cursive")]
 impl CursiveAPI {
     pub fn new(ptr: *mut Cursive) -> Self {
         Self { ptr: Rc::new(ptr) }
@@ -177,6 +180,7 @@ struct WLambdaCursiveContext {
     reg: ViewNameRegistry,
 }
 
+#[cfg(feature = "cursive")]
 impl WLambdaCursiveContext {
     pub fn new() -> Self {
         let reg = Rc::new(RefCell::new(HashMap::new()));
@@ -207,6 +211,7 @@ impl CursiveHandle {
     }
 }
 
+#[cfg(feature = "cursive")]
 #[derive(Debug, Clone)]
 enum ViewType {
     StackView,
@@ -215,6 +220,7 @@ enum ViewType {
     Panel,
 }
 
+#[cfg(feature = "cursive")]
 type ViewNameRegistry = Rc<RefCell<HashMap<String, String>>>;
 
 #[cfg(feature = "cursive")]
@@ -226,6 +232,7 @@ struct NamedViewHandle {
     typ: ViewType,
 }
 
+#[cfg(feature = "cursive")]
 impl NamedViewHandle {
     pub fn new(ptr: Rc<*mut Cursive>, name: &str, typ: ViewType) -> Self {
         let cursive: &mut Cursive = unsafe { &mut **ptr };
@@ -362,6 +369,7 @@ impl VValUserData for NamedViewHandle {
     }
 }
 
+#[cfg(feature = "cursive")]
 fn vv2size_const(v: &VVal) -> Option<SizeConstraint> {
     let topkind = v.s_raw();
 
