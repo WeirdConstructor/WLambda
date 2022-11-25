@@ -198,7 +198,6 @@ fn main() {
             std::fs::write(&output_file, outfile_data).expect("Can read output file");
             println!("Written '{}'", output_file);
             return;
-
         } else if argv.len() > 2 && argv[1] == "-x" {
             if let Some(tail) = tail {
                 let output_file = argv[2].clone();
@@ -208,74 +207,79 @@ fn main() {
             return;
         }
 
-        #[cfg(feature = "zip")]
         if let Some(tail) = tail {
-            use std::io::Cursor;
-            use std::io::Read;
-
-            let mut tail_buf = Cursor::new(&tail[..]);
-
             ctx.set_global_var("_ENABLE_WLAMBDA_REPL_", &VVal::Bol(false));
+            #[allow(unused_mut)]
+            let mut handled_zip = false;
 
-            if let Ok(mut zip_arch) = zip::ZipArchive::new(&mut tail_buf) {
-                let mut main_file = None;
+            #[cfg(feature = "zip")]
+            {
+                use std::io::Cursor;
+                use std::io::Read;
 
-                for i in 0..zip_arch.len() {
-                    let mut file = zip_arch.by_index(i).expect("Indexing ZIP file works");
-                    let mut code = String::new();
-                    if file.is_file() {
-                        match file.read_to_string(&mut code) {
-                            Ok(_) => {
-                                if file.name() == "main.wl" {
-                                    main_file = Some(code);
-                                } else {
+                let mut tail_buf = Cursor::new(&tail[..]);
+                if let Ok(mut zip_arch) = zip::ZipArchive::new(&mut tail_buf) {
+                    let mut main_file = None;
+                    handled_zip = true;
+
+                    for i in 0..zip_arch.len() {
+                        let mut file = zip_arch.by_index(i).expect("Indexing ZIP file works");
+                        let mut code = String::new();
+                        if file.is_file() {
+                            match file.read_to_string(&mut code) {
+                                Ok(_) => {
+                                    if file.name() == "main.wl" {
+                                        main_file = Some(code);
+                                    } else {
+                                        eprintln!(
+                                            "wltail preload: {} (len={})",
+                                            file.name(),
+                                            code.len()
+                                        );
+                                        lfmr.borrow_mut().preload(file.name(), code);
+                                    }
+                                }
+                                Err(e) => {
                                     eprintln!(
-                                        "wltail preload: {} (len={})",
+                                        "Couldn't load embedded code file '{}': {}",
                                         file.name(),
-                                        code.len()
+                                        e
                                     );
-                                    lfmr.borrow_mut().preload(file.name(), code);
                                 }
                             }
-                            Err(e) => {
-                                eprintln!(
-                                    "Couldn't load embedded code file '{}': {}",
-                                    file.name(),
-                                    e
-                                );
-                            }
                         }
                     }
-                }
 
-                if let Some(main_code) = main_file {
-                    print_info();
-                    eprintln!("Executing embedded zip main.wl. extract: `-x script.zip`, repack: `-p script.zip my.exe`");
+                    if let Some(main_code) = main_file {
+                        print_info();
 
-                    match ctx.eval(&main_code) {
-                        Ok(v) => {
-                            let repl_flag =
-                                ctx.get_global_var("_ENABLE_WLAMBDA_REPL_").unwrap_or(VVal::None);
-                            if !repl_flag.b() {
+                        match ctx.eval(&main_code) {
+                            Ok(v) => {
+                                let repl_flag = ctx
+                                    .get_global_var("_ENABLE_WLAMBDA_REPL_")
+                                    .unwrap_or(VVal::None);
+                                if !repl_flag.b() {
+                                    std::process::exit(v.i() as i32);
+                                }
+                            }
+                            Err(EvalError::ExecError(StackAction::Break(v))) => {
                                 std::process::exit(v.i() as i32);
                             }
-                        }
-                        Err(EvalError::ExecError(StackAction::Break(v))) => {
-                            std::process::exit(v.i() as i32);
-                        }
-                        Err(EvalError::ExecError(StackAction::Return(v))) => {
-                            std::process::exit(v.1.i() as i32);
-                        }
-                        Err(e) => {
-                            eprintln!("Appended main.wl ERROR: {}", e);
-                            std::process::exit(1);
+                            Err(EvalError::ExecError(StackAction::Return(v))) => {
+                                std::process::exit(v.1.i() as i32);
+                            }
+                            Err(e) => {
+                                eprintln!("Appended main.wl ERROR: {}", e);
+                                std::process::exit(1);
+                            }
                         }
                     }
                 }
-            } else {
+            }
+
+            if !handled_zip {
                 let code = std::str::from_utf8(&tail).expect("Tail is proper UTF-8");
                 print_info();
-                eprintln!("Loading embedded script. extract: `-x script.wl`, repack: `-p script.wl my.exe`");
 
                 match ctx.eval(code) {
                     Ok(v) => {
@@ -306,6 +310,7 @@ fn main() {
         if argv[1] == "-parse" {
             let contents = std::fs::read_to_string(&argv[2]).unwrap();
             wlambda::parser::parse(&contents, &argv[2]).expect("successful parse");
+
         } else if argv.len() > 2 && argv[1] == "-e" {
             v_argv.delete_key(&VVal::Int(0)).expect("-e argument");
             v_argv.delete_key(&VVal::Int(0)).expect("script argument");

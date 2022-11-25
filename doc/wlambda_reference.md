@@ -9522,13 +9522,13 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
 - `<n>` can be any number.
 - `<bits>` can be 8, 16, 32, 64 or 128.
 
-### <a name="134-cursive-view-definition"></a>13.4 - Cursive View Definition
+## <a name="134-cursive-view-definition"></a>13.4 - Cursive View Definition
 
 The `Cursive` TUI view definition describes the data structure layout
 for defining `Cursive` views. You can specify the layout, the properties
 and the callbacks in this definition.
 
-#### <a name="1341-size-def-cursive-widthheight-size-definition"></a>13.4.1 - size-def Cursive Width/Height Size Definition
+### <a name="1341-size-def-cursive-widthheight-size-definition"></a>13.4.1 - size-def Cursive Width/Height Size Definition
 
 There are the following size specifications possible:
 
@@ -9538,7 +9538,7 @@ There are the following size specifications possible:
 - `:min => characters` makes the view the at least as big as the amount of characters specified
 - `:max => characters` makes the view the at most as big as the amount of characters specified
 
-#### <a name="1342-view-def-panel-grouping-views-in-a-panel"></a>13.4.2 - view-def `panel` Grouping Views in a Panel
+### <a name="1342-view-def-panel-grouping-views-in-a-panel"></a>13.4.2 - view-def `panel` Grouping Views in a Panel
 
 A panel is usually for visual separation and grouping of other views.
 
@@ -9554,7 +9554,7 @@ A panel is usually for visual separation and grouping of other views.
     }
 ```
 
-#### <a name="1343-view-def-hbox-horizontal-layout"></a>13.4.3 - view-def `hbox` Horizontal Layout
+### <a name="1343-view-def-hbox-horizontal-layout"></a>13.4.3 - view-def `hbox` Horizontal Layout
 
 This horizontal box is a short hand form to define a horizontal layout of
 other views. There are no auto wrap properties definable here.
@@ -9567,7 +9567,7 @@ other views. There are no auto wrap properties definable here.
     ]
 ```
 
-#### <a name="1344-view-def-vbox-vertical-layout"></a>13.4.4 - view-def `vbox` Vertical Layout
+### <a name="1344-view-def-vbox-vertical-layout"></a>13.4.4 - view-def `vbox` Vertical Layout
 
 This vertical box is a short hand form to define a vertical layout of
 other views. There are no auto wrap properties definable here.
@@ -9578,4 +9578,60 @@ other views. There are no auto wrap properties definable here.
         view-def2,
         ...
     ]
+```
+
+## - WLambda Interpreter Command Line Interface
+
+There are currently the following command line parameters available:
+
+```text
+    -p <script or zip> <output binary file>     # Packing a script or ZIP into an executable
+    -x <output script or zip>                   # Unpacking a script or ZIP from a packed executable
+    -parse <file>                               # Parse the given <file> and check for syntax errors
+    -e <wlambda code>                           # Execute the <wlambda code> directly.
+    <file>                                      # Execute the <file>
+```
+
+### - WLambda Script To Executable Packing
+
+You can append WLambda scripts to the WLambda binary using the `-p` command line parameter.
+This feature makes your script easily portable as single binary.
+You can either pack a single WLambda script file, or a ZIP archive of multiple WLambda
+files. In the latter case the `main.wl` file will be executed and the other files
+will be made available as modules you can `!@import` into your `main.wl`.
+
+**Attention: You need to enable the `zip` feature for the ZIP files to work!**
+
+Here is an example for Windows with EXE files. On Linux you will need to make
+the resulting binary file executable with `chmod a+x <filename>`:
+
+```text
+    ---- test.wl --------------
+    std:displayln "Hello World!";
+    ---------------------------
+
+    > wlambda -p test.wl my_test.exe
+    Written 'my_test.exe'
+
+    > my_test
+    WLambda Version 0.8.1
+    Copyright (C) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
+    License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+    This is free software: you are free to change and redistribute it.
+    There is NO WARRANTY, to the extent permitted by law.
+
+    For documentation visit: <http://wlambda.m8geil.de>.
+
+    Hello World!
+```
+
+You can unpack the `my_test.exe` file using the `-x` command line parameter.
+Here an example for the Windows `cmd.exe` shell:
+
+```text
+    > my_test -p out_test.wl
+    Written 'out_test.wl'
+
+    > type out_test.wl
+    std:displayln "Hello World!"
 ```
