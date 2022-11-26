@@ -124,6 +124,16 @@ impl VValUserData for CursiveAPI {
                 ));
                 Ok(VVal::None)
             }
+            "focus" => {
+                assert_arg_count!(self, argv, 1, "focus[name]", env);
+                let cursive: &mut Cursive = unsafe { &mut **self.ptr };
+                argv.v_(0).with_s_ref(|s| {
+                    match cursive.focus_name(s) {
+                        Ok(_) => Ok(VVal::Bol(true)),
+                        Err(_) => Ok(VVal::Bol(false)),
+                    }
+                })
+            }
             "get" => {
                 assert_arg_count!(self, argv, 1, "get[name]", env);
 
