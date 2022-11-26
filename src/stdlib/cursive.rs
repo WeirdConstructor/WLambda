@@ -20,7 +20,7 @@ use std::rc::Rc;
 use cursive::view::{IntoBoxedView, Resizable, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Dialog, EditView, LinearLayout, Panel, StackView, TextView, ViewRef,
+    BoxedView, Button, Dialog, EditView, LinearLayout, Panel, StackView, ListView, TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
@@ -545,6 +545,28 @@ fn vv2view(
             })?;
 
             Ok(auto_wrap_view!(stk, define, stack, reg))
+        }
+        "list" => {
+            let mut lst = ListView::new();
+
+            if define.v_k("on_select").is_some() {
+                let cb = define.v_k("on_select");
+                let denv = Rc::new(RefCell::new(env.derive()));
+                lst.set_on_select(move |s, item| call_callback!(s, cb, denv, VVal::new_str(item)));
+            }
+
+            define.v_k("childs").with_iter(|it| {
+                for (v, _) in it {
+                    if v.is_none() {
+                        lst.add_delimiter();
+                    } else {
+                        lst.add_child(&v.v_s_raw(0), vv2view(&v.v_(1), env, reg)?);
+                    }
+                }
+                Ok::<(), String>(())
+            })?;
+
+            Ok(auto_wrap_view!(lst, define, list, reg))
         }
         "button" => {
             let cb = define.v_k("cb");
