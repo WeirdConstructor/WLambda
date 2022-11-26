@@ -10461,7 +10461,7 @@
     "12.11.1.1 - $\\<Cursive\\>.run",
     [
       "",
-      "Start the event loop. You can only exit this event loop using `$<CursiveAPI>.quit[]`.",
+      "Start the event loop. You can only exit this event loop using `$<Cursive>.quit[]`.",
       ""
     ]
   ],
@@ -10474,7 +10474,7 @@
     ]
   ],
   [
-    "12.11.1.3 - $\\<CursiveAPI\\>.quit",
+    "12.11.1.3 - $\\<Cursive\\>.quit",
     [
       "",
       "Quit the main event loop.",
@@ -10930,7 +10930,7 @@
       "        title = \"title of the panel\", # Can be left out for no title.",
       "",
       "        # auto wrap properties:",
-      "        name  = \"view name\",    # Assign a name for $<CursiveAPI>.named",
+      "        name  = \"view name\",    # Assign a name for $<Cursive>.named",
       "        scrollable = $true,     # Make the view scrollable",
       "        width = :free,          # Width size definition, see above under size-def",
       "        height = :free,         # Height size definition, see above under size-def",

@@ -495,7 +495,7 @@ Smalltalk, LISP and Perl.
     - [12.11.1](#12111-stdcursivenew) std:cursive:new
       - [12.11.1.1](#121111-cursiverun) $\<Cursive\>.run
       - [12.11.1.2](#121112-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer view-def
-      - [12.11.1.3](#121113-cursiveapiquit) $\<CursiveAPI\>.quit
+      - [12.11.1.3](#121113-cursivequit) $\<Cursive\>.quit
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -9130,13 +9130,13 @@ c.run[];
 
 ##### <a name="121111-cursiverun"></a>12.11.1.1 - $\<Cursive\>.run
 
-Start the event loop. You can only exit this event loop using `$<CursiveAPI>.quit[]`.
+Start the event loop. You can only exit this event loop using `$<Cursive>.quit[]`.
 
 ##### <a name="121112-cursiveaddlayer-view-def"></a>12.11.1.2 - $\<Cursive\>.add\_layer view-def
 
 Adds the `view-def` view as layer to the TUI.
 
-##### <a name="121113-cursiveapiquit"></a>12.11.1.3 - $\<CursiveAPI\>.quit
+##### <a name="121113-cursivequit"></a>12.11.1.3 - $\<Cursive\>.quit
 
 Quit the main event loop.
 
@@ -9563,7 +9563,7 @@ A panel is usually for visual separation and grouping of other views.
         title = "title of the panel", # Can be left out for no title.
 
         # auto wrap properties:
-        name  = "view name",    # Assign a name for $<CursiveAPI>.named
+        name  = "view name",    # Assign a name for $<Cursive>.named
         scrollable = $true,     # Make the view scrollable
         width = :free,          # Width size definition, see above under size-def
         height = :free,         # Height size definition, see above under size-def

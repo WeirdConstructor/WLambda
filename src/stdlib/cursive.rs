@@ -20,16 +20,17 @@ use std::rc::Rc;
 use cursive::view::{IntoBoxedView, Resizable, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Dialog, EditView, LinearLayout, Panel, StackView, ListView, TextView, ViewRef,
+    BoxedView, Button, Dialog, EditView, LinearLayout, ListView, Panel, StackView, TextView,
+    ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
 
 macro_rules! assert_arg_count {
-    ($self: ident, $argv: expr, $count: expr, $function: expr, $env: ident) => {
+    ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
         if $argv.len() != $count {
             return Err(StackAction::panic_str(
-                format!("{}.{} expects {} arguments", $self.s(), $function, $count),
+                format!("{}.{} expects {} arguments", $self, $function, $count),
                 None,
                 $env.argv(),
             ));
@@ -99,88 +100,13 @@ impl VValUserData for CursiveAPI {
 
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         let argv = env.argv();
+        let cursive: &mut Cursive = unsafe { &mut **self.ptr };
+        let ud = cursive
+            .user_data::<WLambdaCursiveContext>()
+            .expect("Userdata must be WLambdaCursiveContext!");
+        let reg = ud.get_registry();
 
-        match key {
-            "msg" => {
-                if argv.len() < 1 || argv.len() > 2 {
-                    return Err(StackAction::panic_str(
-                        "$<CursiveAPI>.msg([callback], text) expects 1 or 2 arguments".to_string(),
-                        None,
-                        env.argv(),
-                    ));
-                }
-
-                let cb = if argv.len() > 1 { argv.v_(0) } else { VVal::None };
-                let text = if argv.len() > 1 { argv.v_(1) } else { argv.v_(0) };
-                let denv = Rc::new(RefCell::new(env.derive()));
-
-                let cursive: &mut Cursive = unsafe { &mut **self.ptr };
-                cursive.add_layer(Dialog::around(TextView::new(&text.s_raw())).button(
-                    "Ok",
-                    move |s| {
-                        s.pop_layer();
-                        call_callback!(s, cb, denv);
-                    },
-                ));
-                Ok(VVal::None)
-            }
-            "focus" => {
-                assert_arg_count!(self, argv, 1, "focus[name]", env);
-                let cursive: &mut Cursive = unsafe { &mut **self.ptr };
-                argv.v_(0).with_s_ref(|s| {
-                    match cursive.focus_name(s) {
-                        Ok(_) => Ok(VVal::Bol(true)),
-                        Err(_) => Ok(VVal::Bol(false)),
-                    }
-                })
-            }
-            "get" => {
-                assert_arg_count!(self, argv, 1, "get[name]", env);
-
-                let cursive: &mut Cursive = unsafe { &mut **self.ptr };
-                let ud = cursive
-                    .user_data::<WLambdaCursiveContext>()
-                    .expect("Userdata must be WLambdaCursiveContext!");
-                let reg = ud.get_registry();
-
-                let name = argv.v_s_raw(0);
-
-                let viewtype = if let Some(typ) = reg.borrow().get(&name) {
-                    match &typ[..] {
-                        "stack" => ViewType::StackView,
-                        "button" => ViewType::Button,
-                        "edit" => ViewType::EditView,
-                        "panel" => ViewType::Panel,
-                        _ => {
-                            panic!(
-                                "Unknown viewtype encountered, fatal error in programming: {}",
-                                typ
-                            );
-                        }
-                    }
-                } else {
-                    return Err(StackAction::panic_str(
-                        format!("$<CursiveAPI>.get unknown name: '{}'", name),
-                        None,
-                        env.argv(),
-                    ));
-                };
-
-                Ok(VVal::new_usr(NamedViewHandle::new(self.ptr.clone(), &name[..], viewtype)))
-            }
-            "quit" => {
-                assert_arg_count!(self, argv, 0, "quit[]", env);
-
-                unsafe { (**self.ptr).quit() }
-
-                Ok(VVal::None)
-            }
-            _ => Err(StackAction::panic_str(
-                format!("$<CursiveAPI> unknown method called: {}", key),
-                None,
-                env.argv(),
-            )),
-        }
+        handle_cursive_call_method(key, &argv, env, cursive, &reg)
     }
 }
 
@@ -325,7 +251,7 @@ impl VValUserData for NamedViewHandle {
             },
             ViewType::Button => match key {
                 "set_label" => {
-                    assert_arg_count!(self, argv, 1, "set_label[text]", env);
+                    assert_arg_count!(self.s(), argv, 1, "set_label[text]", env);
                     access_named_view!(self, Button, view, env, {
                         view.set_label(argv.v_s_raw(0));
                         Ok(VVal::None)
@@ -335,14 +261,14 @@ impl VValUserData for NamedViewHandle {
             },
             ViewType::EditView => match key {
                 "set_content" => {
-                    assert_arg_count!(self, argv, 1, "set_content[new_text]", env);
+                    assert_arg_count!(self.s(), argv, 1, "set_content[new_text]", env);
                     access_named_view_ctx!(self, cursive, EditView, view, env, {
                         (view.set_content(argv.v_s_raw(0)))(cursive);
                         Ok(VVal::None)
                     })
                 }
                 "content" => {
-                    assert_arg_count!(self, argv, 0, "content[]", env);
+                    assert_arg_count!(self.s(), argv, 0, "content[]", env);
                     access_named_view_ctx!(self, cursive, EditView, view, env, {
                         Ok(VVal::new_str(&view.get_content()))
                     })
@@ -351,14 +277,14 @@ impl VValUserData for NamedViewHandle {
             },
             ViewType::StackView => match key {
                 "pop_layer" => {
-                    assert_arg_count!(self, argv, 0, "pop_layer[]", env);
+                    assert_arg_count!(self.s(), argv, 0, "pop_layer[]", env);
                     access_named_view!(self, StackView, view, env, {
                         view.pop_layer();
                         Ok(VVal::None)
                     })
                 }
                 "add_layer" => {
-                    assert_arg_count!(self, argv, 1, "add_layer[view]", env);
+                    assert_arg_count!(self.s(), argv, 1, "add_layer[view]", env);
                     expect_view!(
                         &argv.v_(0),
                         "$<NamedViewHandle>.add_layer",
@@ -590,6 +516,121 @@ fn vv2view(
     }
 }
 
+pub fn handle_cursive_call_method(
+    method: &str,
+    argv: &VVal,
+    env: &mut Env,
+    cursive: &mut Cursive,
+    reg: &ViewNameRegistry,
+) -> Result<VVal, StackAction> {
+    let ptr: *mut Cursive = cursive;
+
+    match method {
+        "add_layer" => {
+            assert_arg_count!("$<Cursive>", argv, 1, "add_layer[view]", env);
+            expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_layer", new_view, reg, env, {
+                cursive.add_layer(new_view);
+                Ok(VVal::None)
+            })
+        }
+        "run" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "run[]", env);
+            cursive.run();
+            Ok(VVal::None)
+        }
+        "sender" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "sender[]", env);
+            Ok(VVal::new_usr(SendMessageHandle { cb: cursive.cb_sink().clone() }))
+        }
+        "register_cb" => {
+            assert_arg_count!("$<Cursive>", argv, 2, "register_cb[event_tag, callback_fun]", env);
+            let tag = argv.v_s_raw(0);
+            let cb = argv.v_(1);
+            let denv = Rc::new(RefCell::new(env.derive()));
+
+            if let Some(ud) = cursive.user_data::<WLambdaCursiveContext>() {
+                ud.callbacks.insert(
+                    tag,
+                    Some(Box::new(move |s: &mut Cursive, v: VVal| {
+                        call_callback!(s, cb, denv, v);
+                    })),
+                );
+            }
+
+            Ok(VVal::None)
+        }
+        "msg" => {
+            if argv.len() < 1 || argv.len() > 2 {
+                return Err(StackAction::panic_str(
+                    "$<CursiveAPI>.msg([callback], text) expects 1 or 2 arguments".to_string(),
+                    None,
+                    env.argv(),
+                ));
+            }
+
+            let cb = if argv.len() > 1 { argv.v_(0) } else { VVal::None };
+            let text = if argv.len() > 1 { argv.v_(1) } else { argv.v_(0) };
+            let denv = Rc::new(RefCell::new(env.derive()));
+
+            cursive.add_layer(Dialog::around(TextView::new(&text.s_raw())).button(
+                "Ok",
+                move |s| {
+                    s.pop_layer();
+                    call_callback!(s, cb, denv);
+                },
+            ));
+            Ok(VVal::None)
+        }
+        "focus" => {
+            assert_arg_count!("$<Cursive>", argv, 1, "focus[name]", env);
+            argv.v_(0).with_s_ref(|s| match cursive.focus_name(s) {
+                Ok(_) => Ok(VVal::Bol(true)),
+                Err(_) => Ok(VVal::Bol(false)),
+            })
+        }
+        "get" => {
+            assert_arg_count!("$<Cursive>", argv, 1, "get[name]", env);
+
+            let name = argv.v_s_raw(0);
+
+            let viewtype = if let Some(typ) = reg.borrow().get(&name) {
+                match &typ[..] {
+                    "stack" => ViewType::StackView,
+                    "button" => ViewType::Button,
+                    "edit" => ViewType::EditView,
+                    "panel" => ViewType::Panel,
+                    _ => {
+                        panic!(
+                            "Unknown viewtype encountered, fatal error in programming: {}",
+                            typ
+                        );
+                    }
+                }
+            } else {
+                return Err(StackAction::panic_str(
+                    format!("$<CursiveAPI>.get unknown name: '{}'", name),
+                    None,
+                    env.argv(),
+                ));
+            };
+
+            Ok(VVal::new_usr(NamedViewHandle::new(Rc::new(ptr), &name[..], viewtype)))
+        }
+        "quit" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "quit[]", env);
+
+            cursive.quit();
+
+            Ok(VVal::None)
+        }
+        _ => Err(StackAction::panic_str(
+            format!("$<Cursive> unknown method called: {}", method),
+            None,
+            env.argv(),
+        )),
+    }
+}
+
 #[cfg(feature = "cursive")]
 impl VValUserData for CursiveHandle {
     fn s(&self) -> String {
@@ -604,56 +645,7 @@ impl VValUserData for CursiveHandle {
 
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         let argv = env.argv();
-
-        match key {
-            "add_layer" => {
-                assert_arg_count!(self, argv, 1, "add_layer[view]", env);
-                expect_view!(
-                    &argv.v_(0),
-                    "$<NamedViewHandle>.add_layer",
-                    new_view,
-                    self.reg,
-                    env,
-                    {
-                        self.cursive.borrow_mut().add_layer(new_view);
-                        Ok(VVal::None)
-                    }
-                )
-            }
-            "run" => {
-                assert_arg_count!(self, argv, 0, "run[]", env);
-                self.cursive.borrow_mut().run();
-                Ok(VVal::None)
-            }
-            "sender" => {
-                assert_arg_count!(self, argv, 0, "sender[]", env);
-                Ok(VVal::new_usr(SendMessageHandle {
-                    cb: self.cursive.borrow_mut().cb_sink().clone(),
-                }))
-            }
-            "register_cb" => {
-                assert_arg_count!(self, argv, 2, "register_cb[event_tag, callback_fun]", env);
-                let tag = argv.v_s_raw(0);
-                let cb = argv.v_(1);
-                let denv = Rc::new(RefCell::new(env.derive()));
-
-                if let Some(ud) = self.cursive.borrow_mut().user_data::<WLambdaCursiveContext>() {
-                    ud.callbacks.insert(
-                        tag,
-                        Some(Box::new(move |s: &mut Cursive, v: VVal| {
-                            call_callback!(s, cb, denv, v);
-                        })),
-                    );
-                }
-
-                Ok(VVal::None)
-            }
-            _ => Err(StackAction::panic_str(
-                format!("$<Cursive> unknown method called: {}", key),
-                None,
-                env.argv(),
-            )),
-        }
+        handle_cursive_call_method(key, &argv, env, &mut self.cursive.borrow_mut(), &self.reg)
     }
 }
 
