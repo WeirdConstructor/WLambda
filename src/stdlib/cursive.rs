@@ -21,7 +21,7 @@ use cursive::view::{IntoBoxedView, Resizable, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
     BoxedView, Button, Dialog, EditView, LinearLayout, ListView, Panel, StackView, TextView,
-    ViewRef,
+    ViewRef, TextContent,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
@@ -67,6 +67,10 @@ macro_rules! call_callback {
             );
         }
     }};
+}
+
+thread_local! {
+    static CURSIVE_STDOUT: RefCell<TextContent> = RefCell::new(TextContent::new(""));
 }
 
 #[cfg(feature = "cursive")]
@@ -512,6 +516,11 @@ fn vv2view(
 
             Ok(auto_wrap_view!(view, define, button, reg))
         }
+        "stdout" => {
+            let textcontent = CURSIVE_STDOUT.with(|cs| cs.borrow().clone());
+            let view = TextView::new_with_content(textcontent);
+            Ok(auto_wrap_view!(view, define, textview, reg))
+        }
         _ => Err(format!("Unknown view type: '{}'", typ.s())),
     }
 }
@@ -541,6 +550,27 @@ pub fn handle_cursive_call_method(
         "sender" => {
             assert_arg_count!("$<Cursive>", argv, 0, "sender[]", env);
             Ok(VVal::new_usr(SendMessageHandle { cb: cursive.cb_sink().clone() }))
+        }
+        "set_window_title" => {
+            assert_arg_count!("$<Cursive>", argv, 1, "set_window_title[title_string]", env);
+            argv.v_(0).with_s_ref(|s|
+                cursive.set_window_title(s));
+            Ok(VVal::None)
+        }
+        "init_console_logging" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "init_console_logging[]", env);
+            cursive::logger::init();
+            Ok(VVal::None)
+        }
+        "toggle_debug_console" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "toggle_debug_console[]", env);
+            cursive.toggle_debug_console();
+            Ok(VVal::None)
+        }
+        "show_debug_console" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "show_debug_console[]", env);
+            cursive.show_debug_console();
+            Ok(VVal::None)
         }
         "register_cb" => {
             assert_arg_count!("$<Cursive>", argv, 2, "register_cb[event_tag, callback_fun]", env);
@@ -717,12 +747,44 @@ impl VValUserData for SendMessageHandle {
     }
 }
 
+struct CursiveStdoutWriter();
+
+impl std::io::Write for CursiveStdoutWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        CURSIVE_STDOUT.with(|cs| {
+            let s = String::from_utf8_lossy(buf);
+            cs.borrow_mut().append(s);
+        });
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 #[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {
     #[cfg(feature = "cursive")]
     st.fun(
         "cursive:new",
         |env: &mut Env, _argc: usize| Ok(VVal::new_usr(CursiveHandle::new())),
+        Some(0),
+        Some(0),
+        false,
+    );
+
+    #[cfg(feature = "cursive")]
+    st.fun(
+        "cursive:install_cursive_stdio",
+        |env: &mut Env, _argc: usize| {
+            let stdio = crate::vval::Stdio {
+                write: Rc::new(RefCell::new(CursiveStdoutWriter())),
+                read: Rc::new(RefCell::new(std::io::BufReader::new(std::io::stdin()))),
+            };
+            env.set_stdio(stdio);
+            Ok(VVal::None)
+        },
         Some(0),
         Some(0),
         false,
