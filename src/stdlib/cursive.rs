@@ -17,11 +17,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[cfg(feature = "cursive")]
-use cursive::view::{IntoBoxedView, Resizable, Scrollable, SizeConstraint};
+use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Dialog, EditView, LinearLayout, ListView, Panel, StackView, TextView,
-    ViewRef, TextContent,
+    BoxedView, Button, Dialog, EditView, LinearLayout, ListView, Panel, RadioGroup, StackView,
+    TextContent, TextView, ViewRef, RadioButton,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
@@ -158,6 +158,8 @@ enum ViewType {
     EditView,
     Button,
     Panel,
+    TextView,
+    RadioButton,
 }
 
 #[cfg(feature = "cursive")]
@@ -186,7 +188,7 @@ impl NamedViewHandle {
 }
 
 macro_rules! access_named_view_ctx {
-    ($self: ident, $cursive: ident, $type: ident, $name: ident, $env: ident, $block: tt) => {{
+    ($self: ident, $cursive: ident, $type: ty, $name: ident, $env: ident, $block: tt) => {{
         let $cursive: &mut Cursive = unsafe { &mut **$self.ptr };
         let view: Option<ViewRef<$type>> = $cursive.find_name(&$self.name);
         #[allow(unused_mut)]
@@ -279,6 +281,39 @@ impl VValUserData for NamedViewHandle {
                 }
                 _ => named_view_error!(self, env, key),
             },
+            ViewType::TextView => match key {
+                "set_content" => {
+                    assert_arg_count!(self.s(), argv, 1, "set_content[new_text]", env);
+                    access_named_view_ctx!(self, cursive, TextView, view, env, {
+                        view.set_content(argv.v_s_raw(0));
+                        Ok(VVal::None)
+                    })
+                }
+                "append" => {
+                    assert_arg_count!(self.s(), argv, 1, "append[text]", env);
+                    access_named_view_ctx!(self, cursive, TextView, view, env, {
+                        view.append(argv.v_s_raw(0));
+                        Ok(VVal::None)
+                    })
+                }
+                _ => named_view_error!(self, env, key),
+            },
+            ViewType::RadioButton => match key {
+                "select" => {
+                    assert_arg_count!(self.s(), argv, 0, "select[]", env);
+                    access_named_view_ctx!(self, cursive, RadioButton<VVal>, view, env, {
+                        view.select();
+                        Ok(VVal::None)
+                    })
+                }
+                "is_selected" => {
+                    assert_arg_count!(self.s(), argv, 0, "is_selected[]", env);
+                    access_named_view_ctx!(self, cursive, RadioButton<VVal>, view, env, {
+                        Ok(VVal::Bol(view.is_selected()))
+                    })
+                }
+                _ => named_view_error!(self, env, key),
+            },
             ViewType::StackView => match key {
                 "pop_layer" => {
                     assert_arg_count!(self.s(), argv, 0, "pop_layer[]", env);
@@ -342,13 +377,20 @@ macro_rules! auto_wrap_view {
         let size_w = vv2size_const(&$define.v_k("width"));
         let size_h = vv2size_const(&$define.v_k("height"));
 
-        let scrollable = $define.v_bk("scrollable");
+        let mut scroll_strat = None;
+        if $define.v_k("scroll").is_some() {
+            scroll_strat = Some(match &$define.v_s_rawk("scroll")[..] {
+                "top" => ScrollStrategy::StickToTop,
+                "bottom" => ScrollStrategy::StickToBottom,
+                _ => ScrollStrategy::KeepRow,
+            })
+        }
 
         if $define.v_k("name").is_some() {
             $reg.borrow_mut().insert($define.v_s_rawk("name"), stringify!($type).to_string());
 
             if size_w.is_some() || size_h.is_some() {
-                if scrollable {
+                if let Some(scroll_strat) = scroll_strat {
                     $view
                         .with_name($define.v_s_rawk("name"))
                         .resized(
@@ -356,6 +398,7 @@ macro_rules! auto_wrap_view {
                             size_h.unwrap_or(SizeConstraint::Free),
                         )
                         .scrollable()
+                        .scroll_strategy(scroll_strat)
                         .into_boxed_view()
                 } else {
                     $view
@@ -367,21 +410,26 @@ macro_rules! auto_wrap_view {
                         .into_boxed_view()
                 }
             } else {
-                if scrollable {
-                    $view.with_name($define.v_s_rawk("name")).scrollable().into_boxed_view()
+                if let Some(scroll_strat) = scroll_strat {
+                    $view
+                        .with_name($define.v_s_rawk("name"))
+                        .scrollable()
+                        .scroll_strategy(scroll_strat)
+                        .into_boxed_view()
                 } else {
                     $view.with_name($define.v_s_rawk("name")).into_boxed_view()
                 }
             }
         } else {
             if size_w.is_some() || size_h.is_some() {
-                if scrollable {
+                if let Some(scroll_strat) = scroll_strat {
                     $view
                         .resized(
                             size_w.unwrap_or(SizeConstraint::Free),
                             size_h.unwrap_or(SizeConstraint::Free),
                         )
                         .scrollable()
+                        .scroll_strategy(scroll_strat)
                         .into_boxed_view()
                 } else {
                     $view
@@ -392,8 +440,8 @@ macro_rules! auto_wrap_view {
                         .into_boxed_view()
                 }
             } else {
-                if scrollable {
-                    $view.scrollable().into_boxed_view()
+                if let Some(scroll_strat) = scroll_strat {
+                    $view.scrollable().scroll_strategy(scroll_strat).into_boxed_view()
                 } else {
                     $view.into_boxed_view()
                 }
@@ -422,7 +470,7 @@ fn vv2view(
                 Ok::<(), String>(())
             })?;
 
-            Ok(ll.into_boxed_view())
+            Ok(auto_wrap_view!(ll, define, linearlayout, reg))
         }
         "vbox" => {
             let mut ll = LinearLayout::new(Orientation::Vertical);
@@ -434,7 +482,7 @@ fn vv2view(
                 Ok::<(), String>(())
             })?;
 
-            Ok(ll.into_boxed_view())
+            Ok(auto_wrap_view!(ll, define, linearlayout, reg))
         }
         "panel" => {
             let (define, child) = (define.v_(0), define.v_(1));
@@ -459,8 +507,8 @@ fn vv2view(
                 edit.set_filler(define.v_s_rawk("filler"));
             }
 
-            if define.v_k("on_edit").is_some() {
-                let cb = define.v_k("on_edit");
+            if define.v_k("cb").is_some() {
+                let cb = define.v_k("cb");
                 let denv = Rc::new(RefCell::new(env.derive()));
                 edit.set_on_edit(move |s, text, cursor| {
                     call_callback!(s, cb, denv, VVal::new_str(text), VVal::Int(cursor as i64))
@@ -489,8 +537,8 @@ fn vv2view(
         "list" => {
             let mut lst = ListView::new();
 
-            if define.v_k("on_select").is_some() {
-                let cb = define.v_k("on_select");
+            if define.v_k("cb").is_some() {
+                let cb = define.v_k("cb");
                 let denv = Rc::new(RefCell::new(env.derive()));
                 lst.set_on_select(move |s, item| call_callback!(s, cb, denv, VVal::new_str(item)));
             }
@@ -515,6 +563,77 @@ fn vv2view(
             let view = Button::new(define.v_s_rawk("label"), move |s| call_callback!(s, cb, denv));
 
             Ok(auto_wrap_view!(view, define, button, reg))
+        }
+        "radio" => {
+            let orientation = if define.v_bk("horizontal") {
+                Orientation::Horizontal
+            } else {
+                Orientation::Vertical
+            };
+
+            let mut view = LinearLayout::new(orientation);
+            let mut group = RadioGroup::new();
+
+            if define.v_k("cb").is_some() {
+                let cb = define.v_k("cb");
+                let denv = Rc::new(RefCell::new(env.derive()));
+                group.set_on_change(move |s, v: &VVal| call_callback!(s, cb, denv, v.clone()));
+            }
+
+            let prefix =
+                if define.v_k("name").is_some() { Some(define.v_s_rawk("name")) } else { None };
+
+            define.v_k("buttons").with_iter(|it| {
+                // v: Label => Value
+                let mut i = 0;
+                for (v, _) in it {
+                    let sub_view = group.button(v.v_(1), v.v_s_raw(0));
+
+                    if let Some(prefix) = &prefix {
+                        let name = format!("{}_{}", prefix.to_string(), i);
+                        i += 1;
+                        reg.borrow_mut().insert(name.clone(), "radiobutton".to_string());
+
+                        view.add_child(sub_view.with_name(name));
+                    } else {
+                        view.add_child(sub_view);
+                    }
+                }
+            });
+
+            Ok(auto_wrap_view!(view, define, linearlayout, reg))
+        }
+        "textview" => {
+            let mut view = TextView::new(define.v_s_rawk("content"));
+            if define.v_bk("no_wrap") {
+                view.set_content_wrap(false);
+            }
+
+            let view = if define.v_k("h_align").is_some() {
+                let halign = define.v_s_rawk("h_align");
+                let halign = match &halign[..] {
+                    "right" => cursive::align::HAlign::Right,
+                    "center" => cursive::align::HAlign::Center,
+                    _ => cursive::align::HAlign::Left,
+                };
+                view.h_align(halign)
+            } else {
+                view
+            };
+
+            let view = if define.v_k("v_align").is_some() {
+                let valign = define.v_s_rawk("v_align");
+                let valign = match &valign[..] {
+                    "bottom" => cursive::align::VAlign::Bottom,
+                    "center" => cursive::align::VAlign::Center,
+                    _ => cursive::align::VAlign::Top,
+                };
+                view.v_align(valign)
+            } else {
+                view
+            };
+
+            Ok(auto_wrap_view!(view, define, textview, reg))
         }
         "stdout" => {
             let textcontent = CURSIVE_STDOUT.with(|cs| cs.borrow().clone());
@@ -553,8 +672,7 @@ pub fn handle_cursive_call_method(
         }
         "set_window_title" => {
             assert_arg_count!("$<Cursive>", argv, 1, "set_window_title[title_string]", env);
-            argv.v_(0).with_s_ref(|s|
-                cursive.set_window_title(s));
+            argv.v_(0).with_s_ref(|s| cursive.set_window_title(s));
             Ok(VVal::None)
         }
         "init_console_logging" => {
@@ -629,11 +747,10 @@ pub fn handle_cursive_call_method(
                     "button" => ViewType::Button,
                     "edit" => ViewType::EditView,
                     "panel" => ViewType::Panel,
+                    "textview" => ViewType::TextView,
+                    "radiobutton" => ViewType::RadioButton,
                     _ => {
-                        panic!(
-                            "Unknown viewtype encountered, fatal error in programming: {}",
-                            typ
-                        );
+                        panic!("Unknown viewtype encountered, fatal error in programming: {}", typ);
                     }
                 }
             } else {

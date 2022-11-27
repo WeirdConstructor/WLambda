@@ -5198,6 +5198,15 @@ impl VVal {
         }
     }
 
+    /// Returns true if this value is a user value of type T.
+    pub fn is_usr<T: 'static>(&mut self) -> bool {
+        if let VVal::Usr(bx) = self {
+            bx.as_any().is::<T>()
+        } else {
+            false
+        }
+    }
+
     /// Accesses the user data of type T directly.
     /// If the user data is not of that type it returns `None`.
     pub fn with_usr_ref<T: 'static, F, X>(&mut self, f: F) -> Option<X>
