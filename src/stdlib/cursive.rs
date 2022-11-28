@@ -20,8 +20,8 @@ use std::rc::Rc;
 use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Dialog, EditView, LinearLayout, ListView, Panel, RadioGroup, StackView,
-    TextContent, TextView, ViewRef, RadioButton,
+    BoxedView, Button, Dialog, EditView, LinearLayout, ListView, Panel, RadioButton, RadioGroup,
+    StackView, TextContent, TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
@@ -117,6 +117,7 @@ impl VValUserData for CursiveAPI {
 #[cfg(feature = "cursive")]
 struct WLambdaCursiveContext {
     callbacks: HashMap<String, Option<Box<dyn FnMut(&mut Cursive, VVal)>>>,
+    default_callbacks: HashMap<String, Option<Box<dyn FnMut(&mut Cursive, VVal)>>>,
     reg: ViewNameRegistry,
 }
 
@@ -125,7 +126,7 @@ impl WLambdaCursiveContext {
     pub fn new() -> Self {
         let reg = Rc::new(RefCell::new(HashMap::new()));
 
-        Self { callbacks: HashMap::new(), reg }
+        Self { callbacks: HashMap::new(), default_callbacks: HashMap::new(), reg }
     }
 
     pub fn get_registry(&self) -> ViewNameRegistry {
@@ -450,6 +451,58 @@ macro_rules! auto_wrap_view {
     }};
 }
 
+macro_rules! add_cb_handler {
+    ($cursive: ident, $define: ident, $env: ident, $view: ident, $func: ident, $event_str: literal $(,$args: ident)* : $($build: expr,)*) => {
+        {
+            if $define.v_k($event_str).is_some() {
+                let cb = $define.v_k($event_str);
+                let denv = Rc::new(RefCell::new($env.derive()));
+                $view.$func(move |s $(,$args)*| call_callback!(s, cb, denv $(,$build)*));
+
+            } else {
+                add_default_cb!($cursive, $define, $env, $view, $func, $event_str $(,$args)* : $($build,)*);
+            }
+        }
+    }
+}
+
+macro_rules! add_default_cb {
+    ($cursive: ident, $define: ident, $env: ident, $view: ident, $func: ident, $event_str: literal $(,$args: ident)* : $($build: expr,)*) => {
+        {
+//            let denv = Rc::new(RefCell::new($env.derive()));
+            let cb_name = if $define.v_k("name").is_some() {
+                $define.v_s_rawk("name")
+            } else {
+                "*".to_string()
+            };
+
+            $view.$func(move |$cursive $(,$args)*| {
+                let mut cb = if let Some(ud) = $cursive.user_data::<WLambdaCursiveContext>() {
+                    ud.default_callbacks.get_mut(&cb_name).map(|t| t.take()).flatten()
+                } else {
+                    None
+                };
+
+                if let Some(cb) = cb.as_mut() {
+                    let value = VVal::vec();
+
+                    for arg in [VVal::new_str($event_str), $($build,)*] {
+                        value.push(arg);
+                    }
+
+                    (cb)($cursive, value);
+                }
+
+                if let Some(ud) = $cursive.user_data::<WLambdaCursiveContext>() {
+                    if let Some(map_cb) = ud.default_callbacks.get_mut(&cb_name) {
+                        std::mem::swap(map_cb, &mut cb);
+                    }
+                }
+            });
+        }
+    }
+}
+
 #[cfg(feature = "cursive")]
 fn vv2view(
     v: &VVal,
@@ -507,19 +560,26 @@ fn vv2view(
                 edit.set_filler(define.v_s_rawk("filler"));
             }
 
-            if define.v_k("cb").is_some() {
-                let cb = define.v_k("cb");
-                let denv = Rc::new(RefCell::new(env.derive()));
-                edit.set_on_edit(move |s, text, cursor| {
-                    call_callback!(s, cb, denv, VVal::new_str(text), VVal::Int(cursor as i64))
-                });
-            }
-
-            if define.v_k("on_submit").is_some() {
-                let cb = define.v_k("on_submit");
-                let denv = Rc::new(RefCell::new(env.derive()));
-                edit.set_on_submit(move |s, text| call_callback!(s, cb, denv, VVal::new_str(text)));
-            }
+            add_cb_handler!(
+                cursive,
+                define,
+                env,
+                edit,
+                set_on_edit,
+                "on_edit",
+                text,
+                cursor: VVal::new_str(text),
+                VVal::Int(cursor as i64),
+            );
+            add_cb_handler!(
+                cursive,
+                define,
+                env,
+                edit,
+                set_on_submit,
+                "on_submit",
+                text: VVal::new_str(text),
+            );
 
             Ok(auto_wrap_view!(edit, define, edit, reg))
         }
@@ -537,11 +597,15 @@ fn vv2view(
         "list" => {
             let mut lst = ListView::new();
 
-            if define.v_k("cb").is_some() {
-                let cb = define.v_k("cb");
-                let denv = Rc::new(RefCell::new(env.derive()));
-                lst.set_on_select(move |s, item| call_callback!(s, cb, denv, VVal::new_str(item)));
-            }
+            add_cb_handler!(
+                cursive,
+                define,
+                env,
+                lst,
+                set_on_select,
+                "on_select",
+                item: VVal::new_str(item),
+            );
 
             define.v_k("childs").with_iter(|it| {
                 for (v, _) in it {
@@ -557,10 +621,9 @@ fn vv2view(
             Ok(auto_wrap_view!(lst, define, list, reg))
         }
         "button" => {
-            let cb = define.v_k("cb");
-            let denv = Rc::new(RefCell::new(env.derive()));
+            let mut view = Button::new(define.v_s_rawk("label"), |_| ());
 
-            let view = Button::new(define.v_s_rawk("label"), move |s| call_callback!(s, cb, denv));
+            add_cb_handler!(cursive, define, env, view, set_callback, "on_press"  : );
 
             Ok(auto_wrap_view!(view, define, button, reg))
         }
@@ -572,13 +635,9 @@ fn vv2view(
             };
 
             let mut view = LinearLayout::new(orientation);
-            let mut group = RadioGroup::new();
+            let mut group: RadioGroup<VVal> = RadioGroup::new();
 
-            if define.v_k("cb").is_some() {
-                let cb = define.v_k("cb");
-                let denv = Rc::new(RefCell::new(env.derive()));
-                group.set_on_change(move |s, v: &VVal| call_callback!(s, cb, denv, v.clone()));
-            }
+            add_cb_handler!(cursive, define, env, group, set_on_change, "on_change", v : v.clone(),);
 
             let prefix =
                 if define.v_k("name").is_some() { Some(define.v_s_rawk("name")) } else { None };
@@ -690,7 +749,40 @@ pub fn handle_cursive_call_method(
             cursive.show_debug_console();
             Ok(VVal::None)
         }
-        "register_cb" => {
+        "default_cb" => {
+            assert_arg_count!(
+                "$<Cursive>",
+                argv,
+                2,
+                "view_default_cb[widget_name, callback_fun]",
+                env
+            );
+            let name = argv.v_s_raw(0);
+            let cb = argv.v_(1);
+            let denv = Rc::new(RefCell::new(env.derive()));
+
+            if let Some(ud) = cursive.user_data::<WLambdaCursiveContext>() {
+                ud.default_callbacks.insert(
+                    name,
+                    Some(Box::new(move |s: &mut Cursive, args: VVal| {
+                        if args.len() == 1 {
+                            call_callback!(s, cb, denv, args.v_(0));
+                        } else if args.len() == 2 {
+                            call_callback!(s, cb, denv, args.v_(0), args.v_(1));
+                        } else if args.len() == 3 {
+                            call_callback!(s, cb, denv, args.v_(0), args.v_(1), args.v_(2));
+                        } else if args.len() == 4 {
+                            call_callback!(s, cb, denv, args.v_(0), args.v_(1), args.v_(3));
+                        } else {
+                            panic!("There are no default callbacks implemented for more than 3 arguments!");
+                        }
+                    })),
+                );
+            }
+
+            Ok(VVal::None)
+        }
+        "send_cb" => {
             assert_arg_count!("$<Cursive>", argv, 2, "register_cb[event_tag, callback_fun]", env);
             let tag = argv.v_s_raw(0);
             let cb = argv.v_(1);
