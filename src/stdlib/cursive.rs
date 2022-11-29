@@ -20,8 +20,8 @@ use std::rc::Rc;
 use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Dialog, EditView, LinearLayout, ListView, Panel, RadioButton, RadioGroup,
-    StackView, TextContent, TextView, ViewRef,
+    BoxedView, Button, Checkbox, Dialog, EditView, LinearLayout, ListView, Panel, RadioButton,
+    RadioGroup, SliderView, StackView, TextContent, TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
@@ -145,6 +145,10 @@ struct CursiveHandle {
 impl CursiveHandle {
     pub fn new() -> Self {
         let cursive = Rc::new(RefCell::new(Cursive::new()));
+//        cursive.borrow_mut().add_global_callback('c', |s| {
+//            cursive::reexports::log::set_max_level(cursive::reexports::log::LevelFilter::Info);
+//            s.toggle_debug_console()
+//        });
         let ud = WLambdaCursiveContext::new();
         let reg = ud.get_registry();
         cursive.borrow_mut().set_user_data(ud);
@@ -161,6 +165,8 @@ enum ViewType {
     Panel,
     TextView,
     RadioButton,
+    Checkbox,
+    Slider,
 }
 
 #[cfg(feature = "cursive")]
@@ -315,6 +321,44 @@ impl VValUserData for NamedViewHandle {
                 }
                 _ => named_view_error!(self, env, key),
             },
+            ViewType::Checkbox => match key {
+                "set_checked" => {
+                    assert_arg_count!(self.s(), argv, 1, "set_checked[bool]", env);
+                    access_named_view_ctx!(self, cursive, Checkbox, view, env, {
+                        view.set_checked(argv.v_b(0));
+                        Ok(VVal::None)
+                    })
+                }
+                "is_checked" => {
+                    assert_arg_count!(self.s(), argv, 0, "is_checked[]", env);
+                    access_named_view_ctx!(self, cursive, Checkbox, view, env, {
+                        Ok(VVal::Bol(view.is_checked()))
+                    })
+                }
+                _ => named_view_error!(self, env, key),
+            },
+            ViewType::Slider => match key {
+                "set_value" => {
+                    assert_arg_count!(self.s(), argv, 1, "set_value[num]", env);
+                    access_named_view_ctx!(self, cursive, SliderView, view, env, {
+                        view.set_value(argv.v_i(0) as usize);
+                        Ok(VVal::None)
+                    })
+                }
+                "max" => {
+                    assert_arg_count!(self.s(), argv, 0, "max[]", env);
+                    access_named_view_ctx!(self, cursive, SliderView, view, env, {
+                        Ok(VVal::Int(view.get_max_value() as i64))
+                    })
+                }
+                "value" => {
+                    assert_arg_count!(self.s(), argv, 0, "value[]", env);
+                    access_named_view_ctx!(self, cursive, SliderView, view, env, {
+                        Ok(VVal::Int(view.get_value() as i64))
+                    })
+                }
+                _ => named_view_error!(self, env, key),
+            },
             ViewType::StackView => match key {
                 "pop_layer" => {
                     assert_arg_count!(self.s(), argv, 0, "pop_layer[]", env);
@@ -373,8 +417,32 @@ fn vv2size_const(v: &VVal) -> Option<SizeConstraint> {
     None
 }
 
+macro_rules! wrap_scroll_view {
+    ($view: expr, $define: ident, $reg: expr, $cursive: ident, $env: ident) => {
+        {
+            if $define.v_k("scroll_name").is_some() {
+                $reg.borrow_mut().insert($define.v_s_rawk("scroll_name"), "scrollview".to_string());
+            }
+
+            let mut v = $view;
+
+            add_cb_handler!(
+                $cursive,
+                $define,
+                $env,
+                v,
+                set_on_scroll_change,
+                "on_scroll_change",
+                rect: VVal::ivec4(rect.left() as i64, rect.top() as i64, rect.right() as i64, rect.bottom() as i64),
+            );
+
+            v
+        }
+    }
+}
+
 macro_rules! auto_wrap_view {
-    ($view: expr, $define: ident, $type: ident, $reg: expr) => {{
+    ($view: expr, $define: ident, $type: ident, $reg: expr, $cursive: ident, $env: ident) => {{
         let size_w = vv2size_const(&$define.v_k("width"));
         let size_h = vv2size_const(&$define.v_k("height"));
 
@@ -457,10 +525,10 @@ macro_rules! add_cb_handler {
             if $define.v_k($event_str).is_some() {
                 let cb = $define.v_k($event_str);
                 let denv = Rc::new(RefCell::new($env.derive()));
-                $view.$func(move |s $(,$args)*| call_callback!(s, cb, denv $(,$build)*));
+                $view.$func(move |s $(,$args)*| call_callback!(s, cb, denv $(,$build)*))
 
             } else {
-                add_default_cb!($cursive, $define, $env, $view, $func, $event_str $(,$args)* : $($build,)*);
+                add_default_cb!($cursive, $define, $env, $view, $func, $event_str $(,$args)* : $($build,)*)
             }
         }
     }
@@ -498,7 +566,7 @@ macro_rules! add_default_cb {
                         std::mem::swap(map_cb, &mut cb);
                     }
                 }
-            });
+            })
         }
     }
 }
@@ -512,7 +580,9 @@ fn vv2view(
     let typ = v.v_(0);
     let define = v.v_(1);
 
-    match &typ.s_raw()[..] {
+    let typ_str = &typ.s_raw()[..];
+
+    match typ_str {
         "hbox" => {
             let mut ll = LinearLayout::new(Orientation::Horizontal);
             define.with_iter(|it| {
@@ -523,7 +593,7 @@ fn vv2view(
                 Ok::<(), String>(())
             })?;
 
-            Ok(auto_wrap_view!(ll, define, linearlayout, reg))
+            Ok(auto_wrap_view!(ll, define, linearlayout, reg, cursive, env))
         }
         "vbox" => {
             let mut ll = LinearLayout::new(Orientation::Vertical);
@@ -535,7 +605,7 @@ fn vv2view(
                 Ok::<(), String>(())
             })?;
 
-            Ok(auto_wrap_view!(ll, define, linearlayout, reg))
+            Ok(auto_wrap_view!(ll, define, linearlayout, reg, cursive, env))
         }
         "panel" => {
             let (define, child) = (define.v_(0), define.v_(1));
@@ -543,7 +613,7 @@ fn vv2view(
             if define.v_k("title").is_some() {
                 pnl.set_title(define.v_s_rawk("title"));
             }
-            Ok(auto_wrap_view!(pnl, define, panel, reg))
+            Ok(auto_wrap_view!(pnl, define, panel, reg, cursive, env))
         }
         "edit" => {
             let mut edit = EditView::new();
@@ -581,7 +651,7 @@ fn vv2view(
                 text: VVal::new_str(text),
             );
 
-            Ok(auto_wrap_view!(edit, define, edit, reg))
+            Ok(auto_wrap_view!(edit, define, edit, reg, cursive, env))
         }
         "stack" => {
             let mut stk = StackView::new();
@@ -592,7 +662,7 @@ fn vv2view(
                 Ok::<(), String>(())
             })?;
 
-            Ok(auto_wrap_view!(stk, define, stack, reg))
+            Ok(auto_wrap_view!(stk, define, stack, reg, cursive, env))
         }
         "list" => {
             let mut lst = ListView::new();
@@ -618,14 +688,14 @@ fn vv2view(
                 Ok::<(), String>(())
             })?;
 
-            Ok(auto_wrap_view!(lst, define, list, reg))
+            Ok(auto_wrap_view!(lst, define, list, reg, cursive, env))
         }
         "button" => {
             let mut view = Button::new(define.v_s_rawk("label"), |_| ());
 
             add_cb_handler!(cursive, define, env, view, set_callback, "on_press"  : );
 
-            Ok(auto_wrap_view!(view, define, button, reg))
+            Ok(auto_wrap_view!(view, define, button, reg, cursive, env))
         }
         "radio" => {
             let orientation = if define.v_bk("horizontal") {
@@ -660,7 +730,57 @@ fn vv2view(
                 }
             });
 
-            Ok(auto_wrap_view!(view, define, linearlayout, reg))
+            Ok(auto_wrap_view!(view, define, linearlayout, reg, cursive, env))
+        }
+        "checkbox" => {
+            let mut view = if define.v_bk("checked") {
+                Checkbox::new().with_checked(true)
+            } else {
+                Checkbox::new().with_checked(false)
+            };
+
+            add_cb_handler!(
+                cursive,
+                define,
+                env,
+                view,
+                set_on_change,
+                "on_change",
+                checked: VVal::Bol(checked),
+            );
+
+            Ok(auto_wrap_view!(view, define, checkbox, reg, cursive, env))
+        }
+        "hslider" | "vslider" => {
+            let mut view = if typ_str == "vslider" {
+                SliderView::vertical(define.v_ik("max") as usize)
+            } else {
+                SliderView::horizontal(define.v_ik("max") as usize)
+            };
+
+            view.set_value(define.v_ik("value") as usize);
+
+            let view = add_cb_handler!(
+                cursive,
+                define,
+                env,
+                view,
+                on_change,
+                "on_change",
+                value: VVal::Int(value as i64),
+            );
+
+            let view = add_cb_handler!(
+                cursive,
+                define,
+                env,
+                view,
+                on_enter,
+                "on_enter",
+                value: VVal::Int(value as i64),
+            );
+
+            Ok(auto_wrap_view!(view, define, slider, reg, cursive, env))
         }
         "textview" => {
             let mut view = TextView::new(define.v_s_rawk("content"));
@@ -692,12 +812,12 @@ fn vv2view(
                 view
             };
 
-            Ok(auto_wrap_view!(view, define, textview, reg))
+            Ok(auto_wrap_view!(view, define, textview, reg, cursive, env))
         }
         "stdout" => {
             let textcontent = CURSIVE_STDOUT.with(|cs| cs.borrow().clone());
             let view = TextView::new_with_content(textcontent);
-            Ok(auto_wrap_view!(view, define, textview, reg))
+            Ok(auto_wrap_view!(view, define, textview, reg, cursive, env))
         }
         _ => Err(format!("Unknown view type: '{}'", typ.s())),
     }
@@ -841,6 +961,8 @@ pub fn handle_cursive_call_method(
                     "panel" => ViewType::Panel,
                     "textview" => ViewType::TextView,
                     "radiobutton" => ViewType::RadioButton,
+                    "checkbox" => ViewType::Checkbox,
+                    "slider" => ViewType::Slider,
                     _ => {
                         panic!("Unknown viewtype encountered, fatal error in programming: {}", typ);
                     }
