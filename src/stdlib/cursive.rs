@@ -21,7 +21,7 @@ use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeCo
 #[cfg(feature = "cursive")]
 use cursive::views::{
     BoxedView, Button, Checkbox, Dialog, EditView, LinearLayout, ListView, Panel, RadioButton,
-    RadioGroup, SliderView, StackView, TextContent, TextView, ViewRef,
+    RadioGroup, SelectView, SliderView, StackView, TextContent, TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
@@ -60,7 +60,7 @@ macro_rules! call_callback {
         if !api.this_is_the_only_strong_ref() {
             $cursive.add_layer(
                 Dialog::around(TextView::new(format!(
-                    "You must never store $<CursiveAPI> from a callback: {}",
+                    "You must never store $<Cursive> from a callback: {}",
                     $cb.s()
                 )))
                 .button("Quit", |s| s.quit()),
@@ -93,7 +93,7 @@ impl CursiveAPI {
 #[cfg(feature = "cursive")]
 impl VValUserData for CursiveAPI {
     fn s(&self) -> String {
-        format!("$<CursiveAPI>")
+        format!("$<Cursive>")
     }
     fn as_any(&mut self) -> &mut dyn std::any::Any {
         self
@@ -145,10 +145,10 @@ struct CursiveHandle {
 impl CursiveHandle {
     pub fn new() -> Self {
         let cursive = Rc::new(RefCell::new(Cursive::new()));
-//        cursive.borrow_mut().add_global_callback('c', |s| {
-//            cursive::reexports::log::set_max_level(cursive::reexports::log::LevelFilter::Info);
-//            s.toggle_debug_console()
-//        });
+        //        cursive.borrow_mut().add_global_callback('c', |s| {
+        //            cursive::reexports::log::set_max_level(cursive::reexports::log::LevelFilter::Info);
+        //            s.toggle_debug_console()
+        //        });
         let ud = WLambdaCursiveContext::new();
         let reg = ud.get_registry();
         cursive.borrow_mut().set_user_data(ud);
@@ -167,6 +167,7 @@ enum ViewType {
     RadioButton,
     Checkbox,
     Slider,
+    SelectView,
 }
 
 #[cfg(feature = "cursive")]
@@ -355,6 +356,50 @@ impl VValUserData for NamedViewHandle {
                     assert_arg_count!(self.s(), argv, 0, "value[]", env);
                     access_named_view_ctx!(self, cursive, SliderView, view, env, {
                         Ok(VVal::Int(view.get_value() as i64))
+                    })
+                }
+                _ => named_view_error!(self, env, key),
+            },
+            ViewType::SelectView => match key {
+                "clear" => {
+                    assert_arg_count!(self.s(), argv, 0, "clear[]", env);
+                    access_named_view_ctx!(self, cursive, SelectView<VVal>, view, env, {
+                        view.clear();
+                        Ok(VVal::None)
+                    })
+                }
+                "add_item" => {
+                    assert_arg_count!(self.s(), argv, 2, "add_item[label, value]", env);
+                    access_named_view_ctx!(self, cursive, SelectView<VVal>, view, env, {
+                        view.add_item(argv.v_s_raw(0), argv.v_(1));
+                        Ok(VVal::None)
+                    })
+                }
+                "selected_id" => {
+                    assert_arg_count!(self.s(), argv, 0, "selected_id[]", env);
+                    access_named_view_ctx!(self, cursive, SelectView<VVal>, view, env, {
+                        if let Some(id) = view.selected_id() {
+                            Ok(VVal::Int(id as i64))
+                        } else {
+                            Ok(VVal::None)
+                        }
+                    })
+                }
+                "selected" => {
+                    assert_arg_count!(self.s(), argv, 0, "selected[]", env);
+                    access_named_view_ctx!(self, cursive, SelectView<VVal>, view, env, {
+                        if let Some(val) = view.selection() {
+                            Ok((*val).clone())
+                        } else {
+                            Ok(VVal::None)
+                        }
+                    })
+                }
+                "set_selection" => {
+                    assert_arg_count!(self.s(), argv, 1, "set_selection[index]", env);
+                    access_named_view_ctx!(self, cursive, SelectView<VVal>, view, env, {
+                        (view.set_selection(argv.v_i(0) as usize))(cursive);
+                        Ok(VVal::None)
                     })
                 }
                 _ => named_view_error!(self, env, key),
@@ -782,6 +827,75 @@ fn vv2view(
 
             Ok(auto_wrap_view!(view, define, slider, reg, cursive, env))
         }
+        "select" => {
+            let mut view: SelectView<VVal> = SelectView::new();
+
+            define.v_k("items").with_iter(|it| {
+                for (v, _) in it {
+                    view.add_item(v.v_s_raw(0), v.v_(1));
+                }
+            });
+
+            if define.v_bk("popup") {
+                view.set_popup(true);
+            }
+
+            if define.v_bk("autojump") {
+                view.set_autojump(true);
+            }
+
+            add_cb_handler!(
+                cursive,
+                define,
+                env,
+                view,
+                set_on_select,
+                "on_select",
+                v: v.clone(),
+            );
+
+            add_cb_handler!(
+                cursive,
+                define,
+                env,
+                view,
+                set_on_submit,
+                "on_submit",
+                v: v.clone(),
+            );
+
+            let view = if define.v_k("h_align").is_some() {
+                let halign = define.v_s_rawk("h_align");
+                let halign = match &halign[..] {
+                    "right" => cursive::align::HAlign::Right,
+                    "center" => cursive::align::HAlign::Center,
+                    _ => cursive::align::HAlign::Left,
+                };
+                view.h_align(halign)
+            } else {
+                view
+            };
+
+            let view = if define.v_k("v_align").is_some() {
+                let valign = define.v_s_rawk("v_align");
+                let valign = match &valign[..] {
+                    "bottom" => cursive::align::VAlign::Bottom,
+                    "center" => cursive::align::VAlign::Center,
+                    _ => cursive::align::VAlign::Top,
+                };
+                view.v_align(valign)
+            } else {
+                view
+            };
+
+            let view = if define.v_k("select").is_some() {
+                view.selected(define.v_ik("select") as usize)
+            } else {
+                view
+            };
+
+            Ok(auto_wrap_view!(view, define, select, reg, cursive, env))
+        }
         "textview" => {
             let mut view = TextView::new(define.v_s_rawk("content"));
             if define.v_bk("no_wrap") {
@@ -922,7 +1036,7 @@ pub fn handle_cursive_call_method(
         "msg" => {
             if argv.len() < 1 || argv.len() > 2 {
                 return Err(StackAction::panic_str(
-                    "$<CursiveAPI>.msg([callback], text) expects 1 or 2 arguments".to_string(),
+                    "$<Cursive>.msg([callback], text) expects 1 or 2 arguments".to_string(),
                     None,
                     env.argv(),
                 ));
@@ -963,13 +1077,14 @@ pub fn handle_cursive_call_method(
                     "radiobutton" => ViewType::RadioButton,
                     "checkbox" => ViewType::Checkbox,
                     "slider" => ViewType::Slider,
+                    "select" => ViewType::SelectView,
                     _ => {
                         panic!("Unknown viewtype encountered, fatal error in programming: {}", typ);
                     }
                 }
             } else {
                 return Err(StackAction::panic_str(
-                    format!("$<CursiveAPI>.get unknown name: '{}'", name),
+                    format!("$<Cursive>.get unknown name: '{}'", name),
                     None,
                     env.argv(),
                 ));
