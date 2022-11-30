@@ -21,7 +21,7 @@ use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeCo
 #[cfg(feature = "cursive")]
 use cursive::views::{
     BoxedView, Button, Checkbox, Dialog, EditView, LinearLayout, ListView, Panel, RadioButton,
-    RadioGroup, SelectView, SliderView, StackView, TextContent, TextView, ViewRef,
+    RadioGroup, SelectView, SliderView, StackView, TextContent, TextView, TextArea, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
@@ -164,6 +164,7 @@ enum ViewType {
     Button,
     Panel,
     TextView,
+    TextArea,
     RadioButton,
     Checkbox,
     Slider,
@@ -302,6 +303,28 @@ impl VValUserData for NamedViewHandle {
                     access_named_view_ctx!(self, cursive, TextView, view, env, {
                         view.append(argv.v_s_raw(0));
                         Ok(VVal::None)
+                    })
+                }
+                _ => named_view_error!(self, env, key),
+            },
+            ViewType::TextArea => match key {
+                "set_content" => {
+                    assert_arg_count!(self.s(), argv, 1, "set_content[new_text]", env);
+                    access_named_view_ctx!(self, cursive, TextArea, view, env, {
+                        view.set_content(argv.v_s_raw(0));
+                        Ok(VVal::None)
+                    })
+                }
+                "cursor" => {
+                    assert_arg_count!(self.s(), argv, 0, "cursor[]", env);
+                    access_named_view_ctx!(self, cursive, TextArea, view, env, {
+                        Ok(VVal::Int(view.cursor() as i64))
+                    })
+                }
+                "content" => {
+                    assert_arg_count!(self.s(), argv, 0, "content[]", env);
+                    access_named_view_ctx!(self, cursive, TextArea, view, env, {
+                        Ok(VVal::new_str(view.get_content()))
                     })
                 }
                 _ => named_view_error!(self, env, key),
@@ -896,6 +919,15 @@ fn vv2view(
 
             Ok(auto_wrap_view!(view, define, select, reg, cursive, env))
         }
+        "textarea" => {
+            let mut view = TextArea::new();
+
+            if define.v_k("content").is_some() {
+                view.set_content(define.v_s_rawk("content"));
+            }
+
+            Ok(auto_wrap_view!(view, define, textarea, reg, cursive, env))
+        }
         "textview" => {
             let mut view = TextView::new(define.v_s_rawk("content"));
             if define.v_bk("no_wrap") {
@@ -1074,6 +1106,7 @@ pub fn handle_cursive_call_method(
                     "edit" => ViewType::EditView,
                     "panel" => ViewType::Panel,
                     "textview" => ViewType::TextView,
+                    "textarea" => ViewType::TextArea,
                     "radiobutton" => ViewType::RadioButton,
                     "checkbox" => ViewType::Checkbox,
                     "slider" => ViewType::Slider,
