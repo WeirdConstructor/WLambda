@@ -25,6 +25,8 @@ use cursive::views::{
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
+#[cfg(feature = "cursive")]
+use cursive::utils::Counter;
 
 macro_rules! assert_arg_count {
     ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
@@ -1226,6 +1228,62 @@ impl VValUserData for SendMessageHandle {
     }
 }
 
+#[cfg(feature = "cursive")]
+#[derive(Clone)]
+struct CursiveCounter {
+    counter: Counter,
+}
+
+#[cfg(feature = "cursive")]
+impl crate::threads::ThreadSafeUsr for CursiveCounter {
+    fn to_vval(&self) -> VVal {
+        VVal::Usr(Box::new(self.clone()))
+    }
+}
+
+#[cfg(feature = "cursive")]
+impl VValUserData for CursiveCounter {
+    fn s(&self) -> String {
+        format!("$<Cursive:Counter>")
+    }
+    fn as_any(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
+    }
+
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv();
+
+        match key {
+            "get" => {
+                assert_arg_count!(self.s(), argv, 0, "get[]", env);
+                Ok(VVal::Int(self.counter.get() as i64))
+            }
+            "set" => {
+                assert_arg_count!(self.s(), argv, 1, "set[value]", env);
+                self.counter.set(argv.v_i(0) as usize);
+                Ok(VVal::None)
+            }
+            "tick" => {
+                assert_arg_count!(self.s(), argv, 1, "tick[increments]", env);
+                self.counter.tick(argv.v_i(0) as usize);
+                Ok(VVal::None)
+            }
+            _ => Err(StackAction::panic_str(
+                format!("$<Cursive:Counter> unknown method called: {}", key),
+                None,
+                env.argv(),
+            )),
+        }
+    }
+
+    fn as_thread_safe_usr(&mut self) -> Option<Box<dyn crate::threads::ThreadSafeUsr>> {
+        Some(Box::new(self.clone()))
+    }
+}
+
 struct CursiveStdoutWriter();
 
 impl std::io::Write for CursiveStdoutWriter {
@@ -1248,6 +1306,15 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     st.fun(
         "cursive:new",
         |env: &mut Env, _argc: usize| Ok(VVal::new_usr(CursiveHandle::new())),
+        Some(0),
+        Some(0),
+        false,
+    );
+
+    #[cfg(feature = "cursive")]
+    st.fun(
+        "cursive:counter:new",
+        |env: &mut Env, _argc: usize| Ok(VVal::new_usr(CursiveCounter { counter: Counter::new(0) })),
         Some(0),
         Some(0),
         false,
