@@ -17,16 +17,17 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[cfg(feature = "cursive")]
+use cursive::utils::Counter;
+#[cfg(feature = "cursive")]
 use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Checkbox, Dialog, EditView, LinearLayout, ListView, Panel, RadioButton,
-    RadioGroup, SelectView, SliderView, StackView, TextContent, TextView, TextArea, ViewRef,
+    BoxedView, Button, Checkbox, Dialog, EditView, LinearLayout, ListView, Panel, ProgressBar,
+    RadioButton, RadioGroup, SelectView, SliderView, StackView, TextArea, TextContent, TextView,
+    ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
-#[cfg(feature = "cursive")]
-use cursive::utils::Counter;
 
 macro_rules! assert_arg_count {
     ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
@@ -67,6 +68,19 @@ macro_rules! call_callback {
                 )))
                 .button("Quit", |s| s.quit()),
             );
+        }
+    }};
+}
+
+macro_rules! call_plain_callback {
+    ($cb: ident, $env: ident $(,$args: expr)*) => {{
+        if $cb.is_some() {
+            match $cb.call(&mut $env.borrow_mut(), &[$($args,)*]) {
+                Ok(v) => Some(v),
+                Err(_) => { None }
+            }
+        } else {
+            None
         }
     }};
 }
@@ -962,6 +976,39 @@ fn vv2view(
 
             Ok(auto_wrap_view!(view, define, textview, reg, cursive, env))
         }
+        "progressbar" => {
+            let counter =
+                define.v_k("counter").with_usr_ref(|cnt: &mut CursiveCounter| cnt.counter.clone());
+            let mut view = if let Some(counter) = counter {
+                ProgressBar::new().with_value(counter)
+            } else {
+                return Err(format!(
+                    "Can't use '{}' as counter value for :progressbar",
+                    define.v_sk("counter")
+                ));
+            };
+
+            if define.v_k("label_cb").is_some() {
+                let cb = define.v_k("label_cb");
+                let denv = Rc::new(RefCell::new(env.derive()));
+                view.set_label(move |value, (min, max)| {
+                    call_plain_callback!(
+                        cb,
+                        denv,
+                        VVal::Int(value as i64),
+                        VVal::pair(VVal::Int(min as i64), VVal::Int(max as i64))
+                    ).map(|v| v.s_raw()).unwrap_or_else(|| format!("Err"))
+                })
+            }
+
+            let min = if define.v_k("min").is_none() { 0 } else { define.v_ik("min") };
+            let max = if define.v_k("max").is_none() { 100 } else { define.v_ik("max") };
+
+            view.set_min(min as usize);
+            view.set_max(max as usize);
+
+            Ok(auto_wrap_view!(view, define, progressbar, reg, cursive, env))
+        }
         "stdout" => {
             let textcontent = CURSIVE_STDOUT.with(|cs| cs.borrow().clone());
             let view = TextView::new_with_content(textcontent);
@@ -992,6 +1039,13 @@ pub fn handle_cursive_call_method(
             assert_arg_count!("$<Cursive>", argv, 0, "run[]", env);
             cursive.run();
             Ok(VVal::None)
+        }
+        "counter" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "counter[]", env);
+            Ok(VVal::new_usr(CursiveCounter {
+                counter: Counter::new(0),
+                cb: cursive.cb_sink().clone(),
+            }))
         }
         "sender" => {
             assert_arg_count!("$<Cursive>", argv, 0, "sender[]", env);
@@ -1232,6 +1286,7 @@ impl VValUserData for SendMessageHandle {
 #[derive(Clone)]
 struct CursiveCounter {
     counter: Counter,
+    cb: cursive::CbSink,
 }
 
 #[cfg(feature = "cursive")]
@@ -1265,6 +1320,16 @@ impl VValUserData for CursiveCounter {
                 assert_arg_count!(self.s(), argv, 1, "set[value]", env);
                 self.counter.set(argv.v_i(0) as usize);
                 Ok(VVal::None)
+            }
+            "set_update" => {
+                assert_arg_count!(self.s(), argv, 1, "set_update[value]", env);
+                self.counter.set(argv.v_i(0) as usize);
+                let res = self.cb.send(Box::new(move |_s: &mut Cursive| { /* nop for update */ }));
+
+                match res {
+                    Ok(()) => Ok(VVal::Bol(true)),
+                    Err(e) => Ok(env.new_err(format!("$<Cursive:Counter> error: {}", e))),
+                }
             }
             "tick" => {
                 assert_arg_count!(self.s(), argv, 1, "tick[increments]", env);
@@ -1306,15 +1371,6 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     st.fun(
         "cursive:new",
         |env: &mut Env, _argc: usize| Ok(VVal::new_usr(CursiveHandle::new())),
-        Some(0),
-        Some(0),
-        false,
-    );
-
-    #[cfg(feature = "cursive")]
-    st.fun(
-        "cursive:counter:new",
-        |env: &mut Env, _argc: usize| Ok(VVal::new_usr(CursiveCounter { counter: Counter::new(0) })),
         Some(0),
         Some(0),
         false,
