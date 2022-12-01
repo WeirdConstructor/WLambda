@@ -1035,6 +1035,25 @@ pub fn handle_cursive_call_method(
                 Ok(VVal::None)
             })
         }
+        "add_screen" => {
+            assert_arg_count!("$<Cursive>", argv, 1, "add_screen[view]", env);
+            expect_view!(&argv.v_(0), "$<NamedViewHandle>.add_screen", new_view, reg, env, {
+                let old_id = cursive.active_screen();
+                let id = cursive.add_active_screen();
+                cursive.add_layer(new_view);
+                cursive.set_screen(old_id);
+                Ok(VVal::Int(id as i64))
+            })
+        }
+        "active_screen" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "active_screen[]", env);
+            Ok(VVal::Int(cursive.active_screen() as i64))
+        }
+        "set_screen" => {
+            assert_arg_count!("$<Cursive>", argv, 1, "set_screen[id]", env);
+            cursive.set_screen(argv.v_i(0) as usize);
+            Ok(VVal::None)
+        }
         "run" => {
             assert_arg_count!("$<Cursive>", argv, 0, "run[]", env);
             cursive.run();
