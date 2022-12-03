@@ -17,6 +17,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[cfg(feature = "cursive")]
+use cursive_buffered_backend;
+#[cfg(feature = "cursive")]
 use cursive::utils::Counter;
 #[cfg(feature = "cursive")]
 use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeConstraint};
@@ -164,6 +166,12 @@ impl CursiveHandle {
         //        cursive.borrow_mut().add_global_callback('c', |s| {
         //            cursive::reexports::log::set_max_level(cursive::reexports::log::LevelFilter::Info);
         //            s.toggle_debug_console()
+        //        });
+        //        cursive.on_post_event(cursive::event::MouseEvent::Hold(crusive::event::MouseButton::Left), |s| {
+        //            CURSIVE_STDOUT.with(|cs| {
+        //                let s = String::from_utf8_lossy(buf);
+        //                cs.borrow_mut().append(format!("EVENT: {:?}", );
+        //            });
         //        });
         let ud = WLambdaCursiveContext::new();
         let reg = ud.get_registry();
@@ -655,6 +663,25 @@ macro_rules! add_default_cb {
     }
 }
 
+//struct XView {}
+//
+//impl cursive::View for XView {
+//    fn draw(&self, printer: &cursive::Printer) {
+//        printer.print_box((0, 0), (9, 9), true);
+//    }
+//
+//    fn on_event(&mut self, ev: cursive::event::Event) -> cursive::event::EventResult {
+//        CURSIVE_STDOUT.with(|cs| {
+//            cs.borrow_mut().append(format!("EV: {:?}\n", ev));
+//        });
+//        cursive::event::EventResult::Ignored
+//    }
+//
+//    fn required_size(&mut self, _constr: cursive::XY<usize>) -> cursive::XY<usize> {
+//        (10, 10).into()
+//    }
+//}
+
 #[cfg(feature = "cursive")]
 fn vv2view(
     v: &VVal,
@@ -667,6 +694,10 @@ fn vv2view(
     let typ_str = &typ.s_raw()[..];
 
     match typ_str {
+//        "x" => {
+//            let view = XView {};
+//            Ok(auto_wrap_view!(view, define, xview, reg, cursive, env))
+//        }
         "hbox" => {
             let mut ll = LinearLayout::new(Orientation::Horizontal);
             define.with_iter(|it| {
@@ -997,7 +1028,9 @@ fn vv2view(
                         denv,
                         VVal::Int(value as i64),
                         VVal::pair(VVal::Int(min as i64), VVal::Int(max as i64))
-                    ).map(|v| v.s_raw()).unwrap_or_else(|| format!("Err"))
+                    )
+                    .map(|v| v.s_raw())
+                    .unwrap_or_else(|| format!("Err"))
                 })
             }
 
@@ -1056,8 +1089,17 @@ pub fn handle_cursive_call_method(
         }
         "run" => {
             assert_arg_count!("$<Cursive>", argv, 0, "run[]", env);
-            cursive.run();
-            Ok(VVal::None)
+
+            let backend_init = || -> std::io::Result<Box<dyn cursive::backend::Backend>> {
+                let backend = cursive::backends::crossterm::Backend::init()?;
+                let buffered_backend = cursive_buffered_backend::BufferedBackend::new(backend);
+                Ok(Box::new(buffered_backend))
+            };
+
+            match cursive.try_run_with(backend_init) {
+                Ok(_) => Ok(VVal::None),
+                Err(e) => Ok(env.new_err(format!("$<Cursive>.run error: {}", e))),
+            }
         }
         "counter" => {
             assert_arg_count!("$<Cursive>", argv, 0, "counter[]", env);
