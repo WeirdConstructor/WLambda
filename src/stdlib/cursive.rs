@@ -29,7 +29,7 @@ use cursive::views::{
     ViewRef,
 };
 #[cfg(feature = "cursive")]
-use cursive::{direction::Orientation, traits::Nameable, Cursive, CursiveExt};
+use cursive::{direction::Orientation, traits::Nameable, Cursive};
 
 macro_rules! assert_arg_count {
     ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
@@ -1090,16 +1090,19 @@ pub fn handle_cursive_call_method(
         "run" => {
             assert_arg_count!("$<Cursive>", argv, 0, "run[]", env);
 
-            let backend_init = || -> std::io::Result<Box<dyn cursive::backend::Backend>> {
-                let backend = cursive::backends::crossterm::Backend::init()?;
-                let buffered_backend = cursive_buffered_backend::BufferedBackend::new(backend);
-                Ok(Box::new(buffered_backend))
-            };
+//            let backend_init = || -> std::io::Result<Box<dyn cursive::backend::Backend>> {
+//                let backend = cursive::backends::crossterm::Backend::init()?;
+//                let buffered_backend = cursive_buffered_backend::BufferedBackend::new(backend);
+//                Ok(Box::new(buffered_backend))
+//            };
 
-            match cursive.try_run_with(backend_init) {
-                Ok(_) => Ok(VVal::None),
-                Err(e) => Ok(env.new_err(format!("$<Cursive>.run error: {}", e))),
-            }
+//            match cursive.try_run_with(backend_init) {
+//                Ok(_) => Ok(VVal::None),
+//                Err(e) => Ok(env.new_err(format!("$<Cursive>.run error: {}", e))),
+//            }
+            use cursive::CursiveExt;
+            cursive.run();
+            Ok(VVal::None)
         }
         "counter" => {
             assert_arg_count!("$<Cursive>", argv, 0, "counter[]", env);
@@ -1181,6 +1184,15 @@ pub fn handle_cursive_call_method(
             }
 
             Ok(VVal::None)
+        }
+        "popup" => {
+            assert_arg_count!("$<Cursive>", argv, 2, "popup[define, view]", env);
+
+            expect_view!(&argv.v_(1), "$<Cursive>.popup", new_view, reg, env, {
+                let dialog = Dialog::around(new_view).dismiss_button("Ok");
+                cursive.add_layer(dialog);
+                Ok(VVal::None)
+            })
         }
         "msg" => {
             if argv.len() < 1 || argv.len() > 2 {
