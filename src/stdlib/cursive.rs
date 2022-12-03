@@ -757,6 +757,17 @@ impl XBlockNode {
         s
     }
 
+    // TODO:
+    // - identify nodes by ID
+    // - create a list of connections, (ID, output-idx), (ID, input-idx)
+    // - implement a naive routing algorythm:
+    //      - case: ID1.x2 < ID2.x1: get middle x, calc y delta, create a route vector:
+    //                       vec![(x, y, piece-id), ...]
+    //      - case: ID1.x2 > ID2.x1: route out by 1 on ID1, route up or down depending on y delta,
+    //                               route out by 1 on ID2, route down or up depending on y delta,
+    //                               find middle x and connect,
+    //                               create route vector
+
     fn update(&mut self) {
         self.calc_label = self.block_type.generate_label(&self.label);
 
@@ -779,10 +790,14 @@ impl XBlockNode {
     }
 }
 
+use cursive::XY;
+
 struct XView {
     pub nodes: Rc<RefCell<HashMap<(u16, u16), XBlockNode>>>,
     pub w: usize,
     pub h: usize,
+
+    drag: Option<((usize, usize), XY<usize>)>,
 }
 
 impl XView {
@@ -790,19 +805,41 @@ impl XView {
         let mut nodes = HashMap::new();
 
         nodes.insert((1, 1), XBlockNode::new((1, 1), "input_p1", XBlockType::SourceLabel));
+        nodes.insert((1, 5), XBlockNode::new((1, 5), "input_p2", XBlockType::SourceLabel));
         nodes.insert((9, 3), XBlockNode::new((9, 3), "output_x1", XBlockType::SinkLabel));
+        nodes.insert((9, 9), XBlockNode::new((9, 9), "output_x2", XBlockType::SinkLabel));
 
-        Self { w: 40, h: 20, nodes: Rc::new(RefCell::new(nodes)) }
+        Self { w: 60, h: 20, drag: None, nodes: Rc::new(RefCell::new(nodes)) }
+    }
+
+    pub fn move_node_by_offs(&mut self, pos: (u16, u16), offs: (i32, i32)) {
+        let dest = ((pos.0 as i32 + offs.0) as u16, (pos.1 as i32 + offs.1) as u16);
+
+        if self.nodes.borrow().get(&dest).is_some() {
+            return;
+        }
+
+        let node = if let Some(mut node) = self.nodes.borrow_mut().remove(&pos) {
+            node.pos = dest;
+            Some(node)
+        } else {
+            None
+        };
+        if let Some(node) = node {
+            self.nodes.borrow_mut().insert(node.pos, node);
+        }
     }
 }
 
 use cursive::direction;
-use cursive::event::EventResult;
 use cursive::event::Event;
+use cursive::event::EventResult;
 use cursive::view::CannotFocus;
 
 impl cursive::View for XView {
     fn draw(&self, printer: &cursive::Printer) {
+        printer.print_box((0, 0), (self.w, self.h), true);
+
         for ((x, y), node) in self.nodes.borrow_mut().iter_mut() {
             if node.calc_size.1 == 1 {
                 if node.cached_rows.is_empty() {
@@ -838,57 +875,74 @@ impl cursive::View for XView {
         use cursive::event::Event;
         use cursive::event::MouseEvent;
 
-//        CURSIVE_STDOUT.with(|cs| {
-//            cs.borrow_mut().append(format!("EV: {:?}\n", ev));
-//        });
+        //        CURSIVE_STDOUT.with(|cs| {
+        //            cs.borrow_mut().append(format!("EV: {:?}\n", ev));
+        //        });
 
         CURSIVE_STDOUT.with(|cs| {
             cs.borrow_mut().append(format!("TEST: {:?}\n", ev));
         });
         match ev {
-            Event::Mouse {
-                event: MouseEvent::Press(_),
-                position,
-                offset,
-            } if position.fits_in_rect(offset, (self.w, self.h)) => {
+            Event::Mouse { event: MouseEvent::Release(_), position, offset }
+                if position.fits_in_rect(offset, (self.w, self.h)) =>
+            {
+                if let Some(((x, y), mouse_pos)) = self.drag.take() {
+                    self.move_node_by_offs(
+                        (x as u16, y as u16),
+                        (
+                            (position.x as i32 - mouse_pos.x as i32),
+                            (position.y as i32 - mouse_pos.y as i32),
+                        ),
+                    );
+                }
+                cursive::event::EventResult::Ignored
+            }
+            Event::Mouse { event: MouseEvent::Press(_), position, offset }
+                if position.fits_in_rect(offset, (self.w, self.h)) =>
+            {
                 for ((x, y), node) in self.nodes.borrow().iter() {
-//                    let pos : cursive::XY<usize> = (*x, *y).into();
-        CURSIVE_STDOUT.with(|cs| {
-            cs.borrow_mut().append(format!("POS: {:?} at? {:?}\n", (offset.x + (*x as usize), offset.y + (*y as usize)), position));
-        });
-                    if position.fits_in_rect((offset.x + (*x as usize), offset.y + (*y as usize)), (node.calc_size.0, node.calc_size.1)) {
-        CURSIVE_STDOUT.with(|cs| {
-            cs.borrow_mut().append(format!("HIT: {:?}\n", ev));
-        });
+                    //                    let pos : cursive::XY<usize> = (*x, *y).into();
+                    CURSIVE_STDOUT.with(|cs| {
+                        cs.borrow_mut().append(format!(
+                            "POS: {:?} at? {:?}\n",
+                            (offset.x + (*x as usize), offset.y + (*y as usize)),
+                            position
+                        ));
+                    });
+                    if position.fits_in_rect(
+                        (offset.x + (*x as usize), offset.y + (*y as usize)),
+                        (node.calc_size.0, node.calc_size.1),
+                    ) {
+                        self.drag = Some(((*x as usize, *y as usize), position));
+                        CURSIVE_STDOUT.with(|cs| {
+                            cs.borrow_mut().append(format!("HIT: {:?}\n", ev));
+                        });
                     }
                 }
 
                 cursive::event::EventResult::Ignored
-            },
+            }
             _ => cursive::event::EventResult::Ignored,
         }
     }
 
-    fn take_focus(
-        &mut self,
-        source: direction::Direction,
-    ) -> Result<EventResult, CannotFocus> {
-//        let rel = source.relative(direction::Orientation::Vertical);
-//        let (i, res) = if let Some((i, res)) = self
-//            .iter_mut(rel.is_none(), rel.unwrap_or(direction::Relative::Front))
-//            .find_map(|p| try_focus(p, source))
-//        {
-//            (i, res)
-//        } else {
-//            return Err(CannotFocus);
-//        };
+    fn take_focus(&mut self, source: direction::Direction) -> Result<EventResult, CannotFocus> {
+        //        let rel = source.relative(direction::Orientation::Vertical);
+        //        let (i, res) = if let Some((i, res)) = self
+        //            .iter_mut(rel.is_none(), rel.unwrap_or(direction::Relative::Front))
+        //            .find_map(|p| try_focus(p, source))
+        //        {
+        //            (i, res)
+        //        } else {
+        //            return Err(CannotFocus);
+        //        };
         Ok(cursive::event::EventResult::Consumed(None))
     }
 
     fn required_size(&mut self, _constr: cursive::XY<usize>) -> cursive::XY<usize> {
-//        CURSIVE_STDOUT.with(|cs| {
-//            cs.borrow_mut().append(format!("TEST:\n"));
-//        });
+        //        CURSIVE_STDOUT.with(|cs| {
+        //            cs.borrow_mut().append(format!("TEST:\n"));
+        //        });
         (self.w, self.h).into()
     }
 }
