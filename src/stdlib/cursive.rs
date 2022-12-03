@@ -17,8 +17,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[cfg(feature = "cursive")]
-use cursive_buffered_backend;
-#[cfg(feature = "cursive")]
 use cursive::utils::Counter;
 #[cfg(feature = "cursive")]
 use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeConstraint};
@@ -30,6 +28,8 @@ use cursive::views::{
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive};
+#[cfg(feature = "cursive")]
+use cursive_buffered_backend;
 
 macro_rules! assert_arg_count {
     ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
@@ -663,24 +663,235 @@ macro_rules! add_default_cb {
     }
 }
 
-//struct XView {}
-//
-//impl cursive::View for XView {
-//    fn draw(&self, printer: &cursive::Printer) {
-//        printer.print_box((0, 0), (9, 9), true);
-//    }
-//
-//    fn on_event(&mut self, ev: cursive::event::Event) -> cursive::event::EventResult {
+use std::sync::Arc;
+
+#[derive(Clone, Debug)]
+enum XBlockType {
+    SourceLabel,
+    SinkLabel,
+    Primitive {
+        name: String,
+        inputs: Arc<Vec<(String, String)>>,
+        outputs: Arc<Vec<(String, String)>>,
+    },
+    Function {
+        name: String,
+        inputs: Arc<Vec<(String, String)>>,
+        outputs: Arc<Vec<(String, String)>>,
+    },
+}
+
+impl XBlockType {
+    pub fn generate_label(&self, node_label: &str) -> String {
+        match self {
+            XBlockType::SourceLabel => node_label.to_string(),
+            XBlockType::SinkLabel => node_label.to_string(),
+            XBlockType::Primitive { name, .. } => {
+                if node_label.len() > 0 {
+                    format!("{}: {}", name, node_label)
+                } else {
+                    name.to_string()
+                }
+            }
+            XBlockType::Function { name, .. } => {
+                if node_label.len() > 0 {
+                    format!("{}: {}", name, node_label)
+                } else {
+                    name.to_string()
+                }
+            }
+        }
+    }
+
+    pub fn input_count(&self) -> u8 {
+        match self {
+            XBlockType::SourceLabel => 0,
+            XBlockType::SinkLabel => 1,
+            XBlockType::Primitive { inputs, .. } => inputs.len() as u8,
+            XBlockType::Function { inputs, .. } => inputs.len() as u8,
+        }
+    }
+
+    pub fn output_count(&self) -> u8 {
+        match self {
+            XBlockType::SourceLabel => 1,
+            XBlockType::SinkLabel => 0,
+            XBlockType::Primitive { outputs, .. } => outputs.len() as u8,
+            XBlockType::Function { outputs, .. } => outputs.len() as u8,
+        }
+    }
+
+    pub fn has_inputs(&self) -> bool {
+        self.input_count() > 0
+    }
+
+    pub fn has_outputs(&self) -> bool {
+        self.output_count() > 0
+    }
+}
+
+#[derive(Clone, Debug)]
+struct XBlockNode {
+    pos: (u16, u16),
+    block_type: XBlockType,
+    label: String,
+
+    calc_label: String,
+    calc_size: (u16, u16),
+    cached_rows: Vec<String>,
+}
+
+impl XBlockNode {
+    pub fn new(pos: (u16, u16), label: &str, block_type: XBlockType) -> Self {
+        let mut s = Self {
+            pos,
+            block_type,
+            label: label.to_string(),
+            calc_size: (0, 0),
+            calc_label: String::new(),
+            cached_rows: vec![],
+        };
+
+        s.update();
+
+        s
+    }
+
+    fn update(&mut self) {
+        self.calc_label = self.block_type.generate_label(&self.label);
+
+        // FIXME: The actual size should be calculated from the Unicode String Width!
+        let mut width = self.calc_label.len() as u16;
+        if self.block_type.has_inputs() {
+            width += 2;
+        }
+
+        let height =
+            self.block_type.input_count().max(self.block_type.output_count()).min(1) as u16;
+
+        if self.block_type.has_outputs() {
+            width += 2;
+        }
+
+        self.calc_size = (width, height);
+
+        self.cached_rows.clear();
+    }
+}
+
+struct XView {
+    pub nodes: Rc<RefCell<HashMap<(u16, u16), XBlockNode>>>,
+    pub w: usize,
+    pub h: usize,
+}
+
+impl XView {
+    pub fn new() -> Self {
+        let mut nodes = HashMap::new();
+
+        nodes.insert((1, 1), XBlockNode::new((1, 1), "input_p1", XBlockType::SourceLabel));
+        nodes.insert((9, 3), XBlockNode::new((9, 3), "output_x1", XBlockType::SinkLabel));
+
+        Self { w: 40, h: 20, nodes: Rc::new(RefCell::new(nodes)) }
+    }
+}
+
+use cursive::direction;
+use cursive::event::EventResult;
+use cursive::event::Event;
+use cursive::view::CannotFocus;
+
+impl cursive::View for XView {
+    fn draw(&self, printer: &cursive::Printer) {
+        for ((x, y), node) in self.nodes.borrow_mut().iter_mut() {
+            if node.calc_size.1 == 1 {
+                if node.cached_rows.is_empty() {
+                    let mut row = String::new();
+                    if node.block_type.has_inputs() {
+                        row += "┥ ";
+                    }
+
+                    row += &node.calc_label;
+
+                    if node.block_type.has_outputs() {
+                        row += " ┝";
+                    }
+
+                    node.cached_rows.push(row);
+                }
+
+                printer.with_style(cursive::theme::ColorStyle::highlight_inactive(), |printer| {
+                    printer.print((*x, *y), &node.cached_rows[0]);
+                });
+            } else {
+            }
+
+            //            printer.print_box(
+            //                (*x as usize, *y as usize),
+            //                ((*x + node.calc_size.0) as usize, (*y + node.calc_size.1) as usize),
+            //                true,
+            //            );
+        }
+    }
+
+    fn on_event(&mut self, ev: cursive::event::Event) -> cursive::event::EventResult {
+        use cursive::event::Event;
+        use cursive::event::MouseEvent;
+
 //        CURSIVE_STDOUT.with(|cs| {
 //            cs.borrow_mut().append(format!("EV: {:?}\n", ev));
 //        });
-//        cursive::event::EventResult::Ignored
-//    }
-//
-//    fn required_size(&mut self, _constr: cursive::XY<usize>) -> cursive::XY<usize> {
-//        (10, 10).into()
-//    }
-//}
+
+        CURSIVE_STDOUT.with(|cs| {
+            cs.borrow_mut().append(format!("TEST: {:?}\n", ev));
+        });
+        match ev {
+            Event::Mouse {
+                event: MouseEvent::Press(_),
+                position,
+                offset,
+            } if position.fits_in_rect(offset, (self.w, self.h)) => {
+                for ((x, y), node) in self.nodes.borrow().iter() {
+//                    let pos : cursive::XY<usize> = (*x, *y).into();
+        CURSIVE_STDOUT.with(|cs| {
+            cs.borrow_mut().append(format!("POS: {:?} at? {:?}\n", (offset.x + (*x as usize), offset.y + (*y as usize)), position));
+        });
+                    if position.fits_in_rect((offset.x + (*x as usize), offset.y + (*y as usize)), (node.calc_size.0, node.calc_size.1)) {
+        CURSIVE_STDOUT.with(|cs| {
+            cs.borrow_mut().append(format!("HIT: {:?}\n", ev));
+        });
+                    }
+                }
+
+                cursive::event::EventResult::Ignored
+            },
+            _ => cursive::event::EventResult::Ignored,
+        }
+    }
+
+    fn take_focus(
+        &mut self,
+        source: direction::Direction,
+    ) -> Result<EventResult, CannotFocus> {
+//        let rel = source.relative(direction::Orientation::Vertical);
+//        let (i, res) = if let Some((i, res)) = self
+//            .iter_mut(rel.is_none(), rel.unwrap_or(direction::Relative::Front))
+//            .find_map(|p| try_focus(p, source))
+//        {
+//            (i, res)
+//        } else {
+//            return Err(CannotFocus);
+//        };
+        Ok(cursive::event::EventResult::Consumed(None))
+    }
+
+    fn required_size(&mut self, _constr: cursive::XY<usize>) -> cursive::XY<usize> {
+//        CURSIVE_STDOUT.with(|cs| {
+//            cs.borrow_mut().append(format!("TEST:\n"));
+//        });
+        (self.w, self.h).into()
+    }
+}
 
 #[cfg(feature = "cursive")]
 fn vv2view(
@@ -694,10 +905,10 @@ fn vv2view(
     let typ_str = &typ.s_raw()[..];
 
     match typ_str {
-//        "x" => {
-//            let view = XView {};
-//            Ok(auto_wrap_view!(view, define, xview, reg, cursive, env))
-//        }
+        "x" => {
+            let view = XView::new();
+            Ok(auto_wrap_view!(view, define, xview, reg, cursive, env))
+        }
         "hbox" => {
             let mut ll = LinearLayout::new(Orientation::Horizontal);
             define.with_iter(|it| {
@@ -1100,9 +1311,9 @@ pub fn handle_cursive_call_method(
                 Ok(_) => Ok(VVal::None),
                 Err(e) => Ok(env.new_err(format!("$<Cursive>.run error: {}", e))),
             }
-//            use cursive::CursiveExt;
-//            cursive.run();
-//            Ok(VVal::None)
+            //            use cursive::CursiveExt;
+            //            cursive.run();
+            //            Ok(VVal::None)
         }
         "counter" => {
             assert_arg_count!("$<Cursive>", argv, 0, "counter[]", env);
