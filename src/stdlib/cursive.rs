@@ -1090,19 +1090,19 @@ pub fn handle_cursive_call_method(
         "run" => {
             assert_arg_count!("$<Cursive>", argv, 0, "run[]", env);
 
-//            let backend_init = || -> std::io::Result<Box<dyn cursive::backend::Backend>> {
-//                let backend = cursive::backends::crossterm::Backend::init()?;
-//                let buffered_backend = cursive_buffered_backend::BufferedBackend::new(backend);
-//                Ok(Box::new(buffered_backend))
-//            };
+            let backend_init = || -> std::io::Result<Box<dyn cursive::backend::Backend>> {
+                let backend = cursive::backends::crossterm::Backend::init()?;
+                let buffered_backend = cursive_buffered_backend::BufferedBackend::new(backend);
+                Ok(Box::new(buffered_backend))
+            };
 
-//            match cursive.try_run_with(backend_init) {
-//                Ok(_) => Ok(VVal::None),
-//                Err(e) => Ok(env.new_err(format!("$<Cursive>.run error: {}", e))),
-//            }
-            use cursive::CursiveExt;
-            cursive.run();
-            Ok(VVal::None)
+            match cursive.try_run_with(backend_init) {
+                Ok(_) => Ok(VVal::None),
+                Err(e) => Ok(env.new_err(format!("$<Cursive>.run error: {}", e))),
+            }
+//            use cursive::CursiveExt;
+//            cursive.run();
+//            Ok(VVal::None)
         }
         "counter" => {
             assert_arg_count!("$<Cursive>", argv, 0, "counter[]", env);
@@ -1189,7 +1189,36 @@ pub fn handle_cursive_call_method(
             assert_arg_count!("$<Cursive>", argv, 2, "popup[define, view]", env);
 
             expect_view!(&argv.v_(1), "$<Cursive>.popup", new_view, reg, env, {
-                let dialog = Dialog::around(new_view).dismiss_button("Ok");
+                let define = argv.v_(0);
+                let mut dialog = Dialog::around(new_view).dismiss_button("Ok");
+
+                if define.v_k("title").is_some() {
+                    dialog.set_title(define.v_s_rawk("title"));
+                }
+
+                define.v_k("buttons").with_iter(|it| {
+                    for (v, _) in it {
+                        let denv = Rc::new(RefCell::new(env.derive()));
+                        let cb = v.v_(1);
+
+                        if cb.is_none() {
+                            dialog.add_button(v.v_s_raw(0), move |s| {
+                                s.pop_layer();
+                            });
+                        } else {
+                            dialog.add_button(v.v_s_raw(0), move |s| {
+                                call_callback!(s, cb, denv);
+                            });
+                        }
+                    }
+                });
+
+                let dialog = if define.v_k("close_label").is_some() {
+                    dialog.dismiss_button(define.v_s_rawk("close_label"))
+                } else {
+                    dialog
+                };
+
                 cursive.add_layer(dialog);
                 Ok(VVal::None)
             })
