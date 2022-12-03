@@ -1225,9 +1225,9 @@ impl Display for StackAction {
         match self {
             StackAction::Panic(panic) => {
                 if panic.1.is_empty() {
-                    write!(f, "Panic: {}", panic.0.s())
+                    write!(f, "Panic: {}", panic.0.s_raw())
                 } else {
-                    writeln!(f, "Panic: {}", panic.0.s())?;
+                    writeln!(f, "Panic: {}", panic.0.s_raw())?;
 
                     for t in panic.1.iter() {
                         write!(f, "    ")?;
