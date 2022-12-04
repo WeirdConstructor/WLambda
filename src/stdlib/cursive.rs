@@ -721,6 +721,44 @@ impl XBlockType {
         }
     }
 
+    pub fn for_each_output<F: FnMut(&str)>(&self, mut fun: F) {
+        match self {
+            XBlockType::SourceLabel => {
+                fun("");
+            }
+            XBlockType::SinkLabel => {}
+            XBlockType::Primitive { outputs, .. } => {
+                for out in outputs.iter() {
+                    fun(&out.0);
+                }
+            }
+            XBlockType::Function { outputs, .. } => {
+                for out in outputs.iter() {
+                    fun(&out.0);
+                }
+            }
+        }
+    }
+
+    pub fn for_each_input<F: FnMut(&str)>(&self, mut fun: F) {
+        match self {
+            XBlockType::SourceLabel => {}
+            XBlockType::SinkLabel => {
+                fun("");
+            }
+            XBlockType::Primitive { inputs, .. } => {
+                for inp in inputs.iter() {
+                    fun(&inp.0);
+                }
+            }
+            XBlockType::Function { inputs, .. } => {
+                for inp in inputs.iter() {
+                    fun(&inp.0);
+                }
+            }
+        }
+    }
+
     pub fn has_inputs(&self) -> bool {
         self.input_count() > 0
     }
@@ -732,29 +770,50 @@ impl XBlockType {
 
 #[derive(Clone, Debug)]
 struct XBlockNode {
+    id: usize,
     pos: (u16, u16),
     block_type: XBlockType,
     label: String,
 
+    input_labels: Vec<String>,
+    output_labels: Vec<String>,
     calc_label: String,
     calc_size: (u16, u16),
     cached_rows: Vec<String>,
 }
 
 impl XBlockNode {
-    pub fn new(pos: (u16, u16), label: &str, block_type: XBlockType) -> Self {
+    pub fn new(id: usize, pos: (u16, u16), label: &str, block_type: XBlockType) -> Self {
         let mut s = Self {
+            id,
             pos,
             block_type,
             label: label.to_string(),
             calc_size: (0, 0),
             calc_label: String::new(),
             cached_rows: vec![],
+            input_labels: vec![],
+            output_labels: vec![],
         };
 
         s.update();
 
         s
+    }
+
+    pub fn get_output_label(&self, idx: usize) -> Option<&str> {
+        self.output_labels.get(idx).map(|s| &s[..])
+    }
+
+    pub fn get_input_label(&self, idx: usize) -> Option<&str> {
+        self.input_labels.get(idx).map(|s| &s[..])
+    }
+
+    pub fn is_in_node(&self, pos: (u16, u16)) -> bool {
+        pos.0 >= self.pos.0
+            && pos.0 < self.pos.0 + self.calc_size.0
+            && pos.1 >= self.pos.1
+            && pos.1 < self.pos.1 + self.calc_size.1
     }
 
     // TODO:
@@ -777,14 +836,37 @@ impl XBlockNode {
             width += 2;
         }
 
-        let height =
-            self.block_type.input_count().max(self.block_type.output_count()).min(1) as u16;
+        let mut height =
+            self.block_type.input_count().max(self.block_type.output_count()).max(1) as u16;
+
+        if height > 1 {
+            height += 1;
+        }
 
         if self.block_type.has_outputs() {
             width += 2;
         }
 
+        self.output_labels.clear();
+        self.block_type.for_each_output(|out| {
+            if out == "" {
+                self.output_labels.push(self.calc_label.to_string());
+            } else {
+                self.output_labels.push(out.to_string());
+            }
+        });
+
+        self.input_labels.clear();
+        self.block_type.for_each_input(|inp| {
+            if inp == "" {
+                self.input_labels.push(self.calc_label.to_string());
+            } else {
+                self.input_labels.push(inp.to_string());
+            }
+        });
+
         self.calc_size = (width, height);
+        dlog(&format!("NCALC {} {},{}", self.id, width, height));
 
         self.cached_rows.clear();
     }
@@ -793,40 +875,279 @@ impl XBlockNode {
 use cursive::XY;
 
 struct XView {
-    pub nodes: Rc<RefCell<HashMap<(u16, u16), XBlockNode>>>,
+    pub nodes: Rc<RefCell<HashMap<usize, XBlockNode>>>,
+    pub connections: Rc<RefCell<Vec<((usize, u8), (usize, u8))>>>,
     pub w: usize,
     pub h: usize,
 
-    drag: Option<((usize, usize), XY<usize>)>,
+    drag: Option<(usize, XY<usize>)>,
 }
 
 impl XView {
     pub fn new() -> Self {
         let mut nodes = HashMap::new();
 
-        nodes.insert((1, 1), XBlockNode::new((1, 1), "input_p1", XBlockType::SourceLabel));
-        nodes.insert((1, 5), XBlockNode::new((1, 5), "input_p2", XBlockType::SourceLabel));
-        nodes.insert((9, 3), XBlockNode::new((9, 3), "output_x1", XBlockType::SinkLabel));
-        nodes.insert((9, 9), XBlockNode::new((9, 9), "output_x2", XBlockType::SinkLabel));
+        nodes.insert(1, XBlockNode::new(1, (1, 1), "input_p1", XBlockType::SourceLabel));
+        nodes.insert(2, XBlockNode::new(2, (4, 9), "input_p2", XBlockType::SourceLabel));
+        nodes.insert(3, XBlockNode::new(3, (16, 3), "output_x1", XBlockType::SinkLabel));
+        nodes.insert(5, XBlockNode::new(5, (16, 5), "output_x3", XBlockType::SinkLabel));
+        nodes.insert(4, XBlockNode::new(4, (5, 14), "output_x2", XBlockType::SinkLabel));
+        nodes.insert(
+            6,
+            XBlockNode::new(
+                6,
+                (18, 9),
+                "op_ok",
+                XBlockType::Function {
+                    name: "F1".to_string(),
+                    inputs: Arc::new(vec![]),
+                    outputs: Arc::new(vec![
+                        (String::from("o1"), String::from("o1")),
+                        (String::from("o2"), String::from("o2")),
+                    ]),
+                },
+            ),
+        );
 
-        Self { w: 60, h: 20, drag: None, nodes: Rc::new(RefCell::new(nodes)) }
+        nodes.insert(
+            7,
+            XBlockNode::new(
+                7,
+                (18, 15),
+                "ip_a",
+                XBlockType::Function {
+                    name: "Eq".to_string(),
+                    inputs: Arc::new(vec![
+                        (String::from("i1"), String::from("i1")),
+                        (String::from("i2"), String::from("i2")),
+                    ]),
+                    outputs: Arc::new(vec![
+                        (String::from("e1"), String::from("e1")),
+                        (String::from("e2"), String::from("e2")),
+                    ]),
+                },
+            ),
+        );
+
+        let mut connections = vec![];
+        connections.push(((1, 0), (3, 0)));
+        connections.push(((1, 0), (5, 0)));
+        connections.push(((2, 0), (4, 0)));
+        connections.push(((6, 0), (7, 1)));
+
+        Self {
+            w: 60,
+            h: 20,
+            drag: None,
+            nodes: Rc::new(RefCell::new(nodes)),
+            connections: Rc::new(RefCell::new(connections)),
+        }
     }
 
-    pub fn move_node_by_offs(&mut self, pos: (u16, u16), offs: (i32, i32)) {
-        let dest = ((pos.0 as i32 + offs.0) as u16, (pos.1 as i32 + offs.1) as u16);
-
-        if self.nodes.borrow().get(&dest).is_some() {
-            return;
+    pub fn get_input_port_pos(&self, id: usize, idx: u8) -> Option<(u16, u16)> {
+        if let Some(node) = self.nodes.borrow().get(&id) {
+            if idx < node.block_type.input_count() {
+                if node.block_type.input_count() == 1 {
+                    return Some((node.pos.0, node.pos.1));
+                } else {
+                    return Some((node.pos.0, node.pos.1 + 1 + (idx as u16)));
+                }
+            }
         }
 
-        let node = if let Some(mut node) = self.nodes.borrow_mut().remove(&pos) {
-            node.pos = dest;
-            Some(node)
+        None
+    }
+
+    pub fn get_output_port_pos(&self, id: usize, idx: u8) -> Option<(u16, u16)> {
+        if let Some(node) = self.nodes.borrow().get(&id) {
+            if idx < node.block_type.output_count() {
+                if node.block_type.output_count() == 1 {
+                    return Some((node.pos.0 + node.calc_size.0, node.pos.1));
+                } else {
+                    return Some((node.pos.0 + node.calc_size.0, node.pos.1 + 1 + (idx as u16)));
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn get_node_height(&self, id: usize) -> Option<u16> {
+        self.nodes.borrow().get(&id).map(|n| n.calc_size.1)
+    }
+
+    // Plots for these cases:
+    //
+    //  xxx|------
+    //           |
+    //            -------|yyy
+    //
+    //  xxx|-------------|yyy
+    //
+    //            -------|yyy
+    //           |
+    //  xxx|------
+    pub fn plot_case_out_lt_in(
+        &self,
+        out_pos: (u16, u16),
+        in_pos: (u16, u16),
+        points: &mut Vec<(usize, usize, &'static str)>,
+    ) {
+        let (x_left, x_right) = (in_pos.0.min(out_pos.0), out_pos.0.max(in_pos.0));
+
+        let x_mid = x_left + (x_right - x_left) / 2;
+
+        let (is_up, y_bot, y_top) = if out_pos.1 > in_pos.1 {
+            (false, out_pos.1, in_pos.1)
         } else {
-            None
+            (true, in_pos.1, out_pos.1)
         };
-        if let Some(node) = node {
-            self.nodes.borrow_mut().insert(node.pos, node);
+
+        for x_top in out_pos.0..x_mid {
+            points.push((x_top as usize, out_pos.1 as usize, "━"));
+        }
+
+        if out_pos.1 == in_pos.1 {
+            points.push((x_mid as usize, out_pos.1 as usize, "━"));
+        } else {
+            if is_up {
+                points.push((x_mid as usize, out_pos.1 as usize, "┓"));
+            } else {
+                points.push((x_mid as usize, out_pos.1 as usize, "┛"));
+            }
+
+            for y in (y_top + 1)..y_bot {
+                points.push((x_mid as usize, y as usize, "┃"));
+            }
+
+            if is_up {
+                points.push((x_mid as usize, in_pos.1 as usize, "┗"));
+            } else {
+                points.push((x_mid as usize, in_pos.1 as usize, "┏"));
+            }
+        }
+
+        for x_bot in (x_mid + 1)..in_pos.0 {
+            points.push((x_bot as usize, in_pos.1 as usize, "━"));
+        }
+    }
+
+    // Plots for these cases:
+    //
+    //           xxx|--
+    //                |
+    //      ----------
+    //     |
+    //     --|yyy
+    //
+    pub fn plot_case_out_gt_in(
+        &self,
+        out_pos: (u16, u16),
+        out_height: u16,
+        in_pos: (u16, u16),
+        in_height: u16,
+        points: &mut Vec<(usize, usize, &'static str)>,
+    ) {
+        let (y_up, y_down) = (in_pos.1.min(out_pos.1), out_pos.1.max(in_pos.1));
+        let y_mid = y_up + (y_down - y_up) / 2;
+
+        points.push((out_pos.0 as usize, out_pos.1 as usize, "━"));
+        points.push(((out_pos.0 + 1) as usize, out_pos.1 as usize, "┓"));
+        for yh in 1..(out_height - 1) {
+            points.push(((out_pos.0 + 1) as usize, (out_pos.1 + yh) as usize, "┃"));
+        }
+        let out_adj = (out_pos.0 + 1, out_pos.1 + out_height);
+
+        points.push((in_pos.0 as usize, in_pos.1 as usize, "━"));
+        points.push(((in_pos.0 - 1) as usize, in_pos.1 as usize, "┗"));
+        points.push(((in_pos.0 - 1) as usize, (in_pos.1 - 1) as usize, "┃"));
+        let in_adj = (in_pos.0 - 1, in_pos.1 - 1);
+    }
+
+    pub fn plot_path(
+        &self,
+        out_id: usize,
+        out_idx: u8,
+        in_id: usize,
+        in_idx: u8,
+        points: &mut Vec<(usize, usize, &'static str)>,
+    ) -> bool {
+        points.clear();
+
+        if let Some(out_pos) = self.get_output_port_pos(out_id, out_idx) {
+            if let Some(in_pos) = self.get_input_port_pos(in_id, in_idx) {
+                if (out_pos.0 + 1) < in_pos.0 {
+                    self.plot_case_out_lt_in(out_pos, in_pos, points);
+                } else if out_pos.0 > in_pos.0 {
+                    self.plot_case_out_gt_in(
+                        out_pos,
+                        self.get_node_height(out_id).unwrap_or(0),
+                        in_pos,
+                        self.get_node_height(in_id).unwrap_or(0),
+                        points,
+                    );
+                }
+
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn check_free_at(&self, pos: (u16, u16)) -> bool {
+        for (id, node) in self.nodes.borrow().iter() {
+            if node.is_in_node(pos) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    // FIXME: Optimize this using a sparse map that looks up the positions?
+    pub fn find_node_id_at(&self, pos: (u16, u16)) -> Option<usize> {
+        for (_id, node) in self.nodes.borrow().iter() {
+            if node.is_in_node(pos) {
+                return Some(node.id);
+            }
+        }
+
+        None
+    }
+
+    pub fn get_node_pos(&self, id: usize) -> Option<(u16, u16)> {
+        self.nodes.borrow().get(&id).map(|n| n.pos)
+    }
+
+    pub fn node_fits_at(&self, id: usize, at: (u16, u16)) -> bool {
+        if let Some(node) = self.nodes.borrow().get(&id) {
+            for x in at.0..(at.0 + node.calc_size.0) {
+                for y in at.1..(at.1 + node.calc_size.1) {
+                    if let Some(other_id) = self.find_node_id_at((x, y)) {
+                        if other_id != id {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    pub fn move_node_by_offs(&mut self, id: usize, offs: (i32, i32)) {
+        if let Some(pos) = self.get_node_pos(id) {
+            dlog(&format!("Found: {:?}", pos));
+
+            let dest = ((pos.0 as i32 + offs.0) as u16, (pos.1 as i32 + offs.1) as u16);
+            if self.node_fits_at(id, dest) {
+                dlog(&format!("Free at: {:?}", dest));
+                let mut nodes = self.nodes.borrow_mut();
+                if let Some(node) = nodes.get_mut(&id) {
+                    node.pos = dest;
+                }
+            }
         }
     }
 }
@@ -836,11 +1157,27 @@ use cursive::event::Event;
 use cursive::event::EventResult;
 use cursive::view::CannotFocus;
 
+fn dlog(s: &str) {
+    CURSIVE_STDOUT.with(|cs| {
+        cs.borrow_mut().append(format!("{}\n", s));
+    });
+}
+
 impl cursive::View for XView {
     fn draw(&self, printer: &cursive::Printer) {
         printer.print_box((0, 0), (self.w, self.h), true);
 
-        for ((x, y), node) in self.nodes.borrow_mut().iter_mut() {
+        let mut path: Vec<(usize, usize, &'static str)> = vec![];
+
+        for ((out_id, out_idx), (in_id, in_idx)) in self.connections.borrow().iter() {
+            if self.plot_path(*out_id, *out_idx, *in_id, *in_idx, &mut path) {
+                for (x, y, chr) in path.iter() {
+                    printer.print((*x, *y), chr);
+                }
+            }
+        }
+
+        for (_id, node) in self.nodes.borrow_mut().iter_mut() {
             if node.calc_size.1 == 1 {
                 if node.cached_rows.is_empty() {
                     let mut row = String::new();
@@ -858,9 +1195,66 @@ impl cursive::View for XView {
                 }
 
                 printer.with_style(cursive::theme::ColorStyle::highlight_inactive(), |printer| {
-                    printer.print((*x, *y), &node.cached_rows[0]);
+                    printer.print(node.pos, &node.cached_rows[0]);
                 });
             } else {
+                if node.cached_rows.is_empty() {
+                    let mut row = String::new();
+                    if node.block_type.has_inputs() {
+                        row += "┌ ";
+                    }
+
+                    row += &node.calc_label;
+
+                    if node.block_type.has_outputs() {
+                        row += " ┐";
+                    }
+
+                    node.cached_rows.push(row);
+
+                    let width = node.calc_size.0 as usize;
+
+                    for row_idx in 1..node.calc_size.1 {
+                        let mut row = String::new();
+
+                        let mut char_width_row_inp = 0;
+                        let inp = node.get_input_label((row_idx - 1) as usize);
+                        if let Some(inp) = inp {
+                            row += "┥ ";
+                            row += inp;
+                            // FIXME: Also here: use UnicodeStrWidth
+                            char_width_row_inp += inp.len() + 2;
+                        }
+
+                        let out = node.get_output_label((row_idx - 1) as usize);
+                        if let Some(out) = out {
+                            // FIXME: Also here: out.len() should be UnicodeStrWidth
+                            let end_len = char_width_row_inp + out.len() + 2;
+                            if end_len < width {
+                                for _ in end_len..width {
+                                    row += " ";
+                                }
+                            }
+
+                            row += out;
+                            row += " ┝";
+                        } else {
+                            if char_width_row_inp < width {
+                                for _ in char_width_row_inp..width {
+                                    row += " ";
+                                }
+                            }
+                        }
+
+                        node.cached_rows.push(row);
+                    }
+                }
+
+                printer.with_style(cursive::theme::ColorStyle::highlight_inactive(), |printer| {
+                    for (i, row) in node.cached_rows.iter().enumerate() {
+                        printer.print((node.pos.0, node.pos.1 + i as u16), row);
+                    }
+                });
             }
 
             //            printer.print_box(
@@ -886,9 +1280,9 @@ impl cursive::View for XView {
             Event::Mouse { event: MouseEvent::Release(_), position, offset }
                 if position.fits_in_rect(offset, (self.w, self.h)) =>
             {
-                if let Some(((x, y), mouse_pos)) = self.drag.take() {
+                if let Some((id, mouse_pos)) = self.drag.take() {
                     self.move_node_by_offs(
-                        (x as u16, y as u16),
+                        id,
                         (
                             (position.x as i32 - mouse_pos.x as i32),
                             (position.y as i32 - mouse_pos.y as i32),
@@ -900,24 +1294,13 @@ impl cursive::View for XView {
             Event::Mouse { event: MouseEvent::Press(_), position, offset }
                 if position.fits_in_rect(offset, (self.w, self.h)) =>
             {
-                for ((x, y), node) in self.nodes.borrow().iter() {
-                    //                    let pos : cursive::XY<usize> = (*x, *y).into();
+                let rel_pos = ((position.x - offset.x) as u16, (position.y - offset.y) as u16);
+
+                if let Some(id) = self.find_node_id_at(rel_pos) {
+                    self.drag = Some((id, position));
                     CURSIVE_STDOUT.with(|cs| {
-                        cs.borrow_mut().append(format!(
-                            "POS: {:?} at? {:?}\n",
-                            (offset.x + (*x as usize), offset.y + (*y as usize)),
-                            position
-                        ));
+                        cs.borrow_mut().append(format!("HIT: {:?} {}\n", ev, id));
                     });
-                    if position.fits_in_rect(
-                        (offset.x + (*x as usize), offset.y + (*y as usize)),
-                        (node.calc_size.0, node.calc_size.1),
-                    ) {
-                        self.drag = Some(((*x as usize, *y as usize), position));
-                        CURSIVE_STDOUT.with(|cs| {
-                            cs.borrow_mut().append(format!("HIT: {:?}\n", ev));
-                        });
-                    }
                 }
 
                 cursive::event::EventResult::Ignored
