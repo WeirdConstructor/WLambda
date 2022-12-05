@@ -22,9 +22,9 @@ use cursive::utils::Counter;
 use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Checkbox, Dialog, EditView, LinearLayout, ListView, Panel, ProgressBar,
-    RadioButton, RadioGroup, SelectView, SliderView, StackView, TextArea, TextContent, TextView,
-    ViewRef,
+    BoxedView, Button, Checkbox, Dialog, EditView, HideableView, LinearLayout, ListView, Panel,
+    ProgressBar, RadioButton, RadioGroup, SelectView, SliderView, StackView, TextArea, TextContent,
+    TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive};
@@ -193,6 +193,7 @@ enum ViewType {
     Checkbox,
     Slider,
     SelectView,
+    Hideable,
 }
 
 #[cfg(feature = "cursive")]
@@ -477,6 +478,36 @@ impl VValUserData for NamedViewHandle {
                 }
                 _ => named_view_error!(self, env, key),
             },
+            ViewType::Hideable => match key {
+                "set_visible" => {
+                    assert_arg_count!(self.s(), argv, 1, "set_visible[bool]", env);
+                    access_named_view_ctx!(self, cursive, HideableView<BoxedView>, view, env, {
+                        view.set_visible(argv.v_b(0));
+                        Ok(VVal::None)
+                    })
+                }
+                "is_visible" => {
+                    assert_arg_count!(self.s(), argv, 0, "is_visible[]", env);
+                    access_named_view_ctx!(self, cursive, HideableView<BoxedView>, view, env, {
+                        Ok(VVal::Bol(view.is_visible()))
+                    })
+                }
+                "hide" => {
+                    assert_arg_count!(self.s(), argv, 0, "hide[]", env);
+                    access_named_view_ctx!(self, cursive, HideableView<BoxedView>, view, env, {
+                        view.hide();
+                        Ok(VVal::None)
+                    })
+                }
+                "unhide" => {
+                    assert_arg_count!(self.s(), argv, 0, "unhide[]", env);
+                    access_named_view_ctx!(self, cursive, HideableView<BoxedView>, view, env, {
+                        view.unhide();
+                        Ok(VVal::None)
+                    })
+                }
+                _ => named_view_error!(self, env, key),
+            },
         }
     }
 }
@@ -533,6 +564,18 @@ macro_rules! wrap_scroll_view {
     }
 }
 
+macro_rules! wrap_hideable {
+    ($define: ident, $view: expr) => {
+        if $define.v_k("hideable_name").is_some() {
+            HideableView::new(BoxedView::new($view.into_boxed_view()))
+                .with_name($define.v_s_rawk("hideable_name"))
+                .into_boxed_view()
+        } else {
+            $view.into_boxed_view()
+        }
+    };
+}
+
 macro_rules! auto_wrap_view {
     ($view: expr, $define: ident, $type: ident, $reg: expr, $cursive: ident, $env: ident) => {{
         let size_w = vv2size_const(&$define.v_k("width"));
@@ -547,64 +590,77 @@ macro_rules! auto_wrap_view {
             })
         }
 
+        if $define.v_k("hideable_name").is_some() {
+            $reg.borrow_mut().insert($define.v_s_rawk("hideable_name"), "hideable".to_string());
+        }
+
         if $define.v_k("name").is_some() {
             $reg.borrow_mut().insert($define.v_s_rawk("name"), stringify!($type).to_string());
 
             if size_w.is_some() || size_h.is_some() {
                 if let Some(scroll_strat) = scroll_strat {
-                    $view
+                    wrap_hideable!(
+                        $define,
+                        $view
                         .with_name($define.v_s_rawk("name"))
                         .resized(
                             size_w.unwrap_or(SizeConstraint::Free),
                             size_h.unwrap_or(SizeConstraint::Free),
                         )
                         .scrollable()
-                        .scroll_strategy(scroll_strat)
-                        .into_boxed_view()
+                        .scroll_strategy(scroll_strat))
                 } else {
-                    $view
-                        .with_name($define.v_s_rawk("name"))
-                        .resized(
-                            size_w.unwrap_or(SizeConstraint::Free),
-                            size_h.unwrap_or(SizeConstraint::Free),
-                        )
-                        .into_boxed_view()
+                    wrap_hideable!(
+                        $define,
+                        $view
+                            .with_name($define.v_s_rawk("name"))
+                            .resized(
+                                size_w.unwrap_or(SizeConstraint::Free),
+                                size_h.unwrap_or(SizeConstraint::Free),
+                            ))
                 }
             } else {
                 if let Some(scroll_strat) = scroll_strat {
-                    $view
-                        .with_name($define.v_s_rawk("name"))
-                        .scrollable()
-                        .scroll_strategy(scroll_strat)
-                        .into_boxed_view()
+                    wrap_hideable!(
+                        $define,
+                        $view
+                            .with_name($define.v_s_rawk("name"))
+                            .scrollable()
+                            .scroll_strategy(scroll_strat))
                 } else {
-                    $view.with_name($define.v_s_rawk("name")).into_boxed_view()
+                    wrap_hideable!(
+                        $define,
+                        $view.with_name($define.v_s_rawk("name")))
                 }
             }
         } else {
             if size_w.is_some() || size_h.is_some() {
                 if let Some(scroll_strat) = scroll_strat {
-                    $view
-                        .resized(
-                            size_w.unwrap_or(SizeConstraint::Free),
-                            size_h.unwrap_or(SizeConstraint::Free),
-                        )
-                        .scrollable()
-                        .scroll_strategy(scroll_strat)
-                        .into_boxed_view()
+                    wrap_hideable!(
+                        $define,
+                        $view
+                            .resized(
+                                size_w.unwrap_or(SizeConstraint::Free),
+                                size_h.unwrap_or(SizeConstraint::Free),
+                            )
+                            .scrollable()
+                            .scroll_strategy(scroll_strat))
                 } else {
-                    $view
-                        .resized(
-                            size_w.unwrap_or(SizeConstraint::Free),
-                            size_h.unwrap_or(SizeConstraint::Free),
-                        )
-                        .into_boxed_view()
+                    wrap_hideable!(
+                        $define,
+                        $view
+                            .resized(
+                                size_w.unwrap_or(SizeConstraint::Free),
+                                size_h.unwrap_or(SizeConstraint::Free),
+                            ))
                 }
             } else {
                 if let Some(scroll_strat) = scroll_strat {
-                    $view.scrollable().scroll_strategy(scroll_strat).into_boxed_view()
+                    wrap_hideable!(
+                        $define,
+                        $view.scrollable().scroll_strategy(scroll_strat))
                 } else {
-                    $view.into_boxed_view()
+                    wrap_hideable!($define, $view)
                 }
             }
         }
@@ -1336,6 +1392,10 @@ fn vv2view(
     env: &mut Env,
     reg: &ViewNameRegistry,
 ) -> Result<Box<(dyn cursive::View + 'static)>, String> {
+    if v.is_str() {
+        return Ok(TextView::new(v.s_raw()).into_boxed_view());
+    }
+
     let typ = v.v_(0);
     let define = v.v_(1);
 
@@ -1838,14 +1898,18 @@ pub fn handle_cursive_call_method(
 
             expect_view!(&argv.v_(1), "$<Cursive>.popup", new_view, reg, env, {
                 let define = argv.v_(0);
-                let mut dialog = Dialog::around(new_view).dismiss_button("Ok");
+                let mut dialog = Dialog::around(new_view);
 
                 if define.v_k("title").is_some() {
                     dialog.set_title(define.v_s_rawk("title"));
                 }
 
+                let mut has_buttons = false;
+
                 define.v_k("buttons").with_iter(|it| {
                     for (v, _) in it {
+                        has_buttons = true;
+
                         let denv = Rc::new(RefCell::new(env.derive()));
                         let cb = v.v_(1);
 
@@ -1862,10 +1926,13 @@ pub fn handle_cursive_call_method(
                 });
 
                 let dialog = if define.v_k("close_label").is_some() {
+                    has_buttons = true;
                     dialog.dismiss_button(define.v_s_rawk("close_label"))
                 } else {
                     dialog
                 };
+
+                let dialog = if !has_buttons { dialog.dismiss_button("Ok") } else { dialog };
 
                 cursive.add_layer(dialog);
                 Ok(VVal::None)
@@ -1917,6 +1984,7 @@ pub fn handle_cursive_call_method(
                     "checkbox" => ViewType::Checkbox,
                     "slider" => ViewType::Slider,
                     "select" => ViewType::SelectView,
+                    "hideable" => ViewType::Hideable,
                     _ => {
                         panic!("Unknown viewtype encountered, fatal error in programming: {}", typ);
                     }
