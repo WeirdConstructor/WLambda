@@ -602,22 +602,22 @@ macro_rules! auto_wrap_view {
                     wrap_hideable!(
                         $define,
                         $view
-                        .with_name($define.v_s_rawk("name"))
-                        .resized(
-                            size_w.unwrap_or(SizeConstraint::Free),
-                            size_h.unwrap_or(SizeConstraint::Free),
-                        )
-                        .scrollable()
-                        .scroll_strategy(scroll_strat))
-                } else {
-                    wrap_hideable!(
-                        $define,
-                        $view
                             .with_name($define.v_s_rawk("name"))
                             .resized(
                                 size_w.unwrap_or(SizeConstraint::Free),
                                 size_h.unwrap_or(SizeConstraint::Free),
-                            ))
+                            )
+                            .scrollable()
+                            .scroll_strategy(scroll_strat)
+                    )
+                } else {
+                    wrap_hideable!(
+                        $define,
+                        $view.with_name($define.v_s_rawk("name")).resized(
+                            size_w.unwrap_or(SizeConstraint::Free),
+                            size_h.unwrap_or(SizeConstraint::Free),
+                        )
+                    )
                 }
             } else {
                 if let Some(scroll_strat) = scroll_strat {
@@ -626,11 +626,10 @@ macro_rules! auto_wrap_view {
                         $view
                             .with_name($define.v_s_rawk("name"))
                             .scrollable()
-                            .scroll_strategy(scroll_strat))
+                            .scroll_strategy(scroll_strat)
+                    )
                 } else {
-                    wrap_hideable!(
-                        $define,
-                        $view.with_name($define.v_s_rawk("name")))
+                    wrap_hideable!($define, $view.with_name($define.v_s_rawk("name")))
                 }
             }
         } else {
@@ -644,21 +643,20 @@ macro_rules! auto_wrap_view {
                                 size_h.unwrap_or(SizeConstraint::Free),
                             )
                             .scrollable()
-                            .scroll_strategy(scroll_strat))
+                            .scroll_strategy(scroll_strat)
+                    )
                 } else {
                     wrap_hideable!(
                         $define,
-                        $view
-                            .resized(
-                                size_w.unwrap_or(SizeConstraint::Free),
-                                size_h.unwrap_or(SizeConstraint::Free),
-                            ))
+                        $view.resized(
+                            size_w.unwrap_or(SizeConstraint::Free),
+                            size_h.unwrap_or(SizeConstraint::Free),
+                        )
+                    )
                 }
             } else {
                 if let Some(scroll_strat) = scroll_strat {
-                    wrap_hideable!(
-                        $define,
-                        $view.scrollable().scroll_strategy(scroll_strat))
+                    wrap_hideable!($define, $view.scrollable().scroll_strategy(scroll_strat))
                 } else {
                     wrap_hideable!($define, $view)
                 }
@@ -1322,7 +1320,6 @@ impl cursive::View for XView {
     }
 
     fn on_event(&mut self, ev: cursive::event::Event) -> cursive::event::EventResult {
-        use cursive::event::Event;
         use cursive::event::MouseEvent;
 
         //        CURSIVE_STDOUT.with(|cs| {
@@ -1452,6 +1449,12 @@ fn vv2view(
             if define.v_k("filler").is_some() {
                 edit.set_filler(define.v_s_rawk("filler"));
             }
+
+            let mut edit = if define.v_k("content").is_some() {
+                edit.content(define.v_s_rawk("content"))
+            } else {
+                edit
+            };
 
             add_cb_handler!(
                 cursive,
@@ -1775,6 +1778,11 @@ pub fn handle_cursive_call_method(
                 cursive.add_layer(new_view);
                 Ok(VVal::None)
             })
+        }
+        "pop_layer" => {
+            assert_arg_count!("$<Cursive>", argv, 0, "pop_layer[]", env);
+            cursive.pop_layer();
+            Ok(VVal::None)
         }
         "add_screen" => {
             assert_arg_count!("$<Cursive>", argv, 1, "add_screen[view]", env);
