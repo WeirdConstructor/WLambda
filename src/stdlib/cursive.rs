@@ -22,9 +22,9 @@ use cursive::utils::Counter;
 use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeConstraint};
 #[cfg(feature = "cursive")]
 use cursive::views::{
-    BoxedView, Button, Checkbox, Dialog, EditView, HideableView, LinearLayout, ListView, Panel,
-    ProgressBar, RadioButton, RadioGroup, SelectView, SliderView, StackView, TextArea, TextContent,
-    TextView, ViewRef,
+    BoxedView, Button, Checkbox, Dialog, DialogFocus, EditView, HideableView, LinearLayout,
+    ListView, Panel, ProgressBar, RadioButton, RadioGroup, SelectView, SliderView, StackView,
+    TextArea, TextContent, TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive};
@@ -1933,6 +1933,12 @@ pub fn handle_cursive_call_method(
                     }
                 });
 
+                if define.v_k("focus").is_some() {
+                    dialog.set_focus(DialogFocus::Button(define.v_ik("focus") as usize));
+                } else {
+                    dialog.set_focus(DialogFocus::Content);
+                }
+
                 let dialog = if define.v_k("close_label").is_some() {
                     has_buttons = true;
                     dialog.dismiss_button(define.v_s_rawk("close_label"))
@@ -1942,7 +1948,7 @@ pub fn handle_cursive_call_method(
 
                 let dialog = if !has_buttons { dialog.dismiss_button("Ok") } else { dialog };
 
-                cursive.add_layer(dialog);
+                cursive.add_layer(auto_wrap_view!(dialog, define, dialog, reg, cursive, env));
                 Ok(VVal::None)
             })
         }
