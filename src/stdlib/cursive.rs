@@ -845,19 +845,19 @@ impl XBlockType {
 #[derive(Clone, Debug)]
 struct XBlockNode {
     id: usize,
-    pos: (u16, u16),
+    pos: (i32, i32),
     block_type: XBlockType,
     label: String,
 
     input_labels: Vec<String>,
     output_labels: Vec<String>,
     calc_label: String,
-    calc_size: (u16, u16),
+    calc_size: (i32, i32),
     cached_rows: Vec<String>,
 }
 
 impl XBlockNode {
-    pub fn new(id: usize, pos: (u16, u16), label: &str, block_type: XBlockType) -> Self {
+    pub fn new(id: usize, pos: (i32, i32), label: &str, block_type: XBlockType) -> Self {
         let mut s = Self {
             id,
             pos,
@@ -883,7 +883,7 @@ impl XBlockNode {
         self.input_labels.get(idx).map(|s| &s[..])
     }
 
-    pub fn is_in_node(&self, pos: (u16, u16)) -> bool {
+    pub fn is_in_node(&self, pos: (i32, i32)) -> bool {
         pos.0 >= self.pos.0
             && pos.0 < self.pos.0 + self.calc_size.0
             && pos.1 >= self.pos.1
@@ -905,13 +905,13 @@ impl XBlockNode {
         self.calc_label = self.block_type.generate_label(&self.label);
 
         // FIXME: The actual size should be calculated from the Unicode String Width!
-        let mut width = self.calc_label.len() as u16;
+        let mut width = self.calc_label.len() as i32;
         if self.block_type.has_inputs() {
             width += 2;
         }
 
         let mut height =
-            self.block_type.input_count().max(self.block_type.output_count()).max(1) as u16;
+            self.block_type.input_count().max(self.block_type.output_count()).max(1) as i32;
 
         if height > 1 {
             height += 1;
@@ -1018,13 +1018,13 @@ impl XView {
         }
     }
 
-    pub fn get_input_port_pos(&self, id: usize, idx: u8) -> Option<(u16, u16)> {
+    pub fn get_input_port_pos(&self, id: usize, idx: u8) -> Option<(i32, i32)> {
         if let Some(node) = self.nodes.borrow().get(&id) {
             if idx < node.block_type.input_count() {
                 if node.block_type.input_count() == 1 {
                     return Some((node.pos.0, node.pos.1));
                 } else {
-                    return Some((node.pos.0, node.pos.1 + 1 + (idx as u16)));
+                    return Some((node.pos.0, node.pos.1 + 1 + (idx as i32)));
                 }
             }
         }
@@ -1032,13 +1032,13 @@ impl XView {
         None
     }
 
-    pub fn get_output_port_pos(&self, id: usize, idx: u8) -> Option<(u16, u16)> {
+    pub fn get_output_port_pos(&self, id: usize, idx: u8) -> Option<(i32, i32)> {
         if let Some(node) = self.nodes.borrow().get(&id) {
             if idx < node.block_type.output_count() {
                 if node.block_type.output_count() == 1 {
                     return Some((node.pos.0 + node.calc_size.0, node.pos.1));
                 } else {
-                    return Some((node.pos.0 + node.calc_size.0, node.pos.1 + 1 + (idx as u16)));
+                    return Some((node.pos.0 + node.calc_size.0, node.pos.1 + 1 + (idx as i32)));
                 }
             }
         }
@@ -1046,7 +1046,7 @@ impl XView {
         None
     }
 
-    pub fn get_node_height(&self, id: usize) -> Option<u16> {
+    pub fn get_node_height(&self, id: usize) -> Option<i32> {
         self.nodes.borrow().get(&id).map(|n| n.calc_size.1)
     }
 
@@ -1063,9 +1063,9 @@ impl XView {
     //  xxx|------
     pub fn plot_case_out_lt_in(
         &self,
-        out_pos: (u16, u16),
-        in_pos: (u16, u16),
-        points: &mut Vec<(usize, usize, &'static str)>,
+        out_pos: (i32, i32),
+        in_pos: (i32, i32),
+        points: &mut Vec<(i32, i32, &'static str)>,
     ) {
         let (x_left, x_right) = (in_pos.0.min(out_pos.0), out_pos.0.max(in_pos.0));
 
@@ -1078,31 +1078,31 @@ impl XView {
         };
 
         for x_top in out_pos.0..x_mid {
-            points.push((x_top as usize, out_pos.1 as usize, "━"));
+            points.push((x_top, out_pos.1, "━"));
         }
 
         if out_pos.1 == in_pos.1 {
-            points.push((x_mid as usize, out_pos.1 as usize, "━"));
+            points.push((x_mid, out_pos.1, "━"));
         } else {
             if is_up {
-                points.push((x_mid as usize, out_pos.1 as usize, "┓"));
+                points.push((x_mid, out_pos.1, "┓"));
             } else {
-                points.push((x_mid as usize, out_pos.1 as usize, "┛"));
+                points.push((x_mid, out_pos.1, "┛"));
             }
 
             for y in (y_top + 1)..y_bot {
-                points.push((x_mid as usize, y as usize, "┃"));
+                points.push((x_mid, y, "┃"));
             }
 
             if is_up {
-                points.push((x_mid as usize, in_pos.1 as usize, "┗"));
+                points.push((x_mid, in_pos.1, "┗"));
             } else {
-                points.push((x_mid as usize, in_pos.1 as usize, "┏"));
+                points.push((x_mid, in_pos.1, "┏"));
             }
         }
 
         for x_bot in (x_mid + 1)..in_pos.0 {
-            points.push((x_bot as usize, in_pos.1 as usize, "━"));
+            points.push((x_bot, in_pos.1, "━"));
         }
     }
 
@@ -1116,26 +1116,42 @@ impl XView {
     //
     pub fn plot_case_out_gt_in(
         &self,
-        out_pos: (u16, u16),
-        out_height: u16,
-        in_pos: (u16, u16),
-        in_height: u16,
-        points: &mut Vec<(usize, usize, &'static str)>,
+        out_pos: (i32, i32),
+        out_height: i32,
+        in_pos: (i32, i32),
+        in_height: i32,
+        points: &mut Vec<(i32, i32, &'static str)>,
     ) {
         let (y_up, y_down) = (in_pos.1.min(out_pos.1), out_pos.1.max(in_pos.1));
         let y_mid = y_up + (y_down - y_up) / 2;
 
-        points.push((out_pos.0 as usize, out_pos.1 as usize, "━"));
-        points.push(((out_pos.0 + 1) as usize, out_pos.1 as usize, "┓"));
-        for yh in 1..(out_height - 1) {
-            points.push(((out_pos.0 + 1) as usize, (out_pos.1 + yh) as usize, "┃"));
+        points.push((out_pos.0, out_pos.1, "━"));
+        points.push((out_pos.0 + 1, out_pos.1, "┓"));
+        for yh in 1..out_height {
+            points.push((out_pos.0 + 1, out_pos.1 + yh, "┃"));
         }
         let out_adj = (out_pos.0 + 1, out_pos.1 + out_height);
 
-        points.push((in_pos.0 as usize, in_pos.1 as usize, "━"));
-        points.push(((in_pos.0 - 1) as usize, in_pos.1 as usize, "┗"));
-        points.push(((in_pos.0 - 1) as usize, (in_pos.1 - 1) as usize, "┃"));
-        let in_adj = (in_pos.0 - 1, in_pos.1 - 1);
+        points.push((in_pos.0 - 1, in_pos.1, "━"));
+        points.push((in_pos.0 - 2, in_pos.1, "┗"));
+        points.push((in_pos.0 - 2, in_pos.1 - 1, "┃"));
+        let in_adj = (in_pos.0 - 2, in_pos.1 - 1);
+
+        for yh in (y_mid + 1)..in_adj.1 {
+            points.push((in_adj.0, yh, "┃"));
+        }
+
+        for yh in out_adj.1..y_mid {
+            points.push((out_adj.0, yh, "┃"));
+        }
+
+        points.push((in_adj.0, y_mid, "┏"));
+        points.push((out_adj.0, y_mid, "┛"));
+
+        for x in (in_adj.0 + 1)..out_adj.0 {
+            points.push((x, y_mid, "━"));
+        }
+
     }
 
     pub fn plot_path(
@@ -1144,7 +1160,7 @@ impl XView {
         out_idx: u8,
         in_id: usize,
         in_idx: u8,
-        points: &mut Vec<(usize, usize, &'static str)>,
+        points: &mut Vec<(i32, i32, &'static str)>,
     ) -> bool {
         points.clear();
 
@@ -1169,7 +1185,7 @@ impl XView {
         false
     }
 
-    pub fn check_free_at(&self, pos: (u16, u16)) -> bool {
+    pub fn check_free_at(&self, pos: (i32, i32)) -> bool {
         for (id, node) in self.nodes.borrow().iter() {
             if node.is_in_node(pos) {
                 return true;
@@ -1180,7 +1196,7 @@ impl XView {
     }
 
     // FIXME: Optimize this using a sparse map that looks up the positions?
-    pub fn find_node_id_at(&self, pos: (u16, u16)) -> Option<usize> {
+    pub fn find_node_id_at(&self, pos: (i32, i32)) -> Option<usize> {
         for (_id, node) in self.nodes.borrow().iter() {
             if node.is_in_node(pos) {
                 return Some(node.id);
@@ -1190,11 +1206,11 @@ impl XView {
         None
     }
 
-    pub fn get_node_pos(&self, id: usize) -> Option<(u16, u16)> {
+    pub fn get_node_pos(&self, id: usize) -> Option<(i32, i32)> {
         self.nodes.borrow().get(&id).map(|n| n.pos)
     }
 
-    pub fn node_fits_at(&self, id: usize, at: (u16, u16)) -> bool {
+    pub fn node_fits_at(&self, id: usize, at: (i32, i32)) -> bool {
         if let Some(node) = self.nodes.borrow().get(&id) {
             for x in at.0..(at.0 + node.calc_size.0) {
                 for y in at.1..(at.1 + node.calc_size.1) {
@@ -1214,7 +1230,7 @@ impl XView {
         if let Some(pos) = self.get_node_pos(id) {
             dlog(&format!("Found: {:?}", pos));
 
-            let dest = ((pos.0 as i32 + offs.0) as u16, (pos.1 as i32 + offs.1) as u16);
+            let dest = ((pos.0 + offs.0), (pos.1 + offs.1));
             if self.node_fits_at(id, dest) {
                 dlog(&format!("Free at: {:?}", dest));
                 let mut nodes = self.nodes.borrow_mut();
@@ -1241,12 +1257,14 @@ impl cursive::View for XView {
     fn draw(&self, printer: &cursive::Printer) {
         printer.print_box((0, 0), (self.w, self.h), true);
 
-        let mut path: Vec<(usize, usize, &'static str)> = vec![];
+        let mut path: Vec<(i32, i32, &'static str)> = vec![];
 
         for ((out_id, out_idx), (in_id, in_idx)) in self.connections.borrow().iter() {
             if self.plot_path(*out_id, *out_idx, *in_id, *in_idx, &mut path) {
                 for (x, y, chr) in path.iter() {
-                    printer.print((*x, *y), chr);
+                    if *x >= 0 && *y >= 0 {
+                        printer.print((*x as usize, *y as usize), chr);
+                    }
                 }
             }
         }
@@ -1326,7 +1344,7 @@ impl cursive::View for XView {
 
                 printer.with_style(cursive::theme::ColorStyle::highlight_inactive(), |printer| {
                     for (i, row) in node.cached_rows.iter().enumerate() {
-                        printer.print((node.pos.0, node.pos.1 + i as u16), row);
+                        printer.print((node.pos.0, node.pos.1 + i as i32), row);
                     }
                 });
             }
@@ -1367,7 +1385,7 @@ impl cursive::View for XView {
             Event::Mouse { event: MouseEvent::Press(_), position, offset }
                 if position.fits_in_rect(offset, (self.w, self.h)) =>
             {
-                let rel_pos = ((position.x - offset.x) as u16, (position.y - offset.y) as u16);
+                let rel_pos = ((position.x - offset.x) as i32, (position.y - offset.y) as i32);
 
                 if let Some(id) = self.find_node_id_at(rel_pos) {
                     self.drag = Some((id, position));
