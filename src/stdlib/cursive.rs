@@ -590,6 +590,13 @@ macro_rules! auto_wrap_view {
             })
         }
 
+        let scroll_y = if $define.v_k("scroll_y").is_none() {
+            true
+        } else {
+            $define.v_bk("scroll_y")
+        };
+        let scroll_x = $define.v_bk("scroll_x");
+
         if $define.v_k("hideable_name").is_some() {
             $reg.borrow_mut().insert($define.v_s_rawk("hideable_name"), "hideable".to_string());
         }
@@ -608,6 +615,8 @@ macro_rules! auto_wrap_view {
                                 size_h.unwrap_or(SizeConstraint::Free),
                             )
                             .scrollable()
+                            .scroll_x(scroll_x)
+                            .scroll_y(scroll_y)
                             .scroll_strategy(scroll_strat)
                     )
                 } else {
@@ -626,6 +635,8 @@ macro_rules! auto_wrap_view {
                         $view
                             .with_name($define.v_s_rawk("name"))
                             .scrollable()
+                            .scroll_x(scroll_x)
+                            .scroll_y(scroll_y)
                             .scroll_strategy(scroll_strat)
                     )
                 } else {
@@ -643,6 +654,8 @@ macro_rules! auto_wrap_view {
                                 size_h.unwrap_or(SizeConstraint::Free),
                             )
                             .scrollable()
+                            .scroll_x(scroll_x)
+                            .scroll_y(scroll_y)
                             .scroll_strategy(scroll_strat)
                     )
                 } else {
@@ -656,7 +669,14 @@ macro_rules! auto_wrap_view {
                 }
             } else {
                 if let Some(scroll_strat) = scroll_strat {
-                    wrap_hideable!($define, $view.scrollable().scroll_strategy(scroll_strat))
+                    wrap_hideable!(
+                        $define,
+                        $view
+                            .scrollable()
+                            .scroll_x(scroll_x)
+                            .scroll_y(scroll_y)
+                            .scroll_strategy(scroll_strat)
+                    )
                 } else {
                     wrap_hideable!($define, $view)
                 }
