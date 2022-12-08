@@ -1036,9 +1036,9 @@ impl XView {
         if let Some(node) = self.nodes.borrow().get(&id) {
             if idx < node.block_type.output_count() {
                 if node.block_type.output_count() == 1 {
-                    return Some((node.pos.0 + node.calc_size.0, node.pos.1));
+                    return Some((node.pos.0 + (node.calc_size.0 - 1), node.pos.1));
                 } else {
-                    return Some((node.pos.0 + node.calc_size.0, node.pos.1 + 1 + (idx as i32)));
+                    return Some((node.pos.0 + (node.calc_size.0 - 1), node.pos.1 + 1 + (idx as i32)));
                 }
             }
         }
@@ -1106,6 +1106,59 @@ impl XView {
         }
     }
 
+    // plots a vertical line from `pos`, but not including `pos` for the length of `dirlen`.
+    // this means, dirlen=0 draws nothing. dirlen=-1 one `-` on the left and dirlen=1 `-`
+    // on the right.
+    pub fn plot_vline(&self, pos: (i32, i32), dirlen: i32, points: &mut Vec<(i32, i32, &'static str)>) {
+        if dirlen > 0 {
+            for x in (pos.0 + 1)..=(pos.0 + dirlen) {
+                points.push((x, pos.1, "━"));
+            }
+        } else {
+            for x in (pos.0 + dirlen)..pos.0 {
+                points.push((x, pos.1, "━"));
+            }
+        }
+    }
+
+    // Plots a U-Turn in horizontal direction, connecting pos_a and pos_b.
+    // outset_a > 0 defines a U-Turn to the right, outset_a < 0 defines a U-Turn to the left.
+    // outset_a relates to the outset of pos_a.
+    //
+    //         outset_a
+    //           |
+    //           v
+    //   pos_a -----\ <---- x_a point
+    //              |
+    //              |
+    //   pos_b -----/
+    pub fn plot_h_turn(
+        &self,
+        mut pos_a: (i32, i32),
+        outset_a: i32,
+        mut pos_b: (i32, i32),
+        points: &mut Vec<(i32, i32, &'static str)>,
+    ) {
+        let x_a = pos_a.0 + outset_a;
+        let x_sign = outset_a.signum();
+
+        if pos_a.1 > pos_b.1 {
+            std::mem::swap(&mut pos_a, &mut pos_b);
+        }
+
+        let delta_a = x_a - (pos_a.0 + x_sign);
+        self.plot_vline(pos_a, delta_a, points);
+        points.push((x_a, pos_a.1, if x_sign > 0 { "┓" } else { "┏" }));
+
+        for y in (pos_a.1 + 1)..=(pos_b.1 - 1) {
+            points.push((x_a, y, "┃"));
+        }
+
+        let delta_b = x_a - (pos_b.0 + x_sign);
+        self.plot_vline(pos_b, delta_b, points);
+        points.push((x_a, pos_b.1, if x_sign > 0 { "┛" } else {  "┗" }));
+    }
+
     // Plots for these cases:
     //
     //           xxx|--
@@ -1125,33 +1178,20 @@ impl XView {
         let (y_up, y_down) = (in_pos.1.min(out_pos.1), out_pos.1.max(in_pos.1));
         let y_mid = y_up + (y_down - y_up) / 2;
 
-        points.push((out_pos.0, out_pos.1, "━"));
-        points.push((out_pos.0 + 1, out_pos.1, "┓"));
-        for yh in 1..out_height {
-            points.push((out_pos.0 + 1, out_pos.1 + yh, "┃"));
-        }
-        let out_adj = (out_pos.0 + 1, out_pos.1 + out_height);
+        self.plot_h_turn(
+            out_pos, 1,
+            (out_pos.0, y_mid),
+            points);
 
-        points.push((in_pos.0 - 1, in_pos.1, "━"));
-        points.push((in_pos.0 - 2, in_pos.1, "┗"));
-        points.push((in_pos.0 - 2, in_pos.1 - 1, "┃"));
-        let in_adj = (in_pos.0 - 2, in_pos.1 - 1);
+        self.plot_h_turn(
+            in_pos,
+            -1,
+            (out_pos.0 + 1, y_mid),
+            points);
 
-        for yh in (y_mid + 1)..in_adj.1 {
-            points.push((in_adj.0, yh, "┃"));
-        }
-
-        for yh in out_adj.1..y_mid {
-            points.push((out_adj.0, yh, "┃"));
-        }
-
-        points.push((in_adj.0, y_mid, "┏"));
-        points.push((out_adj.0, y_mid, "┛"));
-
-        for x in (in_adj.0 + 1)..out_adj.0 {
-            points.push((x, y_mid, "━"));
-        }
-
+//        for x in (in_adj.0 + 1)..out_adj.0 {
+//            points.push((x, y_mid, "━"));
+//        }
     }
 
     pub fn plot_path(
@@ -1168,7 +1208,7 @@ impl XView {
             if let Some(in_pos) = self.get_input_port_pos(in_id, in_idx) {
                 if (out_pos.0 + 1) < in_pos.0 {
                     self.plot_case_out_lt_in(out_pos, in_pos, points);
-                } else if out_pos.0 > in_pos.0 {
+                } else if out_pos.0 >= in_pos.0 {
                     self.plot_case_out_gt_in(
                         out_pos,
                         self.get_node_height(out_id).unwrap_or(0),
