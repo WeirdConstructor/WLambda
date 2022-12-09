@@ -996,8 +996,8 @@ impl XView {
                         (String::from("i2"), String::from("i2")),
                     ]),
                     outputs: Arc::new(vec![
-                        (String::from("e1"), String::from("e1")),
-                        (String::from("e2"), String::from("e2")),
+                        (String::from("äoooöööße1"), String::from("e1")),
+                        (String::from("äße2"), String::from("e2")),
                     ]),
                 },
             ),
@@ -1050,6 +1050,10 @@ impl XView {
         self.nodes.borrow().get(&id).map(|n| n.calc_size.1)
     }
 
+    pub fn get_node_rect(&self, id: usize) -> Option<(i32, i32, i32, i32)> {
+        self.nodes.borrow().get(&id).map(|n| (n.pos.0, n.pos.1, n.calc_size.0, n.calc_size.1))
+    }
+
     // Plots for these cases:
     //
     //  xxx|------
@@ -1078,31 +1082,31 @@ impl XView {
         };
 
         for x_top in out_pos.0..x_mid {
-            points.push((x_top, out_pos.1, "━"));
+            points.push((x_top, out_pos.1, "─"));
         }
 
         if out_pos.1 == in_pos.1 {
-            points.push((x_mid, out_pos.1, "━"));
+            points.push((x_mid, out_pos.1, "─"));
         } else {
             if is_up {
-                points.push((x_mid, out_pos.1, "┓"));
+                points.push((x_mid, out_pos.1, "┐"));
             } else {
-                points.push((x_mid, out_pos.1, "┛"));
+                points.push((x_mid, out_pos.1, "┘"));
             }
 
             for y in (y_top + 1)..y_bot {
-                points.push((x_mid, y, "┃"));
+                points.push((x_mid, y, "│"));
             }
 
             if is_up {
-                points.push((x_mid, in_pos.1, "┗"));
+                points.push((x_mid, in_pos.1, "└"));
             } else {
-                points.push((x_mid, in_pos.1, "┏"));
+                points.push((x_mid, in_pos.1, "┌"));
             }
         }
 
         for x_bot in (x_mid + 1)..in_pos.0 {
-            points.push((x_bot, in_pos.1, "━"));
+            points.push((x_bot, in_pos.1, "─"));
         }
     }
 
@@ -1112,11 +1116,11 @@ impl XView {
     pub fn plot_vline(&self, pos: (i32, i32), dirlen: i32, points: &mut Vec<(i32, i32, &'static str)>) {
         if dirlen > 0 {
             for x in (pos.0 + 1)..=(pos.0 + dirlen) {
-                points.push((x, pos.1, "━"));
+                points.push((x, pos.1, "─"));
             }
         } else {
             for x in (pos.0 + dirlen)..pos.0 {
-                points.push((x, pos.1, "━"));
+                points.push((x, pos.1, "─"));
             }
         }
     }
@@ -1148,15 +1152,15 @@ impl XView {
 
         let delta_a = x_a - (pos_a.0 + x_sign);
         self.plot_vline(pos_a, delta_a, points);
-        points.push((x_a, pos_a.1, if x_sign > 0 { "┓" } else { "┏" }));
+        points.push((x_a, pos_a.1, if x_sign > 0 { "┐" } else { "┌" }));
 
         for y in (pos_a.1 + 1)..=(pos_b.1 - 1) {
-            points.push((x_a, y, "┃"));
+            points.push((x_a, y, "│"));
         }
 
         let delta_b = x_a - (pos_b.0 + x_sign);
         self.plot_vline(pos_b, delta_b, points);
-        points.push((x_a, pos_b.1, if x_sign > 0 { "┛" } else {  "┗" }));
+        points.push((x_a, pos_b.1, if x_sign > 0 { "┘" } else {  "└" }));
     }
 
     // Plots for these cases:
@@ -1170,28 +1174,69 @@ impl XView {
     pub fn plot_case_out_gt_in(
         &self,
         out_pos: (i32, i32),
-        out_height: i32,
+        out_port_offs: i32,
         in_pos: (i32, i32),
-        in_height: i32,
+        in_port_offs: i32,
+        y_connection: i32,
         points: &mut Vec<(i32, i32, &'static str)>,
     ) {
-        let (y_up, y_down) = (in_pos.1.min(out_pos.1), out_pos.1.max(in_pos.1));
-        let y_mid = y_up + (y_down - y_up) / 2;
-
         self.plot_h_turn(
-            out_pos, 1,
-            (out_pos.0, y_mid),
+            out_pos, 1 + out_port_offs,
+            (out_pos.0, y_connection),
             points);
 
         self.plot_h_turn(
             in_pos,
-            -1,
-            (out_pos.0 + 1, y_mid),
+            -1 - in_port_offs,
+            (out_pos.0 + 1, y_connection),
             points);
+    }
 
-//        for x in (in_adj.0 + 1)..out_adj.0 {
-//            points.push((x, y_mid, "━"));
-//        }
+    fn calc_reverse_route_y(&self, out_id: usize, in_id: usize) -> i32 {
+        if let Some(out_rect) = self.get_node_rect(out_id) {
+            if let Some(in_rect) = self.get_node_rect(in_id) {
+                let out_y0 = out_rect.1;
+                let out_y1 = out_rect.1 + out_rect.3;
+                let in_y0 = in_rect.1;
+                let in_y1 = in_rect.1 + in_rect.3;
+
+                // determine if we overlap in Y:
+                if    (out_y0 >= in_y0 && out_y0 <= in_y1)
+                   || (out_y1 >= in_y0 && out_y1 <= in_y1)
+                   || (in_y1 >= out_y0 && in_y1 <= out_y1)
+                   || (in_y1 >= out_y0 && in_y1 <= out_y1)
+                {
+                    // take an offset of 1 up to 3 depending on the node IDs:
+                    let offs = ((out_id + in_id) % 3) + 1;
+                    out_y1.max(in_y1) + (offs as i32)
+                } else {
+                    // we got a path between the two nodes:
+                    let (y0, y1) = if out_y1 > in_y0 {
+                        (in_y1, out_y0)
+                    } else {
+                        (out_y1, in_y0)
+                    };
+
+                    // Take the mid of the free space between them
+                    let delta_y = (y1 - y0).abs();
+                    if delta_y < 4 {
+                        // determine the row of narrow paths by some more or less
+                        // arbitrary number depending on the node IDs:
+                        y0 + (((out_id + in_id) % (delta_y as usize)) as i32)
+                    } else {
+                        // Determine the row offset from the middle by some arbitrary
+                        // offset depending on the node IDs:
+                        let offs = ((out_id + in_id) % 5) as i32 - 2;
+                        // offs should be one of: [-2, -1, 0, 1, 2]
+                        offs + y0 + delta_y / 2
+                    }
+                }
+            } else {
+                1
+            }
+        } else {
+            1
+        }
     }
 
     pub fn plot_path(
@@ -1208,12 +1253,14 @@ impl XView {
             if let Some(in_pos) = self.get_input_port_pos(in_id, in_idx) {
                 if (out_pos.0 + 1) < in_pos.0 {
                     self.plot_case_out_lt_in(out_pos, in_pos, points);
-                } else if out_pos.0 >= in_pos.0 {
+
+                } else {
+                    // First find some Y row we can use for the connection:
+                    let y_connection = self.calc_reverse_route_y(out_id, in_id);
                     self.plot_case_out_gt_in(
-                        out_pos,
-                        self.get_node_height(out_id).unwrap_or(0),
-                        in_pos,
-                        self.get_node_height(in_id).unwrap_or(0),
+                        out_pos, (out_idx % 5) as i32,
+                        in_pos, (in_idx % 5) as i32,
+                        y_connection,
                         points,
                     );
                 }
@@ -1270,7 +1317,7 @@ impl XView {
         if let Some(pos) = self.get_node_pos(id) {
             dlog(&format!("Found: {:?}", pos));
 
-            let dest = ((pos.0 + offs.0), (pos.1 + offs.1));
+            let dest = ((pos.0 + offs.0).max(0), (pos.1 + offs.1).max(0));
             if self.node_fits_at(id, dest) {
                 dlog(&format!("Free at: {:?}", dest));
                 let mut nodes = self.nodes.borrow_mut();
@@ -1314,13 +1361,13 @@ impl cursive::View for XView {
                 if node.cached_rows.is_empty() {
                     let mut row = String::new();
                     if node.block_type.has_inputs() {
-                        row += "┥ ";
+                        row += "┤ ";
                     }
 
                     row += &node.calc_label;
 
                     if node.block_type.has_outputs() {
-                        row += " ┝";
+                        row += " ├";
                     }
 
                     node.cached_rows.push(row);
@@ -1352,7 +1399,7 @@ impl cursive::View for XView {
                         let mut char_width_row_inp = 0;
                         let inp = node.get_input_label((row_idx - 1) as usize);
                         if let Some(inp) = inp {
-                            row += "┥ ";
+                            row += "┤ ";
                             row += inp;
                             // FIXME: Also here: use UnicodeStrWidth
                             char_width_row_inp += inp.len() + 2;
@@ -1369,7 +1416,7 @@ impl cursive::View for XView {
                             }
 
                             row += out;
-                            row += " ┝";
+                            row += " ├";
                         } else {
                             if char_width_row_inp < width {
                                 for _ in char_width_row_inp..width {
