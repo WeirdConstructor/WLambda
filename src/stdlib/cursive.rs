@@ -592,11 +592,8 @@ macro_rules! auto_wrap_view {
             })
         }
 
-        let scroll_y = if $define.v_k("scroll_y").is_none() {
-            true
-        } else {
-            $define.v_bk("scroll_y")
-        };
+        let scroll_y =
+            if $define.v_k("scroll_y").is_none() { true } else { $define.v_bk("scroll_y") };
         let scroll_x = $define.v_bk("scroll_x");
 
         if $define.v_k("hideable_name").is_some() {
@@ -928,11 +925,7 @@ impl XBlockNode {
         let mut max_out_lbl = 0;
         self.output_labels.clear();
         self.block_type.for_each_output(|out| {
-            let lbl = if out == "" {
-                self.calc_label.to_string()
-            } else {
-                out.to_string()
-            };
+            let lbl = if out == "" { self.calc_label.to_string() } else { out.to_string() };
             max_out_lbl = max_out_lbl.max(UnicodeWidthStr::width(&lbl[..]));
             self.output_labels.push(lbl);
         });
@@ -940,11 +933,7 @@ impl XBlockNode {
         let mut max_in_lbl = 0;
         self.input_labels.clear();
         self.block_type.for_each_input(|inp| {
-            let lbl = if inp == "" {
-                self.calc_label.to_string()
-            } else {
-                inp.to_string()
-            };
+            let lbl = if inp == "" { self.calc_label.to_string() } else { inp.to_string() };
             max_in_lbl = max_in_lbl.max(UnicodeWidthStr::width(&lbl[..]));
             self.input_labels.push(lbl);
         });
@@ -969,7 +958,8 @@ struct XView {
     pub w: usize,
     pub h: usize,
 
-    drag: Option<(usize, XY<usize>)>,
+    drag: Option<(usize, XY<usize>, (i32, i32, i32, i32))>,
+    drag_mouse_offs: (i32, i32),
 }
 
 impl XView {
@@ -1028,6 +1018,7 @@ impl XView {
             w: 60,
             h: 20,
             drag: None,
+            drag_mouse_offs: (-1, -1),
             nodes: Rc::new(RefCell::new(nodes)),
             connections: Rc::new(RefCell::new(connections)),
         }
@@ -1053,7 +1044,10 @@ impl XView {
                 if node.block_type.output_count() == 1 {
                     return Some((node.pos.0 + (node.calc_size.0 - 1), node.pos.1));
                 } else {
-                    return Some((node.pos.0 + (node.calc_size.0 - 1), node.pos.1 + 1 + (idx as i32)));
+                    return Some((
+                        node.pos.0 + (node.calc_size.0 - 1),
+                        node.pos.1 + 1 + (idx as i32),
+                    ));
                 }
             }
         }
@@ -1091,7 +1085,8 @@ impl XView {
 
         if delta > 5 {
             x_mid += x_mid_offs;
-        } else if delta > 3 { // FIXME: > 2 does not work, there is some off by one bug somewhere.
+        } else if delta > 3 {
+            // FIXME: > 2 does not work, there is some off by one bug somewhere.
             x_mid += x_mid_offs.clamp(-1, 1);
         }
 
@@ -1133,7 +1128,12 @@ impl XView {
     // plots a vertical line from `pos`, but not including `pos` for the length of `dirlen`.
     // this means, dirlen=0 draws nothing. dirlen=-1 one `-` on the left and dirlen=1 `-`
     // on the right.
-    pub fn plot_vline(&self, pos: (i32, i32), dirlen: i32, points: &mut Vec<(i32, i32, &'static str)>) {
+    pub fn plot_vline(
+        &self,
+        pos: (i32, i32),
+        dirlen: i32,
+        points: &mut Vec<(i32, i32, &'static str)>,
+    ) {
         if dirlen > 0 {
             for x in (pos.0 + 1)..=(pos.0 + dirlen) {
                 points.push((x, pos.1, "─"));
@@ -1180,7 +1180,7 @@ impl XView {
 
         let delta_b = x_a - (pos_b.0 + x_sign);
         self.plot_vline(pos_b, delta_b, points);
-        points.push((x_a, pos_b.1, if x_sign > 0 { "┘" } else {  "└" }));
+        points.push((x_a, pos_b.1, if x_sign > 0 { "┘" } else { "└" }));
     }
 
     // Plots for these cases:
@@ -1200,16 +1200,9 @@ impl XView {
         y_connection: i32,
         points: &mut Vec<(i32, i32, &'static str)>,
     ) {
-        self.plot_h_turn(
-            out_pos, 1 + out_port_offs,
-            (out_pos.0, y_connection),
-            points);
+        self.plot_h_turn(out_pos, 1 + out_port_offs, (out_pos.0, y_connection), points);
 
-        self.plot_h_turn(
-            in_pos,
-            -1 - in_port_offs,
-            (out_pos.0 + 1, y_connection),
-            points);
+        self.plot_h_turn(in_pos, -1 - in_port_offs, (out_pos.0 + 1, y_connection), points);
     }
 
     fn calc_reverse_route_y(&self, out_id: usize, in_id: usize) -> i32 {
@@ -1221,21 +1214,17 @@ impl XView {
                 let in_y1 = in_rect.1 + in_rect.3;
 
                 // determine if we overlap in Y:
-                if    (out_y0 >= in_y0 && out_y0 <= in_y1)
-                   || (out_y1 >= in_y0 && out_y1 <= in_y1)
-                   || (in_y1 >= out_y0 && in_y1 <= out_y1)
-                   || (in_y1 >= out_y0 && in_y1 <= out_y1)
+                if (out_y0 >= in_y0 && out_y0 <= in_y1)
+                    || (out_y1 >= in_y0 && out_y1 <= in_y1)
+                    || (in_y1 >= out_y0 && in_y1 <= out_y1)
+                    || (in_y1 >= out_y0 && in_y1 <= out_y1)
                 {
                     // take an offset of 1 up to 3 depending on the node IDs:
                     let offs = ((out_id + in_id) % 3) + 1;
                     out_y1.max(in_y1) + (offs as i32)
                 } else {
                     // we got a path between the two nodes:
-                    let (y0, y1) = if out_y1 > in_y0 {
-                        (in_y1, out_y0)
-                    } else {
-                        (out_y1, in_y0)
-                    };
+                    let (y0, y1) = if out_y1 > in_y0 { (in_y1, out_y0) } else { (out_y1, in_y0) };
 
                     // Take the mid of the free space between them
                     let delta_y = (y1 - y0).abs();
@@ -1274,13 +1263,14 @@ impl XView {
                 if (out_pos.0 + 1) < in_pos.0 {
                     let x_mid_offs = (((out_id + in_id) % 5) as i32) - 2;
                     self.plot_case_out_lt_in(out_pos, in_pos, x_mid_offs, points);
-
                 } else {
                     // First find some Y row we can use for the connection:
                     let y_connection = self.calc_reverse_route_y(out_id, in_id);
                     self.plot_case_out_gt_in(
-                        out_pos, (out_idx % 5) as i32,
-                        in_pos, (in_idx % 5) as i32,
+                        out_pos,
+                        (out_idx % 5) as i32,
+                        in_pos,
+                        (in_idx % 5) as i32,
                         y_connection,
                         points,
                     );
@@ -1475,6 +1465,14 @@ impl cursive::View for XView {
             //                true,
             //            );
         }
+
+        if let Some((id, mouse_pos, rect)) = self.drag.as_ref() {
+            let mut rect = *rect;
+            rect.0 += self.drag_mouse_offs.0;
+            rect.1 += self.drag_mouse_offs.1;
+
+            printer.print_box((rect.0, rect.1), (rect.2, rect.3), true);
+        }
     }
 
     fn on_event(&mut self, ev: cursive::event::Event) -> cursive::event::EventResult {
@@ -1491,7 +1489,7 @@ impl cursive::View for XView {
             Event::Mouse { event: MouseEvent::Release(_), position, offset }
                 if position.fits_in_rect(offset, (self.w, self.h)) =>
             {
-                if let Some((id, mouse_pos)) = self.drag.take() {
+                if let Some((id, mouse_pos, _)) = self.drag.take() {
                     self.move_node_by_offs(
                         id,
                         (
@@ -1502,16 +1500,30 @@ impl cursive::View for XView {
                 }
                 cursive::event::EventResult::Ignored
             }
+            Event::Mouse { event: MouseEvent::Hold(_), position, offset }
+                if position.fits_in_rect(offset, (self.w, self.h)) =>
+            {
+                if let Some((id, mouse_pos, _)) = self.drag.as_ref() {
+                    self.drag_mouse_offs = (
+                        position.x as i32 - mouse_pos.x as i32,
+                        position.y as i32 - mouse_pos.y as i32,
+                    );
+                }
+                cursive::event::EventResult::Ignored
+            }
             Event::Mouse { event: MouseEvent::Press(_), position, offset }
                 if position.fits_in_rect(offset, (self.w, self.h)) =>
             {
                 let rel_pos = ((position.x - offset.x) as i32, (position.y - offset.y) as i32);
 
                 if let Some(id) = self.find_node_id_at(rel_pos) {
-                    self.drag = Some((id, position));
-                    CURSIVE_STDOUT.with(|cs| {
-                        cs.borrow_mut().append(format!("HIT: {:?} {}\n", ev, id));
-                    });
+                    if let Some(rect) = self.get_node_rect(id) {
+                        self.drag_mouse_offs = (0, 0);
+                        self.drag = Some((id, position, rect));
+                        CURSIVE_STDOUT.with(|cs| {
+                            cs.borrow_mut().append(format!("HIT: {:?} {}\n", ev, id));
+                        });
+                    }
                 }
 
                 cursive::event::EventResult::Ignored
@@ -1533,11 +1545,13 @@ impl cursive::View for XView {
         Ok(cursive::event::EventResult::Consumed(None))
     }
 
-    fn required_size(&mut self, _constr: cursive::XY<usize>) -> cursive::XY<usize> {
-        //        CURSIVE_STDOUT.with(|cs| {
-        //            cs.borrow_mut().append(format!("TEST:\n"));
-        //        });
-        (self.w, self.h).into()
+    fn layout(&mut self, size: XY<usize>) {
+        self.w = size.x;
+        self.h = size.y;
+    }
+
+    fn required_size(&mut self, constr: cursive::XY<usize>) -> cursive::XY<usize> {
+        constr
     }
 }
 
