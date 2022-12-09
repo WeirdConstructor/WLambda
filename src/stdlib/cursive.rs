@@ -30,6 +30,8 @@ use cursive::views::{
 use cursive::{direction::Orientation, traits::Nameable, Cursive};
 #[cfg(feature = "cursive")]
 use cursive_buffered_backend;
+#[cfg(feature = "cursive")]
+use unicode_width::UnicodeWidthStr;
 
 macro_rules! assert_arg_count {
     ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
@@ -904,10 +906,10 @@ impl XBlockNode {
     fn update(&mut self) {
         self.calc_label = self.block_type.generate_label(&self.label);
 
-        // FIXME: The actual size should be calculated from the Unicode String Width!
-        let mut width = self.calc_label.len() as i32;
+        let mut pad = 0;
+        let mut width = UnicodeWidthStr::width(&self.calc_label[..]) as i32;
         if self.block_type.has_inputs() {
-            width += 2;
+            pad += 2;
         }
 
         let mut height =
@@ -918,29 +920,42 @@ impl XBlockNode {
         }
 
         if self.block_type.has_outputs() {
-            width += 2;
+            pad += 2;
         }
 
+        width += pad as i32;
+
+        let mut max_out_lbl = 0;
         self.output_labels.clear();
         self.block_type.for_each_output(|out| {
-            if out == "" {
-                self.output_labels.push(self.calc_label.to_string());
+            let lbl = if out == "" {
+                self.calc_label.to_string()
             } else {
-                self.output_labels.push(out.to_string());
-            }
+                out.to_string()
+            };
+            max_out_lbl = max_out_lbl.max(UnicodeWidthStr::width(&lbl[..]));
+            self.output_labels.push(lbl);
         });
 
+        let mut max_in_lbl = 0;
         self.input_labels.clear();
         self.block_type.for_each_input(|inp| {
-            if inp == "" {
-                self.input_labels.push(self.calc_label.to_string());
+            let lbl = if inp == "" {
+                self.calc_label.to_string()
             } else {
-                self.input_labels.push(inp.to_string());
-            }
+                inp.to_string()
+            };
+            max_in_lbl = max_in_lbl.max(UnicodeWidthStr::width(&lbl[..]));
+            self.input_labels.push(lbl);
         });
 
+        if height > 1 {
+            // +1 for some extra padding between inputs and outputs
+            width = width.max((pad + 1 + max_in_lbl + max_out_lbl) as i32);
+        }
+
         self.calc_size = (width, height);
-        dlog(&format!("NCALC {} {},{}", self.id, width, height));
+        //d// dlog(&format!("NCALC {} {},{}", self.id, width, height));
 
         self.cached_rows.clear();
     }
@@ -1046,10 +1061,6 @@ impl XView {
         None
     }
 
-    pub fn get_node_height(&self, id: usize) -> Option<i32> {
-        self.nodes.borrow().get(&id).map(|n| n.calc_size.1)
-    }
-
     pub fn get_node_rect(&self, id: usize) -> Option<(i32, i32, i32, i32)> {
         self.nodes.borrow().get(&id).map(|n| (n.pos.0, n.pos.1, n.calc_size.0, n.calc_size.1))
     }
@@ -1069,11 +1080,20 @@ impl XView {
         &self,
         out_pos: (i32, i32),
         in_pos: (i32, i32),
+        x_mid_offs: i32,
         points: &mut Vec<(i32, i32, &'static str)>,
     ) {
         let (x_left, x_right) = (in_pos.0.min(out_pos.0), out_pos.0.max(in_pos.0));
 
-        let x_mid = x_left + (x_right - x_left) / 2;
+        let delta = x_right - x_left;
+
+        let mut x_mid = x_left + delta / 2;
+
+        if delta > 5 {
+            x_mid += x_mid_offs;
+        } else if delta > 3 { // FIXME: > 2 does not work, there is some off by one bug somewhere.
+            x_mid += x_mid_offs.clamp(-1, 1);
+        }
 
         let (is_up, y_bot, y_top) = if out_pos.1 > in_pos.1 {
             (false, out_pos.1, in_pos.1)
@@ -1219,7 +1239,7 @@ impl XView {
 
                     // Take the mid of the free space between them
                     let delta_y = (y1 - y0).abs();
-                    if delta_y < 4 {
+                    if delta_y <= 4 {
                         // determine the row of narrow paths by some more or less
                         // arbitrary number depending on the node IDs:
                         y0 + (((out_id + in_id) % (delta_y as usize)) as i32)
@@ -1252,7 +1272,8 @@ impl XView {
         if let Some(out_pos) = self.get_output_port_pos(out_id, out_idx) {
             if let Some(in_pos) = self.get_input_port_pos(in_id, in_idx) {
                 if (out_pos.0 + 1) < in_pos.0 {
-                    self.plot_case_out_lt_in(out_pos, in_pos, points);
+                    let x_mid_offs = (((out_id + in_id) % 5) as i32) - 2;
+                    self.plot_case_out_lt_in(out_pos, in_pos, x_mid_offs, points);
 
                 } else {
                     // First find some Y row we can use for the connection:
@@ -1273,7 +1294,7 @@ impl XView {
     }
 
     pub fn check_free_at(&self, pos: (i32, i32)) -> bool {
-        for (id, node) in self.nodes.borrow().iter() {
+        for (_id, node) in self.nodes.borrow().iter() {
             if node.is_in_node(pos) {
                 return true;
             }
@@ -1360,11 +1381,18 @@ impl cursive::View for XView {
             if node.calc_size.1 == 1 {
                 if node.cached_rows.is_empty() {
                     let mut row = String::new();
+                    let mut cur_width = 0_i32;
                     if node.block_type.has_inputs() {
                         row += "┤ ";
+                        cur_width += 2;
                     }
 
                     row += &node.calc_label;
+                    cur_width += UnicodeWidthStr::width(&node.calc_label[..]) as i32;
+
+                    for _ in cur_width..(node.calc_size.0 - 2) {
+                        row += " ";
+                    }
 
                     if node.block_type.has_outputs() {
                         row += " ├";
@@ -1379,11 +1407,18 @@ impl cursive::View for XView {
             } else {
                 if node.cached_rows.is_empty() {
                     let mut row = String::new();
+                    let mut cur_width = 0_i32;
                     if node.block_type.has_inputs() {
                         row += "┌ ";
+                        cur_width += 2;
                     }
 
                     row += &node.calc_label;
+                    cur_width += UnicodeWidthStr::width(&node.calc_label[..]) as i32;
+
+                    for _ in cur_width..(node.calc_size.0 - 2) {
+                        row += " ";
+                    }
 
                     if node.block_type.has_outputs() {
                         row += " ┐";
@@ -1401,14 +1436,12 @@ impl cursive::View for XView {
                         if let Some(inp) = inp {
                             row += "┤ ";
                             row += inp;
-                            // FIXME: Also here: use UnicodeStrWidth
-                            char_width_row_inp += inp.len() + 2;
+                            char_width_row_inp += UnicodeWidthStr::width(inp) + 2;
                         }
 
                         let out = node.get_output_label((row_idx - 1) as usize);
                         if let Some(out) = out {
-                            // FIXME: Also here: out.len() should be UnicodeStrWidth
-                            let end_len = char_width_row_inp + out.len() + 2;
+                            let end_len = char_width_row_inp + UnicodeWidthStr::width(out) + 2;
                             if end_len < width {
                                 for _ in end_len..width {
                                     row += " ";
