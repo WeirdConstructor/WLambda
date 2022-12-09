@@ -1471,7 +1471,11 @@ impl cursive::View for XView {
             rect.0 += self.drag_mouse_offs.0;
             rect.1 += self.drag_mouse_offs.1;
 
-            printer.print_box((rect.0, rect.1), (rect.2, rect.3), true);
+            if rect.3 > 1 {
+                printer.print_box((rect.0, rect.1), (rect.2, rect.3), true);
+            } else {
+                printer.print_hline((rect.0, rect.1), rect.2 as usize, "─");
+            }
         }
     }
 
