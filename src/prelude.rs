@@ -11168,6 +11168,34 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::Flt(x * x * (3.0 - (2.0 * x))))
         }, Some(3), Some(3), false);
 
+    func!(st, "fs:canonicalize",
+        |env: &mut Env, _argc: usize| {
+            match std::fs::canonicalize(env.arg(0).s_raw()) {
+                Ok(path) => {
+                    match path.to_str() {
+                        Some(path) => {
+                            if path.starts_with("\\\\?") {
+                                Ok(VVal::new_str(&path[4..]))
+                            } else {
+                                Ok(VVal::new_str(path))
+                            }
+                        },
+                        None => {
+                            return Ok(env.new_err(
+                                format!(
+                                    "Couldn't canonicalize path '{}': bad filename found!",
+                                    env.arg(0).s_raw())))
+                        },
+                    }
+                },
+                Err(e) => {
+                    return Ok(env.new_err(
+                        format!(
+                            "Couldn't canonicalize path '{}': {}",
+                            env.arg(0).s_raw(), e)))
+                },
+            }
+        }, Some(1), Some(1), false);
     func!(st, "fs:read_dir",
         |env: &mut Env, _argc: usize| {
             let path = env.arg(0);
