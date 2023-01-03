@@ -20,7 +20,8 @@ mqtt = ["rumqttd", "rumqttc"]
 http = ["reqwest"]
 cursive = ["dep:cursive", "cursive_buffered_backend", "unicode-width"]
 odbc = ["odbc-api", "odbc-sys"]
-all = ["mqtt", "http", "cursive", "zip", "odbc"]
+clipboard = ["copypasta"]
+all = ["mqtt", "http", "cursive", "zip", "odbc", "clipboard"]
 
 [dependencies]
 fnv        = "1.0.7"
@@ -43,6 +44,7 @@ cursive_buffered_backend = { version = "0.6.1", optional = true }
 unicode-width = { version = "0.1", optional = true }
 odbc-api = { version = "0.52.4", optional = true }
 odbc-sys = { version = "0.21.3", optional = true }
+copypasta = { version = "0.8.1", optional = true }
 #cursive    = { path = "../cursive/cursive",  optional = true, features = ["crossterm-backend"], default-features = false }
 #rumqttc    = { path = "../other/rumqtt/rumqttc",  optional = true }
 #rumqttd    = { path = "../other/rumqtt/rumqttd",  optional = true }
