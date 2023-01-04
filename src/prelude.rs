@@ -11168,6 +11168,23 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::Flt(x * x * (3.0 - (2.0 * x))))
         }, Some(3), Some(3), false);
 
+    func!(st, "fs:path:exists",
+        |env: &mut Env, _argc: usize| {
+            match env.arg(0).with_s_ref(|filename|
+                    std::path::Path::new(filename).try_exists()) {
+                Ok(bol) => Ok(VVal::Bol(bol)),
+                Err(e) =>
+                    return Ok(env.new_err(
+                        format!(
+                            "Couldn't check for file existance '{}': {}",
+                            env.arg(0).s_raw(),
+                            e)))
+            }
+        },
+        Some(1),
+        Some(1),
+        false);
+
     func!(st, "fs:canonicalize",
         |env: &mut Env, _argc: usize| {
             match std::fs::canonicalize(env.arg(0).s_raw()) {
