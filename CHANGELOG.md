@@ -11,6 +11,7 @@ TOML configuration files.
 for adding WLambda sources at Rust compile time, for easier deploying of the
 Rust binary later.
 * **Feature:** Access to environment variables is now possible using `std:sys:env:var`.
+* **Feature:** Added `std:str:strip_utf8_bom`.
 
 0.8.1 (2022-03-05)
 ==================

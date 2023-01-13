@@ -3461,6 +3461,18 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 ```
 
+#### - std:str:strip\_utf8\_bom _string-or-bytes_
+
+Strips the sequence `$b"\xEF\xBB\xBF"` from the start of either the _string_ or the _bytes_
+vector given at the input and returns it as utf8 encoded string.
+
+This is useful in combination with eg. `std:deser:csv`.
+
+```
+std:assert_eq (std:str:strip_utf8_bom $b"\xEF\xBB\xBF") "";
+std:assert_eq (std:str:strip_utf8_bom (std:str:from_utf8 $b"\xEF\xBB\xBF")) "";
+```
+
 #### <a name="31025-stdstreditdistance-str-a-strb"></a>3.10.25 - std:str:edit\_distance _str-a_ _str\_b
 
 Calculates the Levenshtein distance between two (Unicode) strings.
@@ -8407,6 +8419,9 @@ std:assert_eq
 
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
+
+Note: Some CSV files in the wild might come with an UTF8 BOM. You might want to run it through
+`std:str:strip_utf8_bom` before.
 
 ```wlambda
 !table = std:deser:csv ";" "\r\n" "foo;bar\r\nx;y\r\n";

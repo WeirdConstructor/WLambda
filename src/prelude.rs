@@ -11919,6 +11919,19 @@ pub fn std_symbol_table() -> SymbolTable {
                 val)))
         }, Some(4), Some(4), false);
 
+    func!(st, "str:strip_utf8_bom",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_bv_ref(|s| {
+                if s.starts_with(b"\xEF\xBB\xBF") {
+                    Ok(VVal::new_str_mv(
+                            std::str::from_utf8(&s[3..])
+                            .expect("valid utf-8 after removing bom").to_string()))
+                } else {
+                    Ok(env.arg(0))
+                }
+            })
+        }, Some(1), Some(1), false);
+
     func!(st, "deser:csv",
         |env: &mut Env, _argc: usize| {
             use crate::csv;
