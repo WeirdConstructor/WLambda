@@ -194,7 +194,8 @@ Smalltalk, LISP and Perl.
     - [3.10.22](#31022-stdstrfromcharvec-vector) std:str:from\_char\_vec _vector_
     - [3.10.23](#31023-stdstrtolowercase-string) std:str:to\_lowercase _string_
     - [3.10.24](#31024-stdstrtouppercase-string) std:str:to\_uppercase _string_
-    - [3.10.25](#31025-stdstreditdistance-str-a-strb) std:str:edit\_distance _str-a_ _str\_b
+    - [3.10.25](#31025-stdstrstriputf8bom-string-or-bytes) std:str:strip\_utf8\_bom _string-or-bytes_
+    - [3.10.26](#31026-stdstreditdistance-str-a-strb) std:str:edit\_distance _str-a_ _str\_b
   - [3.11](#311-byte-vectors) Byte Vectors
     - [3.11.1](#3111-call-properties-of-bytes) Call Properties of Bytes
     - [3.11.2](#3112-byte-conversion-functions) Byte Conversion Functions
@@ -399,12 +400,14 @@ Smalltalk, LISP and Perl.
     - [11.3.4](#1134-stdprocesskillwait-child-handle) std:process:kill\_wait _child-handle_
     - [11.3.5](#1135-stdprocesswait-child-handle) std:process:wait _child-handle_
   - [11.4](#114-file-system) File System
-    - [11.4.1](#1141-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
-    - [11.4.2](#1142-stdfscopy-src-file-path-dst-file-path) std:fs:copy _src-file-path_ _dst-file-path_
-    - [11.4.3](#1143-stdfsreaddir-path-function) std:fs:read\_dir _path_ _function_
-    - [11.4.4](#1144-stdfsremovefile-file-path) std:fs:remove\_file _file-path_
-    - [11.4.5](#1145-stdfsremovedir-dir-path) std:fs:remove\_dir _dir-path_
-    - [11.4.6](#1146-stdfsremovedirall-dir-path) std:fs:remove\_dir\_all _dir-path_
+    - [11.4.1](#1141-stdfspathexists-string) std:fs:path:exists _string_
+    - [11.4.2](#1142-stdfscanonicalize-string) std:fs:canonicalize _string_
+    - [11.4.3](#1143-stdfsrename-file-path-new-file-name) std:fs:rename _file-path_ _new-file-name_
+    - [11.4.4](#1144-stdfscopy-src-file-path-dst-file-path) std:fs:copy _src-file-path_ _dst-file-path_
+    - [11.4.5](#1145-stdfsreaddir-path-function) std:fs:read\_dir _path_ _function_
+    - [11.4.6](#1146-stdfsremovefile-file-path) std:fs:remove\_file _file-path_
+    - [11.4.7](#1147-stdfsremovedir-dir-path) std:fs:remove\_dir _dir-path_
+    - [11.4.8](#1148-stdfsremovedirall-dir-path) std:fs:remove\_dir\_all _dir-path_
   - [11.5](#115-system) System
     - [11.5.1](#1151-stdsysvar-variable-name) std:sys:var _variable-name_
     - [11.5.2](#1152-stdsysos) std:sys:os
@@ -485,17 +488,20 @@ Smalltalk, LISP and Perl.
     - [12.9.2](#1292-stdhttpget-http-client-url-string-headers-and-options-map) std:http:get _http-client_ _url-string_ [_headers-and-options-map_]
     - [12.9.3](#1293-stdhttppost-http-client-url-string-body-bytes-headers-and-options-map) std:http:post _http-client_ _url-string_ _body-bytes_ [_headers-and-options-map_]
     - [12.9.4](#1294-stdhttprequest-http-client-method-string-url-string-body-bytes-headers-and-options-map) std:http:request _http-client_ _method-string_ _url-string_ [_body-bytes_ [_headers-and-options-map_]]
-  - [12.10](#1210-mqtt-messaging) MQTT Messaging
-    - [12.10.1](#12101-stdmqttbrokernew-config) std:mqtt:broker:new _config_
-      - [12.10.1.1](#121011-brokerpublish-topic-string-payload-bytes) broker.publish _topic-string_ _payload-bytes_
-    - [12.10.2](#12102-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
-      - [12.10.2.1](#121021-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
-      - [12.10.2.2](#121022-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
-  - [12.11](#1211-cursive-consoleterminal-text-user-interface) Cursive Console/Terminal Text User Interface
-    - [12.11.1](#12111-stdcursivenew) std:cursive:new
-      - [12.11.1.1](#121111-cursiverun) $\<Cursive\>.run
-      - [12.11.1.2](#121112-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer view-def
-      - [12.11.1.3](#121113-cursivequit) $\<Cursive\>.quit
+  - [12.10](#1210-operating-system-utilities) Operating System Utilities
+    - [12.10.1](#12101-stdosgetclipboardtext) std:os:get\_clipboard\_text
+    - [12.10.2](#12102-stdossetclipboardtext-string) std:os:set\_clipboard\_text _string_
+  - [12.11](#1211-mqtt-messaging) MQTT Messaging
+    - [12.11.1](#12111-stdmqttbrokernew-config) std:mqtt:broker:new _config_
+      - [12.11.1.1](#121111-brokerpublish-topic-string-payload-bytes) broker.publish _topic-string_ _payload-bytes_
+    - [12.11.2](#12112-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
+      - [12.11.2.1](#121121-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
+      - [12.11.2.2](#121122-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
+  - [12.12](#1212-cursive-consoleterminal-text-user-interface) Cursive Console/Terminal Text User Interface
+    - [12.12.1](#12121-stdcursivenew) std:cursive:new
+      - [12.12.1.1](#121211-cursiverun) $\<Cursive\>.run
+      - [12.12.1.2](#121212-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer view-def
+      - [12.12.1.3](#121213-cursivequit) $\<Cursive\>.quit
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -3475,7 +3481,19 @@ Swaps all (Unicode) characters in _string_ to their lowercase version.
 std:assert_eq (std:str:to_uppercase "ZABzabäßüö") "ZABZABÄSSÜÖ";
 ```
 
-#### <a name="31025-stdstreditdistance-str-a-strb"></a>3.10.25 - std:str:edit\_distance _str-a_ _str\_b
+#### <a name="31025-stdstrstriputf8bom-string-or-bytes"></a>3.10.25 - std:str:strip\_utf8\_bom _string-or-bytes_
+
+Strips the sequence `$b"\xEF\xBB\xBF"` from the start of either the _string_ or the _bytes_
+vector given at the input and returns it as utf8 encoded string.
+
+This is useful in combination with eg. `std:deser:csv`.
+
+```
+std:assert_eq (std:str:strip_utf8_bom $b"\xEF\xBB\xBF") "";
+std:assert_eq (std:str:strip_utf8_bom (std:str:from_utf8 $b"\xEF\xBB\xBF")) "";
+```
+
+#### <a name="31026-stdstreditdistance-str-a-strb"></a>3.10.26 - std:str:edit\_distance _str-a_ _str\_b
 
 Calculates the Levenshtein distance between two (Unicode) strings.
 
@@ -7744,19 +7762,33 @@ std:assert_eq res.status 20;
 
 ### <a name="114-file-system"></a>11.4 - File System
 
-#### <a name="1141-stdfsrename-file-path-new-file-name"></a>11.4.1 - std:fs:rename _file-path_ _new-file-name_
+#### <a name="1141-stdfspathexists-string"></a>11.4.1 - std:fs:path:exists _string_
+
+Returns `$true` if the path _string_ exists. Otherwise it returns `$false` or an error if there
+was an issue with the path or the system.
+
+```wlambda
+std:fs:path:exists "C:\\temp\\test.txt";
+```
+
+#### <a name="1142-stdfscanonicalize-string"></a>11.4.2 - std:fs:canonicalize _string_
+
+Creates a canonical path from the relative path _string_. If there is some problem with either the path _string_
+or the system, an error is returned.
+
+#### <a name="1143-stdfsrename-file-path-new-file-name"></a>11.4.3 - std:fs:rename _file-path_ _new-file-name_
 
 Renames the file at _file-path_ to the new name _new-file-name_. This
 usually does only work on a single file system.
 Returns `$true` if renaming was successful, and an error object if it was not
 successful.
 
-#### <a name="1142-stdfscopy-src-file-path-dst-file-path"></a>11.4.2 - std:fs:copy _src-file-path_ _dst-file-path_
+#### <a name="1144-stdfscopy-src-file-path-dst-file-path"></a>11.4.4 - std:fs:copy _src-file-path_ _dst-file-path_
 
 Copies the file _src-file-path_ to the _dst-file-path_.
 Returns an error if something went wrong.
 
-#### <a name="1143-stdfsreaddir-path-function"></a>11.4.3 - std:fs:read\_dir _path_ _function_
+#### <a name="1145-stdfsreaddir-path-function"></a>11.4.5 - std:fs:read\_dir _path_ _function_
 
 Calls _function_ with the first argument being the directory entry as map
 of this structure:
@@ -7782,18 +7814,18 @@ directory by returning a `$true` value.
 
 You can format the timestamps using `std:chrono:format_utc`.
 
-#### <a name="1144-stdfsremovefile-file-path"></a>11.4.4 - std:fs:remove\_file _file-path_
+#### <a name="1146-stdfsremovefile-file-path"></a>11.4.6 - std:fs:remove\_file _file-path_
 
 Removes the file at the given _file-path_.
 Returns an error if the file is missing or some other error occured.
 
-#### <a name="1145-stdfsremovedir-dir-path"></a>11.4.5 - std:fs:remove\_dir _dir-path_
+#### <a name="1147-stdfsremovedir-dir-path"></a>11.4.7 - std:fs:remove\_dir _dir-path_
 
 Removes the dir at the given _dir-path_.
 Returns an error if the dir is missing, is not empty
 or some other error occured.
 
-#### <a name="1146-stdfsremovedirall-dir-path"></a>11.4.6 - std:fs:remove\_dir\_all _dir-path_
+#### <a name="1148-stdfsremovedirall-dir-path"></a>11.4.8 - std:fs:remove\_dir\_all _dir-path_
 
 Removes the given _dir-path_ recursively. Use with care!
 Returns an error if the directory does not exist.
@@ -8422,6 +8454,9 @@ std:assert_eq
 Parses the string _data_ as CSV. With the field delimiter _field_delim_
 and the _row_separator_ for the data rows.
 
+Note: Some CSV files in the wild might come with an UTF8 BOM. You might want to run it through
+`std:str:strip_utf8_bom` before.
+
 ```wlambda
 !table = std:deser:csv ";" "\r\n" "foo;bar\r\nx;y\r\n";
 std:assert_eq table.0.0 "foo";
@@ -8977,7 +9012,22 @@ std:assert_str_eq body.json  $[ $["x", 10], ${ y = 20 } ];
 std:assert_eq response.status 200;
 ```
 
-### <a name="1210-mqtt-messaging"></a>12.10 - MQTT Messaging
+### <a name="1210-operating-system-utilities"></a>12.10 - Operating System Utilities
+
+Some operating system utility functions. Some might only be available if
+WLambda was compiled with the corresponding features.
+
+#### <a name="12101-stdosgetclipboardtext"></a>12.10.1 - std:os:get\_clipboard\_text
+
+Only available if WLambda was compiled with the `clipboard` feature.
+Retrieves the text contents of the operating system clipboard.
+
+#### <a name="12102-stdossetclipboardtext-string"></a>12.10.2 - std:os:set\_clipboard\_text _string_
+
+Only available if WLambda was compiled with the `clipboard` feature.
+Sets the clipboard text contents.
+
+### <a name="1211-mqtt-messaging"></a>12.11 - MQTT Messaging
 
 WLambda offers an optional support for the MQTT protocol. You can setup a MQTT client
 as well as an embedded MQTT broker. The very simple integration offers you a very
@@ -8986,7 +9036,7 @@ easy way to setup inter process communication between WLambda applications.
 Support for MQTT has to be explicitly compiled into WLambda by selecting the
 `mqtt` feature.
 
-#### <a name="12101-stdmqttbrokernew-config"></a>12.10.1 - std:mqtt:broker:new _config_
+#### <a name="12111-stdmqttbrokernew-config"></a>12.11.1 - std:mqtt:broker:new _config_
 
 This function sets up an embedded MQTT broker. A handle is returned that you can use
 to publish messages using the locally connected client link.
@@ -9035,13 +9085,13 @@ std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
 std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
 ```
 
-##### <a name="121011-brokerpublish-topic-string-payload-bytes"></a>12.10.1.1 - broker.publish _topic-string_ _payload-bytes_
+##### <a name="121111-brokerpublish-topic-string-payload-bytes"></a>12.11.1.1 - broker.publish _topic-string_ _payload-bytes_
 
 Publishes the _payload-bytes_ under the _topic-string_. Returns an error
 if something went wrong (client not connected, or some other error). It might
 block.
 
-#### <a name="12102-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.10.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
+#### <a name="12112-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.11.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
 
 This sets up a MQTT client that connects to the given _broker-host_ and _broker-port_.
 It will connect and reconnect upon connection failure in the background automatically
@@ -9095,18 +9145,18 @@ std:assert_eq got_some_stuff.data  $b"test";
 
 The returned client handle understands the following methods:
 
-##### <a name="121021-mqttclientpublish-topic-string-payload-bytes"></a>12.10.2.1 - mqtt\_client.publish _topic-string_ _payload-bytes_
+##### <a name="121121-mqttclientpublish-topic-string-payload-bytes"></a>12.11.2.1 - mqtt\_client.publish _topic-string_ _payload-bytes_
 
 Publishes the _payload-bytes_ under the _topic-string_. Returns an error
 if something went wrong (client not connected, or some other error). It might
 block.
 
-##### <a name="121022-mqttclientsubscribe-topic-string"></a>12.10.2.2 - mqtt\_client.subscribe _topic-string_
+##### <a name="121122-mqttclientsubscribe-topic-string"></a>12.11.2.2 - mqtt\_client.subscribe _topic-string_
 
 Subscribes to the _topic-string_. Returns an error if something went wrong.
 It might block.
 
-### <a name="1211-cursive-consoleterminal-text-user-interface"></a>12.11 - Cursive Console/Terminal Text User Interface
+### <a name="1212-cursive-consoleterminal-text-user-interface"></a>12.12 - Cursive Console/Terminal Text User Interface
 
 WLambda comes with a text based user interface library binding to the `cursive` crate.
 You will need to enable the feature `cursive` when compiling WLambda. It's not included
@@ -9114,7 +9164,7 @@ in the default feature set of WLambda.
 
 The `view-def` view definition format is defined in an extra section of this reference at the end.
 
-#### <a name="12111-stdcursivenew"></a>12.11.1 - std:cursive:new
+#### <a name="12121-stdcursivenew"></a>12.12.1 - std:cursive:new
 
 Create a new Cursive instance. You can call the following functions on it:
 
@@ -9128,15 +9178,15 @@ c.add_layer :panel => ${} =>
 c.run[];
 ```
 
-##### <a name="121111-cursiverun"></a>12.11.1.1 - $\<Cursive\>.run
+##### <a name="121211-cursiverun"></a>12.12.1.1 - $\<Cursive\>.run
 
 Start the event loop. You can only exit this event loop using `$<Cursive>.quit[]`.
 
-##### <a name="121112-cursiveaddlayer-view-def"></a>12.11.1.2 - $\<Cursive\>.add\_layer view-def
+##### <a name="121212-cursiveaddlayer-view-def"></a>12.12.1.2 - $\<Cursive\>.add\_layer view-def
 
 Adds the `view-def` view as layer to the TUI.
 
-##### <a name="121113-cursivequit"></a>12.11.1.3 - $\<Cursive\>.quit
+##### <a name="121213-cursivequit"></a>12.12.1.3 - $\<Cursive\>.quit
 
 Quit the main event loop.
 
