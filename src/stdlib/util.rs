@@ -19,7 +19,7 @@ use copypasta::{ClipboardContext, ClipboardProvider};
 
 #[cfg(feature = "clipboard")]
 thread_local! {
-    pub static ClipCtx: RefCell<ClipboardContext> = RefCell::new(ClipboardContext::new().unwrap());
+    pub static CLIP_CTX: RefCell<ClipboardContext> = RefCell::new(ClipboardContext::new().unwrap());
 }
 
 #[allow(unused_variables)]
@@ -28,7 +28,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     st.fun(
         "os:get_clipboard_text",
         |env: &mut Env, _argc: usize| {
-            ClipCtx.with(|ctx| {
+            CLIP_CTX.with(|ctx| {
                 match ctx.borrow_mut().get_contents() {
                     Ok(txt) => Ok(VVal::new_str_mv(txt)),
                     Err(e) =>
@@ -45,7 +45,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     st.fun(
         "os:set_clipboard_text",
         |env: &mut Env, _argc: usize| {
-            ClipCtx.with(|ctx| {
+            CLIP_CTX.with(|ctx| {
                 match ctx.borrow_mut().set_contents(env.arg(0).s_raw()) {
                     Ok(()) => Ok(VVal::Bol(true)),
                     Err(e) =>

@@ -11,15 +11,15 @@ use quick_xml::Reader;
 #[cfg(feature="quick-xml")]
 use quick_xml::Writer;
 #[cfg(feature="quick-xml")]
-use quick_xml::events::{Event, BytesStart, BytesEnd, BytesText, BytesDecl};
+use quick_xml::events::{Event, BytesStart, BytesEnd, BytesText, BytesCData, BytesDecl};
 use crate::compiler::*;
 use std::rc::Rc;
 
 #[allow(unused_macros)]
 macro_rules! unesc_val_to_vval_or_err {
     ($env: ident, $rd: ident, $val: expr) => {
-        match $val.unescape_and_decode_value(&$rd) {
-            Ok(text) => VVal::new_str_mv(text),
+        match $val.decode_and_unescape_value(&$rd) {
+            Ok(text) => VVal::new_str_mv(text.to_string()),
             Err(e) => {
                 return
                     Ok($env.new_err(
@@ -31,10 +31,28 @@ macro_rules! unesc_val_to_vval_or_err {
 }
 
 #[allow(unused_macros)]
+macro_rules! decode_to_vval_or_err {
+    ($env: ident, $rd: ident, $val: expr) => {
+        {
+            let decoder = $rd.decoder();
+            match decoder.decode(&$val) {
+                Ok(text) => VVal::new_str_mv(text.to_string()),
+                Err(e) => {
+                    return
+                        Ok($env.new_err(
+                            format!("XML error at {}: {}",
+                                    $rd.buffer_position(), e)));
+                }
+            }
+        }
+    }
+}
+
+#[allow(unused_macros)]
 macro_rules! unesc_to_vval_or_err {
     ($env: ident, $rd: ident, $val: expr) => {
-        match $val.unescape_and_decode(&$rd) {
-            Ok(text) => VVal::new_str_mv(text),
+        match $val.unescape() {
+            Ok(text) => VVal::new_str_mv(text.to_string()),
             Err(e) => {
                 return
                     Ok($env.new_err(
@@ -62,7 +80,7 @@ fn xml_start_attrs<'a, B>(
         match attr {
             Ok(attr) => {
                 attrs.set_key_str(
-                    &String::from_utf8_lossy(attr.key),
+                    &String::from_utf8_lossy(attr.key.into_inner().as_ref()),
                     unesc_val_to_vval_or_err!(env, rd, attr))
                     .expect("single use");
             },
@@ -84,7 +102,6 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
     -> Result<VVal, StackAction> {
 
     input.with_s_ref(|xml| {
-        let mut buf = Vec::new();
         let mut rd  = Reader::from_str(xml);
         let mut ret = VVal::None;
 
@@ -96,7 +113,7 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
         loop {
             let mut call_arg = None;
 
-            match rd.read_event(&mut buf) {
+            match rd.read_event() {
                 Ok(Event::Start(ref e)) => {
                     let attrs = xml_start_attrs(env, &rd, e)?;
 
@@ -105,7 +122,7 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
                             VVal::sym("start"),
                             VVal::new_str_mv(
                                 String::from_utf8_lossy(
-                                    e.name()).to_string()),
+                                    e.name().into_inner().as_ref()).to_string()),
                             attrs));
                 },
                 Ok(Event::Empty(ref e)) => {
@@ -116,7 +133,7 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
                             VVal::sym("empty"),
                             VVal::new_str_mv(
                                 String::from_utf8_lossy(
-                                    e.name()).to_string()),
+                                    e.name().into_inner().as_ref()).to_string()),
                             attrs));
                 },
                 Ok(Event::Comment(ref t)) => {
@@ -200,7 +217,7 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
                     call_arg = Some(
                         VVal::vec2(
                             VVal::sym("cdata"),
-                            unesc_to_vval_or_err!(env, rd, t)));
+                            decode_to_vval_or_err!(env, rd, t)));
                 },
                 Ok(Event::Text(t)) => {
                     call_arg = Some(
@@ -214,7 +231,7 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
                             VVal::sym("end"),
                             VVal::new_str_mv(
                                 String::from_utf8_lossy(
-                                    e.name()).to_string())));
+                                    e.name().into_inner().as_ref()).to_string())));
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => {
@@ -236,8 +253,6 @@ pub(crate) fn read_sax(env: &mut Env, input: VVal, event_func: VVal, trim: bool)
                 };
                 env.popn(1);
             }
-
-            buf.clear();
         }
 
         Ok(ret)
@@ -290,10 +305,7 @@ pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
                 match s {
                     "start" => {
                         elem.v_with_s_ref(1, |name| {
-                            let mut bytes =
-                                BytesStart::borrowed(
-                                    name.as_bytes(),
-                                    name.as_bytes().len());
+                            let mut bytes = BytesStart::new(name);
 
                             for (v, k) in elem.v_(2).iter() {
                                 if let Some(k) = k {
@@ -308,10 +320,7 @@ pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
                     },
                     "empty" => {
                         elem.v_with_s_ref(1, |name| {
-                            let mut bytes =
-                                BytesStart::borrowed(
-                                    name.as_bytes(),
-                                    name.as_bytes().len());
+                            let mut bytes = BytesStart::new(name);
 
                             for (v, k) in elem.v_(2).iter() {
                                 if let Some(k) = k {
@@ -328,37 +337,37 @@ pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
                         elem.v_with_s_ref(1, |name|
                             write_event!(
                                 env, writer,
-                                Event::End(BytesEnd::borrowed(name.as_bytes()))))
+                                Event::End(BytesEnd::new(name))))
                     },
                     "text" => {
                         elem.v_with_s_ref(1, |text|
                             write_event!(
                                 env, writer,
-                                Event::Text(BytesText::from_plain_str(text))))
+                                Event::Text(BytesText::new(text))))
                     },
                     "comment" => {
                         elem.v_with_s_ref(1, |text|
                             write_event!(
                                 env, writer,
-                                Event::Comment(BytesText::from_plain_str(text))))
+                                Event::Comment(BytesText::new(text))))
                     },
                     "pi" => {
                         elem.v_with_s_ref(1, |text|
                             write_event!(
                                 env, writer,
-                                Event::PI(BytesText::from_plain_str(text))))
+                                Event::PI(BytesText::new(text))))
                     },
                     "doctype" => {
                         elem.v_with_s_ref(1, |text|
                             write_event!(
                                 env, writer,
-                                Event::DocType(BytesText::from_plain_str(text))))
+                                Event::DocType(BytesText::new(text))))
                     },
                     "cdata" => {
                         elem.v_with_s_ref(1, |text|
                             write_event!(
                                 env, writer,
-                                Event::CData(BytesText::from_plain_str(text))))
+                                Event::CData(BytesCData::new(text))))
                     },
                     "decl" => {
                         elem.v_with_s_ref(1, |version| {
@@ -378,9 +387,9 @@ pub(crate) fn create_sax_writer(indent_depth: Option<usize>) -> VVal {
                             write_event!(
                                 env, writer,
                                 Event::Decl(BytesDecl::new(
-                                    version.as_bytes(),
-                                    encoding.as_ref().map(|e| e.as_bytes()),
-                                    standalone.as_ref().map(|s| s.as_bytes()))))
+                                    version,
+                                    encoding.as_ref().map(|e| &e[..]),
+                                    standalone.as_ref().map(|s| &s[..]))))
                         })
                     },
                     _ => Ok(VVal::None),

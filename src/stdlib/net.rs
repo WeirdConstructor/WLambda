@@ -218,7 +218,8 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                         let _ = socket.set_reuse_address(true);
                         #[cfg(unix)]
                         let _ = socket.set_reuse_port(true);
-                        socket.into_tcp_listener()
+                        let listener : std::net::TcpListener = socket.into();
+                        listener
                     };
 
                     for stream in listener.incoming() {

@@ -5522,15 +5522,15 @@ fn check_parse_error_sym_start() {
 fn check_mqtt() {
     assert_eq!(ve(r#"
         !broker = std:mqtt:broker:new ${
-            listen         = "0.0.0.0:1883",
-            console_listen = "0.0.0.0:18080",
+            listen         = "0.0.0.0:1889",
+            console_listen = "0.0.0.0:18089",
         };
 
         # sleep a bit until the broker is initialized:
-        std:thread:sleep :ms => 500;
+        std:thread:sleep :ms => 900;
 
         !chan = std:sync:mpsc:new[];
-        !cl = std:mqtt:client:new chan "test1" "localhost" 1883;
+        !cl = std:mqtt:client:new chan "test1" "localhost" 1889;
 
         # let it connect:
         std:thread:sleep :ms => 200;
@@ -5539,6 +5539,7 @@ fn check_mqtt() {
         !_ = cl.publish "test/me" $b"test123\xFF";
 
         std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
+        std:assert_str_eq chan.recv[] $p(:"$WL/subscribed", $n);
         std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
         1
     "#),
@@ -5550,26 +5551,26 @@ fn check_mqtt() {
 fn check_mqtt_broker_link1() {
     assert_eq!(ve(r#"
         !broker = std:mqtt:broker:new ${
-            listen         = "0.0.0.0:1884",
-            console_listen = "0.0.0.0:18081",
+        name = "X",
+            listen         = "0.0.0.0:8884",
+            console_listen = "0.0.0.0:18191",
         };
 
         # sleep a bit until the broker is initialized:
         std:thread:sleep :ms => 900;
 
         !chan = std:sync:mpsc:new[];
-        !cl = std:mqtt:client:new chan "test1" "localhost" 1884;
+        !cl = std:mqtt:client:new chan "test1" "localhost" 8884;
 
         # let it connect:
         std:thread:sleep :ms => 500;
 
         !_ = cl.subscribe "test/me";
 
-        # let it subscribe:
-        std:thread:sleep :ms => 500;
-        !_ = broker.publish "test/me" $b"test123\xFF";
-
         std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
+        std:assert_str_eq chan.recv[] $p(:"$WL/subscribed", $n);
+
+        !_ = broker.publish "test/me" $b"test123\xFF";
         std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
         1
     "#),

@@ -13,8 +13,10 @@ use crate::vval::{VValFun, VValUserData};
 #[cfg(feature="rumqttc")]
 use rumqttc::{MqttOptions, Client, QoS, Event, Packet};
 #[cfg(feature="rumqttd")]
-use librumqttd::{Broker, Config};
+use rumqttd::{Broker, Config, Notification};
 use crate::compiler::*;
+
+use std::collections::HashMap;
 
 #[cfg(feature="rumqttc")]
 use std::sync::{Arc, Mutex};
@@ -164,6 +166,10 @@ impl DetachedMQTTClient {
                                             VVal::new_byt(
                                                 pubpkt.payload.as_ref().to_vec())));
                                     },
+                                    Packet::SubAck(_ack) => {
+                                        chan.send(&VVal::pair(
+                                            VVal::new_sym("$WL/subscribed"), VVal::None));
+                                    },
                                     _ => { },
                                 }
                             },
@@ -251,7 +257,7 @@ impl crate::threads::ThreadSafeUsr for DetachedMQTTClient {
 #[cfg(feature="rumqttd")]
 #[derive(Clone)]
 struct MQTTBroker {
-    link_tx: Arc<Mutex<librumqttd::LinkTx>>,
+    link_tx: Arc<Mutex<rumqttd::local::LinkTx>>,
 }
 
 #[cfg(feature="rumqttd")]
@@ -265,34 +271,55 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal>  {
 
     let mut servers = std::collections::HashMap::new();
     let listen = first_addr!(cfg.v_k("listen"), env)?;
-    let srv = librumqttd::ServerSettings {
+    let srv = rumqttd::ServerSettings {
+        name: cfg.v_s_rawk("name"),
         listen,
         next_connection_delay_ms: 1,
-        connections: librumqttd::ConnectionSettings {
-            connection_timeout_ms: 100,
-            max_client_id_len:     256,
+        connections: rumqttd::ConnectionSettings {
+            connection_timeout_ms: 1000,
             throttle_delay_ms:     0,
             max_payload_size:      10240,
             max_inflight_count:    500,
             max_inflight_size:     10240,
-            login_credentials: None,
+            auth: None,
+            dynamic_filters: false,
         },
-        cert: None,
+        tls: None,
     };
 
     servers.insert(format!("{}", 1), srv);
 
-    let cons_listen = first_addr!(cfg.v_k("console_listen"), env)?;
+    let mut v4 = HashMap::new();
+    let mut v5 = HashMap::new();
+    let mut ws = HashMap::new();
+
+    match &cfg.v_s_rawk("version")[..] {
+        "v4" => { v4 = servers; },
+        "v5" => { v5 = servers; },
+        "ws" => { ws = servers; },
+        _ => { v4 = servers; },
+    }
+
+    let mut console : rumqttd::ConsoleSettings = Default::default();
+    console.listen = cfg.v_s_rawk("console_listen");
 
     let config = Config {
         id: cfg.v_ik("id") as usize,
-        servers,
         cluster: None,
-        replicator: None,
-        console: librumqttd::ConsoleSettings {
-            listen: cons_listen,
+        v4,
+        v5,
+        ws,
+        bridge: None,
+        prometheus: None,
+        console,
+        router: rumqttd::RouterConfig {
+            instant_ack: true,
+            max_segment_size: 1024,
+            max_connections: 10,
+            max_segment_count: 10,
+            max_read_len: 1024,
+            initialized_filters: None,
         },
-        router: Default::default(),
     };
 
     Ok(config)
@@ -314,7 +341,7 @@ impl MQTTBroker {
                 "wl_local".to_string()
             };
 
-        let mut link =
+        let (mut link_tx, mut link_rx) =
             match broker.link(&client_id) {
                 Ok(link) => link,
                 Err(e) => {
@@ -325,8 +352,9 @@ impl MQTTBroker {
             };
 
         std::thread::spawn(move || {
-            broker.start().unwrap();
-            // TODO: Log errors?!
+            if let Err(e) = broker.start() {
+                eprintln!("MQTT Broker Error: {}", e);
+            }
         });
 
         let chan =
@@ -356,25 +384,25 @@ impl MQTTBroker {
                 None
             };
 
-        let mut link_rx =
-            match link.connect(100) {
-                Ok(link_rx) => link_rx,
-                Err(e) => {
-                    return
-                        Err(env.new_err(format!(
-                            "mqtt:broker:setup: config.link.recv could not setup a receiver link: {}",
-                            e)));
-                },
-            };
+//        let mut link_rx =
+//            match link.connect(100) {
+//                Ok(link_rx) => link_rx,
+//                Err(e) => {
+//                    return
+//                        Err(env.new_err(format!(
+//                            "mqtt:broker:setup: config.link.recv could not setup a receiver link: {}",
+//                            e)));
+//                },
+//            };
 
         if let Some(chan) = chan {
             if link_cfg.v_k("topics").is_some() {
                 if let Some(err) = link_cfg.v_k("topics").with_iter(|it| {
                         for (v, _) in it {
-                            if let Err(e) = link.subscribe(&v.s_raw()) {
+                            if let Err(e) = link_tx.subscribe(&v.s_raw()) {
                                 return
                                     Some(env.new_err(format!(
-                                        "mqtt:broker:setup: config.link.topics could not subscribe to '#': {}",
+                                        "mqtt:broker:setup: config.link_tx.topics could not subscribe to '#': {}",
                                         e)));
                             }
                         }
@@ -385,10 +413,10 @@ impl MQTTBroker {
                 }
 
             } else {
-                if let Err(e) = link.subscribe("#") {
+                if let Err(e) = link_tx.subscribe("#") {
                     return
                         Err(env.new_err(format!(
-                            "mqtt:broker:setup: config.link.topics could not subscribe to '#': {}",
+                            "mqtt:broker:setup: config.link_tx.topics could not subscribe to '#': {}",
                             e)));
                 }
             }
@@ -400,11 +428,21 @@ impl MQTTBroker {
 
                     match link_rx.recv() {
                         Ok(Some(msg)) => {
-                            let topic = VVal::new_str_mv(msg.topic);
-                            for payl in msg.payload {
-                                chan.send(&VVal::pair(
-                                    topic.clone(),
-                                    VVal::new_byt(payl.as_ref().to_vec())));
+                            match msg {
+                                Notification::Forward(forward) => {
+                                    let topic = VVal::new_str_mv(String::from_utf8_lossy(forward.publish.topic.as_ref()).to_string());
+                                    chan.send(&VVal::pair(
+                                        topic,
+                                        VVal::new_byt(forward.publish.payload.as_ref().to_vec())));
+                                },
+                                Notification::ForwardWithProperties(forward, _) => {
+                                    let topic = VVal::new_str_mv(String::from_utf8_lossy(forward.publish.topic.as_ref()).to_string());
+                                    chan.send(&VVal::pair(
+                                        topic,
+                                        VVal::new_byt(forward.publish.payload.as_ref().to_vec())));
+                                },
+                                _ => {
+                                }
                             }
 
                         },
@@ -422,15 +460,19 @@ impl MQTTBroker {
             std::thread::spawn(move || {
                 loop {
                     match link_rx.recv() {
-                        Ok(_) => (),
-                        Err(_) => { break; },
+                        Ok(a) => {
+                            ()
+                        },
+                        Err(e) => {
+                            break;
+                        },
                     }
                 }
             });
         }
 
         Ok(Self {
-            link_tx: Arc::new(Mutex::new(link)),
+            link_tx: Arc::new(Mutex::new(link_tx)),
         })
     }
 }
@@ -464,7 +506,7 @@ impl VValUserData for MQTTBroker {
                     let ret =
                         env.arg(0).with_s_ref(|topic|
                             env.arg(1).with_bv_ref(|payload|
-                                link.publish(topic, false, payload)));
+                                link.publish(topic.as_bytes().to_vec(), payload.to_vec())));
                     match ret {
                         Ok(_)  => Ok(VVal::Bol(true)),
                         Err(e) => Ok(env.new_err(format!("publish error: {}", e))),

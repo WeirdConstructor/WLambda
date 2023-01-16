@@ -9034,6 +9034,8 @@ ${
     id             = 0,                 # Broker ID
     listen         = "0.0.0.0:1883",    # Broker server endpoint
     console_listen = "0.0.0.0:18088",   # An extra HTTP console endpoint
+    name           = "nameofbroker",    # Name of the Broker server
+    version        = "v4",              # MQTT Version: "v4", "v5" and "ws"
     link = ${                           # Configure the local link
         client_id = "some_id",          # Link client ID, default is 'wl_local'
         recv = <std:sync:mpsc channel>, # Channel to receive messages for the

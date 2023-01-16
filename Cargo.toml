@@ -34,11 +34,11 @@ serde_json = { version = "1.0.53",  optional = true }
 rmp-serde  = { version = "0.14.3",  optional = true }
 toml       = { version = "0.5.9",   optional = true }
 mint       = { version = "0.5.5",   optional = true }
-quick-xml  = { version = "0.20.0",  optional = true }
-socket2    = { version = "0.3.11",  optional = true, features = ["reuseport"] }
+quick-xml  = { version = "0.27.1",  optional = true }
+socket2    = { version = "0.4.7",  optional = true }
 reqwest    = { version = "0.11.9",  optional = true, features = ["blocking"] }
-rumqttc    = { version = "0.16.0",  optional = true }
-rumqttd    = { version = "0.11.0",  optional = true }
+rumqttc    = { version = "0.19.0",  optional = true }
+rumqttd    = { version = "0.12.2",  optional = true }
 cursive    = { version = "0.20.0",  optional = true, features = ["crossterm-backend"], default-features = false }
 cursive_buffered_backend = { version = "0.6.1", optional = true }
 unicode-width = { version = "0.1", optional = true }
