@@ -2061,7 +2061,7 @@ pub fn handle_cursive_call_method(
             Ok(VVal::None)
         }
         "send_cb" => {
-            assert_arg_count!("$<Cursive>", argv, 2, "register_cb[event_tag, callback_fun]", env);
+            assert_arg_count!("$<Cursive>", argv, 2, "send_cb[event_tag, callback_fun]", env);
             let tag = argv.v_s_raw(0);
             let cb = argv.v_(1);
             let denv = Rc::new(RefCell::new(env.derive()));
@@ -2343,6 +2343,16 @@ impl VValUserData for CursiveCounter {
                 assert_arg_count!(self.s(), argv, 1, "tick[increments]", env);
                 self.counter.tick(argv.v_i(0) as usize);
                 Ok(VVal::None)
+            }
+            "tick_update" => {
+                assert_arg_count!(self.s(), argv, 1, "tick_update[increments]", env);
+                self.counter.tick(argv.v_i(0) as usize);
+                let res = self.cb.send(Box::new(move |_s: &mut Cursive| { /* nop for update */ }));
+
+                match res {
+                    Ok(()) => Ok(VVal::Bol(true)),
+                    Err(e) => Ok(env.new_err(format!("$<Cursive:Counter> error: {}", e))),
+                }
             }
             _ => Err(StackAction::panic_str(
                 format!("$<Cursive:Counter> unknown method called: {}", key),

@@ -49,18 +49,20 @@ Smalltalk, LISP and Perl.
     - [2.4.3](#243-object-oriented-with-prototypes-and-inheritance) Object Oriented with Prototypes and Inheritance
     - [2.4.4](#244-object-oriented-with-prototypes-and-self-references-and-data-references) Object Oriented with Prototypes and $self References and $data References
   - [2.5](#25-function-call-composition) Function call composition
-    - [2.5.1](#251--tail-argument-function-chaninig) '|' Tail Argument Function Chaninig
-    - [2.5.2](#252--left-hand-function-chaining) '|>' Left Hand Function Chaining
-    - [2.5.3](#253-forward-argument-pipe-arg--fun) Forward Argument Pipe `arg &> fun`
-    - [2.5.4](#254-forward-argument-apply-pipe-list--fun) Forward Argument Apply Pipe `list &@> fun`
-    - [2.5.5](#255-reverse-argument-pipe-fun--arg) Reverse Argument Pipe `fun <& arg`
-    - [2.5.6](#256-reverse-argument-apply-pipe-list--fun) Reverse Argument Apply Pipe `list &@> fun`
+    - [2.5.1](#251--argument-list-delimiter) '~' Argument List Delimiter
+    - [2.5.2](#252--tail-argument-function-chaninig) '|' Tail Argument Function Chaninig
+    - [2.5.3](#253--head-argument-function-chaining) '||' Head Argument Function Chaining
+    - [2.5.4](#254--left-hand-function-chaining) '|>' Left Hand Function Chaining
+    - [2.5.5](#255-forward-argument-pipe-arg--fun) Forward Argument Pipe `arg &> fun`
+    - [2.5.6](#256-forward-argument-apply-pipe-list--fun) Forward Argument Apply Pipe `list &@> fun`
+    - [2.5.7](#257-reverse-argument-pipe-fun--arg) Reverse Argument Pipe `fun <& arg`
+    - [2.5.8](#258-reverse-argument-apply-pipe-list--fun) Reverse Argument Apply Pipe `list &@> fun`
   - [2.6](#26-control-flow---returning) Control Flow - Returning
-    - [2.6.1](#261-return-label-value) return [_label_] _value_
-    - [2.6.2](#262-block-label-function) block [label] _function_
+    - [2.6.1](#261-return-label-value) return \[_label_\] _value_
+    - [2.6.2](#262-block-label-function) block \[label\] _function_
     - [2.6.3](#263-stdtodrop-function-or-raii-destructors-or-drop-functions) std:to\_drop _function_ (or RAII, Destructors or Drop Functions)
-    - [2.6.4](#264-stdtimenow-unit) std:time:now [_unit_]
-    - [2.6.5](#265-stdsrand-seed) std:srand [_seed_]
+    - [2.6.4](#264-stdtimenow-unit) std:time:now \[_unit_\]
+    - [2.6.5](#265-stdsrand-seed) std:srand \[_seed_\]
     - [2.6.6](#266-stdrand-max-or-mode) std:rand [_max-or-mode_]
   - [2.7](#27-function-utilities) Function utilities
     - [2.7.1](#271-isfun-value) is\_fun _value_
@@ -72,7 +74,7 @@ Smalltalk, LISP and Perl.
     - [3.2.1](#321-isoptional-value) is\_optional _value_
     - [3.2.2](#322-unwrapping-optionals) Unwrapping optionals
   - [3.3](#33-error-values-e-expr-or-error-expr) Error values: `$e expr` or `$error expr`
-    - [3.3.1](#331--label-value) _? [_label_] _value_
+    - [3.3.1](#331--label-value) _? \[_label_\] _value_
     - [3.3.2](#332-unwrap-value) unwrap _value_
     - [3.3.3](#333-unwraperr-error-value) unwrap\_err _error-value_
     - [3.3.4](#334-onerror-handler-maybe-error-value) on\_error _handler_ _maybe-error-value_
@@ -177,7 +179,7 @@ Smalltalk, LISP and Perl.
     - [3.10.5](#3105-stdstrcat-a-b-) std:str:cat _a_ _b_ ...
     - [3.10.6](#3106-stdstrjoin-sep-vector) std:str:join _sep_ _vector_
     - [3.10.7](#3107-stdstrlen-value) std:str:len _value_
-    - [3.10.8](#3108-stdstrfind-pattern-string-offset) std:str:find _pattern_ _string_ [_offset_]
+    - [3.10.8](#3108-stdstrfind-pattern-string-offset---index--none) std:str:find _pattern_ _string_ \[_offset_\] -> _index_ | $none
     - [3.10.9](#3109-stdstrreplace-pattern-replacement-string) std:str:replace _pattern_ _replacement_ _string_
     - [3.10.10](#31010-stdstrreplacen-pattern-replacement-count-string) std:str:replace\_n _pattern_ _replacement_ _count_ _string_
     - [3.10.11](#31011-stdstrtrim-value) std:str:trim _value_
@@ -200,13 +202,13 @@ Smalltalk, LISP and Perl.
     - [3.11.1](#3111-call-properties-of-bytes) Call Properties of Bytes
     - [3.11.2](#3112-byte-conversion-functions) Byte Conversion Functions
     - [3.11.3](#3113-isbytes-value) is\_bytes _value_
-    - [3.11.4](#3114-stdbytesfind-pattern-string-offset) std:bytes:find _pattern_ _string_ [_offset_]
+    - [3.11.4](#3114-stdbytesfind-pattern-string-offset---index--none) std:bytes:find _pattern_ _string_ \[_offset_\] -> _index_ | $none
     - [3.11.5](#3115-stdbytesreplace-byte-vector-pattern-replacement) std:bytes:replace _byte-vector_ _pattern_ _replacement_
     - [3.11.6](#3116-stdbytesfromhex-string-with-hex-chars) std:bytes:from\_hex _string-with-hex-chars_
     - [3.11.7](#3117-stdbytesfromvec-vector-of-ints) std:bytes:from\_vec _vector-of-ints_
     - [3.11.8](#3118-stdbytestohex-byte-vector) std:bytes:to\_hex _byte-vector_
-    - [3.11.9](#3119-stdbytestobase64-byte-vector-config) std:bytes:to\_base64 _byte-vector_ [_config_]
-    - [3.11.10](#31110-stdbytesfrombase64-byte-vector-config) std:bytes:from\_base64 _byte-vector_ [_config_]
+    - [3.11.9](#3119-stdbytestobase64-byte-vector-config---string) std:bytes:to\_base64 _byte-vector_ \[_config_\] -> _string_
+    - [3.11.10](#31110-stdbytesfrombase64-string-config---byte-vector) std:bytes:from\_base64 _string_ \[_config_\] -> _byte-vector_
     - [3.11.11](#31111-stdbytestovec-byte-vector) std:bytes:to\_vec _byte-vector_
     - [3.11.12](#31112-stdbytespack-pack-format-string-list-of-values) std:bytes:pack _pack-format-string_ _list-of-values_
     - [3.11.13](#31113-stdbytesunpack-pack-format-string-byte-vector) std:bytes:unpack _pack-format-string_ _byte-vector_
@@ -331,7 +333,7 @@ Smalltalk, LISP and Perl.
   - [7.1](#71-formatting-numbers) Formatting Numbers
 - [8](#8-data-structure-matchers-selectors-and-string-patternsregex) Data Structure Matchers, Selectors and String Patterns/Regex
   - [8.1](#81-data-structure-matcher) Data Structure Matcher
-    - [8.1.1](#811-match-value-expr-match-pair1--default-expr) match _value-expr_ _match-pair1_ ... [_default-expr_]
+    - [8.1.1](#811-match-value-expr-match-pair1--default-expr) match _value-expr_ _match-pair1_ ... \[_default-expr_\]
     - [8.1.2](#812-m-expr) $M _expr_
     - [8.1.3](#813-data-structure-matcher-syntax) Data Structure Matcher Syntax
   - [8.2](#82-data-structure-selectors-s) Data Structure Selectors `$S(...)`
@@ -342,7 +344,7 @@ Smalltalk, LISP and Perl.
     - [8.3.2](#832-pattern-substitutions-rs) Pattern Substitutions `$rs/.../`
     - [8.3.3](#833-pattern-syntax-overview) Pattern Syntax Overview
     - [8.3.4](#834-standard-regular-expressions) Standard Regular Expressions
-    - [8.3.5](#835-stdpattern-string-mode) std:pattern _string_ [_mode_]
+    - [8.3.5](#835-stdpattern-string-mode) std:pattern _string_ \[_mode_\]
 - [9](#9-modules) Modules
   - [9.1](#91-export) export
   - [9.2](#92-import) import
@@ -374,7 +376,7 @@ Smalltalk, LISP and Perl.
     - [11.0.21](#11021-stdmeasuretime-unit-function) std:measure\_time _unit_ _function_
   - [11.1](#111-io) I/O
     - [11.1.1](#1111-stdioline) std:io:line
-    - [11.1.2](#1112-stdiolines-value) std:io:lines [_value_]
+    - [11.1.2](#1112-stdiolines-function---value--vector) std:io:lines \[_function_\] -> _value_ | _vector_
     - [11.1.3](#1113-stdiofilereadtext-filename) std:io:file:read\_text _filename_
     - [11.1.4](#1114-stdiofileread-filename) std:io:file:read _filename_
     - [11.1.5](#1115-stdiofilewritesafe-filename-bytes-or-string) std:io:file:write\_safe _filename_ _bytes-or-string_
@@ -385,7 +387,7 @@ Smalltalk, LISP and Perl.
     - [11.1.10](#11110-stdiostdoutwrite-value) std:io:stdout:write _value_
     - [11.1.11](#11111-stdioflush-handle) std:io:flush _handle_
     - [11.1.12](#11112-stdioreadsome-handle) std:io:read\_some _handle_
-    - [11.1.13](#11113-stdiowrite-handle-data-offs) std:io:write _handle_ _data_ [_offs_]
+    - [11.1.13](#11113-stdiowrite-handle-data-offs---count--error--none) std:io:write _handle_ _data_ \[_offs_\] -> _count_ | $error | $none
     - [11.1.14](#11114-stdiowritesome-handle-data) std:io:write\_some _handle_ _data_
   - [11.2](#112-networking) Networking
     - [11.2.1](#1121-stdnettcpconnect-socket-addr-connect-timeout) std:net:tcp:connect _socket-addr_ [_connect-timeout_]
@@ -394,7 +396,7 @@ Smalltalk, LISP and Perl.
     - [11.2.4](#1124-stdnetudpsend-socket-data-socket-addr) std:net:udp:send _socket_ _data_ [_socket-addr_]
     - [11.2.5](#1125-stdnetudprecv-socket-byte-count) std:net:udp:recv _socket_ [_byte-count_]
   - [11.3](#113-processes) Processes
-    - [11.3.1](#1131-stdprocessrun-executable-path-arguments) std:process:run _executable-path_ [_arguments_]
+    - [11.3.1](#1131-stdprocessrun-executable-path-arguments---map) std:process:run _executable-path_ \[_arguments_\] -> _map_
     - [11.3.2](#1132-stdprocessspawn-executable-path-arg-vector-inheritout--inheritall) std:process:spawn _executable-path_ _arg-vector_ [:inherit\_out | :inherit\_all]
     - [11.3.3](#1133-stdprocesstrywait-child-handle) std:process:try\_wait _child-handle_
     - [11.3.4](#1134-stdprocesskillwait-child-handle) std:process:kill\_wait _child-handle_
@@ -455,12 +457,12 @@ Smalltalk, LISP and Perl.
     - [12.2.4](#1224-stdrereplaceall-regex-string-replace-function-input-string) std:re:replace\_all _regex-string_ _replace-function_ _input-string_
   - [12.3](#123-xml) xml
     - [12.3.1](#1231-stdxmlreadsax-xml-string-event-callback-function-do-not-trim-text) std:xml:read\_sax _xml-string_ _event-callback-function_ [_do-not-trim-text_]
-    - [12.3.2](#1232-stdxmlcreatesaxwriter-indent) std:xml:create\_sax\_writer [_indent_]
+    - [12.3.2](#1232-stdxmlcreatesaxwriter-indent) std:xml:create\_sax\_writer \[_indent_\]
     - [12.3.3](#1233-stdxmlcreatetreebuilder) std:xml:create\_tree\_builder
   - [12.4](#124-chrono) chrono
     - [12.4.1](#1241-stdchronotimestamp-format) std:chrono:timestamp \[_format_]
-    - [12.4.2](#1242-stdchronoformatutc-utc-timestamp-format) std:chrono:format\_utc _utc-timestamp_ [_format_]
-    - [12.4.3](#1243-stdchronoformatlocal-utc-timestamp-format) std:chrono:format\_local _utc-timestamp_ [_format_]
+    - [12.4.2](#1242-stdchronoformatutc-utc-timestamp-format---string) std:chrono:format\_utc _utc-timestamp_ \[_format_\] -> _string_
+    - [12.4.3](#1243-stdchronoformatlocal-utc-timestamp-format---string) std:chrono:format\_local _utc-timestamp_ \[_format_\] -> _string_
   - [12.5](#125-color-conversion) color conversion
     - [12.5.1](#1251-stdvrgb2hsv-color-vector) std:v:rgb2hsv _color-vector_
     - [12.5.2](#1252-stdvhsv2rgb-color-vector) std:v:hsv2rgb _color-vector_
@@ -498,10 +500,27 @@ Smalltalk, LISP and Perl.
       - [12.11.2.1](#121121-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
       - [12.11.2.2](#121122-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
   - [12.12](#1212-cursive-consoleterminal-text-user-interface) Cursive Console/Terminal Text User Interface
-    - [12.12.1](#12121-stdcursivenew) std:cursive:new
-      - [12.12.1.1](#121211-cursiverun) $\<Cursive\>.run
-      - [12.12.1.2](#121212-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer view-def
-      - [12.12.1.3](#121213-cursivequit) $\<Cursive\>.quit
+    - [12.12.1](#12121-stdcursivenew---cursive) std:cursive:new -> $\<Cursive\>
+    - [12.12.2](#12122-stdcursiveinstallcursivestdio) std:cursive:install\_cursive\_stdio
+    - [12.12.3](#12123-cursive-object) $\<Cursive\> Object
+      - [12.12.3.1](#121231-cursiverun---none--error) $\<Cursive\>.run -> $none | $error
+      - [12.12.3.2](#121232-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer _view-def_
+      - [12.12.3.3](#121233-cursivepoplayer) $\<Cursive\>.pop\_layer
+      - [12.12.3.4](#121234-cursiveaddscreen-view-def---screen-id) $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
+      - [12.12.3.5](#121235-cursivesetscreen-screen-id) $\<Cursive\>.*set\_screen* _screen-id_
+      - [12.12.3.6](#121236-cursiveactivescreen---screen-id) $\<Cursive\>.active\_screen -> _screen-id_
+      - [12.12.3.7](#121237-cursivesender---cursivesendmsgcb) $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
+        - [12.12.3.7.1](#1212371-cursivesendmsgcb-event-tag-value---true--error) $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
+      - [12.12.3.8](#121238-cursivepoplayer) $\<Cursive\>.pop\_layer
+      - [12.12.3.9](#121239-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer view-def
+      - [12.12.3.10](#1212310-cursivequit) $\<Cursive\>.quit
+      - [12.12.3.11](#1212311-cursivecounter---cursivecounter) $\<Cursive\>.counter -> $\<Cursive:Counter\>
+    - [12.12.4](#12124-cursivecounter-object) $\<Cursive:Counter\> Object
+      - [12.12.4.1](#121241-cursivecounterget) $\<Cursive:Counter\>.get
+      - [12.12.4.2](#121242-cursivecounterset-integer) $\<Cursive:Counter\>.set _integer_
+      - [12.12.4.3](#121243-cursivecountersetupdate-integer) $\<Cursive:Counter\>.set\_update _integer_
+      - [12.12.4.4](#121244-cursivecountertick-integer) $\<Cursive:Counter\>.tick _integer_
+      - [12.12.4.5](#121245-cursivecountertickupdate-integer) $\<Cursive:Counter\>.tick\_update _integer_
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -511,6 +530,7 @@ Smalltalk, LISP and Perl.
   - [14.2](#142-view-def-panel-grouping-views-in-a-panel) view-def `panel` Grouping Views in a Panel
   - [14.3](#143-view-def-hbox-horizontal-layout) view-def `hbox` Horizontal Layout
   - [14.4](#144-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
+  - [14.5](#145-view-def-progress-progress-bar) view-def `progress` Progress Bar
 - [15](#15-wlambda-interpreter-cli-command-line-interface) WLambda Interpreter (CLI) Command Line Interface
   - [15.1](#151-wlambda-script-to-executable-packing) WLambda Script To Executable Packing
 
@@ -1142,24 +1162,36 @@ example.
 
 ### <a name="25-function-call-composition"></a>2.5 - Function call composition
 
-- chaining
-- traditional () call syntax
-- ~ syntax
-- || syntax
+For regular function calling please consult the section [2.2](#22-function-calling).
 
->> $[] || push 10
-> $[10]
->> $[] || push 10 || push 20
-> $[10,20]
->> !x = { push _1 _ };
-> $n
->> $[] | x 10 | x 20
-> $[10,20]
->>
+#### <a name="251--argument-list-delimiter"></a>2.5.1 - '~' Argument List Delimiter
 
-- [...] syntax
+The '~' character can be used to end argument lists in case of a function call without `[]`.
+This means:
 
-#### <a name="251--tail-argument-function-chaninig"></a>2.5.1 - '|' Tail Argument Function Chaninig
+```text
+    function arg1 arg2 ~ function2 arg2_1 arg2_2 ...
+```
+
+Is the same as:
+
+```text
+    (function arg1 arg2 (function2 arg2_1 arg2_2 ...))
+```
+
+or:
+
+```text
+    function[arg1, arg2, function2 arg2_1 arg2_2 ...]
+```
+
+Here is an example:
+
+```wlambda
+std:assert_eq (std:str:cat :a :b ~ std:str:to_lowercase "X") "abX";
+```
+
+#### <a name="252--tail-argument-function-chaninig"></a>2.5.2 - '|' Tail Argument Function Chaninig
 
 This syntax is useful if you have following function call composition:
 
@@ -1181,6 +1213,14 @@ An example with actual values:
 std:assert_eq x 42;
 ```
 
+An example with strings:
+
+```wlambda
+!res = "a" | "b" "x" | "c" "d";
+
+std:assert_eq res "cdbxa";
+```
+
 Think of it as if the value `10` was _piped_ through the
 functions on the right.
 
@@ -1193,7 +1233,27 @@ The call reordering of the `|` operator looks like this:
         --------------------|
 ```
 
-#### <a name="252--left-hand-function-chaining"></a>2.5.2 - '|>' Left Hand Function Chaining
+#### <a name="253--head-argument-function-chaining"></a>2.5.3 - '||' Head Argument Function Chaining
+
+This operator works similar to the '|' operator. But it inserts the function call at the front
+of the function call on the right side of the '||' operator like this:
+
+```text
+    fn1 a1 a2 || fn2 (   ) b1 b2  =>  fn2 (fn1 a1 a2) b1 b2
+    """""""""          ^
+        v              |
+        ---------------|
+```
+
+An example:
+
+```wlambda
+!res = "a" || "b" "x" || "c" "d";
+
+std:assert_eq res "cbaxd";
+```
+
+#### <a name="254--left-hand-function-chaining"></a>2.5.4 - '|>' Left Hand Function Chaining
 
 This syntax is useful if you want to make deep call chains like these:
 
@@ -1238,7 +1298,7 @@ The call reordering of the `|>` operator looks like this:
                    -------------------|
 ```
 
-#### <a name="253-forward-argument-pipe-arg--fun"></a>2.5.3 - Forward Argument Pipe `arg &> fun`
+#### <a name="255-forward-argument-pipe-arg--fun"></a>2.5.5 - Forward Argument Pipe `arg &> fun`
 
 This operator has the highest precedence over all other operators
 and is used to be able to write this:
@@ -1261,7 +1321,7 @@ You can see it as piping operation:
 std:assert_eq r "0000000abc";
 ```
 
-#### <a name="254-forward-argument-apply-pipe-list--fun"></a>2.5.4 - Forward Argument Apply Pipe `list &@> fun`
+#### <a name="256-forward-argument-apply-pipe-list--fun"></a>2.5.6 - Forward Argument Apply Pipe `list &@> fun`
 
 This operator is like `&>`. But it will call the function with the elements
 in the given _list_ as arguments.
@@ -1272,7 +1332,7 @@ That means: `list &@> fun` is equivalent to `fun[[list]]`.
 std:assert_eq $[2, 5] &@> `+`   7;
 ```
 
-#### <a name="255-reverse-argument-pipe-fun--arg"></a>2.5.5 - Reverse Argument Pipe `fun <& arg`
+#### <a name="257-reverse-argument-pipe-fun--arg"></a>2.5.7 - Reverse Argument Pipe `fun <& arg`
 
 Like the `&>` operator this operator, but it has a lower precedence (does not bind
 as strongly as `&>`) and is right associative. That means you can write this:
@@ -1285,7 +1345,7 @@ std:assert_eq r "0000000abc";
 
 That means, writing `f <& a <& x` becomes `f[a[x]]` or `(f (a x))`.
 
-#### <a name="256-reverse-argument-apply-pipe-list--fun"></a>2.5.6 - Reverse Argument Apply Pipe `list &@> fun`
+#### <a name="258-reverse-argument-apply-pipe-list--fun"></a>2.5.8 - Reverse Argument Apply Pipe `list &@> fun`
 
 This operator is like `<&`. But it will call the function with the elements
 in the given _list_ as arguments.
@@ -1316,7 +1376,7 @@ boolean calling semantics.
 }
 ```
 
-#### <a name="261-return-label-value"></a>2.6.1 - return [_label_] _value_
+#### <a name="261-return-label-value"></a>2.6.1 - return \[_label_\] _value_
 
 Returns _value_ from the current function if no _label_ is given.
 If _label_ is given, the call stack will unwind until either a `block`
@@ -1354,7 +1414,7 @@ The labels do not adhere to lexical scoping and are dynamically scoped:
 std:assert_eq f[] 30;
 ```
 
-#### <a name="262-block-label-function"></a>2.6.2 - block [label] _function_
+#### <a name="262-block-label-function"></a>2.6.2 - block \[label\] _function_
 
 Calls the _function_ with the given _label_ for `return`to jump to.
 
@@ -1410,7 +1470,7 @@ Please note, that the drop function will be executed in a newly constructed
 default EvalContext, this means there is some overhead and that the EvalContext
 dependent results of `std:eval` might be different.
 
-#### <a name="264-stdtimenow-unit"></a>2.6.4 - std:time:now [_unit_]
+#### <a name="264-stdtimenow-unit"></a>2.6.4 - std:time:now \[_unit_\]
 
 Returns the current system time since the UNIX epoch (1970-01-01 00:00:00 UTC).
 If no _unit_ is specified, the default is `:ms`. Following units are available:
@@ -1426,7 +1486,7 @@ std:assert (std:time:now :ms) > 1000;
 std:assert len[str[std:time:now :ns]] > 18;
 ```
 
-#### <a name="265-stdsrand-seed"></a>2.6.5 - std:srand [_seed_]
+#### <a name="265-stdsrand-seed"></a>2.6.5 - std:srand \[_seed_\]
 
 With this function you can seed the internal pseudo random number
 generator based on an unspecified PRNG algorithm, that might or might not
@@ -1798,7 +1858,7 @@ a few functions that accept error values in their arguments:
 
 All other functions don't accept errors as their argument.
 
-#### <a name="331--label-value"></a>3.3.1 - _? [_label_] _value_
+#### <a name="331--label-value"></a>3.3.1 - _? \[_label_\] _value_
 
 Unwind the call stack from the current function to a given _label_ if _value_ is an error value.
 If no _label_ is given only the current function is returned from with the error value.  If there
@@ -3233,7 +3293,7 @@ std:assert_eq (len         "abcd") 4;
 std:assert_eq (std:str:len "abcd") 4;
 ```
 
-#### <a name="3108-stdstrfind-pattern-string-offset"></a>3.10.8 - std:str:find _pattern_ _string_ [_offset_]
+#### <a name="3108-stdstrfind-pattern-string-offset---index--none"></a>3.10.8 - std:str:find _pattern_ _string_ \[_offset_\] -> _index_ | $none
 
 Searches for the string _pattern_ in the _string_ and returns the 0 based position
 in the string the given _pattern_ starts.
@@ -3622,7 +3682,7 @@ std:assert ~ is_bytes $b"ABC";
 std:assert ~ not ~ is_bytes "ABC";
 ```
 
-#### <a name="3114-stdbytesfind-pattern-string-offset"></a>3.11.4 - std:bytes:find _pattern_ _string_ [_offset_]
+#### <a name="3114-stdbytesfind-pattern-string-offset---index--none"></a>3.11.4 - std:bytes:find _pattern_ _string_ \[_offset_\] -> _index_ | $none
 
 Searches for the string _pattern_ in the _string_ and returns the 0 based position
 in the string the given _pattern_ starts.
@@ -3683,7 +3743,7 @@ std:assert_eq
     "62797465";
 ```
 
-#### <a name="3119-stdbytestobase64-byte-vector-config"></a>3.11.9 - std:bytes:to\_base64 _byte-vector_ [_config_]
+#### <a name="3119-stdbytestobase64-byte-vector-config---string"></a>3.11.9 - std:bytes:to\_base64 _byte-vector_ \[_config_\] -> _string_
 
 Converts the given byte vector to a Base64 encoded string. With _config_ you can
 define the encoding style:
@@ -3711,11 +3771,10 @@ std:assert_eq
     $b"test";
 ```
 
-#### <a name="31110-stdbytesfrombase64-byte-vector-config"></a>3.11.10 - std:bytes:from\_base64 _byte-vector_ [_config_]
+#### <a name="31110-stdbytesfrombase64-string-config---byte-vector"></a>3.11.10 - std:bytes:from\_base64 _string_ \[_config_\] -> _byte-vector_
 
-Converts the given byte vector to a Base64 encoded string. With _config_ you can
+Converts the given Base64 encoded string to a byte vector. With _config_ you can
 define the encoding style, see also `to_base64` for a list of possible values.
-
 
 ```wlambda
 std:assert_eq
@@ -6183,10 +6242,10 @@ std:assert_str_eq v v2;
 
 See also:
 
-- [Forward Argument Pipe `arg &> fun`](#253-forward-argument-pipe-arg--fun)
-- [Forward Argument Apply Pipe `list &@> fun`](254-forward-argument-apply-pipe-list--fun)
-- [Reverse Argument Pipe `fun <& arg`](#255-reverse-argument-pipe-fun--arg)
-- [Reverse Argument Apply Pipe `list &@> fun`](#256-reverse-argument-apply-pipe-list--fun)
+- [Forward Argument Pipe `arg &> fun`](#255-forward-argument-pipe-arg--fun)
+- [Forward Argument Apply Pipe `list &@> fun`](256-forward-argument-apply-pipe-list--fun)
+- [Reverse Argument Pipe `fun <& arg`](#257-reverse-argument-pipe-fun--arg)
+- [Reverse Argument Apply Pipe `list &@> fun`](#258-reverse-argument-apply-pipe-list--fun)
 
 ### <a name="67-default-value-operators---n-o-and-e"></a>6.7 - Default Value Operators //, /?, /$n, /$o and /$e
 
@@ -6464,7 +6523,7 @@ match (commonly used in an if expression).
 
 For a reference of the matcher syntax see below.
 
-#### <a name="811-match-value-expr-match-pair1--default-expr"></a>8.1.1 - match _value-expr_ _match-pair1_ ... [_default-expr_]
+#### <a name="811-match-value-expr-match-pair1--default-expr"></a>8.1.1 - match _value-expr_ _match-pair1_ ... \[_default-expr_\]
 
 The match operation is a very versatile control flow operation.
 
@@ -6837,7 +6896,7 @@ which implements a more common syntax for regular expressions.
 Please refer to the functions `std:re:match` in the WLambda standard library
 for this.
 
-#### <a name="835-stdpattern-string-mode"></a>8.3.5 - std:pattern _string_ [_mode_]
+#### <a name="835-stdpattern-string-mode"></a>8.3.5 - std:pattern _string_ \[_mode_\]
 
 Compiles the regex pattern _string_ to a function just like `$r/.../` would do.
 The _mode_ can either be `:g` (global match like `$rg...`), `:s` (substitution
@@ -7352,10 +7411,10 @@ went wrong.
 std:displayln "you entered: " std:str:trim_end[line];
 ```
 
-#### <a name="1112-stdiolines-value"></a>11.1.2 - std:io:lines [_value_]
+#### <a name="1112-stdiolines-function---value--vector"></a>11.1.2 - std:io:lines \[_function_\] -> _value_ | _vector_
 
-Calls the given _value_ for each line in standard input until EOF and returns
-the last returned value from that call.  If _value_ is not given, all lines
+Calls the given _function_ for each line in standard input until EOF and returns
+the last returned value from that call.  If _function_ is not given, all lines
 will be appended to a new vector and returned.  Returns an error if some IO
 error occured.
 
@@ -7472,7 +7531,7 @@ while not[done] {
 };
 ```
 
-#### <a name="11113-stdiowrite-handle-data-offs"></a>11.1.13 - std:io:write _handle_ _data_ [_offs_]
+#### <a name="11113-stdiowrite-handle-data-offs---count--error--none"></a>11.1.13 - std:io:write _handle_ _data_ \[_offs_\] -> _count_ | $error | $none
 
 Write all data as byte vector to the IO _handle_ (socket, file handle, ...),
 starting at _offs_ (0 default).
@@ -7629,7 +7688,7 @@ that it was received from. Or an error.
 
 This chapter documents how to execute new processes.
 
-#### <a name="1131-stdprocessrun-executable-path-arguments"></a>11.3.1 - std:process:run _executable-path_ [_arguments_]
+#### <a name="1131-stdprocessrun-executable-path-arguments---map"></a>11.3.1 - std:process:run _executable-path_ \[_arguments_\] -> _map_
 
 Starts the given _executable-path_ with the given (but optional) _arguments_.
 _arguments_ can be a vector or an iterator. A data structure containing
@@ -8563,7 +8622,7 @@ std:assert_eq res "foo 33 fifi 100";
 }[]
 ```
 
-#### <a name="1232-stdxmlcreatesaxwriter-indent"></a>12.3.2 - std:xml:create\_sax\_writer [_indent_]
+#### <a name="1232-stdxmlcreatesaxwriter-indent"></a>12.3.2 - std:xml:create\_sax\_writer \[_indent_\]
 
 Creates an XML SAX event based writer function. The function
 should be called with single events as received by `std:xml:read_sax`.
@@ -8643,7 +8702,7 @@ std:assert ~ (year_str | int) == 2022;
 !now_str = std:chrono:timestamp[];
 ```
 
-#### <a name="1242-stdchronoformatutc-utc-timestamp-format"></a>12.4.2 - std:chrono:format\_utc _utc-timestamp_ [_format_]
+#### <a name="1242-stdchronoformatutc-utc-timestamp-format---string"></a>12.4.2 - std:chrono:format\_utc _utc-timestamp_ \[_format_\] -> _string_
 
 Formats the given _utc-timestamp_ in seconds according to _format_.
 
@@ -8656,7 +8715,7 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 std:assert_str_eq year_str "11:09:49 2020";
 ```
 
-#### <a name="1243-stdchronoformatlocal-utc-timestamp-format"></a>12.4.3 - std:chrono:format\_local _utc-timestamp_ [_format_]
+#### <a name="1243-stdchronoformatlocal-utc-timestamp-format---string"></a>12.4.3 - std:chrono:format\_local _utc-timestamp_ \[_format_\] -> _string_
 
 Formats the given _utc-timestamp_ in seconds according to _format_ in the local timezone.
 
@@ -9048,6 +9107,8 @@ ${
     id             = 0,                 # Broker ID
     listen         = "0.0.0.0:1883",    # Broker server endpoint
     console_listen = "0.0.0.0:18088",   # An extra HTTP console endpoint
+    name           = "nameofbroker",    # Name of the Broker server
+    version        = "v4",              # MQTT Version: "v4", "v5" and "ws"
     link = ${                           # Configure the local link
         client_id = "some_id",          # Link client ID, default is 'wl_local'
         recv = <std:sync:mpsc channel>, # Channel to receive messages for the
@@ -9164,11 +9225,11 @@ in the default feature set of WLambda.
 
 The `view-def` view definition format is defined in an extra section of this reference at the end.
 
-#### <a name="12121-stdcursivenew"></a>12.12.1 - std:cursive:new
+#### <a name="12121-stdcursivenew---cursive"></a>12.12.1 - std:cursive:new -> $\<Cursive\>
 
 Create a new Cursive instance. You can call the following functions on it:
 
-```wlambda
+```text
 !c = std:cursive:new[];
 c.add_layer :panel => ${} =>
     :button => ${
@@ -9178,17 +9239,118 @@ c.add_layer :panel => ${} =>
 c.run[];
 ```
 
-##### <a name="121211-cursiverun"></a>12.12.1.1 - $\<Cursive\>.run
+#### <a name="12122-stdcursiveinstallcursivestdio"></a>12.12.2 - std:cursive:install\_cursive\_stdio
+
+Sets up WLambda to output things that would go to the standard output, to go to the `stdout`
+text view. This allows eg. `std:displayln` to be rerouted to the Cursive UI.
+
+#### <a name="12123-cursive-object"></a>12.12.3 - $\<Cursive\> Object
+
+##### <a name="121231-cursiverun---none--error"></a>12.12.3.1 - $\<Cursive\>.run -> $none | $error
 
 Start the event loop. You can only exit this event loop using `$<Cursive>.quit[]`.
 
-##### <a name="121212-cursiveaddlayer-view-def"></a>12.12.1.2 - $\<Cursive\>.add\_layer view-def
+##### <a name="121232-cursiveaddlayer-view-def"></a>12.12.3.2 - $\<Cursive\>.add\_layer _view-def_
+
+Adds a layer on top of the current screen and instanciates a _view-def_.
+You can remove the layer using `$<Cursive>.pop_layer[]`.
+
+##### <a name="121238-cursivepoplayer"></a>12.12.3.8 - $\<Cursive\>.pop\_layer
+
+Removes the top most layer of the current screen.
+
+##### <a name="121234-cursiveaddscreen-view-def---screen-id"></a>12.12.3.4 - $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
+
+Creates a new screen (not visible) and instanciates the _view-def_ on a new
+layer there.  The new screen ID is returned. To activate the screen use
+`$<Cursive>.set_screen id`.
+
+##### <a name="121235-cursivesetscreen-screen-id"></a>12.12.3.5 - $\<Cursive\>.*set\_screen* _screen-id_
+
+Sets the currently visible screen by it's ID as returned by `$<Cursive>.add_screen`.
+The first screen has the ID 0.
+
+##### <a name="121236-cursiveactivescreen---screen-id"></a>12.12.3.6 - $\<Cursive\>.active\_screen -> _screen-id_
+
+Returns the current active/visible screen's ID.
+
+##### <a name="121237-cursivesender---cursivesendmsgcb"></a>12.12.3.7 - $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
+
+Creates an event sender callback to communicate with the Cursive UI thread/event loop from
+another thread. You can call the `$<Cursive:SendMsgCb>` like a regular function.
+
+###### <a name="1212371-cursivesendmsgcb-event-tag-value---true--error"></a>12.12.3.7.1 - $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
+
+Sends the _value_ to the Cursive UI thread's event loop. The _event-tag_
+can be used as event name to dispatch specific callbacks that have been installed
+using `$<Cursive>.send_cb _event-tag_ { ... }`.
+
+Returns a true value if sending was successful or an `$error`.
+
+##### <a name="121238-cursivepoplayer"></a>12.12.3.8 - $\<Cursive\>.pop\_layer
+
+##### <a name="121239-cursiveaddlayer-view-def"></a>12.12.3.9 - $\<Cursive\>.add\_layer view-def
 
 Adds the `view-def` view as layer to the TUI.
 
-##### <a name="121213-cursivequit"></a>12.12.1.3 - $\<Cursive\>.quit
+##### <a name="1212310-cursivequit"></a>12.12.3.10 - $\<Cursive\>.quit
 
 Quit the main event loop.
+
+##### <a name="1212311-cursivecounter---cursivecounter"></a>12.12.3.11 - $\<Cursive\>.counter -> $\<Cursive:Counter\>
+
+Creates a counter instance to be used by the `progress` view-def. It's initialized with 0.
+It returns a `$<Cursive:Counter>` object. See further below about an API definition of that
+object.
+
+```wlambda
+!c = std:cursive:new[];
+!counter = c.counter[];
+
+# Set the counter value:
+counter.set 10;
+
+# Setting the counter from another thread:
+std:thread:spawn $code{
+    counter.set_update 20;
+} ${ counter = counter };
+
+# Increment the counter by 11 ticks:
+counter.tick 11;
+
+# Get the counter value:
+std:assert counter.get[] > 0;
+```
+
+#### <a name="12124-cursivecounter-object"></a>12.12.4 - $\<Cursive:Counter\> Object
+
+This section describes the `$<Cursive:Counter>` object API. It is instanciated
+by the `$<Cursive>.counter` method.
+
+##### <a name="121241-cursivecounterget"></a>12.12.4.1 - $\<Cursive:Counter\>.get
+
+Returns the current counter integer value.
+
+##### <a name="121242-cursivecounterset-integer"></a>12.12.4.2 - $\<Cursive:Counter\>.set _integer_
+
+Sets the current counter integer value.
+
+##### <a name="121243-cursivecountersetupdate-integer"></a>12.12.4.3 - $\<Cursive:Counter\>.set\_update _integer_
+
+Sets the current counter integer value and sends a signal to the Cursive UI thread
+to update it's views. This can be used to update a `progress` bar from another thread.
+
+It may returns an error if the Cursive UI thread is not available anymore.
+
+##### <a name="121244-cursivecountertick-integer"></a>12.12.4.4 - $\<Cursive:Counter\>.tick _integer_
+
+Increments the counter by _integer_.
+
+##### <a name="121245-cursivecountertickupdate-integer"></a>12.12.4.5 - $\<Cursive:Counter\>.tick\_update _integer_
+
+Increments the counter by _integer_ and updates the Cursive UI thread.
+
+It may returns an error if the Cursive UI thread is not available anymore.
 
 ## <a name="13-wlambda-lexical-syntax-and-grammar"></a>13 - WLambda Lexical Syntax and Grammar
 
@@ -9506,7 +9668,7 @@ There are certain calls that are handled by the compiler differently.
 - `iter _var_ _value-expr_ _block-or-expr_`
 - `next _x_`
 - `break`
-- `match _value-expr_ $p(structure_pattern, branch_block) ... [ branch_block ]
+- `match _value-expr_ $p(structure_pattern, branch_block) ... \[branch_block\]
 - `jump _idx-expr_ _block1_ ...`
 
 ### <a name="132-string-formatting-syntax"></a>13.2 - String Formatting Syntax
@@ -9645,6 +9807,8 @@ other views. There are no auto wrap properties definable here.
         ...
     ]
 ```
+
+### <a name="145-view-def-progress-progress-bar"></a>14.5 - view-def `progress` Progress Bar
 
 ## <a name="15-wlambda-interpreter-cli-command-line-interface"></a>15 - WLambda Interpreter (CLI) Command Line Interface
 
