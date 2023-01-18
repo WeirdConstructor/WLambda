@@ -506,31 +506,42 @@ Smalltalk, LISP and Perl.
       - [12.12.3.1](#121231-cursiverun---none--error) $\<Cursive\>.run -> $none | $error
       - [12.12.3.2](#121232-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer _view-def_
       - [12.12.3.3](#121233-cursivepoplayer) $\<Cursive\>.pop\_layer
-      - [12.12.3.4](#121234-cursiveaddscreen-view-def---screen-id) $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
-      - [12.12.3.5](#121235-cursivesetscreen-screen-id) $\<Cursive\>.*set\_screen* _screen-id_
-      - [12.12.3.6](#121236-cursiveactivescreen---screen-id) $\<Cursive\>.active\_screen -> _screen-id_
-      - [12.12.3.7](#121237-cursivesender---cursivesendmsgcb) $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
-        - [12.12.3.7.1](#1212371-cursivesendmsgcb-event-tag-value---true--error) $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
-      - [12.12.3.8](#121238-cursivepoplayer) $\<Cursive\>.pop\_layer
-      - [12.12.3.9](#121239-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer view-def
-      - [12.12.3.10](#1212310-cursivequit) $\<Cursive\>.quit
-      - [12.12.3.11](#1212311-cursivecounter---cursivecounter) $\<Cursive\>.counter -> $\<Cursive:Counter\>
-    - [12.12.4](#12124-cursivecounter-object) $\<Cursive:Counter\> Object
-      - [12.12.4.1](#121241-cursivecounterget) $\<Cursive:Counter\>.get
-      - [12.12.4.2](#121242-cursivecounterset-integer) $\<Cursive:Counter\>.set _integer_
-      - [12.12.4.3](#121243-cursivecountersetupdate-integer) $\<Cursive:Counter\>.set\_update _integer_
-      - [12.12.4.4](#121244-cursivecountertick-integer) $\<Cursive:Counter\>.tick _integer_
-      - [12.12.4.5](#121245-cursivecountertickupdate-integer) $\<Cursive:Counter\>.tick\_update _integer_
+      - [12.12.3.4](#121234-cursiveget-name-of-view---none--namedviewnametype) $\<Cursive\>.get _name-of-view_ -> $none | $\<NamedView:Name:Type\>
+      - [12.12.3.5](#121235-cursivepopup-popup-def-view-def) $\<Cursive\>.popup _popup-def_ _view-def_
+      - [12.12.3.6](#121236-cursiveaddscreen-view-def---screen-id) $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
+      - [12.12.3.7](#121237-cursivesetscreen-screen-id) $\<Cursive\>.*set\_screen* _screen-id_
+      - [12.12.3.8](#121238-cursiveactivescreen---screen-id) $\<Cursive\>.active\_screen -> _screen-id_
+      - [12.12.3.9](#121239-cursivesender---cursivesendmsgcb) $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
+        - [12.12.3.9.1](#1212391-cursivesendmsgcb-event-tag-value---true--error) $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
+      - [12.12.3.10](#1212310-cursivedefaultcb-widget-name-function) $\<Cursive\>.default\_cb _widget-name_ _function_
+      - [12.12.3.11](#1212311-cursivesetwindowtitle-string) $\<Cursive\>.set\_window\_title _string_
+    - [12.12.4](#12124-cursiveinitconsolelogging) $\<Cursive\>.init\_console\_logging
+    - [12.12.5](#12125-cursivetoggledebugconsole) $\<Cursive\>.toggle\_debug\_console
+    - [12.12.6](#12126-cursiveshowdebugconsole) $\<Cursive\>.show\_debug\_console
+      - [12.12.6.1](#121261-cursivequit) $\<Cursive\>.quit
+      - [12.12.6.2](#121262-cursivecounter---cursivecounter) $\<Cursive\>.counter -> $\<Cursive:Counter\>
+    - [12.12.7](#12127-cursivecounter-object) $\<Cursive:Counter\> Object
+      - [12.12.7.1](#121271-cursivecounterget) $\<Cursive:Counter\>.get
+      - [12.12.7.2](#121272-cursivecounterset-integer) $\<Cursive:Counter\>.set _integer_
+      - [12.12.7.3](#121273-cursivecountersetupdate-integer) $\<Cursive:Counter\>.set\_update _integer_
+      - [12.12.7.4](#121274-cursivecountertick-integer) $\<Cursive:Counter\>.tick _integer_
+      - [12.12.7.5](#121275-cursivecountertickupdate-integer) $\<Cursive:Counter\>.tick\_update _integer_
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
   - [13.3](#133-format-string-syntax-for-stdbytespack-and-stdbytesunpack) Format String Syntax for std:bytes:pack and std:bytes:unpack
 - [14](#14-cursive-view-definition) Cursive View Definition
   - [14.1](#141-size-def-cursive-widthheight-size-definition) size-def Cursive Width/Height Size Definition
-  - [14.2](#142-view-def-panel-grouping-views-in-a-panel) view-def `panel` Grouping Views in a Panel
-  - [14.3](#143-view-def-hbox-horizontal-layout) view-def `hbox` Horizontal Layout
-  - [14.4](#144-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
-  - [14.5](#145-view-def-progress-progress-bar) view-def `progress` Progress Bar
+  - [14.2](#142-view-default-def-view-default-definitions) view-default-def View Default Definitions
+    - [14.2.1](#1421-hideable-views) Hideable Views
+      - [14.2.1.1](#14211-hideablesetvisible-bool) hideable.set\_visible _bool_
+      - [14.2.1.2](#14212-hideableisvisible---bool) hideable.is\_visible -> _bool_
+      - [14.2.1.3](#14213-hideablehide) hideable.hide
+      - [14.2.1.4](#14214-hideableunhide) hideable.unhide
+  - [14.3](#143-view-def-panel-grouping-views-in-a-panel) view-def `panel` Grouping Views in a Panel
+  - [14.4](#144-view-def-hbox-horizontal-layout) view-def `hbox` Horizontal Layout
+  - [14.5](#145-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
+  - [14.6](#146-view-def-progress-progress-bar) view-def `progress` Progress Bar
 - [15](#15-wlambda-interpreter-cli-command-line-interface) WLambda Interpreter (CLI) Command Line Interface
   - [15.1](#151-wlambda-script-to-executable-packing) WLambda Script To Executable Packing
 
@@ -654,8 +665,8 @@ performance advantage (roughly 3-4%) over (global or local) variables.
 
 std:assert_eq X 11;
 
-# Destructuring works too, but only with compile time literal values
-# in the vectors / maps:
+## Destructuring works too, but only with compile time literal values
+## in the vectors / maps:
 !:const (ON, OFF) = $[$true, $false];
 !:const (RED, BLUE) = ${
     BLUE = 0x0000FF,
@@ -687,7 +698,7 @@ Constants also work across module borders:
 ```wlambda
 !:const X = 10;
 
-# When imported the X will remain constant:
+## When imported the X will remain constant:
 !@export X = X;
 ```
 
@@ -706,18 +717,18 @@ at runtime to a hidden reference to their previous value:
 !a = 10;
 !b = 20;
 
-# function transforms a and b to hidden references
+## function transforms a and b to hidden references
 !add_a_and_b = { a + b };
 
 std:assert_eq add_a_and_b[] 30;
 
-# The assignment assigns to the hidden reference, so the closure add_a_and_b
-# also receives the new value:
+## The assignment assigns to the hidden reference, so the closure add_a_and_b
+## also receives the new value:
 .a = 33;
 
 std:assert_eq add_a_and_b[] 53;
 
-# a and b are dereferenced on local variable access.
+## a and b are dereferenced on local variable access.
 std:assert_eq a + b         53;
 ```
 
@@ -734,24 +745,24 @@ cycles and memory leaks.
 
 ```wlambda
 !new_Cat = {!(name) = @;
-    # Captures by closures upgrade the outer `self` variable to a _hidden_
-    # reference, which is then captured. As the closure is stored in
-    # `self`, this would create a ref cycle. This is why we needed
-    # to make a weak reference to self.
+    ## Captures by closures upgrade the outer `self` variable to a _hidden_
+    ## reference, which is then captured. As the closure is stored in
+    ## `self`, this would create a ref cycle. This is why we needed
+    ## to make a weak reference to self.
 
-    # Make an explicit hidden reference:
+    ## Make an explicit hidden reference:
     !self_ = $& ${
         name = name,
     };
 
-    # Create a weak reference form the hidden reference:
+    ## Create a weak reference form the hidden reference:
     !self = $weak& $:self_;
 
     self.meow     = { std:displayln self.name " meows!"; };
     self.get_name = { self.name };
 
-    # To keep the object alive, we retrieve a strong reference
-    # from the hidden reference:
+    ## To keep the object alive, we retrieve a strong reference
+    ## from the hidden reference:
     $:self
 };
 
@@ -766,15 +777,15 @@ Alternatively you can just make the cat name private:
 
 ```wlambda
 !new_Cat = {!(name) = @;
-    # This does not make cycles, because `name` does not contain
-    # the closures in the end.
+    ## This does not make cycles, because `name` does not contain
+    ## the closures in the end.
     !cat_name = name;
 
     !meow     = { std:displayln cat_name " meows!"; };
     !get_name = { $*cat_name };
     !set_name = { .*cat_name = _; };
 
-    # Just holds the methods
+    ## Just holds the methods
     ${
         meow     = meow,
         get_name = get_name,
@@ -814,17 +825,17 @@ category of function calling operators there is the collection addition operator
 Here are examples:
 
 ```wlambda
-# All the second variant:
+## All the second variant:
 std:assert_eq[std:str:cat[1, 2, 3], "123"];
 
-# Can also be written as:
+## Can also be written as:
 std:assert_eq (std:str:cat 1 2 3) "123";
 
-# As the third variant:
+## As the third variant:
 !some_args = $[1, 2, 3];
 std:assert_eq std:str:cat[[some_args]] "123";
 
-# The fourth variant:
+## The fourth variant:
 std:assert_eq str <& $[1, 2, 3]     "$[1,2,3]";
 std:assert_eq $[1, 2, 3] &> str     "$[1,2,3]";
 ```
@@ -842,8 +853,8 @@ std:assert_eq twoify[2] 4;
 
 std:assert_eq twoify2[2] 4;
 
-# You may also call them directly, notice the parenthesis ( ... ) syntax
-# for delimiting the inner function call:
+## You may also call them directly, notice the parenthesis ( ... ) syntax
+## for delimiting the inner function call:
 std:assert_eq ({ _ * 2 } 2) 4;
 ```
 
@@ -878,10 +889,10 @@ Here an example:
 
 ```wlambda
 !dosomething = {|2 < 4| !(a, b, c, d) = @;
-    # Please note: We have to assign the
-    # parameters to named values here, because
-    # the arms of the conditional below have
-    # their own set of arguments.
+    ## Please note: We have to assign the
+    ## parameters to named values here, because
+    ## the arms of the conditional below have
+    ## their own set of arguments.
 
     (is_none c) { a + b } { a * b + c * d }
 };
@@ -898,8 +909,8 @@ and diligence.
 ```wlambda
 !f = { _ }; # accepts exactly 1 param
 
-# f keeps its arity checks, but f2 will
-# call the same function, but without arity checks.
+## f keeps its arity checks, but f2 will
+## call the same function, but without arity checks.
 !f2 = std:to_no_arity f;
 
 std:assert_eq (f2 1 2 3) 1;
@@ -979,7 +990,7 @@ by using the `'_proto'` key of a map:
 
 ```wlambda
 !class_a = ${
-    # $self is set by any key access using the '.' calling form:
+    ## $self is set by any key access using the '.' calling form:
     new = { ${ _proto = $self } },
     generate = { "I am A" },  # A method
 };
@@ -1131,7 +1142,7 @@ functions, you are advised to also wrap it into a strong reference.
     },
 };
 
-# Create instance:
+## Create instance:
 !my_obj = MyClass.new[];
 
 my_obj.inc_x[];
@@ -1140,16 +1151,16 @@ my_obj.inc_x[];
 my_obj.install_on     chain;
 my_obj.install_getter chain;
 
-# There are now 3 references to 'my_obj':
-# - my_obj variable
-# - first callback in chain
-# - second callback in chain
+## There are now 3 references to 'my_obj':
+## - my_obj variable
+## - first callback in chain
+## - second callback in chain
 
 std:assert_eq my_obj._data.x 2;
 chain.0[]; # calls my_ocj.inc_x[];
 std:assert_eq my_obj._data.x 3;
 
-# Second callback gets x:
+## Second callback gets x:
 std:assert_eq chain.1[] 3;
 
 !my_obj = $n; # destroy only strong reference
@@ -1366,13 +1377,13 @@ boolean calling semantics.
 !some_func = \:outer {
     !x = 10;
 
-    # does stuff...
+    ## does stuff...
 
     (x == 10) {
         return :outer 20
     };
 
-    # more stuff that is not executed if x == 10.
+    ## more stuff that is not executed if x == 10.
 }
 ```
 
@@ -1781,7 +1792,7 @@ functions:
 
 std:assert_eq (res 0 8) "str:join";
 
-# As comparison, the positive case for this construct:
+## As comparison, the positive case for this construct:
 
 !res = match 100
     ($e err) => { $\.err }
@@ -1798,7 +1809,7 @@ But use this with care, it hides errors all to easily!
 std:assert_eq ($e 30) /$e 20    20;
 std:assert_eq $n      /$e 10    $n;
 
-# The extended default value operator also hides errors:
+## The extended default value operator also hides errors:
 std:assert_eq ($e 30) /? 20    20;
 std:assert_eq $n      /? 10    10;
 std:assert_eq $o()    /? 10    10;
@@ -1806,11 +1817,11 @@ std:assert_eq $o(22)  /? 10    22;
 std:assert_eq 22      /? 10    22;
 std:assert_eq $f      /? 10    $false;
 
-# You can combine this operator with the some or operator `//` or even `/?`:
+## You can combine this operator with the some or operator `//` or even `/?`:
 std:assert_eq ($e 30) /$e 10 // 20   10;
 std:assert_eq $n      /$e 10 // 20   20;
 
-# To demonstrate short circuit:
+## To demonstrate short circuit:
 !res = 0;
 !x = ($e 10) /$e { .res = 10 }[];
 std:assert_eq res 10;
@@ -1871,17 +1882,17 @@ further upwards the call stack for the parent functions to handle.
 !func = { $e "this failed!" };
 
 !other = {
-    # some code ...
+    ## some code ...
 
-    _? func[]; # If you would not catch the error value here,
-               # the program would panic, as an error value
-               # must not be ignored!
+    _? func[]; ## If you would not catch the error value here,
+               ## the program would panic, as an error value
+               ## must not be ignored!
 
-    # other code ...
+    ## other code ...
 
     panic "this will never be reached!";
 
-    # something here...
+    ## something here...
 };
 
 std:assert ~ (unwrap_err other[]) == "this failed!";
@@ -1897,9 +1908,9 @@ as jump label. That is handy if you want to jump up multiple call frames:
     ( _ == 42 ) {
         std:displayln "We got 42!";
 
-        # The `then` branch we are currently in is a call frame.
-        # To jump further up the call stack, we need the label
-        # we defined for the function above.
+        ## The `then` branch we are currently in is a call frame.
+        ## To jump further up the call stack, we need the label
+        ## we defined for the function above.
         !val = _? :some_unique_label failing_func[];
 
         std:displayln "Returned:" val;
@@ -1988,7 +1999,7 @@ An example to demonstrate the handler arguments:
 
 ```wlambda
 on_error {!(func, line, col, filename) = @;
-    # ...
+    ## ...
 } ($e "test");
 ```
 
@@ -2005,8 +2016,8 @@ A usage example:
 
 !x = $n;
 
-# The first function of on_error will be called with the unwrapped
-# error if an error occured.
+## The first function of on_error will be called with the unwrapped
+## error if an error occured.
 on_error {|4| .x = _; } ~ func 13;
 std:assert_eq x "this failed!";
 
@@ -2124,17 +2135,17 @@ WLambda's most basic numeric data type is the 64-Bit integer, aka _i64_ in Rust.
 Like with other numbers multiple radix literal forms are supported:
 
 ```wlambda
-# Decimal:
+## Decimal:
 std:assert_eq 10r99         99;
 
-# Hexadecimal:
+## Hexadecimal:
 std:assert_eq 0xFF01        65281;
 
-# Binary:
+## Binary:
 std:assert_eq  0b1011       11;
 std:assert_eq -0b1011      -11;
 
-# Radix 4:
+## Radix 4:
 std:assert_eq 4r31          13;
 ```
 
@@ -2208,16 +2219,16 @@ WLambda supports 64-Bit floating point numbers, aka _f64_ in Rust.
 Like with other numbers multiple radix literal forms are supported:
 
 ```wlambda
-# Decimal:
+## Decimal:
 std:assert_eq 10r9.92       9.92;
 
-# Hexadecimal:
+## Hexadecimal:
 std:assert_eq 0xFF.1        255.0625;
 
-# Binary:
+## Binary:
 std:assert_eq 0b1011.101    11.625;
 
-# Radix 4:
+## Radix 4:
 std:assert_eq 4r3.3         3.75;
 ```
 
@@ -2484,16 +2495,16 @@ WLambda comes with a built in datatype for mathematical vectors, which can conta
 and have between two and four dimensions.
 
 ```wlambda
-# integer vectors
+## integer vectors
 std:assert ~ $i(-1, 2).y                == 2;
 std:assert ~ (ivec ${z=3})              == $i(0,0,3);
 std:assert ~ (ivec4 $[])                == $i(0,0,0,0);
 std:assert ~ $i(1.49, -2.72)            == $i(1,-2);
-# float vectors
+## float vectors
 std:assert ~ $f(1.00, -33).x            == $f(1, 200).first;
 std:assert ~ $f(-0, 2.4).y              == $f(1.6, 2.4).second;
 std:assert ~ (fvec3 ${w=0.1})           == $f(0,0,0);
-# conversion
+## conversion
 std:assert ~ (fvec3 $i(1, 2))/10        == $f(0.1, 0.2, 0);
 std:assert ~ (ivec2 $f(1.3, 2.7, -5.8)) == $i(1, 2);
 std:assert ~ (ivec $f(1.3, 2.7, -5.8))  == $i(1, 2, -5);
@@ -2630,7 +2641,7 @@ This is equivalent to multiplying the vector by `1`.
 !my_vec = $f(1.2, 2.3, 3.4);
 std:assert_eq (ivec (-my_vec)) $i(-1, -2, -3);
 std:assert_eq (+my_vec) my_vec;
-# adding something to its inverse yields all 0s
+## adding something to its inverse yields all 0s
 std:assert_eq[ my_vec + (-my_vec), my_vec * 0 ];
 ```
 
@@ -2648,7 +2659,7 @@ std:assert_eq   (is_fvec $[3.4, 4.5])   $false;
 
 std:assert_eq   (is_fvec fvec <& $[3.4, 4.5])   $true;
 
-# References are not dereferenced:
+## References are not dereferenced:
 std:assert_eq   (is_fvec $&&$f(3,4))    $false;
 std:assert_eq   (is_fvec $*$&&$f(3,4))  $true;
 ```
@@ -2666,7 +2677,7 @@ std:assert_eq   (is_ivec $[3, 4])       $false;
 
 std:assert_eq   (is_ivec ivec <& $[3.4, 4.5])   $true;
 
-# References are not dereferenced:
+## References are not dereferenced:
 std:assert_eq   (is_ivec    $&& $i(3,4))  $false;
 std:assert_eq   (is_ivec $* $&& $i(3,4))  $true;
 ```
@@ -2831,9 +2842,9 @@ if that value is not a `fvec`.
 This function always returns an integer, regardless of whether an `ivec` or `fvec` is passed in.
 
 ```wlambda
-# the least number of dimensions a vector can have is 2.
+## the least number of dimensions a vector can have is 2.
 std:assert_eq (std:v:dims $[]) 2;
-# while the most is 4.
+## while the most is 4.
 std:assert_eq (std:v:dims ${w=0}) 4;
 std:assert_eq (std:v:dims $f(1,2)) (std:v:dims $i(1,2));
 ```
@@ -2879,12 +2890,12 @@ These are the only `ivec2`s that have a length of `1`.
 !p1 = fvec ${ x = 20, y = 30.5 };
 !p2 = fvec ${ x = -10, y = 0.5 };
 
-# get the delta representing how far you'd have to travel to get from p1 to p2
+## get the delta representing how far you'd have to travel to get from p1 to p2
 !delta = p2 - p1;
-# the normalized delta represents a single 1 sized step you could take to get to p2 from p1.
+## the normalized delta represents a single 1 sized step you could take to get to p2 from p1.
 !n = std:v:norm delta;
 
-# the length of this step is reflected in the magnitude of the vectors
+## the length of this step is reflected in the magnitude of the vectors
 std:assert_eq[ (std:v:mag delta) - 1, std:v:mag (p1 + n) - p2 ];
 ```
 
@@ -2906,14 +2917,14 @@ If _vec1_ isn't an `fvec`, then it's coerced into an `ivec`, just like the other
 !goal    = fvec ${ x = -10, y = 0.5  };           # where you want to look
 !looking = std:v:rad2vec (std:num:to_radians 90); # direction you're looking in
 
-# do you need to turn left or right to look at `goal`,
-# if you're standing at `at` looking in `looking`?
+## do you need to turn left or right to look at `goal`,
+## if you're standing at `at` looking in `looking`?
 
-# find the unit vector representing the space between where you want to look and where you're at.
+## find the unit vector representing the space between where you want to look and where you're at.
 !delta = std:v:norm goal - at;
 
-# the direction you need to turn in can be found by checking the sign of
-# the dot product of where you're currently looking and where you're at.
+## the direction you need to turn in can be found by checking the sign of
+## the dot product of where you're currently looking and where you're at.
 !dir = std:v:dot delta looking;
 
 std:assert_eq[ (dir < 0) "left" "right", "left" ];
@@ -2932,14 +2943,14 @@ Regardless of the number of dimensions in the input vectors, this function will 
 !x = fvec ${x=1};
 !y = fvec ${y=1};
 
-# the cross product of these two values will represent the third axis, z, and will be
-# perpendicular to both other vectors.
+## the cross product of these two values will represent the third axis, z, and will be
+## perpendicular to both other vectors.
 
 !z = std:v:cross x y;
 
 std:assert_eq z (fvec ${z=1});
 
-# because all three vectors are perpindicular, they'll all have the same dot product from each other.
+## because all three vectors are perpindicular, they'll all have the same dot product from each other.
 std:assert_eq[(std:v:dot x y), (std:v:dot y z)];
 std:assert_eq[(std:v:dot y z), (std:v:dot z x)];
 ```
@@ -2984,16 +2995,16 @@ If _t_ is `0`, _vec1_ is returned. If _t_ is `1`, then _vec2_ is returned.
 If _t_ is `0.5`, the resulting vector will be halfway in between _vec1_ and _vec2_.
 
 ```wlambda
-# compare this to the one for std:v:lerp! note that the length of this one is almost 1.
-# this is definitely not the case for std:v:lerp's output with the same input.
+## compare this to the one for std:v:lerp! note that the length of this one is almost 1.
+## this is definitely not the case for std:v:lerp's output with the same input.
 !v = std:v:slerp $f(1,0) $f(0,1) 0.5;
-# the values may not be exact because of floating point rounding errors,
-# but they should be pretty close.
+## the values may not be exact because of floating point rounding errors,
+## but they should be pretty close.
 std:assert_rel_eq v.x 0.7071067811865476 0.000001;
 std:assert_rel_eq v.y 0.7071067811865476 0.000001;
 
-# The values are interpolated around a circle, so if you raise t high enough you'll start
-# getting the same values as you get with a lower t, although not quite because of float rounding.
+## The values are interpolated around a circle, so if you raise t high enough you'll start
+## getting the same values as you get with a lower t, although not quite because of float rounding.
 !half = (std:v:slerp $f(1,0) $f(0,1) 0.5);
 !four = (std:v:slerp $f(1,0) $f(0,1) 4.5);
 std:assert_rel_eq half.x four.x 0.000001;
@@ -3012,8 +3023,8 @@ Coerces the argument into an `ivec` unless it's a `fvec`.
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${x=1}) , 0.0 ];
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad ${y=1}) , 90.0 ];
 
-# halfway in between 0.0 and 90.0 should be 45.
-# note that lerp would work here as well
+## halfway in between 0.0 and 90.0 should be 45.
+## note that lerp would work here as well
 !h = std:v:slerp $f(1, 0) $f(0, 1) 0.5;
 std:assert_eq[ std:num:to_degrees (std:v:vec2rad h) , 45.0 ];
 ```
@@ -3028,8 +3039,8 @@ Always returns an `fvec`.
 std:assert_eq[ std:v:rad2vec (std:num:to_radians 0.0) , $f(1, 0)];
 std:assert_eq[ ivec (std:v:rad2vec (std:num:to_radians 90.0)), $i(0, 1)];
 
-# halfway in between 0.0 and 90.0 should be 45.
-# note that lerp would NOT work here as well, rad2vec returns a unit vector.
+## halfway in between 0.0 and 90.0 should be 45.
+## note that lerp would NOT work here as well, rad2vec returns a unit vector.
 !h = std:v:slerp $f(1, 0) $f(0, 1) 0.5; # slerp because rotations
 !r = std:v:rad2vec (std:num:to_radians 45.0);
 std:assert_rel_eq r.x h.x 0.0001;
@@ -3048,10 +3059,10 @@ std:assert_eq (type $b'a') "byte";
 std:assert_eq (type '\u{40}') "char";
 std:assert_eq (type $b'\x40') "byte";
 
-# You can use the unicode escapes up to the first 256 code points in bytes too:
+## You can use the unicode escapes up to the first 256 code points in bytes too:
 std:assert_eq (char $b'\u{40}') '\u{40}';
 
-# Beyond that, you will get the byte '?':
+## Beyond that, you will get the byte '?':
 std:assert_eq (char $b'\u{3131}') '?';
 ```
 
@@ -3143,7 +3154,7 @@ There are two types of literal forms for strings:
 "abc def \"foo\"";
 std:assert_eq $q/any delimiter may be used instead of/
     "any delimiter may be used instead of";
-# Unicode escapes are also working:
+## Unicode escapes are also working:
 std:assert_eq "\u{2211}" "∑";
 ```
 
@@ -3163,7 +3174,7 @@ std:assert_eq s "a b c";
 - Quoted byte vectors `$Q(XZY)`
 - WLambda code strings
 ```wlambda
-# Short form $c works too.
+## Short form $c works too.
 !code = $code {
     !this = is a block;
     It just needs to be in valid WLambda[:Syntax];
@@ -3171,7 +3182,7 @@ std:assert_eq s "a b c";
         phase.x;
 };
 
-# Primary use case is `eval` and `std:thread:spawn`:
+## Primary use case is `eval` and `std:thread:spawn`:
 !v = (std:thread:spawn $code {
     !@import std std;
     !res = "x" "y" "z";
@@ -3386,16 +3397,16 @@ std:assert_eq
     (std:str:pad_start 8 "Ä∑ßs" "∑∑")
     "ßsÄ∑ßs∑∑";
 
-# Empty _pad-str_ is not an error but a nop:
+## Empty _pad-str_ is not an error but a nop:
 std:assert_eq
     (std:str:pad_start 8 "" "∑∑")
     "∑∑";
 
-# also works with characters
+## also works with characters
 std:assert_eq
     (std:str:pad_start 3 'x' "0")
     "xx0";
-# also works with bytes
+## also works with bytes
 std:assert_eq
     (std:str:pad_start 3 $b'x' "0")
     "xx0";
@@ -3419,16 +3430,16 @@ std:assert_eq
     (std:str:pad_end 8 "Ä∑ßs" "∑∑")
     "∑∑Ä∑ßsÄ∑";
 
-# Empty _pad-str_ is not an error but a nop:
+## Empty _pad-str_ is not an error but a nop:
 std:assert_eq
     (std:str:pad_end 8 "" "∑∑")
     "∑∑";
 
-# also works with characters
+## also works with characters
 std:assert_eq
     (std:str:pad_end 3 'x' "0")
     "0xx";
-# also works with bytes
+## also works with bytes
 std:assert_eq
     (std:str:pad_end 3 $b'x' "0")
     "0xx";
@@ -3604,18 +3615,18 @@ If you call bytes with a pair as argument, you can do a multitude of
 operations, from replacement to finding a byte:
 
 ```wlambda
-# replacing substrings:
+## replacing substrings:
 std:assert_eq ($b"a,b,c,d" $p($b',', $b';')) $b"a;b;c;d";
 std:assert_eq ($b"a,b,c,d" $p($b"a,", $b"XXX")) $b"XXXb,c,d";
-# also works with strings and chars:
+## also works with strings and chars:
 std:assert_eq ($b"a,b,c,d" $p("a,", "XXX")) $b"XXXb,c,d";
 std:assert_eq ($b"a,b,c,d" $p("a,", 'O')) $b"Ob,c,d";
 
-# finding a character/byte:
+## finding a character/byte:
 std:assert_eq ($b"a,b,c,d" $p(0, $b'c')) 4;
 std:assert_eq ($b"a,b,c,d" $p(0,   'c')) 4;
 
-# splitting:
+## splitting:
 std:assert_str_eq ($b"A\<SOH>B\<SOH>C" $p($b'\<SOH>', 0)) $[$b"A", $b"B", $b"C"];
 ```
 
@@ -3648,7 +3659,7 @@ You can convert bytes to strings in a multitude of ways:
   ```wlambda
   std:assert_eq (std:str:from_utf8 $b"\xC3\xA4\xC3\x9F\xC3\xBF") "äßÿ";
   std:assert_eq (std:str:from_utf8 [std:str:to_bytes "äßÿ"])         "äßÿ";
-  # broken UTF8 will result in an error:
+  ## broken UTF8 will result in an error:
   std:assert ~ is_err (std:str:from_utf8 $b"\xC3\xC3\xA4\xC3\x9F\xC3\xBF");
   ```
 - std:str:from\_utf8\_lossy _bytes_
@@ -3863,10 +3874,10 @@ They can be very useful as sentinel values or custom enums:
 
 std:assert_eq ((x == :ON) { 10 }) 10;
 
-# They don't match with strings:
+## They don't match with strings:
 std:assert_eq ((x == "ON") { 10 } { 20 }) 20;
 
-# Work together nicely with `match`:
+## Work together nicely with `match`:
 
 !state = "";
 match x
@@ -4010,9 +4021,9 @@ std:assert_eq v.tail  12;
 std:assert_eq v.first    11;
 std:assert_eq v.second   12;
 
-# Pairs are often used to represent map entries,
-# so you can use `key` and `value`
-# and the short forms `k` and `v` too:
+## Pairs are often used to represent map entries,
+## so you can use `key` and `value`
+## and the short forms `k` and `v` too:
 std:assert_eq v.value 11;
 std:assert_eq v.key   12;
 
@@ -4026,7 +4037,7 @@ Comparison does happen by their contents:
 std:assert $p(1, 2) == $p(1, 2);
 std:assert $p(2, 2) != $p(1, 2);
 
-# In contrast to vectors:
+## In contrast to vectors:
 std:assert not ~ $[1, 2] == $[1, 2];
 ```
 
@@ -4169,9 +4180,9 @@ it will enumerate entries in a map or values in a vector.
 ```wlambda
 !v = $[];
 
-# $iter is only explicit here for demonstration
-# purposes! `iter` will make an iter from the pair
-# if you don't pass one!
+## $iter is only explicit here for demonstration
+## purposes! `iter` will make an iter from the pair
+## if you don't pass one!
 iter i ($iter $p(:enumerate, $[:a, :b, :c]))
     ~ std:push v i;
 
@@ -4239,12 +4250,12 @@ The following example demonstrates it:
 
 !some_vec = $[1, 2 * 10, add20 10]; 
 
-# Index calling:
+## Index calling:
 std:assert_eq (0 some_vec) 1;
 std:assert_eq (1 some_vec) 20;
 std:assert_eq (2 some_vec) 30;
 
-# Field syntax:
+## Field syntax:
 std:assert_eq some_vec.0 1;
 std:assert_eq some_vec.1 20;
 std:assert_eq some_vec.2 30;
@@ -4333,10 +4344,10 @@ syntax. Here is an example:
 std:assert_eq some_vec.1 2;
 std:assert_eq some_vec.2 3;
 
-# There can be any expression after the `.` if you wrap it into `(...)`:
+## There can be any expression after the `.` if you wrap it into `(...)`:
 std:assert_eq some_vec.(1 + 1) 3;
 
-# A more direct example:
+## A more direct example:
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
@@ -4422,18 +4433,18 @@ calling syntax. Here are some examples:
 ```wlambda
 !some_map = ${ a = 1, b = 2 };
 
-# Symbol calling:
+## Symbol calling:
 std:assert_eq (:a some_map) 1;
 std:assert_eq (:b some_map) 2;
 std:assert_eq ("a" some_map) 1;
 std:assert_eq ("b" some_map) 2;
 
-# Field syntax:
+## Field syntax:
 std:assert_eq some_map.a 1;
 std:assert_eq some_map.b 2;
 
-# There can be any expression after the `.` if you wrap it into `(...)`,
-# also strings:
+## There can be any expression after the `.` if you wrap it into `(...)`,
+## also strings:
 std:assert_eq some_map.("a") 1;
 std:assert_eq some_map.("b") 2;
 ```
@@ -4465,7 +4476,7 @@ std:assert_eq some_map._x "x";
 
 std:assert_eq (str ${*${a=10}}) "${a=10}";
 
-# As a reminder, a full expression can come after the '*':
+## As a reminder, a full expression can come after the '*':
 
 std:assert_eq (str ${*map_gen "y"}) $q/${_y="y"}/;
 ```
@@ -4584,17 +4595,17 @@ You can weaken any of those two types of references manually using the
 ```wlambda
 !drop_check = $& $f;
 
-# Set `drop_check` to $true when all (non weak) references to it are gone.
+## Set `drop_check` to $true when all (non weak) references to it are gone.
 !x = $&& (std:to_drop {|| .drop_check = $true });
 
-# Create a weakened reference to the value referred to by x:
+## Create a weakened reference to the value referred to by x:
 !y = std:ref:weaken x;
 
-# The reference to the drop function is removed and this means
-# that the weak reference in y is invalidated and returns $n in future.
+## The reference to the drop function is removed and this means
+## that the weak reference in y is invalidated and returns $n in future.
 .x = $n;
 
-# Deref y now gives you $n:
+## Deref y now gives you $n:
 std:assert_eq $*y $n;
 
 std:assert drop_check;
@@ -4617,7 +4628,7 @@ Creates a hidden reference from a given value or reference.
 ```wlambda
 !r = $&& 10;            # strong ref to value 10
 
-# hide the reference for direct access via local variables
+## hide the reference for direct access via local variables
 !h = std:ref:hide r;
 
 .h += 11;
@@ -4692,9 +4703,9 @@ Returns _value_ or `$none`.
 std:ref:set r1 10;
 std:assert_eq $*r1 10;
 
-# Note that $& references in local variables are
-# automatically dereferenced. Because of that we need to wrap it into
-# an extra reference.
+## Note that $& references in local variables are
+## automatically dereferenced. Because of that we need to wrap it into
+## an extra reference.
 !r2 = $& $& 1;
 std:ref:set r2 11;
 std:assert_eq $*r2 11;
@@ -4984,7 +4995,7 @@ if x > 4 {
 
 std:assert_eq msg "x is bigger than 4";
 
-# You may also use `if` in case it suits your coding style better:
+## You may also use `if` in case it suits your coding style better:
 if x == 10 {
     std:assert $true;
 } {
@@ -5313,8 +5324,8 @@ iteration you need to make a new variable binding for each iteration:
 ```wlambda
 !closures = $[];
 
-# Without the rebinding of the variable `i`, `i` would be captured as hidden
-# reference and each iteration would update the contents of that reference.
+## Without the rebinding of the variable `i`, `i` would be captured as hidden
+## reference and each iteration would update the contents of that reference.
 iter i $i(0, 10) {
     !i = i;
     std:push closures { i * 10 };
@@ -5351,8 +5362,8 @@ range 0.3 0.4 0.01 {
     std:push out ~ std:num:round 100.0 * _;
 };
 
-# 40 is not in the set because the accumulation of 0.01 results
-# in a value slightly above 0.4 and ends the range iteration:
+## 40 is not in the set because the accumulation of 0.01 results
+## in a value slightly above 0.4 and ends the range iteration:
 std:assert_eq (str out) "$[30,31,32,33,34,35,36,37,38,39]";
 ```
 
@@ -5436,7 +5447,7 @@ and the above could be written like this:
         x + 5;
 std:assert_eq res 15;
 
-# or even this:
+## or even this:
 !res = x + (jump idx 3 4 5);
 std:assert_eq res 15;
 ```
@@ -5555,7 +5566,7 @@ Note: When iterating over maps, don't assume any order.
 It is very similar to `$@vec iter i <iterable> { $+ ... }`.
 
 ```wlambda
-# Lists:
+## Lists:
 
 std:assert_str_eq
     (map { float[_] / 2.0 } $[1,2,3,4,5])
@@ -5568,20 +5579,20 @@ std:assert_str_eq
             $+ i * 10
         });
 
-# Great for working with strings too:
+## Great for working with strings too:
 
 std:assert_str_eq
     (map std:str:to_uppercase
         $["abc", "bcbc", "aaad", "afoo", "foo"])
     $["ABC", "BCBC", "AAAD", "AFOO", "FOO"];
 
-# Maps:
+## Maps:
 
 std:assert_str_eq
     (std:sort ~ map { @ } ${a = 10, b = 20})
     $[$[10, "a"], $[20, "b"]];
 
-# Generally anything that you can pass into `$iter`:
+## Generally anything that you can pass into `$iter`:
 
 std:assert_str_eq
     (map { _ * 2 } 0 => 10)
@@ -5601,13 +5612,13 @@ the first being the map entry value and the second the key.
 It is very similar to `$@vec iter i <iterable> { if some_function[_] { $+ ... } }`.
 
 ```wlambda
-# Lists:
+## Lists:
 
 std:assert_str_eq
     (filter { (_ 0 1) == "a" } $["abc", "bcbc", "aaad", "afoo", "foo"])
     $["abc","aaad","afoo"];
 
-# Good in combination with `map` too:
+## Good in combination with `map` too:
 
 std:assert_str_eq
     (map std:str:to_uppercase
@@ -5615,8 +5626,8 @@ std:assert_str_eq
             $["abc", "bcbc", "aaad", "afoo", "foo"])
     $["ABC","AAAD","AFOO"];
 
-# Also like `map` works fine with maps, but the function
-# needs to take two arguments and returns a pair:
+## Also like `map` works fine with maps, but the function
+## needs to take two arguments and returns a pair:
 
 std:assert_str_eq
     (std:sort
@@ -5624,7 +5635,7 @@ std:assert_str_eq
             ${a = 2, b = 43, c = 16, d = 13 })
     $[16 => "c", 2 => "a"];
 
-# Generally anything that you can pass into `$iter`:
+## Generally anything that you can pass into `$iter`:
 
 std:assert_str_eq
     (filter { _ % 2 == 0 } 0 => 10)
@@ -5732,7 +5743,7 @@ you to efficiently create a long string. For demonstration purposes
 we compare the following inefficient code with the usage of `$@string`:
 
 ```wlambda
-# Inefficient example:
+## Inefficient example:
 
 !accum = "";
 $["abc", "def", "ghi", "XXX"] {
@@ -5873,12 +5884,12 @@ like `=>`, `&>` and `<&` with assignment operations:
 .x += 3;
 std:assert_eq x 13;
 
-# also comparison operators work
+## also comparison operators work
 !y = 10;
 .y < = 10;
 std:assert_eq y $false;
 
-# function argument pipelining also works in this context
+## function argument pipelining also works in this context
 !f = \_ * 10;
 .f <&= 10;
 std:assert_eq f 100;
@@ -6418,8 +6429,8 @@ special formatting syntax `{:...!w}`:
 ```wlambda
 std:assert_eq ($F"x={:!w}" $&&$[1, 2, 3, 4]) "x=$&&$[1,2,3,4]";
 
-# Without the `!w` the reference would just
-# be auto dereferenced like `str` would do it:
+## Without the `!w` the reference would just
+## be auto dereferenced like `str` would do it:
 std:assert_eq ($F"x={}"   $&&$[1, 2, 3, 4]) "x=$[1,2,3,4]";
 ```
 
@@ -6460,7 +6471,7 @@ std:assert_eq ($F "{:<8.2!f}" 123.567)   "123.57  ";
 std:assert_eq ($F "{:^8.2!f}" 123.567)   " 123.57 ";
 std:assert_eq ($F "{:>8.2!f}" 123.567)   "  123.57";
 
-# Note: For floats, the "!f" is implicit if you specify a precision:
+## Note: For floats, the "!f" is implicit if you specify a precision:
 std:assert_eq ($F "{:8.2}"  123.567)   "  123.57";
 std:assert_eq ($F "{:08.2}" 123.567)   "00123.57";
 std:assert_eq ($F "{:<8.2}" 123.567)   "123.57  ";
@@ -6764,7 +6775,7 @@ The function returns `$none` if the pattern could not be found in the input stri
 Lets start off with a simple example:
 
 ```wlambda
-# Please note: Whitespace inside the pattern is allowed and will not be matched!
+## Please note: Whitespace inside the pattern is allowed and will not be matched!
 
 !res = $r/a (^*) b/ "fooaxxxxbber";
 
@@ -6792,7 +6803,7 @@ matcher function, or use the global variable `$\` which will contain
 the results of the latest match that was executed:
 
 ```wlambda
-# Notice the usage of the `<&` function call operator:
+## Notice the usage of the `<&` function call operator:
 !res =
     if "foo//\\/foo" &> $r| $<*? (^$+[\\/]) * | {
         std:assert_eq $\.0 "foo//\\/foo";
@@ -7013,7 +7024,7 @@ Returns the length of _value_. Depending on the data type you will get
 different semantics.
 
 ```wlambda
-# Always zero for scalar non sequential/collection values:
+## Always zero for scalar non sequential/collection values:
 std:assert_eq (len 10)              0;
 std:assert_eq (len 10.1)            0;
 std:assert_eq (len $t)              0;
@@ -7369,13 +7380,13 @@ If the absolute value of the difference between `l` and `r` is greater than `eps
 this function will panic, also displaying the optional message if present.
 
 ```wlambda
-# these two are within 1 of each other
+## these two are within 1 of each other
 !x = 10.5;
 !y = 11.3;
 std:assert_rel_eq x y 1;
 
-# but not within 0.5 of each other, so this line is commented out.
-# std:assert_eq x y 0.5;
+## but not within 0.5 of each other, so this line is commented out.
+## std:assert_eq x y 0.5;
 ```
 
 #### <a name="11021-stdmeasuretime-unit-function"></a>11.0.21 - std:measure\_time _unit_ _function_
@@ -7701,10 +7712,10 @@ it in a data structure of the following form:
 
 ```text
 {
-    status  = 0,        # exit code
-    success = $true,    # $true or $false
-    stdout  = $b"...",  # data printed to stdout
-    stderr  = $b"...",  # data printed to stderr
+    status  = 0,        ## exit code
+    success = $true,    ## $true or $false
+    stdout  = $b"...",  ## data printed to stdout
+    stderr  = $b"...",  ## data printed to stderr
 }
 ```
 
@@ -7748,7 +7759,7 @@ read/written to via `std:io:read_some` and `std:io:write`.
     "-c", "for i in `seq 0 10`; do echo $i; sleep 0.2; done; exit 20"
 ];
 
-# do something in your program....
+## do something in your program....
 
 !result = unwrap ~ std:process:wait hdl;
 
@@ -7854,17 +7865,17 @@ of this structure:
 
 ```wlambda
     ${
-        atime     = 1587628635, # seconds since UNIX Epoch
-        ctime     = 1557382099, # seconds since UNIX Epoch
-        mtime     = 1557382099, # seconds since UNIX Epoch
-        len       = 478,        # bytes
-        name      = "test",     # file name
-        path      = "..\\test", # path name
-        read_only = $false,     # read only flag
-        type      = :f          # possible values:
-                                #   - :f for files
-                                #   - :l for symlinks
-                                #   - :d for directories
+        atime     = 1587628635, ## seconds since UNIX Epoch
+        ctime     = 1557382099, ## seconds since UNIX Epoch
+        mtime     = 1557382099, ## seconds since UNIX Epoch
+        len       = 478,        ## bytes
+        name      = "test",     ## file name
+        path      = "..\\test", ## path name
+        read_only = $false,     ## read only flag
+        type      = :f          ## possible values:
+                                ##   - :f for files
+                                ##   - :l for symlinks
+                                ##   - :d for directories
     }
 ```
 
@@ -7967,10 +7978,10 @@ a worker thread and wait in a blocking manner:
 
 ```wlambda
 !handle = std:thread:spawn $code {
-    # Attention: Even if this example does not use any
-    #            built in functions, it's a good practice
-    #            to load them into the global environment
-    #            of the thread!
+    ## Attention: Even if this example does not use any
+    ##            built in functions, it's a good practice
+    ##            to load them into the global environment
+    ##            of the thread!
     !@wlambda;
     !@import std;
 
@@ -8482,7 +8493,7 @@ Deserializes/parses a TOML formatted _string_ and returns a data structure.
 This is super useful for parsing/reading configuration files.
 
 ```wlambda
-# Quick example how to read TOML config files:
+## Quick example how to read TOML config files:
 !config = std:deser:toml ~ std:io:file:read_text "Cargo.toml";
 ```
 
@@ -8677,8 +8688,8 @@ std:assert_str_eq
             $[:text,"blop"],$[:elem,"i",${x="10"},$n],$[:text,"lol"]]]
     ]];
 
-# Here we use the structure matchers for finding the values of the x attributes
-# of the <i> elements:
+## Here we use the structure matchers for finding the values of the x attributes
+## of the <i> elements:
 std:assert_str_eq
     $S[ 3 / *:{0=elem,1=foo} /
         3 / *:{0=elem,1=i} /
@@ -9010,7 +9021,7 @@ Here is an example on how to use this while providing HTTP Headers:
     };
 
 !body = std:deser:json ~ std:str:from_utf8_lossy response.body;
-# std:displayln ~ std:ser:json body $f;
+## std:displayln ~ std:ser:json body $f;
 std:assert_eq body.crates.0.name            "wlambda";
 std:assert_eq response.headers.content-type "application/json; charset=utf-8";
 std:assert_eq response.status               200;
@@ -9112,8 +9123,8 @@ ${
     link = ${                           # Configure the local link
         client_id = "some_id",          # Link client ID, default is 'wl_local'
         recv = <std:sync:mpsc channel>, # Channel to receive messages for the
-                                        # subscribed topics.
-        # Topics to subscribe to, if not given, '#' will be used:
+                                        ## subscribed topics.
+        ## Topics to subscribe to, if not given, '#' will be used:
         topics = $["test/me", "another/topic", ...]
     },
 }
@@ -9130,13 +9141,13 @@ Here is an example:
     console_listen = "0.0.0.0:18080",
 };
 
-# sleep a bit until the broker is initialized:
+## sleep a bit until the broker is initialized:
 std:thread:sleep :ms => 500;
 
 !chan = std:sync:mpsc:new[];
 !cl = std:mqtt:client:new chan "test1" "localhost" 1883;
 
-# let it connect:
+## let it connect:
 std:thread:sleep :ms => 200;
 
 !_ = cl.subscribe "test/me";
@@ -9178,13 +9189,13 @@ Here is an example of a common client setup:
     console_listen = "0.0.0.0:18080",
 };
 
-# sleep a bit until the broker is initialized:
+## sleep a bit until the broker is initialized:
 std:thread:sleep :ms => 500;
 
 !chan = std:sync:mpsc:new[];
 !cl = std:mqtt:client:new chan "test1" "localhost" 1883;
 
-# let it connect:
+## let it connect:
 std:thread:sleep :ms => 200;
 
 !_ = cl.subscribe "test/me";
@@ -9255,31 +9266,79 @@ Start the event loop. You can only exit this event loop using `$<Cursive>.quit[]
 Adds a layer on top of the current screen and instanciates a _view-def_.
 You can remove the layer using `$<Cursive>.pop_layer[]`.
 
-##### <a name="121238-cursivepoplayer"></a>12.12.3.8 - $\<Cursive\>.pop\_layer
+##### <a name="121233-cursivepoplayer"></a>12.12.3.3 - $\<Cursive\>.pop\_layer
 
 Removes the top most layer of the current screen.
 
-##### <a name="121234-cursiveaddscreen-view-def---screen-id"></a>12.12.3.4 - $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
+##### <a name="121234-cursiveget-name-of-view---none--namedviewnametype"></a>12.12.3.4 - $\<Cursive\>.get _name-of-view_ -> $none | $\<NamedView:Name:Type\>
+
+Retrieves the handle of a specific view. You must not store this handle anywhere except
+in a local variable. This handle is only available inside a context where you have
+a `$<Cursive>` handle. This is typically only inside an event callback.
+
+Here is an example:
+
+```text
+cursive.add_layer :vbox => $[
+    :button => ${
+        label = "Toggle Button Label",
+        name = "LblBtn",
+        on_press = {!(cursive) = @;
+            (cursive.get "LblBtn").set_label "Yay Button Label";
+        },
+    },
+];
+```
+
+##### <a name="121235-cursivepopup-popup-def-view-def"></a>12.12.3.5 - $\<Cursive\>.popup _popup-def_ _view-def_
+
+This opens a popup dialog that shows the view _view-def_. It has a frame, a title and you can
+supply multiple buttons for the user to interact with the popup.
+
+The _popup-def_ can contain the following keys:
+
+```text
+_popup-def_ = ${
+    _view-default-def_,                 # The default definitions a _view-def_ also has.
+    title = "window title",             # The window title of the popup
+    focus = _button-index_ or $none,    # Focuses a specific button or the content _view-def_
+
+    ## If no buttons (or a close_label) are defined,
+    ## a default "Ok" dismiss button will be added.
+    ##
+    ## The `focus` property allows to focus a specific button from this list:
+    buttons = $[
+        $p("button1_name", _click-callback_),
+        ...
+    ],
+
+    ## If defined, a dismiss/close button
+    ## with the corresponding Label is added.
+    close_label = _string_ or $none_,
+};
+```
+
+##### <a name="121236-cursiveaddscreen-view-def---screen-id"></a>12.12.3.6 - $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
 
 Creates a new screen (not visible) and instanciates the _view-def_ on a new
 layer there.  The new screen ID is returned. To activate the screen use
 `$<Cursive>.set_screen id`.
 
-##### <a name="121235-cursivesetscreen-screen-id"></a>12.12.3.5 - $\<Cursive\>.*set\_screen* _screen-id_
+##### <a name="121237-cursivesetscreen-screen-id"></a>12.12.3.7 - $\<Cursive\>.*set\_screen* _screen-id_
 
 Sets the currently visible screen by it's ID as returned by `$<Cursive>.add_screen`.
 The first screen has the ID 0.
 
-##### <a name="121236-cursiveactivescreen---screen-id"></a>12.12.3.6 - $\<Cursive\>.active\_screen -> _screen-id_
+##### <a name="121238-cursiveactivescreen---screen-id"></a>12.12.3.8 - $\<Cursive\>.active\_screen -> _screen-id_
 
 Returns the current active/visible screen's ID.
 
-##### <a name="121237-cursivesender---cursivesendmsgcb"></a>12.12.3.7 - $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
+##### <a name="121239-cursivesender---cursivesendmsgcb"></a>12.12.3.9 - $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
 
 Creates an event sender callback to communicate with the Cursive UI thread/event loop from
 another thread. You can call the `$<Cursive:SendMsgCb>` like a regular function.
 
-###### <a name="1212371-cursivesendmsgcb-event-tag-value---true--error"></a>12.12.3.7.1 - $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
+###### <a name="1212391-cursivesendmsgcb-event-tag-value---true--error"></a>12.12.3.9.1 - $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
 
 Sends the _value_ to the Cursive UI thread's event loop. The _event-tag_
 can be used as event name to dispatch specific callbacks that have been installed
@@ -9287,17 +9346,51 @@ using `$<Cursive>.send_cb _event-tag_ { ... }`.
 
 Returns a true value if sending was successful or an `$error`.
 
-##### <a name="121238-cursivepoplayer"></a>12.12.3.8 - $\<Cursive\>.pop\_layer
+##### <a name="1212310-cursivedefaultcb-widget-name-function"></a>12.12.3.10 - $\<Cursive\>.default\_cb _widget-name_ _function_
 
-##### <a name="121239-cursiveaddlayer-view-def"></a>12.12.3.9 - $\<Cursive\>.add\_layer view-def
+Installs a default callback for handling events from the correspondig _widget-name_.
+The _widget-name_ `"*"` is a wildcard for all widgets without a name assigned.
 
-Adds the `view-def` view as layer to the TUI.
+```text
+!cursive = std:cursive:new[];
 
-##### <a name="1212310-cursivequit"></a>12.12.3.10 - $\<Cursive\>.quit
+cursive.add_layer :vbox => $[
+    :checkbox => ${ name = :check1, checked = $true },
+];
+
+cursive.default_cb :check1 {
+    !event_name = _;
+    std:displayln "Checkbox 1 event:" @;
+};
+
+cursive.default_cb :* {
+    std:displayln "Unnamed widget sent event:" @;
+};
+```
+
+##### <a name="1212311-cursivesetwindowtitle-string"></a>12.12.3.11 - $\<Cursive\>.set\_window\_title _string_
+
+Sets the window title of the application. That title will usually appear in the window title bar of
+the console or terminal the application runs in.
+
+#### <a name="12124-cursiveinitconsolelogging"></a>12.12.4 - $\<Cursive\>.init\_console\_logging
+
+Enables logging of Cursive debugging information to the console. Use `$<Cursive>.toggle_debug_console[]`
+to show/hide the debug console.
+
+#### <a name="12125-cursivetoggledebugconsole"></a>12.12.5 - $\<Cursive\>.toggle\_debug\_console
+
+Shows/Hides the Cursive debugging console. See also `$<Cursive>.init_console_logging[]`.
+
+#### <a name="12126-cursiveshowdebugconsole"></a>12.12.6 - $\<Cursive\>.show\_debug\_console
+
+Shows the Cursive debugging console. See also `$<Cursive>.init_console_logging[]`.
+
+##### <a name="121261-cursivequit"></a>12.12.6.1 - $\<Cursive\>.quit
 
 Quit the main event loop.
 
-##### <a name="1212311-cursivecounter---cursivecounter"></a>12.12.3.11 - $\<Cursive\>.counter -> $\<Cursive:Counter\>
+##### <a name="121262-cursivecounter---cursivecounter"></a>12.12.6.2 - $\<Cursive\>.counter -> $\<Cursive:Counter\>
 
 Creates a counter instance to be used by the `progress` view-def. It's initialized with 0.
 It returns a `$<Cursive:Counter>` object. See further below about an API definition of that
@@ -9307,46 +9400,46 @@ object.
 !c = std:cursive:new[];
 !counter = c.counter[];
 
-# Set the counter value:
+## Set the counter value:
 counter.set 10;
 
-# Setting the counter from another thread:
+## Setting the counter from another thread:
 std:thread:spawn $code{
     counter.set_update 20;
 } ${ counter = counter };
 
-# Increment the counter by 11 ticks:
+## Increment the counter by 11 ticks:
 counter.tick 11;
 
-# Get the counter value:
+## Get the counter value:
 std:assert counter.get[] > 0;
 ```
 
-#### <a name="12124-cursivecounter-object"></a>12.12.4 - $\<Cursive:Counter\> Object
+#### <a name="12127-cursivecounter-object"></a>12.12.7 - $\<Cursive:Counter\> Object
 
 This section describes the `$<Cursive:Counter>` object API. It is instanciated
 by the `$<Cursive>.counter` method.
 
-##### <a name="121241-cursivecounterget"></a>12.12.4.1 - $\<Cursive:Counter\>.get
+##### <a name="121271-cursivecounterget"></a>12.12.7.1 - $\<Cursive:Counter\>.get
 
 Returns the current counter integer value.
 
-##### <a name="121242-cursivecounterset-integer"></a>12.12.4.2 - $\<Cursive:Counter\>.set _integer_
+##### <a name="121272-cursivecounterset-integer"></a>12.12.7.2 - $\<Cursive:Counter\>.set _integer_
 
 Sets the current counter integer value.
 
-##### <a name="121243-cursivecountersetupdate-integer"></a>12.12.4.3 - $\<Cursive:Counter\>.set\_update _integer_
+##### <a name="121273-cursivecountersetupdate-integer"></a>12.12.7.3 - $\<Cursive:Counter\>.set\_update _integer_
 
 Sets the current counter integer value and sends a signal to the Cursive UI thread
 to update it's views. This can be used to update a `progress` bar from another thread.
 
 It may returns an error if the Cursive UI thread is not available anymore.
 
-##### <a name="121244-cursivecountertick-integer"></a>12.12.4.4 - $\<Cursive:Counter\>.tick _integer_
+##### <a name="121274-cursivecountertick-integer"></a>12.12.7.4 - $\<Cursive:Counter\>.tick _integer_
 
 Increments the counter by _integer_.
 
-##### <a name="121245-cursivecountertickupdate-integer"></a>12.12.4.5 - $\<Cursive:Counter\>.tick\_update _integer_
+##### <a name="121275-cursivecountertickupdate-integer"></a>12.12.7.5 - $\<Cursive:Counter\>.tick\_update _integer_
 
 Increments the counter by _integer_ and updates the Cursive UI thread.
 
@@ -9766,7 +9859,78 @@ There are the following size specifications possible:
 - `:min => characters` makes the view the at least as big as the amount of characters specified
 - `:max => characters` makes the view the at most as big as the amount of characters specified
 
-### <a name="142-view-def-panel-grouping-views-in-a-panel"></a>14.2 - view-def `panel` Grouping Views in a Panel
+### <a name="142-view-default-def-view-default-definitions"></a>14.2 - view-default-def View Default Definitions
+
+These properties are available for all _view-def_ of any kind of view.
+
+```code
+_view-default-def_ = ${
+    ## The name allows you to retrieve a temporary view handle
+    ## view using the `$<Cursive>.get` method.
+    ## You can call methods that depend on the type of view on that handle.
+    name = "aViewName",
+
+    ## The horizontal and vertical sizes of this view.
+    ## See above about the possible values for _size-def_
+    ## (eg. `:free`, `:full`, `:fixed => 30`, `:min => 30`, `:max => 30`).
+    size_w = $none | _size-def_,
+    size_h = $none | _size-def_,
+
+    ## If not `$none`: Wraps the view in a scrolled view with
+    ## the corresponding scroll strategy. You will get a scroll bar if the view
+    ## does not fit inside the available space.
+    scroll = $none | "top" | "bottom" | "row",
+
+    ## Enables/disables the vertical scroll bar. (Enabled by default)
+    scroll_y = $true | $false,
+
+    ## Enables/disables the horizontal scroll bar. (Disabled by default)
+    scroll_x = $true | $false,
+
+    ##  Wraps the view into a hideable view, which can be shown
+    ##  or hidden. For a listing of the available methods see below.
+    hideable_name = "hide_name",
+};
+```
+
+#### <a name="1421-hideable-views"></a>14.2.1 - Hideable Views
+
+You can specify the `hideable_name` property in the _view-default-def_ as specified above.
+In that case you can refer to the hideable part of that view by name and call one of the following
+methods on that.
+
+```text
+cursive.add_layer :vbox => $[
+    :button => ${
+        label = "Test",
+        hideable_name = "TestHideBtn",
+    },
+    :button => ${
+        label = "Hide Test",
+        on_press = {!(cursive) = @;
+            (cursive.get "TestHideBtn").hide[];
+        },
+    },
+];
+```
+
+##### <a name="14211-hideablesetvisible-bool"></a>14.2.1.1 - hideable.set\_visible _bool_
+
+Sets the visibility of the view.
+
+##### <a name="14212-hideableisvisible---bool"></a>14.2.1.2 - hideable.is\_visible -> _bool_
+
+Returns the visibility of the view.
+
+##### <a name="14213-hideablehide"></a>14.2.1.3 - hideable.hide
+
+Hides the view.
+
+##### <a name="14214-hideableunhide"></a>14.2.1.4 - hideable.unhide
+
+Shows the view.
+
+### <a name="143-view-def-panel-grouping-views-in-a-panel"></a>14.3 - view-def `panel` Grouping Views in a Panel
 
 A panel is usually for visual separation and grouping of other views.
 
@@ -9774,7 +9938,7 @@ A panel is usually for visual separation and grouping of other views.
     :panel => ${
         title = "title of the panel", # Can be left out for no title.
 
-        # auto wrap properties:
+        ## auto wrap properties:
         name  = "view name",    # Assign a name for $<Cursive>.named
         scrollable = $true,     # Make the view scrollable
         width = :free,          # Width size definition, see above under size-def
@@ -9782,7 +9946,7 @@ A panel is usually for visual separation and grouping of other views.
     }
 ```
 
-### <a name="143-view-def-hbox-horizontal-layout"></a>14.3 - view-def `hbox` Horizontal Layout
+### <a name="144-view-def-hbox-horizontal-layout"></a>14.4 - view-def `hbox` Horizontal Layout
 
 This horizontal box is a short hand form to define a horizontal layout of
 other views. There are no auto wrap properties definable here.
@@ -9795,7 +9959,7 @@ other views. There are no auto wrap properties definable here.
     ]
 ```
 
-### <a name="144-view-def-vbox-vertical-layout"></a>14.4 - view-def `vbox` Vertical Layout
+### <a name="145-view-def-vbox-vertical-layout"></a>14.5 - view-def `vbox` Vertical Layout
 
 This vertical box is a short hand form to define a vertical layout of
 other views. There are no auto wrap properties definable here.
@@ -9808,20 +9972,20 @@ other views. There are no auto wrap properties definable here.
     ]
 ```
 
-### <a name="145-view-def-progress-progress-bar"></a>14.5 - view-def `progress` Progress Bar
+### <a name="146-view-def-progress-progress-bar"></a>14.6 - view-def `progress` Progress Bar
 
 ## <a name="15-wlambda-interpreter-cli-command-line-interface"></a>15 - WLambda Interpreter (CLI) Command Line Interface
 
 There are currently the following command line parameters available:
 
 ```text
-    -p <script or zip> <output binary file>     # Packing a script or ZIP into an executable
-    -P <script or zip> <output binary file>     # Packing a script or ZIP into an executable but
-                                                # disabling the copyright & license output.
-    -x <output script or zip>                   # Unpacking a script or ZIP from a packed executable
-    -parse <file>                               # Parse the given <file> and check for syntax errors
-    -e <wlambda code>                           # Execute the <wlambda code> directly.
-    <file>                                      # Execute the <file>
+-p <script or zip> <output binary file>     # Packing a script or ZIP into an executable
+-P <script or zip> <output binary file>     # Packing a script or ZIP into an executable but
+                                            ## disabling the copyright & license output.
+-x <output script or zip>                   # Unpacking a script or ZIP from a packed executable
+-parse <file>                               # Parse the given <file> and check for syntax errors
+-e <wlambda code>                           # Execute the <wlambda code> directly.
+<file>                                      # Execute the <file>
 ```
 
 ### <a name="151-wlambda-script-to-executable-packing"></a>15.1 - WLambda Script To Executable Packing
@@ -9838,23 +10002,23 @@ Here is an example for Windows with EXE files. On Linux you will need to make
 the resulting binary file executable with `chmod a+x <filename>`:
 
 ```text
-    ---- test.wl --------------
-    std:displayln "Hello World!";
-    ---------------------------
+---- test.wl --------------
+std:displayln "Hello World!";
+---------------------------
 
-    > wlambda -p test.wl my_test.exe
-    Written 'my_test.exe'
+> wlambda -p test.wl my_test.exe
+Written 'my_test.exe'
 
-    > my_test
-    WLambda Version 0.8.1
-    Copyright (C) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
-    License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
-    This is free software: you are free to change and redistribute it.
-    There is NO WARRANTY, to the extent permitted by law.
+> my_test
+WLambda Version 0.8.1
+Copyright (C) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
 
-    For documentation visit: <http://wlambda.m8geil.de>.
+For documentation visit: <http://wlambda.m8geil.de>.
 
-    Hello World!
+Hello World!
 ```
 
 You can use the `-X` command line option to pack an executable and disable the copyright
@@ -9864,11 +10028,11 @@ You can unpack the `my_test.exe` file using the `-x` command line parameter.
 Here an example for the Windows `cmd.exe` shell:
 
 ```text
-    > my_test -p out_test.wl
-    Written 'out_test.wl'
+> my_test -p out_test.wl
+Written 'out_test.wl'
 
-    > type out_test.wl
-    std:displayln "Hello World!"
+> type out_test.wl
+std:displayln "Hello World!"
 ```
 
 

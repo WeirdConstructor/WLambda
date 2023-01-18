@@ -57,10 +57,18 @@ std:fs:copy "doc/wlambda_reference.md" "doc/wlambda_reference.bak";
 
 !c = collector.new[];
 
+!check_code_hash = {!(code) = @;
+    iter line ("\n" => 0) <& code {
+        if line &> $r/$^ $*$s \# $+[^#] $$/ {
+            std:displayln "ERROR: Bad comment in code example: " line;
+        };
+    };
+};
+
 !orig = ref_doc_md;
 # remove code fragments, or else we get all the # comments
 # from the WLambda code examples:
-.ref_doc_md = ref_doc_md | std:re:replace_all $q_(?s)```.*?```_ {|| "" };
+.ref_doc_md = ref_doc_md | std:re:replace_all $q_(?s)```.*?```_ {|| check_code_hash _.0; "" };
 
 std:re:map $q_(#+)\s*(?:<a name=.*?</a>\s*)?(?:[1-9][0-9]*(?:\.[0-9]+)*\s*)?\s*-\s+(.*)_ {
     c.feed_section_header _.1 _.2 _.0;
