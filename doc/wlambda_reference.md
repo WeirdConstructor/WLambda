@@ -9245,6 +9245,54 @@ You can remove the layer using `$<Cursive>.pop_layer[]`.
 
 Removes the top most layer of the current screen.
 
+##### - $\<Cursive\>.get _name-of-view_ -> $none | $\<NamedView:Name:Type\>
+
+Retrieves the handle of a specific view. You must not store this handle anywhere except
+in a local variable. This handle is only available inside a context where you have
+a `$<Cursive>` handle. This is typically only inside an event callback.
+
+Here is an example:
+
+```text
+cursive.add_layer :vbox => $[
+    :button => ${
+        label = "Toggle Button Label",
+        name = "LblBtn",
+        on_press = {!(cursive) = @;
+            (cursive.get "LblBtn").set_label "Yay Button Label";
+        },
+    },
+];
+```
+
+##### - $\<Cursive\>.popup _popup-def_ _view-def_
+
+This opens a popup dialog that shows the view _view-def_. It has a frame, a title and you can
+supply multiple buttons for the user to interact with the popup.
+
+The _popup-def_ can contain the following keys:
+
+```text
+_popup-def_ = ${
+    _view-default-def_,                 # The default definitions a _view-def_ also has.
+    title = "window title",             # The window title of the popup
+    focus = _button-index_ or $none,    # Focuses a specific button or the content _view-def_
+
+    # If no buttons (or a close_label) are defined,
+    # a default "Ok" dismiss button will be added.
+    #
+    # The `focus` property allows to focus a specific button from this list:
+    buttons = $[
+        $p("button1_name", _click-callback_),
+        ...
+    ],
+
+    # If defined, a dismiss/close button
+    # with the corresponding Label is added.
+    close_label = _string_ or $none_,
+};
+```
+
 ##### <a name="121234-cursiveaddscreen-view-def---screen-id"></a>12.12.3.4 - $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
 
 Creates a new screen (not visible) and instanciates the _view-def_ on a new
@@ -9273,11 +9321,45 @@ using `$<Cursive>.send_cb _event-tag_ { ... }`.
 
 Returns a true value if sending was successful or an `$error`.
 
-##### <a name="121238-cursivepoplayer"></a>12.12.3.8 - $\<Cursive\>.pop\_layer
+##### - $\<Cursive\>.default\_cb _widget-name_ _function_
 
-##### <a name="121239-cursiveaddlayer-view-def"></a>12.12.3.9 - $\<Cursive\>.add\_layer view-def
+Installs a default callback for handling events from the correspondig _widget-name_.
+The _widget-name_ `"*"` is a wildcard for all widgets without a name assigned.
 
-Adds the `view-def` view as layer to the TUI.
+```text
+!cursive = std:cursive:new[];
+
+cursive.add_layer :vbox => $[
+    :checkbox => ${ name = :check1, checked = $true },
+];
+
+cursive.default_cb :check1 {
+    !event_name = _;
+    std:displayln "Checkbox 1 event:" @;
+};
+
+cursive.default_cb :* {
+    std:displayln "Unnamed widget sent event:" @;
+};
+```
+
+##### - $\<Cursive\>.set\_window\_title _string_
+
+Sets the window title of the application. That title will usually appear in the window title bar of
+the console or terminal the application runs in.
+
+#### - $\<Cursive\>.init\_console\_logging
+
+Enables logging of Cursive debugging information to the console. Use `$<Cursive>.toggle_debug_console[]`
+to show/hide the debug console.
+
+#### - $\<Cursive\>.toggle\_debug\_console
+
+Shows/Hides the Cursive debugging console. See also `$<Cursive>.init_console_logging[]`.
+
+#### - $\<Cursive\>.show\_debug\_console
+
+Shows the Cursive debugging console. See also `$<Cursive>.init_console_logging[]`.
 
 ##### <a name="1212310-cursivequit"></a>12.12.3.10 - $\<Cursive\>.quit
 
@@ -9752,6 +9834,77 @@ There are the following size specifications possible:
 - `:min => characters` makes the view the at least as big as the amount of characters specified
 - `:max => characters` makes the view the at most as big as the amount of characters specified
 
+### - view-default-def View Default Definitions
+
+These properties are available for all _view-def_ of any kind of view.
+
+```text
+_view-default-def_ = ${
+    # The name allows you to retrieve a temporary view handle
+    # view using the `$<Cursive>.get` method.
+    # You can call methods that depend on the type of view on that handle.
+    name = "aViewName",
+
+    # The horizontal and vertical sizes of this view.
+    # See above about the possible values for _size-def_
+    # (eg. `:free`, `:full`, `:fixed => 30`, `:min => 30`, `:max => 30`).
+    size_w = $none | _size-def_,
+    size_h = $none | _size-def_,
+
+    # If not `$none`: Wraps the view in a scrolled view with
+    # the corresponding scroll strategy. You will get a scroll bar if the view
+    # does not fit inside the available space.
+    scroll = $none | "top" | "bottom" | "row",
+
+    # Enables/disables the vertical scroll bar. (Enabled by default)
+    scroll_y = $true | $false,
+
+    # Enables/disables the horizontal scroll bar. (Disabled by default)
+    scroll_x = $true | $false,
+
+    # Wraps the view into a hideable view, which can be shown
+    # or hidden. For a listing of the available methods see below.
+    hideable_name = "hide_name",
+};
+```
+
+#### - Hideable Views
+
+You can specify the `hideable_name` property in the _view-default-def_ as specified above.
+In that case you can refer to the hideable part of that view by name and call one of the following
+methods on that.
+
+```text
+cursive.add_layer :vbox => $[
+    :button => ${
+        label = "Test",
+        hideable_name = "TestHideBtn",
+    },
+    :button => ${
+        label = "Hide Test",
+        on_press = {!(cursive) = @;
+            (cursive.get "TestHideBtn").hide[];
+        },
+    },
+];
+```
+
+##### - hideable.set\_visible _bool_
+
+Sets the visibility of the view.
+
+##### - hideable.is\_visible -> _bool_
+
+Returns the visibility of the view.
+
+##### - hideable.hide
+
+Hides the view.
+
+##### - hideable.unhide
+
+Shows the view.
+
 ### <a name="142-view-def-panel-grouping-views-in-a-panel"></a>14.2 - view-def `panel` Grouping Views in a Panel
 
 A panel is usually for visual separation and grouping of other views.
@@ -9801,13 +9954,13 @@ other views. There are no auto wrap properties definable here.
 There are currently the following command line parameters available:
 
 ```text
-    -p <script or zip> <output binary file>     # Packing a script or ZIP into an executable
-    -P <script or zip> <output binary file>     # Packing a script or ZIP into an executable but
-                                                # disabling the copyright & license output.
-    -x <output script or zip>                   # Unpacking a script or ZIP from a packed executable
-    -parse <file>                               # Parse the given <file> and check for syntax errors
-    -e <wlambda code>                           # Execute the <wlambda code> directly.
-    <file>                                      # Execute the <file>
+-p <script or zip> <output binary file>     # Packing a script or ZIP into an executable
+-P <script or zip> <output binary file>     # Packing a script or ZIP into an executable but
+# disabling the copyright & license output.
+-x <output script or zip>                   # Unpacking a script or ZIP from a packed executable
+-parse <file>                               # Parse the given <file> and check for syntax errors
+-e <wlambda code>                           # Execute the <wlambda code> directly.
+<file>                                      # Execute the <file>
 ```
 
 ### <a name="151-wlambda-script-to-executable-packing"></a>15.1 - WLambda Script To Executable Packing
@@ -9824,23 +9977,23 @@ Here is an example for Windows with EXE files. On Linux you will need to make
 the resulting binary file executable with `chmod a+x <filename>`:
 
 ```text
-    ---- test.wl --------------
-    std:displayln "Hello World!";
-    ---------------------------
+---- test.wl --------------
+std:displayln "Hello World!";
+---------------------------
 
-    > wlambda -p test.wl my_test.exe
-    Written 'my_test.exe'
+> wlambda -p test.wl my_test.exe
+Written 'my_test.exe'
 
-    > my_test
-    WLambda Version 0.8.1
-    Copyright (C) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
-    License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
-    This is free software: you are free to change and redistribute it.
-    There is NO WARRANTY, to the extent permitted by law.
+> my_test
+WLambda Version 0.8.1
+Copyright (C) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
 
-    For documentation visit: <http://wlambda.m8geil.de>.
+For documentation visit: <http://wlambda.m8geil.de>.
 
-    Hello World!
+Hello World!
 ```
 
 You can use the `-X` command line option to pack an executable and disable the copyright
@@ -9850,9 +10003,9 @@ You can unpack the `my_test.exe` file using the `-x` command line parameter.
 Here an example for the Windows `cmd.exe` shell:
 
 ```text
-    > my_test -p out_test.wl
-    Written 'out_test.wl'
+> my_test -p out_test.wl
+Written 'out_test.wl'
 
-    > type out_test.wl
-    std:displayln "Hello World!"
+> type out_test.wl
+std:displayln "Hello World!"
 ```

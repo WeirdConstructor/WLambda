@@ -2032,7 +2032,7 @@ pub fn handle_cursive_call_method(
                 "$<Cursive>",
                 argv,
                 2,
-                "view_default_cb[widget_name, callback_fun]",
+                "default_cb[widget_name, callback_fun]",
                 env
             );
             let name = argv.v_s_raw(0);
