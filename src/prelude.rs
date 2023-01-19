@@ -13221,8 +13221,9 @@ pub fn std_symbol_table() -> SymbolTable {
                 let ntc = tc.clone();
                 match tc.lock() {
                     Ok(mut tcg) => {
+                        let mod_resolver = env.global.borrow().get_resolver();
                         env.arg(0).with_s_ref(|code: &str|
-                            Ok(tcg.spawn(ntc, code.to_string(), avs)))
+                            Ok(tcg.spawn(ntc, mod_resolver, code.to_string(), avs)))
                     },
                     Err(e) => {
                         Err(StackAction::panic_str(

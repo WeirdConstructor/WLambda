@@ -112,13 +112,15 @@ pub trait ModuleResolver {
     ///
     /// See LocalFileModuleResolver as example on how to implement this.
     fn resolve(&self, global: GlobalEnvRef, path: &[String], import_file_path: Option<&str>) -> Result<SymbolTable, ModuleLoadError>;
+
+    fn clone_preloaded_files(&self) -> Option<std::collections::HashMap<String, Arc<String>>>;
 }
 
 /// This structure implements the ModuleResolver trait and is
 /// responsible for loading modules on `!@import` for WLambda.
 #[derive(Debug, Clone, Default)]
 pub struct LocalFileModuleResolver {
-    preloaded_files: Option<Rc<RefCell<std::collections::HashMap<String, String>>>>,
+    preloaded_files: Option<Rc<RefCell<std::collections::HashMap<String, Arc<String>>>>>,
     loaded_modules: Rc<RefCell<std::collections::HashMap<String, Rc<SymbolTable>>>>,
 }
 
@@ -127,6 +129,16 @@ impl LocalFileModuleResolver {
     pub fn new() -> LocalFileModuleResolver {
         LocalFileModuleResolver {
             preloaded_files: None,
+            loaded_modules:
+                Rc::new(RefCell::new(std::collections::HashMap::new())),
+        }
+    }
+
+    pub fn new_with_preloaded(
+        preloaded: Rc<RefCell<std::collections::HashMap<String, Arc<String>>>>) -> LocalFileModuleResolver {
+
+        LocalFileModuleResolver {
+            preloaded_files: Some(preloaded),
             loaded_modules:
                 Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
@@ -158,7 +170,7 @@ impl LocalFileModuleResolver {
         }
 
         self.preloaded_files.as_ref().unwrap().borrow_mut()
-            .insert(filepath.to_string(), contents);
+            .insert(filepath.to_string(), Arc::new(contents));
     }
 }
 
@@ -255,6 +267,14 @@ impl SymbolTable {
 }
 
 impl ModuleResolver for LocalFileModuleResolver {
+    fn clone_preloaded_files(&self) -> Option<std::collections::HashMap<String, Arc<String>>> {
+        if let Some(preloaded) = self.preloaded_files.as_ref() {
+            return Some(preloaded.borrow().clone());
+        }
+
+        None
+    }
+
     fn resolve(&self, global: GlobalEnvRef, path: &[String], import_file_path: Option<&str>)
         -> Result<SymbolTable, ModuleLoadError>
     {

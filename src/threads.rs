@@ -874,6 +874,7 @@ pub trait ThreadCreator: Send {
     /// global environment. This is the only way to share
     /// data between threads.
     fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+             module_resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
              code: String,
              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal;
 
@@ -1011,11 +1012,14 @@ impl<A> ThreadCreator for DefaultThreadCreator<A> where A: ThreadGlobalEnvCreato
     fn new_env(&mut self) -> GlobalEnvRef { self.0.new_env() }
 
     fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+             module_resolver: Option<Rc<RefCell<dyn ModuleResolver>>>,
              code: String,
              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
 
         let ready = AtomicAValSlot::new();
         let tcc = tc.clone();
+
+        let preloaded_files = module_resolver.map(|res| res.borrow().clone_preloaded_files()).flatten();
 
         let trdy = ready.clone();
         let hdl =
@@ -1027,6 +1031,12 @@ impl<A> ThreadCreator for DefaultThreadCreator<A> where A: ThreadGlobalEnvCreato
                     };
 
                 genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
+                if let Some(preloaded_files) = preloaded_files {
+                    let mut resolver =
+                        Rc::new(RefCell::new(
+                            LocalFileModuleResolver::new_with_preloaded(Rc::new(RefCell::new(preloaded_files)))));
+                    genv.borrow_mut().set_resolver(resolver);
+                }
 
                 genv.borrow_mut().set_var(
                     "_READY",
