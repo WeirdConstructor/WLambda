@@ -130,7 +130,7 @@ impl VValUserData for CursiveAPI {
             .expect("Userdata must be WLambdaCursiveContext!");
         let reg = ud.get_registry();
 
-        handle_cursive_call_method(key, &argv, env, cursive, &reg)
+        handle_cursive_call_method(key, &argv, env, *self.ptr, &reg)
     }
 }
 
@@ -1942,10 +1942,10 @@ pub fn handle_cursive_call_method(
     method: &str,
     argv: &VVal,
     env: &mut Env,
-    cursive: &mut Cursive,
+    ptr: *mut Cursive,
     reg: &ViewNameRegistry,
 ) -> Result<VVal, StackAction> {
-    let ptr: *mut Cursive = cursive;
+    let cursive: &mut Cursive = unsafe { &mut *ptr };
 
     match method {
         "add_layer" => {
@@ -2218,7 +2218,12 @@ impl VValUserData for CursiveHandle {
 
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         let argv = env.argv();
-        handle_cursive_call_method(key, &argv, env, &mut self.cursive.borrow_mut(), &self.reg)
+        let ptr: *mut Cursive = {
+            let ptr: *mut Cursive = (&mut self.cursive.borrow_mut()) as &mut Cursive;
+            ptr
+        };
+
+        handle_cursive_call_method(key, &argv, env, ptr, &self.reg)
     }
 }
 

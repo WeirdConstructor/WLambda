@@ -9304,6 +9304,16 @@ _popup-def_ = ${
 };
 ```
 
+Here is an example for a message popup:
+
+```text
+cursive.popup
+    ${ title = "Message for you!", }
+    :textview => ${ content = "Attention! You did good!" };
+```
+
+See also _view-def_ example for the "list" view futher below.
+
 ##### <a name="121236-cursiveaddscreen-view-def---screen-id"></a>12.12.3.6 - $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
 
 Creates a new screen (not visible) and instanciates the _view-def_ on a new
@@ -9919,17 +9929,80 @@ Shows the view.
 ### <a name="143-view-def-panel-grouping-views-in-a-panel"></a>14.3 - view-def `panel` Grouping Views in a Panel
 
 A panel is usually for visual separation and grouping of other views.
+This panel view is wrapping around another _view-def_.
+
+```text
+    :panel => ${ config } => _view-def_
+```
 
 ```text
     :panel => ${
+        _view-default-def_, # The default definitions a _view-def_ also has.
         title = "title of the panel", # Can be left out for no title.
+    } => _view-def_
+```
 
-        ## auto wrap properties:
-        name  = "view name",    # Assign a name for $<Cursive>.named
-        scrollable = $true,     # Make the view scrollable
-        width = :free,          # Width size definition, see above under size-def
-        height = :free,         # Height size definition, see above under size-def
+Here is an example that just makes a border around a text view:
+
+```text
+    cursive.add_layer
+        :panel => ${} => :textview => ${ content = "Test is framed!" };
+```
+
+### - view-def `list` A List View with Labels
+
+This view allows you to make an entry form with labels in front of views that are vertically
+arranged.
+
+```text
+    :list => ${
+        _view-default-def_, # The default definitions a _view-def_ also has.
+
+        ## This callback is called when a certain entry is selected.
+        on_select = {!(cursive, item) = @; ... },
+
+        ## A list of pairs that contain the label and the _view-def_.
+        ## If you want to add a delimiter, use `$none`.
+        childs = $[
+            $p("label 1", _view-def1_),     # Add a view
+            $none,                          # Delimiter
+            $p("label 2", _view-def2_),     # Add a view
+            ...                             # Add more views
+        ],
     }
+```
+
+Here is an example of a simple configuration dialog:
+
+```text
+    !CONFIG = ${
+        port1 = 12931,
+        port2 = 39392,
+    };
+
+    cursive.popup ${
+        title = "Settings",
+        width = :min => 50,
+        buttons = $[
+            $p("Next", {!(cursive) = @;
+                open_some_other_dialog_here cursive;
+            }),
+            $p("Exit", { _.quit[] })
+        ],
+    } :list => ${
+        childs = $[
+            $p("Port1", :edit => ${
+                content = CONFIG.port1, on_edit = {!(cursive, text, cursor) = @;
+                    CONFIG.port1 = int text;
+                },
+            }),
+            $p("Port2", :edit => ${
+                content = CONFIG.port2, on_edit = {!(cursive, text, cursor) = @;
+                    CONFIG.port2 = int text;
+                },
+            }),
+        ],
+    };
 ```
 
 ### <a name="144-view-def-hbox-horizontal-layout"></a>14.4 - view-def `hbox` Horizontal Layout
