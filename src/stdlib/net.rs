@@ -504,5 +504,34 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 "std:io:read_some: First argument not an IO handle! {}",
                 fd.s()))))
     }, Some(1), Some(1), false);
+
+    st.fun("net:tcp:set_timeouts", |env: &mut Env, argc: usize| {
+        let mut socket = env.arg(0);
+        let read_t     = env.arg(1);
+        let write_t    = env.arg(2);
+
+        let read_t = if read_t.is_some() {
+            match read_t.to_duration() {
+                Ok(dur) => Some(dur),
+                Err(e)  => return Ok(e),
+            }
+        } else { None };
+
+        let write_t = if write_t.is_some() {
+            match write_t.to_duration() {
+                Ok(dur) => Some(dur),
+                Err(e)  => return Ok(e),
+            }
+        } else { None };
+
+        socket.with_usr_ref(|vts: &mut VTcpStream| {
+            vts.stream.borrow_mut().set_read_timeout(read_t);
+            vts.stream.borrow_mut().set_write_timeout(write_t);
+            Ok(VVal::Bol(true))
+        }).unwrap_or_else(||
+            Ok(env.new_err(format!(
+                "std:net:tcp:set_timeouts: First argument not a socket! {}",
+                socket.s()))))
+    }, Some(2), Some(3), false);
 }
 

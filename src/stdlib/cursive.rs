@@ -23,8 +23,8 @@ use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeCo
 #[cfg(feature = "cursive")]
 use cursive::views::{
     BoxedView, Button, Checkbox, Dialog, DialogFocus, EditView, HideableView, LinearLayout,
-    ListView, Panel, ProgressBar, RadioButton, RadioGroup, SelectView, SliderView, StackView,
-    TextArea, TextContent, TextView, ViewRef,
+    ScrollView, ListView, Panel, ProgressBar, RadioButton, RadioGroup, SelectView, SliderView,
+    StackView, TextArea, TextContent, TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
 use cursive::{direction::Orientation, traits::Nameable, Cursive};
@@ -196,6 +196,7 @@ enum ViewType {
     Slider,
     SelectView,
     Hideable,
+    ScrollView,
 }
 
 #[cfg(feature = "cursive")]
@@ -480,6 +481,33 @@ impl VValUserData for NamedViewHandle {
                 }
                 _ => named_view_error!(self, env, key),
             },
+            ViewType::ScrollView => match key {
+                "set_scroll" => {
+                    assert_arg_count!(self.s(), argv, 1, "set_scroll[_strategy_]", env);
+
+                    let scroll_strat = match &argv.v_s_raw(0)[..] {
+                        "top" => ScrollStrategy::StickToTop,
+                        "bottom" => ScrollStrategy::StickToBottom,
+                        _ => ScrollStrategy::KeepRow,
+                    };
+
+                    access_named_view_ctx!(self, cursive, ScrollView<BoxedView>, view, env, {
+                        match scroll_strat {
+                            ScrollStrategy::StickToBottom => {
+                                view.scroll_to_bottom();
+                            },
+                            ScrollStrategy::StickToTop => {
+                                view.scroll_to_top();
+                            },
+                            _ => (),
+                        }
+                        view.set_scroll_strategy(scroll_strat);
+
+                        Ok(VVal::None)
+                    })
+                },
+                _ => named_view_error!(self, env, key),
+            },
             ViewType::Hideable => match key {
                 "set_visible" => {
                     assert_arg_count!(self.s(), argv, 1, "set_visible[bool]", env);
@@ -543,37 +571,63 @@ fn vv2size_const(v: &VVal) -> Option<SizeConstraint> {
 }
 
 macro_rules! wrap_scroll_view {
-    ($view: expr, $define: ident, $reg: expr, $cursive: ident, $env: ident) => {
+    ($define: ident, $view: expr, $reg: expr, $cursive: ident, $env: ident) => {
         {
             if $define.v_k("scroll_name").is_some() {
-                $reg.borrow_mut().insert($define.v_s_rawk("scroll_name"), "scrollview".to_string());
+                $reg.borrow_mut().insert($define.v_s_rawk("scroll_name"), "scroll".to_string());
             }
 
-            let mut v = $view;
+            let mut scroll_strat = None;
+            if $define.v_k("scroll").is_some() {
+                scroll_strat = Some(match &$define.v_s_rawk("scroll")[..] {
+                    "top" => ScrollStrategy::StickToTop,
+                    "bottom" => ScrollStrategy::StickToBottom,
+                    _ => ScrollStrategy::KeepRow,
+                })
+            }
 
-            add_cb_handler!(
-                $cursive,
-                $define,
-                $env,
-                v,
-                set_on_scroll_change,
-                "on_scroll_change",
-                rect: VVal::ivec4(rect.left() as i64, rect.top() as i64, rect.right() as i64, rect.bottom() as i64),
-            );
+            let scroll_y =
+                if $define.v_k("scroll_y").is_none() { true } else { $define.v_bk("scroll_y") };
+            let scroll_x = $define.v_bk("scroll_x");
 
-            v
+            if let Some(scroll_strat) = scroll_strat {
+                let mut v =
+                    BoxedView::new($view.into_boxed_view())
+                        .scrollable()
+                        .scroll_x(scroll_x)
+                        .scroll_y(scroll_y)
+                        .scroll_strategy(scroll_strat);
+
+                add_cb_handler!(
+                    $cursive,
+                    $define,
+                    $env,
+                    v,
+                    set_on_scroll_change,
+                    "on_scroll_change",
+                    rect: VVal::ivec4(rect.left() as i64, rect.top() as i64, rect.right() as i64, rect.bottom() as i64),
+                );
+
+                if $define.v_k("scroll_name").is_some() {
+                    v.with_name($define.v_s_rawk("scroll_name")).into_boxed_view()
+                } else {
+                    v.into_boxed_view()
+                }
+            } else {
+                $view.into_boxed_view()
+            }
         }
     }
 }
 
 macro_rules! wrap_hideable {
-    ($define: ident, $view: expr) => {
+    ($define: ident, $view: expr, $reg: expr, $cursive: ident, $env: ident) => {
         if $define.v_k("hideable_name").is_some() {
-            HideableView::new(BoxedView::new($view.into_boxed_view()))
+            HideableView::new(BoxedView::new(wrap_scroll_view!($define, $view, $reg, $cursive, $env)))
                 .with_name($define.v_s_rawk("hideable_name"))
                 .into_boxed_view()
         } else {
-            $view.into_boxed_view()
+            wrap_scroll_view!($define, $view, $reg, $cursive, $env)
         }
     };
 }
@@ -583,19 +637,6 @@ macro_rules! auto_wrap_view {
         let size_w = vv2size_const(&$define.v_k("width"));
         let size_h = vv2size_const(&$define.v_k("height"));
 
-        let mut scroll_strat = None;
-        if $define.v_k("scroll").is_some() {
-            scroll_strat = Some(match &$define.v_s_rawk("scroll")[..] {
-                "top" => ScrollStrategy::StickToTop,
-                "bottom" => ScrollStrategy::StickToBottom,
-                _ => ScrollStrategy::KeepRow,
-            })
-        }
-
-        let scroll_y =
-            if $define.v_k("scroll_y").is_none() { true } else { $define.v_bk("scroll_y") };
-        let scroll_x = $define.v_bk("scroll_x");
-
         if $define.v_k("hideable_name").is_some() {
             $reg.borrow_mut().insert($define.v_s_rawk("hideable_name"), "hideable".to_string());
         }
@@ -604,81 +645,33 @@ macro_rules! auto_wrap_view {
             $reg.borrow_mut().insert($define.v_s_rawk("name"), stringify!($type).to_string());
 
             if size_w.is_some() || size_h.is_some() {
-                if let Some(scroll_strat) = scroll_strat {
-                    wrap_hideable!(
-                        $define,
-                        $view
-                            .with_name($define.v_s_rawk("name"))
-                            .resized(
-                                size_w.unwrap_or(SizeConstraint::Free),
-                                size_h.unwrap_or(SizeConstraint::Free),
-                            )
-                            .scrollable()
-                            .scroll_x(scroll_x)
-                            .scroll_y(scroll_y)
-                            .scroll_strategy(scroll_strat)
-                    )
-                } else {
-                    wrap_hideable!(
-                        $define,
-                        $view.with_name($define.v_s_rawk("name")).resized(
+                wrap_hideable!(
+                    $define,
+                    $view
+                        .with_name($define.v_s_rawk("name"))
+                        .resized(
                             size_w.unwrap_or(SizeConstraint::Free),
                             size_h.unwrap_or(SizeConstraint::Free),
-                        )
-                    )
-                }
+                        ),
+                    $reg, $cursive, $env
+                )
             } else {
-                if let Some(scroll_strat) = scroll_strat {
-                    wrap_hideable!(
-                        $define,
-                        $view
-                            .with_name($define.v_s_rawk("name"))
-                            .scrollable()
-                            .scroll_x(scroll_x)
-                            .scroll_y(scroll_y)
-                            .scroll_strategy(scroll_strat)
-                    )
-                } else {
-                    wrap_hideable!($define, $view.with_name($define.v_s_rawk("name")))
-                }
+                wrap_hideable!(
+                    $define,
+                    $view.with_name($define.v_s_rawk("name")),
+                    $reg, $cursive, $env)
             }
         } else {
             if size_w.is_some() || size_h.is_some() {
-                if let Some(scroll_strat) = scroll_strat {
-                    wrap_hideable!(
-                        $define,
-                        $view
-                            .resized(
-                                size_w.unwrap_or(SizeConstraint::Free),
-                                size_h.unwrap_or(SizeConstraint::Free),
-                            )
-                            .scrollable()
-                            .scroll_x(scroll_x)
-                            .scroll_y(scroll_y)
-                            .scroll_strategy(scroll_strat)
-                    )
-                } else {
-                    wrap_hideable!(
-                        $define,
-                        $view.resized(
-                            size_w.unwrap_or(SizeConstraint::Free),
-                            size_h.unwrap_or(SizeConstraint::Free),
-                        )
-                    )
-                }
+                wrap_hideable!(
+                    $define,
+                    $view.resized(
+                        size_w.unwrap_or(SizeConstraint::Free),
+                        size_h.unwrap_or(SizeConstraint::Free),
+                    ),
+                    $reg, $cursive, $env)
             } else {
-                if let Some(scroll_strat) = scroll_strat {
-                    wrap_hideable!(
-                        $define,
-                        $view
-                            .scrollable()
-                            .scroll_x(scroll_x)
-                            .scroll_y(scroll_y)
-                            .scroll_strategy(scroll_strat)
-                    )
-                } else {
-                    wrap_hideable!($define, $view)
-                }
+                wrap_hideable!($define, $view, $reg, $cursive, $env)
             }
         }
     }};
@@ -2175,6 +2168,7 @@ pub fn handle_cursive_call_method(
                     "slider" => ViewType::Slider,
                     "select" => ViewType::SelectView,
                     "hideable" => ViewType::Hideable,
+                    "scroll" => ViewType::ScrollView,
                     _ => {
                         panic!("Unknown viewtype encountered, fatal error in programming: {}", typ);
                     }
