@@ -12756,6 +12756,123 @@ pub fn std_symbol_table() -> SymbolTable {
             })
         }, Some(1), Some(2), false);
 
+    #[cfg(feature="flate2")]
+    func!(st, "bytes:gzip:decode",
+        |env: &mut Env, _argc: usize| {
+            use std::io::Read;
+            use flate2::read::GzDecoder;
+
+            env.arg(0).with_bv_ref(|bytes| {
+                let mut defl = GzDecoder::new(bytes);
+                let mut buf = vec![];
+
+                match defl.read_to_end(&mut buf) {
+                    Ok(_) => Ok(VVal::new_byt(buf)),
+                    Err(e) =>
+                        Ok(env.new_err(
+                            format!("bytes:gzip:decode: {}", e)))
+                }
+            })
+        }, Some(1), Some(1), false);
+
+    #[cfg(feature="flate2")]
+    func!(st, "bytes:gzip:encode",
+        |env: &mut Env, _argc: usize| {
+            use std::io::Read;
+            use flate2::read::GzEncoder;
+            use flate2::Compression;
+
+            env.arg(0).with_bv_ref(|bytes| {
+                let mut defl = GzEncoder::new(bytes, Compression::best());
+                let mut buf = vec![];
+
+                match defl.read_to_end(&mut buf) {
+                    Ok(_) => Ok(VVal::new_byt(buf)),
+                    Err(e) =>
+                        Ok(env.new_err(
+                            format!("bytes:gzip:encode: {}", e)))
+                }
+            })
+        }, Some(1), Some(1), false);
+
+    #[cfg(feature="flate2")]
+    func!(st, "bytes:zlib:decode",
+        |env: &mut Env, _argc: usize| {
+            use std::io::Read;
+            use flate2::read::ZlibDecoder;
+
+            env.arg(0).with_bv_ref(|bytes| {
+                let mut defl = ZlibDecoder::new(bytes);
+                let mut buf = vec![];
+
+                match defl.read_to_end(&mut buf) {
+                    Ok(_) => Ok(VVal::new_byt(buf)),
+                    Err(e) =>
+                        Ok(env.new_err(
+                            format!("bytes:zlib:decode: {}", e)))
+                }
+            })
+        }, Some(1), Some(1), false);
+
+    #[cfg(feature="flate2")]
+    func!(st, "bytes:zlib:encode",
+        |env: &mut Env, _argc: usize| {
+            use std::io::Read;
+            use flate2::read::ZlibEncoder;
+            use flate2::Compression;
+
+            env.arg(0).with_bv_ref(|bytes| {
+                let mut defl = ZlibEncoder::new(bytes, Compression::best());
+                let mut buf = vec![];
+
+                match defl.read_to_end(&mut buf) {
+                    Ok(_) => Ok(VVal::new_byt(buf)),
+                    Err(e) =>
+                        Ok(env.new_err(
+                            format!("bytes:zlib:encode: {}", e)))
+                }
+            })
+        }, Some(1), Some(1), false);
+
+    #[cfg(feature="flate2")]
+    func!(st, "bytes:deflate:decode",
+        |env: &mut Env, _argc: usize| {
+            use std::io::Read;
+            use flate2::read::DeflateDecoder;
+
+            env.arg(0).with_bv_ref(|bytes| {
+                let mut defl = DeflateDecoder::new(bytes);
+                let mut buf = vec![];
+
+                match defl.read_to_end(&mut buf) {
+                    Ok(_) => Ok(VVal::new_byt(buf)),
+                    Err(e) =>
+                        Ok(env.new_err(
+                            format!("bytes:deflate:decode: {}", e)))
+                }
+            })
+        }, Some(1), Some(1), false);
+
+    #[cfg(feature="flate2")]
+    func!(st, "bytes:deflate:encode",
+        |env: &mut Env, _argc: usize| {
+            use std::io::Read;
+            use flate2::read::DeflateEncoder;
+            use flate2::Compression;
+
+            env.arg(0).with_bv_ref(|bytes| {
+                let mut defl = DeflateEncoder::new(bytes, Compression::best());
+                let mut buf = vec![];
+
+                match defl.read_to_end(&mut buf) {
+                    Ok(_) => Ok(VVal::new_byt(buf)),
+                    Err(e) =>
+                        Ok(env.new_err(
+                            format!("bytes:deflate:encode: {}", e)))
+                }
+            })
+        }, Some(1), Some(1), false);
+
     func!(st, "copy",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).shallow_clone())

@@ -14,7 +14,7 @@ exclude      = ["res/*"]
 [features]
 default = [
     "rustyline", "regex", "chrono", "serde", "serde_json",
-    "rmp-serde", "toml", "quick-xml", "socket2", "base64"
+    "rmp-serde", "toml", "quick-xml", "socket2", "base64", "flate2"
 ]
 mqtt = ["rumqttd", "rumqttc"]
 http = ["reqwest"]
@@ -27,6 +27,7 @@ all = ["mqtt", "http", "cursive", "zip", "odbc", "clipboard"]
 fnv        = "1.0.7"
 rustyline  = { version = "6.1.2",   optional = true }
 zip        = { version = "0.6.3",   optional = true, features = ["deflate"], default-features = false }
+flate2     = { version = "1.0.25",  optional = true }
 regex      = { version = "1.3.9",   optional = true }
 chrono     = { version = "0.4.11",  optional = true }
 serde      = { version = "1.0.111", optional = true, features = ["derive"] }

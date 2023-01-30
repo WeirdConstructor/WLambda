@@ -5935,3 +5935,15 @@ fn check_some_none_err_or_short_circuit() {
     assert_eq!(ve("!x = 99; !r = { .x = ($e 1) /$o return[-1]; 2 }[]; $p(r, is_err x)"),    "$p(2,$true)");
     assert_eq!(ve("!x = 99; !r = { .x = 200    /$o return[-1]; 2 }[]; $p(r, x)"),           "$p(2,200)");
 }
+
+#[test]
+fn check_prelude_deflate() {
+    if cfg!(feature="flate2") {
+        assert_eq!(ve("len ~ std:bytes:deflate:encode $q'AAAAAAAAAAAAAAAA'"), "5");
+        assert_eq!(ve("std:bytes:deflate:decode ~ std:bytes:deflate:encode $q'AAAAAAAAAAAAAAAA'"), "$b\"AAAAAAAAAAAAAAAA\"");
+        assert_eq!(ve("len ~ std:bytes:zlib:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "11");
+        assert_eq!(ve("std:bytes:zlib:decode ~ std:bytes:zlib:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "$b\"AAAAAAAAAAAAAAAAAAAAAAAAAA\"");
+        assert_eq!(ve("len ~ std:bytes:gzip:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "23");
+        assert_eq!(ve("std:bytes:gzip:decode ~ std:bytes:gzip:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "$b\"AAAAAAAAAAAAAAAAAAAAAAAAAA\"");
+    }
+}
