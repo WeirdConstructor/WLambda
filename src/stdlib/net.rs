@@ -525,8 +525,8 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         } else { None };
 
         socket.with_usr_ref(|vts: &mut VTcpStream| {
-            vts.stream.borrow_mut().set_read_timeout(read_t);
-            vts.stream.borrow_mut().set_write_timeout(write_t);
+            let _ = vts.stream.borrow_mut().set_read_timeout(read_t);
+            let _ = vts.stream.borrow_mut().set_write_timeout(write_t);
             Ok(VVal::Bol(true))
         }).unwrap_or_else(||
             Ok(env.new_err(format!(

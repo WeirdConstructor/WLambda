@@ -33,6 +33,7 @@ use cursive_buffered_backend;
 #[cfg(feature = "cursive")]
 use unicode_width::UnicodeWidthStr;
 
+#[cfg(feature = "cursive")]
 macro_rules! assert_arg_count {
     ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
         if $argv.len() != $count {
@@ -45,6 +46,7 @@ macro_rules! assert_arg_count {
     };
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! call_callback {
     ($cursive: ident, $cb: ident, $env: ident $(,$args: expr)*) => {{
         let cursive_ptr: *mut Cursive = $cursive;
@@ -76,6 +78,7 @@ macro_rules! call_callback {
     }};
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! call_plain_callback {
     ($cb: ident, $env: ident $(,$args: expr)*) => {{
         if $cb.is_some() {
@@ -89,6 +92,7 @@ macro_rules! call_plain_callback {
     }};
 }
 
+#[cfg(feature = "cursive")]
 thread_local! {
     static CURSIVE_STDOUT: RefCell<TextContent> = RefCell::new(TextContent::new(""));
 }
@@ -224,6 +228,7 @@ impl NamedViewHandle {
     }
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! access_named_view_ctx {
     ($self: ident, $cursive: ident, $type: ty, $name: ident, $env: ident, $block: tt) => {{
         let $cursive: &mut Cursive = unsafe { &mut **$self.ptr };
@@ -242,12 +247,14 @@ macro_rules! access_named_view_ctx {
     }};
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! access_named_view {
     ($self: ident, $type: ident, $name: ident, $env: ident, $block: tt) => {
         access_named_view_ctx!($self, cursive, $type, $name, $env, $block)
     };
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! expect_view {
     ($argv: expr, $what: expr, $name: ident, $reg: expr, $env: ident, $block: tt) => {
         match vv2view($argv, $env, &$reg) {
@@ -263,6 +270,7 @@ macro_rules! expect_view {
     };
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! named_view_error {
     ($self: ident, $env: ident, $key: ident) => {
         Err(StackAction::panic_str(
@@ -570,6 +578,7 @@ fn vv2size_const(v: &VVal) -> Option<SizeConstraint> {
     None
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! wrap_scroll_view {
     ($define: ident, $view: expr, $reg: expr, $cursive: ident, $env: ident) => {
         {
@@ -620,6 +629,7 @@ macro_rules! wrap_scroll_view {
     }
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! wrap_hideable {
     ($define: ident, $view: expr, $reg: expr, $cursive: ident, $env: ident) => {
         if $define.v_k("hideable_name").is_some() {
@@ -632,6 +642,7 @@ macro_rules! wrap_hideable {
     };
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! auto_wrap_view {
     ($view: expr, $define: ident, $type: ident, $reg: expr, $cursive: ident, $env: ident) => {{
         let size_w = vv2size_const(&$define.v_k("width"));
@@ -677,6 +688,7 @@ macro_rules! auto_wrap_view {
     }};
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! add_cb_handler {
     ($cursive: ident, $define: ident, $env: ident, $view: ident, $func: ident, $event_str: literal $(,$args: ident)* : $($build: expr,)*) => {
         {
@@ -692,6 +704,7 @@ macro_rules! add_cb_handler {
     }
 }
 
+#[cfg(feature = "cursive")]
 macro_rules! add_default_cb {
     ($cursive: ident, $define: ident, $env: ident, $view: ident, $func: ident, $event_str: literal $(,$args: ident)* : $($build: expr,)*) => {
         {
@@ -731,6 +744,7 @@ macro_rules! add_default_cb {
 
 use std::sync::Arc;
 
+#[cfg(feature = "cursive")]
 #[derive(Clone, Debug)]
 enum XBlockType {
     SourceLabel,
@@ -747,6 +761,7 @@ enum XBlockType {
     },
 }
 
+#[cfg(feature = "cursive")]
 impl XBlockType {
     pub fn generate_label(&self, node_label: &str) -> String {
         match self {
@@ -834,6 +849,7 @@ impl XBlockType {
     }
 }
 
+#[cfg(feature = "cursive")]
 #[derive(Clone, Debug)]
 struct XBlockNode {
     id: usize,
@@ -848,6 +864,7 @@ struct XBlockNode {
     cached_rows: Vec<String>,
 }
 
+#[cfg(feature = "cursive")]
 impl XBlockNode {
     pub fn new(id: usize, pos: (i32, i32), label: &str, block_type: XBlockType) -> Self {
         let mut s = Self {
@@ -943,8 +960,10 @@ impl XBlockNode {
     }
 }
 
+#[cfg(feature = "cursive")]
 use cursive::XY;
 
+#[cfg(feature = "cursive")]
 struct XView {
     pub nodes: Rc<RefCell<HashMap<usize, XBlockNode>>>,
     pub connections: Rc<RefCell<Vec<((usize, u8), (usize, u8))>>>,
@@ -955,6 +974,7 @@ struct XView {
     drag_mouse_offs: (i32, i32),
 }
 
+#[cfg(feature = "cursive")]
 impl XView {
     pub fn new() -> Self {
         let mut nodes = HashMap::new();
@@ -1333,17 +1353,23 @@ impl XView {
     }
 }
 
+#[cfg(feature = "cursive")]
 use cursive::direction;
+#[cfg(feature = "cursive")]
 use cursive::event::Event;
+#[cfg(feature = "cursive")]
 use cursive::event::EventResult;
+#[cfg(feature = "cursive")]
 use cursive::view::CannotFocus;
 
+#[cfg(feature = "cursive")]
 fn dlog(s: &str) {
     CURSIVE_STDOUT.with(|cs| {
         cs.borrow_mut().append(format!("{}\n", s));
     });
 }
 
+#[cfg(feature = "cursive")]
 impl cursive::View for XView {
     fn draw(&self, printer: &cursive::Printer) {
         printer.print_box((0, 0), (self.w, self.h), true);
@@ -1931,6 +1957,7 @@ fn vv2view(
     }
 }
 
+#[cfg(feature = "cursive")]
 pub fn handle_cursive_call_method(
     method: &str,
     argv: &VVal,
@@ -2366,8 +2393,10 @@ impl VValUserData for CursiveCounter {
     }
 }
 
+#[cfg(feature = "cursive")]
 struct CursiveStdoutWriter();
 
+#[cfg(feature = "cursive")]
 impl std::io::Write for CursiveStdoutWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         CURSIVE_STDOUT.with(|cs| {

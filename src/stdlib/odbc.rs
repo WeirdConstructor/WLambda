@@ -63,18 +63,64 @@ impl PendingResult {
     }
 }
 
-enum OdbcThreadRequest {
-    Retrieve(String, Arc<PendingResult>, bool),
+#[derive(Debug, Clone)]
+enum WParam {
+    Str(String),
+    Bytes(Vec<u8>),
+    Double(f64),
+    Bit(bool),
+    Null,
 }
 
+impl WParam {
+    fn from_vval(v: &VVal) -> Result<Self, String> {
+        match v {
+//            VVal::Lst(l) | VVal::Pair(_) => {
+//                if l.borrow().len() != 2 {
+//                    return Err(format!("Only vectors with two fields allowed for SQL parameter: {}", v.s()));
+//                }
+//            },
+            VVal::Int(_) => {
+                Ok(WParam::Str(v.s_raw()))
+            }
+            VVal::Str(_) => {
+                Ok(WParam::Str(v.s_raw()))
+            }
+            VVal::Flt(_) => {
+                Ok(WParam::Double(v.f()))
+            }
+            VVal::Byt(_) => {
+                Ok(WParam::Bytes(v.as_bytes()))
+            }
+            VVal::Bol(_) => {
+                Ok(WParam::Bit(v.b()))
+            }
+            VVal::None => {
+                Ok(WParam::Null)
+            }
+            _ => Err(format!("Unsupported value type for SQL parameter: {}", v.type_name())),
+        }
+    }
+}
+
+enum OdbcThreadRequest {
+    Retrieve(String, Option<Vec<WParam>>, Arc<PendingResult>, bool),
+    EnableManualCommit(Arc<PendingResult>),
+    Commit(Arc<PendingResult>),
+    Rollback(Arc<PendingResult>),
+}
+
+#[cfg(feature = "odbc")]
 #[derive(Clone)]
 struct OdbcHandle {
     sender: std::sync::mpsc::Sender<OdbcThreadRequest>,
 }
 
+#[cfg(feature = "odbc")]
 fn exec_and_retrieve_sql(
     con: &mut Connection,
     sql: &str,
+    input_params: Option<Vec<WParam>>,
     with_types: bool,
 ) -> Result<VVal, String> {
     let mut prep = match con.prepare(sql) {
@@ -82,7 +128,32 @@ fn exec_and_retrieve_sql(
         Err(e) => return Err(format!("SQL prepare error (query: {}): {}", sql, e)),
     };
 
-    let mut cursor = match prep.execute(()) {
+    let mut params : Vec<Box<dyn odbc_api::parameter::InputParameter>> = vec![];
+    if let Some(input_params) = input_params {
+        use odbc_api::IntoParameter;
+        for p in input_params.into_iter() {
+            match p {
+                WParam::Str(s) => {
+                    params.push(Box::new(s.into_parameter()))
+                }
+                WParam::Double(d) => {
+                    params.push(Box::new(d.into_parameter()))
+                }
+                WParam::Bytes(uv) => {
+                    params.push(Box::new(uv.into_parameter()))
+                }
+                WParam::Bit(b) => {
+                    let b : i16 = if b { 1 } else { 0 };
+                    params.push(Box::new(b.into_parameter()))
+                }
+                WParam::Null => {
+                    params.push(Box::new(odbc_api::Nullable::<i16>::null()))
+                }
+            }
+        }
+    }
+
+    let mut cursor = match prep.execute(&params[..]) {
         Ok(None) => return Ok(VVal::None),
         Err(e) => {
             return Err(format!("SQL execute error (query: {}): {}", sql, e));
@@ -120,7 +191,7 @@ fn exec_and_retrieve_sql(
         };
 
         if vtypes.is_some() {
-            vtypes.set_key_str(
+            let _ = vtypes.set_key_str(
                 names.get((i - 1) as usize).map(|x| &x[..]).unwrap_or_else(|| ""),
                 VVal::new_str_mv(format!("{:?}", r)),
             );
@@ -190,9 +261,9 @@ fn exec_and_retrieve_sql(
                 };
 
                 if let Some(key) = names.get(col_i) {
-                    row.set_key_str(key, v);
+                    let _ = row.set_key_str(key, v);
                 } else {
-                    row.set_key_str("?", v);
+                    let _ = row.set_key_str("?", v);
                 }
             }
 
@@ -215,6 +286,7 @@ fn exec_and_retrieve_sql(
     }
 }
 
+#[cfg(feature = "odbc")]
 impl OdbcHandle {
     pub fn connect(con_str: String) -> Result<Self, VVal> {
         let res = Arc::new(PendingResult::new());
@@ -244,7 +316,7 @@ impl OdbcHandle {
                 Ok(con) => con,
             };
 
-            res_thrd.send(&VVal::Bol(true));
+            let _ = res_thrd.send(&VVal::Bol(true));
 
             loop {
                 let msg = match recv.recv() {
@@ -255,8 +327,41 @@ impl OdbcHandle {
                 };
 
                 match msg {
-                    OdbcThreadRequest::Retrieve(sql, req, with_types) => {
-                        match exec_and_retrieve_sql(&mut con, &sql, with_types) {
+                    OdbcThreadRequest::EnableManualCommit(req) => {
+                        match con.set_autocommit(false) {
+                            Ok(_) => {
+                                let _ = req.send(&VVal::Bol(true));
+                            }
+                            Err(e) => {
+                                let _ = req.send(&VVal::err_msg(
+                                    &format!("Can't enable manual commit, error: {}", e)));
+                            },
+                        }
+                    }
+                    OdbcThreadRequest::Rollback(req) => {
+                        match con.rollback() {
+                            Ok(_) => {
+                                let _ = req.send(&VVal::Bol(true));
+                            }
+                            Err(e) => {
+                                let _ = req.send(&VVal::err_msg(
+                                    &format!("Can't rollback, error: {}", e)));
+                            },
+                        }
+                    }
+                    OdbcThreadRequest::Commit(req) => {
+                        match con.commit() {
+                            Ok(_) => {
+                                let _ = req.send(&VVal::Bol(true));
+                            }
+                            Err(e) => {
+                                let _ = req.send(&VVal::err_msg(
+                                    &format!("Can't commit, error: {}", e)));
+                            },
+                        }
+                    }
+                    OdbcThreadRequest::Retrieve(sql, params, req, with_types) => {
+                        match exec_and_retrieve_sql(&mut con, &sql, params, with_types) {
                             Ok(v) => {
                                 let _ = req.send(&v);
                             }
@@ -406,7 +511,7 @@ impl OdbcHandle {
             //                        Ok(None) => Ok(VVal::None),
             //                        Err(e) => {
             //                            Ok(VVal::err_msg(&format!(
-            //                                "SQL execute error (query: {}): {}",
+            //                                "SQL execute error (exec: {}): {}",
             //                                sql, e
             //                            ))))
             //                        }
@@ -414,7 +519,7 @@ impl OdbcHandle {
             //                }
             //                Err(e) => {
             //                    Ok(VVal::err_msg(&format!(
-            //                        "SQL prepare error (query: {}): {}",
+            //                        "SQL prepare error (exec: {}): {}",
             //                        sql, e
             //                    ))))
             //                }
@@ -435,6 +540,7 @@ impl OdbcHandle {
     }
 }
 
+#[cfg(feature = "odbc")]
 impl OdbcHandle {
     //    pub fn connect(&mut self, env: &mut Env, con_str: &str) -> Result<VVal, StackAction> {
     //        let res = self.env.connect_with_connection_string(&con_str);
@@ -481,11 +587,13 @@ impl OdbcHandle {
     //    }
 }
 
+#[cfg(feature = "odbc")]
 #[derive(Clone)]
 struct Odbc {
     handle: OdbcHandle,
 }
 
+#[cfg(feature = "odbc")]
 macro_rules! assert_arg_count {
     ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
         if $argv.len() != $count {
@@ -498,6 +606,7 @@ macro_rules! assert_arg_count {
     };
 }
 
+#[cfg(feature = "odbc")]
 impl Odbc {
     fn query_thread(&self, req: OdbcThreadRequest, res: Arc<PendingResult>) -> VVal {
         if let Err(e) = self.handle.sender.send(req) {
@@ -511,7 +620,7 @@ impl Odbc {
     }
 }
 
-#[cfg(feature = "cursive")]
+#[cfg(feature = "odbc")]
 impl VValUserData for Odbc {
     fn s(&self) -> String {
         format!("$<Odbc>")
@@ -527,19 +636,92 @@ impl VValUserData for Odbc {
         let argv = env.argv();
 
         match key {
-            "query_t" => {
-                assert_arg_count!("$<Odbc>", argv, 1, "query_t[sql_string]", env);
+            "set_manual_commit" => {
+                assert_arg_count!("$<Odbc>", argv, 0, "set_manual_commit[]", env);
+
                 let res = Arc::new(PendingResult::new());
                 Ok(self.query_thread(
-                    OdbcThreadRequest::Retrieve(argv.v_s_raw(0), res.clone(), true),
+                    OdbcThreadRequest::EnableManualCommit(res.clone()),
                     res,
                 ))
             }
-            "query" => {
-                assert_arg_count!("$<Odbc>", argv, 1, "query[sql_string]", env);
+            "commit" => {
+                assert_arg_count!("$<Odbc>", argv, 0, "commit[]", env);
+
                 let res = Arc::new(PendingResult::new());
                 Ok(self.query_thread(
-                    OdbcThreadRequest::Retrieve(argv.v_s_raw(0), res.clone(), false),
+                    OdbcThreadRequest::Commit(res.clone()),
+                    res,
+                ))
+            }
+            "rollback" => {
+                assert_arg_count!("$<Odbc>", argv, 0, "rollback[]", env);
+
+                let res = Arc::new(PendingResult::new());
+                Ok(self.query_thread(
+                    OdbcThreadRequest::Rollback(res.clone()),
+                    res,
+                ))
+            }
+            "exec_t" => {
+                if argv.len() <= 0 {
+                    return Err(StackAction::panic_str(
+                        format!("$<Odbc>.exec_t[sql_string, param1, ...] expects at least 1 argument"),
+                        None,
+                        env.argv(),
+                    ));
+                }
+
+                let mut params : Option<Vec<WParam>> = None;
+                for i in 1..argv.len() {
+                    match WParam::from_vval(&argv.v_(i)) {
+                        Ok(p) => {
+                            if let Some(params) = params.as_mut() {
+                                params.push(p);
+                            } else {
+                                params = Some(vec![p]);
+                            }
+                        }
+                        Err(e) => {
+                            return Ok(env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e)));
+                        }
+                    }
+                }
+
+                let res = Arc::new(PendingResult::new());
+                Ok(self.query_thread(
+                    OdbcThreadRequest::Retrieve(argv.v_s_raw(0), params, res.clone(), true),
+                    res,
+                ))
+            }
+            "exec" => {
+                if argv.len() <= 0 {
+                    return Err(StackAction::panic_str(
+                        format!("$<Odbc>.exec[sql_string, param1, ...] expects at least 1 argument"),
+                        None,
+                        env.argv(),
+                    ));
+                }
+
+                let mut params : Option<Vec<WParam>> = None;
+                for i in 1..argv.len() {
+                    match WParam::from_vval(&argv.v_(i)) {
+                        Ok(p) => {
+                            if let Some(params) = params.as_mut() {
+                                params.push(p);
+                            } else {
+                                params = Some(vec![p]);
+                            }
+                        }
+                        Err(e) => {
+                            return Ok(env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e)));
+                        }
+                    }
+                }
+
+                let res = Arc::new(PendingResult::new());
+                Ok(self.query_thread(
+                    OdbcThreadRequest::Retrieve(argv.v_s_raw(0), params, res.clone(), false),
                     res,
                 ))
             }
