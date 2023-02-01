@@ -3299,7 +3299,7 @@ impl VVal {
     }
 
     /// Returns true if this vval is containing (multiple) other VVals.
-    /// Usually true for: Maps, Vectors, Pairs and Opt.
+    /// Usually true for: Maps, Vectors and Opt.
     ///
     /// Helpful if you want to iterate through a data structure by recursively
     /// iterating over a vval. Without getting iterations over individual
