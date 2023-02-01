@@ -5042,6 +5042,11 @@ impl VVal {
         matches!(self, VVal::Str(_))
     }
 
+    /// Returns true if the VVal is a string, symbol, byte vector, byte or character.
+    pub fn is_kind_of_string(&self) -> bool {
+        matches!(self, VVal::Chr(_) | VVal::Sym(_) | VVal::Str(_) | VVal::Byt(_))
+    }
+
     pub fn is_fun(&self) -> bool {
         matches!(self, VVal::Fun(_))
     }
