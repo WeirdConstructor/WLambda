@@ -935,6 +935,31 @@ impl EvalContext {
         f.call(&mut env, args)
     }
 
+    /// Calls a wlambda method (aka function with object that provides $self and $data)
+    /// with the given `EvalContext`.
+    ///
+    /// ```
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
+    ///
+    /// let obj = VVal::map1("my_data", VVal::Int(12));
+    ///
+    /// let method_fun = &mut ctx.eval("{ $self.my_data }").unwrap();
+    /// assert_eq!(
+    ///     ctx.call_with_self(
+    ///         obj,
+    ///         method_fun,
+    ///         &vec![]).unwrap().i(),
+    ///     12);
+    /// ```
+    #[allow(dead_code)]
+    pub fn call_with_object(&mut self, obj: VVal, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
+        let mut env = self.local.borrow_mut();
+        env.with_object(obj.clone(), |env| {
+            f.call(env, args)
+        })
+    }
+
     /// Sets a global variable for the scripts to access.
     ///
     /// ```
