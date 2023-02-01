@@ -5083,6 +5083,16 @@ impl VVal {
         !matches!(self, VVal::Opt(None) | VVal::None)
     }
 
+    pub fn map_some<T, R>(&self, r: R, f: T) -> R
+        where T: FnOnce(R, &VVal) -> R
+    {
+        match self {
+            VVal::None => r,
+            VVal::Opt(Some(v)) => { f(r, &*v) },
+            _ => { f(r, self) }
+        }
+    }
+
     pub fn is_none(&self) -> bool {
         matches!(self, VVal::Opt(None) | VVal::None)
     }
