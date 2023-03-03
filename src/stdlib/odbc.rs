@@ -24,6 +24,7 @@ use odbc_api::{
     ResultSetMetadata,
 };
 
+#[allow(dead_code)]
 struct PendingResult {
     lock: Mutex<(bool, AVal)>,
     cvar: Condvar,

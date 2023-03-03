@@ -742,8 +742,6 @@ macro_rules! add_default_cb {
     }
 }
 
-use std::sync::Arc;
-
 #[cfg(feature = "cursive")]
 #[derive(Clone, Debug)]
 enum XBlockType {

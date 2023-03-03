@@ -16,8 +16,6 @@ use rumqttc::{MqttOptions, Client, QoS, Event, Packet};
 use rumqttd::{Broker, Config, Notification};
 use crate::compiler::*;
 
-use std::collections::HashMap;
-
 #[cfg(feature="rumqttc")]
 use std::sync::{Arc, Mutex};
 

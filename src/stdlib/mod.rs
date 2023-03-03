@@ -5,6 +5,7 @@ mod process;
 mod http;
 mod mqtt;
 mod cursive;
+#[allow(dead_code)]
 mod odbc;
 mod util;
 use super::compiler::*;

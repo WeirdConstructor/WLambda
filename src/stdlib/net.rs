@@ -505,7 +505,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 fd.s()))))
     }, Some(1), Some(1), false);
 
-    st.fun("net:tcp:set_timeouts", |env: &mut Env, argc: usize| {
+    st.fun("net:tcp:set_timeouts", |env: &mut Env, _argc: usize| {
         let mut socket = env.arg(0);
         let read_t     = env.arg(1);
         let write_t    = env.arg(2);

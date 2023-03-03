@@ -1032,7 +1032,7 @@ impl<A> ThreadCreator for DefaultThreadCreator<A> where A: ThreadGlobalEnvCreato
 
                 genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
                 if let Some(preloaded_files) = preloaded_files {
-                    let mut resolver =
+                    let resolver =
                         Rc::new(RefCell::new(
                             LocalFileModuleResolver::new_with_preloaded(Rc::new(RefCell::new(preloaded_files)))));
                     genv.borrow_mut().set_resolver(resolver);
