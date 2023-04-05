@@ -525,9 +525,10 @@ Smalltalk, LISP and Perl.
       - [14.2.1.3](#14213-hideablehide) hideable.hide
       - [14.2.1.4](#14214-hideableunhide) hideable.unhide
   - [14.3](#143-view-def-panel-grouping-views-in-a-panel) view-def `panel` Grouping Views in a Panel
-  - [14.4](#144-view-def-hbox-horizontal-layout) view-def `hbox` Horizontal Layout
-  - [14.5](#145-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
-  - [14.6](#146-view-def-progress-progress-bar) view-def `progress` Progress Bar
+  - [14.4](#144-view-def-list-a-list-view-with-labels) view-def `list` A List View with Labels
+  - [14.5](#145-view-def-hbox-horizontal-layout) view-def `hbox` Horizontal Layout
+  - [14.6](#146-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
+  - [14.7](#147-view-def-progress-progress-bar) view-def `progress` Progress Bar
 - [15](#15-wlambda-interpreter-cli-command-line-interface) WLambda Interpreter (CLI) Command Line Interface
   - [15.1](#151-wlambda-script-to-executable-packing) WLambda Script To Executable Packing
 
@@ -3545,7 +3546,7 @@ vector given at the input and returns it as utf8 encoded string.
 
 This is useful in combination with eg. `std:deser:csv`.
 
-```
+```wlambda
 std:assert_eq (std:str:strip_utf8_bom $b"\xEF\xBB\xBF") "";
 std:assert_eq (std:str:strip_utf8_bom (std:str:from_utf8 $b"\xEF\xBB\xBF")) "";
 ```
@@ -9949,7 +9950,7 @@ Here is an example that just makes a border around a text view:
         :panel => ${} => :textview => ${ content = "Test is framed!" };
 ```
 
-### - view-def `list` A List View with Labels
+### <a name="144-view-def-list-a-list-view-with-labels"></a>14.4 - view-def `list` A List View with Labels
 
 This view allows you to make an entry form with labels in front of views that are vertically
 arranged.
@@ -10005,7 +10006,7 @@ Here is an example of a simple configuration dialog:
     };
 ```
 
-### <a name="144-view-def-hbox-horizontal-layout"></a>14.4 - view-def `hbox` Horizontal Layout
+### <a name="145-view-def-hbox-horizontal-layout"></a>14.5 - view-def `hbox` Horizontal Layout
 
 This horizontal box is a short hand form to define a horizontal layout of
 other views. There are no auto wrap properties definable here.
@@ -10018,7 +10019,7 @@ other views. There are no auto wrap properties definable here.
     ]
 ```
 
-### <a name="145-view-def-vbox-vertical-layout"></a>14.5 - view-def `vbox` Vertical Layout
+### <a name="146-view-def-vbox-vertical-layout"></a>14.6 - view-def `vbox` Vertical Layout
 
 This vertical box is a short hand form to define a vertical layout of
 other views. There are no auto wrap properties definable here.
@@ -10031,7 +10032,7 @@ other views. There are no auto wrap properties definable here.
     ]
 ```
 
-### <a name="146-view-def-progress-progress-bar"></a>14.6 - view-def `progress` Progress Bar
+### <a name="147-view-def-progress-progress-bar"></a>14.7 - view-def `progress` Progress Bar
 
 ## <a name="15-wlambda-interpreter-cli-command-line-interface"></a>15 - WLambda Interpreter (CLI) Command Line Interface
 

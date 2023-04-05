@@ -825,6 +825,8 @@ impl VValUserData for AtomicAVal {
 /// use wlambda::threads::*;
 /// use std::sync::Arc;
 /// use std::sync::Mutex;
+/// use std::rc::Rc;
+/// use std::cell::RefCell;
 ///
 /// // For simplicity we make detached threads here and don't pass any globals.
 /// pub struct CustomThreadCreator();
@@ -835,13 +837,18 @@ impl VValUserData for AtomicAVal {
 ///     }
 ///
 ///     fn spawn(&mut self, tc: Arc<Mutex<dyn ThreadCreator>>,
+///              _module_resolver: Option<Rc<RefCell<dyn wlambda::compiler::ModuleResolver>>>,
 ///              code: String,
 ///              globals: Option<std::vec::Vec<(String, AtomicAVal)>>) -> VVal {
 ///
 ///         let tcc = tc.clone();
 ///         let hdl =
 ///             std::thread::spawn(move || {
+///                 // _module_resolver is interesting, in case you use preloaded files.
+///                 // you have a chance here to customize the ModuleResolver in the new GlobalEnv
+///                 // here and set preloaded files for it's resolver:
 ///                 let genv = GlobalEnv::new_empty_default();
+///
 ///                 genv.borrow_mut().set_thread_creator(Some(tcc.clone()));
 ///
 ///                 let mut ctx = EvalContext::new(genv);

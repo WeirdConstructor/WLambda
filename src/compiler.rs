@@ -929,6 +929,20 @@ impl EvalContext {
     ///              &vec![VVal::Int(10), VVal::Int(11)]).unwrap().i(),
     ///     21);
     /// ```
+    ///
+    /// Another example with more error handling context. See also [StackAction].
+    /// ```
+    /// use wlambda::{VVal, EvalContext};
+    /// let mut ctx = EvalContext::new_default();
+    ///
+    /// let returned_func = &mut ctx.eval("{ _ + _1 }").unwrap();
+    /// let v = match ctx.call(returned_func, &[VVal::Int(1), VVal::Int(2)]) {
+    ///     Ok(v) => v,
+    ///     Err(stack_action) => panic!("{}", stack_action),
+    /// };
+    ///
+    /// assert_eq!(v.i(), 3);
+    /// ```
     #[allow(dead_code)]
     pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
         let mut env = self.local.borrow_mut();
@@ -946,7 +960,7 @@ impl EvalContext {
     ///
     /// let method_fun = &mut ctx.eval("{ $self.my_data }").unwrap();
     /// assert_eq!(
-    ///     ctx.call_with_self(
+    ///     ctx.call_with_object(
     ///         obj,
     ///         method_fun,
     ///         &vec![]).unwrap().i(),

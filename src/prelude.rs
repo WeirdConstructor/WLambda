@@ -539,9 +539,10 @@ Smalltalk, LISP and Perl.
       - [14.2.1.3](#14213-hideablehide) hideable.hide
       - [14.2.1.4](#14214-hideableunhide) hideable.unhide
   - [14.3](#143-view-def-panel-grouping-views-in-a-panel) view-def `panel` Grouping Views in a Panel
-  - [14.4](#144-view-def-hbox-horizontal-layout) view-def `hbox` Horizontal Layout
-  - [14.5](#145-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
-  - [14.6](#146-view-def-progress-progress-bar) view-def `progress` Progress Bar
+  - [14.4](#144-view-def-list-a-list-view-with-labels) view-def `list` A List View with Labels
+  - [14.5](#145-view-def-hbox-horizontal-layout) view-def `hbox` Horizontal Layout
+  - [14.6](#146-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
+  - [14.7](#147-view-def-progress-progress-bar) view-def `progress` Progress Bar
 - [15](#15-wlambda-interpreter-cli-command-line-interface) WLambda Interpreter (CLI) Command Line Interface
   - [15.1](#151-wlambda-script-to-executable-packing) WLambda Script To Executable Packing
 
@@ -3559,7 +3560,7 @@ vector given at the input and returns it as utf8 encoded string.
 
 This is useful in combination with eg. `std:deser:csv`.
 
-```
+```wlambda
 std:assert_eq (std:str:strip_utf8_bom $b"\xEF\xBB\xBF") "";
 std:assert_eq (std:str:strip_utf8_bom (std:str:from_utf8 $b"\xEF\xBB\xBF")) "";
 ```
@@ -9318,6 +9319,16 @@ _popup-def_ = ${
 };
 ```
 
+Here is an example for a message popup:
+
+```text
+cursive.popup
+    ${ title = "Message for you!", }
+    :textview => ${ content = "Attention! You did good!" };
+```
+
+See also _view-def_ example for the "list" view futher below.
+
 ##### <a name="121236-cursiveaddscreen-view-def---screen-id"></a>12.12.3.6 - $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
 
 Creates a new screen (not visible) and instanciates the _view-def_ on a new
@@ -9933,20 +9944,83 @@ Shows the view.
 ### <a name="143-view-def-panel-grouping-views-in-a-panel"></a>14.3 - view-def `panel` Grouping Views in a Panel
 
 A panel is usually for visual separation and grouping of other views.
+This panel view is wrapping around another _view-def_.
+
+```text
+    :panel => ${ config } => _view-def_
+```
 
 ```text
     :panel => ${
+        _view-default-def_, # The default definitions a _view-def_ also has.
         title = "title of the panel", # Can be left out for no title.
+    } => _view-def_
+```
 
-        ## auto wrap properties:
-        name  = "view name",    # Assign a name for $<Cursive>.named
-        scrollable = $true,     # Make the view scrollable
-        width = :free,          # Width size definition, see above under size-def
-        height = :free,         # Height size definition, see above under size-def
+Here is an example that just makes a border around a text view:
+
+```text
+    cursive.add_layer
+        :panel => ${} => :textview => ${ content = "Test is framed!" };
+```
+
+### <a name="144-view-def-list-a-list-view-with-labels"></a>14.4 - view-def `list` A List View with Labels
+
+This view allows you to make an entry form with labels in front of views that are vertically
+arranged.
+
+```text
+    :list => ${
+        _view-default-def_, # The default definitions a _view-def_ also has.
+
+        ## This callback is called when a certain entry is selected.
+        on_select = {!(cursive, item) = @; ... },
+
+        ## A list of pairs that contain the label and the _view-def_.
+        ## If you want to add a delimiter, use `$none`.
+        childs = $[
+            $p("label 1", _view-def1_),     # Add a view
+            $none,                          # Delimiter
+            $p("label 2", _view-def2_),     # Add a view
+            ...                             # Add more views
+        ],
     }
 ```
 
-### <a name="144-view-def-hbox-horizontal-layout"></a>14.4 - view-def `hbox` Horizontal Layout
+Here is an example of a simple configuration dialog:
+
+```text
+    !CONFIG = ${
+        port1 = 12931,
+        port2 = 39392,
+    };
+
+    cursive.popup ${
+        title = "Settings",
+        width = :min => 50,
+        buttons = $[
+            $p("Next", {!(cursive) = @;
+                open_some_other_dialog_here cursive;
+            }),
+            $p("Exit", { _.quit[] })
+        ],
+    } :list => ${
+        childs = $[
+            $p("Port1", :edit => ${
+                content = CONFIG.port1, on_edit = {!(cursive, text, cursor) = @;
+                    CONFIG.port1 = int text;
+                },
+            }),
+            $p("Port2", :edit => ${
+                content = CONFIG.port2, on_edit = {!(cursive, text, cursor) = @;
+                    CONFIG.port2 = int text;
+                },
+            }),
+        ],
+    };
+```
+
+### <a name="145-view-def-hbox-horizontal-layout"></a>14.5 - view-def `hbox` Horizontal Layout
 
 This horizontal box is a short hand form to define a horizontal layout of
 other views. There are no auto wrap properties definable here.
@@ -9959,7 +10033,7 @@ other views. There are no auto wrap properties definable here.
     ]
 ```
 
-### <a name="145-view-def-vbox-vertical-layout"></a>14.5 - view-def `vbox` Vertical Layout
+### <a name="146-view-def-vbox-vertical-layout"></a>14.6 - view-def `vbox` Vertical Layout
 
 This vertical box is a short hand form to define a vertical layout of
 other views. There are no auto wrap properties definable here.
@@ -9972,7 +10046,7 @@ other views. There are no auto wrap properties definable here.
     ]
 ```
 
-### <a name="146-view-def-progress-progress-bar"></a>14.6 - view-def `progress` Progress Bar
+### <a name="147-view-def-progress-progress-bar"></a>14.7 - view-def `progress` Progress Bar
 
 ## <a name="15-wlambda-interpreter-cli-command-line-interface"></a>15 - WLambda Interpreter (CLI) Command Line Interface
 

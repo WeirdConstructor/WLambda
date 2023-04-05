@@ -1164,12 +1164,50 @@ impl Env {
 ///
 /// As WLambda is not using a VM, it uses return values of the
 /// closure call tree to handle jumping up the stack.
+///
+/// If you implement some loop that calls into WLambda, you can handle Break and Next accordingly!
+/// You could even do other nifty stuff witht the return label.
+///
+/// Here is an example how to handle a `StackAction` result in the context of a simple
+/// call:
+///```
+/// use wlambda::*;
+/// let mut ctx = EvalContext::new_default();
+///
+/// let func = ctx.eval("{ _ + _1 }").unwrap();
+/// let val = match ctx.call(&func, &[VVal::Int(1), VVal::Int(2)]) {
+///     Ok(v) => v,
+///     Err(StackAction::Return(val)) => {
+///         // ignore the label in val.0:
+///         val.1.clone()
+///     }
+///     Err(StackAction::Break(val)) => {
+///         val.as_ref().clone()
+///     }
+///     Err(StackAction::Next) => {
+///         VVal::None
+///     }
+///     Err(panic) => {
+///         // Yes, you can just print the StackAction directly too:
+///         panic!("{}", panic)
+///     }
+/// };
+///
+/// assert_eq!(val.i(), 3);
+///```
 #[derive(Clone)]
 #[allow(clippy::type_complexity)]
 pub enum StackAction {
+    /// A panic was triggered. The first value in the pair is the panic value, usually an error message.
+    /// The rest is the syntactic position information and the argument vector, if one
+    /// was available at the panic site.
     Panic(Box<(VVal, Vec<(Option<SynPos>, VVal)>)>),
+    /// A `return` was called. The second value of the pair is the return value.
+    /// The first value is the label to return to.
     Return(Box<(VVal, VVal)>),
+    /// A `break` was called with the given break value.
     Break(Box<VVal>),
+    /// A `next` was called.
     Next,
 }
 
