@@ -5782,7 +5782,7 @@ impl VVal {
     /// Creates a VVal structure from a msgpack byte vector.
     #[cfg(feature="rmp-serde")]
     pub fn from_msgpack(s: &[u8]) -> Result<VVal, String> {
-        match rmp_serde::from_read_ref(&s) {
+        match rmp_serde::from_slice(s) {
             Ok(v) => Ok(v),
             Err(e) => Err(format!("from_msgpack failed: {}", e)),
         }

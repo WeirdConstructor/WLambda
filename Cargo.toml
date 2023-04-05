@@ -28,11 +28,11 @@ fnv        = "1.0.7"
 rustyline  = { version = "6.1.2",   optional = true }
 zip        = { version = "0.6.3",   optional = true, features = ["deflate"], default-features = false }
 flate2     = { version = "1.0.25",  optional = true }
-regex      = { version = "1.3.9",   optional = true }
-chrono     = { version = "0.4.11",  optional = true }
-serde      = { version = "1.0.111", optional = true, features = ["derive"] }
-serde_json = { version = "1.0.53",  optional = true }
-rmp-serde  = { version = "0.14.3",  optional = true }
+regex      = { version = "1.7.3",   optional = true }
+chrono     = { version = "0.4.24",  optional = true }
+serde      = { version = "1.0.159", optional = true, features = ["derive"] }
+serde_json = { version = "1.0.95",  optional = true }
+rmp-serde  = { version = "1.1.1",  optional = true }
 toml       = { version = "0.5.9",   optional = true }
 mint       = { version = "0.5.5",   optional = true }
 quick-xml  = { version = "0.27.1",  optional = true }
