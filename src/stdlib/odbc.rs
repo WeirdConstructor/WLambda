@@ -216,7 +216,7 @@ fn exec_and_retrieve_sql(
         }
     };
 
-    let mut batch = row_set_cursor.fetch();
+    let batch = row_set_cursor.fetch();
     let mut in_batch = match batch {
         Ok(batch) => batch,
         Err(e) => {
@@ -271,7 +271,7 @@ fn exec_and_retrieve_sql(
             lst.push(row);
         }
 
-        let mut batch = row_set_cursor.fetch();
+        let batch = row_set_cursor.fetch();
         in_batch = match batch {
             Ok(batch) => batch,
             Err(e) => {

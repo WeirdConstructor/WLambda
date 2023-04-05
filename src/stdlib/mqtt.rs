@@ -18,6 +18,8 @@ use crate::compiler::*;
 
 #[cfg(feature="rumqttc")]
 use std::sync::{Arc, Mutex};
+#[cfg(feature="rumqttd")]
+use std::collections::HashMap;
 
 #[cfg(feature="rumqttc")]
 struct ThreadClientHandle {
@@ -288,13 +290,13 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal>  {
     servers.insert(format!("{}", 1), srv);
 
     let mut v4 = HashMap::new();
-    let mut v5 = HashMap::new();
-    let mut ws = HashMap::new();
+    let mut v5 = None;
+    let mut ws = None;
 
     match &cfg.v_s_rawk("version")[..] {
         "v4" => { v4 = servers; },
-        "v5" => { v5 = servers; },
-        "ws" => { ws = servers; },
+        "v5" => { v5 = Some(servers); },
+        "ws" => { ws = Some(servers); },
         _ => { v4 = servers; },
     }
 
@@ -309,6 +311,7 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal>  {
         ws,
         bridge: None,
         prometheus: None,
+        metrics: None,
         console,
         router: rumqttd::RouterConfig {
             instant_ack: true,
@@ -458,10 +461,10 @@ impl MQTTBroker {
             std::thread::spawn(move || {
                 loop {
                     match link_rx.recv() {
-                        Ok(a) => {
+                        Ok(_a) => {
                             ()
                         },
-                        Err(e) => {
+                        Err(_e) => {
                             break;
                         },
                     }

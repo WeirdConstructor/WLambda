@@ -15,6 +15,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 #[allow(unused_imports)]
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[cfg(feature = "cursive")]
 use cursive::utils::Counter;
@@ -742,6 +743,7 @@ macro_rules! add_default_cb {
     }
 }
 
+#[allow(dead_code)]
 #[cfg(feature = "cursive")]
 #[derive(Clone, Debug)]
 enum XBlockType {
@@ -1294,6 +1296,7 @@ impl XView {
         false
     }
 
+    #[allow(dead_code)]
     pub fn check_free_at(&self, pos: (i32, i32)) -> bool {
         for (_id, node) in self.nodes.borrow().iter() {
             if node.is_in_node(pos) {
@@ -1483,7 +1486,7 @@ impl cursive::View for XView {
             //            );
         }
 
-        if let Some((id, mouse_pos, rect)) = self.drag.as_ref() {
+        if let Some((_id, _mouse_pos, rect)) = self.drag.as_ref() {
             let mut rect = *rect;
             rect.0 += self.drag_mouse_offs.0;
             rect.1 += self.drag_mouse_offs.1;
@@ -1524,7 +1527,7 @@ impl cursive::View for XView {
             Event::Mouse { event: MouseEvent::Hold(_), position, offset }
                 if position.fits_in_rect(offset, (self.w, self.h)) =>
             {
-                if let Some((id, mouse_pos, _)) = self.drag.as_ref() {
+                if let Some((_id, mouse_pos, _)) = self.drag.as_ref() {
                     self.drag_mouse_offs = (
                         position.x as i32 - mouse_pos.x as i32,
                         position.y as i32 - mouse_pos.y as i32,
@@ -1553,7 +1556,7 @@ impl cursive::View for XView {
         }
     }
 
-    fn take_focus(&mut self, source: direction::Direction) -> Result<EventResult, CannotFocus> {
+    fn take_focus(&mut self, _source: direction::Direction) -> Result<EventResult, CannotFocus> {
         //        let rel = source.relative(direction::Orientation::Vertical);
         //        let (i, res) = if let Some((i, res)) = self
         //            .iter_mut(rel.is_none(), rel.unwrap_or(direction::Relative::Front))

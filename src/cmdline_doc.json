@@ -717,7 +717,7 @@
       "Here is an example:",
       "",
       "```wlambda",
-      "std:assert_eq (std:str:cat :a :b ~ std:str:to_lowercase \"X\") \"abX\";",
+      "std:assert_eq (std:str:cat :a :b ~ std:str:to_lowercase \"X\") \"abx\";",
       "```",
       ""
     ]
@@ -8511,7 +8511,24 @@
     ]
   ],
   [
-    "11.2.3 - std:net:udp:new _socket-addr_ [_connect-addr_]",
+    "11.2.3 - std:net:tcp:set_timeouts _socket_ _read-timeout-duration_ [_write-timeout-duration_]",
+    [
+      "",
+      "Sets the read/write timeout of that TCP _socket_. The duration can be specified as described for `std:thread:sleep`.",
+      "",
+      "```text",
+      "!socket =",
+      "    match (std:net:tcp:connect \"127.0.0.1:8328\")",
+      "        ($e err) => { panic (\"Couldn't connect: \" + str[$\\.err]) }",
+      "        socket   => $\\.socket;",
+      "",
+      "std:net:tcp:set\\_timeouts socket :ms => 250 :ms => 100;",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "11.2.4 - std:net:udp:new _socket-addr_ [_connect-addr_]",
     [
       "",
       "Creates a new UDP socket and binds it to an endpoint.  The arguments",
@@ -8561,7 +8578,7 @@
     ]
   ],
   [
-    "11.2.4 - std:net:udp:send _socket_ _data_ [_socket-addr_]",
+    "11.2.5 - std:net:udp:send _socket_ _data_ [_socket-addr_]",
     [
       "",
       "Sends the _data_ to the given _socket-addr_ or to the connected",
@@ -8578,7 +8595,7 @@
     ]
   ],
   [
-    "11.2.5 - std:net:udp:recv _socket_ [_byte-count_]",
+    "11.2.6 - std:net:udp:recv _socket_ [_byte-count_]",
     [
       "",
       "Receives _byte-count_ number of bytes from the given _socket_.",
@@ -8869,7 +8886,7 @@
     ]
   ],
   [
-    "11.5.1 - std:sys:var _variable-name_",
+    "11.5.1 - std:sys:env:var _variable-name_",
     [
       "",
       "Returns the variable contents of the environment variable _variable-name_.",
@@ -9869,8 +9886,8 @@
       "",
       "```wlambda",
       "!year_str = std:chrono:timestamp \"%Y\";",
-      "std:displayln :XXXX ~ (year_str | int) == 2022;",
-      "std:assert ~ (year_str | int) == 2022;",
+      "std:displayln :XXXX ~ (year_str | int) == 2023;",
+      "std:assert ~ (year_str | int) == 2023;",
       "",
       "!now_str = std:chrono:timestamp[];",
       "```",
@@ -10293,7 +10310,7 @@
       "!body = std:deser:json ~ std:str:from_utf8_lossy response.body;",
       "## std:displayln ~ std:ser:json body $f;",
       "std:assert_eq body.crates.0.name            \"wlambda\";",
-      "std:assert_eq response.headers.content-type \"application/json; charset=utf-8\";",
+      "std:assert_eq response.headers.content-type \"application/json\";",
       "std:assert_eq response.status               200;",
       "```",
       ""
@@ -10303,8 +10320,10 @@
     "12.9.3 - std:http:post _http-client_ _url-string_ _body-bytes_ [_headers-and-options-map_]",
     [
       "",
-      "This call is like `std:http:get` but makes a HTTP POST request with the given payload _body_. For HTTP requests with other methods please look at `std:http:request`. The rest of the options are the same as `std:http:get`. But here is an example how to",
-      "transmit a piece of JSON easily:",
+      "This call is like `std:http:get` but makes a HTTP POST request with the given",
+      "payload _body_. For HTTP requests with other methods please look at",
+      "`std:http:request`. The rest of the options are the same as `std:http:get`. But",
+      "here is an example how to transmit a piece of JSON easily:",
       "",
       "```wlambda",
       "!client = std:http:client:new[];",
@@ -10452,6 +10471,7 @@
       "!_ = cl.publish \"test/me\" $b\"test123\\xFF\";",
       "",
       "std:assert_str_eq chan.recv[] $p(:\"$WL/connected\", $n);",
+      "std:assert_str_eq chan.recv[] $p(:\"$WL/subscribed\", $n);",
       "std:assert_str_eq chan.recv[] $p(\"test/me\", $b\"test123\\xFF\");",
       "```",
       ""

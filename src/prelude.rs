@@ -392,9 +392,10 @@ Smalltalk, LISP and Perl.
   - [11.2](#112-networking) Networking
     - [11.2.1](#1121-stdnettcpconnect-socket-addr-connect-timeout) std:net:tcp:connect _socket-addr_ [_connect-timeout_]
     - [11.2.2](#1122-stdnettcplisten-socket-addr-function) std:net:tcp:listen _socket-addr_ _function_
-    - [11.2.3](#1123-stdnetudpnew-socket-addr-connect-addr) std:net:udp:new _socket-addr_ [_connect-addr_]
-    - [11.2.4](#1124-stdnetudpsend-socket-data-socket-addr) std:net:udp:send _socket_ _data_ [_socket-addr_]
-    - [11.2.5](#1125-stdnetudprecv-socket-byte-count) std:net:udp:recv _socket_ [_byte-count_]
+    - [11.2.3](#1123-stdnettcpsettimeouts-socket-read-timeout-duration-write-timeout-duration) std:net:tcp:set\_timeouts _socket_ _read-timeout-duration_ [_write-timeout-duration_]
+    - [11.2.4](#1124-stdnetudpnew-socket-addr-connect-addr) std:net:udp:new _socket-addr_ [_connect-addr_]
+    - [11.2.5](#1125-stdnetudpsend-socket-data-socket-addr) std:net:udp:send _socket_ _data_ [_socket-addr_]
+    - [11.2.6](#1126-stdnetudprecv-socket-byte-count) std:net:udp:recv _socket_ [_byte-count_]
   - [11.3](#113-processes) Processes
     - [11.3.1](#1131-stdprocessrun-executable-path-arguments---map) std:process:run _executable-path_ \[_arguments_\] -> _map_
     - [11.3.2](#1132-stdprocessspawn-executable-path-arg-vector-inheritout--inheritall) std:process:spawn _executable-path_ _arg-vector_ [:inherit\_out | :inherit\_all]
@@ -411,7 +412,7 @@ Smalltalk, LISP and Perl.
     - [11.4.7](#1147-stdfsremovedir-dir-path) std:fs:remove\_dir _dir-path_
     - [11.4.8](#1148-stdfsremovedirall-dir-path) std:fs:remove\_dir\_all _dir-path_
   - [11.5](#115-system) System
-    - [11.5.1](#1151-stdsysvar-variable-name) std:sys:var _variable-name_
+    - [11.5.1](#1151-stdsysenvvar-variable-name) std:sys:env:var _variable-name_
     - [11.5.2](#1152-stdsysos) std:sys:os
   - [11.6](#116-threading) Threading
     - [11.6.1](#1161-stdthreadspawn-string-globals-map) std:thread:spawn _string_ [_globals-map_]
@@ -1200,7 +1201,7 @@ or:
 Here is an example:
 
 ```wlambda
-std:assert_eq (std:str:cat :a :b ~ std:str:to_lowercase "X") "abX";
+std:assert_eq (std:str:cat :a :b ~ std:str:to_lowercase "X") "abx";
 ```
 
 #### <a name="252--tail-argument-function-chaninig"></a>2.5.2 - '|' Tail Argument Function Chaninig
@@ -7623,7 +7624,20 @@ unwrap ~ std:net:tcp:listen "0.0.0.0:8292" {!(socket) = @;
 
 Please note that you can share the socket with other threads, see also `std:net:tcp:connect`.
 
-#### <a name="1123-stdnetudpnew-socket-addr-connect-addr"></a>11.2.3 - std:net:udp:new _socket-addr_ [_connect-addr_]
+#### <a name="1123-stdnettcpsettimeouts-socket-read-timeout-duration-write-timeout-duration"></a>11.2.3 - std:net:tcp:set\_timeouts _socket_ _read-timeout-duration_ [_write-timeout-duration_]
+
+Sets the read/write timeout of that TCP _socket_. The duration can be specified as described for `std:thread:sleep`.
+
+```text
+!socket =
+    match (std:net:tcp:connect "127.0.0.1:8328")
+        ($e err) => { panic ("Couldn't connect: " + str[$\.err]) }
+        socket   => $\.socket;
+
+std:net:tcp:set\_timeouts socket :ms => 250 :ms => 100;
+```
+
+#### <a name="1124-stdnetudpnew-socket-addr-connect-addr"></a>11.2.4 - std:net:udp:new _socket-addr_ [_connect-addr_]
 
 Creates a new UDP socket and binds it to an endpoint.  The arguments
 _socket-addr_ and _connect-addr_ have the same properties as the _socket-addr_
@@ -7669,7 +7683,7 @@ std:assert_eq data $b"Test:XYB123";
 hdl.join[];
 ```
 
-#### <a name="1124-stdnetudpsend-socket-data-socket-addr"></a>11.2.4 - std:net:udp:send _socket_ _data_ [_socket-addr_]
+#### <a name="1125-stdnetudpsend-socket-data-socket-addr"></a>11.2.5 - std:net:udp:send _socket_ _data_ [_socket-addr_]
 
 Sends the _data_ to the given _socket-addr_ or to the connected
 address of the _socket_.
@@ -7682,7 +7696,7 @@ Returns the number of bytes sent or an error.
 std:net:udp:send socket $b"TEST" "127.0.0.1:31888";
 ```
 
-#### <a name="1125-stdnetudprecv-socket-byte-count"></a>11.2.5 - std:net:udp:recv _socket_ [_byte-count_]
+#### <a name="1126-stdnetudprecv-socket-byte-count"></a>11.2.6 - std:net:udp:recv _socket_ [_byte-count_]
 
 Receives _byte-count_ number of bytes from the given _socket_.
 If _byte-count_ is omitted 512 is assumed.
@@ -7905,7 +7919,7 @@ Returns an error if the directory does not exist.
 
 This chapter contains a few system as in _operating system_ related functions.
 
-#### <a name="1151-stdsysvar-variable-name"></a>11.5.1 - std:sys:var _variable-name_
+#### <a name="1151-stdsysenvvar-variable-name"></a>11.5.1 - std:sys:env:var _variable-name_
 
 Returns the variable contents of the environment variable _variable-name_.
 If any error occurs, this returns an error.
@@ -8708,8 +8722,8 @@ chrono Rust crate documentation: [chrono crate strftime format](https://docs.rs/
 
 ```wlambda
 !year_str = std:chrono:timestamp "%Y";
-std:displayln :XXXX ~ (year_str | int) == 2022;
-std:assert ~ (year_str | int) == 2022;
+std:displayln :XXXX ~ (year_str | int) == 2023;
+std:assert ~ (year_str | int) == 2023;
 
 !now_str = std:chrono:timestamp[];
 ```
@@ -9024,14 +9038,16 @@ Here is an example on how to use this while providing HTTP Headers:
 !body = std:deser:json ~ std:str:from_utf8_lossy response.body;
 ## std:displayln ~ std:ser:json body $f;
 std:assert_eq body.crates.0.name            "wlambda";
-std:assert_eq response.headers.content-type "application/json; charset=utf-8";
+std:assert_eq response.headers.content-type "application/json";
 std:assert_eq response.status               200;
 ```
 
 #### <a name="1293-stdhttppost-http-client-url-string-body-bytes-headers-and-options-map"></a>12.9.3 - std:http:post _http-client_ _url-string_ _body-bytes_ [_headers-and-options-map_]
 
-This call is like `std:http:get` but makes a HTTP POST request with the given payload _body_. For HTTP requests with other methods please look at `std:http:request`. The rest of the options are the same as `std:http:get`. But here is an example how to
-transmit a piece of JSON easily:
+This call is like `std:http:get` but makes a HTTP POST request with the given
+payload _body_. For HTTP requests with other methods please look at
+`std:http:request`. The rest of the options are the same as `std:http:get`. But
+here is an example how to transmit a piece of JSON easily:
 
 ```wlambda
 !client = std:http:client:new[];
@@ -9155,6 +9171,7 @@ std:thread:sleep :ms => 200;
 !_ = cl.publish "test/me" $b"test123\xFF";
 
 std:assert_str_eq chan.recv[] $p(:"$WL/connected", $n);
+std:assert_str_eq chan.recv[] $p(:"$WL/subscribed", $n);
 std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
 ```
 

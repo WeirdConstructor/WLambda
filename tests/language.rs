@@ -476,7 +476,7 @@ fn check_call_primitives() {
     assert_eq!(ve("$t[]"), "$true");
     assert_eq!(ve(":foo"), ":foo");
     assert_eq!(ve("$n[]"),
-        "EXEC ERR: Caught Panic: \"Calling $none is invalid\"\n        []\n    <compiler:s_eval>:1:3 Call []\n");
+        "EXEC ERR: Caught Panic: Calling $none is invalid\n        []\n    <compiler:s_eval>:1:3 Call []\n");
 }
 
 #[test]
@@ -1015,12 +1015,12 @@ fn check_return() {
 #[test]
 fn check_arity() {
     assert_eq!(ve("{}[1,2,3]"),
-        "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 3\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3]\n    <compiler:s_eval>:1:3 Call [1, 2, 3]\n");
+        "EXEC ERR: Caught Panic: function expects at most 0 arguments, got 3\n    <compiler:s_eval>:1:1 Func [1, 2, 3]\n    <compiler:s_eval>:1:3 Call [1, 2, 3]\n");
     assert_eq!(ve("{|3| _1 }[1,2,3]"), "2");
     assert_eq!(ve("{|3| _1 }[2,3]"),
-        "EXEC ERR: Caught Panic: \"function expects at least 3 arguments, got 2\"\n    <compiler:s_eval>:1:1 Func [2, 3]\n    <compiler:s_eval>:1:10 Call [2, 3]\n");
+        "EXEC ERR: Caught Panic: function expects at least 3 arguments, got 2\n    <compiler:s_eval>:1:1 Func [2, 3]\n    <compiler:s_eval>:1:10 Call [2, 3]\n");
     assert_eq!(ve("{|3| _1 }[2,3,4,5]"),
-        "EXEC ERR: Caught Panic: \"function expects at most 3 arguments, got 4\"\n    <compiler:s_eval>:1:1 Func [2, 3, 4, 5]\n    <compiler:s_eval>:1:10 Call [2, 3, 4, 5]\n");
+        "EXEC ERR: Caught Panic: function expects at most 3 arguments, got 4\n    <compiler:s_eval>:1:1 Func [2, 3, 4, 5]\n    <compiler:s_eval>:1:10 Call [2, 3, 4, 5]\n");
     assert_eq!(ve("{|0<4| _1 }[]"), "$n");
     assert_eq!(ve("{|0<4| _1 }[1]"), "$n");
     assert_eq!(ve("{|0<4| _1 }[1,2]"), "2");
@@ -1028,25 +1028,25 @@ fn check_arity() {
     assert_eq!(ve("(\\|0<4| _1)[1,2,3]"), "2");
     assert_eq!(ve("{|0<4| _1 }[1,2,3,4]"), "2");
     assert_eq!(ve("{|0<4| _1 }[1,2,3,4,5]"),
-        "EXEC ERR: Caught Panic: \"function expects at most 4 arguments, got 5\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:12 Call [1, 2, 3, 4, 5]\n");
+        "EXEC ERR: Caught Panic: function expects at most 4 arguments, got 5\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:12 Call [1, 2, 3, 4, 5]\n");
     assert_eq!(ve("{ @ }[1,2,3,4,5]"), "$[1,2,3,4,5]");
     assert_eq!(ve("{|2| @ }[1,2]"), "$[1,2]");
     assert_eq!(ve("{|2| @ }[1]"),
-        "EXEC ERR: Caught Panic: \"function expects at least 2 arguments, got 1\"\n    <compiler:s_eval>:1:1 Func [1]\n    <compiler:s_eval>:1:9 Call [1]\n");
+        "EXEC ERR: Caught Panic: function expects at least 2 arguments, got 1\n    <compiler:s_eval>:1:1 Func [1]\n    <compiler:s_eval>:1:9 Call [1]\n");
     assert_eq!(ve("{|2| @ }[1,2,3]"),
-        "EXEC ERR: Caught Panic: \"function expects at most 2 arguments, got 3\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3]\n    <compiler:s_eval>:1:9 Call [1, 2, 3]\n");
+        "EXEC ERR: Caught Panic: function expects at most 2 arguments, got 3\n    <compiler:s_eval>:1:1 Func [1, 2, 3]\n    <compiler:s_eval>:1:9 Call [1, 2, 3]\n");
 
     assert_eq!(ve("{!(a,b,c) = @;}[1,2,3,4]"),
-        "EXEC ERR: Caught Panic: \"function expects at most 3 arguments, got 4\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4]\n    <compiler:s_eval>:1:16 Call [1, 2, 3, 4]\n");
+        "EXEC ERR: Caught Panic: function expects at most 3 arguments, got 4\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4]\n    <compiler:s_eval>:1:16 Call [1, 2, 3, 4]\n");
     assert_eq!(ve("{_3; !(a,b,c) = @; }[1,2,3,4,5]"),
-        "EXEC ERR: Caught Panic: \"function expects at most 4 arguments, got 5\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:21 Call [1, 2, 3, 4, 5]\n");
+        "EXEC ERR: Caught Panic: function expects at most 4 arguments, got 5\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:21 Call [1, 2, 3, 4, 5]\n");
     assert_eq!(ve("{!(a,b,c) = @; _3 }[1,2,3,4,5]"),
-        "EXEC ERR: Caught Panic: \"function expects at most 4 arguments, got 5\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:20 Call [1, 2, 3, 4, 5]\n");
+        "EXEC ERR: Caught Panic: function expects at most 4 arguments, got 5\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:20 Call [1, 2, 3, 4, 5]\n");
     assert_eq!(ve("{!(a,b,c) = @; b }[1,2,3]"), "2");
     assert_eq!(ve("{!(a,b,c) = @; _3 }[1,2,3,5]"), "5");
     assert_eq!(ve("{!:global (a,b,c) = @; _3 }[1,2,3,5]"), "5");
     assert_eq!(ve("{!:global (a,b,c) = @; _3 }[1,2,3,4,5]"),
-        "EXEC ERR: Caught Panic: \"function expects at most 4 arguments, got 5\"\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:28 Call [1, 2, 3, 4, 5]\n");
+        "EXEC ERR: Caught Panic: function expects at most 4 arguments, got 5\n    <compiler:s_eval>:1:1 Func [1, 2, 3, 4, 5]\n    <compiler:s_eval>:1:28 Call [1, 2, 3, 4, 5]\n");
 }
 
 #[test]
@@ -1060,21 +1060,21 @@ fn check_error_fn_pos() {
         !l = { x 10 };
         l[];
     "#),
-    "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 1\"\n    <compiler:s_eval>:3:14 Func[x] [10]\n    <compiler:s_eval>:7:18 Call [10]\n    <compiler:s_eval>:7:14 Func[l] []\n    <compiler:s_eval>:8:10 Call []\n");
+    "EXEC ERR: Caught Panic: function expects at most 0 arguments, got 1\n    <compiler:s_eval>:3:14 Func[x] [10]\n    <compiler:s_eval>:7:18 Call [10]\n    <compiler:s_eval>:7:14 Func[l] []\n    <compiler:s_eval>:8:10 Call []\n");
 }
 
 #[test]
 fn check_error() {
     assert_eq!(ve("$e 10; 14"),
-        "EXEC ERR: Caught Panic: \"Dropped error value: 10\"\n    <compiler:s_eval>:1:4 Err 10\n");
+        "EXEC ERR: Caught Panic: Dropped error value: 10\n    <compiler:s_eval>:1:4 Err 10\n");
     assert_eq!(ve("{ { { { $e 10; 14 }[]; 3 }[]; 9 }[]; 10 }[]"),
-        "EXEC ERR: Caught Panic: \"Dropped error value: 10\"\n    <compiler:s_eval>:1:12 Err 10\n    <compiler:s_eval>:1:7 Func []\n    <compiler:s_eval>:1:20 Call []\n    <compiler:s_eval>:1:5 Func []\n    <compiler:s_eval>:1:27 Call []\n    <compiler:s_eval>:1:3 Func []\n    <compiler:s_eval>:1:34 Call []\n    <compiler:s_eval>:1:1 Func []\n    <compiler:s_eval>:1:42 Call []\n");
+        "EXEC ERR: Caught Panic: Dropped error value: 10\n    <compiler:s_eval>:1:12 Err 10\n    <compiler:s_eval>:1:7 Func []\n    <compiler:s_eval>:1:20 Call []\n    <compiler:s_eval>:1:5 Func []\n    <compiler:s_eval>:1:27 Call []\n    <compiler:s_eval>:1:3 Func []\n    <compiler:s_eval>:1:34 Call []\n    <compiler:s_eval>:1:1 Func []\n    <compiler:s_eval>:1:42 Call []\n");
     assert_eq!(ve("_? $e 10"),
         "EXEC ERR: Caught Return[lbl=$n] $e 10 [@ <compiler:s_eval>:1:7 Err]");
     assert_eq!(ve("_? { return $e 10; 10 }[]"),
         "EXEC ERR: Caught Return[lbl=$n] $e 10 [@ <compiler:s_eval>:1:16 Err]");
     assert_eq!(ve("unwrap $e 1"),
-        "EXEC ERR: Caught Panic: \"unwrap error: 1\"\n    <compiler:s_eval>:1:11 Err 1\n    <compiler:s_eval>:1:8 Call [$e 1 [@ <compiler:s_eval>:1:11 Err]]\n");
+        "EXEC ERR: Caught Panic: unwrap error: 1\n    <compiler:s_eval>:1:11 Err 1\n    <compiler:s_eval>:1:8 Call [$e 1 [@ <compiler:s_eval>:1:11 Err]]\n");
     assert_eq!(ve("unwrap 1.1"), "1.1");
     assert_eq!(ve("on_error {|4| _ + 20 } $e 19.9"), "39.9");
 
@@ -1118,17 +1118,17 @@ fn check_error() {
     assert_eq!(ve("{ $e 23 }[] | on_error {|4| _ + 21 }"), "44");
 
     assert_eq!(ve("!x = $[$e 181];"),
-        "EXEC ERR: Caught Panic: \"Error value in list element: 181\"\n    <compiler:s_eval>:1:11 Err 181\n");
+        "EXEC ERR: Caught Panic: Error value in list element: 181\n    <compiler:s_eval>:1:11 Err 181\n");
     assert_eq!(ve("!x = ${a=$e 182};"),
-        "EXEC ERR: Caught Panic: \"Error value in map value: 182\"\n    <compiler:s_eval>:1:13 Err 182\n");
+        "EXEC ERR: Caught Panic: Error value in map value: 182\n    <compiler:s_eval>:1:13 Err 182\n");
     assert_eq!(ve("!x = $[]; x.0 = $e 183;"),
-        "EXEC ERR: Caught Panic: \"Error value in map value: 183\"\n    <compiler:s_eval>:1:20 Err 183\n");
+        "EXEC ERR: Caught Panic: Error value in map value: 183\n    <compiler:s_eval>:1:20 Err 183\n");
     assert_eq!(ve("!x = ${}; x.a = $e 184;"),
-        "EXEC ERR: Caught Panic: \"Error value in map value: 184\"\n    <compiler:s_eval>:1:20 Err 184\n");
+        "EXEC ERR: Caught Panic: Error value in map value: 184\n    <compiler:s_eval>:1:20 Err 184\n");
     assert_eq!(ve("!x = $[]; x.($e 185) = 5;"),
-        "EXEC ERR: Caught Panic: \"Error value in map key: 185\"\n    <compiler:s_eval>:1:17 Err 185\n");
+        "EXEC ERR: Caught Panic: Error value in map key: 185\n    <compiler:s_eval>:1:17 Err 185\n");
     assert_eq!(ve("!x = ${}; x.($e 186) = 4;"),
-        "EXEC ERR: Caught Panic: \"Error value in map key: 186\"\n    <compiler:s_eval>:1:17 Err 186\n");
+        "EXEC ERR: Caught Panic: Error value in map key: 186\n    <compiler:s_eval>:1:17 Err 186\n");
 }
 
 #[test]
@@ -1311,7 +1311,7 @@ fn check_prelude_str() {
 #[test]
 fn check_prelude_chrono() {
     if cfg!(feature="chrono") {
-        assert_eq!(ve("std:chrono:timestamp $q$%Y$ | int"), "2022");
+        assert_eq!(ve("std:chrono:timestamp $q$%Y$ | int"), "2023");
     }
 }
 
@@ -1478,7 +1478,7 @@ fn check_prelude_regex() {
         assert_eq!(ve("
             std:re:replace_all $q/ar/ { \"mak\" } $q/foobarbarfoobararar/
         "),
-        "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 1\"\n    <compiler:s_eval>:2:39 Func [$[\"ar\"]]\n    <compiler:s_eval>:2:32 Call [\"ar\", &F{@<compiler:s_eval>:2:39 Func,ami..., \"foobarbarfoobararar\"]\n");
+        "EXEC ERR: Caught Panic: function expects at most 0 arguments, got 1\n    <compiler:s_eval>:2:39 Func [$[\"ar\"]]\n    <compiler:s_eval>:2:32 Call [\"ar\", &F{@<compiler:s_eval>:2:39 Func,ami..., \"foobarbarfoobararar\"]\n");
         assert_eq!(ve("
             std:re:replace_all $q/a+r/ { std:str:cat \"mak\" ~ std:str:len _.0 } $q/foobarbaaaarfoobaararar/
         "),
@@ -2126,31 +2126,31 @@ fn check_borrow_error() {
         !x = $[1,2,3];
         x { x.1 = _; }
     "),
-    "EXEC ERR: Caught Panic: \"Can\\'t mutate borrowed value: $[1,2,3]\"\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
+    "EXEC ERR: Caught Panic: Can't mutate borrowed value: $[1,2,3]\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
 
     assert_eq!(ve(r"
         !x = ${a=1};
         x { x.a = $[_, _1]; }
     "),
-    "EXEC ERR: Caught Panic: \"Can\\'t mutate borrowed value: ${a=1}\"\n    <compiler:s_eval>:3:11 Func[a] [1, \"a\"]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[a],...]\n");
+    "EXEC ERR: Caught Panic: Can't mutate borrowed value: ${a=1}\n    <compiler:s_eval>:3:11 Func[a] [1, \"a\"]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[a],...]\n");
 
     assert_eq!(ve(r"
         !x = $[1,2,3];
         x { std:prepend x $[_] }
     "),
-    "EXEC ERR: Caught Panic: \"Can\\'t mutate borrowed value: $[1,2,3]\"\n    <compiler:s_eval>:3:25 Call [$[1,2,3], $[1]]\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
+    "EXEC ERR: Caught Panic: Can't mutate borrowed value: $[1,2,3]\n    <compiler:s_eval>:3:25 Call [$[1,2,3], $[1]]\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
 
     assert_eq!(ve(r"
         !x = $[1,2,3];
         x { std:append x $[_] }
     "),
-    "EXEC ERR: Caught Panic: \"Can\\'t mutate borrowed value: $[1,2,3]\"\n    <compiler:s_eval>:3:24 Call [$[1,2,3], $[1]]\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
+    "EXEC ERR: Caught Panic: Can't mutate borrowed value: $[1,2,3]\n    <compiler:s_eval>:3:24 Call [$[1,2,3], $[1]]\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
 
     assert_eq!(ve(r"
         !x = $[1,2,3];
         x { std:take 2 x; _ }
     "),
-    "EXEC ERR: Caught Panic: \"Can\\'t mutate borrowed value: $[1,2,3]\"\n    <compiler:s_eval>:3:22 Call [2, $[1,2,3]]\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
+    "EXEC ERR: Caught Panic: Can't mutate borrowed value: $[1,2,3]\n    <compiler:s_eval>:3:22 Call [2, $[1,2,3]]\n    <compiler:s_eval>:3:11 Func[x] [1]\n    <compiler:s_eval>:3:11 Call [&F{@<compiler:s_eval>:3:11 Func[x],...]\n");
 }
 
 #[test]
@@ -2717,13 +2717,13 @@ fn check_accum() {
 #[test]
 fn check_error_reporting_func() {
     assert_eq!(ve("!f = {}; f 10;"),
-        "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 1\"\n    <compiler:s_eval>:1:6 Func[f] [10]\n    <compiler:s_eval>:1:12 Call [10]\n");
+        "EXEC ERR: Caught Panic: function expects at most 0 arguments, got 1\n    <compiler:s_eval>:1:6 Func[f] [10]\n    <compiler:s_eval>:1:12 Call [10]\n");
     assert_eq!(ve("!x = ${}; x.foo = {}; x.foo 10;"),
-        "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 1\"\n    <compiler:s_eval>:1:19 Func[foo] [10]\n    <compiler:s_eval>:1:29 Call [10]\n");
-    assert_eq!(ve("!x = ${(\"foo\") = {}}; x.foo 10;"),
-        "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 1\"\n    <compiler:s_eval>:1:18 Func[foo] [10]\n    <compiler:s_eval>:1:29 Call [10]\n");
+        "EXEC ERR: Caught Panic: function expects at most 0 arguments, got 1\n    <compiler:s_eval>:1:19 Func[foo] [10]\n    <compiler:s_eval>:1:29 Call [10]\n");
+    assert_eq!(ve("!x = ${(foo) = {}}; x.foo 10;"),
+        "COMPILE ERROR: <compiler:s_eval>:1:12 Compilation Error: Variable 'foo' undefined");
     assert_eq!(ve("!x = ${foo = {}}; x.foo 10;"),
-        "EXEC ERR: Caught Panic: \"function expects at most 0 arguments, got 1\"\n    <compiler:s_eval>:1:14 Func[foo] [10]\n    <compiler:s_eval>:1:25 Call [10]\n");
+        "EXEC ERR: Caught Panic: function expects at most 0 arguments, got 1\n    <compiler:s_eval>:1:14 Func[foo] [10]\n    <compiler:s_eval>:1:25 Call [10]\n");
 }
 
 #[test]
@@ -3515,7 +3515,7 @@ fn check_iter() {
     assert_eq!(v(r"
         !it = $iter $i(0,5);
         $@v it \$+ $p(_, unwrap it[]);
-    "), "Runtime error: Panic: \"unwrap empty option!\"\n        $n\n    <wlambda::eval>:3:31 Call [$o()]\n    <wlambda::eval>:3:15 Func[it] [4]\n    <wlambda::eval>:3:14 Call [&F{@<wlambda::eval>:3:15 Func[it],a...]\n");
+    "), "Runtime error: Panic: unwrap empty option!\n        $n\n    <wlambda::eval>:3:31 Call [$o()]\n    <wlambda::eval>:3:15 Func[it] [4]\n    <wlambda::eval>:3:14 Call [&F{@<wlambda::eval>:3:15 Func[it],a...]\n");
 }
 
 #[test]
@@ -3731,7 +3731,7 @@ fn check_optionals() {
     assert_eq!(ve("$o(10)[]"),              "10");
     assert_eq!(ve("$o()[]"),                "$n");
 
-    assert_eq!(ve("$o() 340"), "EXEC ERR: Caught Panic: \"Calling $none is invalid\"\n        [340]\n    <compiler:s_eval>:1:6 Call [340]\n");
+    assert_eq!(ve("$o() 340"), "EXEC ERR: Caught Panic: Calling $none is invalid\n        [340]\n    <compiler:s_eval>:1:6 Call [340]\n");
     assert_eq!(ve("$o(\"f\") \"a\" 340 4 :vvv"), "\"fa3404vvv\"");
 
     assert_eq!(ve(r"
@@ -4241,7 +4241,7 @@ fn check_formatter() {
     assert_eq!(v2s("$F\"a{}x\" 10"),                        "a10x");
     assert_eq!(v2s("$F\"a{1}{0}x\" 10 22"),                 "a2210x");
     assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22"),               format!("a{1}{0}{}x", 10, 22));
-    assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22 33"),            "Runtime error: Panic: \"function expects at most 2 arguments, got 3\"\n        [10, 22, 33]\n    <wlambda::eval>:1:16 Call [10, 22, 33]\n");
+    assert_eq!(v2s("$F\"a{1}{0}{}x\" 10 22 33"),            "Runtime error: Panic: function expects at most 2 arguments, got 3\n        [10, 22, 33]\n    <wlambda::eval>:1:16 Call [10, 22, 33]\n");
     assert_eq!(v2s("$F\"a{1}{0}{}{}x\" 10 22"),             format!("a{1}{0}{}{}x", 10, 22));
     assert_eq!(v2s("$F\"a{x}{y}x\" $i(3, 4, 5, 6)"),        "a34x");
     assert_eq!(v2s("$F\"a{zx}{xx}x\" $i(3, 4, 5, 6)"),      "a(5,3)(3,3)x");
@@ -4738,10 +4738,10 @@ fn check_regex_pattern_global() {
     assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $+ $\\ }"), "$[$[\"fff\"],$[\"ffff\"],$[\"f\"],$[\"f\"]]");
     assert_eq!(ve("$rg $+f  $q fffooffffofof { ? len[_.0] > 3 { break _.0; } }"), "\"ffff\"");
     assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { ? len[_.0] > 3 { next[]; } { $+ _.0 } }"), "$[\"fff\",\"f\",\"f\"]");
-    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught Panic: \"Dropped error value: 11\"\n    <compiler:s_eval>:1:34 Err 11\n");
+    assert_eq!(ve("$@v $rg $+f  $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught Panic: Dropped error value: 11\n    <compiler:s_eval>:1:34 Err 11\n");
 
     assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { ? len[_.0] > 3 { next[]; } { $+ _.0 } }"), "$[\"fff\",\"f\",\"f\"]");
-    assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught Panic: \"Dropped error value: 11\"\n    <compiler:s_eval>:1:49 Err 11\n");
+    assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { $e 11 }"), "EXEC ERR: Caught Panic: Dropped error value: 11\n    <compiler:s_eval>:1:49 Err 11\n");
 
     assert_eq!(ve("$@v $rg\"$^$+f\" \"ffooofffofo\" \\$+ _.0"), "$[\"ff\"]");
 
@@ -4795,7 +4795,7 @@ fn check_call_self() {
     assert_eq!(ve("$f(1,2)[]"),           "$f(1,2)");
     assert_eq!(ve("$f(1,2,3)[]"),         "$f(1,2,3)");
     assert_eq!(ve("$f(1,2,3,4)[]"),       "$f(1,2,3,4)");
-    assert_eq!(ve("$n[]"),                "EXEC ERR: Caught Panic: \"Calling $none is invalid\"\n        []\n    <compiler:s_eval>:1:3 Call []\n");
+    assert_eq!(ve("$n[]"),                "EXEC ERR: Caught Panic: Calling $none is invalid\n        []\n    <compiler:s_eval>:1:3 Call []\n");
 }
 
 #[test]
@@ -5292,9 +5292,9 @@ fn check_toml() {
 
 #[test]
 fn check_mutate_point() {
-    assert_eq!(ve("$i(0,0).0 = 3"), "EXEC ERR: Caught Panic: \"Can\\\'t mutate integer vector\"");
-    assert_eq!(ve("$f(0,0).0 = 3"), "EXEC ERR: Caught Panic: \"Can\\\'t mutate float vector\"");
-    assert_eq!(ve("$p(0,0).0 = 3"), "EXEC ERR: Caught Panic: \"Can\\\'t mutate pair\"");
+    assert_eq!(ve("$i(0,0).0 = 3"), "EXEC ERR: Caught Panic: Can't mutate integer vector");
+    assert_eq!(ve("$f(0,0).0 = 3"), "EXEC ERR: Caught Panic: Can't mutate float vector");
+    assert_eq!(ve("$p(0,0).0 = 3"), "EXEC ERR: Caught Panic: Can't mutate pair");
 }
 
 #[test]
@@ -5476,17 +5476,17 @@ fn check_process_try_wait() {
 #[test]
 fn check_div_zero() {
     assert_eq!(ve("1 % 0"),
-        "EXEC ERR: Caught Panic: \"Remainder with divisor of 0: 1%0\"\n    <compiler:s_eval>:1:3 BinOpMod [1, 0]\n");
+        "EXEC ERR: Caught Panic: Remainder with divisor of 0: 1%0\n    <compiler:s_eval>:1:3 BinOpMod [1, 0]\n");
     assert_eq!(ve("1.0 % 0.0"),
         "NaN");
     assert_eq!(ve("1 / 0"),
-        "EXEC ERR: Caught Panic: \"Division by 0: 1/0\"\n    <compiler:s_eval>:1:3 BinOpDiv [1, 0]\n");
+        "EXEC ERR: Caught Panic: Division by 0: 1/0\n    <compiler:s_eval>:1:3 BinOpDiv [1, 0]\n");
     assert_eq!(ve("1.0 / 0.0"),
         "inf");
     assert_eq!(ve("`%` 1 0"),
-        "EXEC ERR: Caught Panic: \"Remainder with divisor by 0\"\n        [1, 0]\n    <compiler:s_eval>:1:5 Call [1, 0]\n");
+        "EXEC ERR: Caught Panic: Remainder with divisor by 0\n        [1, 0]\n    <compiler:s_eval>:1:5 Call [1, 0]\n");
     assert_eq!(ve("`/` 1 0"),
-        "EXEC ERR: Caught Panic: \"Division by 0\"\n        [1, 0]\n    <compiler:s_eval>:1:5 Call [1, 0]\n");
+        "EXEC ERR: Caught Panic: Division by 0\n        [1, 0]\n    <compiler:s_eval>:1:5 Call [1, 0]\n");
 }
 
 #[test]
