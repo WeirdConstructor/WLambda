@@ -25,6 +25,7 @@ all = ["mqtt", "http", "cursive", "zip", "odbc", "clipboard"]
 
 [dependencies]
 fnv        = "1.0.7"
+weezl      = "0.1.7"
 rustyline  = { version = "6.1.2",   optional = true }
 zip        = { version = "0.6.3",   optional = true, features = ["deflate"], default-features = false }
 flate2     = { version = "1.0.25",  optional = true }

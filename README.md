@@ -625,3 +625,16 @@ without any additional terms or conditions.
 
 * Cedric Hutchings <cedhut02@gmail.com> (cedric-h on GitHub)
 
+## Attribution
+
+* src/chemical_elements.json was taken from
+  https://raw.githubusercontent.com/eliaxelang007/Periodic-Table-Rs/master/_data_formatting/final.json
+  big thanks go to Eli (Github handle eliaxelang007) for collecting this information.
+  His note about this:
+    The element data in this library primarily came from
+    [PubChem](https://pubchem.ncbi.nlm.nih.gov/periodic-table/) with some of its
+    missing fields filled in by the data from the [Royal Society of Chemistry](https://www.rsc.org/periodic-table). 
+
+    The combined and parsed element data from both these sources is in
+    [this json file](https://github.com/eliaxelang007/Periodic-Table-Rs/blob/master/_data_formatting/final.json)
+    and you can use it in your own projects if all you need is the raw element data :D

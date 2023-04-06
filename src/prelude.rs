@@ -12964,6 +12964,68 @@ pub fn std_symbol_table() -> SymbolTable {
             })
         }, Some(1), Some(1), false);
 
+    func!(st, "bytes:lzw:encode",
+        |env: &mut Env, _argc: usize| {
+            use weezl::{BitOrder, encode::Encoder};
+
+            let bitsize = env.arg(1);
+            let bitsize = if bitsize.is_none() {
+                9
+            } else {
+                bitsize.i() as u8
+            };
+
+            if bitsize < 2 || bitsize > 12 {
+                return Ok(env.new_err(format!("bytes:lzw:encode: invalid bitsize: {}", bitsize)));
+            }
+
+            let bitorder = if env.arg(2).with_s_ref(|s| s == "lsb") {
+                BitOrder::Lsb
+            } else {
+                BitOrder::Msb
+            };
+
+            env.arg(0).with_bv_ref(|bytes| {
+                match Encoder::new(bitorder, bitsize).encode(bytes) {
+                    Ok(data) => Ok(VVal::new_byt(data)),
+                    Err(e) => 
+                        Ok(env.new_err(
+                            format!("bytes:lzw:encode: {}", e)))
+                }
+            })
+        }, Some(1), Some(3), false);
+
+    func!(st, "bytes:lzw:decode",
+        |env: &mut Env, _argc: usize| {
+            use weezl::{BitOrder, decode::Decoder};
+
+            let bitsize = env.arg(1);
+            let bitsize = if bitsize.is_none() {
+                9
+            } else {
+                bitsize.i() as u8
+            };
+
+            if bitsize < 2 || bitsize > 12 {
+                return Ok(env.new_err(format!("bytes:lzw:decode: invalid bitsize: {}", bitsize)));
+            }
+
+            let bitorder = if env.arg(2).with_s_ref(|s| s == "lsb") {
+                BitOrder::Lsb
+            } else {
+                BitOrder::Msb
+            };
+
+            env.arg(0).with_bv_ref(|bytes| {
+                match Decoder::new(bitorder, bitsize).decode(bytes) {
+                    Ok(data) => Ok(VVal::new_byt(data)),
+                    Err(e) => 
+                        Ok(env.new_err(
+                            format!("bytes:lzw:decode: {}", e)))
+                }
+            })
+        }, Some(1), Some(3), false);
+
     func!(st, "copy",
         |env: &mut Env, _argc: usize| {
             Ok(env.arg(0).shallow_clone())
