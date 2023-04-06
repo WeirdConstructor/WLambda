@@ -4013,6 +4013,49 @@
     ]
   ],
   [
+    "3.11.14 - std:bytes:lzw:encode _bytes-or-string_ [_bitsize_ [_bitorder_]] -> _bytes_ | $error",
+    [
+      "",
+      "This function encodes the given _bytes-or-string_ using the LZW algorithm. You can",
+      "specify a _bitsize_ which is by default 9. It has to be within (or equal) 2 and 12.",
+      "You can also specific the bitorder (`:msb` or `:lsb`).",
+      "",
+      "If the _bitsize_ is not sufficient for encoding the given data, an `$error` is returned.",
+      "",
+      "```wlambda",
+      "std:assert_eq len[std:bytes:lzw:encode $b\"123123123123123123123123123123123123\"] 20;",
+      "std:assert_eq len[std:bytes:lzw:encode $b\"123123123123123123123123123123123123\" 6] 14;",
+      "",
+      "!text = \"123123123123123123123123123123123123\";",
+      "!data = std:bytes:lzw:encode text;",
+      "",
+      "std:assert_eq std:str:from_utf8[std:bytes:lzw:decode[data]] text;",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "3.11.15 - std:bytes:lzw:decode _bytes_ [_bitsize_ [_bitorder_]] -> _bytes_ | $error",
+    [
+      "",
+      "This function decodes the given _bytes_ and decodes them according to the LZW algorithm.",
+      "Make sure to set the right _bitsize_ and _bitorder_!",
+      "",
+      "If there is some error in the data, an `$error` is returned.",
+      "",
+      "The decoded data as bytes is returned otherwise. Here is an example:",
+      "",
+      "```wlambda",
+      "!text = \"123123123123123123123123123123123123\";",
+      "!data = std:bytes:lzw:encode text 6;",
+      "std:assert_eq len[data] 14;",
+      "",
+      "std:assert_eq std:str:from_utf8[std:bytes:lzw:decode[data, 6]] text;",
+      "```",
+      ""
+    ]
+  ],
+  [
     "3.12 - Symbols",
     [
       "",

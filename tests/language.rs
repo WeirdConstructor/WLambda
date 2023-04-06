@@ -5947,3 +5947,9 @@ fn check_prelude_deflate() {
         assert_eq!(ve("std:bytes:gzip:decode ~ std:bytes:gzip:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "$b\"AAAAAAAAAAAAAAAAAAAAAAAAAA\"");
     }
 }
+
+#[test]
+fn check_prelude_lzw() {
+    assert_eq!(ve("len ~ std:bytes:lzw:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "12");
+    assert_eq!(ve("std:bytes:lzw:decode ~ std:bytes:lzw:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "$b\"AAAAAAAAAAAAAAAAAAAAAAAAAA\"");
+}

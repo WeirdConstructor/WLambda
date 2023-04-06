@@ -198,6 +198,8 @@ Smalltalk, LISP and Perl.
     - [3.11.11](#31111-stdbytestovec-byte-vector) std:bytes:to\_vec _byte-vector_
     - [3.11.12](#31112-stdbytespack-pack-format-string-list-of-values) std:bytes:pack _pack-format-string_ _list-of-values_
     - [3.11.13](#31113-stdbytesunpack-pack-format-string-byte-vector) std:bytes:unpack _pack-format-string_ _byte-vector_
+    - [3.11.14](#31114-stdbyteslzwencode-bytes-or-string-bitsize-bitorder---bytes--error) std:bytes:lzw:encode _bytes-or-string_ [_bitsize_ [_bitorder_]] -> _bytes_ | $error
+    - [3.11.15](#31115-stdbyteslzwdecode-bytes-bitsize-bitorder---bytes--error) std:bytes:lzw:decode _bytes_ [_bitsize_ [_bitorder_]] -> _bytes_ | $error
   - [3.12](#312-symbols) Symbols
     - [3.12.1](#3121-sym-value) sym _value_
     - [3.12.2](#3122-issym-value) is\_sym _value_
@@ -3830,6 +3832,41 @@ std:assert_str_eq
         "< i16 x c3 s16 x y"
         $b"\x10\x00\x00ABC\x02\x00XY\x00This is the rest")
     $[16, $b"ABC", $b"XY", $b"This is the rest"];
+```
+
+#### <a name="31114-stdbyteslzwencode-bytes-or-string-bitsize-bitorder---bytes--error"></a>3.11.14 - std:bytes:lzw:encode _bytes-or-string_ [_bitsize_ [_bitorder_]] -> _bytes_ | $error
+
+This function encodes the given _bytes-or-string_ using the LZW algorithm. You can
+specify a _bitsize_ which is by default 9. It has to be within (or equal) 2 and 12.
+You can also specific the bitorder (`:msb` or `:lsb`).
+
+If the _bitsize_ is not sufficient for encoding the given data, an `$error` is returned.
+
+```wlambda
+std:assert_eq len[std:bytes:lzw:encode $b"123123123123123123123123123123123123"] 20;
+std:assert_eq len[std:bytes:lzw:encode $b"123123123123123123123123123123123123" 6] 14;
+
+!text = "123123123123123123123123123123123123";
+!data = std:bytes:lzw:encode text;
+
+std:assert_eq std:str:from_utf8[std:bytes:lzw:decode[data]] text;
+```
+
+#### <a name="31115-stdbyteslzwdecode-bytes-bitsize-bitorder---bytes--error"></a>3.11.15 - std:bytes:lzw:decode _bytes_ [_bitsize_ [_bitorder_]] -> _bytes_ | $error
+
+This function decodes the given _bytes_ and decodes them according to the LZW algorithm.
+Make sure to set the right _bitsize_ and _bitorder_!
+
+If there is some error in the data, an `$error` is returned.
+
+The decoded data as bytes is returned otherwise. Here is an example:
+
+```wlambda
+!text = "123123123123123123123123123123123123";
+!data = std:bytes:lzw:encode text 6;
+std:assert_eq len[data] 14;
+
+std:assert_eq std:str:from_utf8[std:bytes:lzw:decode[data, 6]] text;
 ```
 
 ### <a name="312-symbols"></a>3.12 - Symbols
