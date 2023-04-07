@@ -15,6 +15,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 #[allow(unused_imports)]
 use std::rc::Rc;
+#[allow(unused_imports)]
 use std::sync::Arc;
 
 #[cfg(feature = "cursive")]
