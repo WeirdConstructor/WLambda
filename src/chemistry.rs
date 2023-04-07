@@ -1,12 +1,65 @@
-use crate::vval::{Env, VVal, VValUserData, StackAction};
 use crate::threads::ThreadSafeUsr;
+use crate::vval::{Env, StackAction, VVal, VValUserData};
 
 use crate::parser::state::State;
 use crate::parser::state::{ParseError, ParseErrorKind};
 
-use std::fmt::Write;
 use std::sync::Arc;
+use std::cell::RefCell;
 
+thread_local! {
+    static ELEMS_DATA: RefCell<VVal> = RefCell::new(VVal::None);
+    static ELEMS_VEC: RefCell<Vec<VVal>> = RefCell::new(vec![]);
+}
+
+macro_rules! assert_arg_count {
+    ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
+        if $argv.len() != $count {
+            return Err(StackAction::panic_str(
+                format!("{}.{} expects {} arguments", $self, $function, $count),
+                None,
+                $env.argv(),
+            ));
+        }
+    };
+}
+
+fn load_elems() {
+    use weezl::{decode::Decoder, BitOrder};
+
+    let elems_data_packed = include_bytes!("chemical_elements.json.lzw");
+
+    match Decoder::new(BitOrder::Msb, 7).decode(elems_data_packed) {
+        Ok(data) => {
+            let s = String::from_utf8(data).unwrap();
+            let chemical_data_tree = VVal::from_json(&s).expect("No malformed json compiled in!");
+            let mut elems_vec = vec![];
+
+            chemical_data_tree.with_iter(|iter| {
+                for (v, _) in iter {
+                    elems_vec.push(v);
+                }
+            });
+
+            ELEMS_VEC.with(|v| {
+                (*v.borrow_mut()) = elems_vec;
+            });
+
+            ELEMS_DATA.with(|d| {
+                (*d.borrow_mut()) = chemical_data_tree;
+            });
+        }
+        Err(e) => panic!("loading chemical elements failed, this should never happen! {}", e),
+    }
+}
+
+pub fn get_elem_by_atomic_number(num: u8) -> Option<VVal> {
+    let not_loaded = ELEMS_VEC.with(|v| v.borrow().is_empty());
+    if not_loaded {
+        load_elems();
+    }
+    ELEMS_VEC.with(|v| v.borrow().get(num as usize - 1).cloned())
+}
 
 #[derive(Debug, Clone)]
 pub enum ChemFormula {
@@ -40,30 +93,37 @@ impl std::fmt::Display for ChemFormula {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ChemFormula::Element(e, num) => {
-                if *num == 1 {
-                    write!(f, "{{{}}}", e)
-                } else {
-                    write!(f, "{{{}}}{}", e, num)
-                }
+                let el = get_elem_by_atomic_number(*e).unwrap_or(VVal::None);
+                el.v_with_s_refk("symbol", |s: &str| {
+                    if *num == 1 {
+                        write!(f, "{}", s)
+                    } else {
+                        write!(f, "{}{}", s, num)
+                    }
+                })
             }
             ChemFormula::Group(seq, num) => {
-                write!(f, "(")?;
+                if *num != 1 {
+                    write!(f, "(")?;
+                }
                 for cf in seq.iter() {
                     write!(f, "{}", cf)?;
                 }
-                write!(f, ")")?;
                 if *num != 1 {
+                    write!(f, ")")?;
                     write!(f, "{}", num)?
                 }
                 Ok(())
             }
             ChemFormula::Ion(seq, num) => {
-                write!(f, "[")?;
+                if *num != 1 {
+                    write!(f, "[")?;
+                }
                 for cf in seq.iter() {
                     write!(f, "{}", cf)?;
                 }
-                write!(f, "]")?;
                 if *num != 1 {
+                    write!(f, "]")?;
                     write!(f, "{}", num)?
                 }
                 Ok(())
@@ -73,13 +133,22 @@ impl std::fmt::Display for ChemFormula {
 }
 
 impl VValUserData for ChemFormula {
-    fn s(&self) -> String { format!("$<Chem:({:?})>", *self) }
-    fn i(&self) -> i64    { self.first_atomic_number() as i64 }
+    fn s(&self) -> String {
+        format!("$<Chem:{}>", *self)
+    }
+    fn i(&self) -> i64 {
+        self.first_atomic_number() as i64
+    }
 
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
-        let args = env.argv_ref();
+        let argv = env.argv();
+
         match key {
-            "test" => Ok(VVal::Int(42)),
+            "first_elem_info" => {
+                assert_arg_count!("$<Chem>", argv, 0, "first_elem_info[]", env);
+                let num = self.first_atomic_number();
+                Ok(get_elem_by_atomic_number(num).unwrap_or(VVal::None))
+            }
             _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
         }
     }
@@ -87,14 +156,18 @@ impl VValUserData for ChemFormula {
     fn call(&self, env: &mut Env) -> Result<VVal, StackAction> {
         let args = env.argv_ref();
         if args.len() <= 0 {
-            return Err(StackAction::panic_msg(
-                format!("{} called with too few arguments", self.s())));
+            return Err(StackAction::panic_msg(format!(
+                "{} called with too few arguments",
+                self.s()
+            )));
         }
 
         Ok(args[0].clone())
     }
 
-    fn as_any(&mut self) -> &mut dyn std::any::Any { self }
+    fn as_any(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
     fn clone_ud(&self) -> Box<dyn VValUserData> {
         Box::new(self.clone())
     }
@@ -124,7 +197,7 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
                 'k' => Some((2, 97)),  // Bk: Berkelium
                 'r' => Some((2, 35)),  // Br: Bromine
                 'a' => Some((2, 56)),  // Ba: Barium
-                _ => Some((1, 5)),  // B: Boron
+                _ => Some((1, 5)),     // B: Boron
             },
             'C' | 'c' => match s.at(1) {
                 'm' => Some((2, 96)),  // Cm: Curium
@@ -138,7 +211,7 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
                 's' => Some((2, 55)),  // Cs: Cesium
                 'e' => Some((2, 58)),  // Ce: Cerium
                 'n' => Some((2, 112)), // Cn: Copernicium
-                _ => Some((1, 6)),  // C: Carbon
+                _ => Some((1, 6)),     // C: Carbon
             },
             'D' | 'd' => match s.at(1) {
                 'b' => Some((2, 105)), // Db: Dubnium
@@ -157,7 +230,7 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
                 'm' => Some((2, 100)), // Fm: Fermium
                 'e' => Some((2, 26)),  // Fe: Iron
                 'r' => Some((2, 87)),  // Fr: Francium
-                _ => Some(9),  // F: Fluorine
+                _ => Some((1, 9)),     // F: Fluorine
             },
             'G' | 'g' => match s.at(1) {
                 'd' => Some((2, 64)), // Gd: Gadolinium
@@ -171,16 +244,16 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
                 'g' => Some((2, 80)),  // Hg: Mercury
                 'f' => Some((2, 72)),  // Hf: Hafnium
                 's' => Some((2, 108)), // Hs: Hassium
-                _ => Some((1, 1)),  // H: Hydrogen
+                _ => Some((1, 1)),     // H: Hydrogen
             },
             'I' | 'i' => match s.at(1) {
                 'r' => Some((2, 77)), // Ir: Iridium
                 'n' => Some((2, 49)), // In: Indium
-                _ => Some((1, 53)), // I: Iodine
+                _ => Some((1, 53)),   // I: Iodine
             },
             'K' | 'k' => match s.at(1) {
                 'r' => Some((2, 36)), // Kr: Krypton
-                _ => Some((1, 19)), // K: Potassium
+                _ => Some((1, 19)),   // K: Potassium
             },
             'L' | 'l' => match s.at(1) {
                 'i' => Some((2, 3)),   // Li: Lithium
@@ -208,12 +281,12 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
                 'a' => Some((2, 11)),  // Na: Sodium
                 'o' => Some((2, 102)), // No: Nobelium
                 'd' => Some((2, 60)),  // Nd: Neodymium
-                _ => Some((1, 7)),  // N: Nitrogen
+                _ => Some((1, 7)),     // N: Nitrogen
             },
             'O' | 'o' => match s.at(1) {
                 's' => Some((2, 76)),  // Os: Osmium
                 'g' => Some((2, 118)), // Og: Oganesson
-                _ => Some((1, 8)),  // O: Oxygen
+                _ => Some((1, 8)),     // O: Oxygen
             },
             'P' | 'p' => match s.at(1) {
                 'r' => Some((2, 59)), // Pr: Praseodymium
@@ -224,7 +297,7 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
                 'b' => Some((2, 82)), // Pb: Lead
                 'd' => Some((2, 46)), // Pd: Palladium
                 'u' => Some((2, 94)), // Pu: Plutonium
-                _ => Some((1, 15)), // P: Phosphorus
+                _ => Some((1, 15)),   // P: Phosphorus
             },
             'R' | 'r' => match s.at(1) {
                 'e' => Some((2, 75)),  // Re: Rhenium
@@ -246,7 +319,7 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
                 'r' => Some((2, 38)),  // Sr: Strontium
                 'n' => Some((2, 50)),  // Sn: Tin
                 'b' => Some((2, 51)),  // Sb: Antimony
-                _ => Some((1, 16)), // S: Sulfur
+                _ => Some((1, 16)),    // S: Sulfur
             },
             'T' | 't' => match s.at(1) {
                 's' => Some((2, 117)), // Ts: Tennessine
@@ -271,7 +344,7 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
             'Z' | 'z' => match s.at(1) {
                 'n' => Some((2, 30)), // Zn: Zinc
                 'r' => Some((2, 40)), // Zr: Zirconium
-                _ => Some((1, 39)), // Y: Yttrium
+                _ => Some((1, 39)),   // Y: Yttrium
             },
             'U' | 'u' => Some((1, 92)), // U: Uranium
             'V' | 'v' => Some((1, 23)), // V: Vanadium
@@ -321,11 +394,12 @@ fn try_parse_number(ps: &mut State) -> Result<Option<u32>, ParseError> {
             '0'..='9' => {
                 let num = ps.take_while(|c| c.is_digit(10)).to_string();
                 if let Ok(cn) = u32::from_str_radix(&num, 10) {
+                    ps.skip_ws_and_comments();
                     Ok(Some(cn))
                 } else {
                     Err(ps.err(ParseErrorKind::UnexpectedToken(
                         '?',
-                        "Can't parse number in sum formula!"
+                        "Can't parse number in sum formula!",
                     )))
                 }
             }
