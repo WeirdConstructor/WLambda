@@ -86,10 +86,11 @@ impl VValUserData for ChemFormula {
 
     fn call(&self, env: &mut Env) -> Result<VVal, StackAction> {
         let args = env.argv_ref();
-        if args.len() < 0 {
+        if args.len() <= 0 {
             return Err(StackAction::panic_msg(
                 format!("{} called with too few arguments", self.s())));
         }
+
         Ok(args[0].clone())
     }
 
@@ -156,13 +157,13 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
                 'm' => Some((2, 100)), // Fm: Fermium
                 'e' => Some((2, 26)),  // Fe: Iron
                 'r' => Some((2, 87)),  // Fr: Francium
-                _ => None,
+                _ => Some(9),  // F: Fluorine
             },
             'G' | 'g' => match s.at(1) {
                 'd' => Some((2, 64)), // Gd: Gadolinium
                 'e' => Some((2, 32)), // Ge: Germanium
                 'a' => Some((2, 31)), // Ga: Gallium
-                _ => Some((1, 9)),  // F: Fluorine
+                _ => None,
             },
             'H' | 'h' => match s.at(1) {
                 'e' => Some((2, 2)),   // He: Helium
@@ -383,8 +384,6 @@ fn parse_sequence(ps: &mut State) -> Result<Vec<ChemFormula>, ParseError> {
 
 pub fn parse_chemical_sum_formula(s: &str) -> Result<VVal, ParseError> {
     let mut ps = State::new_verbatim(s, "<chemical-sum-formula>");
-
-    let res = VVal::map();
 
     let seq = parse_sequence(&mut ps)?;
     if seq.len() == 0 {

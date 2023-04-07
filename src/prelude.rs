@@ -13548,6 +13548,20 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(1), Some(2), false);
 
+    func!(st, "chem:parse",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_s_ref(|s| {
+                match crate::chemistry::parse_chemical_sum_formula(s) {
+                    Ok(form) => Ok(form),
+                    Err(e) => {
+                        Ok(env.new_err(
+                            format!("bad chemical sum formula ({}): {}",
+                                    s, e)))
+                    }
+                }
+            })
+        }, Some(1), Some(1), false);
+
     crate::stdlib::add_to_symtable(&mut st);
 
     st
