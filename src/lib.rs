@@ -643,6 +643,7 @@ pub mod vval_user_obj;
 pub mod selector;
 pub mod struct_pattern;
 pub mod formatter;
+pub mod chemistry;
 mod packer;
 mod prog_writer;
 mod io;
