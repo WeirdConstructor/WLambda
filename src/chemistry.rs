@@ -4,8 +4,8 @@ use crate::vval::{Env, StackAction, VVal, VValUserData};
 use crate::parser::state::State;
 use crate::parser::state::{ParseError, ParseErrorKind};
 
-use std::sync::Arc;
 use std::cell::RefCell;
+use std::sync::Arc;
 
 thread_local! {
     static ELEMS_DATA: RefCell<VVal> = RefCell::new(VVal::None);
@@ -69,6 +69,41 @@ pub enum ChemFormula {
 }
 
 impl ChemFormula {
+    pub fn atomic_numbers(&self, out: &mut Vec<u8>) {
+        match self {
+            ChemFormula::Element(anum, _) => {
+                if !out.contains(anum) {
+                    out.push(*anum);
+                }
+            }
+            ChemFormula::Ion(seq, _) | ChemFormula::Group(seq, _) => {
+                for cf in seq.iter() {
+                    cf.atomic_numbers(out);
+                }
+            }
+        }
+    }
+
+    pub fn atoms(&self, out: &mut Vec<(u8, u32)>, factor: u32) {
+        match self {
+            ChemFormula::Element(anum, count) => {
+                for (num, ncount) in out.iter_mut() {
+                    if *num == *anum {
+                        *ncount += factor * *count;
+                        return;
+                    }
+                }
+
+                out.push((*anum, factor * *count));
+            }
+            ChemFormula::Ion(seq, count) | ChemFormula::Group(seq, count) => {
+                for cf in seq.iter() {
+                    cf.atoms(out, factor * *count);
+                }
+            }
+        }
+    }
+
     pub fn first_atomic_number(&self) -> u8 {
         match self {
             ChemFormula::Element(anum, _) => *anum,
@@ -148,6 +183,37 @@ impl VValUserData for ChemFormula {
                 assert_arg_count!("$<Chem>", argv, 0, "first_elem_info[]", env);
                 let num = self.first_atomic_number();
                 Ok(get_elem_by_atomic_number(num).unwrap_or(VVal::None))
+            }
+            "summary" => {
+                assert_arg_count!("$<Chem>", argv, 0, "summary[]", env);
+                let mut nums = vec![];
+                self.atomic_numbers(&mut nums);
+                let v = VVal::vec();
+                for anum in nums.iter() {
+                    v.push(get_elem_by_atomic_number(*anum).unwrap_or(VVal::None));
+                }
+                Ok(v)
+            }
+            "for_each_element" => {
+                assert_arg_count!("$<Chem>", argv, 1, "for_each_element[function]", env);
+                let mut nums = vec![];
+                self.atoms(&mut nums, 1);
+
+                let fun = argv.v_(0);
+                fun.disable_function_arity();
+
+                for (anum, count) in nums.iter() {
+                    let info = get_elem_by_atomic_number(*anum).unwrap_or(VVal::None);
+                    match fun.call(env, &[VVal::Int(*anum as i64), VVal::Int(*count as i64), info])
+                    {
+                        Ok(_) => (),
+                        Err(StackAction::Return(_)) => (),
+                        Err(StackAction::Break(_)) => break,
+                        Err(StackAction::Next) => continue,
+                        Err(a) => return Err(a),
+                    }
+                }
+                Ok(VVal::None)
             }
             _ => Ok(VVal::err_msg(&format!("Unknown method called: {}", key))),
         }

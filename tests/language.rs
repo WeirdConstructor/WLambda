@@ -5953,3 +5953,13 @@ fn check_prelude_lzw() {
     assert_eq!(ve("len ~ std:bytes:lzw:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "12");
     assert_eq!(ve("std:bytes:lzw:decode ~ std:bytes:lzw:encode $q'AAAAAAAAAAAAAAAAAAAAAAAAAA'"), "$b\"AAAAAAAAAAAAAAAAAAAAAAAAAA\"");
 }
+
+#[test]
+fn check_chem() {
+    assert_eq!(ve("!c = std:chem:parse :FeH2O; c.first_atomic_number[]"), "1");
+    assert!(false, "For each element, make a parse for it appearing alone and one for a combination");
+    assert_eq!(ve("(std:chem:parse :H2OFe3).canonical_hill[]"), "$<Chem:Fe3H2O>");
+    assert_eq!(ve("(std:chem:parse :H2Fe3O).canonical[]"), "$<Chem:H2OFe3>");
+    assert_eq!(ve("(std:chem:parse :H2Fe3O).canonical[]"), "$<Chem:H2OFe3>");
+    assert_eq!(ve(r#"!sum_formula = std:chem:parse "c14 (h19)2 n o2 cl h"; $@i sum_formula.for_each_element \$+ _2.atomic_mass * _1"#), "?");
+}
