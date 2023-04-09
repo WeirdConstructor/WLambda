@@ -1346,7 +1346,7 @@ std:assert_eq r "0000000abc";
 
 That means, writing `f <& a <& x` becomes `f[a[x]]` or `(f (a x))`.
 
-#### <a name="258-reverse-argument-apply-pipe-list--fun"></a>2.5.8 - Reverse Argument Apply Pipe `list &@> fun`
+#### <a name="258-reverse-argument-apply-pipe-list--fun"></a>2.5.8 - Reverse Argument Apply Pipe `fun <@& list`
 
 This operator is like `<&`. But it will call the function with the elements
 in the given _list_ as arguments.

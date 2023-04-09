@@ -13567,6 +13567,64 @@ pub fn std_symbol_table() -> SymbolTable {
             })
         }, Some(1), Some(1), false);
 
+    func!(st, "min",
+        |env: &mut Env, argc: usize| {
+            if env.arg(0).is_float() {
+                let mut r = env.arg(0).f();
+
+                for i in 1..argc {
+                    r = r.min(env.arg(i).f());
+                }
+
+                Ok(VVal::Flt(r))
+            } else if env.arg(0).is_int() {
+                let mut r = env.arg(0).i();
+
+                for i in 1..argc {
+                    r = r.min(env.arg(i).i());
+                }
+
+                Ok(VVal::Int(r))
+            } else {
+                let mut r = env.arg(0).s_raw();
+
+                for i in 1..argc {
+                    r = r.min(env.arg(i).s_raw());
+                }
+
+                Ok(VVal::new_str_mv(r))
+            }
+        }, None, None, false);
+
+    func!(st, "max",
+        |env: &mut Env, argc: usize| {
+            if env.arg(0).is_float() {
+                let mut r = env.arg(0).f();
+
+                for i in 1..argc {
+                    r = r.max(env.arg(i).f());
+                }
+
+                Ok(VVal::Flt(r))
+            } else if env.arg(0).is_int() {
+                let mut r = env.arg(0).i();
+
+                for i in 1..argc {
+                    r = r.max(env.arg(i).i());
+                }
+
+                Ok(VVal::Int(r))
+            } else {
+                let mut r = env.arg(0).s_raw();
+
+                for i in 1..argc {
+                    r = r.max(env.arg(i).s_raw());
+                }
+
+                Ok(VVal::new_str_mv(r))
+            }
+        }, None, None, false);
+
     crate::stdlib::add_to_symtable(&mut st);
 
     st
