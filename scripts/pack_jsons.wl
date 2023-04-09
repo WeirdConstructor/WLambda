@@ -6,5 +6,5 @@
                 (std:deser:json
                     (std:io:file:read_text "src/chemical_elements.json"))
                     $true))
-        7;
+        8;
 std:io:file:write_safe "src/chemical_elements.json.lzw" packed;

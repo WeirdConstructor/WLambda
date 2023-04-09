@@ -29,7 +29,7 @@ fn load_elems() {
 
     let elems_data_packed = include_bytes!("chemical_elements.json.lzw");
 
-    match Decoder::new(BitOrder::Msb, 7).decode(elems_data_packed) {
+    match Decoder::new(BitOrder::Msb, 8).decode(elems_data_packed) {
         Ok(data) => {
             let s = String::from_utf8(data).unwrap();
             let chemical_data_tree = VVal::from_json(&s).expect("No malformed json compiled in!");
@@ -405,12 +405,12 @@ fn try_parse_element(ps: &mut State) -> Option<u8> {
             },
             'Y' | 'y' => match s.at(1) {
                 'b' => Some((2, 70)), // Yb: Ytterbium
-                _ => None,
+                _ => Some((1, 39)),   // Y: Yttrium
             },
             'Z' | 'z' => match s.at(1) {
                 'n' => Some((2, 30)), // Zn: Zinc
                 'r' => Some((2, 40)), // Zr: Zirconium
-                _ => Some((1, 39)),   // Y: Yttrium
+                _ => None,
             },
             'U' | 'u' => Some((1, 92)), // U: Uranium
             'V' | 'v' => Some((1, 23)), // V: Vanadium
@@ -520,6 +520,23 @@ fn parse_sequence(ps: &mut State) -> Result<Vec<ChemFormula>, ParseError> {
     }
 
     Ok(ret)
+}
+
+pub fn get_periodic_table_data() -> VVal {
+    let not_loaded = ELEMS_VEC.with(|v| v.borrow().is_empty());
+    if not_loaded {
+        load_elems();
+    }
+
+    let ret = VVal::vec();
+
+    ELEMS_VEC.with(|v| {
+        for elem in v.borrow().iter() {
+            ret.push(elem.clone());
+        }
+    });
+
+    ret
 }
 
 pub fn parse_chemical_sum_formula(s: &str) -> Result<VVal, ParseError> {

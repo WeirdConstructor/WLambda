@@ -13548,6 +13548,11 @@ pub fn std_symbol_table() -> SymbolTable {
             }
         }, Some(1), Some(2), false);
 
+    func!(st, "chem:data",
+        |_env: &mut Env, _argc: usize| {
+            Ok(crate::chemistry::get_periodic_table_data())
+        }, Some(0), Some(0), false);
+
     func!(st, "chem:parse",
         |env: &mut Env, _argc: usize| {
             env.arg(0).with_s_ref(|s| {
