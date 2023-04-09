@@ -345,6 +345,22 @@ impl VValUserData for ChemFormula {
                 assert_arg_count!("$<Chem>", argv, 0, "canonical_hill[]", env);
                 Ok(VVal::new_usr(self.to_canonical_hill_order()))
             }
+            "mass" => {
+                assert_arg_count!("$<Chem>", argv, 0, "mass[]", env);
+
+                let mut res = 0.0;
+
+                let mut nums = vec![];
+                self.atoms(&mut nums, 1);
+
+                for (anum, count) in nums.iter() {
+                    let info = get_elem_by_atomic_number(*anum).unwrap_or(VVal::None);
+                    let mass = info.v_fk("atomic_mass");
+                    res += mass * *count as f64;
+                }
+
+                Ok(VVal::Flt(res))
+            }
             "summary" => {
                 assert_arg_count!("$<Chem>", argv, 0, "summary[]", env);
                 let mut nums = vec![];
