@@ -12,6 +12,137 @@ thread_local! {
     static ELEMS_VEC: RefCell<Vec<VVal>> = RefCell::new(vec![]);
 }
 
+#[allow(dead_code)]
+static ELEMS_ORDER_HILL: [u8; 118] = [
+    6,   // C
+    1,   // H
+    89,  // Ac
+    47,  // Ag
+    13,  // Al
+    95,  // Am
+    18,  // Ar
+    33,  // As
+    85,  // At
+    79,  // Au
+    5,   // B
+    56,  // Ba
+    4,   // Be
+    107, // Bh
+    83,  // Bi
+    97,  // Bk
+    35,  // Br
+    20,  // Ca
+    48,  // Cd
+    58,  // Ce
+    98,  // Cf
+    17,  // Cl
+    96,  // Cm
+    112, // Cn
+    27,  // Co
+    24,  // Cr
+    55,  // Cs
+    29,  // Cu
+    105, // Db
+    110, // Ds
+    66,  // Dy
+    68,  // Er
+    99,  // Es
+    63,  // Eu
+    9,   // F
+    26,  // Fe
+    114, // Fl
+    100, // Fm
+    87,  // Fr
+    31,  // Ga
+    64,  // Gd
+    32,  // Ge
+    2,   // He
+    72,  // Hf
+    80,  // Hg
+    67,  // Ho
+    108, // Hs
+    53,  // I
+    49,  // In
+    77,  // Ir
+    19,  // K
+    36,  // Kr
+    57,  // La
+    3,   // Li
+    103, // Lr
+    71,  // Lu
+    116, // Lv
+    115, // Mc
+    101, // Md
+    12,  // Mg
+    25,  // Mn
+    42,  // Mo
+    109, // Mt
+    7,   // N
+    11,  // Na
+    41,  // Nb
+    60,  // Nd
+    10,  // Ne
+    113, // Nh
+    28,  // Ni
+    102, // No
+    93,  // Np
+    8,   // O
+    118, // Og
+    76,  // Os
+    15,  // P
+    91,  // Pa
+    82,  // Pb
+    46,  // Pd
+    61,  // Pm
+    84,  // Po
+    59,  // Pr
+    78,  // Pt
+    94,  // Pu
+    88,  // Ra
+    37,  // Rb
+    75,  // Re
+    104, // Rf
+    111, // Rg
+    45,  // Rh
+    86,  // Rn
+    44,  // Ru
+    16,  // S
+    51,  // Sb
+    21,  // Sc
+    34,  // Se
+    106, // Sg
+    14,  // Si
+    62,  // Sm
+    50,  // Sn
+    38,  // Sr
+    73,  // Ta
+    65,  // Tb
+    43,  // Tc
+    52,  // Te
+    90,  // Th
+    22,  // Ti
+    81,  // Tl
+    69,  // Tm
+    117, // Ts
+    92,  // U
+    23,  // V
+    74,  // W
+    54,  // Xe
+    39,  // Y
+    70,  // Yb
+    30,  // Zn
+    40,  // Zr
+];
+
+static ELEMS_ORDER_MAP_HILL: [u8; 118] = [
+    1, 42, 53, 12, 10, 0, 63, 72, 34, 67, 64, 59, 4, 97, 75, 92, 21, 6, 50, 17, 94, 106, 111, 25,
+    60, 35, 24, 69, 27, 116, 39, 41, 7, 95, 16, 51, 85, 100, 114, 117, 65, 61, 103, 91, 89, 78, 3,
+    18, 48, 99, 93, 104, 47, 113, 26, 11, 52, 19, 81, 66, 79, 98, 33, 40, 102, 30, 45, 31, 108,
+    115, 55, 43, 101, 112, 86, 74, 49, 82, 9, 44, 107, 77, 14, 80, 8, 90, 38, 84, 2, 105, 76, 110,
+    71, 83, 5, 22, 15, 20, 32, 37, 58, 70, 54, 87, 28, 96, 13, 46, 62, 29, 88, 23, 68, 36, 57, 56,
+    109, 73,
+];
+
 macro_rules! assert_arg_count {
     ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
         if $argv.len() != $count {
@@ -82,6 +213,28 @@ impl ChemFormula {
                 }
             }
         }
+    }
+
+    pub fn to_canonical_hill_order(&self) -> Self {
+        let mut nums: Vec<(u8, u32)> = vec![];
+        self.atoms(&mut nums, 1);
+        nums.sort_by(|a: &(u8, u32), b: &(u8, u32)| {
+            ELEMS_ORDER_MAP_HILL[(a.0 - 1) as usize].cmp(&ELEMS_ORDER_MAP_HILL[(b.0 - 1) as usize])
+        });
+        let group: Vec<ChemFormula> =
+            nums.iter().map(|(num, count)| ChemFormula::Element(*num, *count)).collect();
+
+        ChemFormula::Group(Arc::new(group), 1)
+    }
+
+    pub fn to_canonical_order(&self) -> Self {
+        let mut nums: Vec<(u8, u32)> = vec![];
+        self.atoms(&mut nums, 1);
+        nums.sort_by(|a: &(u8, u32), b: &(u8, u32)| a.0.cmp(&b.0));
+        let group: Vec<ChemFormula> =
+            nums.iter().map(|(num, count)| ChemFormula::Element(*num, *count)).collect();
+
+        ChemFormula::Group(Arc::new(group), 1)
     }
 
     pub fn atoms(&self, out: &mut Vec<(u8, u32)>, factor: u32) {
@@ -183,6 +336,14 @@ impl VValUserData for ChemFormula {
                 assert_arg_count!("$<Chem>", argv, 0, "first_elem_info[]", env);
                 let num = self.first_atomic_number();
                 Ok(get_elem_by_atomic_number(num).unwrap_or(VVal::None))
+            }
+            "canonical" => {
+                assert_arg_count!("$<Chem>", argv, 0, "canonical[]", env);
+                Ok(VVal::new_usr(self.to_canonical_order()))
+            }
+            "canonical_hill" => {
+                assert_arg_count!("$<Chem>", argv, 0, "canonical_hill[]", env);
+                Ok(VVal::new_usr(self.to_canonical_hill_order()))
             }
             "summary" => {
                 assert_arg_count!("$<Chem>", argv, 0, "summary[]", env);

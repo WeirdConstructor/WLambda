@@ -6450,7 +6450,13 @@ fn check_chem() {
     assert_eq!(ve("std:chem:parse :OtsFe"), "$<Chem:OTsFe>");
     assert_eq!(ve("std:chem:parse :OogFe"), "$<Chem:OOgFe>");
 
-    assert_eq!(ve("(std:chem:parse :H2OFe3).canonical_hill[]"), "$<Chem:Fe3H2O>");
     assert_eq!(ve("(std:chem:parse :H2Fe3O).canonical[]"), "$<Chem:H2OFe3>");
-    assert_eq!(ve("(std:chem:parse :H2Fe3O).canonical[]"), "$<Chem:H2OFe3>");
+    assert_eq!(ve("(std:chem:parse \"H2(Zr3La9)2Fe3O\").canonical[]"), "$<Chem:H2OFe3Zr6La18>");
+    assert_eq!(ve("(std:chem:parse :H2Fe3O).canonical_hill[]"), "$<Chem:H2Fe3O>");
+    assert_eq!(ve("(std:chem:parse \"H2(Zr3La9)2Fe3O\").canonical_hill[]"), "$<Chem:H2Fe3La18OZr6>");
+    assert_eq!(ve("(std:chem:parse :H2OFe3).canonical_hill[]"), "$<Chem:H2Fe3O>");
+    assert_eq!(ve("(std:chem:parse \"(h19)2 n o2 cl h c14\").canonical_hill[]"), "$<Chem:C14H39ClNO2>");
+    assert_eq!(ve("!s = $@s iter e std:chem:data[] { $+ e.symbol }; (std:chem:parse s).canonical_hill[]"),
+"$<Chem:CHAcAgAlAmArAsAtAuBBaBeBhBiBkBrCaCdCeCfClCmCnCoCrCsCuDbDsDyErEsEuFFeFlFmFrGaGdGeHeHfHgHoHsIInIrKKrLaLiLrLuLvMcMdMgMnMoMtNNaNbNdNeNhNiNoNpOOgOsPPaPbPdPmPoPrPtPuRaRbReRfRgRhRnRuSSbScSeSgSiSmSnSrTaTbTcTeThTiTlTmTsUVWXeYYbZnZr>");
+
 }
