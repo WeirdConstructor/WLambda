@@ -21,7 +21,7 @@ use std::sync::{Arc, Condvar, Mutex};
 #[cfg(feature = "odbc")]
 use odbc_api::{
     buffers::Indicator, buffers::TextRowSet, handles::DataType, Connection, Cursor, Environment,
-    ResultSetMetadata,
+    ResultSetMetadata, buffers::{BufferDesc, ColumnarAnyBuffer}, U16String,
 };
 
 #[allow(dead_code)]
@@ -76,29 +76,17 @@ enum WParam {
 impl WParam {
     fn from_vval(v: &VVal) -> Result<Self, String> {
         match v {
-//            VVal::Lst(l) | VVal::Pair(_) => {
-//                if l.borrow().len() != 2 {
-//                    return Err(format!("Only vectors with two fields allowed for SQL parameter: {}", v.s()));
-//                }
-//            },
-            VVal::Int(_) => {
-                Ok(WParam::Str(v.s_raw()))
-            }
-            VVal::Str(_) => {
-                Ok(WParam::Str(v.s_raw()))
-            }
-            VVal::Flt(_) => {
-                Ok(WParam::Double(v.f()))
-            }
-            VVal::Byt(_) => {
-                Ok(WParam::Bytes(v.as_bytes()))
-            }
-            VVal::Bol(_) => {
-                Ok(WParam::Bit(v.b()))
-            }
-            VVal::None => {
-                Ok(WParam::Null)
-            }
+            //            VVal::Lst(l) | VVal::Pair(_) => {
+            //                if l.borrow().len() != 2 {
+            //                    return Err(format!("Only vectors with two fields allowed for SQL parameter: {}", v.s()));
+            //                }
+            //            },
+            VVal::Int(_) => Ok(WParam::Str(v.s_raw())),
+            VVal::Str(_) => Ok(WParam::Str(v.s_raw())),
+            VVal::Flt(_) => Ok(WParam::Double(v.f())),
+            VVal::Byt(_) => Ok(WParam::Bytes(v.as_bytes())),
+            VVal::Bol(_) => Ok(WParam::Bit(v.b())),
+            VVal::None => Ok(WParam::Null),
             _ => Err(format!("Unsupported value type for SQL parameter: {}", v.type_name())),
         }
     }
@@ -114,6 +102,7 @@ enum OdbcThreadRequest {
 #[cfg(feature = "odbc")]
 #[derive(Clone)]
 struct OdbcHandle {
+    slow: bool,
     sender: std::sync::mpsc::Sender<OdbcThreadRequest>,
 }
 
@@ -129,27 +118,19 @@ fn exec_and_retrieve_sql(
         Err(e) => return Err(format!("SQL prepare error (query: {}): {}", sql, e)),
     };
 
-    let mut params : Vec<Box<dyn odbc_api::parameter::InputParameter>> = vec![];
+    let mut params: Vec<Box<dyn odbc_api::parameter::InputParameter>> = vec![];
     if let Some(input_params) = input_params {
         use odbc_api::IntoParameter;
         for p in input_params.into_iter() {
             match p {
-                WParam::Str(s) => {
-                    params.push(Box::new(s.into_parameter()))
-                }
-                WParam::Double(d) => {
-                    params.push(Box::new(d.into_parameter()))
-                }
-                WParam::Bytes(uv) => {
-                    params.push(Box::new(uv.into_parameter()))
-                }
+                WParam::Str(s) => params.push(Box::new(s.into_parameter())),
+                WParam::Double(d) => params.push(Box::new(d.into_parameter())),
+                WParam::Bytes(uv) => params.push(Box::new(uv.into_parameter())),
                 WParam::Bit(b) => {
-                    let b : i16 = if b { 1 } else { 0 };
+                    let b: i16 = if b { 1 } else { 0 };
                     params.push(Box::new(b.into_parameter()))
                 }
-                WParam::Null => {
-                    params.push(Box::new(odbc_api::Nullable::<i16>::null()))
-                }
+                WParam::Null => params.push(Box::new(odbc_api::Nullable::<i16>::null())),
             }
         }
     }
@@ -234,6 +215,7 @@ fn exec_and_retrieve_sql(
                 let v = match batch.indicator_at(col_i, row_index) {
                     Indicator::Null => VVal::None,
                     _ => {
+                        println!("DATA: col={} {:?} {:?}", col_i, types.get(col_i), data);
                         if let Ok(s) = std::str::from_utf8(data) {
                             match types.get(col_i) {
                                 Some(&DataType::Integer) => {
@@ -253,13 +235,253 @@ fn exec_and_retrieve_sql(
                                     VVal::new_byt(data.to_vec())
                                 }
                                 Some(&DataType::Binary { .. }) => VVal::new_byt(data.to_vec()),
-                                _ => VVal::new_str(s),
+                                _ => {
+                                    println!("DEFAULTED: {}", s);
+                                    VVal::new_str(s)
+                                }
                             }
                         } else {
                             VVal::new_byt(data.to_vec())
                         }
                     }
                 };
+
+                if let Some(key) = names.get(col_i) {
+                    let _ = row.set_key_str(key, v);
+                } else {
+                    let _ = row.set_key_str("?", v);
+                }
+            }
+
+            lst.push(row);
+        }
+
+        let batch = row_set_cursor.fetch();
+        in_batch = match batch {
+            Ok(batch) => batch,
+            Err(e) => {
+                return Err(format!("ODBC fetch error: {}", e));
+            }
+        };
+    }
+
+    if vtypes.is_some() {
+        Ok(VVal::pair(vtypes, lst))
+    } else {
+        Ok(lst)
+    }
+}
+
+#[cfg(feature = "odbc")]
+fn exec_and_retrieve_sql_slow(
+    con: &mut Connection,
+    sql: &str,
+    input_params: Option<Vec<WParam>>,
+    with_types: bool,
+) -> Result<VVal, String> {
+    let mut prep = match con.prepare(sql) {
+        Ok(prep) => prep,
+        Err(e) => return Err(format!("SQL prepare error (query: {}): {}", sql, e)),
+    };
+
+    let mut params: Vec<Box<dyn odbc_api::parameter::InputParameter>> = vec![];
+    if let Some(input_params) = input_params {
+        use odbc_api::IntoParameter;
+        for p in input_params.into_iter() {
+            match p {
+                WParam::Str(s) => params.push(Box::new(s.into_parameter())),
+                WParam::Double(d) => params.push(Box::new(d.into_parameter())),
+                WParam::Bytes(uv) => params.push(Box::new(uv.into_parameter())),
+                WParam::Bit(b) => {
+                    let b: i16 = if b { 1 } else { 0 };
+                    params.push(Box::new(b.into_parameter()))
+                }
+                WParam::Null => params.push(Box::new(odbc_api::Nullable::<i16>::null())),
+            }
+        }
+    }
+
+    let mut cursor = match prep.execute(&params[..]) {
+        Ok(None) => return Ok(VVal::None),
+        Err(e) => {
+            return Err(format!("SQL execute error (query: {}): {}", sql, e));
+        }
+        Ok(Some(cursor)) => cursor,
+    };
+
+    let cnt = match cursor.num_result_cols() {
+        Ok(cnt) => cnt,
+        Err(e) => {
+            return Err(format!("ODBC num_result_cols error: {}", e));
+        }
+    };
+
+    let mut names = vec![];
+    for i in 1..=cnt {
+        let r = match cursor.col_name(i as u16) {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(format!("ODBC col_data_type error: {}", e));
+            }
+        };
+
+        names.push(r.to_string());
+    }
+
+    let vtypes = if with_types { VVal::map() } else { VVal::None };
+    let mut types = vec![];
+    for i in 1..=cnt {
+        let r = match cursor.col_data_type(i as u16) {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(format!("ODBC col_data_type error: {}", e));
+            }
+        };
+
+        if vtypes.is_some() {
+            let _ = vtypes.set_key_str(
+                names.get((i - 1) as usize).map(|x| &x[..]).unwrap_or_else(|| ""),
+                VVal::new_str_mv(format!("{:?}", r)),
+            );
+        }
+
+        types.push(r);
+    }
+    let lst = VVal::vec();
+
+    let batch_size = 1000;
+
+    let descs: Vec<BufferDesc> = types
+        .iter()
+        .map(|typ| match Some(typ) {
+            Some(DataType::Integer) | Some(DataType::SmallInt) | Some(DataType::TinyInt) => {
+                BufferDesc::I64 { nullable: true }
+            }
+            Some(DataType::Bit) => BufferDesc::Bit { nullable: true },
+            Some(DataType::Varbinary { .. })
+            | Some(DataType::LongVarbinary { .. })
+            | Some(DataType::Binary { .. })  => BufferDesc::Binary { length: 4096 },
+            Some(DataType::WVarchar { .. }) => {
+                BufferDesc::WText { max_str_len: 2048 }
+            }
+            _ => BufferDesc::Text { max_str_len: 4096 }
+        })
+        .collect();
+
+    let mut buf = ColumnarAnyBuffer::from_descs(batch_size, descs);
+
+    let mut row_set_cursor = match cursor.bind_buffer(&mut buf) {
+        Ok(cur) => cur,
+        Err(e) => {
+            return Err(format!("ODBC bind_buffer error: {}", e));
+        }
+    };
+
+    let batch = row_set_cursor.fetch();
+    let mut in_batch = match batch {
+        Ok(batch) => batch,
+        Err(e) => {
+            return Err(format!("ODBC fetch error: {}", e));
+        }
+    };
+
+    while let Some(batch) = in_batch {
+        for row_index in 0..batch.num_rows() {
+            let row = VVal::map();
+
+            for col_i in 0..batch.num_cols() {
+                let data = batch.column(col_i);
+
+                let rs = if let Some(buf) = data.as_text_view() {
+                    if let Some(s) = buf.get(row_index) {
+                        if let Ok(s) = std::str::from_utf8(s) {
+                            VVal::new_str(s)
+                        } else {
+                            VVal::new_byt(s.to_vec())
+                        }
+                    } else {
+                        continue;
+                    }
+                } else if let Some(buf) = data.as_w_text_view() {
+                    if let Some(s) = buf.get(row_index) {
+                        VVal::new_str_mv(U16String::from_vec(s).to_string_lossy())
+                    } else {
+                        continue;
+                    }
+                } else if let Some(buf) = data.as_bin_view() {
+                    if let Some(s) = buf.get(row_index) {
+                        VVal::new_byt(s.to_vec())
+                    } else {
+                        continue;
+                    }
+                } else {
+                    panic!("Unknown col: {:?}", data);
+                };
+
+                println!("DATA col={} {:?} = {:?}", col_i, types.get(col_i), rs.s_raw());
+                let v = rs;
+
+//                    match types.get(col_i) {
+//                        Some(&DataType::Integer) => {
+//                            VVal::Int(s.parse::<i64>().unwrap_or(0))
+//                        }
+//                        Some(&DataType::SmallInt) => {
+//                            VVal::Int(s.parse::<i64>().unwrap_or(0))
+//                        }
+//                        Some(&DataType::TinyInt) => {
+//                            VVal::Int(s.parse::<i64>().unwrap_or(0))
+//                        }
+//                        Some(&DataType::Bit) => {
+//                            VVal::Bol(s.parse::<i64>().unwrap_or(0) == 1)
+//                        }
+////                        Some(&DataType::Varbinary { .. }) => VVal::new_byt(s.to_vec()),
+////                        Some(&DataType::LongVarbinary { .. }) => {
+////                            VVal::new_byt(data.to_vec())
+////                        }
+//                        Some(&DataType::WVarchar { .. }) => {
+//                        }
+//                        _ => {
+//                            println!("DEFAULTED: {}", s);
+//                            VVal::new_str(s)
+//                        }
+//                    }
+//                } else {
+//                    VVal::new_byt(s.to_vec())
+//                };
+
+//                let v = match batch.indicator_at(col_i, row_index) {
+//                    Indicator::Null => VVal::None,
+//                    _ => {
+//                        println!("DATA: col={} {:?} {:?}", col_i, types.get(col_i), data);
+//                        if let Ok(s) = std::str::from_utf8(data) {
+//                            match types.get(col_i) {
+//                                Some(&DataType::Integer) => {
+//                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
+//                                }
+//                                Some(&DataType::SmallInt) => {
+//                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
+//                                }
+//                                Some(&DataType::TinyInt) => {
+//                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
+//                                }
+//                                Some(&DataType::Bit) => {
+//                                    VVal::Bol(s.parse::<i64>().unwrap_or(0) == 1)
+//                                }
+//                                Some(&DataType::Varbinary { .. }) => VVal::new_byt(data.to_vec()),
+//                                Some(&DataType::LongVarbinary { .. }) => {
+//                                    VVal::new_byt(data.to_vec())
+//                                }
+//                                Some(&DataType::Binary { .. }) => VVal::new_byt(data.to_vec()),
+//                                _ => {
+//                                    println!("DEFAULTED: {}", s);
+//                                    VVal::new_str(s)
+//                                }
+//                            }
+//                        } else {
+//                            VVal::new_byt(data.to_vec())
+//                        }
+//                    }
+//                };
 
                 if let Some(key) = names.get(col_i) {
                     let _ = row.set_key_str(key, v);
@@ -295,6 +517,8 @@ impl OdbcHandle {
 
         let (sender, recv) = std::sync::mpsc::channel();
 
+        let slow = true;
+
         std::thread::spawn(move || {
             let odbc_env = Environment::new();
             let env = match odbc_env {
@@ -328,46 +552,54 @@ impl OdbcHandle {
                 };
 
                 match msg {
-                    OdbcThreadRequest::EnableManualCommit(req) => {
-                        match con.set_autocommit(false) {
-                            Ok(_) => {
-                                let _ = req.send(&VVal::Bol(true));
-                            }
-                            Err(e) => {
-                                let _ = req.send(&VVal::err_msg(
-                                    &format!("Can't enable manual commit, error: {}", e)));
-                            },
+                    OdbcThreadRequest::EnableManualCommit(req) => match con.set_autocommit(false) {
+                        Ok(_) => {
+                            let _ = req.send(&VVal::Bol(true));
                         }
-                    }
-                    OdbcThreadRequest::Rollback(req) => {
-                        match con.rollback() {
-                            Ok(_) => {
-                                let _ = req.send(&VVal::Bol(true));
-                            }
-                            Err(e) => {
-                                let _ = req.send(&VVal::err_msg(
-                                    &format!("Can't rollback, error: {}", e)));
-                            },
+                        Err(e) => {
+                            let _ = req.send(&VVal::err_msg(&format!(
+                                "Can't enable manual commit, error: {}",
+                                e
+                            )));
                         }
-                    }
-                    OdbcThreadRequest::Commit(req) => {
-                        match con.commit() {
-                            Ok(_) => {
-                                let _ = req.send(&VVal::Bol(true));
-                            }
-                            Err(e) => {
-                                let _ = req.send(&VVal::err_msg(
-                                    &format!("Can't commit, error: {}", e)));
-                            },
+                    },
+                    OdbcThreadRequest::Rollback(req) => match con.rollback() {
+                        Ok(_) => {
+                            let _ = req.send(&VVal::Bol(true));
                         }
-                    }
+                        Err(e) => {
+                            let _ =
+                                req.send(&VVal::err_msg(&format!("Can't rollback, error: {}", e)));
+                        }
+                    },
+                    OdbcThreadRequest::Commit(req) => match con.commit() {
+                        Ok(_) => {
+                            let _ = req.send(&VVal::Bol(true));
+                        }
+                        Err(e) => {
+                            let _ =
+                                req.send(&VVal::err_msg(&format!("Can't commit, error: {}", e)));
+                        }
+                    },
                     OdbcThreadRequest::Retrieve(sql, params, req, with_types) => {
-                        match exec_and_retrieve_sql(&mut con, &sql, params, with_types) {
-                            Ok(v) => {
-                                let _ = req.send(&v);
+                        if slow {
+                            match exec_and_retrieve_sql_slow(&mut con, &sql, params, with_types) {
+                                Ok(v) => {
+                                    let _ = req.send(&v);
+                                }
+                                Err(e) => {
+                                    let _ = req.send(&VVal::err_msg(&e));
+                                }
                             }
-                            Err(e) => {
-                                let _ = req.send(&VVal::err_msg(&e));
+
+                        } else {
+                            match exec_and_retrieve_sql(&mut con, &sql, params, with_types) {
+                                Ok(v) => {
+                                    let _ = req.send(&v);
+                                }
+                                Err(e) => {
+                                    let _ = req.send(&VVal::err_msg(&e));
+                                }
                             }
                         }
                     }
@@ -533,7 +765,7 @@ impl OdbcHandle {
                 if res.is_err() {
                     Err(res)
                 } else {
-                    Ok(Self { sender })
+                    Ok(Self { sender, slow })
                 }
             }
             Err(e) => Err(VVal::err_msg(&format!("Couldn't startup ODBC thread: {}", e))),
@@ -641,39 +873,32 @@ impl VValUserData for Odbc {
                 assert_arg_count!("$<Odbc>", argv, 0, "set_manual_commit[]", env);
 
                 let res = Arc::new(PendingResult::new());
-                Ok(self.query_thread(
-                    OdbcThreadRequest::EnableManualCommit(res.clone()),
-                    res,
-                ))
+                Ok(self.query_thread(OdbcThreadRequest::EnableManualCommit(res.clone()), res))
             }
             "commit" => {
                 assert_arg_count!("$<Odbc>", argv, 0, "commit[]", env);
 
                 let res = Arc::new(PendingResult::new());
-                Ok(self.query_thread(
-                    OdbcThreadRequest::Commit(res.clone()),
-                    res,
-                ))
+                Ok(self.query_thread(OdbcThreadRequest::Commit(res.clone()), res))
             }
             "rollback" => {
                 assert_arg_count!("$<Odbc>", argv, 0, "rollback[]", env);
 
                 let res = Arc::new(PendingResult::new());
-                Ok(self.query_thread(
-                    OdbcThreadRequest::Rollback(res.clone()),
-                    res,
-                ))
+                Ok(self.query_thread(OdbcThreadRequest::Rollback(res.clone()), res))
             }
             "exec_t" => {
                 if argv.len() <= 0 {
                     return Err(StackAction::panic_str(
-                        format!("$<Odbc>.exec_t[sql_string, param1, ...] expects at least 1 argument"),
+                        format!(
+                            "$<Odbc>.exec_t[sql_string, param1, ...] expects at least 1 argument"
+                        ),
                         None,
                         env.argv(),
                     ));
                 }
 
-                let mut params : Option<Vec<WParam>> = None;
+                let mut params: Option<Vec<WParam>> = None;
                 for i in 1..argv.len() {
                     match WParam::from_vval(&argv.v_(i)) {
                         Ok(p) => {
@@ -684,7 +909,9 @@ impl VValUserData for Odbc {
                             }
                         }
                         Err(e) => {
-                            return Ok(env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e)));
+                            return Ok(
+                                env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e))
+                            );
                         }
                     }
                 }
@@ -698,13 +925,15 @@ impl VValUserData for Odbc {
             "exec" => {
                 if argv.len() <= 0 {
                     return Err(StackAction::panic_str(
-                        format!("$<Odbc>.exec[sql_string, param1, ...] expects at least 1 argument"),
+                        format!(
+                            "$<Odbc>.exec[sql_string, param1, ...] expects at least 1 argument"
+                        ),
                         None,
                         env.argv(),
                     ));
                 }
 
-                let mut params : Option<Vec<WParam>> = None;
+                let mut params: Option<Vec<WParam>> = None;
                 for i in 1..argv.len() {
                     match WParam::from_vval(&argv.v_(i)) {
                         Ok(p) => {
@@ -715,7 +944,9 @@ impl VValUserData for Odbc {
                             }
                         }
                         Err(e) => {
-                            return Ok(env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e)));
+                            return Ok(
+                                env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e))
+                            );
                         }
                     }
                 }
