@@ -20,8 +20,12 @@ use std::sync::{Arc, Condvar, Mutex};
 
 #[cfg(feature = "odbc")]
 use odbc_api::{
-    buffers::Indicator, buffers::TextRowSet, handles::DataType, Connection, Cursor, Environment,
-    ResultSetMetadata, buffers::{BufferDesc, ColumnarAnyBuffer}, U16String,
+    buffers::Indicator,
+    buffers::TextRowSet,
+    buffers::{BufferDesc, ColumnarAnyBuffer},
+    handles::DataType,
+    parameter::InputParameter,
+    Connection, Cursor, Environment, IntoParameter, ResultSetMetadata, U16String,
 };
 
 #[allow(dead_code)]
@@ -92,6 +96,23 @@ impl WParam {
     }
 }
 
+impl IntoParameter for WParam {
+    type Parameter = Box<dyn InputParameter>;
+
+    fn into_parameter(self) -> Self::Parameter {
+        match self {
+            WParam::Str(s) => Box::new(s.into_parameter()),
+            WParam::Double(d) => Box::new(d.into_parameter()),
+            WParam::Bytes(uv) => Box::new(uv.into_parameter()),
+            WParam::Bit(b) => {
+                let b: i16 = if b { 1 } else { 0 };
+                Box::new(b.into_parameter())
+            }
+            WParam::Null => Box::new(odbc_api::Nullable::<i16>::null()),
+        }
+    }
+}
+
 enum OdbcThreadRequest {
     Retrieve(String, Option<Vec<WParam>>, Arc<PendingResult>, bool),
     EnableManualCommit(Arc<PendingResult>),
@@ -118,24 +139,15 @@ fn exec_and_retrieve_sql(
         Err(e) => return Err(format!("SQL prepare error (query: {}): {}", sql, e)),
     };
 
-    let mut params: Vec<Box<dyn odbc_api::parameter::InputParameter>> = vec![];
-    if let Some(input_params) = input_params {
-        use odbc_api::IntoParameter;
-        for p in input_params.into_iter() {
-            match p {
-                WParam::Str(s) => params.push(Box::new(s.into_parameter())),
-                WParam::Double(d) => params.push(Box::new(d.into_parameter())),
-                WParam::Bytes(uv) => params.push(Box::new(uv.into_parameter())),
-                WParam::Bit(b) => {
-                    let b: i16 = if b { 1 } else { 0 };
-                    params.push(Box::new(b.into_parameter()))
-                }
-                WParam::Null => params.push(Box::new(odbc_api::Nullable::<i16>::null())),
-            }
-        }
-    }
+    let exec_result = if let Some(input_params) = input_params {
+        let params: Vec<Box<dyn InputParameter>> =
+            input_params.into_iter().map(|p| p.into_parameter()).collect();
+        prep.execute(&params[..])
+    } else {
+        prep.execute(())
+    };
 
-    let mut cursor = match prep.execute(&params[..]) {
+    let mut cursor = match exec_result {
         Ok(None) => return Ok(VVal::None),
         Err(e) => {
             return Err(format!("SQL execute error (query: {}): {}", sql, e));
@@ -284,24 +296,15 @@ fn exec_and_retrieve_sql_slow(
         Err(e) => return Err(format!("SQL prepare error (query: {}): {}", sql, e)),
     };
 
-    let mut params: Vec<Box<dyn odbc_api::parameter::InputParameter>> = vec![];
-    if let Some(input_params) = input_params {
-        use odbc_api::IntoParameter;
-        for p in input_params.into_iter() {
-            match p {
-                WParam::Str(s) => params.push(Box::new(s.into_parameter())),
-                WParam::Double(d) => params.push(Box::new(d.into_parameter())),
-                WParam::Bytes(uv) => params.push(Box::new(uv.into_parameter())),
-                WParam::Bit(b) => {
-                    let b: i16 = if b { 1 } else { 0 };
-                    params.push(Box::new(b.into_parameter()))
-                }
-                WParam::Null => params.push(Box::new(odbc_api::Nullable::<i16>::null())),
-            }
-        }
-    }
+    let exec_result = if let Some(input_params) = input_params {
+        let params: Vec<Box<dyn InputParameter>> =
+            input_params.into_iter().map(|p| p.into_parameter()).collect();
+        prep.execute(&params[..])
+    } else {
+        prep.execute(())
+    };
 
-    let mut cursor = match prep.execute(&params[..]) {
+    let mut cursor = match exec_result {
         Ok(None) => return Ok(VVal::None),
         Err(e) => {
             return Err(format!("SQL execute error (query: {}): {}", sql, e));
@@ -360,11 +363,9 @@ fn exec_and_retrieve_sql_slow(
             Some(DataType::Bit) => BufferDesc::Bit { nullable: true },
             Some(DataType::Varbinary { .. })
             | Some(DataType::LongVarbinary { .. })
-            | Some(DataType::Binary { .. })  => BufferDesc::Binary { length: 4096 },
-            Some(DataType::WVarchar { .. }) => {
-                BufferDesc::WText { max_str_len: 2048 }
-            }
-            _ => BufferDesc::Text { max_str_len: 4096 }
+            | Some(DataType::Binary { .. }) => BufferDesc::Binary { length: 4096 },
+            Some(DataType::WVarchar { .. }) => BufferDesc::WText { max_str_len: 2048 },
+            _ => BufferDesc::Text { max_str_len: 4096 },
         })
         .collect();
 
@@ -421,67 +422,67 @@ fn exec_and_retrieve_sql_slow(
                 println!("DATA col={} {:?} = {:?}", col_i, types.get(col_i), rs.s_raw());
                 let v = rs;
 
-//                    match types.get(col_i) {
-//                        Some(&DataType::Integer) => {
-//                            VVal::Int(s.parse::<i64>().unwrap_or(0))
-//                        }
-//                        Some(&DataType::SmallInt) => {
-//                            VVal::Int(s.parse::<i64>().unwrap_or(0))
-//                        }
-//                        Some(&DataType::TinyInt) => {
-//                            VVal::Int(s.parse::<i64>().unwrap_or(0))
-//                        }
-//                        Some(&DataType::Bit) => {
-//                            VVal::Bol(s.parse::<i64>().unwrap_or(0) == 1)
-//                        }
-////                        Some(&DataType::Varbinary { .. }) => VVal::new_byt(s.to_vec()),
-////                        Some(&DataType::LongVarbinary { .. }) => {
-////                            VVal::new_byt(data.to_vec())
-////                        }
-//                        Some(&DataType::WVarchar { .. }) => {
-//                        }
-//                        _ => {
-//                            println!("DEFAULTED: {}", s);
-//                            VVal::new_str(s)
-//                        }
-//                    }
-//                } else {
-//                    VVal::new_byt(s.to_vec())
-//                };
+                //                    match types.get(col_i) {
+                //                        Some(&DataType::Integer) => {
+                //                            VVal::Int(s.parse::<i64>().unwrap_or(0))
+                //                        }
+                //                        Some(&DataType::SmallInt) => {
+                //                            VVal::Int(s.parse::<i64>().unwrap_or(0))
+                //                        }
+                //                        Some(&DataType::TinyInt) => {
+                //                            VVal::Int(s.parse::<i64>().unwrap_or(0))
+                //                        }
+                //                        Some(&DataType::Bit) => {
+                //                            VVal::Bol(s.parse::<i64>().unwrap_or(0) == 1)
+                //                        }
+                ////                        Some(&DataType::Varbinary { .. }) => VVal::new_byt(s.to_vec()),
+                ////                        Some(&DataType::LongVarbinary { .. }) => {
+                ////                            VVal::new_byt(data.to_vec())
+                ////                        }
+                //                        Some(&DataType::WVarchar { .. }) => {
+                //                        }
+                //                        _ => {
+                //                            println!("DEFAULTED: {}", s);
+                //                            VVal::new_str(s)
+                //                        }
+                //                    }
+                //                } else {
+                //                    VVal::new_byt(s.to_vec())
+                //                };
 
-//                let v = match batch.indicator_at(col_i, row_index) {
-//                    Indicator::Null => VVal::None,
-//                    _ => {
-//                        println!("DATA: col={} {:?} {:?}", col_i, types.get(col_i), data);
-//                        if let Ok(s) = std::str::from_utf8(data) {
-//                            match types.get(col_i) {
-//                                Some(&DataType::Integer) => {
-//                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
-//                                }
-//                                Some(&DataType::SmallInt) => {
-//                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
-//                                }
-//                                Some(&DataType::TinyInt) => {
-//                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
-//                                }
-//                                Some(&DataType::Bit) => {
-//                                    VVal::Bol(s.parse::<i64>().unwrap_or(0) == 1)
-//                                }
-//                                Some(&DataType::Varbinary { .. }) => VVal::new_byt(data.to_vec()),
-//                                Some(&DataType::LongVarbinary { .. }) => {
-//                                    VVal::new_byt(data.to_vec())
-//                                }
-//                                Some(&DataType::Binary { .. }) => VVal::new_byt(data.to_vec()),
-//                                _ => {
-//                                    println!("DEFAULTED: {}", s);
-//                                    VVal::new_str(s)
-//                                }
-//                            }
-//                        } else {
-//                            VVal::new_byt(data.to_vec())
-//                        }
-//                    }
-//                };
+                //                let v = match batch.indicator_at(col_i, row_index) {
+                //                    Indicator::Null => VVal::None,
+                //                    _ => {
+                //                        println!("DATA: col={} {:?} {:?}", col_i, types.get(col_i), data);
+                //                        if let Ok(s) = std::str::from_utf8(data) {
+                //                            match types.get(col_i) {
+                //                                Some(&DataType::Integer) => {
+                //                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
+                //                                }
+                //                                Some(&DataType::SmallInt) => {
+                //                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
+                //                                }
+                //                                Some(&DataType::TinyInt) => {
+                //                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
+                //                                }
+                //                                Some(&DataType::Bit) => {
+                //                                    VVal::Bol(s.parse::<i64>().unwrap_or(0) == 1)
+                //                                }
+                //                                Some(&DataType::Varbinary { .. }) => VVal::new_byt(data.to_vec()),
+                //                                Some(&DataType::LongVarbinary { .. }) => {
+                //                                    VVal::new_byt(data.to_vec())
+                //                                }
+                //                                Some(&DataType::Binary { .. }) => VVal::new_byt(data.to_vec()),
+                //                                _ => {
+                //                                    println!("DEFAULTED: {}", s);
+                //                                    VVal::new_str(s)
+                //                                }
+                //                            }
+                //                        } else {
+                //                            VVal::new_byt(data.to_vec())
+                //                        }
+                //                    }
+                //                };
 
                 if let Some(key) = names.get(col_i) {
                     let _ = row.set_key_str(key, v);
@@ -591,7 +592,6 @@ impl OdbcHandle {
                                     let _ = req.send(&VVal::err_msg(&e));
                                 }
                             }
-
                         } else {
                             match exec_and_retrieve_sql(&mut con, &sql, params, with_types) {
                                 Ok(v) => {
