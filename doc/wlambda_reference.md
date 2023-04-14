@@ -9002,7 +9002,7 @@ std:assert_str_eq
 
 ### <a name="129-http-client"></a>12.9 - HTTP Client
 
-WLambda offers an optional integrated HTTP client by enabling the `reqwest`
+WLambda offers an optional integrated HTTP client by enabling the `reqwest` or `http`
 feature at compile time. With this you can create a new client using `std:http:client:new` and make HTTP requests using `std:http:get`, `std:http:post` and `std:http:request`. Also support for basic authentication and token based bearer authentication
 is there.
 
@@ -9120,6 +9120,72 @@ Or a POST request:
 std:assert_eq body.url "http://httpbin.org/post";
 std:assert_str_eq body.json  $[ $["x", 10], ${ y = 20 } ];
 std:assert_eq response.status 200;
+```
+
+### <a name="129-http-server"></a>12.9 - HTTP Server
+
+WLambda offers an optional integrated HTTP server by enabling the `http`
+feature at compile time. With this you can create a new server using `std:http:server:new`.
+
+#### - std:http:server:new _endpoint-string_ -> $\<HttpServer\> | $error
+
+This creates a new http server handle. If you drop that handle, meaning if you remove the last
+reference to it the HTTP server will be stopped.
+
+You can use the following methods to handle requests:
+
+- `$<HttpServer>.try_respond _respond-func_` to check quickly if some request can be answered.
+- `$<HttpServer>.wait_respond _respond-func_` to wait indefinitely until a request arrives
+- `$<HttpServer>.timeout_respond _duration_ _respond-func_` to wait the specified _duration_ until a request arrives.
+
+All three methods call the _respond-func_ when a new request arrives. The first argument is a request
+map with the following keys:
+
+- `:url` contains the URL (no query, unescaped)
+- `:method` contains the HTTP method
+- `:body` contains the request body bytes
+
+Here is a more elaborate example to get you started. It also starts a client request, for
+stopping the code (as it is executed by the test suite):
+
+```wlambda
+!srv = std:http:server:new "localhost:28080";
+
+!client_thread = std:thread:spawn $code{
+    !@import std;
+    !@wlambda;
+    std:thread:sleep :ms => 500;
+    !cl = std:http:client:new[];
+    !resp = std:http:get cl "http://localhost:28080/quit";
+    std:displayln resp;
+    resp.status
+};
+
+!running = $true;
+while running {
+    srv.timeout_respond :ms => 1000 {!(req) = @;
+        std:displayln "Req " req.method req.url;
+
+        if req.url == "/" {
+            return :redirect => "/files/xxx.txt";
+        };
+
+        if req.url == "/quit" {
+            .running = $false;
+            return $[:data, "application/json", std:ser:json $["quit"]];
+        };
+
+        if req.url &> $r($^\/files\/) {
+            $[:file, "/files", "/var/www/"]
+        } {
+            $[:data, "application/json", std:ser:json $["ok", 1, 2, 3]]
+        };
+    };
+
+    std:displayln ":tick:";
+};
+
+std:assert_eq client_thread.join[] 200;
 ```
 
 ### <a name="1210-operating-system-utilities"></a>12.10 - Operating System Utilities

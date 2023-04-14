@@ -17,6 +17,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 #[allow(unused_imports)]
 use std::sync::{Arc, Condvar, Mutex};
+#[allow(unused_imports)]
+use super::PendingResult;
 
 #[cfg(feature = "odbc")]
 use odbc_api::{
@@ -27,46 +29,6 @@ use odbc_api::{
     parameter::InputParameter,
     Connection, Cursor, Environment, IntoParameter, ResultSetMetadata, U16String,
 };
-
-#[allow(dead_code)]
-struct PendingResult {
-    lock: Mutex<(bool, AVal)>,
-    cvar: Condvar,
-}
-
-impl PendingResult {
-    pub fn new() -> Self {
-        Self { lock: Mutex::new((true, AVal::None)), cvar: Condvar::new() }
-    }
-
-    pub fn send(&self, res: &VVal) -> Result<(), String> {
-        match self.lock.lock() {
-            Ok(mut pend) => {
-                pend.0 = false;
-                pend.1 = AVal::from_vval(&res);
-                self.cvar.notify_one();
-                Ok(())
-            }
-            Err(e) => Err(format!("ODBC thread send error: {}", e)),
-        }
-    }
-
-    pub fn wait(&self) -> Result<VVal, String> {
-        let lock = match self.lock.lock() {
-            Ok(lock) => lock,
-            Err(e) => {
-                return Err(format!("ODBC thread lock error: {}", e));
-            }
-        };
-
-        match self.cvar.wait_while(lock, |pend| pend.0) {
-            Ok(pend) => Ok(pend.1.to_vval()),
-            Err(e) => {
-                return Err(format!("ODBC thread wait error: {}", e));
-            }
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 enum WParam {
@@ -96,6 +58,7 @@ impl WParam {
     }
 }
 
+#[cfg(feature = "odbc")]
 impl IntoParameter for WParam {
     type Parameter = Box<dyn InputParameter>;
 

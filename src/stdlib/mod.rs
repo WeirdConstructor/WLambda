@@ -9,6 +9,8 @@ mod cursive;
 mod odbc;
 mod util;
 use super::compiler::*;
+mod helpers;
+pub use helpers::PendingResult;
 
 pub fn add_to_symtable(st: &mut SymbolTable) {
     net::add_to_symtable(st);

@@ -17,6 +17,17 @@ use std::cell::RefCell;
 #[cfg(feature = "reqwest")]
 use std::rc::Rc;
 
+#[cfg(feature = "rouille")]
+use super::PendingResult;
+#[cfg(feature = "rouille")]
+use rouille::{Response, Server};
+#[cfg(feature = "rouille")]
+use std::sync::mpsc::{Receiver, Sender};
+#[cfg(feature = "rouille")]
+use std::sync::{Arc, Mutex};
+#[cfg(feature = "rouille")]
+use std::thread::JoinHandle;
+
 #[cfg(feature = "reqwest")]
 #[derive(Debug, Clone)]
 struct VHttpClient {
@@ -218,6 +229,275 @@ fn add_dump(out: VVal, dump: VVal) -> VVal {
     }
 }
 
+#[cfg(feature = "rouille")]
+#[derive(Debug, Clone)]
+struct PendingHttpRequest {
+    url: String,
+    method: String,
+    body: Vec<u8>,
+}
+
+#[cfg(feature = "rouille")]
+struct HttpServer {
+    request_receiver: Receiver<(PendingHttpRequest, Arc<PendingResult>)>,
+    quit_sender: Sender<()>,
+    thread_join: Option<JoinHandle<()>>,
+}
+
+#[cfg(feature = "rouille")]
+impl HttpServer {
+    pub fn start(listen_ip_port: &str) -> Result<Self, String> {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let sender = Arc::new(Mutex::new(sender));
+
+        match Server::new(listen_ip_port, move |request| {
+            if request.url() == "/favicon.ico" {
+                Response::from_data(
+                    "image/x-icon",
+                    include_bytes!("../../res/wlambda_logo_60.ico").to_vec(),
+                )
+            } else {
+                use std::io::Read;
+
+                let pending = Arc::new(PendingResult::new());
+
+                let mut data = match request.data() {
+                    Some(data) => data,
+                    None => {
+                        return Response::text("Failed to get body data").with_status_code(500);
+                    }
+                };
+
+                let mut buf = Vec::new();
+                match data.read_to_end(&mut buf) {
+                    Ok(_) => (),
+                    Err(_) => return Response::text("Failed to read body").with_status_code(500),
+                };
+                let p_request = PendingHttpRequest {
+                    body: buf,
+                    method: request.method().to_string(),
+                    url: request.url().to_string(),
+                };
+
+                match sender.lock() {
+                    Ok(locked_sender) => match locked_sender.send((p_request, pending.clone())) {
+                        Ok(_) => (),
+                        Err(e) => {
+                            return Response::text(format!(
+                                "Failed to send request to WLambda: {}",
+                                e
+                            ))
+                            .with_status_code(500)
+                        }
+                    },
+                    Err(e) => {
+                        return Response::text(format!("Internal Mutex Error: {}", e))
+                            .with_status_code(500)
+                    }
+                }
+
+                match pending.wait() {
+                    Ok(res) => {
+                        let resp_type = res.v_s_raw(0);
+                        match &resp_type[..] {
+                            "file" => {
+                                let prefix = res.v_(1).s_raw();
+                                let path = res.v_(2).s_raw();
+
+                                if let Some(req) = request.remove_prefix(&prefix) {
+                                    rouille::match_assets(&req, &path)
+                                } else {
+                                    Response::text(format!("Invalid file response: {}", res.s()))
+                                        .with_status_code(500)
+                                }
+                            }
+                            "redirect" => Response::redirect_303(res.v_(1).s_raw()),
+                            "data" => res.v_(1).with_s_ref(|conttype| {
+                                res.v_(2)
+                                    .with_bv_ref(|bv| Response::from_data(conttype.to_string(), bv))
+                            }),
+                            _ => Response::text(format!("Unknown Response Type: {}", res.s())),
+                        }
+                    }
+                    Err(e) => Response::text(format!("Pending request not answered: {}", e))
+                        .with_status_code(500),
+                }
+            }
+        }) {
+            Ok(server) => {
+                let (handle, sender) = server.stoppable();
+
+                Ok(Self {
+                    request_receiver: receiver,
+                    thread_join: Some(handle),
+                    quit_sender: sender,
+                })
+            }
+            Err(e) => Err(format!("{}", e)),
+        }
+    }
+}
+
+#[cfg(feature = "rouille")]
+impl Drop for HttpServer {
+    #[allow(unused_must_use)]
+    fn drop(&mut self) {
+        if let Some(handle) = self.thread_join.take() {
+            self.quit_sender.send(()).expect("Sending http:server end signal works on drop");
+            handle.join().expect("Joining the http:server thread works on drop");
+        }
+    }
+}
+
+#[cfg(feature = "rouille")]
+#[derive(Clone)]
+struct VHttpServer {
+    srv: Rc<RefCell<HttpServer>>,
+}
+
+#[cfg(feature = "rouille")]
+macro_rules! assert_arg_count {
+    ($self: expr, $argv: expr, $count: expr, $function: expr, $env: ident) => {
+        if $argv.len() != $count {
+            return Err(StackAction::panic_str(
+                format!("{}.{} expects {} arguments", $self, $function, $count),
+                None,
+                $env.argv(),
+            ));
+        }
+    };
+}
+
+#[cfg(feature = "rouille")]
+fn handle_request(
+    env: &mut Env,
+    fun: VVal,
+    pend_req: PendingHttpRequest,
+    pending_response: Arc<PendingResult>,
+) -> Result<VVal, StackAction> {
+    let req = VVal::map3(
+        "url",
+        VVal::new_str_mv(pend_req.url),
+        "method",
+        VVal::new_str_mv(pend_req.method),
+        "body",
+        VVal::new_byt(pend_req.body),
+    );
+
+    match fun.call(env, &[req.clone()]) {
+        Ok(val) => match pending_response.send(&val) {
+            Ok(()) => Ok(req),
+            Err(e) => {
+                Ok(env.new_err(format!("http:server:try_respond error on responding: {}", e)))
+            }
+        },
+        Err(StackAction::Return(val)) => match pending_response.send(&val.1) {
+            Ok(()) => Ok(req),
+            Err(e) => {
+                Ok(env.new_err(format!("http:server:try_respond error on responding: {}", e)))
+            }
+        },
+        Err(StackAction::Break(val)) => {
+            let _ = pending_response.send(&VVal::None);
+            Ok(val.as_ref().clone())
+        }
+        Err(StackAction::Next) => {
+            let _ = pending_response.send(&VVal::None);
+            Ok(VVal::None)
+        }
+        Err(panic) => Err(panic),
+    }
+}
+
+#[cfg(feature = "rouille")]
+impl VValUserData for VHttpServer {
+    fn s(&self) -> String {
+        format!("$<HttpServer>")
+    }
+
+    fn as_any(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
+        let argv = env.argv();
+
+        match key {
+            "wait_respond" => {
+                assert_arg_count!(
+                    "$<HttpServer>",
+                    argv,
+                    1,
+                    "wait_respond[responder_function]",
+                    env
+                );
+                match self.srv.borrow_mut().request_receiver.recv() {
+                    Ok((pend_req, pending_response)) => {
+                        return handle_request(env, argv.v_(0), pend_req, pending_response);
+                    }
+                    Err(e) => Err(StackAction::panic_str(
+                        format!("$<HttpServer> error waiting for request: {}", e),
+                        None,
+                        env.argv(),
+                    )),
+                }
+            }
+            "timeout_respond" => {
+                assert_arg_count!(
+                    "$<HttpServer>",
+                    argv,
+                    2,
+                    "timeout_respond[duration, responder_function]",
+                    env
+                );
+                let dur = match argv.v_(0).to_duration() {
+                    Ok(dur) => dur,
+                    Err(e) => return Ok(e),
+                };
+
+                match self.srv.borrow_mut().request_receiver.recv_timeout(dur) {
+                    Ok((pend_req, pending_response)) => {
+                        return handle_request(env, argv.v_(1), pend_req, pending_response);
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                        Err(StackAction::panic_str(
+                            format!("$<HttpServer> server request thread not running anymore!"),
+                            None,
+                            env.argv(),
+                        ))
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => Ok(VVal::None),
+                }
+            }
+            "try_respond" => {
+                assert_arg_count!("$<HttpServer>", argv, 1, "try_respond[responder_function]", env);
+                match self.srv.borrow_mut().request_receiver.try_recv() {
+                    Ok((pend_req, pending_response)) => {
+                        return handle_request(env, argv.v_(0), pend_req, pending_response);
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        Err(StackAction::panic_str(
+                            format!("$<HttpServer> server request thread not running anymore!"),
+                            None,
+                            env.argv(),
+                        ))
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => Ok(VVal::None),
+                }
+            }
+            _ => Err(StackAction::panic_str(
+                format!("$<HttpServer> unknown method called: {}", key),
+                None,
+                env.argv(),
+            )),
+        }
+    }
+
+    fn clone_ud(&self) -> Box<dyn VValUserData> {
+        Box::new(self.clone())
+    }
+}
+
 #[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {
     #[cfg(feature = "reqwest")]
@@ -226,6 +506,20 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         |_env: &mut Env, _argc: usize| Ok(VVal::new_usr(VHttpClient::new())),
         Some(0),
         Some(0),
+        false,
+    );
+
+    #[cfg(feature = "rouille")]
+    st.fun(
+        "http:server:new",
+        |env: &mut Env, _argc: usize| match HttpServer::start(
+            &env.arg(0).s_raw()
+        ) {
+            Ok(srv) => Ok(VVal::new_usr(VHttpServer { srv: Rc::new(RefCell::new(srv)) })),
+            Err(e) => Ok(env.new_err(format!("http:server:new Error: {}", e))),
+        },
+        Some(1),
+        Some(1),
         false,
     );
 
