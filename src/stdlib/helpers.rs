@@ -7,6 +7,7 @@ pub struct PendingResult {
     cvar: Condvar,
 }
 
+#[allow(dead_code)]
 impl PendingResult {
     pub fn new() -> Self {
         Self { lock: Mutex::new((true, AVal::None)), cvar: Condvar::new() }
