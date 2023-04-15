@@ -674,6 +674,7 @@ impl VValUserData for Odbc {
                     if argv.v_(i).is_vec() {
                         let r = argv.v_(i).with_iter(|it| {
                             for (v, _) in it {
+                                println!("ADD PARAM: {:?}", v.s());
                                 match WParam::from_vval(&v, self.handle.legacy) {
                                     Ok(p) => {
                                         if let Some(params) = params.as_mut() {
