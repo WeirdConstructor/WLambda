@@ -671,18 +671,46 @@ impl VValUserData for Odbc {
 
                 let mut params: Option<Vec<WParam>> = None;
                 for i in 1..argv.len() {
-                    match WParam::from_vval(&argv.v_(i), self.handle.legacy) {
-                        Ok(p) => {
-                            if let Some(params) = params.as_mut() {
-                                params.push(p);
-                            } else {
-                                params = Some(vec![p]);
+                    if argv.v_(i).is_vec() {
+                        let r = argv.v_(i).with_iter(|it| {
+                            for (v, _) in it {
+                                match WParam::from_vval(&v, self.handle.legacy) {
+                                    Ok(p) => {
+                                        if let Some(params) = params.as_mut() {
+                                            params.push(p);
+                                        } else {
+                                            params = Some(vec![p]);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        return Some(
+                                            env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e))
+                                        );
+                                    }
+                                }
                             }
+
+                            None
+                        });
+
+                        if let Some(r) = r {
+                            return Ok(r);
                         }
-                        Err(e) => {
-                            return Ok(
-                                env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e))
-                            );
+
+                    } else {
+                        match WParam::from_vval(&argv.v_(i), self.handle.legacy) {
+                            Ok(p) => {
+                                if let Some(params) = params.as_mut() {
+                                    params.push(p);
+                                } else {
+                                    params = Some(vec![p]);
+                                }
+                            }
+                            Err(e) => {
+                                return Ok(
+                                    env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e))
+                                );
+                            }
                         }
                     }
                 }
