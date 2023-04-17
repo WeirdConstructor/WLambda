@@ -4721,6 +4721,10 @@ impl VVal {
                 }
             },
             VVal::Lst(l) => {
+                if key.i() < 0 {
+                    return Ok(VVal::None);
+                }
+
                 let idx = key.i() as usize;
                 match l.try_borrow_mut() {
                     Ok(mut v) => {
@@ -4768,6 +4772,10 @@ impl VVal {
                 }
             },
             VVal::Lst(l) => {
+                if key.i() < 0 {
+                    return Ok(());
+                }
+
                 let idx = key.i() as usize;
                 match l.try_borrow_mut() {
                     Ok(mut v) => {

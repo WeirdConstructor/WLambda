@@ -197,7 +197,7 @@ fn exec_and_retrieve_sql(
                 let v = match batch.indicator_at(col_i, row_index) {
                     Indicator::Null => VVal::None,
                     _ => {
-                        println!("DATA: col={} {:?} {:?}", col_i, types.get(col_i), data);
+                        //d// println!("DATA: col={} {:?} {:?}", col_i, types.get(col_i), data);
                         if let Ok(s) = std::str::from_utf8(data) {
                             match types.get(col_i) {
                                 Some(&DataType::Integer) => {
@@ -218,7 +218,7 @@ fn exec_and_retrieve_sql(
                                 }
                                 Some(&DataType::Binary { .. }) => VVal::new_byt(data.to_vec()),
                                 _ => {
-                                    println!("DEFAULTED: {}", s);
+                                    //d// println!("DEFAULTED: {}", s);
                                     VVal::new_str(s)
                                 }
                             }
@@ -389,7 +389,7 @@ fn exec_and_retrieve_sql_legacy(
                     panic!("Unknown col: {:?}", data);
                 };
 
-                println!("DATA col={} {:?} = {:?}", col_i, types.get(col_i), rs.s_raw());
+                //d// println!("DATA col={} {:?} = {:?}", col_i, types.get(col_i), rs.s_raw());
                 let v = rs;
 
                 //                    match types.get(col_i) {
@@ -674,7 +674,7 @@ impl VValUserData for Odbc {
                     if argv.v_(i).is_vec() {
                         let r = argv.v_(i).with_iter(|it| {
                             for (v, _) in it {
-                                println!("ADD PARAM: {:?}", v.s());
+                                //d// println!("ADD PARAM: {:?}", v.s());
                                 match WParam::from_vval(&v, self.handle.legacy) {
                                     Ok(p) => {
                                         if let Some(params) = params.as_mut() {

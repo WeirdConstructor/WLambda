@@ -10,6 +10,7 @@ mod odbc;
 mod util;
 use super::compiler::*;
 mod helpers;
+mod sqlite;
 pub use helpers::PendingResult;
 
 pub fn add_to_symtable(st: &mut SymbolTable) {
@@ -21,4 +22,5 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     cursive::add_to_symtable(st);
     odbc::add_to_symtable(st);
     util::add_to_symtable(st);
+    sqlite::add_to_symtable(st);
 }
