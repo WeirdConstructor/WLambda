@@ -316,6 +316,9 @@ impl HttpServer {
                                 res.v_(2)
                                     .with_bv_ref(|bv| Response::from_data(conttype.to_string(), bv))
                             }),
+                            "error" => Response::text(res.v_s_raw(2)).with_status_code(res.v_i(1) as u16),
+                            "internal_error" => Response::text(res.v_s_raw(1)).with_status_code(500),
+                            "no_file" => Response::text("Not Found").with_status_code(404),
                             _ => Response::text(format!("Unknown Response Type: {}", res.s())),
                         }
                     }
@@ -405,7 +408,13 @@ fn handle_request(
             let _ = pending_response.send(&VVal::None);
             Ok(VVal::None)
         }
-        Err(panic) => Err(panic),
+        Err(panic) => {
+            let _ = pending_response.send(
+                &VVal::vec2(
+                    VVal::new_sym("internal_error"),
+                    VVal::new_str_mv(format!("Internal Server Error:\n{}", panic))));
+            Ok(VVal::None)
+        }
     }
 }
 
@@ -512,9 +521,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     #[cfg(feature = "rouille")]
     st.fun(
         "http:server:new",
-        |env: &mut Env, _argc: usize| match HttpServer::start(
-            &env.arg(0).s_raw()
-        ) {
+        |env: &mut Env, _argc: usize| match HttpServer::start(&env.arg(0).s_raw()) {
             Ok(srv) => Ok(VVal::new_usr(VHttpServer { srv: Rc::new(RefCell::new(srv)) })),
             Err(e) => Ok(env.new_err(format!("http:server:new Error: {}", e))),
         },
