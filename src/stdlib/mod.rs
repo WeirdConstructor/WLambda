@@ -11,6 +11,7 @@ mod util;
 use super::compiler::*;
 mod helpers;
 mod sqlite;
+mod imap;
 pub use helpers::PendingResult;
 
 pub fn add_to_symtable(st: &mut SymbolTable) {
@@ -23,4 +24,5 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     odbc::add_to_symtable(st);
     util::add_to_symtable(st);
     sqlite::add_to_symtable(st);
+    imap::add_to_symtable(st);
 }

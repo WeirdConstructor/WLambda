@@ -31,6 +31,7 @@ use odbc_api::{
     U16String,
 };
 
+#[cfg(feature = "odbc")]
 #[derive(Debug, Clone)]
 enum WParam {
     Str(String),
@@ -41,6 +42,7 @@ enum WParam {
     Null,
 }
 
+#[cfg(feature = "odbc")]
 impl WParam {
     fn from_vval(v: &VVal, use_wide_strings: bool) -> Result<Self, String> {
         match v {
@@ -83,6 +85,7 @@ impl IntoParameter for WParam {
     }
 }
 
+#[cfg(feature = "odbc")]
 enum OdbcThreadRequest {
     Retrieve(String, Option<Vec<WParam>>, Arc<PendingResult>, bool),
     EnableManualCommit(Arc<PendingResult>),
