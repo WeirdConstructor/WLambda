@@ -1,11 +1,11 @@
 #[cfg(feature = "mail")]
 use imap::{types::Fetch, Session};
 #[cfg(feature = "mail")]
-use imap_proto::types::{BodyStructure, BodyContentCommon, ContentType};
+use imap_proto::types::{BodyContentCommon, BodyStructure, MessageSection, SectionPath};
 #[cfg(feature = "mail")]
 use mailparse;
 #[cfg(feature = "mail")]
-use mailparse::MailHeaderMap;
+use mailparse::{MailHeaderMap, ParsedMail};
 #[cfg(feature = "mail")]
 use native_tls;
 
@@ -59,16 +59,14 @@ fn bodystructure2vv<'a>(bs: &'a BodyStructure) -> VVal {
         BodyStructure::Text { common, .. } => {
             VVal::pair(VVal::new_sym("text"), body_cont2vv(common))
         }
-        BodyStructure::Message { common, envelope, body, .. } => {
+        BodyStructure::Message { common, body, .. } => {
             let sub = body_cont2vv(common);
             let _ = sub.v_(1).set_key_str("body", bodystructure2vv(body));
             VVal::pair(VVal::new_sym("message"), sub)
         }
         BodyStructure::Multipart { common, bodies, .. } => {
             let bods = VVal::vec();
-//                println!("BODIES MULTIPART {}!!!", bodies.len());
             for body in bodies.iter() {
-//                println!("BODY EXT!!!");
                 bods.push(bodystructure2vv(body));
             }
 
@@ -80,17 +78,76 @@ fn bodystructure2vv<'a>(bs: &'a BodyStructure) -> VVal {
     }
 }
 
-fn fetch2vv(env: &mut Env, f: &Fetch) -> VVal {
+fn vv2section_path(vv: &VVal) -> Option<SectionPath> {
+    if vv.is_kind_of_string() {
+        vv.with_s_ref(|s| match s {
+            "header" => Some(SectionPath::Full(MessageSection::Header)),
+            "mime" => Some(SectionPath::Full(MessageSection::Mime)),
+            "text" => Some(SectionPath::Full(MessageSection::Text)),
+            _ => None,
+        })
+    } else if vv.v_(0).is_int() || vv.v_(0).is_float() {
+        let mut path = vec![];
+        vv.with_iter(|it| {
+            for (elem, _) in it {
+                path.push(elem.i() as u32);
+            }
+        });
+
+        Some(SectionPath::Part(path, None))
+    } else {
+        let mut path = vec![];
+        vv.v_(0).with_iter(|it| {
+            for (elem, _) in it {
+                path.push(elem.i() as u32);
+            }
+        });
+
+        if vv.v_(1).is_none() {
+            Some(SectionPath::Part(path, None))
+        } else {
+            vv.v_(1).with_s_ref(|s| match s {
+                "header" => Some(SectionPath::Part(path, Some(MessageSection::Header))),
+                "mime" => Some(SectionPath::Part(path, Some(MessageSection::Mime))),
+                "text" => Some(SectionPath::Part(path, Some(MessageSection::Text))),
+                _ => None,
+            })
+        }
+    }
+}
+
+fn fetch2vv(env: &mut Env, f: &Fetch, arg: VVal) -> VVal {
     let uid = if let Some(uid) = f.uid { VVal::Int(uid.into()) } else { VVal::None };
 
     let ret = VVal::vec2(VVal::Int(f.message.into()), uid);
 
+    if arg.is_some() {
+        if let Some(sp) = vv2section_path(&arg) {
+            println!("SEC:ÜP {:?}", sp);
+            if let Some(body) = f.section(&sp) {
+                ret.push(VVal::pair(VVal::new_sym("section"), VVal::new_byt(body.to_vec())));
+            } else {
+                ret.push(VVal::pair(
+                    VVal::new_sym("section_not_found"),
+                    VVal::new_str_mv(format!("{:?}", f)),
+                ));
+            }
+
+            return ret;
+        } else {
+            return env.new_err(format!("$<IMAPSession>.fetch bad section path: {}", arg.s()));
+        }
+    }
+
     if let Some(bs) = f.bodystructure() {
-//        println!("BS: {:#?}", bs);
+        //        println!("BS: {:#?}", bs);
         ret.push(bodystructure2vv(bs));
+    } else if let Some(body) = f.body() {
+        ret.push(VVal::pair(VVal::new_sym("body"), VVal::new_byt(body.to_vec())));
+    } else if let Some(body) = f.text() {
+        ret.push(VVal::pair(VVal::new_sym("text"), VVal::new_byt(body.to_vec())));
     } else {
-        println!("UNIMPL: {:#?}", f);
-        return env.new_err(format!("$<IMAPSession>.fetch unimplemented return value"));
+        ret.push(VVal::pair(VVal::new_sym("unimplemented"), VVal::new_str_mv(format!("{:?}", f))));
     }
 
     ret
@@ -110,6 +167,7 @@ impl VValUserData for VImapSession {
 
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         let argv = env.argv();
+        let argc = argv.len();
 
         let mut session = match self.session.lock() {
             Ok(session) => session,
@@ -117,6 +175,24 @@ impl VValUserData for VImapSession {
         };
 
         match key {
+            "examine" => {
+                assert_arg_count!("$<IMAPSession>", argv, 1, "examine[mailbox_string]", env);
+                match session.examine(argv.v_s_raw(0)) {
+                    Ok(mailbox) => Ok(VVal::map3(
+                        "exists",
+                        VVal::Int(mailbox.exists.into()),
+                        "recent",
+                        VVal::Int(mailbox.recent.into()),
+                        "unseen",
+                        mailbox.unseen.map(|u| VVal::Int(u.into())).unwrap_or(VVal::None),
+                    )),
+                    Err(e) => Ok(env.new_err(format!(
+                        "$<IMAPSession>.examine[{}] error: {}",
+                        argv.v_s_raw(0),
+                        e
+                    ))),
+                }
+            }
             "select" => {
                 assert_arg_count!("$<IMAPSession>", argv, 1, "select[mailbox_string]", env);
                 match session.select(argv.v_s_raw(0)) {
@@ -135,12 +211,26 @@ impl VValUserData for VImapSession {
                     ))),
                 }
             }
-
-            //            if let Err(e) = imap_session.select("INBOX") {
-            //                return Ok(env.new_err(format!("$<IMAP>.select error: {}", e)))
-            //            }
             "fetch" => {
-                assert_arg_count!("$<IMAPSession>", argv, 2, "fetch[sequence_set, query]", env);
+                if argc < 2 {
+                    return Err(StackAction::panic_str(
+                        format!(
+                            "{} expects at least 2 arguments",
+                            "$<IMAPSession>.fetch[sequence_set, query, [section]]"
+                        ),
+                        None,
+                        env.argv(),
+                    ));
+                } else if argc > 3 {
+                    return Err(StackAction::panic_str(
+                        format!(
+                            "{} expects at most 3 arguments",
+                            "$<IMAPSession>.fetch[sequence_set, query, [section]]"
+                        ),
+                        None,
+                        env.argv(),
+                    ));
+                }
 
                 let messages = match session.fetch(argv.v_s_raw(0), argv.v_s_raw(1)) {
                     Ok(msgs) => msgs,
@@ -150,17 +240,10 @@ impl VValUserData for VImapSession {
                 let ret = VVal::vec();
 
                 for msg in messages.iter() {
-                    ret.push(fetch2vv(env, msg));
+                    ret.push(fetch2vv(env, msg, argv.v_(2)));
                 }
 
                 return Ok(ret);
-
-                //            let message = if let Some(m) = messages.iter().next() {
-                //
-                //                if let Some(bs) = message.bodystructure() {
-                //                    println!("STRUCT: {:#?}", bs);
-                //                }
-                //
             }
             "logout" => {
                 assert_arg_count!("$<IMAPSession>", argv, 0, "logout[]", env);
@@ -180,8 +263,77 @@ impl VValUserData for VImapSession {
     }
 }
 
+fn mail_part2vv(env: &mut Env, part: &ParsedMail) -> Result<VVal, VVal> {
+    let m = VVal::map();
+    for header in part.get_headers().into_iter() {
+        let _ = m.set_key_str(&header.get_key()[..], VVal::new_str_mv(header.get_value()));
+    }
+
+    let body = if let Some(ct) = part.get_headers().get_first_value("Content-Type") {
+        if ct.contains("text/") {
+            match part.get_body() {
+                Ok(text) => VVal::new_str_mv(text),
+                Err(e) => {
+                    return Err(
+                        env.new_err(format!("std:mail:parse raw body parse error: {:?}", e))
+                    );
+                }
+            }
+        } else {
+            match part.get_body_raw() {
+                Ok(raw) => VVal::new_byt(raw),
+                Err(e) => {
+                    return Err(
+                        env.new_err(format!("std:mail:parse raw body parse error: {:?}", e))
+                    );
+                }
+            }
+        }
+    } else {
+        match part.get_body_raw() {
+            Ok(raw) => VVal::new_byt(raw),
+            Err(e) => {
+                return Err(env.new_err(format!("std:mail:parse raw body parse error: {:?}", e)));
+            }
+        }
+    };
+
+    Ok(VVal::vec2(m, body))
+}
+
+fn mail2vv(env: &mut Env, mail: &ParsedMail) -> Result<VVal, VVal> {
+    let parts = VVal::vec();
+
+    let top = mail_part2vv(env, mail)?;
+
+    for part in mail.parts().skip(1) {
+        parts.push(mail2vv(env, part)?);
+    }
+
+    top.push(parts);
+
+    Ok(top)
+}
+
 #[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {
+    #[cfg(feature = "mailparse")]
+    st.fun(
+        "mail:parse",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_bv_ref(|s| match mailparse::parse_mail(s) {
+                Ok(mail) => match mail2vv(env, &mail) {
+                    Ok(mail) => Ok(mail),
+                    Err(err) => Ok(err),
+                },
+                Err(e) => Ok(env.new_err(format!("std:mail:parse error: {}", e))),
+            })
+        },
+        Some(1),
+        Some(1),
+        false,
+    );
+
     #[cfg(feature = "imap")]
     st.fun(
         "imap:connect_and_login_tls",
@@ -209,65 +361,6 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
             };
 
             Ok(VVal::new_usr(VImapSession { session: Arc::new(Mutex::new(imap_session)) }))
-
-            //            // we want to fetch the first email in the INBOX mailbox
-            //            if let Err(e) = imap_session.select("INBOX") {
-            //                return Ok(env.new_err(format!("$<IMAP>.select error: {}", e)))
-            //            }
-            //
-            //            // fetch message number 1 in this mailbox, along with its RFC822 field.
-            //            // RFC 822 dictates the format of the body of e-mails
-            //            let messages = match imap_session.fetch("2", "BODYSTRUCTURE") {
-            //                Ok(msgs) => msgs,
-            //                Err(e) => {
-            //                    return Ok(env.new_err(format!("$<IMAP>.fetch error: {}", e)))
-            //                }
-            //            };
-            //            let message = if let Some(m) = messages.iter().next() {
-            //                m
-            //            } else {
-            //                return Ok(VVal::None);
-            //            };
-            ////
-            //            if let Some(bs) = message.bodystructure() {
-            //                println!("STRUCT: {:#?}", bs);
-            //
-            //            } else if let Some(body) = message.body() {
-            //                match mailparse::parse_mail(body) {
-            //                    Ok(mail) => {
-            //                        println!("OO: {:?}", mail.get_headers());
-            //                        for part in mail.parts() {
-            //    //                        println!("> {:#?}", part.get_headers());
-            //    //                        println!("> parts: {}", part.parts().count());
-            //                        if let Some(v) = part.get_headers().get_first_value("Content-Type")  {
-            //                            println!("CONTENT TYPE: {}", v);
-            //                            if v.contains("text/plain") {
-            //                                println!("text: {}", part.get_body().unwrap());
-            //                            } else if v.contains("text/html") {
-            //                                println!("html: {}", part.get_body().unwrap());
-            //                            }
-            //                        }
-            //    //                        for part2 in part.parts() {
-            //    //                            if let Some(v) = part2.get_headers().get_first_value("Content-Type")  {
-            //    //                            }
-            //    ////                            println!(">> {:#?}", part2.get_headers());
-            //    ////                            println!(">> parts: {}", part2.parts().count());
-            //    //                        }
-            //    //                        println!("{}", part.get_body().unwrap());
-            //                        }
-            //                    }
-            //                    Err(e) => {
-            //                        return Ok(env.new_err(format!("$<IMAP>.fetch parse mail error: {}", e)))
-            //                    }
-            //                }
-            //            }
-            //
-            // be nice to the server and log out
-            //            if let Err(e) = imap_session.logout() {
-            //                return Ok(env.new_err(format!("$<IMAP>.logout error: {}", e)))
-            //            }
-
-            //            Ok(VVal::None)
         },
         Some(4),
         Some(4),
