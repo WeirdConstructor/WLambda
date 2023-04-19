@@ -211,6 +211,38 @@ impl VValUserData for VImapSession {
                     ))),
                 }
             }
+            "list" => {
+                if argc > 2 {
+                    return Err(StackAction::panic_str(
+                        format!(
+                            "{} expects at most 2 arguments",
+                            "$<IMAPSession>.list[[reference_name, [mailbox_pattern]]]"
+                        ),
+                        None,
+                        env.argv(),
+                    ));
+                }
+
+                let refname = if argv.v_(0).is_none() { None } else { Some(argv.v_s_raw(0)) };
+                let pattern = if argv.v_(1).is_none() { None } else { Some(argv.v_s_raw(1)) };
+
+                let dirs = match session
+                    .list(refname.as_ref().map(|x| &**x), pattern.as_ref().map(|x| &**x))
+                {
+                    Ok(dirs) => dirs,
+                    Err(e) => return Ok(env.new_err(format!("$<IMAP>.list error: {}", e))),
+                };
+                println!("DIRS: {:?}", dirs);
+
+                let ret = VVal::vec();
+
+                for dir in dirs.iter() {
+                println!("DIRS: {:?}", dir);
+                    ret.push(VVal::new_str(dir.name()));
+                }
+
+                return Ok(ret);
+            }
             "fetch" => {
                 if argc < 2 {
                     return Err(StackAction::panic_str(
