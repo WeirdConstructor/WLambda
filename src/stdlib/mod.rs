@@ -12,6 +12,10 @@ use super::compiler::*;
 mod helpers;
 mod sqlite;
 mod imap;
+#[cfg(feature = "html")]
+mod html2vval;
+#[cfg(feature = "html")]
+mod rcdom;
 pub use helpers::PendingResult;
 
 pub fn add_to_symtable(st: &mut SymbolTable) {

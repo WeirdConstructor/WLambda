@@ -232,12 +232,10 @@ impl VValUserData for VImapSession {
                     Ok(dirs) => dirs,
                     Err(e) => return Ok(env.new_err(format!("$<IMAP>.list error: {}", e))),
                 };
-                println!("DIRS: {:?}", dirs);
 
                 let ret = VVal::vec();
 
                 for dir in dirs.iter() {
-                println!("DIRS: {:?}", dir);
                     ret.push(VVal::new_str(dir.name()));
                 }
 

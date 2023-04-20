@@ -57,4 +57,30 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         Some(1),
         false,
     );
+
+    #[cfg(feature = "html")]
+    st.fun(
+        "html:parse_simple",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_s_ref(|s| {
+                Ok(super::html2vval::parse_simplified(s))
+            })
+        },
+        Some(1),
+        Some(1),
+        false,
+    );
+
+    #[cfg(feature = "html")]
+    st.fun(
+        "html:parse_complex",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_s_ref(|s| {
+                Ok(super::html2vval::parse(s, true))
+            })
+        },
+        Some(1),
+        Some(1),
+        false,
+    );
 }
