@@ -12726,6 +12726,20 @@ pub fn std_symbol_table() -> SymbolTable {
         }, Some(0), Some(1), false);
 
     #[cfg(feature="chrono")]
+    func!(st, "chrono:parse:rfc_2822",
+        |env: &mut Env, _argc: usize| {
+            use chrono::prelude::*;
+            env.arg(0).with_s_ref(|s| {
+                match DateTime::parse_from_rfc2822(s) {
+                    Ok(dt) => Ok(VVal::Int(dt.timestamp())),
+                    Err(e) =>
+                        Ok(env.new_err(
+                            format!("std:chrono:parse:rfc_2822 can't parse date {}: {}", s, e))),
+                }
+            })
+        }, Some(1), Some(1), false);
+
+    #[cfg(feature="chrono")]
     func!(st, "chrono:format_utc",
         |env: &mut Env, _argc: usize| {
             use chrono::prelude::*;
