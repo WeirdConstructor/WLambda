@@ -123,7 +123,7 @@ fn fetch2vv(env: &mut Env, f: &Fetch, arg: VVal) -> VVal {
 
     if arg.is_some() {
         if let Some(sp) = vv2section_path(&arg) {
-            println!("SEC:ÜP {:?}", sp);
+            //d// println!("SEC:ÜP {:?}", sp);
             if let Some(body) = f.section(&sp) {
                 ret.push(VVal::pair(VVal::new_sym("section"), VVal::new_byt(body.to_vec())));
             } else {
@@ -165,6 +165,10 @@ impl VValUserData for VImapSession {
         Box::new(self.clone())
     }
 
+    fn as_thread_safe_usr(&mut self) -> Option<Box<dyn crate::threads::ThreadSafeUsr>> {
+        Some(Box::new(self.clone()))
+    }
+
     fn call_method(&self, key: &str, env: &mut Env) -> Result<VVal, StackAction> {
         let argv = env.argv();
         let argc = argv.len();
@@ -191,6 +195,23 @@ impl VValUserData for VImapSession {
                         argv.v_s_raw(0),
                         e
                     ))),
+                }
+            }
+            "search" => {
+                assert_arg_count!("$<IMAPSession>", argv, 1, "select[query]", env);
+                match session.search(argv.v_s_raw(0)) {
+                    Ok(set) => {
+                        let res = VVal::vec();
+                        for seq in set.iter() {
+                            res.push(VVal::Int(*seq as i64));
+                        }
+                        Ok(res)
+                    }
+                    Err(e) => Ok(env.new_err(format!(
+                        "$<IMAPSession>.search[{}] error: {}",
+                        argv.v_s_raw(0),
+                        e
+                    )))
                 }
             }
             "select" => {
@@ -296,7 +317,7 @@ impl VValUserData for VImapSession {
 fn mail_part2vv(env: &mut Env, part: &ParsedMail) -> Result<VVal, VVal> {
     let m = VVal::map();
     for header in part.get_headers().into_iter() {
-        let _ = m.set_key_str(&header.get_key()[..], VVal::new_str_mv(header.get_value()));
+        let _ = m.set_key_str(&header.get_key().to_lowercase()[..], VVal::new_str_mv(header.get_value()));
     }
 
     let body = if let Some(ct) = part.get_headers().get_first_value("Content-Type") {

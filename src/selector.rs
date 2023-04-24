@@ -1111,6 +1111,9 @@ fn compile_atom(p: &VVal, next: PatternNode) -> PatternNode {
     } else if p.to_sym() == s2sym("ToLowercase") {
         Box::new(move |s: RxBuf, st: &mut SelectorState| {
             let s_lower = s.s.to_lowercase();
+
+            //d// println!("s={}[{}] s_l={}[{}]", s.s.len(), s, s_lower.len(), s_lower);
+
             let rx = RxBuf {
                 s:              &s_lower[..],
                 offs:           s.offs,

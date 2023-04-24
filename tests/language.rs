@@ -3859,6 +3859,10 @@ fn check_regex_patterns() {
     assert_eq!(ve(r#"
         $r/$+[a-z]/ <& "abz"
     "#), "$[\"abz\"]");
+
+    assert_eq!(ve(r#"
+        "İ" &> $r/$&L*/;
+    "#), "");
 }
 
 #[test]

@@ -27,6 +27,8 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "rouille")]
 use std::thread::JoinHandle;
+#[cfg(feature = "rouille")]
+use std::collections::HashMap;
 
 #[cfg(feature = "reqwest")]
 #[derive(Debug, Clone)]
@@ -235,6 +237,7 @@ struct PendingHttpRequest {
     url: String,
     method: String,
     body: Vec<u8>,
+    headers: HashMap<String, Vec<String>>,
 }
 
 #[cfg(feature = "rouille")]
@@ -273,10 +276,21 @@ impl HttpServer {
                     Ok(_) => (),
                     Err(_) => return Response::text("Failed to read body").with_status_code(500),
                 };
+
+                let mut headers : HashMap<String, Vec<String>> = HashMap::new();
+                for (key, value) in request.headers() {
+                    if let Some(vals) = headers.get_mut(key) {
+                        vals.push(value.to_string());
+                    } else {
+                        headers.insert(key.to_string(), vec![value.to_string()]);
+                    }
+                }
+
                 let p_request = PendingHttpRequest {
                     body: buf,
                     method: request.method().to_string(),
                     url: request.url().to_string(),
+                    headers,
                 };
 
                 match sender.lock() {
@@ -386,6 +400,19 @@ fn handle_request(
         "body",
         VVal::new_byt(pend_req.body),
     );
+
+    let headers = VVal::map();
+    for (key, vals) in pend_req.headers.into_iter() {
+        if headers.v_k(&key).is_none() {
+            let header_vals = VVal::vec();
+            for val in vals.into_iter() {
+                header_vals.push(VVal::new_str_mv(val));
+            }
+
+            let _ = headers.set_key_str(&key, header_vals);
+        }
+    }
+    let _ = req.set_key_str("headers", headers);
 
     match fun.call(env, &[req.clone()]) {
         Ok(val) => match pending_response.send(&val) {
