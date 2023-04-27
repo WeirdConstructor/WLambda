@@ -629,37 +629,37 @@ without any additional terms or conditions.
 
 */
 
-pub mod vval;
-pub mod parser;
-pub mod compiler;
-pub mod ops;
-pub mod vm;
-pub mod prelude;
-pub mod threads;
-pub mod rpc_helper;
-pub mod util;
-pub mod nvec;
-pub mod vval_user_obj;
-pub mod selector;
-pub mod struct_pattern;
-pub mod formatter;
 pub mod chemistry;
-mod packer;
-mod prog_writer;
+pub mod compiler;
+pub mod formatter;
 mod io;
-mod str_int;
+pub mod nvec;
+pub mod ops;
+mod packer;
+pub mod parser;
+pub mod prelude;
+mod prog_writer;
+pub mod rpc_helper;
+pub mod selector;
 mod stdlib;
+mod str_int;
+pub mod struct_pattern;
+pub mod threads;
+pub mod util;
+pub mod vm;
+pub mod vval;
+pub mod vval_user_obj;
 
-pub use stdlib::csv;
-pub use vval::VVal;
-pub use vval::Env;
-pub use vval::StackAction;
-pub use vval::VValUserData;
-pub use threads::AVal;
+pub use compiler::EvalContext;
 pub use compiler::GlobalEnv;
 pub use compiler::GlobalEnvRef;
-pub use compiler::EvalContext;
 pub use compiler::SymbolTable;
+pub use stdlib::csv;
+pub use threads::AVal;
+pub use vval::Env;
+pub use vval::StackAction;
+pub use vval::VVal;
+pub use vval::VValUserData;
 
 /// Evaluates a piece of WLambda code in a default global environment.
 ///
@@ -667,7 +667,7 @@ pub use compiler::SymbolTable;
 /// println!("> {}", wlambda::eval("${a = 10, b = 20}").unwrap().s());
 /// ```
 #[allow(dead_code)]
-pub fn eval(s: &str) -> Result<VVal, crate::compiler::EvalError>  {
+pub fn eval(s: &str) -> Result<VVal, crate::compiler::EvalError> {
     let mut ctx = EvalContext::new_default();
     ctx.eval(s)
 }

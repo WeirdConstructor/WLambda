@@ -211,7 +211,7 @@ impl VValUserData for VImapSession {
                         "$<IMAPSession>.search[{}] error: {}",
                         argv.v_s_raw(0),
                         e
-                    )))
+                    ))),
                 }
             }
             "select" => {
@@ -317,7 +317,10 @@ impl VValUserData for VImapSession {
 fn mail_part2vv(env: &mut Env, part: &ParsedMail) -> Result<VVal, VVal> {
     let m = VVal::map();
     for header in part.get_headers().into_iter() {
-        let _ = m.set_key_str(&header.get_key().to_lowercase()[..], VVal::new_str_mv(header.get_value()));
+        let _ = m.set_key_str(
+            &header.get_key().to_lowercase()[..],
+            VVal::new_str_mv(header.get_value()),
+        );
     }
 
     let body = if let Some(ct) = part.get_headers().get_first_value("Content-Type") {

@@ -42,48 +42,47 @@ assert_eq!(res.s(), "$[10,50]");
 
 */
 
+use crate::nvec::NVec;
 use crate::parser::{self};
 use crate::prelude::*;
-use crate::vval::VVal;
-use crate::vval::Syntax;
-use crate::vval::Env;
-use crate::vval::VValFun;
-use crate::vval::StackAction;
-use crate::vval::CompileError;
-use crate::vval::VarPos;
-use crate::vval::EvalNode;
-use crate::vval::SynPos;
-use crate::vval::CollectionAdd;
-use crate::nvec::NVec;
 use crate::str_int::*;
 use crate::threads::*;
+use crate::vval::CollectionAdd;
+use crate::vval::CompileError;
+use crate::vval::Env;
+use crate::vval::EvalNode;
+use crate::vval::StackAction;
+use crate::vval::SynPos;
+use crate::vval::Syntax;
+use crate::vval::VVal;
+use crate::vval::VValFun;
+use crate::vval::VarPos;
 
-use crate::pw_null;
+use crate::ops::*;
+use crate::prog_writer::*;
 use crate::pw;
+use crate::pw_needs_storage;
+use crate::pw_null;
 use crate::pw_provides_result_pos;
 use crate::pw_store_if_needed;
-use crate::pw_needs_storage;
-use crate::prog_writer::*;
-use crate::ops::*;
 
 use crate::io::debug_print_value;
 
+use crate::formatter;
 use crate::selector;
 use crate::struct_pattern;
-use crate::formatter;
 
+use std::cell::RefCell;
+use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::cell::RefCell;
-use std::fmt::{Display, Formatter};
 
 use fnv::FnvHashMap;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
-struct CompileLocal {
-}
+struct CompileLocal {}
 
 #[derive(Debug)]
 /// Error for the `ModuleResolver` trait, to implement
@@ -111,7 +110,12 @@ pub trait ModuleResolver {
     /// load them by executing another WLambda script or whatever you fancy.
     ///
     /// See LocalFileModuleResolver as example on how to implement this.
-    fn resolve(&self, global: GlobalEnvRef, path: &[String], import_file_path: Option<&str>) -> Result<SymbolTable, ModuleLoadError>;
+    fn resolve(
+        &self,
+        global: GlobalEnvRef,
+        path: &[String],
+        import_file_path: Option<&str>,
+    ) -> Result<SymbolTable, ModuleLoadError>;
 
     fn clone_preloaded_files(&self) -> Option<std::collections::HashMap<String, Arc<String>>>;
 }
@@ -129,18 +133,16 @@ impl LocalFileModuleResolver {
     pub fn new() -> LocalFileModuleResolver {
         LocalFileModuleResolver {
             preloaded_files: None,
-            loaded_modules:
-                Rc::new(RefCell::new(std::collections::HashMap::new())),
+            loaded_modules: Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
     }
 
     pub fn new_with_preloaded(
-        preloaded: Rc<RefCell<std::collections::HashMap<String, Arc<String>>>>) -> LocalFileModuleResolver {
-
+        preloaded: Rc<RefCell<std::collections::HashMap<String, Arc<String>>>>,
+    ) -> LocalFileModuleResolver {
         LocalFileModuleResolver {
             preloaded_files: Some(preloaded),
-            loaded_modules:
-                Rc::new(RefCell::new(std::collections::HashMap::new())),
+            loaded_modules: Rc::new(RefCell::new(std::collections::HashMap::new())),
         }
     }
 
@@ -165,11 +167,13 @@ impl LocalFileModuleResolver {
     ///```
     pub fn preload(&mut self, filepath: &str, contents: String) {
         if self.preloaded_files.is_none() {
-            self.preloaded_files =
-                Some(Rc::new(RefCell::new(std::collections::HashMap::new())));
+            self.preloaded_files = Some(Rc::new(RefCell::new(std::collections::HashMap::new())));
         }
 
-        self.preloaded_files.as_ref().unwrap().borrow_mut()
+        self.preloaded_files
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
             .insert(filepath.to_string(), Arc::new(contents));
     }
 }
@@ -206,9 +210,7 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub fn new() -> Self {
-        SymbolTable {
-            symbols: FnvHashMap::with_capacity_and_hasher(10, Default::default()),
-        }
+        SymbolTable { symbols: FnvHashMap::with_capacity_and_hasher(10, Default::default()) }
     }
 
     /// This function returns all symbols defined in this SymbolTable.
@@ -254,15 +256,16 @@ impl SymbolTable {
     ///        None, None, false);
     ///```
     pub fn fun<T>(
-        &mut self, fnname: &str, fun: T,
+        &mut self,
+        fnname: &str,
+        fun: T,
         min_args: Option<usize>,
         max_args: Option<usize>,
-        err_arg_ok: bool)
-        where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
-
-        self.symbols.insert(
-            s2sym(fnname),
-            VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
+        err_arg_ok: bool,
+    ) where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        self.symbols.insert(s2sym(fnname), VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
     }
 }
 
@@ -275,12 +278,14 @@ impl ModuleResolver for LocalFileModuleResolver {
         None
     }
 
-    fn resolve(&self, global: GlobalEnvRef, path: &[String], import_file_path: Option<&str>)
-        -> Result<SymbolTable, ModuleLoadError>
-    {
+    fn resolve(
+        &self,
+        global: GlobalEnvRef,
+        path: &[String],
+        import_file_path: Option<&str>,
+    ) -> Result<SymbolTable, ModuleLoadError> {
         let genv = GlobalEnv::new_empty_default();
-        genv.borrow_mut().set_thread_creator(
-            global.borrow().get_thread_creator());
+        genv.borrow_mut().set_thread_creator(global.borrow().get_thread_creator());
         genv.borrow_mut().import_modules_from(&*global.borrow());
 
         let mut ctx = EvalContext::new(genv);
@@ -295,16 +300,13 @@ impl ModuleResolver for LocalFileModuleResolver {
         if let Some(ifp) = import_file_path {
             let impfp = std::path::Path::new(ifp);
 
-            let import_dir_path =
-                if impfp.is_file() {
-                    impfp.parent()
-                } else {
-                    Some(impfp)
-                };
+            let import_dir_path = if impfp.is_file() { impfp.parent() } else { Some(impfp) };
 
             if let Some(idp) = import_dir_path {
                 let mut pb = idp.to_path_buf();
-                for p in path { pb.push(p); }
+                for p in path {
+                    pb.push(p);
+                }
 
                 if let Some(p) = pb.as_path().to_str() {
                     check_paths.push(format!("{}.wl", p));
@@ -319,11 +321,9 @@ impl ModuleResolver for LocalFileModuleResolver {
                         Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
                         Ok(_v) => {
                             let exports = Rc::new(ctx.get_exports());
-                            self.loaded_modules
-                                .borrow_mut()
-                                .insert(pth, exports);
+                            self.loaded_modules.borrow_mut().insert(pth, exports);
                             Ok(ctx.get_exports())
-                        },
+                        }
                     };
                 }
             }
@@ -333,12 +333,10 @@ impl ModuleResolver for LocalFileModuleResolver {
                     Err(e) => Err(ModuleLoadError::ModuleEvalError(e)),
                     Ok(_v) => {
                         let exports = Rc::new(ctx.get_exports());
-                        self.loaded_modules
-                            .borrow_mut()
-                            .insert(pth, exports);
+                        self.loaded_modules.borrow_mut().insert(pth, exports);
                         Ok(ctx.get_exports())
-                    },
-                }
+                    }
+                };
             }
         }
 
@@ -365,8 +363,7 @@ impl ModuleResolver for LocalFileModuleResolver {
 #[derive(Clone)]
 pub struct GlobalEnv {
     env: std::collections::HashMap<String, VVal>,
-    mem_modules:
-        std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, SymbolTable>>>,
+    mem_modules: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, SymbolTable>>>,
 
     /// Holds the default module resolver for this global environment.
     /// If some code executed with this global environment uses `!@import`
@@ -407,11 +404,16 @@ impl GlobalEnv {
     ///         Ok(v.clone())
     ///     }, Some(2), Some(2));
     /// ```
-    pub fn add_func<T>(&mut self, fnname: &str, fun: T, min_args: Option<usize>, max_args: Option<usize>)
-        where T: 'static + Fn(&mut Env, usize) -> Result<VVal,StackAction> {
-        self.env.insert(
-            String::from(fnname),
-            VValFun::new_fun(fun, min_args, max_args, false));
+    pub fn add_func<T>(
+        &mut self,
+        fnname: &str,
+        fun: T,
+        min_args: Option<usize>,
+        max_args: Option<usize>,
+    ) where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        self.env.insert(String::from(fnname), VValFun::new_fun(fun, min_args, max_args, false));
     }
 
     /// Sets a global variable to a value.
@@ -420,8 +422,12 @@ impl GlobalEnv {
     #[allow(dead_code)]
     pub fn set_var(&mut self, var: &str, val: &VVal) {
         match self.env.get(var) {
-            Some(v) => { v.set_ref(val.clone()); }
-            None    => { self.env.insert(String::from(var), val.to_ref()); }
+            Some(v) => {
+                v.set_ref(val.clone());
+            }
+            None => {
+                self.env.insert(String::from(var), val.to_ref());
+            }
         }
     }
 
@@ -466,10 +472,13 @@ impl GlobalEnv {
     /// only works on previously `set_module` modules.
     /// Returns true if the module was found.
     pub fn import_module_as(&mut self, mod_name: &str, prefix: &str) -> bool {
-        let prefix =
-            if mod_name == "wlambda" && prefix == "wlambda" { String::from("") }
-            else if !prefix.is_empty() { prefix.to_string() + ":" }
-            else { String::from("") };
+        let prefix = if mod_name == "wlambda" && prefix == "wlambda" {
+            String::from("")
+        } else if !prefix.is_empty() {
+            prefix.to_string() + ":"
+        } else {
+            String::from("")
+        };
 
         if let Some(st) = self.mem_modules.borrow_mut().get(mod_name) {
             for (k, v) in &st.symbols {
@@ -514,9 +523,9 @@ impl GlobalEnv {
     pub fn new() -> GlobalEnvRef {
         Rc::new(RefCell::new(GlobalEnv {
             env: std::collections::HashMap::new(),
-            mem_modules:
-                std::rc::Rc::new(std::cell::RefCell::new(
-                    std::collections::HashMap::new())),
+            mem_modules: std::rc::Rc::new(
+                std::cell::RefCell::new(std::collections::HashMap::new()),
+            ),
             resolver: None,
             thread_creator: None,
         }))
@@ -542,7 +551,7 @@ impl GlobalEnv {
     pub fn new_default() -> GlobalEnvRef {
         let g = Self::new_empty_default();
         g.borrow_mut().import_module_as("wlambda", "");
-        g.borrow_mut().import_module_as("std",     "std");
+        g.borrow_mut().import_module_as("std", "std");
         g
     }
 
@@ -550,8 +559,7 @@ impl GlobalEnv {
     /// from the given `parent_global_env` to the current environment.
     pub fn import_modules_from(&mut self, parent_global_env: &GlobalEnv) {
         if parent_global_env.resolver.is_some() {
-            self.set_resolver(
-                parent_global_env.resolver.as_ref().unwrap().clone());
+            self.set_resolver(parent_global_env.resolver.as_ref().unwrap().clone());
         }
 
         for (mod_name, symtbl) in parent_global_env.mem_modules.borrow().iter() {
@@ -572,14 +580,11 @@ impl GlobalEnv {
     pub fn new_empty_default() -> GlobalEnvRef {
         let g = GlobalEnv::new();
         g.borrow_mut().set_module("wlambda", core_symbol_table());
-        g.borrow_mut().set_module("std",     std_symbol_table());
-        g.borrow_mut().set_thread_creator(
-            Some(Arc::new(Mutex::new(
-                DefaultThreadCreator::new(
-                    FunctionGlobalEnvCreator::from(
-                        Box::new(GlobalEnv::new_default)))))));
-        g.borrow_mut().set_resolver(
-            Rc::new(RefCell::new(LocalFileModuleResolver::new())));
+        g.borrow_mut().set_module("std", std_symbol_table());
+        g.borrow_mut().set_thread_creator(Some(Arc::new(Mutex::new(DefaultThreadCreator::new(
+            FunctionGlobalEnvCreator::from(Box::new(GlobalEnv::new_default)),
+        )))));
+        g.borrow_mut().set_resolver(Rc::new(RefCell::new(LocalFileModuleResolver::new())));
         g.borrow_mut().set_var("\\", &VVal::None);
         g
     }
@@ -587,16 +592,12 @@ impl GlobalEnv {
     /// Assigns a new thread creator to this GlobalEnv.
     /// It will be used to spawn new threads if `std:thread:spawn` from
     /// WLambda's standard library is called.
-    pub fn set_thread_creator(&mut self,
-        tc: Option<Arc<Mutex<dyn ThreadCreator>>>)
-    {
+    pub fn set_thread_creator(&mut self, tc: Option<Arc<Mutex<dyn ThreadCreator>>>) {
         self.thread_creator = tc.clone();
     }
 
     /// Returns the thread creator for this GlobalEnv if one is set.
-    pub fn get_thread_creator(&self)
-        -> Option<Arc<Mutex<dyn ThreadCreator>>>
-    {
+    pub fn get_thread_creator(&self) -> Option<Arc<Mutex<dyn ThreadCreator>>> {
         self.thread_creator.clone()
     }
 }
@@ -619,9 +620,9 @@ impl Display for EvalError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             EvalError::IOError(file, e) => write!(f, "IO error: file '{}': {} ", file, e),
-            EvalError::ParseError(e)    => write!(f, "Parse error: {}", e),
-            EvalError::CompileError(e)  => write!(f, "Compile error: {}", e),
-            EvalError::ExecError(s)     => write!(f, "Runtime error: {}", s),
+            EvalError::ParseError(e) => write!(f, "Parse error: {}", e),
+            EvalError::CompileError(e) => write!(f, "Compile error: {}", e),
+            EvalError::ExecError(s) => write!(f, "Runtime error: {}", s),
         }
     }
 }
@@ -678,12 +679,12 @@ impl Display for EvalError {
 pub struct EvalContext {
     /// Holds the reference to the supplied or internally created
     /// GlobalEnv.
-    pub global:         GlobalEnvRef,
-    local_compile:      Rc<RefCell<CompileEnv>>,
-    user:               Rc<RefCell<dyn std::any::Any>>,
+    pub global: GlobalEnvRef,
+    local_compile: Rc<RefCell<CompileEnv>>,
+    user: Rc<RefCell<dyn std::any::Any>>,
     /// Holds the top level environment data accross multiple eval()
     /// invocations.
-    pub local:          Rc<RefCell<Env>>,
+    pub local: Rc<RefCell<Env>>,
 }
 
 impl EvalContext {
@@ -696,8 +697,7 @@ impl EvalContext {
     /// let ctx = EvalContext::new(genv);
     ///```
     pub fn new(global: GlobalEnvRef) -> EvalContext {
-        (Self::new_with_user_impl(global, Rc::new(RefCell::new(VVal::vec()))))
-        .register_self_eval()
+        (Self::new_with_user_impl(global, Rc::new(RefCell::new(VVal::vec())))).register_self_eval()
     }
 
     /// Creates a new EvalContext with an empty GlobalEnv.
@@ -723,9 +723,7 @@ impl EvalContext {
     ///```
     #[allow(dead_code)]
     pub fn new_empty_global_env() -> EvalContext {
-        Self::new_with_user_impl(
-            GlobalEnv::new(),
-            Rc::new(RefCell::new(VVal::vec())))
+        Self::new_with_user_impl(GlobalEnv::new(), Rc::new(RefCell::new(VVal::vec())))
     }
 
     /// A shortcut: This creates a new EvalContext with a GlobalEnv::new_default()
@@ -743,19 +741,22 @@ impl EvalContext {
 
     fn register_self_eval(self) -> Self {
         let ctx_clone =
-            Self::new_with_user_impl(
-                self.global.clone(),
-                self.local.borrow().get_user());
+            Self::new_with_user_impl(self.global.clone(), self.local.borrow().get_user());
 
-        self.global.borrow_mut().add_func("std:eval", move |env: &mut Env, _argc: usize| {
-            let code    = env.arg(0).s_raw();
-            let ctx     = ctx_clone.clone();
-            let mut ctx = ctx.register_self_eval();
-            match ctx.eval(&code) {
-                Ok(v)  => Ok(v),
-                Err(e) => Ok(env.new_err(format!("{}", e))),
-            }
-        }, Some(1), Some(2));
+        self.global.borrow_mut().add_func(
+            "std:eval",
+            move |env: &mut Env, _argc: usize| {
+                let code = env.arg(0).s_raw();
+                let ctx = ctx_clone.clone();
+                let mut ctx = ctx.register_self_eval();
+                match ctx.eval(&code) {
+                    Ok(v) => Ok(v),
+                    Err(e) => Ok(env.new_err(format!("{}", e))),
+                }
+            },
+            Some(1),
+            Some(2),
+        );
 
         self
     }
@@ -780,29 +781,33 @@ impl EvalContext {
 
     #[allow(dead_code)]
     fn new_with_user_impl(
-        global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> EvalContext {
-
+        global: GlobalEnvRef,
+        user: Rc<RefCell<dyn std::any::Any>>,
+    ) -> EvalContext {
         EvalContext {
             global: global.clone(),
-            user:   user.clone(),
+            user: user.clone(),
             local_compile: Rc::new(RefCell::new(CompileEnv {
-                parent:         None,
-                global:         global.clone(),
-                block_env:      BlockEnv::new(),
-                upvals:         Vec::new(),
-                locals_space:   0,
-                recent_var:     String::new(),
-                recent_sym:     String::new(),
+                parent: None,
+                global: global.clone(),
+                block_env: BlockEnv::new(),
+                upvals: Vec::new(),
+                locals_space: 0,
+                recent_var: String::new(),
+                recent_sym: String::new(),
                 implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
                 explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-                quote_func:     false,
+                quote_func: false,
             })),
             local: Rc::new(RefCell::new(Env::new_with_user(global, user))),
         }
     }
 
     #[allow(dead_code)]
-    pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> EvalContext {
+    pub fn new_with_user(
+        global: GlobalEnvRef,
+        user: Rc<RefCell<dyn std::any::Any>>,
+    ) -> EvalContext {
         (Self::new_with_user_impl(global, user)).register_self_eval()
     }
 
@@ -818,23 +823,22 @@ impl EvalContext {
     ///
     /// println!("Res: {}", r.s());
     /// ```
-    pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError>  {
+    pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError> {
         let prog = compile_vm_fun(ast, &mut self.local_compile);
         let locals_size = self.local_compile.borrow().get_local_space();
 
         let mut temporary_env = None;
 
-        let env =
-            match self.local.try_borrow_mut() {
-                Ok(env) => env,
-                Err(_) => {
-                    temporary_env =
-                        Some(Rc::new(RefCell::new(
-                            Env::new_with_user(
-                                self.global.clone(), self.user.clone()))));
-                    temporary_env.as_ref().unwrap().borrow_mut()
-                },
-            };
+        let env = match self.local.try_borrow_mut() {
+            Ok(env) => env,
+            Err(_) => {
+                temporary_env = Some(Rc::new(RefCell::new(Env::new_with_user(
+                    self.global.clone(),
+                    self.user.clone(),
+                ))));
+                temporary_env.as_ref().unwrap().borrow_mut()
+            }
+        };
 
         let mut res = Ok(VVal::None);
 
@@ -843,11 +847,11 @@ impl EvalContext {
                 Ok(prog_closures) => {
                     l_env.sp = 0;
                     l_env.set_bp(locals_size);
-                    match l_env.with_restore_sp(|e: &mut Env| { prog_closures(e) }) {
-                        Ok(v)   => Ok(v),
+                    match l_env.with_restore_sp(|e: &mut Env| prog_closures(e)) {
+                        Ok(v) => Ok(v),
                         Err(je) => Err(EvalError::ExecError(je)),
                     }
-                },
+                }
                 Err(e) => Err(EvalError::CompileError(e)),
             };
             l_env
@@ -877,7 +881,7 @@ impl EvalContext {
             let contents = contents.unwrap();
             match parser::parse(&contents, filename) {
                 Ok(ast) => self.eval_ast(&ast),
-                Err(e)  => Err(EvalError::ParseError(e)),
+                Err(e) => Err(EvalError::ParseError(e)),
             }
         }
     }
@@ -891,10 +895,10 @@ impl EvalContext {
     /// println!("Res: {}", r.s());
     /// ```
     #[allow(dead_code)]
-    pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError>  {
+    pub fn eval(&mut self, s: &str) -> Result<VVal, EvalError> {
         match parser::parse(s, "<wlambda::eval>") {
             Ok(ast) => self.eval_ast(&ast),
-            Err(e)  => Err(EvalError::ParseError(e)),
+            Err(e) => Err(EvalError::ParseError(e)),
         }
     }
 
@@ -908,12 +912,10 @@ impl EvalContext {
     /// assert_eq!(r.i(), 403, "matches contents!");
     /// ```
     #[allow(dead_code)]
-    pub fn eval_string(&mut self, code: &str, filename: &str)
-        -> Result<VVal, EvalError>
-    {
+    pub fn eval_string(&mut self, code: &str, filename: &str) -> Result<VVal, EvalError> {
         match parser::parse(code, filename) {
             Ok(ast) => self.eval_ast(&ast),
-            Err(e)  => Err(EvalError::ParseError(e)),
+            Err(e) => Err(EvalError::ParseError(e)),
         }
     }
 
@@ -944,7 +946,7 @@ impl EvalContext {
     /// assert_eq!(v.i(), 3);
     /// ```
     #[allow(dead_code)]
-    pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
+    pub fn call(&mut self, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction> {
         let mut env = self.local.borrow_mut();
         f.call(&mut env, args)
     }
@@ -967,11 +969,14 @@ impl EvalContext {
     ///     12);
     /// ```
     #[allow(dead_code)]
-    pub fn call_with_object(&mut self, obj: VVal, f: &VVal, args: &[VVal]) -> Result<VVal, StackAction>  {
+    pub fn call_with_object(
+        &mut self,
+        obj: VVal,
+        f: &VVal,
+        args: &[VVal],
+    ) -> Result<VVal, StackAction> {
         let mut env = self.local.borrow_mut();
-        env.with_object(obj.clone(), |env| {
-            f.call(env, args)
-        })
+        env.with_object(obj.clone(), |env| f.call(env, args))
     }
 
     /// Sets a global variable for the scripts to access.
@@ -1016,10 +1021,10 @@ pub(crate) enum ArityParam {
 #[allow(clippy::box_collection)]
 struct BlockEnv {
     local_map_stack: std::vec::Vec<(usize, Box<std::collections::HashMap<String, VarPos>>)>,
-    locals:          std::vec::Vec<(String, CompileLocal)>,
+    locals: std::vec::Vec<(String, CompileLocal)>,
 }
 
-#[derive(Debug,Clone,Copy,PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum ResValue {
     None,
     OptNone,
@@ -1030,7 +1035,7 @@ pub(crate) enum ResValue {
     SelfData,
 }
 
-#[derive(Debug,Clone,Copy,PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum ResPos {
     Local(u16),
     LocalRef(u16),
@@ -1048,7 +1053,7 @@ impl BlockEnv {
     fn new() -> Self {
         Self {
             local_map_stack: vec![(0, Box::new(std::collections::HashMap::new()))],
-            locals:          vec![],
+            locals: vec![],
         }
     }
 
@@ -1074,14 +1079,13 @@ impl BlockEnv {
 
     fn set_upvalue(&mut self, var: &str, idx: usize) -> VarPos {
         let last_idx = self.local_map_stack.len() - 1;
-        self.local_map_stack[last_idx].1
-            .insert(String::from(var), VarPos::UpValue(idx));
+        self.local_map_stack[last_idx].1.insert(String::from(var), VarPos::UpValue(idx));
         VarPos::UpValue(idx)
     }
 
     fn next_local(&mut self) -> usize {
         let next_index = self.locals.len();
-        self.locals.push((String::from(""), CompileLocal { }));
+        self.locals.push((String::from(""), CompileLocal {}));
         next_index
     }
 
@@ -1098,9 +1102,7 @@ impl BlockEnv {
     fn def_local(&mut self, var: &str, idx: usize) {
         self.locals[idx].0 = String::from(var);
         let last_idx = self.local_map_stack.len() - 1;
-        self.local_map_stack[last_idx].1
-            .insert(String::from(var),
-                    VarPos::Local(idx));
+        self.local_map_stack[last_idx].1.insert(String::from(var), VarPos::Local(idx));
         self.local_map_stack[last_idx].0 += 1;
     }
 
@@ -1124,15 +1126,15 @@ impl BlockEnv {
 #[derive(Debug, Clone)]
 pub(crate) struct CompileEnv {
     /// Reference to the global environment
-    pub global:    GlobalEnvRef,
+    pub global: GlobalEnvRef,
     /// Reference to the environment of the _parent_ function.
-    parent:    Option<Rc<RefCell<CompileEnv>>>,
+    parent: Option<Rc<RefCell<CompileEnv>>>,
     /// Holds all function local variables and manages nesting of blocks.
     block_env: BlockEnv,
     /// Holds the maximum number of locals ever used:
     locals_space: usize,
     /// Stores position of the upvalues for copying the upvalues at runtime.
-    upvals:    std::vec::Vec<VarPos>,
+    upvals: std::vec::Vec<VarPos>,
     /// Stores the implicitly calculated arity of this function.
     pub implicit_arity: (ArityParam, ArityParam),
     /// Stores the explicitly defined arity of this function.
@@ -1150,39 +1152,36 @@ type CompileEnvRef = Rc<RefCell<CompileEnv>>;
 
 impl CompileEnv {
     /// Creates a new compilation environment that references symbols in the
-    /// given [GlobalEnv]. 
+    /// given [GlobalEnv].
     pub fn new(g: GlobalEnvRef) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(CompileEnv {
-            parent:         None,
-            global:         g,
-            block_env:      BlockEnv::new(),
-            upvals:         Vec::new(),
-            locals_space:   0,
-            quote_func:     false,
-            recent_var:     String::new(),
-            recent_sym:     String::new(),
+            parent: None,
+            global: g,
+            block_env: BlockEnv::new(),
+            upvals: Vec::new(),
+            locals_space: 0,
+            quote_func: false,
+            recent_var: String::new(),
+            recent_sym: String::new(),
             implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
         }))
     }
 
     pub fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
-        let global = if let Some(p) = &parent {
-            p.borrow_mut().global.clone()
-        } else {
-            GlobalEnv::new()
-        };
+        let global =
+            if let Some(p) = &parent { p.borrow_mut().global.clone() } else { GlobalEnv::new() };
         Rc::new(RefCell::new(CompileEnv {
             parent,
             global,
-            block_env:      BlockEnv::new(),
-            upvals:         Vec::new(),
-            locals_space:   0,
-            recent_var:     String::new(),
-            recent_sym:     String::new(),
+            block_env: BlockEnv::new(),
+            upvals: Vec::new(),
+            locals_space: 0,
+            recent_var: String::new(),
+            recent_sym: String::new(),
             implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
-            quote_func:     false,
+            quote_func: false,
         }))
     }
 
@@ -1201,12 +1200,11 @@ impl CompileEnv {
     }
 
     pub fn find_or_new_local(&mut self, var: &str) -> usize {
-        let idx =
-            if let Some(idx) = self.block_env.find_local_in_current_block(var) {
-                idx
-            } else {
-                self.block_env.next_local()
-            };
+        let idx = if let Some(idx) = self.block_env.find_local_in_current_block(var) {
+            idx
+        } else {
+            self.block_env.next_local()
+        };
         if (idx + 1) > self.locals_space {
             self.locals_space = idx + 1;
         }
@@ -1221,7 +1219,9 @@ impl CompileEnv {
         idx
     }
 
-    pub fn get_local_space(&self) -> usize { self.locals_space }
+    pub fn get_local_space(&self) -> usize {
+        self.locals_space
+    }
 
     pub fn def(&mut self, s: &str, is_global: bool) -> VarPos {
         if is_global {
@@ -1241,13 +1241,13 @@ impl CompileEnv {
         for p in self.upvals.iter() {
             match p {
                 VarPos::UpValue(_) => poses.push(p.clone()),
-                VarPos::Local(_)   => poses.push(p.clone()),
+                VarPos::Local(_) => poses.push(p.clone()),
                 VarPos::Global(_) => {
                     panic!("Globals can't be captured as upvalues!");
-                },
+                }
                 VarPos::Const(_) => {
                     panic!("Consts can't be captured as upvalues!");
-                },
+                }
                 VarPos::NoPos => poses.push(p.clone()),
             }
         }
@@ -1273,7 +1273,7 @@ impl CompileEnv {
             VarPos::NoPos => {
                 let opt_p = self.parent.as_mut();
                 if opt_p.is_none() {
-                    if let Some(v) = self.global.borrow().env.get(s){
+                    if let Some(v) = self.global.borrow().env.get(s) {
                         if v.is_ref() {
                             return VarPos::Global(v.clone());
                         } else {
@@ -1289,14 +1289,14 @@ impl CompileEnv {
                 let par_var_pos = par_mut.block_env.get(s);
                 let par_var_pos = match par_var_pos {
                     VarPos::NoPos => par_mut.get(s),
-                    _             => par_var_pos,
+                    _ => par_var_pos,
                 };
                 match par_var_pos {
-                    VarPos::Local(_)   => self.def_up(s, par_var_pos),
+                    VarPos::Local(_) => self.def_up(s, par_var_pos),
                     VarPos::UpValue(_) => self.def_up(s, par_var_pos),
-                    VarPos::Global(g)  => VarPos::Global(g),
-                    VarPos::Const(c)   => VarPos::Const(c),
-                    VarPos::NoPos      => VarPos::NoPos
+                    VarPos::Global(g) => VarPos::Global(g),
+                    VarPos::Const(c) => VarPos::Const(c),
+                    VarPos::NoPos => VarPos::NoPos,
                 }
             }
             _ => pos,
@@ -1307,8 +1307,14 @@ impl CompileEnv {
 fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
     let min = ce.borrow().implicit_arity.0.clone();
     match min {
-        ArityParam::Undefined => { ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i); },
-        ArityParam::Limit(j) => { if j < i { ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i); }; },
+        ArityParam::Undefined => {
+            ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i);
+        }
+        ArityParam::Limit(j) => {
+            if j < i {
+                ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i);
+            };
+        }
         _ => (),
     }
 
@@ -1316,22 +1322,25 @@ fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
     match max {
         ArityParam::Undefined => {
             ce.borrow_mut().implicit_arity.1 = ArityParam::Limit(i);
-        },
+        }
         ArityParam::Limit(j) => {
-            if j < i { ce.borrow_mut().implicit_arity.1 = ArityParam::Limit(i); }
-        },
+            if j < i {
+                ce.borrow_mut().implicit_arity.1 = ArityParam::Limit(i);
+            }
+        }
         _ => (),
     }
 }
 
-fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal,
-                          ce: &mut Rc<RefCell<CompileEnv>>, vars: &VVal)
-{
+fn check_for_at_arity(
+    prev_arity: (ArityParam, ArityParam),
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    vars: &VVal,
+) {
     // If we have an destructuring assignment directly from "@", then we conclude
     // the implicit max arity to be minimum of number of vars:
-    if ast.at(2).unwrap_or(VVal::None)
-          .at(0).unwrap_or(VVal::None).get_syn() == Syntax::Var {
-
+    if ast.at(2).unwrap_or(VVal::None).at(0).unwrap_or(VVal::None).get_syn() == Syntax::Var {
         if let VVal::Lst(l) = vars {
             let llen = l.borrow().len();
 
@@ -1347,36 +1356,32 @@ fn check_for_at_arity(prev_arity: (ArityParam, ArityParam), ast: &VVal,
 fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
     let syn = ast.v_(0).get_syn();
     match syn {
-        Syntax::GetKey => {
-            Some((Syntax::GetKey, ast.v_(1), ast.v_(2)))
-        },
+        Syntax::GetKey => Some((Syntax::GetKey, ast.v_(1), ast.v_(2))),
         Syntax::GetKey2 => {
             let get_obj = ast.shallow_clone();
             get_obj.set_syn_at(0, Syntax::GetKey);
             let key = get_obj.pop();
             Some((Syntax::GetKey, get_obj, key))
-        },
+        }
         Syntax::GetKey3 => {
             let get_obj = ast.shallow_clone();
             get_obj.set_syn_at(0, Syntax::GetKey2);
             let key = get_obj.pop();
             Some((Syntax::GetKey, get_obj, key))
-        },
-        Syntax::GetSym => {
-            Some((Syntax::GetSym, ast.v_(1), ast.v_(2)))
-        },
+        }
+        Syntax::GetSym => Some((Syntax::GetSym, ast.v_(1), ast.v_(2))),
         Syntax::GetSym2 => {
             let get_obj = ast.shallow_clone();
             get_obj.set_syn_at(0, Syntax::GetSym);
             let key = get_obj.pop();
             Some((Syntax::GetSym, get_obj, key))
-        },
+        }
         Syntax::GetSym3 => {
             let get_obj = ast.shallow_clone();
             get_obj.set_syn_at(0, Syntax::GetSym2);
             let key = get_obj.pop();
             Some((Syntax::GetSym, get_obj, key))
-        },
+        }
         _ => None,
     }
 }
@@ -1385,23 +1390,27 @@ pub(crate) fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::V
     for u in upvs.iter() {
         match u {
             VarPos::UpValue(i) => upvalues.push(e.get_up_raw(*i)),
-            VarPos::Local(i)   => upvalues.push(e.get_local_up_promotion(*i)),
-            VarPos::NoPos      => upvalues.push(VVal::None.to_ref()),
-            VarPos::Global(_)  => (),
-            VarPos::Const(_)   => (),
+            VarPos::Local(i) => upvalues.push(e.get_local_up_promotion(*i)),
+            VarPos::NoPos => upvalues.push(VVal::None.to_ref()),
+            VarPos::Global(_) => (),
+            VarPos::Const(_) => (),
         }
     }
 }
 
-fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+fn compile_def(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    is_global: bool,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
-    let vars    = ast.at(1).unwrap();
-    let value   = ast.at(2).unwrap();
-    let destr   = ast.at(3).unwrap_or(VVal::None);
+    let vars = ast.at(1).unwrap();
+    let value = ast.at(2).unwrap();
+    let destr = ast.at(3).unwrap_or(VVal::None);
 
     //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
@@ -1410,18 +1419,15 @@ fn compile_def(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_global: bool) ->
 
         check_for_at_arity(prev_max_arity, ast, ce, &vars);
 
-        let poses =
-            vars.map_ok_skip(
-                |v| ce.borrow_mut().def(&v.s_raw(), is_global),
-                0);
+        let poses = vars.map_ok_skip(|v| ce.borrow_mut().def(&v.s_raw(), is_global), 0);
 
         pw_null!(prog, {
             let vp = val_pw.eval(prog);
-            prog.op_destr(&spos, vp, DestructureInfo {
-                vars:   vars.clone(),
-                poses:  poses.clone(),
-                is_ref: false,
-            });
+            prog.op_destr(
+                &spos,
+                vp,
+                DestructureInfo { vars: vars.clone(), poses: poses.clone(), is_ref: false },
+            );
         })
     } else {
         let varname = vars.at(0).unwrap().s_raw();
@@ -1461,30 +1467,62 @@ pub(crate) fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, Compile
             })
         })
     } else {
-        pw_provides_result_pos!(prog, {
-            arg_pos
-        })
+        pw_provides_result_pos!(prog, { arg_pos })
     }
 }
 
-fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+fn compile_var(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    capt_ref: bool,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     let var = ast.at(1).unwrap();
     var.with_s_ref(|var_s: &str| -> Result<ProgWriter, CompileError> {
         match var_s {
-            "_"  => { set_impl_arity(1,  ce); pw_arg(0, capt_ref) },
-            "_1" => { set_impl_arity(2,  ce); pw_arg(1, capt_ref) },
-            "_2" => { set_impl_arity(3,  ce); pw_arg(2, capt_ref) },
-            "_3" => { set_impl_arity(4,  ce); pw_arg(3, capt_ref) },
-            "_4" => { set_impl_arity(5,  ce); pw_arg(4, capt_ref) },
-            "_5" => { set_impl_arity(6,  ce); pw_arg(5, capt_ref) },
-            "_6" => { set_impl_arity(7,  ce); pw_arg(6, capt_ref) },
-            "_7" => { set_impl_arity(8,  ce); pw_arg(7, capt_ref) },
-            "_8" => { set_impl_arity(9,  ce); pw_arg(8, capt_ref) },
-            "_9" => { set_impl_arity(10, ce); pw_arg(9, capt_ref) },
-            "@"  => {
+            "_" => {
+                set_impl_arity(1, ce);
+                pw_arg(0, capt_ref)
+            }
+            "_1" => {
+                set_impl_arity(2, ce);
+                pw_arg(1, capt_ref)
+            }
+            "_2" => {
+                set_impl_arity(3, ce);
+                pw_arg(2, capt_ref)
+            }
+            "_3" => {
+                set_impl_arity(4, ce);
+                pw_arg(3, capt_ref)
+            }
+            "_4" => {
+                set_impl_arity(5, ce);
+                pw_arg(4, capt_ref)
+            }
+            "_5" => {
+                set_impl_arity(6, ce);
+                pw_arg(5, capt_ref)
+            }
+            "_6" => {
+                set_impl_arity(7, ce);
+                pw_arg(6, capt_ref)
+            }
+            "_7" => {
+                set_impl_arity(8, ce);
+                pw_arg(7, capt_ref)
+            }
+            "_8" => {
+                set_impl_arity(9, ce);
+                pw_arg(8, capt_ref)
+            }
+            "_9" => {
+                set_impl_arity(10, ce);
+                pw_arg(9, capt_ref)
+            }
+            "@" => {
                 ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
                 pw!(prog, store, {
                     store.if_must_store(|store_pos| {
@@ -1494,24 +1532,26 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool) -> 
                         }
                     })
                 })
-            },
+            }
             _ => {
                 let pos = ce.borrow_mut().get(var_s);
-                let mk_respos : Result<Box<dyn Fn(&mut Prog) -> ResPos>, CompileError> =
-                    match pos {
-                        VarPos::UpValue(i) =>
-                            Ok(Box::new(move |_prog: &mut Prog| ResPos::Up(i as u16))),
-                        VarPos::Local(i) =>
-                            Ok(Box::new(move |_prog: &mut Prog| ResPos::Local(i as u16))),
-                        VarPos::Global(v) =>
-                            Ok(Box::new(move |prog: &mut Prog| prog.global_pos(v.clone()))),
-                        VarPos::Const(v) =>
-                            Ok(Box::new(move |prog: &mut Prog| prog.data_pos(v.clone()))),
-                        VarPos::NoPos => {
-                            Err(ast.compile_err(
-                                format!("Variable '{}' undefined", var_s)))
-                        }
-                    };
+                let mk_respos: Result<Box<dyn Fn(&mut Prog) -> ResPos>, CompileError> = match pos {
+                    VarPos::UpValue(i) => {
+                        Ok(Box::new(move |_prog: &mut Prog| ResPos::Up(i as u16)))
+                    }
+                    VarPos::Local(i) => {
+                        Ok(Box::new(move |_prog: &mut Prog| ResPos::Local(i as u16)))
+                    }
+                    VarPos::Global(v) => {
+                        Ok(Box::new(move |prog: &mut Prog| prog.global_pos(v.clone())))
+                    }
+                    VarPos::Const(v) => {
+                        Ok(Box::new(move |prog: &mut Prog| prog.data_pos(v.clone())))
+                    }
+                    VarPos::NoPos => {
+                        Err(ast.compile_err(format!("Variable '{}' undefined", var_s)))
+                    }
+                };
                 let mk_respos = mk_respos?;
                 pw_provides_result_pos!(prog, {
                     let var_respos = mk_respos(prog);
@@ -1528,17 +1568,19 @@ fn compile_var(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, capt_ref: bool) -> 
     })
 }
 
-fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool)
-    -> Result<ProgWriter, CompileError>
-{
+fn compile_assign(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    is_ref: bool,
+) -> Result<ProgWriter, CompileError> {
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
-    let vars          = ast.at(1).unwrap();
-    let value         = ast.at(2).unwrap();
-    let destr         = ast.at(3).unwrap_or(VVal::None);
+    let vars = ast.at(1).unwrap();
+    let value = ast.at(2).unwrap();
+    let destr = ast.at(3).unwrap_or(VVal::None);
 
     if destr.b() {
         let val_pw = compile(&value, ce)?;
@@ -1549,67 +1591,72 @@ fn compile_assign(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>, is_ref: bool)
 
         pw_null!(prog, {
             let vp = val_pw.eval(prog);
-            prog.op_destr(&spos, vp, DestructureInfo {
-                vars:   vars.clone(),
-                poses:  poses.clone(),
-                is_ref,
-            });
+            prog.op_destr(
+                &spos,
+                vp,
+                DestructureInfo { vars: vars.clone(), poses: poses.clone(), is_ref },
+            );
         })
     } else {
         let varname = &vars.at(0).unwrap().s_raw();
-        let pos     = ce.borrow_mut().get(varname);
+        let pos = ce.borrow_mut().get(varname);
 
         let val_pw = compile(&value, ce)?;
 
         match pos {
-            VarPos::Const(_) =>
-                return Err(ast.compile_err(
-                    format!("Can't assign to constant '{}'", varname))),
-            VarPos::NoPos =>
-                return Err(ast.compile_err(
-                    format!("Can't assign to undefined local variable '{}'", varname))),
+            VarPos::Const(_) => {
+                return Err(ast.compile_err(format!("Can't assign to constant '{}'", varname)))
+            }
+            VarPos::NoPos => {
+                return Err(ast.compile_err(format!(
+                    "Can't assign to undefined local variable '{}'",
+                    varname
+                )))
+            }
             _ => (),
         }
 
         pw_null!(prog, {
-            let rp =
-                match pos.clone() {
-                    VarPos::Local(vip) => {
-                        if is_ref {
-                            ResPos::LocalRef(vip as u16)
-                        } else {
-                            ResPos::Local(vip as u16)
-                        }
-                    },
-                    VarPos::Global(r) => {
-                        if is_ref {
-                            prog.global_ref_pos(r)
-                        } else {
-                            prog.global_pos(r)
-                        }
-                    },
-                    VarPos::UpValue(vip) => {
-                        if is_ref {
-                            ResPos::UpRef(vip as u16)
-                        } else {
-                            ResPos::Up(vip as u16)
-                        }
-                    },
-                    _ => ResPos::Value(ResValue::None)
-                };
+            let rp = match pos.clone() {
+                VarPos::Local(vip) => {
+                    if is_ref {
+                        ResPos::LocalRef(vip as u16)
+                    } else {
+                        ResPos::Local(vip as u16)
+                    }
+                }
+                VarPos::Global(r) => {
+                    if is_ref {
+                        prog.global_ref_pos(r)
+                    } else {
+                        prog.global_pos(r)
+                    }
+                }
+                VarPos::UpValue(vip) => {
+                    if is_ref {
+                        ResPos::UpRef(vip as u16)
+                    } else {
+                        ResPos::Up(vip as u16)
+                    }
+                }
+                _ => ResPos::Value(ResValue::None),
+            };
 
             val_pw.eval_to(prog, rp)
         })
     }
 }
 
-fn compile_stmts(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
-    let exprs : Vec<ProgWriter> =
-        ast.map_skip( |e| { compile(e, ce) }, skip_cnt)?;
+fn compile_stmts(
+    ast: &VVal,
+    skip_cnt: usize,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let exprs: Vec<ProgWriter> = ast.map_skip(|e| compile(e, ce), skip_cnt)?;
 
     pw!(prog, store, {
         let expr_count = exprs.len();
-        let mut res    = ResPos::Value(ResValue::None);
+        let mut res = ResPos::Value(ResValue::None);
 
         for (i, e) in exprs.iter().enumerate() {
             if i == expr_count - 1 {
@@ -1635,11 +1682,15 @@ macro_rules! var_env_clear_locals {
         } else {
             $block
         }
-    }
+    };
 }
 
-fn compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+fn compile_block(
+    ast: &VVal,
+    skip_cnt: usize,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     ce.borrow_mut().push_block_env();
@@ -1653,7 +1704,7 @@ fn compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) 
                     stmts.eval_to(prog, ResPos::Stack(0))
                 });
                 ResPos::Stack(0)
-            },
+            }
             _ => {
                 var_env_clear_locals!(prog, from_local_idx, to_local_idx, spos, {
                     stmts.eval_proxy(prog, store)
@@ -1663,47 +1714,49 @@ fn compile_block(ast: &VVal, skip_cnt: usize, ce: &mut Rc<RefCell<CompileEnv>>) 
     })
 }
 
-fn compile_direct_block(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
+fn compile_direct_block(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
     match ast {
         VVal::Lst(_) => {
-            let syn  = ast.at(0).unwrap_or(VVal::None);
-            let syn  = syn.get_syn();
+            let syn = ast.at(0).unwrap_or(VVal::None);
+            let syn = syn.get_syn();
 
             match syn {
                 Syntax::Func => {
-                    let label          = ast.at(1).unwrap();
+                    let label = ast.at(1).unwrap();
                     let explicit_arity = ast.at(2).unwrap();
 
                     if !label.is_none() {
-                        return Err(
-                            ast.compile_err(
-                                format!("direct blocks don't support labels: {}",
-                                        ast.s())));
+                        return Err(ast.compile_err(format!(
+                            "direct blocks don't support labels: {}",
+                            ast.s()
+                        )));
                     }
 
                     if !explicit_arity.is_none() {
-                        return Err(
-                            ast.compile_err(
-                                format!("direct blocks don't support arity: {}",
-                                        ast.s())));
+                        return Err(ast.compile_err(format!(
+                            "direct blocks don't support arity: {}",
+                            ast.s()
+                        )));
                     }
 
                     compile_block(ast, 3, ce)
-                },
+                }
                 _ => compile(ast, ce),
             }
-        },
+        }
         _ => compile(ast, ce),
     }
 }
 
-
-fn compile_binop(ast: &VVal, op: BinOp, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+fn compile_binop(
+    ast: &VVal,
+    op: BinOp,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     let a_pw = compile(&ast.at(1).unwrap(), ce)?;
@@ -1730,17 +1783,17 @@ fn compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                         v.push(compile_const_value(i)?);
                     }
                     Ok(v)
-                },
+                }
                 Syntax::Map => {
                     let m = VVal::map();
                     for i in l.iter().skip(1) {
                         let key = compile_const_value(&i.at(0).unwrap_or(VVal::None))?;
                         let val = compile_const_value(&i.at(1).unwrap_or(VVal::None))?;
                         m.set_key_sym(key.to_sym(), val)
-                         .expect("Const map not used more than once");
+                            .expect("Const map not used more than once");
                     }
                     Ok(m)
-                },
+                }
                 Syntax::IVec => {
                     let a = compile_const_value(&l[1])?;
                     let b = compile_const_value(&l[2])?;
@@ -1755,7 +1808,7 @@ fn compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                     } else {
                         Ok(VVal::IVec(Box::new(NVec::Vec2(a.i(), b.i()))))
                     }
-                },
+                }
                 Syntax::FVec => {
                     let a = compile_const_value(&l[1])?;
                     let b = compile_const_value(&l[2])?;
@@ -1770,39 +1823,36 @@ fn compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
                     } else {
                         Ok(VVal::FVec(Box::new(NVec::Vec2(a.f(), b.f()))))
                     }
-                },
-                _ => Err(val.to_compile_err(
-                    format!(
-                        "Invalid literal in constant definition: {}",
-                        val.s())).err().unwrap()),
+                }
+                _ => Err(val
+                    .to_compile_err(format!("Invalid literal in constant definition: {}", val.s()))
+                    .err()
+                    .unwrap()),
             }
-        },
+        }
         VVal::Pair(bx) => {
             let a = compile_const_value(&bx.0)?;
             let b = compile_const_value(&bx.1)?;
             Ok(VVal::pair(a, b))
-        },
+        }
         _ => Ok(val.clone()),
     }
 }
 
-fn compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let vars    = ast.at(1).unwrap();
-    let value   = ast.at(2).unwrap();
-    let destr   = ast.at(3).unwrap_or(VVal::None);
+fn compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWriter, CompileError> {
+    let vars = ast.at(1).unwrap();
+    let value = ast.at(2).unwrap();
+    let destr = ast.at(3).unwrap_or(VVal::None);
 
     if destr.b() {
         for (i, (v, _)) in vars.iter().enumerate() {
             let varname = v.s_raw();
             let val = compile_const_value(&value)?;
-            let val =
-                match val {
-                    VVal::Lst(_) => val.at(i).unwrap_or(VVal::None),
-                    VVal::Map(_) => val.get_key(&varname).unwrap_or(VVal::None),
-                    _ => val,
-                };
+            let val = match val {
+                VVal::Lst(_) => val.at(i).unwrap_or(VVal::None),
+                VVal::Map(_) => val.get_key(&varname).unwrap_or(VVal::None),
+                _ => val,
+            };
 
             ce.borrow_mut().def_const(&varname, val);
         }
@@ -1812,17 +1862,18 @@ fn compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         ce.borrow_mut().def_const(&varname, const_val);
     }
 
-    pw_null!(prog, { })
+    pw_null!(prog, {})
 }
 
-pub(crate) fn compile_break(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+pub(crate) fn compile_break(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() > 3 {
-        return Err(ast.compile_err("break takes 0 or 1 arguments".to_string()))
+        return Err(ast.compile_err("break takes 0 or 1 arguments".to_string()));
     }
 
     if let Some(expr) = ast.at(2) {
@@ -1833,20 +1884,20 @@ pub(crate) fn compile_break(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         })
     } else {
         pw_null!(prog, {
-            prog.op_ctrl_flow_break(
-                &spos, ResPos::Value(ResValue::None));
+            prog.op_ctrl_flow_break(&spos, ResPos::Value(ResValue::None));
         })
     }
 }
 
-pub(crate) fn compile_next(ast: &VVal, _ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+pub(crate) fn compile_next(
+    ast: &VVal,
+    _ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() > 2 {
-        return Err(ast.compile_err("next takes no arguments".to_string()))
+        return Err(ast.compile_err("next takes no arguments".to_string()));
     }
 
     pw_null!(prog, {
@@ -1854,30 +1905,27 @@ pub(crate) fn compile_next(ast: &VVal, _ce: &mut Rc<RefCell<CompileEnv>>)
     })
 }
 
-pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+pub(crate) fn compile_if(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 4 && ast.len() != 5 {
-        return Err(ast.compile_err(
-            "?/if takes 1 or 2 arguments (condition and expression)".to_string()))
+        return Err(
+            ast.compile_err("?/if takes 1 or 2 arguments (condition and expression)".to_string())
+        );
     }
 
-    let cond =
-        compile_direct_block(
-            &ast.at(2).unwrap_or(VVal::None), ce)?;
+    let cond = compile_direct_block(&ast.at(2).unwrap_or(VVal::None), ce)?;
 
-    let then_body =
-        compile_direct_block(
-            &ast.at(3).unwrap_or(VVal::None), ce)?;
+    let then_body = compile_direct_block(&ast.at(3).unwrap_or(VVal::None), ce)?;
 
     if let Some(else_body) = ast.at(4) {
         let else_body = compile_direct_block(&else_body, ce)?;
 
         pw!(prog, store, {
-
             let needs_store = store.if_null(|_| {
                 let mut then_body_prog = Prog::new();
                 let mut else_body_prog = Prog::new();
@@ -1887,8 +1935,7 @@ pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 then_body_prog.op_jmp(&spos, else_body_prog.op_count() as i32);
 
                 let condval = cond.eval(prog);
-                prog.op_jmp_ifn(
-                    &spos, condval, then_body_prog.op_count() as i32);
+                prog.op_jmp_ifn(&spos, condval, then_body_prog.op_count() as i32);
                 prog.append(then_body_prog);
                 prog.append(else_body_prog);
             });
@@ -1902,8 +1949,7 @@ pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     then_body_prog.op_jmp(&spos, else_body_prog.op_count() as i32);
 
                     let condval = cond.eval(prog);
-                    prog.op_jmp_ifn(
-                        &spos, condval, then_body_prog.op_count() as i32);
+                    prog.op_jmp_ifn(&spos, condval, then_body_prog.op_count() as i32);
                     prog.append(then_body_prog);
                     prog.append(else_body_prog);
                 })
@@ -1918,8 +1964,7 @@ pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 then_body.eval_nul(&mut then_body_prog);
 
                 let condval = cond.eval(prog);
-                prog.op_jmp_ifn(
-                    &spos, condval, then_body_prog.op_count() as i32);
+                prog.op_jmp_ifn(&spos, condval, then_body_prog.op_count() as i32);
                 prog.append(then_body_prog);
             });
 
@@ -1930,8 +1975,7 @@ pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     then_body_prog.op_jmp(&spos, 1);
 
                     let condval = cond.eval(prog);
-                    prog.op_jmp_ifn(
-                        &spos, condval, then_body_prog.op_count() as i32);
+                    prog.op_jmp_ifn(&spos, condval, then_body_prog.op_count() as i32);
                     prog.append(then_body_prog);
                     prog.op_mov(&spos, ResPos::Value(ResValue::None), store_pos);
                 })
@@ -1942,25 +1986,22 @@ pub(crate) fn compile_if(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     }
 }
 
-pub(crate) fn compile_while(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+pub(crate) fn compile_while(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 4 {
         return Err(ast.compile_err(
-            "while takes exactly 2 arguments (condition and expression)"
-            .to_string()));
+            "while takes exactly 2 arguments (condition and expression)".to_string(),
+        ));
     }
 
-    let cond =
-        compile_direct_block(
-            &ast.at(2).unwrap_or(VVal::None), ce)?;
+    let cond = compile_direct_block(&ast.at(2).unwrap_or(VVal::None), ce)?;
 
-    let body =
-        compile_direct_block(
-            &ast.at(3).unwrap_or(VVal::None), ce)?;
+    let body = compile_direct_block(&ast.at(3).unwrap_or(VVal::None), ce)?;
 
     return pw_null!(prog, {
         // Create the OPs for the body:
@@ -1971,58 +2012,52 @@ pub(crate) fn compile_while(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
         let mut cond_prog = Prog::new();
         let cond_val = cond.eval(&mut cond_prog);
 
-        prog.op_push_loop_info(
-            &spos, (cond_prog.op_count() + body_op_count + 2) as u16);
+        prog.op_push_loop_info(&spos, (cond_prog.op_count() + body_op_count + 2) as u16);
 
         let cond_op_count1 = prog.op_count();
-        cond_prog.op_jmp_ifn(
-            &spos, cond_val, body_op_count as i32 + 1);
+        cond_prog.op_jmp_ifn(&spos, cond_val, body_op_count as i32 + 1);
         prog.append(cond_prog);
 
-        let cond_offs =
-            body_op_count + (prog.op_count() - cond_op_count1);
+        let cond_offs = body_op_count + (prog.op_count() - cond_op_count1);
         body_prog.op_jmp(&spos, -(cond_offs as i32 + 1));
         prog.append(body_prog);
         prog.op_unwind(&spos);
     });
 }
 
-pub(crate) fn compile_iter(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let syn  = ast.at(0).unwrap_or(VVal::None);
+pub(crate) fn compile_iter(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     if ast.len() != 5 {
         return Err(ast.compile_err(
             "iter takes exactly 3 arguments \
              (variable identifier, iterable expression and \
-             iteration expression)".to_string()));
+             iteration expression)"
+                .to_string(),
+        ));
     }
 
     let var = ast.at(2).unwrap_or(VVal::None);
 
-    let varname =
-        match var.at(0).unwrap().get_syn() {
-            Syntax::Var => var.at(1).unwrap_or(VVal::None).s_raw(),
-            _ => {
-                return Err(ast.compile_err(
-                    "iter takes an identifier as first argument".to_string()));
-            }
-        };
+    let varname = match var.at(0).unwrap().get_syn() {
+        Syntax::Var => var.at(1).unwrap_or(VVal::None).s_raw(),
+        _ => {
+            return Err(ast.compile_err("iter takes an identifier as first argument".to_string()));
+        }
+    };
 
     ce.borrow_mut().push_block_env();
     let iter_var = ce.borrow_mut().next_local();
 
-    let iterable =
-        compile_direct_block(
-            &ast.at(3).unwrap_or(VVal::None), ce)?;
+    let iterable = compile_direct_block(&ast.at(3).unwrap_or(VVal::None), ce)?;
 
     ce.borrow_mut().def_local(&varname, iter_var);
 
-    let expr =
-        compile_direct_block(
-            &ast.at(4).unwrap_or(VVal::None), ce)?;
+    let expr = compile_direct_block(&ast.at(4).unwrap_or(VVal::None), ce)?;
 
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
 
@@ -2048,12 +2083,14 @@ pub(crate) fn compile_iter(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     })
 }
 
-pub(crate) fn generate_jump_table(spos: SynPos, value: ProgWriter, blocks: Vec<ProgWriter>)
-    -> Result<ProgWriter, CompileError>
-{
+pub(crate) fn generate_jump_table(
+    spos: SynPos,
+    value: ProgWriter,
+    blocks: Vec<ProgWriter>,
+) -> Result<ProgWriter, CompileError> {
     pw!(prog, store, {
         let mut block_progs = Vec::new();
-        let mut end_offs : i32 = 0;
+        let mut end_offs: i32 = 0;
 
         let needs_store = store.if_null(|_| {
             end_offs = 0;
@@ -2071,30 +2108,29 @@ pub(crate) fn generate_jump_table(spos: SynPos, value: ProgWriter, blocks: Vec<P
             }
         });
 
-        let res =
-            if needs_store {
-                store.if_must_store(|store_pos| {
-                    end_offs = 0;
-                    for b in blocks.iter().rev() {
-                        let mut b_prog = Prog::new();
+        let res = if needs_store {
+            store.if_must_store(|store_pos| {
+                end_offs = 0;
+                for b in blocks.iter().rev() {
+                    let mut b_prog = Prog::new();
 
-                        b.eval_to(&mut b_prog, store_pos);
-                        if end_offs > 0 {
-                            b_prog.op_jmp(&spos, end_offs);
-                        }
-                        end_offs += b_prog.op_count() as i32;
-
-                        block_progs.push(b_prog);
+                    b.eval_to(&mut b_prog, store_pos);
+                    if end_offs > 0 {
+                        b_prog.op_jmp(&spos, end_offs);
                     }
-                })
-            } else {
-                ResPos::Value(ResValue::None)
-            };
+                    end_offs += b_prog.op_count() as i32;
+
+                    block_progs.push(b_prog);
+                }
+            })
+        } else {
+            ResPos::Value(ResValue::None)
+        };
 
         let mut val_prog = Prog::new();
         let val = value.eval(&mut val_prog);
 
-        let mut tbl : Vec<i32> = vec![];
+        let mut tbl: Vec<i32> = vec![];
         let mut offs = 0;
         for b in block_progs.iter().rev() {
             tbl.push(offs);
@@ -2112,15 +2148,15 @@ pub(crate) fn generate_jump_table(spos: SynPos, value: ProgWriter, blocks: Vec<P
     })
 }
 
-pub(crate) fn compile_jump(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let syn  = ast.v_(0);
+pub(crate) fn compile_jump(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.v_(0);
     let spos = syn.get_syn_pos();
 
     if ast.len() < 4 {
-        return Err(ast.compile_err(
-            "jump takes at least 2 arguments".to_string()));
+        return Err(ast.compile_err("jump takes at least 2 arguments".to_string()));
     }
 
     let value = compile(&ast.v_(2), ce)?;
@@ -2146,15 +2182,15 @@ pub(crate) fn compile_jump(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 // 2. use op_jmp_tbl next to jump to the destinations
 // 3. benchmark the VM speed changes (if any, still fear it might slow down
 //    OP dispatch).
-pub(crate) fn compile_match(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
-    let syn  = ast.v_(0);
+pub(crate) fn compile_match(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.v_(0);
     let spos = syn.get_syn_pos();
 
     if ast.len() < 4 {
-        return Err(ast.compile_err(
-            "match takes at least 2 arguments".to_string()));
+        return Err(ast.compile_err("match takes at least 2 arguments".to_string()));
     }
 
     let value = compile(&ast.v_(2), ce)?;
@@ -2166,19 +2202,19 @@ pub(crate) fn compile_match(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
     for (i, (struct_pat, _)) in ast.iter().enumerate().skip(3) {
         if (i + 1) < len {
             if !struct_pat.is_pair() {
-                return Err(ast.compile_err(
-                    format!("match argument {} is not a pair: {}",
-                            i - 1, struct_pat.s())));
+                return Err(ast.compile_err(format!(
+                    "match argument {} is not a pair: {}",
+                    i - 1,
+                    struct_pat.s()
+                )));
             }
 
             patterns.push(struct_pat.v_(0));
             blocks.push(compile_direct_block(&struct_pat.v_(1), ce)?);
-
         } else if struct_pat.is_pair() {
             patterns.push(struct_pat.v_(0));
             blocks.push(compile_direct_block(&struct_pat.v_(1), ce)?);
             blocks.push(compile(&VVal::None, ce)?);
-
         } else {
             blocks.push(compile_direct_block(&struct_pat, ce)?);
         }
@@ -2186,44 +2222,41 @@ pub(crate) fn compile_match(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
 
     let map = VVal::map();
 
-    let dfun_constr =
-        struct_pattern::create_struct_patterns_direct_fun(
-            &patterns, &map)?;
+    let dfun_constr = struct_pattern::create_struct_patterns_direct_fun(&patterns, &map)?;
 
-    let res_ref =
-        ce.borrow_mut().global.borrow_mut()
-          .get_var_ref("\\")
-          .unwrap_or(VVal::None);
+    let res_ref = ce.borrow_mut().global.borrow_mut().get_var_ref("\\").unwrap_or(VVal::None);
 
-    let dfun =
-        if map.is_empty() {
-            (dfun_constr)(
-                Box::new(|_sym, _val| ()),
-                Box::new(|| ()))
-        } else {
-            let set_res_ref = res_ref.clone();
-            (dfun_constr)(
-                Box::new(move |sym, val| set_res_ref.set_key_sym(sym.clone(), val.clone()).unwrap()),
-                Box::new(move ||
-                    if let VVal::Map(m) = res_ref.deref() {
-                        m.borrow_mut().clear();
-                    } else {
-                        res_ref.set_ref(VVal::map());
-                    }))
-        };
+    let dfun = if map.is_empty() {
+        (dfun_constr)(Box::new(|_sym, _val| ()), Box::new(|| ()))
+    } else {
+        let set_res_ref = res_ref.clone();
+        (dfun_constr)(
+            Box::new(move |sym, val| set_res_ref.set_key_sym(sym.clone(), val.clone()).unwrap()),
+            Box::new(move || {
+                if let VVal::Map(m) = res_ref.deref() {
+                    m.borrow_mut().clear();
+                } else {
+                    res_ref.set_ref(VVal::map());
+                }
+            }),
+        )
+    };
 
     let spos_jmp = spos.clone();
-    let jump_value =
-        pw_provides_result_pos!(prog, {
-            let v = value.eval(prog);
-            prog.op_call_direct(&spos_jmp, v, dfun.clone(), ResPos::Stack(0));
-            ResPos::Stack(0)
-        })?;
+    let jump_value = pw_provides_result_pos!(prog, {
+        let v = value.eval(prog);
+        prog.op_call_direct(&spos_jmp, v, dfun.clone(), ResPos::Stack(0));
+        ResPos::Stack(0)
+    })?;
 
     generate_jump_table(spos, jump_value, blocks)
 }
 
-pub(crate) fn collection_add(env: &mut Env, argc: usize, col_add: CollectionAdd) -> Result<VVal, StackAction> {
+pub(crate) fn collection_add(
+    env: &mut Env,
+    argc: usize,
+    col_add: CollectionAdd,
+) -> Result<VVal, StackAction> {
     let args = env.argv_ref();
     if args[0].is_fun() {
         let fun = args[0].clone();
@@ -2239,18 +2272,26 @@ pub(crate) fn collection_add(env: &mut Env, argc: usize, col_add: CollectionAdd)
                         retf = Ok(*v);
                         env.popn(1);
                         return false;
-                    },
-                    r => { retf = r; }
+                    }
+                    r => {
+                        retf = r;
+                    }
                 }
                 env.popn(1);
                 true
             });
 
             match retf {
-                Ok(v)                      => { ret = v; },
-                Err(StackAction::Break(v)) => { return Ok(*v); },
-                Err(StackAction::Next)     => { },
-                Err(e)                     => { return Err(e); }
+                Ok(v) => {
+                    ret = v;
+                }
+                Err(StackAction::Break(v)) => {
+                    return Ok(*v);
+                }
+                Err(StackAction::Next) => {}
+                Err(e) => {
+                    return Err(e);
+                }
             }
         }
 
@@ -2262,70 +2303,69 @@ pub(crate) fn collection_add(env: &mut Env, argc: usize, col_add: CollectionAdd)
 }
 
 #[allow(clippy::cognitive_complexity)]
-pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<ProgWriter, CompileError>
-{
+pub(crate) fn compile(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<ProgWriter, CompileError> {
     match ast {
         VVal::Lst(_) => {
-            let syn  = ast.at(0).unwrap_or(VVal::None);
+            let syn = ast.at(0).unwrap_or(VVal::None);
             let spos = syn.get_syn_pos();
-            let syn  = syn.get_syn();
+            let syn = syn.get_syn();
 
             match syn {
-                Syntax::Block       => compile_block(ast, 1, ce),
-                Syntax::Assign      => compile_assign(ast, ce, false),
-                Syntax::AssignRef   => compile_assign(ast, ce, true),
-                Syntax::Var         => compile_var(ast, ce, false),
-                Syntax::CaptureRef  => compile_var(ast, ce, true),
-                Syntax::Def         => compile_def(ast, ce, false),
-                Syntax::DefGlobRef  => compile_def(ast, ce, true),
-                Syntax::DefConst    => compile_const(ast, ce),
-                Syntax::BinOpAdd    => compile_binop(ast, BinOp::Add, ce),
-                Syntax::BinOpSub    => compile_binop(ast, BinOp::Sub, ce),
-                Syntax::BinOpDiv    => compile_binop(ast, BinOp::Div, ce),
-                Syntax::BinOpMod    => compile_binop(ast, BinOp::Mod, ce),
-                Syntax::BinOpMul    => compile_binop(ast, BinOp::Mul, ce),
-                Syntax::BinOpGe     => compile_binop(ast, BinOp::Ge,  ce),
-                Syntax::BinOpGt     => compile_binop(ast, BinOp::Gt,  ce),
-                Syntax::BinOpLe     => compile_binop(ast, BinOp::Le,  ce),
-                Syntax::BinOpLt     => compile_binop(ast, BinOp::Lt,  ce),
-                Syntax::BinOpEq     => compile_binop(ast, BinOp::Eq,  ce),
+                Syntax::Block => compile_block(ast, 1, ce),
+                Syntax::Assign => compile_assign(ast, ce, false),
+                Syntax::AssignRef => compile_assign(ast, ce, true),
+                Syntax::Var => compile_var(ast, ce, false),
+                Syntax::CaptureRef => compile_var(ast, ce, true),
+                Syntax::Def => compile_def(ast, ce, false),
+                Syntax::DefGlobRef => compile_def(ast, ce, true),
+                Syntax::DefConst => compile_const(ast, ce),
+                Syntax::BinOpAdd => compile_binop(ast, BinOp::Add, ce),
+                Syntax::BinOpSub => compile_binop(ast, BinOp::Sub, ce),
+                Syntax::BinOpDiv => compile_binop(ast, BinOp::Div, ce),
+                Syntax::BinOpMod => compile_binop(ast, BinOp::Mod, ce),
+                Syntax::BinOpMul => compile_binop(ast, BinOp::Mul, ce),
+                Syntax::BinOpGe => compile_binop(ast, BinOp::Ge, ce),
+                Syntax::BinOpGt => compile_binop(ast, BinOp::Gt, ce),
+                Syntax::BinOpLe => compile_binop(ast, BinOp::Le, ce),
+                Syntax::BinOpLt => compile_binop(ast, BinOp::Lt, ce),
+                Syntax::BinOpEq => compile_binop(ast, BinOp::Eq, ce),
                 Syntax::Ref => {
                     let ref_pw = compile(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
                         prog.op_to_ref(&spos, ref_rp, store, ToRefType::ToRef);
                     })
-                },
+                }
                 Syntax::HRef => {
                     let ref_pw = compile(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
                         prog.op_to_ref(&spos, ref_rp, store, ToRefType::Hidden);
                     })
-                },
+                }
                 Syntax::WRef => {
                     let ref_pw = compile(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
                         prog.op_to_ref(&spos, ref_rp, store, ToRefType::Weak);
                     })
-                },
+                }
                 Syntax::Deref => {
                     let ref_pw = compile(&ast.at(1).unwrap(), ce)?;
                     pw_needs_storage!(prog, store, {
                         let ref_rp = ref_pw.eval(prog);
                         prog.op_to_ref(&spos, ref_rp, store, ToRefType::Deref);
                     })
-                },
+                }
                 Syntax::Lst => {
-                    let mut pws : std::vec::Vec<(bool, ProgWriter)> = vec![];
+                    let mut pws: std::vec::Vec<(bool, ProgWriter)> = vec![];
                     for (a, _) in ast.iter().skip(1) {
                         if a.is_vec()
-                           && a.at(0).unwrap_or(VVal::None).syn().unwrap()
-                              == Syntax::VecSplice
+                            && a.at(0).unwrap_or(VVal::None).syn().unwrap() == Syntax::VecSplice
                         {
-
                             let splice_pw = compile(&a.at(1).unwrap(), ce)?;
                             pws.push((true, splice_pw));
                             continue;
@@ -2345,19 +2385,21 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                     &spos,
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),
-                                    ResPos::Stack(0));
+                                    ResPos::Stack(0),
+                                );
                             } else {
                                 prog.op_list_push(
                                     &spos,
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),
-                                    ResPos::Stack(0));
+                                    ResPos::Stack(0),
+                                );
                             }
                         }
 
                         ResPos::Stack(0)
                     })
-                },
+                }
                 Syntax::Iter => {
                     let val_pw = compile(&ast.at(1).unwrap(), ce)?;
 
@@ -2365,7 +2407,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let vp = val_pw.eval(prog);
                         prog.op_new_iter(&spos, vp, store);
                     })
-                },
+                }
                 Syntax::Opt => {
                     if let Some(v) = ast.at(1) {
                         let val_pw = compile(&v, ce)?;
@@ -2376,16 +2418,12 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         })
                     } else {
                         pw_store_if_needed!(prog, store, {
-                            prog.op_new_opt(
-                                &spos,
-                                ResPos::Value(ResValue::OptNone),
-                                store);
+                            prog.op_new_opt(&spos, ResPos::Value(ResValue::OptNone), store);
                         })
                     }
-                },
+                }
                 Syntax::Map => {
-                    let mut pws : std::vec::Vec<(ProgWriter, Option<ProgWriter>)> =
-                        vec![];
+                    let mut pws: std::vec::Vec<(ProgWriter, Option<ProgWriter>)> = vec![];
 
                     for (e, _) in ast.iter().skip(1) {
                         let k = e.at(0).unwrap();
@@ -2422,7 +2460,8 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),
-                                    ResPos::Stack(0));
+                                    ResPos::Stack(0),
+                                );
                             } else {
                                 kc_pw.eval_to(prog, ResPos::Stack(0));
 
@@ -2430,13 +2469,14 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                     &spos,
                                     ResPos::Stack(0),
                                     ResPos::Stack(0),
-                                    ResPos::Stack(0));
+                                    ResPos::Stack(0),
+                                );
                             }
                         }
 
                         ResPos::Stack(0)
                     })
-                },
+                }
                 Syntax::Func => {
                     let mut fun_spos = spos.clone();
                     fun_spos.set_name(&ce.borrow().recent_var);
@@ -2444,7 +2484,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                     let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
                     let ce_sub = func_ce.clone();
 
-                    let label          = ast.at(1).unwrap();
+                    let label = ast.at(1).unwrap();
                     let explicit_arity = ast.at(2).unwrap();
 
                     let mut func_prog = Prog::new();
@@ -2469,51 +2509,57 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                             _ => ArityParam::Undefined,
                         };
 
-                    let deciding_min_arity = if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
-                        ce_sub.borrow().explicit_arity.0.clone()
-                    } else {
-                        ce_sub.borrow().implicit_arity.0.clone()
-                    };
+                    let deciding_min_arity =
+                        if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
+                            ce_sub.borrow().explicit_arity.0.clone()
+                        } else {
+                            ce_sub.borrow().implicit_arity.0.clone()
+                        };
 
-                    let deciding_max_arity = if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
-                        ce_sub.borrow().explicit_arity.1.clone()
-                    } else {
-                        ce_sub.borrow().implicit_arity.1.clone()
-                    };
+                    let deciding_max_arity =
+                        if ce_sub.borrow().explicit_arity.1 != ArityParam::Undefined {
+                            ce_sub.borrow().explicit_arity.1.clone()
+                        } else {
+                            ce_sub.borrow().implicit_arity.1.clone()
+                        };
 
-                    let min_args : Option<usize> = match deciding_min_arity {
-                        ArityParam::Infinite  => None,
+                    let min_args: Option<usize> = match deciding_min_arity {
+                        ArityParam::Infinite => None,
                         ArityParam::Undefined => Some(0),
-                        ArityParam::Limit(i)  => Some(i),
+                        ArityParam::Limit(i) => Some(i),
                     };
 
-                    let max_args : Option<usize> = match deciding_max_arity {
-                        ArityParam::Infinite  => None,
+                    let max_args: Option<usize> = match deciding_max_arity {
+                        ArityParam::Infinite => None,
                         ArityParam::Undefined => Some(0),
-                        ArityParam::Limit(i)  => Some(i),
+                        ArityParam::Limit(i) => Some(i),
                     };
 
                     let env_size = ce_sub.borrow().get_local_space();
-                    let upvs     = ce_sub.borrow_mut().get_upval_pos();
+                    let upvs = ce_sub.borrow_mut().get_upval_pos();
                     let upvalues = vec![];
 
-                    let fun_template =
-                        VValFun::new_prog(
-                            func_prog,
-                            upvalues, env_size, min_args, max_args, false,
-                            Some(fun_spos),
-                            Rc::new(upvs),
-                            label);
+                    let fun_template = VValFun::new_prog(
+                        func_prog,
+                        upvalues,
+                        env_size,
+                        min_args,
+                        max_args,
+                        false,
+                        Some(fun_spos),
+                        Rc::new(upvs),
+                        label,
+                    );
 
                     pw_needs_storage!(prog, store, {
                         let fp = prog.data_pos(fun_template.clone());
                         prog.op_new_clos(&spos, fp, store)
                     })
-                },
+                }
                 Syntax::Call => {
                     if let Some((syntax, object, key)) =
-                        fetch_object_key_access(&ast.at(1).unwrap()) {
-
+                        fetch_object_key_access(&ast.at(1).unwrap())
+                    {
                         let obj = compile(&object, ce)?;
 
                         let mut args = vec![];
@@ -2542,9 +2588,10 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                         obj_p,
                                         key_p,
                                         argc as u16,
-                                        store);
+                                        store,
+                                    );
                                 })
-                            },
+                            }
                             Syntax::GetSym => {
                                 let key = key.s_raw();
                                 pw_store_if_needed!(prog, store, {
@@ -2557,34 +2604,35 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                         obj_p,
                                         key.clone(),
                                         argc as u16,
-                                        store);
+                                        store,
+                                    );
                                 })
-                            },
-                            _ => {
-                                Err(ast.compile_err(
-                                    format!("fetch_object_key_access failed: {}",
-                                            ast.s())))
-                            },
+                            }
+                            _ => Err(ast.compile_err(format!(
+                                "fetch_object_key_access failed: {}",
+                                ast.s()
+                            ))),
                         }
                     } else {
-                        let symbol =
-                            if let Syntax::Var = ast.at(1).unwrap_or(VVal::None).at(0).unwrap_or(VVal::None).get_syn() {
-                                let var = ast.at(1).unwrap().at(1).unwrap();
-                                Some(var.s_raw())
-                            } else {
-                                None
-                            };
+                        let symbol = if let Syntax::Var =
+                            ast.at(1).unwrap_or(VVal::None).at(0).unwrap_or(VVal::None).get_syn()
+                        {
+                            let var = ast.at(1).unwrap().at(1).unwrap();
+                            Some(var.s_raw())
+                        } else {
+                            None
+                        };
 
                         if let Some(sym) = symbol {
                             match &sym[..] {
-                                "?"     => return compile_if(ast, ce),
-                                "if"    => return compile_if(ast, ce),
+                                "?" => return compile_if(ast, ce),
+                                "if" => return compile_if(ast, ce),
                                 "while" => return compile_while(ast, ce),
-                                "iter"  => return compile_iter(ast, ce),
-                                "next"  => return compile_next(ast, ce),
+                                "iter" => return compile_iter(ast, ce),
+                                "next" => return compile_next(ast, ce),
                                 "break" => return compile_break(ast, ce),
                                 "match" => return compile_match(ast, ce),
-                                "jump"  => return compile_jump(ast, ce),
+                                "jump" => return compile_jump(ast, ce),
                                 _ => (),
                             }
                         }
@@ -2608,7 +2656,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                             prog.op_call(&spos, argc as u16 - 1, store);
                         })
                     }
-                },
+                }
                 Syntax::Err => {
                     let err_pw = compile(&ast.at(1).unwrap(), ce)?;
 
@@ -2616,24 +2664,19 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let err_val_p = err_pw.eval(prog);
                         prog.op_new_err(&spos, err_val_p, store);
                     })
-                },
+                }
                 Syntax::Key => {
                     let sym = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = sym.s_raw();
-                    pw_provides_result_pos!(prog, {
-                        prog.data_pos(sym.clone())
-                    })
-                },
+                    pw_provides_result_pos!(prog, { prog.data_pos(sym.clone()) })
+                }
                 Syntax::Str => {
                     let string = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = string.s_raw();
-                    pw_provides_result_pos!(prog, {
-                        prog.data_pos(string.clone())
-                    })
-                },
+                    pw_provides_result_pos!(prog, { prog.data_pos(string.clone()) })
+                }
                 Syntax::IVec => {
-                    let lc : Vec<ProgWriter> =
-                        ast.map_skip(|e| { compile(e, ce) }, 1)?;
+                    let lc: Vec<ProgWriter> = ast.map_skip(|e| compile(e, ce), 1)?;
 
                     match lc.len() {
                         2 => {
@@ -2642,36 +2685,32 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                 let lc1p = lc[1].eval(prog);
                                 prog.op_new_ivec2(&spos, lc0p, lc1p, store);
                             })
-                        },
+                        }
                         3 => {
                             pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
-                                prog.op_new_ivec3(
-                                    &spos, lc0p, lc1p, lc2p, store);
+                                prog.op_new_ivec3(&spos, lc0p, lc1p, lc2p, store);
                             })
-                        },
+                        }
                         4 => {
                             pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
                                 let lc3p = lc[3].eval(prog);
-                                prog.op_new_ivec4(
-                                    &spos, lc0p, lc1p, lc2p, lc3p, store);
+                                prog.op_new_ivec4(&spos, lc0p, lc1p, lc2p, lc3p, store);
                             })
-                        },
-                        ecount => {
-                            Err(ast.compile_err(
-                                format!(
-                                    "Can only create an IVector with 2, 3 or 4 elements, but got {}.", ecount)))
                         }
+                        ecount => Err(ast.compile_err(format!(
+                            "Can only create an IVector with 2, 3 or 4 elements, but got {}.",
+                            ecount
+                        ))),
                     }
-                },
+                }
                 Syntax::FVec => {
-                    let lc : Vec<ProgWriter> =
-                        ast.map_skip(|e| { compile(e, ce) }, 1)?;
+                    let lc: Vec<ProgWriter> = ast.map_skip(|e| compile(e, ce), 1)?;
 
                     match lc.len() {
                         2 => {
@@ -2680,90 +2719,78 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                                 let lc1p = lc[1].eval(prog);
                                 prog.op_new_fvec2(&spos, lc0p, lc1p, store);
                             })
-                        },
+                        }
                         3 => {
                             pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
-                                prog.op_new_fvec3(
-                                    &spos, lc0p, lc1p, lc2p, store);
+                                prog.op_new_fvec3(&spos, lc0p, lc1p, lc2p, store);
                             })
-                        },
+                        }
                         4 => {
                             pw_store_if_needed!(prog, store, {
                                 let lc0p = lc[0].eval(prog);
                                 let lc1p = lc[1].eval(prog);
                                 let lc2p = lc[2].eval(prog);
                                 let lc3p = lc[3].eval(prog);
-                                prog.op_new_fvec4(
-                                    &spos, lc0p, lc1p, lc2p, lc3p, store);
+                                prog.op_new_fvec4(&spos, lc0p, lc1p, lc2p, lc3p, store);
                             })
-                        },
-                        ecount => {
-                            Err(ast.compile_err(
-                                format!(
-                                    "Can only create an FVector with 2, 3 or 4 elements, but got {}.", ecount)))
                         }
+                        ecount => Err(ast.compile_err(format!(
+                            "Can only create an FVector with 2, 3 or 4 elements, but got {}.",
+                            ecount
+                        ))),
                     }
-                },
+                }
                 Syntax::SelfObj => {
-                    pw_provides_result_pos!(prog,
-                        { ResPos::Value(ResValue::SelfObj) })
-                },
+                    pw_provides_result_pos!(prog, { ResPos::Value(ResValue::SelfObj) })
+                }
                 Syntax::SelfData => {
-                    pw_provides_result_pos!(prog,
-                        { ResPos::Value(ResValue::SelfData) })
-                },
+                    pw_provides_result_pos!(prog, { ResPos::Value(ResValue::SelfData) })
+                }
                 Syntax::DebugPrint => {
                     pw_provides_result_pos!(prog, {
                         let pos_str = spos.s_only_pos();
-                        let print_fun =
-                            VValFun::new_fun(
-                                move |env: &mut Env, argc: usize| {
-                                    debug_print_value(env, argc, &pos_str)
-                                }, None, None, true);
+                        let print_fun = VValFun::new_fun(
+                            move |env: &mut Env, argc: usize| {
+                                debug_print_value(env, argc, &pos_str)
+                            },
+                            None,
+                            None,
+                            true,
+                        );
                         prog.data_pos(print_fun)
                     })
-                },
-                Syntax::Accum => {
-                    match ast.at(1) {
-                        Some(s) => {
-                            if s.s_raw() == "@" {
-                                pw_provides_result_pos!(prog, {
-                                    ResPos::Value(ResValue::AccumVal)
-                                })
-                            } else {
-                                let accum_type =
-                                    match &s.s_raw()[..] {
-                                        "string" => AccumType::String,
-                                        "bytes"  => AccumType::Bytes,
-                                        "float"  => AccumType::Float,
-                                        "int"    => AccumType::Int,
-                                        "map"    => AccumType::Map,
-                                        "vec"    => AccumType::Vec,
-                                        _ => {
-                                            panic!("COMPILER ERROR: BAD ACCUM SYM");
-                                        }
-                                    };
+                }
+                Syntax::Accum => match ast.at(1) {
+                    Some(s) => {
+                        if s.s_raw() == "@" {
+                            pw_provides_result_pos!(prog, { ResPos::Value(ResValue::AccumVal) })
+                        } else {
+                            let accum_type = match &s.s_raw()[..] {
+                                "string" => AccumType::String,
+                                "bytes" => AccumType::Bytes,
+                                "float" => AccumType::Float,
+                                "int" => AccumType::Int,
+                                "map" => AccumType::Map,
+                                "vec" => AccumType::Vec,
+                                _ => {
+                                    panic!("COMPILER ERROR: BAD ACCUM SYM");
+                                }
+                            };
 
-                                let acc_pw =
-                                    compile(&ast.at(2).unwrap(), ce)?;
-                                pw_store_if_needed!(prog, store, {
-                                    prog.op_accumulator(&spos, accum_type);
-                                    acc_pw.eval_nul(prog);
-                                    prog.op_mov(&spos,
-                                        ResPos::Value(ResValue::AccumVal),
-                                        store);
-                                    prog.op_unwind(&spos);
-                                })
-                            }
-                        },
-                        None => {
-                            pw_provides_result_pos!(prog, {
-                                ResPos::Value(ResValue::AccumFun)
+                            let acc_pw = compile(&ast.at(2).unwrap(), ce)?;
+                            pw_store_if_needed!(prog, store, {
+                                prog.op_accumulator(&spos, accum_type);
+                                acc_pw.eval_nul(prog);
+                                prog.op_mov(&spos, ResPos::Value(ResValue::AccumVal), store);
+                                prog.op_unwind(&spos);
                             })
                         }
+                    }
+                    None => {
+                        pw_provides_result_pos!(prog, { ResPos::Value(ResValue::AccumFun) })
                     }
                 },
                 Syntax::GetIdx => {
@@ -2774,58 +2801,60 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let opos = o_pw.eval(prog);
                         prog.op_get_idx(&spos, opos, idx, store);
                     })
-                },
+                }
                 Syntax::GetIdx2 => {
                     let o_pw = compile(&ast.at(1).unwrap(), ce)?;
-                    let idx  = ast.at(2).unwrap().i() as u32;
+                    let idx = ast.at(2).unwrap().i() as u32;
                     let idx2 = ast.at(3).unwrap().i() as u32;
                     pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
-                        prog.op_get_idx2(
-                            &spos, opos, idx, idx2, store);
+                        prog.op_get_idx2(&spos, opos, idx, idx2, store);
                     })
-                },
+                }
                 Syntax::GetIdx3 => {
                     let o_pw = compile(&ast.at(1).unwrap(), ce)?;
-                    let idx  = ast.at(2).unwrap().i() as u32;
+                    let idx = ast.at(2).unwrap().i() as u32;
                     let idx2 = ast.at(3).unwrap().i() as u32;
                     let idx3 = ast.at(4).unwrap().i() as u32;
                     pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
-                        prog.op_get_idx3(
-                            &spos, opos, idx, idx2, idx3, store);
+                        prog.op_get_idx3(&spos, opos, idx, idx2, idx3, store);
                     })
-                },
+                }
                 Syntax::GetSym => {
                     let o_pw = compile(&ast.at(1).unwrap(), ce)?;
                     let sym = ast.at(2).unwrap().to_sym();
                     pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
-                        prog.op_get_sym(
-                            &spos, opos, sym.clone(), store);
+                        prog.op_get_sym(&spos, opos, sym.clone(), store);
                     })
-                },
+                }
                 Syntax::GetSym2 => {
                     let o_pw = compile(&ast.at(1).unwrap(), ce)?;
-                    let sym  = ast.at(2).unwrap().to_sym();
+                    let sym = ast.at(2).unwrap().to_sym();
                     let sym2 = ast.at(3).unwrap().to_sym();
                     pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
-                        prog.op_get_sym2(
-                            &spos, opos, sym.clone(), sym2.clone(), store);
+                        prog.op_get_sym2(&spos, opos, sym.clone(), sym2.clone(), store);
                     })
-                },
+                }
                 Syntax::GetSym3 => {
                     let o_pw = compile(&ast.at(1).unwrap(), ce)?;
-                    let sym  = ast.at(2).unwrap().to_sym();
+                    let sym = ast.at(2).unwrap().to_sym();
                     let sym2 = ast.at(3).unwrap().to_sym();
                     let sym3 = ast.at(4).unwrap().to_sym();
                     pw_store_if_needed!(prog, store, {
                         let opos = o_pw.eval(prog);
                         prog.op_get_sym3(
-                            &spos, opos, sym.clone(), sym2.clone(), sym3.clone(), store);
+                            &spos,
+                            opos,
+                            sym.clone(),
+                            sym2.clone(),
+                            sym3.clone(),
+                            store,
+                        );
                     })
-                },
+                }
                 Syntax::GetKey => {
                     let map_pw = compile(&ast.at(1).unwrap(), ce)?;
                     let idx_pw = compile(&ast.at(2).unwrap(), ce)?;
@@ -2835,7 +2864,7 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let ip = idx_pw.eval(prog);
                         prog.op_get_key(&spos, mp, ip, store);
                     })
-                },
+                }
                 Syntax::SetKey => {
                     let map_pw = compile(&ast.at(1).unwrap(), ce)?;
                     let sym_pw = compile(&ast.at(2).unwrap(), ce)?;
@@ -2851,26 +2880,24 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let val = val_pw.eval(prog);
                         prog.op_map_set_key(&spos, val, sym, map, store);
                     })
-                },
-                  Syntax::Or
+                }
+                Syntax::Or
                 | Syntax::BinOpSomeOr
                 | Syntax::BinOpNoneOr
                 | Syntax::BinOpErrOr
                 | Syntax::BinOpOptOr
                 | Syntax::BinOpExtSomeOr => {
-
                     let a = compile(&ast.at(1).unwrap(), ce)?;
                     let b = compile(&ast.at(2).unwrap(), ce)?;
 
-                    let mode =
-                        match syn {
-                            Syntax::BinOpSomeOr    => OrMode::SomeOp,
-                            Syntax::BinOpNoneOr    => OrMode::NoneOp,
-                            Syntax::BinOpErrOr     => OrMode::ErrOp,
-                            Syntax::BinOpOptOr     => OrMode::OptOp,
-                            Syntax::BinOpExtSomeOr => OrMode::ExtSomeOp,
-                            _                      => OrMode::Bool,
-                        };
+                    let mode = match syn {
+                        Syntax::BinOpSomeOr => OrMode::SomeOp,
+                        Syntax::BinOpNoneOr => OrMode::NoneOp,
+                        Syntax::BinOpErrOr => OrMode::ErrOp,
+                        Syntax::BinOpOptOr => OrMode::OptOp,
+                        Syntax::BinOpExtSomeOr => OrMode::ExtSomeOp,
+                        _ => OrMode::Bool,
+                    };
 
                     pw_needs_storage!(prog, store, {
                         let mut aprog = Prog::new();
@@ -2880,12 +2907,11 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let bp = b.eval(&mut bprog);
 
                         bprog.op_mov(&spos, bp, store);
-                        aprog.op_or_jmp_mode(
-                            &spos, ap, bprog.op_count() as i32, store, mode);
+                        aprog.op_or_jmp_mode(&spos, ap, bprog.op_count() as i32, store, mode);
                         prog.append(aprog);
                         prog.append(bprog);
                     })
-                },
+                }
                 Syntax::And => {
                     let a = compile(&ast.at(1).unwrap(), ce)?;
                     let b = compile(&ast.at(2).unwrap(), ce)?;
@@ -2902,28 +2928,28 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         prog.append(aprog);
                         prog.append(bprog);
                     })
-                },
+                }
                 Syntax::Apply => {
                     let call_argv_pw = compile(&ast.at(2).unwrap(), ce)?;
-                    let func_pw      = compile(&ast.at(1).unwrap(), ce)?;
+                    let func_pw = compile(&ast.at(1).unwrap(), ce)?;
 
                     pw_store_if_needed!(prog, store, {
-                        let f_rp    = func_pw.eval(prog);
+                        let f_rp = func_pw.eval(prog);
                         let argv_rp = call_argv_pw.eval(prog);
 
                         prog.op_apply(&spos, argv_rp, f_rp, store);
                     })
-                },
+                }
                 Syntax::DumpVM => {
                     pw_null!(prog, {
                         prog.op_dump_vm(&spos);
                     })
-                },
+                }
                 Syntax::DumpStack => {
                     pw_null!(prog, {
                         prog.op_dump_stack(&spos);
                     })
-                },
+                }
                 Syntax::Export => {
                     let name = ast.at(1).unwrap();
                     let val_pw = compile(&ast.at(2).unwrap(), ce)?;
@@ -2932,168 +2958,123 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                         let vp = val_pw.eval(prog);
                         prog.op_export(&spos, vp, name.s_raw());
                     })
-                },
+                }
                 Syntax::Import => {
                     let prefix = ast.at(1).unwrap();
-                    let name   = ast.at(2).unwrap();
-                    let s_prefix = if prefix.is_none() { String::from("") }
-                                   else { prefix.s_raw() + ":" };
+                    let name = ast.at(2).unwrap();
+                    let s_prefix =
+                        if prefix.is_none() { String::from("") } else { prefix.s_raw() + ":" };
 
                     let glob_ref = ce.borrow_mut().global.clone();
-                    if glob_ref.borrow_mut().import_module_as(
-                         &name.s_raw(), &prefix.s_raw())
-                    {
-                        return pw_null!(prog, { });
+                    if glob_ref.borrow_mut().import_module_as(&name.s_raw(), &prefix.s_raw()) {
+                        return pw_null!(prog, {});
                     }
 
-                    let resolver : Option<Rc<RefCell<dyn ModuleResolver>>> =
+                    let resolver: Option<Rc<RefCell<dyn ModuleResolver>>> =
                         glob_ref.borrow_mut().resolver.clone();
 
-                    let path : Vec<String> =
-                        (&name.s_raw())
-                            .split(':')
-                            .map(String::from)
-                            .collect();
+                    let path: Vec<String> = (&name.s_raw()).split(':').map(String::from).collect();
 
                     let import_file_path =
-                        if spos.filename() == "?" {
-                            None
-                        } else {
-                            Some(spos.filename())
-                        };
+                        if spos.filename() == "?" { None } else { Some(spos.filename()) };
 
                     if let Some(resolver) = resolver {
-
                         let r = resolver.borrow();
-                        let exports = r.resolve(
-                            glob_ref.clone(), &path, import_file_path);
+                        let exports = r.resolve(glob_ref.clone(), &path, import_file_path);
                         match exports {
-                            Err(ModuleLoadError::NoSuchModule(p)) => {
-                                Err(ast.compile_err(
-                                    format!("Couldn't find module '{}' in paths: {}", name.s_raw(), p)))
-                            },
-                            Err(ModuleLoadError::ModuleEvalError(e)) => {
-                                Err(ast.compile_err(
-                                    format!("Error on evaluating module '{}': {}", name.s_raw(), e)))
-                            },
-                            Err(ModuleLoadError::Other(s)) => {
-                                Err(ast.compile_err(
-                                    format!("Error on resolving module '{}': {}", name.s_raw(), s)))
-                            },
+                            Err(ModuleLoadError::NoSuchModule(p)) => Err(ast.compile_err(format!(
+                                "Couldn't find module '{}' in paths: {}",
+                                name.s_raw(),
+                                p
+                            ))),
+                            Err(ModuleLoadError::ModuleEvalError(e)) => Err(ast.compile_err(
+                                format!("Error on evaluating module '{}': {}", name.s_raw(), e),
+                            )),
+                            Err(ModuleLoadError::Other(s)) => Err(ast.compile_err(format!(
+                                "Error on resolving module '{}': {}",
+                                name.s_raw(),
+                                s
+                            ))),
                             Ok(symtbl) => {
-                                glob_ref.borrow_mut().import_from_symtbl(
-                                    &s_prefix, symtbl);
+                                glob_ref.borrow_mut().import_from_symtbl(&s_prefix, symtbl);
 
-                                pw_null!(prog, { })
-                            },
+                                pw_null!(prog, {})
+                            }
                         }
                     } else {
-                        Err(ast.compile_err(
-                            format!("Couldn't resolve module '{}'", name.s_raw())))
+                        Err(ast.compile_err(format!("Couldn't resolve module '{}'", name.s_raw())))
                     }
-                },
+                }
                 Syntax::Pattern => {
                     let res_ref =
-                        ce.borrow_mut().global.borrow_mut()
-                          .get_var_ref("\\")
-                          .unwrap_or(VVal::None);
+                        ce.borrow_mut().global.borrow_mut().get_var_ref("\\").unwrap_or(VVal::None);
 
-                    let regex_mode =
-                        ast.at(2)
-                           .unwrap()
-                           .with_s_ref(
-                               selector::RegexMode::from_str);
+                    let regex_mode = ast.at(2).unwrap().with_s_ref(selector::RegexMode::from_str);
 
                     ast.at(1).unwrap().with_s_ref(|pat_src| {
-                        match selector::create_regex_find_function(
-                                pat_src, res_ref, regex_mode)
-                        {
+                        match selector::create_regex_find_function(pat_src, res_ref, regex_mode) {
                             Ok(fun) => {
-                                pw_provides_result_pos!(prog, {
-                                    prog.data_pos(fun.clone())
-                                })
-                            },
-                            Err(e) => {
-                                Err(ast.compile_err(
-                                    format!("bad pattern: {}", e)))
+                                pw_provides_result_pos!(prog, { prog.data_pos(fun.clone()) })
                             }
+                            Err(e) => Err(ast.compile_err(format!("bad pattern: {}", e))),
                         }
                     })
-                },
+                }
                 Syntax::Selector => {
                     let res_ref =
-                        ce.borrow_mut().global.borrow_mut()
-                          .get_var_ref("\\")
-                          .unwrap_or(VVal::None);
+                        ce.borrow_mut().global.borrow_mut().get_var_ref("\\").unwrap_or(VVal::None);
 
-                    ast.at(1).unwrap().with_s_ref(|sel_src| {
-                        match selector::create_selector_function(sel_src, res_ref) {
+                    ast.at(1).unwrap().with_s_ref(
+                        |sel_src| match selector::create_selector_function(sel_src, res_ref) {
                             Ok(fun) => {
-                                pw_provides_result_pos!(prog, {
-                                    prog.data_pos(fun.clone())
-                                })
-                            },
-                            Err(e) => {
-                                Err(ast.compile_err(
-                                    format!("bad selector: {}", e)))
+                                pw_provides_result_pos!(prog, { prog.data_pos(fun.clone()) })
                             }
-                        }
-                    })
-                },
+                            Err(e) => Err(ast.compile_err(format!("bad selector: {}", e))),
+                        },
+                    )
+                }
                 Syntax::StructPattern => {
                     let res_ref =
-                        ce.borrow_mut().global.borrow_mut()
-                          .get_var_ref("\\")
-                          .unwrap_or(VVal::None);
+                        ce.borrow_mut().global.borrow_mut().get_var_ref("\\").unwrap_or(VVal::None);
 
                     let variable_map = VVal::map();
 
-                    let fun =
-                        struct_pattern::create_struct_pattern_function(
-                            &ast.at(1).unwrap(), &variable_map, res_ref)?;
-                    pw_provides_result_pos!(prog, {
-                        prog.data_pos(fun.clone())
-                    })
-                },
+                    let fun = struct_pattern::create_struct_pattern_function(
+                        &ast.at(1).unwrap(),
+                        &variable_map,
+                        res_ref,
+                    )?;
+                    pw_provides_result_pos!(prog, { prog.data_pos(fun.clone()) })
+                }
                 Syntax::Formatter => {
                     let fun =
-                        match formatter::create_formatter_fun(
-                                &ast.at(1).unwrap().at(1).unwrap())
-                        {
+                        match formatter::create_formatter_fun(&ast.at(1).unwrap().at(1).unwrap()) {
                             Ok(fun) => fun,
-                            Err(e) => {
-                                return Err(ast.compile_err(
-                                    format!("bad formatter: {}", e)))
-                            },
+                            Err(e) => return Err(ast.compile_err(format!("bad formatter: {}", e))),
                         };
 
-                    pw_provides_result_pos!(prog, {
-                        prog.data_pos(fun.clone())
-                    })
-                },
-                _ => { Err(ast.compile_err(format!("bad input: {}", ast.s()))) },
+                    pw_provides_result_pos!(prog, { prog.data_pos(fun.clone()) })
+                }
+                _ => Err(ast.compile_err(format!("bad input: {}", ast.s()))),
             }
-        },
-        VVal::Syn(s)
-            if s.syn() == Syntax::OpColAddL
-            || s.syn() == Syntax::OpColAddR => {
-
-            let col_add =
-                if s.syn() == Syntax::OpColAddL {
-                    CollectionAdd::Unshift
-                } else {
-                    CollectionAdd::Push
-                };
+        }
+        VVal::Syn(s) if s.syn() == Syntax::OpColAddL || s.syn() == Syntax::OpColAddR => {
+            let col_add = if s.syn() == Syntax::OpColAddL {
+                CollectionAdd::Unshift
+            } else {
+                CollectionAdd::Push
+            };
 
             pw_provides_result_pos!(prog, {
-                let add_fun =
-                    VValFun::new_fun(
-                        move |env, argc|
-                            collection_add(env, argc, col_add),
-                        None, None, true);
+                let add_fun = VValFun::new_fun(
+                    move |env, argc| collection_add(env, argc, col_add),
+                    None,
+                    None,
+                    true,
+                );
                 prog.data_pos(add_fun)
             })
-        },
+        }
         VVal::Pair(bx) => {
             let a = compile(&bx.0, ce)?;
             let b = compile(&bx.1, ce)?;
@@ -3103,26 +3084,24 @@ pub(crate) fn compile(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
                 let br = b.eval(prog);
                 prog.op_new_pair(&SynPos::empty(), br, ar, store);
             })
-        },
+        }
         _ => {
             let ast = ast.clone();
             pw_provides_result_pos!(prog, { prog.data_pos(ast.clone()) })
-        },
+        }
     }
 }
 
 /// Compiles a WLambda AST into an [EvalNode] in the given CompileEnv.
 /// This is an internal function.
-fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>)
-    -> Result<EvalNode, CompileError>
-{
+fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     let prog = compile_stmts(ast, 1, ce)?;
 
     let mut p = Prog::new();
     prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));
     p.op_end();
 
-    Ok(Box::new(move |e: &mut Env| { crate::vm::vm(&p, e) }))
+    Ok(Box::new(move |e: &mut Env| crate::vm::vm(&p, e)))
 }
 
 /// This is a function to help evaluating a piece of WLambda code and
@@ -3158,10 +3137,10 @@ pub fn test_eval_to_string(s: &str) -> String {
                             format!("EXEC ERR: Caught {:?}", je)
                         }
                     }
-                },
+                }
                 Err(re) => format!("COMPILE ERROR: {}", re),
             }
         }
-        Err(e)  => format!("PARSE ERROR: {}", e),
+        Err(e) => format!("PARSE ERROR: {}", e),
     }
 }

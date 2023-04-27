@@ -1,13 +1,13 @@
-use std::collections::HashMap;
-use std::rc::Weak;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::rc::Rc;
+use std::rc::Weak;
 
 #[allow(dead_code)]
 struct StringInterner {
     strmap: HashMap<String, Weak<String>>,
-    fixed:  std::vec::Vec<Symbol>,
+    fixed: std::vec::Vec<Symbol>,
     allocated_since_gc: usize,
 }
 
@@ -134,12 +134,16 @@ impl std::fmt::Debug for Symbol {
 
 impl std::clone::Clone for Symbol {
     #[inline]
-    fn clone(&self) -> Self { Self(self.0.clone()) }
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
 }
 
 impl std::convert::AsRef<str> for Symbol {
     #[inline]
-    fn as_ref(&self) -> &str { &*self.0 }
+    fn as_ref(&self) -> &str {
+        &*self.0
+    }
 }
 
 impl std::cmp::PartialOrd for Symbol {
@@ -183,21 +187,13 @@ impl std::ops::Deref for Symbol {
 }
 
 pub fn s2sym(s: &str) -> Symbol {
-    STR_INTERN.with(|si| {
-        si.borrow_mut().s2sym(s)
-    })
+    STR_INTERN.with(|si| si.borrow_mut().s2sym(s))
 }
 
 pub fn new_sym_mv(s: String) -> Symbol {
-    STR_INTERN.with(|si| {
-        si.borrow_mut().new_sym_mv(s)
-    })
+    STR_INTERN.with(|si| si.borrow_mut().new_sym_mv(s))
 }
-
 
 pub fn string_interner_collect() -> i64 {
-    STR_INTERN.with(|si| {
-        si.borrow_mut().collect()
-    })
+    STR_INTERN.with(|si| si.borrow_mut().collect())
 }
-

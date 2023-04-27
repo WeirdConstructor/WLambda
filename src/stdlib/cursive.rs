@@ -25,7 +25,7 @@ use cursive::view::{IntoBoxedView, Resizable, ScrollStrategy, Scrollable, SizeCo
 #[cfg(feature = "cursive")]
 use cursive::views::{
     BoxedView, Button, Checkbox, Dialog, DialogFocus, EditView, HideableView, LinearLayout,
-    ScrollView, ListView, Panel, ProgressBar, RadioButton, RadioGroup, SelectView, SliderView,
+    ListView, Panel, ProgressBar, RadioButton, RadioGroup, ScrollView, SelectView, SliderView,
     StackView, TextArea, TextContent, TextView, ViewRef,
 };
 #[cfg(feature = "cursive")]
@@ -505,17 +505,17 @@ impl VValUserData for NamedViewHandle {
                         match scroll_strat {
                             ScrollStrategy::StickToBottom => {
                                 view.scroll_to_bottom();
-                            },
+                            }
                             ScrollStrategy::StickToTop => {
                                 view.scroll_to_top();
-                            },
+                            }
                             _ => (),
                         }
                         view.set_scroll_strategy(scroll_strat);
 
                         Ok(VVal::None)
                     })
-                },
+                }
                 _ => named_view_error!(self, env, key),
             },
             ViewType::Hideable => match key {
@@ -635,9 +635,11 @@ macro_rules! wrap_scroll_view {
 macro_rules! wrap_hideable {
     ($define: ident, $view: expr, $reg: expr, $cursive: ident, $env: ident) => {
         if $define.v_k("hideable_name").is_some() {
-            HideableView::new(BoxedView::new(wrap_scroll_view!($define, $view, $reg, $cursive, $env)))
-                .with_name($define.v_s_rawk("hideable_name"))
-                .into_boxed_view()
+            HideableView::new(BoxedView::new(wrap_scroll_view!(
+                $define, $view, $reg, $cursive, $env
+            )))
+            .with_name($define.v_s_rawk("hideable_name"))
+            .into_boxed_view()
         } else {
             wrap_scroll_view!($define, $view, $reg, $cursive, $env)
         }
@@ -660,19 +662,22 @@ macro_rules! auto_wrap_view {
             if size_w.is_some() || size_h.is_some() {
                 wrap_hideable!(
                     $define,
-                    $view
-                        .with_name($define.v_s_rawk("name"))
-                        .resized(
-                            size_w.unwrap_or(SizeConstraint::Free),
-                            size_h.unwrap_or(SizeConstraint::Free),
-                        ),
-                    $reg, $cursive, $env
+                    $view.with_name($define.v_s_rawk("name")).resized(
+                        size_w.unwrap_or(SizeConstraint::Free),
+                        size_h.unwrap_or(SizeConstraint::Free),
+                    ),
+                    $reg,
+                    $cursive,
+                    $env
                 )
             } else {
                 wrap_hideable!(
                     $define,
                     $view.with_name($define.v_s_rawk("name")),
-                    $reg, $cursive, $env)
+                    $reg,
+                    $cursive,
+                    $env
+                )
             }
         } else {
             if size_w.is_some() || size_h.is_some() {
@@ -682,7 +687,10 @@ macro_rules! auto_wrap_view {
                         size_w.unwrap_or(SizeConstraint::Free),
                         size_h.unwrap_or(SizeConstraint::Free),
                     ),
-                    $reg, $cursive, $env)
+                    $reg,
+                    $cursive,
+                    $env
+                )
             } else {
                 wrap_hideable!($define, $view, $reg, $cursive, $env)
             }
@@ -2050,13 +2058,7 @@ pub fn handle_cursive_call_method(
             Ok(VVal::None)
         }
         "default_cb" => {
-            assert_arg_count!(
-                "$<Cursive>",
-                argv,
-                2,
-                "default_cb[widget_name, callback_fun]",
-                env
-            );
+            assert_arg_count!("$<Cursive>", argv, 2, "default_cb[widget_name, callback_fun]", env);
             let name = argv.v_s_raw(0);
             let cb = argv.v_(1);
             let denv = Rc::new(RefCell::new(env.derive()));

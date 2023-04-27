@@ -1,21 +1,21 @@
-mod xml;
 pub mod csv;
-mod net;
-mod process;
+mod cursive;
 mod http;
 mod mqtt;
-mod cursive;
+mod net;
 #[allow(dead_code)]
 mod odbc;
+mod process;
 mod util;
+mod xml;
 use super::compiler::*;
 mod helpers;
-mod sqlite;
-mod imap;
 #[cfg(feature = "html")]
 mod html2vval;
+mod imap;
 #[cfg(feature = "html")]
 mod rcdom;
+mod sqlite;
 pub use helpers::PendingResult;
 
 pub fn add_to_symtable(st: &mut SymbolTable) {

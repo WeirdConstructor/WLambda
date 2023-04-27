@@ -1,9 +1,9 @@
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 use std::fs::File;
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 use std::io::{BufRead, BufReader};
 
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
     use regex::Regex;
     let f = File::open(filename).expect("Open file");
@@ -14,7 +14,7 @@ fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
     let mut code_snippets = Vec::new();
 
     let mut code_name = String::from("");
-    let mut code      = String::from("");
+    let mut code = String::from("");
     let mut in_code = false;
     for (lidx, l) in BufReader::new(f).lines().enumerate() {
         let line = l.unwrap();
@@ -23,12 +23,10 @@ fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
             in_code = false;
             code_snippets.push((code_name, code));
             code_name = String::from("");
-            code      = String::from("");
-
+            code = String::from("");
         } else if !in_code && rx.is_match(&line) {
             in_code = true;
             code_name = format!("{} line {}", filename, lidx + 1);
-
         } else if in_code {
             code += &line;
             code += "\n";
@@ -38,14 +36,16 @@ fn get_scripts_from_file(filename: &str) -> Vec<(String, String)> {
     code_snippets
 }
 
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 fn execute_script(name: &str, snippet: &str) {
     use wlambda::EvalContext;
 
     print!("- code block '{}'...", name);
     let mut ctx = EvalContext::new_default();
     match ctx.eval(snippet) {
-        Ok(v) => { println!("  result: {}", v.s()); },
+        Ok(v) => {
+            println!("  result: {}", v.s());
+        }
         Err(e) => {
             panic!("   FAILED code snippet '{}': {}", name, e);
         }
@@ -54,8 +54,7 @@ fn execute_script(name: &str, snippet: &str) {
 
 #[test]
 fn wlambda_code_blocks() {
-
-    #[cfg(feature="regex")]
+    #[cfg(feature = "regex")]
     {
         for (name, snip) in get_scripts_from_file("doc/wlambda_reference.md") {
             execute_script(&name, &snip);

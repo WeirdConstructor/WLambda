@@ -1,12 +1,12 @@
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 use std::fs::File;
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 use std::io::{BufRead, BufReader};
 
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 use wlambda::prelude::*;
 
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 fn get_functions_from_file(filename: &str) -> Vec<String> {
     use regex::Regex;
     let f = File::open(filename).expect("Open file");
@@ -30,12 +30,12 @@ fn get_functions_from_file(filename: &str) -> Vec<String> {
     functions
 }
 
-#[cfg(feature="regex")]
+#[cfg(feature = "regex")]
 #[test]
 fn wlambda_functions() {
     let documented_funs = get_functions_from_file("doc/wlambda_reference.md");
 
-    let mut total         = 0;
+    let mut total = 0;
     let mut count_missing = 0;
 
     let mut missing = vec![];
@@ -70,15 +70,11 @@ fn wlambda_functions() {
     }
 
     if count_missing > 0 {
-
         eprintln!("--------- MISSING SYMBOLS ---------");
         for s in missing {
             eprintln!("MISSING: {}", s);
         }
-        panic!(
-            "Found {}/{} undocumented functions!",
-            count_missing,
-            total);
+        panic!("Found {}/{} undocumented functions!", count_missing, total);
     } else {
         println!("Found {} functions!", total);
     }

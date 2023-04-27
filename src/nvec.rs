@@ -6,8 +6,7 @@ Numeric vector implementation for WLambda.
 */
 
 use crate::vval::VVal;
-use std::ops::{Neg, Add, Sub, Div, Mul};
-
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 /// WLambda supports Integer and Float vectors in two, three, and four dimensions.
 /// See also [VVal::nvec] and functions like [VVal::ivec2], [VVal::fvec2], ...
@@ -21,9 +20,9 @@ pub enum NVec<N: NVecNum> {
 /// Dimensionality of a numeric vector ([NVec])
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub enum NVecDim {
-    Two   = 2,
+    Two = 2,
     Three = 3,
-    Four  = 4,
+    Four = 4,
 }
 
 #[allow(clippy::len_without_is_empty)]
@@ -31,9 +30,9 @@ impl NVecDim {
     /// The number of dimensions, either 2, 3 or 4.
     pub fn len(self) -> usize {
         match self {
-            NVecDim::Two   => 2,
+            NVecDim::Two => 2,
             NVecDim::Three => 3,
-            NVecDim::Four  => 4,
+            NVecDim::Four => 4,
         }
     }
 }
@@ -55,19 +54,19 @@ pub trait NVecNum: Sized + Copy + Clone + PartialEq {
     fn sign() -> char;
 
     fn from_vval(v: &VVal) -> Self;
-    fn into_vval(self)     -> VVal;
+    fn into_vval(self) -> VVal;
 
-    fn into_f64(self)      -> f64;
-    fn from_f64(f: f64)    -> Self;
+    fn into_f64(self) -> f64;
+    fn from_f64(f: f64) -> Self;
 
-    fn into_f32(self)      -> f32;
-    fn from_f32(f: f32)    -> Self;
+    fn into_f32(self) -> f32;
+    fn from_f32(f: f32) -> Self;
 
-    fn into_i64(self)      -> i64;
-    fn from_i64(i: i64)    -> Self;
+    fn into_i64(self) -> i64;
+    fn from_i64(i: i64) -> Self;
 
-    fn into_i32(self)      -> i32;
-    fn from_i32(i: i32)    -> Self;
+    fn into_i32(self) -> i32;
+    fn from_i32(i: i32) -> Self;
 
     /// When added/subtracted to something, has no effect
     fn zero() -> Self;
@@ -77,59 +76,97 @@ pub trait NVecNum: Sized + Copy + Clone + PartialEq {
     fn mul(self, o: Self) -> Self;
     fn div(self, o: Self) -> Self;
 
-    fn from_ivec(ivec: NVec<i64>)       -> NVec<Self>;
-    fn into_fvec(s: NVec<Self>)         -> NVec<f64>;
-    fn from_fvec(fvec: NVec<f64>)       -> NVec<Self>;
+    fn from_ivec(ivec: NVec<i64>) -> NVec<Self>;
+    fn into_fvec(s: NVec<Self>) -> NVec<f64>;
+    fn from_fvec(fvec: NVec<f64>) -> NVec<Self>;
     fn from_fvec_round(fvec: NVec<f64>) -> NVec<Self>;
 }
 
 impl NVecNum for i64 {
     #[inline]
-    fn sign()              -> char { 'i' }
+    fn sign() -> char {
+        'i'
+    }
 
     #[inline]
-    fn from_vval(v: &VVal) -> Self { v.i() }
+    fn from_vval(v: &VVal) -> Self {
+        v.i()
+    }
     #[inline]
-    fn into_vval(self)     -> VVal { VVal::Int(self) }
+    fn into_vval(self) -> VVal {
+        VVal::Int(self)
+    }
 
     #[inline]
-    fn into_f64(self)      -> f64  { self as f64 }
+    fn into_f64(self) -> f64 {
+        self as f64
+    }
     #[inline]
-    fn from_f64(f: f64)    -> Self { f as i64 }
+    fn from_f64(f: f64) -> Self {
+        f as i64
+    }
 
     #[inline]
-    fn into_f32(self)      -> f32  { self as f32 }
+    fn into_f32(self) -> f32 {
+        self as f32
+    }
     #[inline]
-    fn from_f32(f: f32)    -> Self { f as i64 }
+    fn from_f32(f: f32) -> Self {
+        f as i64
+    }
 
     #[inline]
-    fn into_i64(self)      -> i64  { self }
+    fn into_i64(self) -> i64 {
+        self
+    }
     #[inline]
-    fn from_i64(i: i64)    -> Self { i }
+    fn from_i64(i: i64) -> Self {
+        i
+    }
 
     #[inline]
-    fn into_i32(self)      -> i32  { self as i32 }
+    fn into_i32(self) -> i32 {
+        self as i32
+    }
     #[inline]
-    fn from_i32(i: i32)    -> Self { i as i64 }
+    fn from_i32(i: i32) -> Self {
+        i as i64
+    }
 
     #[inline]
-    fn zero()              -> Self { 0 }
+    fn zero() -> Self {
+        0
+    }
 
     #[inline]
-    fn add(self, o: Self)  -> Self { self + o }
+    fn add(self, o: Self) -> Self {
+        self + o
+    }
     #[inline]
-    fn sub(self, o: Self)  -> Self { self - o }
+    fn sub(self, o: Self) -> Self {
+        self - o
+    }
     #[inline]
-    fn mul(self, o: Self)  -> Self { self * o }
+    fn mul(self, o: Self) -> Self {
+        self * o
+    }
     #[inline]
-    fn div(self, o: Self)  -> Self { self / o }
+    fn div(self, o: Self) -> Self {
+        self / o
+    }
 
     #[inline]
-    fn from_ivec(i: NVec<i64>)       -> NVec<Self> { i }
+    fn from_ivec(i: NVec<i64>) -> NVec<Self> {
+        i
+    }
     #[inline]
-    fn into_fvec(i: NVec<Self>)      -> NVec<f64>  { NVec::from_vval_tpl(i.into_vval_tpl()).unwrap() }
+    fn into_fvec(i: NVec<Self>) -> NVec<f64> {
+        NVec::from_vval_tpl(i.into_vval_tpl()).unwrap()
+    }
     #[inline]
-    fn from_fvec(f: NVec<f64>)       -> NVec<Self> { NVec::from_vval_tpl(f.into_vval_tpl()).unwrap() }
+    fn from_fvec(f: NVec<f64>) -> NVec<Self> {
+        NVec::from_vval_tpl(f.into_vval_tpl()).unwrap()
+    }
     #[inline]
     #[allow(clippy::many_single_char_names)]
     fn from_fvec_round(f: NVec<f64>) -> NVec<Self> {
@@ -138,60 +175,101 @@ impl NVecNum for i64 {
             x.round() as i64,
             y.round() as i64,
             z.map(|z| z.round() as i64),
-            w.map(|w| w.round() as i64)
-        )).unwrap()
+            w.map(|w| w.round() as i64),
+        ))
+        .unwrap()
     }
 }
 
 impl NVecNum for f64 {
     #[inline]
-    fn sign()              -> char { 'f' }
+    fn sign() -> char {
+        'f'
+    }
 
     #[inline]
-    fn from_vval(v: &VVal) -> Self { v.f() }
+    fn from_vval(v: &VVal) -> Self {
+        v.f()
+    }
     #[inline]
-    fn into_vval(self)     -> VVal { VVal::Flt(self) }
+    fn into_vval(self) -> VVal {
+        VVal::Flt(self)
+    }
 
     #[inline]
-    fn into_f64(self)      -> f64  { self }
+    fn into_f64(self) -> f64 {
+        self
+    }
     #[inline]
-    fn from_f64(f: f64)    -> Self { f }
+    fn from_f64(f: f64) -> Self {
+        f
+    }
 
     #[inline]
-    fn into_f32(self)      -> f32  { self as f32 }
+    fn into_f32(self) -> f32 {
+        self as f32
+    }
     #[inline]
-    fn from_f32(f: f32)    -> Self { f as f64 }
+    fn from_f32(f: f32) -> Self {
+        f as f64
+    }
 
     #[inline]
-    fn into_i64(self)      -> i64  { self as i64 }
+    fn into_i64(self) -> i64 {
+        self as i64
+    }
     #[inline]
-    fn from_i64(f: i64)    -> Self { f as f64 }
+    fn from_i64(f: i64) -> Self {
+        f as f64
+    }
 
     #[inline]
-    fn into_i32(self)      -> i32  { self as i32 }
+    fn into_i32(self) -> i32 {
+        self as i32
+    }
     #[inline]
-    fn from_i32(f: i32)    -> Self { f as f64 }
+    fn from_i32(f: i32) -> Self {
+        f as f64
+    }
 
     #[inline]
-    fn zero()              -> Self { 0.0 }
+    fn zero() -> Self {
+        0.0
+    }
 
     #[inline]
-    fn add(self, o: Self)  -> Self { self + o }
+    fn add(self, o: Self) -> Self {
+        self + o
+    }
     #[inline]
-    fn sub(self, o: Self)  -> Self { self - o }
+    fn sub(self, o: Self) -> Self {
+        self - o
+    }
     #[inline]
-    fn mul(self, o: Self)  -> Self { self * o }
+    fn mul(self, o: Self) -> Self {
+        self * o
+    }
     #[inline]
-    fn div(self, o: Self)  -> Self { self / o }
+    fn div(self, o: Self) -> Self {
+        self / o
+    }
 
     #[inline]
-    fn from_ivec(i: NVec<i64>)       -> NVec<Self> { NVec::from_vval_tpl(i.into_vval_tpl()).unwrap() }
+    fn from_ivec(i: NVec<i64>) -> NVec<Self> {
+        NVec::from_vval_tpl(i.into_vval_tpl()).unwrap()
+    }
     #[inline]
-    fn into_fvec(f: NVec<Self>)      -> NVec<f64>  { f }
+    fn into_fvec(f: NVec<Self>) -> NVec<f64> {
+        f
+    }
     #[inline]
-    fn from_fvec(f: NVec<f64>)       -> NVec<Self> { f }
+    fn from_fvec(f: NVec<f64>) -> NVec<Self> {
+        f
+    }
     #[inline]
-    fn from_fvec_round(f: NVec<f64>) -> NVec<Self> { f }
+    fn from_fvec_round(f: NVec<f64>) -> NVec<Self> {
+        f
+    }
 }
 
 impl AsRef<VVal> for VVal {
@@ -211,8 +289,8 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn x_raw(&self) -> N {
         match self {
-            Vec2(x, _)       => *x,
-            Vec3(x, _, _)    => *x,
+            Vec2(x, _) => *x,
+            Vec3(x, _, _) => *x,
             Vec4(x, _, _, _) => *x,
         }
     }
@@ -227,8 +305,8 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn y_raw(&self) -> N {
         match self {
-            Vec2(_, y)       => *y,
-            Vec3(_, y, _)    => *y,
+            Vec2(_, y) => *y,
+            Vec3(_, y, _) => *y,
             Vec4(_, y, _, _) => *y,
         }
     }
@@ -243,8 +321,8 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn z_raw(&self) -> Option<N> {
         match self {
-            Vec2(_, _)       => None,
-            Vec3(_, _, z)    => Some(*z),
+            Vec2(_, _) => None,
+            Vec3(_, _, z) => Some(*z),
             Vec4(_, _, z, _) => Some(*z),
         }
     }
@@ -259,8 +337,8 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn w_raw(&self) -> Option<N> {
         match self {
-            Vec2(_, _)       => None,
-            Vec3(_, _, _)    => None,
+            Vec2(_, _) => None,
+            Vec3(_, _, _) => None,
             Vec4(_, _, _, w) => Some(*w),
         }
     }
@@ -269,8 +347,8 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn dims(&self) -> NVecDim {
         match self {
-            Vec2(_, _)       => NVecDim::Two,
-            Vec3(_, _, _)    => NVecDim::Three,
+            Vec2(_, _) => NVecDim::Two,
+            Vec3(_, _, _) => NVecDim::Three,
             Vec4(_, _, _, _) => NVecDim::Four,
         }
     }
@@ -280,8 +358,8 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn into_tpl(self) -> (N, N, Option<N>, Option<N>) {
         match self {
-            Vec2(x, y)       => (x, y, None   , None),
-            Vec3(x, y, z)    => (x, y, Some(z), None),
+            Vec2(x, y) => (x, y, None, None),
+            Vec3(x, y, z) => (x, y, Some(z), None),
             Vec4(x, y, z, w) => (x, y, Some(z), Some(w)),
         }
     }
@@ -292,9 +370,9 @@ impl<N: NVecNum> NVec<N> {
     pub fn into_zero_tpl(self) -> (N, N, N, N) {
         let zero = N::zero();
         match self {
-            Vec2(x, y)       => (x, y, zero, zero),
-            Vec3(x, y, z)    => (x, y, z,    zero),
-            Vec4(x, y, z, w) => (x, y, z,    w),
+            Vec2(x, y) => (x, y, zero, zero),
+            Vec3(x, y, z) => (x, y, z, zero),
+            Vec4(x, y, z, w) => (x, y, z, w),
         }
     }
 
@@ -303,9 +381,11 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn into_vval_tpl(self) -> (VVal, VVal, Option<VVal>, Option<VVal>) {
         match self {
-            Vec2(x, y)       => (x.into_vval(), y.into_vval(), None   , None),
-            Vec3(x, y, z)    => (x.into_vval(), y.into_vval(), Some(z.into_vval()), None),
-            Vec4(x, y, z, w) => (x.into_vval(), y.into_vval(), Some(z.into_vval()), Some(w.into_vval())),
+            Vec2(x, y) => (x.into_vval(), y.into_vval(), None, None),
+            Vec3(x, y, z) => (x.into_vval(), y.into_vval(), Some(z.into_vval()), None),
+            Vec4(x, y, z, w) => {
+                (x.into_vval(), y.into_vval(), Some(z.into_vval()), Some(w.into_vval()))
+            }
         }
     }
 
@@ -313,24 +393,30 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn from_tpl(tpl: (N, N, Option<N>, Option<N>)) -> Option<Self> {
         Some(match tpl {
-            (x, y, None   , None)    => Vec2(x, y),
-            (x, y, Some(z), None)    => Vec3(x, y, z),
+            (x, y, None, None) => Vec2(x, y),
+            (x, y, Some(z), None) => Vec3(x, y, z),
             (x, y, Some(z), Some(w)) => Vec4(x, y, z, w),
-            _ => return None
+            _ => return None,
         })
     }
 
     /// Convert a tuple of [VVal] into an NVec.
     #[inline]
-    pub fn from_vval_tpl<W: AsRef<VVal>>((x, y, z, w): (W, W, Option<W>, Option<W>)) -> Option<Self> {
+    pub fn from_vval_tpl<W: AsRef<VVal>>(
+        (x, y, z, w): (W, W, Option<W>, Option<W>),
+    ) -> Option<Self> {
         Some(match (x.as_ref(), y.as_ref(), z, w) {
-            (x, y, None   , None)    =>
-                Vec2(N::from_vval(x), N::from_vval(y)),
-            (x, y, Some(z), None)    =>
-                Vec3(N::from_vval(x), N::from_vval(y), N::from_vval(z.as_ref())),
-            (x, y, Some(z), Some(w)) =>
-                Vec4(N::from_vval(x), N::from_vval(y), N::from_vval(z.as_ref()), N::from_vval(w.as_ref())),
-            _ => return None
+            (x, y, None, None) => Vec2(N::from_vval(x), N::from_vval(y)),
+            (x, y, Some(z), None) => {
+                Vec3(N::from_vval(x), N::from_vval(y), N::from_vval(z.as_ref()))
+            }
+            (x, y, Some(z), Some(w)) => Vec4(
+                N::from_vval(x),
+                N::from_vval(y),
+                N::from_vval(z.as_ref()),
+                N::from_vval(w.as_ref()),
+            ),
+            _ => return None,
         })
     }
 
@@ -338,10 +424,12 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn s(&self) -> String {
         match self.into_vval_tpl() {
-            (x, y, None,    None)    => format!("${}({},{})", N::sign(), x.s(), y.s()),
-            (x, y, Some(z), None)    => format!("${}({},{},{})", N::sign(), x.s(), y.s(), z.s()),
-            (x, y, Some(z), Some(w)) => format!("${}({},{},{},{})", N::sign(), x.s(), y.s(), z.s(), w.s()),
-            _ => unreachable!()
+            (x, y, None, None) => format!("${}({},{})", N::sign(), x.s(), y.s()),
+            (x, y, Some(z), None) => format!("${}({},{},{})", N::sign(), x.s(), y.s(), z.s()),
+            (x, y, Some(z), Some(w)) => {
+                format!("${}({},{},{},{})", N::sign(), x.s(), y.s(), z.s(), w.s())
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -349,8 +437,8 @@ impl<N: NVecNum> NVec<N> {
     /// Converts this vector into one with three dimensions, discarding the unnecessary values.
     pub fn vec2(self) -> Self {
         match self {
-            Vec2(_, _)       => self,
-            Vec3(x, y, _)    => Vec2(x, y),
+            Vec2(_, _) => self,
+            Vec3(x, y, _) => Vec2(x, y),
             Vec4(x, y, _, _) => Vec2(x, y),
         }
     }
@@ -360,8 +448,8 @@ impl<N: NVecNum> NVec<N> {
     /// and filling in the missing values with 0s if necessary.
     pub fn vec3(self) -> Self {
         match self {
-            Vec2(x, y)       => Vec3(x, y, N::zero()),
-            Vec3(_, _, _)    => self,
+            Vec2(x, y) => Vec3(x, y, N::zero()),
+            Vec3(_, _, _) => self,
             Vec4(x, y, z, _) => Vec3(x, y, z),
         }
     }
@@ -372,8 +460,8 @@ impl<N: NVecNum> NVec<N> {
     pub fn vec4(self) -> Self {
         let o = N::zero();
         match self {
-            Vec2(x, y)       => Vec4(x, y, o, o),
-            Vec3(x, y, z)    => Vec4(x, y, z, o),
+            Vec2(x, y) => Vec4(x, y, o, o),
+            Vec3(x, y, z) => Vec4(x, y, z, o),
             Vec4(_, _, _, _) => self,
         }
     }
@@ -383,12 +471,14 @@ impl<N: NVecNum> NVec<N> {
     #[inline]
     pub fn mag2(&self) -> f64 {
         match self {
-            Vec2(x, y)       =>
-                x.into_f64().powi(2) + y.into_f64().powi(2),
-            Vec3(x, y, z)    =>
-                x.into_f64().powi(2) + y.into_f64().powi(2) + z.into_f64().powi(2),
-            Vec4(x, y, z, w) =>
-                x.into_f64().powi(2) + y.into_f64().powi(2) + z.into_f64().powi(2) + w.into_f64().powi(2),
+            Vec2(x, y) => x.into_f64().powi(2) + y.into_f64().powi(2),
+            Vec3(x, y, z) => x.into_f64().powi(2) + y.into_f64().powi(2) + z.into_f64().powi(2),
+            Vec4(x, y, z, w) => {
+                x.into_f64().powi(2)
+                    + y.into_f64().powi(2)
+                    + z.into_f64().powi(2)
+                    + w.into_f64().powi(2)
+            }
         }
     }
 
@@ -419,9 +509,9 @@ impl<N: NVecNum> NVec<N> {
         let (rx, ry, rz, rw) = o.into_zero_tpl();
 
         match max_dims {
-            NVecDim::Two   => lx.mul(rx).add(ly.mul(ry)),
+            NVecDim::Two => lx.mul(rx).add(ly.mul(ry)),
             NVecDim::Three => lx.mul(rx).add(ly.mul(ry)).add(lz.mul(rz)),
-            NVecDim::Four  => lx.mul(rx).add(ly.mul(ry)).add(lz.mul(rz)).add(lw.mul(rw)),
+            NVecDim::Four => lx.mul(rx).add(ly.mul(ry)).add(lz.mul(rz)).add(lw.mul(rw)),
         }
     }
 
@@ -442,10 +532,7 @@ impl<N: NVecNum> NVec<N> {
     /// The parameter \a t should be between 0.0 and 1.0.
     #[inline]
     pub fn lerp(self, o: NVec<N>, t: f64) -> Self {
-        N::from_fvec_round(
-            (N::into_fvec(self) * (1.0 - t))
-            + (N::into_fvec(o) * t)
-        )
+        N::from_fvec_round((N::into_fvec(self) * (1.0 - t)) + (N::into_fvec(o) * t))
     }
 
     /// Turns the first two components of this vector into an angle in radians.
@@ -463,7 +550,7 @@ impl<N: NVecNum> NVec<N> {
     /// The resulting NVec will almost always have a length of 1,
     /// except for in cases where `o` and `self` are collinear opposites.
     /// To work around this, the resulting vector may be normalized.
-    /// 
+    ///
     /// # Panics
     /// Panics if input vectors aren't unit vectors.
     pub fn slerp(self, o: NVec<N>, t: f64) -> Self {
@@ -479,8 +566,7 @@ impl<N: NVecNum> NVec<N> {
         let omega = p0.dot(p1).acos();
         let sin_omega = omega.sin();
         N::from_fvec_round(
-            (p0 * (((1.0 - t) * omega).sin() / sin_omega))
-            + (p1 * ((t * omega).sin() / sin_omega))
+            (p0 * (((1.0 - t) * omega).sin() / sin_omega)) + (p1 * ((t * omega).sin() / sin_omega)),
         )
     }
 }

@@ -69,11 +69,7 @@ pub enum NodeData {
     /// [document type declaration on wikipedia][dtd wiki].
     ///
     /// [dtd wiki]: https://en.wikipedia.org/wiki/Document_type_declaration
-    Doctype {
-        name: StrTendril,
-        public_id: StrTendril,
-        system_id: StrTendril,
-    },
+    Doctype { name: StrTendril, public_id: StrTendril, system_id: StrTendril },
 
     /// A text node.
     Text { contents: RefCell<StrTendril> },
@@ -98,10 +94,7 @@ pub enum NodeData {
     },
 
     /// A Processing instruction.
-    ProcessingInstruction {
-        target: StrTendril,
-        contents: StrTendril,
-    },
+    ProcessingInstruction { target: StrTendril, contents: StrTendril },
 }
 
 /// A DOM node.
@@ -117,11 +110,7 @@ pub struct Node {
 impl Node {
     /// Create a new node from its contents
     pub fn new(data: NodeData) -> Rc<Self> {
-        Rc::new(Node {
-            data: data,
-            parent: Cell::new(None),
-            children: RefCell::new(Vec::new()),
-        })
+        Rc::new(Node { data, parent: Cell::new(None), children: RefCell::new(Vec::new()) })
     }
 }
 
@@ -184,7 +173,7 @@ fn append_to_existing_text(prev: &Handle, text: &str) -> bool {
         NodeData::Text { ref contents } => {
             contents.borrow_mut().push_slice(text);
             true
-        },
+        }
         _ => false,
     }
 }
@@ -226,11 +215,7 @@ impl TreeSink for RcDom {
     }
 
     fn get_template_contents(&mut self, target: &Handle) -> Handle {
-        if let NodeData::Element {
-            template_contents: Some(ref contents),
-            ..
-        } = target.data
-        {
+        if let NodeData::Element { template_contents: Some(ref contents), .. } = target.data {
             contents.clone()
         } else {
             panic!("not a template element!")
@@ -259,7 +244,7 @@ impl TreeSink for RcDom {
         flags: ElementFlags,
     ) -> Handle {
         Node::new(NodeData::Element {
-            name: name,
+            name,
             attrs: RefCell::new(attrs),
             template_contents: if flags.template {
                 Some(Node::new(NodeData::Document))
@@ -275,10 +260,7 @@ impl TreeSink for RcDom {
     }
 
     fn create_pi(&mut self, target: StrTendril, data: StrTendril) -> Handle {
-        Node::new(NodeData::ProcessingInstruction {
-            target: target,
-            contents: data,
-        })
+        Node::new(NodeData::ProcessingInstruction { target, contents: data })
     }
 
     fn append(&mut self, parent: &Handle, child: NodeOrText<Handle>) {
@@ -289,7 +271,7 @@ impl TreeSink for RcDom {
                     if append_to_existing_text(h, &text) {
                         return;
                     }
-                },
+                }
                 _ => (),
             },
             _ => (),
@@ -298,9 +280,9 @@ impl TreeSink for RcDom {
         append(
             &parent,
             match child {
-                NodeOrText::AppendText(text) => Node::new(NodeData::Text {
-                    contents: RefCell::new(text),
-                }),
+                NodeOrText::AppendText(text) => {
+                    Node::new(NodeData::Text { contents: RefCell::new(text) })
+                }
                 NodeOrText::AppendNode(node) => node,
             },
         );
@@ -312,9 +294,9 @@ impl TreeSink for RcDom {
 
         let child = match (child, i) {
             // No previous node.
-            (NodeOrText::AppendText(text), 0) => Node::new(NodeData::Text {
-                contents: RefCell::new(text),
-            }),
+            (NodeOrText::AppendText(text), 0) => {
+                Node::new(NodeData::Text { contents: RefCell::new(text) })
+            }
 
             // Look for a text node before the insertion point.
             (NodeOrText::AppendText(text), i) => {
@@ -323,10 +305,8 @@ impl TreeSink for RcDom {
                 if append_to_existing_text(prev, &text) {
                     return;
                 }
-                Node::new(NodeData::Text {
-                    contents: RefCell::new(text),
-                })
-            },
+                Node::new(NodeData::Text { contents: RefCell::new(text) })
+            }
 
             // The tree builder promises we won't have a text node after
             // the insertion point.
@@ -364,14 +344,7 @@ impl TreeSink for RcDom {
         public_id: StrTendril,
         system_id: StrTendril,
     ) {
-        append(
-            &self.document,
-            Node::new(NodeData::Doctype {
-                name: name,
-                public_id: public_id,
-                system_id: system_id,
-            }),
-        );
+        append(&self.document, Node::new(NodeData::Doctype { name, public_id, system_id }));
     }
 
     fn add_attrs_if_missing(&mut self, target: &Handle, attrs: Vec<Attribute>) {
@@ -381,15 +354,8 @@ impl TreeSink for RcDom {
             panic!("not an element")
         };
 
-        let existing_names = existing
-            .iter()
-            .map(|e| e.name.clone())
-            .collect::<HashSet<_>>();
-        existing.extend(
-            attrs
-                .into_iter()
-                .filter(|attr| !existing_names.contains(&attr.name)),
-        );
+        let existing_names = existing.iter().map(|e| e.name.clone()).collect::<HashSet<_>>();
+        existing.extend(attrs.into_iter().filter(|attr| !existing_names.contains(&attr.name)));
     }
 
     fn remove_from_parent(&mut self, target: &Handle) {
@@ -401,20 +367,13 @@ impl TreeSink for RcDom {
         let mut new_children = new_parent.children.borrow_mut();
         for child in children.iter() {
             let previous_parent = child.parent.replace(Some(Rc::downgrade(&new_parent)));
-            assert!(Rc::ptr_eq(
-                &node,
-                &previous_parent.unwrap().upgrade().expect("dangling weak")
-            ))
+            assert!(Rc::ptr_eq(&node, &previous_parent.unwrap().upgrade().expect("dangling weak")))
         }
         new_children.extend(mem::replace(&mut *children, Vec::new()));
     }
 
     fn is_mathml_annotation_xml_integration_point(&self, target: &Handle) -> bool {
-        if let NodeData::Element {
-            mathml_annotation_xml_integration_point,
-            ..
-        } = target.data
-        {
+        if let NodeData::Element { mathml_annotation_xml_integration_point, .. } = target.data {
             mathml_annotation_xml_integration_point
         } else {
             panic!("not an element!")
@@ -452,23 +411,15 @@ impl Serialize for SerializableHandle {
     {
         let mut ops = match traversal_scope {
             IncludeNode => vec![SerializeOp::Open(self.0.clone())],
-            ChildrenOnly(_) => self
-                .0
-                .children
-                .borrow()
-                .iter()
-                .map(|h| SerializeOp::Open(h.clone()))
-                .collect(),
+            ChildrenOnly(_) => {
+                self.0.children.borrow().iter().map(|h| SerializeOp::Open(h.clone())).collect()
+            }
         };
 
         while !ops.is_empty() {
             match ops.remove(0) {
                 SerializeOp::Open(handle) => match &handle.data {
-                    &NodeData::Element {
-                        ref name,
-                        ref attrs,
-                        ..
-                    } => {
+                    &NodeData::Element { ref name, ref attrs, .. } => {
                         serializer.start_elem(
                             name.clone(),
                             attrs.borrow().iter().map(|at| (&at.name, &at.value[..])),
@@ -479,27 +430,26 @@ impl Serialize for SerializableHandle {
                         for child in handle.children.borrow().iter().rev() {
                             ops.insert(0, SerializeOp::Open(child.clone()));
                         }
-                    },
+                    }
 
                     &NodeData::Doctype { ref name, .. } => serializer.write_doctype(&name)?,
 
                     &NodeData::Text { ref contents } => {
                         serializer.write_text(&contents.borrow())?
-                    },
+                    }
 
                     &NodeData::Comment { ref contents } => serializer.write_comment(&contents)?,
 
-                    &NodeData::ProcessingInstruction {
-                        ref target,
-                        ref contents,
-                    } => serializer.write_processing_instruction(target, contents)?,
+                    &NodeData::ProcessingInstruction { ref target, ref contents } => {
+                        serializer.write_processing_instruction(target, contents)?
+                    }
 
                     &NodeData::Document => panic!("Can't serialize Document node itself"),
                 },
 
                 SerializeOp::Close(name) => {
                     serializer.end_elem(name)?;
-                },
+                }
             }
         }
 

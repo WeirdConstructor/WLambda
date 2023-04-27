@@ -52,10 +52,12 @@ impl WParam {
             //                }
             //            },
             VVal::Int(_) => Ok(WParam::Str(v.s_raw())),
-            VVal::Str(_) => v.with_s_ref(|s| if use_wide_strings {
-                Ok(WParam::WStr(U16String::from_str(s)))
-            } else {
-                Ok(WParam::Str(s.to_string()))
+            VVal::Str(_) => v.with_s_ref(|s| {
+                if use_wide_strings {
+                    Ok(WParam::WStr(U16String::from_str(s)))
+                } else {
+                    Ok(WParam::Str(s.to_string()))
+                }
             }),
             VVal::Flt(_) => Ok(WParam::Double(v.f())),
             VVal::Byt(_) => Ok(WParam::Bytes(v.as_bytes())),
@@ -687,9 +689,10 @@ impl VValUserData for Odbc {
                                         }
                                     }
                                     Err(e) => {
-                                        return Some(
-                                            env.new_err(format!("$<Odbc>.exec bad parameter value: {}", e))
-                                        );
+                                        return Some(env.new_err(format!(
+                                            "$<Odbc>.exec bad parameter value: {}",
+                                            e
+                                        )));
                                     }
                                 }
                             }
@@ -700,7 +703,6 @@ impl VValUserData for Odbc {
                         if let Some(r) = r {
                             return Ok(r);
                         }
-
                     } else {
                         match WParam::from_vval(&argv.v_(i), self.handle.legacy) {
                             Ok(p) => {

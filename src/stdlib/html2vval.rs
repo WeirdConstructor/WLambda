@@ -92,9 +92,7 @@ fn handle2vval_simplified(handle: &Handle, parent: &VVal, level: u32) {
             parent.v_(1).v_k("_").push(VVal::new_str_mv(contents.borrow().to_string()));
             return;
         }
-        NodeData::Document => {
-            parent.clone()
-        }
+        NodeData::Document => parent.clone(),
         NodeData::Element { name, attrs, .. } => {
             let v_attrs = VVal::map1("_", VVal::vec());
 
@@ -117,14 +115,14 @@ fn handle2vval_simplified(handle: &Handle, parent: &VVal, level: u32) {
     for child in handle.children.borrow().iter() {
         handle2vval_simplified(child, &v_node, level + 1);
 
-//        let name = v_child.v_k("%name");
-//        name.with_s_ref(|e_name| {
-//            if !v_node.v_k(e_name).is_some() {
-//                let _ = v_node.set_key_str(e_name, VVal::vec());
-//            }
-//
-//            v_node.v_k(e_name).push(v_child.clone());
-//        });
+        //        let name = v_child.v_k("%name");
+        //        name.with_s_ref(|e_name| {
+        //            if !v_node.v_k(e_name).is_some() {
+        //                let _ = v_node.set_key_str(e_name, VVal::vec());
+        //            }
+        //
+        //            v_node.v_k(e_name).push(v_child.clone());
+        //        });
     }
 }
 

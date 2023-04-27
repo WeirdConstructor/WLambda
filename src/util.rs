@@ -9,7 +9,7 @@
 
 */
 
-//- splitmix64 (http://xoroshiro.di.unimi.it/splitmix64.c) 
+//- splitmix64 (http://xoroshiro.di.unimi.it/splitmix64.c)
 //"""
 //  Written in 2015 by Sebastiano Vigna (vigna@acm.org)
 //
@@ -17,7 +17,7 @@
 //  and related and neighboring rights to this software to the public domain
 //  worldwide. This software is distributed without any warranty.
 //
-//  See <http://creativecommons.org/publicdomain/zero/1.0/>. 
+//  See <http://creativecommons.org/publicdomain/zero/1.0/>.
 //"""
 //
 // Written by Alexander Stocko <as@coder.gg>
@@ -28,9 +28,8 @@
 //
 // See <LICENSE or http://creativecommons.org/publicdomain/zero/1.0/>
 
-
-use std::num::Wrapping as w;
 use std::cell::RefCell;
+use std::num::Wrapping as w;
 
 thread_local! {
     static RAND_STATE: RefCell<SplitMix64> =
@@ -44,21 +43,15 @@ pub fn srand(seed: i64) {
 }
 
 pub fn rand_closed_open01() -> f64 {
-    RAND_STATE.with(|si| {
-        u64_to_closed_open01(si.borrow_mut().next_u64())
-    })
+    RAND_STATE.with(|si| u64_to_closed_open01(si.borrow_mut().next_u64()))
 }
 
 pub fn rand_i(max: u64) -> i64 {
-    RAND_STATE.with(|si| {
-        (si.borrow_mut().next_u64() % max) as i64
-    })
+    RAND_STATE.with(|si| (si.borrow_mut().next_u64() % max) as i64)
 }
 
 pub fn rand_full_i() -> i64 {
-    RAND_STATE.with(|si| {
-        si.borrow_mut().next_i64()
-    })
+    RAND_STATE.with(|si| si.borrow_mut().next_i64())
 }
 
 /// The `SplitMix64` random number generator.
@@ -66,7 +59,9 @@ pub fn rand_full_i() -> i64 {
 pub struct SplitMix64(pub u64);
 
 impl SplitMix64 {
-    pub fn new(seed: u64) -> Self { Self(seed) }
+    pub fn new(seed: u64) -> Self {
+        Self(seed)
+    }
     pub fn new_from_i64(seed: i64) -> Self {
         Self::new(u64::from_be_bytes(seed.to_be_bytes()))
     }
@@ -82,8 +77,7 @@ impl SplitMix64 {
 
     #[inline]
     pub fn next_i64(&mut self) -> i64 {
-        i64::from_be_bytes(
-            self.next_u64().to_be_bytes())
+        i64::from_be_bytes(self.next_u64().to_be_bytes())
     }
 }
 
@@ -92,8 +86,8 @@ impl SplitMix64 {
 // Copyright 2018 Developers of the Rand project.
 pub fn u64_to_open01(u: u64) -> f64 {
     use core::f64::EPSILON;
-    let float_size         = std::mem::size_of::<f64>() as u32 * 8;
-    let fraction           = u >> (float_size - 52);
+    let float_size = std::mem::size_of::<f64>() as u32 * 8;
+    let fraction = u >> (float_size - 52);
     let exponent_bits: u64 = 1023_u64 << 52;
     f64::from_bits(fraction | exponent_bits) - (1.0 - EPSILON / 2.0)
 }
@@ -159,13 +153,12 @@ impl FnvHasher {
 
     #[inline]
     pub fn finish_i64(self) -> i64 {
-        i64::from_be_bytes(
-            self.finish().to_be_bytes())
+        i64::from_be_bytes(self.finish().to_be_bytes())
     }
 
     #[inline]
     pub fn write_f64(&mut self, f: f64) {
-            self.write(&f.to_bits().to_be_bytes());
+        self.write(&f.to_bits().to_be_bytes());
     }
 
     #[inline]
@@ -189,9 +182,9 @@ impl FnvHasher {
 
 pub fn now_timestamp() -> u64 {
     std::time::SystemTime::now()
-    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-    .unwrap()
-    .as_secs() as u64
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as u64
 }
 
 pub fn rgba2hsvaf(rgba: (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
@@ -203,13 +196,21 @@ pub fn rgb2hsv(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
     let c_max = r.max(g.max(b));
     let c_min = r.min(g.min(b));
     let delta = c_max - c_min;
-    let mut hue =
-        if delta < 0.000_001 { 0.0 }
-        else if (r - c_max).abs() < 0.000_001  { 60.0 * (((g - b) / delta) % 6.0) }
-        else if (g - c_max).abs() < 0.000_001  { 60.0 * (((b - r) / delta) + 2.0) }
-        else                                   { 60.0 * (((r - g) / delta) + 4.0) };
-    if hue < 0.0   { hue += 360.0 }
-    if hue > 360.0 { hue -= 360.0 }
+    let mut hue = if delta < 0.000_001 {
+        0.0
+    } else if (r - c_max).abs() < 0.000_001 {
+        60.0 * (((g - b) / delta) % 6.0)
+    } else if (g - c_max).abs() < 0.000_001 {
+        60.0 * (((b - r) / delta) + 2.0)
+    } else {
+        60.0 * (((r - g) / delta) + 4.0)
+    };
+    if hue < 0.0 {
+        hue += 360.0
+    }
+    if hue > 360.0 {
+        hue -= 360.0
+    }
     let sat = if c_max < 0.000_001 { 0.0 } else { delta / c_max };
     let val = c_max;
     (hue, sat, val)
@@ -224,38 +225,39 @@ pub fn hsv2rgb(hue: f64, sat: f64, val: f64) -> (f64, f64, f64) {
     let c = val * sat;
     let x = c * (1.0 - ((hue / 60.0) % 2.0 - 1.0).abs());
     let m = val - c;
-    let (r_, g_, b_) =
-        if        (0.0..60.0).contains(&hue) {
-            (c, x, 0.0)
-        } else if (60.0..120.0).contains(&hue) {
-            (x, c, 0.0)
-        } else if (120.0..180.0).contains(&hue) {
-            (0.0, c, x)
-        } else if (180.0..240.0).contains(&hue) {
-            (0.0, x, c)
-        } else if (240.0..300.0).contains(&hue) {
-            (x, 0.0, c)
-        } else { // if hue >= 300.0 && hue < 360.0 {
-            (c, 0.0, x)
-        };
-//    println!("in: h={}, s={}, v={}, r:{}, g:{}, b: {}", hue, sat, val,
-//        (r_ + m) * 255.0,
-//        (g_ + m) * 255.0,
-//        (b_ + m) * 255.0);
+    let (r_, g_, b_) = if (0.0..60.0).contains(&hue) {
+        (c, x, 0.0)
+    } else if (60.0..120.0).contains(&hue) {
+        (x, c, 0.0)
+    } else if (120.0..180.0).contains(&hue) {
+        (0.0, c, x)
+    } else if (180.0..240.0).contains(&hue) {
+        (0.0, x, c)
+    } else if (240.0..300.0).contains(&hue) {
+        (x, 0.0, c)
+    } else {
+        // if hue >= 300.0 && hue < 360.0 {
+        (c, 0.0, x)
+    };
+    //    println!("in: h={}, s={}, v={}, r:{}, g:{}, b: {}", hue, sat, val,
+    //        (r_ + m) * 255.0,
+    //        (g_ + m) * 255.0,
+    //        (b_ + m) * 255.0);
     (r_ + m, g_ + m, b_ + m)
 }
 
 pub fn rgba2hexf(rgba: (f64, f64, f64, f64)) -> String {
-    format!("{:02x}{:02x}{:02x}{:02x}",
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}",
         (rgba.0 * 255.0).round() as u8,
         (rgba.1 * 255.0).round() as u8,
         (rgba.2 * 255.0).round() as u8,
-        (rgba.3 * 255.0).round() as u8)
+        (rgba.3 * 255.0).round() as u8
+    )
 }
 
 pub fn rgba2hex(rgba: (u8, u8, u8, u8)) -> String {
-    format!("{:02x}{:02x}{:02x}{:02x}",
-        rgba.0, rgba.1, rgba.2, rgba.3)
+    format!("{:02x}{:02x}{:02x}{:02x}", rgba.0, rgba.1, rgba.2, rgba.3)
 }
 
 pub fn hex2hsvaf(s: &str) -> (f64, f64, f64, f64) {
@@ -264,22 +266,23 @@ pub fn hex2hsvaf(s: &str) -> (f64, f64, f64, f64) {
 }
 
 pub fn hsva2hexf(hsva: (f64, f64, f64, f64)) -> String {
-    format!("{:02x}{:02x}{:02x}{:02x}",
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}",
         ((hsva.0 / 360.0) * 255.0).round() as u8,
         (hsva.1 * 255.0).round() as u8,
         (hsva.2 * 255.0).round() as u8,
-        (hsva.3 * 255.0).round() as u8)
+        (hsva.3 * 255.0).round() as u8
+    )
 }
 
 pub fn hex2rgbaf(hex_str: &str) -> (f64, f64, f64, f64) {
     let (r, g, b, a) = hex2rgba(hex_str);
-    (r as f64 / 255.0,
-     g as f64 / 255.0,
-     b as f64 / 255.0,
-     a as f64 / 255.0)
+    (r as f64 / 255.0, g as f64 / 255.0, b as f64 / 255.0, a as f64 / 255.0)
 }
 
-fn shiftaddup4(u: u8) -> u8 { (u << 4) | u }
+fn shiftaddup4(u: u8) -> u8 {
+    (u << 4) | u
+}
 
 pub fn hex2rgba(s: &str) -> (u8, u8, u8, u8) {
     match s.len() {
@@ -287,13 +290,13 @@ pub fn hex2rgba(s: &str) -> (u8, u8, u8, u8) {
             u8::from_str_radix(&s[0..2], 16).unwrap_or(0),
             u8::from_str_radix(&s[2..4], 16).unwrap_or(0),
             u8::from_str_radix(&s[4..6], 16).unwrap_or(0),
-            u8::from_str_radix(&s[6..8], 16).unwrap_or(255)
+            u8::from_str_radix(&s[6..8], 16).unwrap_or(255),
         ),
         6 => (
             u8::from_str_radix(&s[0..2], 16).unwrap_or(0),
             u8::from_str_radix(&s[2..4], 16).unwrap_or(0),
             u8::from_str_radix(&s[4..6], 16).unwrap_or(0),
-            255
+            255,
         ),
         4 => (
             shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
@@ -305,18 +308,17 @@ pub fn hex2rgba(s: &str) -> (u8, u8, u8, u8) {
             shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
             shiftaddup4(u8::from_str_radix(&s[1..2], 16).unwrap_or(0)),
             shiftaddup4(u8::from_str_radix(&s[2..3], 16).unwrap_or(0)),
-            255
+            255,
         ),
         2 => (
             shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
             shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
             shiftaddup4(u8::from_str_radix(&s[0..1], 16).unwrap_or(0)),
-            255
+            255,
         ),
         _ => (255, 0, 255, 255),
     }
 }
-
 
 // Taken from https://github.com/febeling/edit-distance/blob/master/src/lib.rs
 // Apache-2.0 License
@@ -378,37 +380,16 @@ mod tests {
 
     #[test]
     fn util_rgb2hsv() {
-        assert_eq!(
-            hsva2hexf(rgba2hsvaf(hex2rgbaf("FF0000FF"))),
-            "00ffffff");
-        assert_eq!(
-            hsva2hexf(rgba2hsvaf(hex2rgbaf("00FF00FF"))),
-            "55ffffff");
-        assert_eq!(
-            hsva2hexf(rgba2hsvaf(hex2rgbaf("0000FFFF"))),
-            "aaffffff");
-        assert_eq!(
-            rgba2hsvaf(hex2rgbaf("FF00FFFF")),
-            (300.0, 1.0, 1.0, 1.0));
-        assert_eq!(
-            rgba2hsvaf(hex2rgbaf("00FFFFFF")),
-            (180.0, 1.0, 1.0, 1.0));
-        assert_eq!(
-            rgba2hsvaf(hex2rgbaf("FFFF00FF")),
-            (60.0, 1.0, 1.0, 1.0));
+        assert_eq!(hsva2hexf(rgba2hsvaf(hex2rgbaf("FF0000FF"))), "00ffffff");
+        assert_eq!(hsva2hexf(rgba2hsvaf(hex2rgbaf("00FF00FF"))), "55ffffff");
+        assert_eq!(hsva2hexf(rgba2hsvaf(hex2rgbaf("0000FFFF"))), "aaffffff");
+        assert_eq!(rgba2hsvaf(hex2rgbaf("FF00FFFF")), (300.0, 1.0, 1.0, 1.0));
+        assert_eq!(rgba2hsvaf(hex2rgbaf("00FFFFFF")), (180.0, 1.0, 1.0, 1.0));
+        assert_eq!(rgba2hsvaf(hex2rgbaf("FFFF00FF")), (60.0, 1.0, 1.0, 1.0));
 
-        assert_eq!(
-            rgba2hexf(hsva2rgba((300.0, 1.0, 1.0, 1.0))),
-            "ff00ffff");
-        assert_eq!(
-            rgba2hexf(hsva2rgba((180.0, 1.0, 1.0, 1.0))),
-            "00ffffff");
-        assert_eq!(
-            rgba2hexf(hsva2rgba((60.0, 1.0, 1.0, 1.0))),
-            "ffff00ff");
-        assert_eq!(
-            rgba2hexf(hsva2rgba((100.0, 0.5, 0.25, 1.0))),
-            "2b4020ff");
+        assert_eq!(rgba2hexf(hsva2rgba((300.0, 1.0, 1.0, 1.0))), "ff00ffff");
+        assert_eq!(rgba2hexf(hsva2rgba((180.0, 1.0, 1.0, 1.0))), "00ffffff");
+        assert_eq!(rgba2hexf(hsva2rgba((60.0, 1.0, 1.0, 1.0))), "ffff00ff");
+        assert_eq!(rgba2hexf(hsva2rgba((100.0, 0.5, 0.25, 1.0))), "2b4020ff");
     }
 }
-

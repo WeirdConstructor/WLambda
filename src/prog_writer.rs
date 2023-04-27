@@ -1,7 +1,7 @@
-use crate::vval::SynPos;
-use crate::ops::*;
 use crate::compiler::ResPos;
 use crate::compiler::ResValue;
+use crate::ops::*;
+use crate::vval::SynPos;
 
 #[derive(Debug, Clone)]
 pub(crate) enum ResultSink {
@@ -12,7 +12,8 @@ pub(crate) enum ResultSink {
 
 impl ResultSink {
     pub(crate) fn if_null<T>(&self, f: T) -> bool
-        where T: FnOnce(ResPos)
+    where
+        T: FnOnce(ResPos),
     {
         match self {
             ResultSink::WriteTo(_) => true,
@@ -21,23 +22,24 @@ impl ResultSink {
                 let rp = ResPos::Value(ResValue::None);
                 f(rp);
                 false
-            },
+            }
         }
     }
 
     pub(crate) fn if_must_store<T>(&self, f: T) -> ResPos
-        where T: FnOnce(ResPos)
+    where
+        T: FnOnce(ResPos),
     {
         match self {
             ResultSink::WriteTo(rp) => {
                 f(*rp);
                 *rp
-            },
+            }
             ResultSink::WantResult => {
                 let rp = ResPos::Stack(0);
                 f(rp);
                 rp
-            },
+            }
             ResultSink::Null => ResPos::Value(ResValue::None),
         }
     }
@@ -46,7 +48,7 @@ impl ResultSink {
 pub(crate) type ProgWriteNode = Box<dyn Fn(&mut Prog, ResultSink) -> ResPos>;
 
 pub(crate) struct ProgWriter {
-    node:  ProgWriteNode,
+    node: ProgWriteNode,
 }
 
 impl ProgWriter {
@@ -71,9 +73,7 @@ impl ProgWriter {
 }
 
 pub(crate) fn pw(f: ProgWriteNode) -> ProgWriter {
-    ProgWriter {
-        node:   Box::new(f),
-    }
+    ProgWriter { node: Box::new(f) }
 }
 
 /// Internal helper macro for the code generator. It creates a `ProgWriter`
@@ -84,10 +84,8 @@ pub(crate) fn pw(f: ProgWriteNode) -> ProgWriter {
 #[macro_export]
 macro_rules! pw {
     ($prog: ident, $store: ident, $b: block) => {
-        Ok(pw(Box::new(move |$prog, $store| {
-            $b
-        })))
-    }
+        Ok(pw(Box::new(move |$prog, $store| $b)))
+    };
 }
 
 /// Internal helper macro for the code generator. It creates a `ProgWriter`
@@ -119,19 +117,17 @@ macro_rules! pw_provides_result_pos {
                 ResultSink::WriteTo(store_pos) => {
                     $prog.op_mov(&SynPos::empty(), pos, store_pos);
                     store_pos
-                },
-                ResultSink::WantResult => {
-                    pos
-                },
+                }
+                ResultSink::WantResult => pos,
                 ResultSink::Null => {
                     if let ResPos::Stack(_) = pos {
                         $prog.op_mov(&SynPos::empty(), pos, ResPos::Value(ResValue::None));
                     }
                     ResPos::Value(ResValue::None)
-                },
+                }
             }
         })
-    }
+    };
 }
 
 /// Internal helper macro for the code generator. It creates a `ProgWriter`
@@ -143,19 +139,17 @@ macro_rules! pw_provides_result_pos {
 macro_rules! pw_store_if_needed {
     ($prog: ident, $pos: ident, $b: block) => {
         pw!($prog, store, {
-            let $pos =
-                match store {
-                    ResultSink::WriteTo(store_pos) => store_pos,
-                    ResultSink::WantResult => ResPos::Stack(0),
-                    ResultSink::Null => ResPos::Value(ResValue::None),
-                };
+            let $pos = match store {
+                ResultSink::WriteTo(store_pos) => store_pos,
+                ResultSink::WantResult => ResPos::Stack(0),
+                ResultSink::Null => ResPos::Value(ResValue::None),
+            };
 
             $b;
             $pos
         })
-    }
+    };
 }
-
 
 /// Internal helper macro for the code generator. It creates a `ProgWriter`
 /// instance from the given code block. It's used where the `ProgWriter`
@@ -170,19 +164,19 @@ macro_rules! pw_needs_storage {
                     let $pos = store_pos;
                     $b;
                     $pos
-                },
+                }
                 ResultSink::WantResult => {
                     let $pos = ResPos::Stack(0);
                     $b;
                     $pos
-                },
+                }
                 ResultSink::Null => {
                     let $pos = ResPos::Stack(0);
                     $b;
                     $prog.op_mov(&SynPos::empty(), $pos, ResPos::Value(ResValue::None));
                     ResPos::Value(ResValue::None)
-                },
+                }
             }
         })
-    }
+    };
 }

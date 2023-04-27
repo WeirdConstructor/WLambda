@@ -1,4 +1,4 @@
-use crate::vval::{VVal, Env, StackAction};
+use crate::vval::{Env, StackAction, VVal};
 
 pub fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackAction> {
     let mut write = env.stdio.write.borrow_mut();
@@ -7,10 +7,14 @@ pub fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackA
         if raw {
             env.arg_ref(i).unwrap().with_s_ref(|s: &str| {
                 if i == (argc - 1) {
-                    if i > 0 { write!(write, " ").ok(); }
+                    if i > 0 {
+                        write!(write, " ").ok();
+                    }
                     writeln!(write, "{}", s).ok();
                 } else {
-                    if i > 0 { write!(write, " ").ok(); }
+                    if i > 0 {
+                        write!(write, " ").ok();
+                    }
                     write!(write, "{}", s).ok();
                 }
             });
@@ -18,10 +22,14 @@ pub fn print_value(env: &mut Env, argc: usize, raw: bool) -> Result<VVal, StackA
             let s = env.arg_ref(i).unwrap().s();
 
             if i == (argc - 1) {
-                if i > 0 { write!(write, " ").ok(); }
+                if i > 0 {
+                    write!(write, " ").ok();
+                }
                 writeln!(write, "{}", s).ok();
             } else {
-                if i > 0 { write!(write, " ").ok(); }
+                if i > 0 {
+                    write!(write, " ").ok();
+                }
                 write!(write, "{}", s).ok();
             }
         }
@@ -60,10 +68,14 @@ pub fn debug_print_value(env: &mut Env, argc: usize, pos_str: &str) -> Result<VV
 
             env.arg_ref(i).unwrap().with_s_ref(|s: &str| {
                 if i == (argc - 1) {
-                    if i > 1 { write!(write, " ").ok(); }
+                    if i > 1 {
+                        write!(write, " ").ok();
+                    }
                     writeln!(write, "{}", s).ok();
                 } else {
-                    if i > 1 { write!(write, " ").ok(); }
+                    if i > 1 {
+                        write!(write, " ").ok();
+                    }
                     write!(write, "{}", s).ok();
                 }
             })
@@ -71,10 +83,14 @@ pub fn debug_print_value(env: &mut Env, argc: usize, pos_str: &str) -> Result<VV
             let s = env.arg_ref(i).unwrap().s();
 
             if i == (argc - 1) {
-                if i > 0 { write!(write, " ").ok(); }
+                if i > 0 {
+                    write!(write, " ").ok();
+                }
                 writeln!(write, "{}({})", s, t).ok();
             } else {
-                if i > 0 { write!(write, " ").ok(); }
+                if i > 0 {
+                    write!(write, " ").ok();
+                }
                 write!(write, "{}({})", s, t).ok();
             }
         }
@@ -88,4 +104,3 @@ pub fn debug_print_value(env: &mut Env, argc: usize, pos_str: &str) -> Result<VV
         Ok(VVal::None)
     }
 }
-

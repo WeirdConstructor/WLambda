@@ -41,4 +41,3 @@ impl PendingResult {
         }
     }
 }
-

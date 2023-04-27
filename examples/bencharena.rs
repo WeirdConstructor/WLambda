@@ -1,5 +1,5 @@
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use std::time::Instant;
 
@@ -30,7 +30,9 @@ enum Val2 {
 }
 
 impl Val {
-    pub fn n(a: Val, b: Val) -> Self { Val::N(AR1::new(a, b)) }
+    pub fn n(a: Val, b: Val) -> Self {
+        Val::N(AR1::new(a, b))
+    }
     pub fn x(a: f64) -> Self {
         let mut x = XXX::new();
         x.a = a;
@@ -39,7 +41,9 @@ impl Val {
 }
 
 impl Val2 {
-    pub fn n(a: Val2, b: Val2) -> Self { Val2::N(Rc::new((a, b))) }
+    pub fn n(a: Val2, b: Val2) -> Self {
+        Val2::N(Rc::new((a, b)))
+    }
     pub fn x(a: f64) -> Self {
         let mut x = XXX::new();
         x.a = a;
@@ -49,13 +53,7 @@ impl Val2 {
 
 impl XXX {
     pub fn new() -> Self {
-        Self {
-            u: 0.0,
-            a: 0.0,
-            b: 0.0,
-            c: 0.0,
-            d: 0.0,
-        }
+        Self { u: 0.0, a: 0.0, b: 0.0, c: 0.0, d: 0.0 }
     }
 }
 
@@ -158,4 +156,3 @@ fn main() {
         t2(1000);
     }
 }
-

@@ -11,23 +11,23 @@ utility WLambda functions `std:ser:csv` and `std:deser:csv`.
 use crate::vval::VVal;
 
 struct CSVParser {
-    delim:   char,
+    delim: char,
     row_sep: String,
-    data:    std::vec::Vec<char>,
-    pos:     usize,
+    data: std::vec::Vec<char>,
+    pos: usize,
 
     cur_table: VVal,
-    cur_row:   VVal,
+    cur_row: VVal,
 }
 
 impl CSVParser {
     pub fn new(delim: char, row_sep: &str) -> Self {
         Self {
-            data:      vec![],
-            row_sep:   row_sep.to_string(),
-            pos:       0,
+            data: vec![],
+            row_sep: row_sep.to_string(),
+            pos: 0,
             cur_table: VVal::None,
-            cur_row:   VVal::None,
+            cur_row: VVal::None,
             delim,
         }
     }
@@ -40,15 +40,21 @@ impl CSVParser {
         }
     }
 
-    fn skip_char(&mut self, count: usize) { self.pos += count; }
+    fn skip_char(&mut self, count: usize) {
+        self.pos += count;
+    }
 
     fn check_char(&mut self, c: char) -> bool {
-        if self.rest_len() == 0 { return false; }
+        if self.rest_len() == 0 {
+            return false;
+        }
         self.next_char() == c
     }
 
     fn next_char(&mut self) -> char {
-        if self.rest_len() == 0 { return '\0'; }
+        if self.rest_len() == 0 {
+            return '\0';
+        }
         self.data[self.pos]
     }
 
@@ -60,10 +66,14 @@ impl CSVParser {
 
     fn check_row_sep(&mut self) -> bool {
         let sep = &self.row_sep;
-        if self.rest_len() < sep.len() { return false; }
+        if self.rest_len() < sep.len() {
+            return false;
+        }
 
         for (i, c) in sep.chars().enumerate() {
-            if self.data[self.pos + i] != c { return false; }
+            if self.data[self.pos + i] != c {
+                return false;
+            }
         }
 
         true
@@ -74,8 +84,7 @@ impl CSVParser {
     }
 
     fn on_row_end(&mut self) {
-        self.cur_table.push(
-            std::mem::replace(&mut self.cur_row, VVal::vec()));
+        self.cur_table.push(std::mem::replace(&mut self.cur_row, VVal::vec()));
     }
 
     fn parse_escaped_field(&mut self) -> Result<bool, String> {
@@ -93,43 +102,41 @@ impl CSVParser {
                 } else {
                     end_found = true;
                 }
-
             } else if self.check_char('\x0d') {
                 self.skip_char(1);
-                if self.check_char('\x0a') { self.skip_char(1); }
+                if self.check_char('\x0a') {
+                    self.skip_char(1);
+                }
                 field_data.push('\x0a');
-
             } else if self.check_char('\x0a') {
                 self.skip_char(1);
                 field_data.push('\x0a');
-
             } else {
                 field_data.push(self.next_char_skip());
             }
         }
 
-        if self.rest_len() == 0 { end_found = true; }
+        if self.rest_len() == 0 {
+            end_found = true;
+        }
 
         let mut row_end = false;
 
-        if self.rest_len() == 0
-           || self.check_row_sep()
-        {
+        if self.rest_len() == 0 || self.check_row_sep() {
             self.skip_char(self.row_sep.len());
             row_end = true;
-
         } else if self.check_char(self.delim) {
             self.skip_char(1);
-
         } else {
-            return Err(
-                format!(
-                    "Runaway escaped field '\"', field data: [{}]",
-                    field_data));
+            return Err(format!("Runaway escaped field '\"', field data: [{}]", field_data));
         }
 
-        if end_found { self.on_field(field_data); }
-        if row_end { self.on_row_end(); }
+        if end_found {
+            self.on_field(field_data);
+        }
+        if row_end {
+            self.on_row_end();
+        }
 
         Ok(end_found)
     }
@@ -137,14 +144,13 @@ impl CSVParser {
     fn parse_delimited_field(&mut self) -> Result<bool, String> {
         let mut field_data = String::new();
         let mut end_found = false;
-        let mut row_end   = false;
+        let mut row_end = false;
 
         while !end_found && self.rest_len() > 0 {
             if self.check_row_sep() {
                 self.skip_char(self.row_sep.len());
                 end_found = true;
-                row_end   = true;
-
+                row_end = true;
             } else if self.check_char(self.delim) {
                 self.skip_char(1);
                 end_found = true;
@@ -155,17 +161,23 @@ impl CSVParser {
 
         if self.rest_len() == 0 {
             end_found = true;
-            row_end   = true;
+            row_end = true;
         }
 
-        if end_found { self.on_field(field_data); }
-        if row_end   { self.on_row_end(); }
+        if end_found {
+            self.on_field(field_data);
+        }
+        if row_end {
+            self.on_row_end();
+        }
 
         Ok(end_found)
     }
 
     fn parse_field(&mut self) -> Result<bool, String> {
-        if self.rest_len() < 1 { return Ok(false); }
+        if self.rest_len() < 1 {
+            return Ok(false);
+        }
         if self.next_char() == '"' {
             self.skip_char(1);
             self.parse_escaped_field()
@@ -175,10 +187,10 @@ impl CSVParser {
     }
 
     pub fn parse(&mut self, data: String) -> Result<VVal, String> {
-        self.data      = data.chars().collect();
-        self.pos       = 0;
+        self.data = data.chars().collect();
+        self.pos = 0;
         self.cur_table = VVal::vec();
-        self.cur_row   = VVal::vec();
+        self.cur_row = VVal::vec();
 
         while self.rest_len() > 0 {
             if !self.parse_field()? {
@@ -203,18 +215,23 @@ pub fn to_csv(delim: char, row_sep: &str, escape_all: bool, table: VVal) -> Stri
         let mut first_field = true;
 
         for (cell, _) in row.iter() {
-            if !first_field { ret.push(delim); }
-            else { first_field = false; }
+            if !first_field {
+                ret.push(delim);
+            } else {
+                first_field = false;
+            }
 
             cell.with_s_ref(|field: &str| {
-                if escape_all
-                   || field.find(|c| need_escape_chars.find(c).is_some()).is_some()
-                {
+                if escape_all || field.find(|c| need_escape_chars.find(c).is_some()).is_some() {
                     ret.push('"');
                     for c in field.chars() {
                         match c {
-                            '"' => { ret += "\"\""; }
-                            _   => { ret.push(c); }
+                            '"' => {
+                                ret += "\"\"";
+                            }
+                            _ => {
+                                ret.push(c);
+                            }
                         }
                     }
                     ret.push('"');

@@ -323,7 +323,6 @@ fn main() {
         if argv[1] == "-parse" {
             let contents = std::fs::read_to_string(&argv[2]).unwrap();
             wlambda::parser::parse(&contents, &argv[2]).expect("successful parse");
-
         } else if argv.len() > 2 && argv[1] == "-e" {
             v_argv.delete_key(&VVal::Int(0)).expect("-e argument");
             v_argv.delete_key(&VVal::Int(0)).expect("script argument");

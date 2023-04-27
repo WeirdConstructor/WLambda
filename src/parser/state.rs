@@ -1,10 +1,10 @@
 // Copyright (c) 2020-2022 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
-use crate::vval::VVal;
-use crate::vval::Syntax;
-use crate::vval::SynPos;
 use crate::vval::FileRef;
+use crate::vval::SynPos;
+use crate::vval::Syntax;
+use crate::vval::VVal;
 use std::fmt;
 
 /// This is the parser state data structure. It holds the to be read source
@@ -22,15 +22,15 @@ use std::fmt;
 /// ```
 #[allow(dead_code)]
 pub struct State {
-    input:          Vec<char>,
-    ch_ptr:         usize,
-    line_no:        u32,
-    col_no:         u32,
-    indent:         Option<u32>,
-    line_indent:    u32,
-    last_tok_char:  char,
-    file:           FileRef,
-    ident_mode:     IdentMode,
+    input: Vec<char>,
+    ch_ptr: usize,
+    line_no: u32,
+    col_no: u32,
+    indent: Option<u32>,
+    line_indent: u32,
+    last_tok_char: char,
+    file: FileRef,
+    ident_mode: IdentMode,
 }
 
 /// This is a special mode for selector parsing.
@@ -44,18 +44,23 @@ pub enum IdentMode {
 
 #[derive(Copy, Clone, Debug)]
 pub struct IndentPos {
-    line_no:        u32,
-    indent:         Option<u32>,
-    line_indent:    u32,
+    line_no: u32,
+    indent: Option<u32>,
+    line_indent: u32,
 }
 
 impl IndentPos {
     pub fn belongs_to(&self, call_ip: &IndentPos) -> bool {
         self.line_no == call_ip.line_no
-        || (if let Some(i) = self.indent {
-                if let Some(i2) = call_ip.indent { i > i2 }
-                else { i > call_ip.line_indent } }
-            else { true })
+            || (if let Some(i) = self.indent {
+                if let Some(i2) = call_ip.indent {
+                    i > i2
+                } else {
+                    i > call_ip.line_indent
+                }
+            } else {
+                true
+            })
     }
 }
 
@@ -80,17 +85,17 @@ impl fmt::Display for ParseErrorKind {
         use ParseErrorKind::*;
         match self {
             UnexpectedToken(c, s) => write!(f, "Unexpected token '{}'. At {}", c, s),
-            ExpectedToken(c, s)   => write!(f, "Expected token '{}'. At {}", c, s),
-            BadEscape(s)          => write!(f, "{}", s),
-            BadIndent(s)          => write!(f, "{}", s),
-            BadValue(s)           => write!(f, "{}", s),
-            BadPack(s)            => write!(f, "{}", s),
-            BadPattern(s)         => write!(f, "{}", s),
-            BadFormat(s)          => write!(f, "{}", s),
-            BadKeyword(kw, s)     => write!(f, "Got '{}', expected {}", kw, s),
-            BadNumber(s)          => write!(f, "{}", s),
+            ExpectedToken(c, s) => write!(f, "Expected token '{}'. At {}", c, s),
+            BadEscape(s) => write!(f, "{}", s),
+            BadIndent(s) => write!(f, "{}", s),
+            BadValue(s) => write!(f, "{}", s),
+            BadPack(s) => write!(f, "{}", s),
+            BadPattern(s) => write!(f, "{}", s),
+            BadFormat(s) => write!(f, "{}", s),
+            BadKeyword(kw, s) => write!(f, "Got '{}', expected {}", kw, s),
+            BadNumber(s) => write!(f, "{}", s),
             //BadCall(s)            => write!(f, "{}", s),
-            EOF(s)                => write!(f, "EOF while parsing: {}", s),
+            EOF(s) => write!(f, "EOF while parsing: {}", s),
         }
     }
 }
@@ -108,20 +113,14 @@ impl fmt::Display for ParseValueError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use ParseValueError::*;
         match self {
-            UnknownSpecialIdentifier(c) => write!(
-                f,
-                "Expected special value, unknown special value identifier '{}'",
-                c
-            ),
-            Expected(s) => write!(
-                f,
-                "Expected {}",
-                s
-            ),
-            VectorLength        => write!(f, "Numerical Vectors must have 2 to 4 values, inclusive!"),
+            UnknownSpecialIdentifier(c) => {
+                write!(f, "Expected special value, unknown special value identifier '{}'", c)
+            }
+            Expected(s) => write!(f, "Expected {}", s),
+            VectorLength => write!(f, "Numerical Vectors must have 2 to 4 values, inclusive!"),
             ExpectedAccumulator => write!(f, "Expected accumulator value"),
-            ExpectedMaxArity    => write!(f, "Expected integer value for min arity"),
-            ExpectedMinArity    => write!(f, "Expected integer value for max arity"),
+            ExpectedMaxArity => write!(f, "Expected integer value for min arity"),
+            ExpectedMinArity => write!(f, "Expected integer value for max arity"),
         }
     }
 }
@@ -144,20 +143,15 @@ impl fmt::Display for ParseNumberError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use ParseNumberError::*;
         match self {
-            InvalidIndexDigits(r)      => write!(f, "Invalid radix: {}", r),
+            InvalidIndexDigits(r) => write!(f, "Invalid radix: {}", r),
             InvalidFractionalDigits(s) => write!(f, "Invalid fractional digits: {}", s),
-            UnsupportedRadix(r)        => write!(f, "Unsupported radix: {}", r),
-            UnsupportedRadixPrefix(body, found) => write!(
-                f,
-                "Unsupported radix prefix. Must be '0{0}'. Found '{1}{0}'",
-                body,
-                found
-            ),
-            InvalidRadix(num, r, e) => write!(
-                f,
-                "'{}' can't be parsed with radix '{}': {}",
-                num, r, e
-            ),
+            UnsupportedRadix(r) => write!(f, "Unsupported radix: {}", r),
+            UnsupportedRadixPrefix(body, found) => {
+                write!(f, "Unsupported radix prefix. Must be '0{0}'. Found '{1}{0}'", body, found)
+            }
+            InvalidRadix(num, r, e) => {
+                write!(f, "'{}' can't be parsed with radix '{}': {}", num, r, e)
+            }
         }
     }
 }
@@ -174,17 +168,13 @@ pub struct ParseError {
     /// A snip of the code that caused this error.
     snip: String,
     line: u32,
-    col:  u32,
-    file: FileRef
+    col: u32,
+    file: FileRef,
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "{}:{}:{} {}",
-            self.file.s(),
-            self.line,
-            self.col,
-            self.kind)?;
+        writeln!(f, "{}:{}:{} {}", self.file.s(), self.line, self.col, self.kind)?;
 
         writeln!(f, "at code:")?;
         for (i, line) in self.snip.split('\n').enumerate() {
@@ -202,12 +192,16 @@ pub struct StrPart<'a> {
 
 impl<'a, 'b> PartialEq<&'a str> for StrPart<'a> {
     fn eq(&self, other: &&'a str) -> bool {
-        if other.len() != self.slice.len() { return false; }
+        if other.len() != self.slice.len() {
+            return false;
+        }
 
         let mut sc = other.chars();
         for c in self.slice.iter() {
             if let Some(oc) = sc.next() {
-                if *c != oc { return false; }
+                if *c != oc {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -219,10 +213,18 @@ impl<'a, 'b> PartialEq<&'a str> for StrPart<'a> {
 
 #[allow(clippy::inherent_to_string)]
 impl<'a> StrPart<'a> {
-    pub fn to_string(&self) -> String { self.slice.iter().collect() }
-    pub fn is_empty(&self) -> bool { self.slice.is_empty() }
-    pub fn len(&self) -> usize { self.slice.len() }
-    pub fn at(&self, i: usize) -> char { self.slice[i] }
+    pub fn to_string(&self) -> String {
+        self.slice.iter().collect()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.slice.is_empty()
+    }
+    pub fn len(&self) -> usize {
+        self.slice.len()
+    }
+    pub fn at(&self, i: usize) -> char {
+        self.slice[i]
+    }
 }
 
 #[allow(dead_code)]
@@ -232,7 +234,7 @@ impl State {
             kind: kind.into(),
             snip: self.rest().to_string(),
             line: self.line_no,
-            col:  self.col_no,
+            col: self.col_no,
             file: self.file.clone(),
         }
     }
@@ -257,15 +259,23 @@ impl State {
     /// Returns the next character under the parse head.
     /// Returns `None` when the parse head is at EOF.
     pub fn peek(&self) -> Option<char> {
-        if self.at_end() { None } else { Some(self.input[self.ch_ptr]) }
+        if self.at_end() {
+            None
+        } else {
+            Some(self.input[self.ch_ptr])
+        }
     }
 
     /// Returns if the end of the input was reached.
     #[inline]
-    pub fn at_end(&self) -> bool { self.ch_ptr >= self.input.len() }
+    pub fn at_end(&self) -> bool {
+        self.ch_ptr >= self.input.len()
+    }
 
     /// Returns the remaining count of characters in the buffer.
-    pub fn rest_len(&self) -> usize { self.input.len() - self.ch_ptr }
+    pub fn rest_len(&self) -> usize {
+        self.input.len() - self.ch_ptr
+    }
 
     /// Generates a StrPart slice:
     fn spart(&self, a: usize, b: usize) -> StrPart {
@@ -333,67 +343,65 @@ impl State {
     /// Tries to peek for an WLambda operator. Returns `None`
     /// either at EOF or if no operator could be found.
     pub fn peek_op(&self) -> Option<StrPart> {
-        if self.at_end() { return None; }
+        if self.at_end() {
+            return None;
+        }
         let ch = self.input[self.ch_ptr];
         match ch {
-            '+' | '-'
-                => {
-                    if let Some(s) = self.peek2() {
-                        if self.rest_len() > 1
-                           && self.input[self.ch_ptr + 1].is_digit(10)
-                        {
-                            return None;
-                        } else if s == "+>" {
-                            return Some(s);
-                        }
+            '+' | '-' => {
+                if let Some(s) = self.peek2() {
+                    if self.rest_len() > 1 && self.input[self.ch_ptr + 1].is_digit(10) {
+                        return None;
+                    } else if s == "+>" {
+                        return Some(s);
                     }
-                    Some(self.spart_ptr(1))
-                },
-            '*' | '/' | '%' | '^'
-                => {
-                    if let Some(s) = self.peek3() {
-                        if    s == "/$e"
-                           || s == "/$n"
-                           || s == "/$o" { return Some(s); }
+                }
+                Some(self.spart_ptr(1))
+            }
+            '*' | '/' | '%' | '^' => {
+                if let Some(s) = self.peek3() {
+                    if s == "/$e" || s == "/$n" || s == "/$o" {
+                        return Some(s);
                     }
-                    if let Some(s) = self.peek2() {
-                        if    s == "%>"
-                           || s == "//"
-                           || s == "/?"
-                        {
-                            Some(s)
-                        } else {
-                            Some(self.spart_ptr(1))
-                        }
+                }
+                if let Some(s) = self.peek2() {
+                    if s == "%>" || s == "//" || s == "/?" {
+                        Some(s)
                     } else {
                         Some(self.spart_ptr(1))
                     }
-                },
+                } else {
+                    Some(self.spart_ptr(1))
+                }
+            }
             '<' | '>' | '!' | '=' | '&' => {
                 if let Some(s) = self.peek4() {
-                    if s == "&and" { return Some(s); }
+                    if s == "&and" {
+                        return Some(s);
+                    }
                 }
                 if let Some(s) = self.peek3() {
-                    if    s == "&or"
-                       || s == "&@>"
-                       || s == "<@&"
-                       { return Some(s); }
+                    if s == "&or" || s == "&@>" || s == "<@&" {
+                        return Some(s);
+                    }
                 }
                 if let Some(s) = self.peek2() {
-                    if   s == "<="
-                      || s == ">="
-                      || s == "!="
-                      || s == "=="
-                      || s == "<<"
-                      || s == ">>"
-                      || s == "&|"
-                      || s == "&^"
-                      || s == "=>"
-                      || s == "<&"
-                      || s == "&>"
-                      || s == "<+"
-                      || s == "<%"
-                    { return Some(s); }
+                    if s == "<="
+                        || s == ">="
+                        || s == "!="
+                        || s == "=="
+                        || s == "<<"
+                        || s == ">>"
+                        || s == "&|"
+                        || s == "&^"
+                        || s == "=>"
+                        || s == "<&"
+                        || s == "&>"
+                        || s == "<+"
+                        || s == "<%"
+                    {
+                        return Some(s);
+                    }
                 }
 
                 if ch != '=' && ch != '!' {
@@ -401,8 +409,8 @@ impl State {
                 } else {
                     None
                 }
-            },
-            _ => { None }
+            }
+            _ => None,
         }
     }
 
@@ -416,12 +424,17 @@ impl State {
     /// Consumes characters while `pred` returns a true value.
     /// Returns `true` if it matched and consumed at least once.
     pub fn consume_while<F>(&mut self, pred: F) -> bool
-        where F: Fn(char) -> bool {
-
+    where
+        F: Fn(char) -> bool,
+    {
         let mut did_match_once = false;
         while let Some(c) = self.peek() {
-            if pred(c) { self.consume(); did_match_once = true; }
-            else { break; }
+            if pred(c) {
+                self.consume();
+                did_match_once = true;
+            } else {
+                break;
+            }
         }
         did_match_once
     }
@@ -455,7 +468,9 @@ impl State {
     }
 
     pub fn take_while_wsc<F>(&mut self, pred: F) -> StrPart
-        where F: Fn(char) -> bool {
+    where
+        F: Fn(char) -> bool,
+    {
         let start = self.remember();
         self.take_while(pred);
         let end = self.remember();
@@ -464,22 +479,21 @@ impl State {
     }
 
     pub fn take_while<F>(&mut self, pred: F) -> StrPart
-        where F: Fn(char) -> bool {
-
+    where
+        F: Fn(char) -> bool,
+    {
         let start = self.ch_ptr;
         while let Some(c) = self.peek() {
-            if !pred(c) { break; }
+            if !pred(c) {
+                break;
+            }
             self.consume();
         }
         self.spart(start, self.ch_ptr)
     }
 
     pub fn indent_pos(&self) -> IndentPos {
-        IndentPos {
-            line_no:     self.line_no,
-            indent:      self.indent,
-            line_indent: self.line_indent,
-        }
+        IndentPos { line_no: self.line_no, indent: self.indent, line_indent: self.line_indent }
     }
 
     pub fn last_token_char(&self) -> char {
@@ -522,11 +536,15 @@ impl State {
     }
 
     pub fn lookahead_one_of(&self, s: &str) -> bool {
-        if self.at_end() { return false; }
+        if self.at_end() {
+            return false;
+        }
 
         let pc = self.peek().unwrap();
         for c in s.chars() {
-            if pc == c { return true; }
+            if pc == c {
+                return true;
+            }
         }
         false
     }
@@ -563,15 +581,17 @@ impl State {
     }
 
     pub fn consume(&mut self) {
-        if self.at_end() { return }
+        if self.at_end() {
+            return;
+        }
 
         let c = self.peek().unwrap();
         self.col_no = self.col_no.wrapping_add(1);
         if c == '\n' {
             self.line_no += 1;
-            self.indent      = Some(0);
+            self.indent = Some(0);
             self.line_indent = 0;
-            self.col_no      = 1;
+            self.col_no = 1;
         } else if c.is_whitespace() {
             if let Some(i) = self.indent {
                 self.line_indent += 1;
@@ -638,15 +658,15 @@ impl State {
     /// ```
     pub fn new_verbatim(code: &str, filename: &str) -> State {
         State {
-            input:          code.chars().collect(),
-            ch_ptr:         0,
-            line_no:        1,
-            col_no:         1,
-            indent:         Some(0),
-            line_indent:    0,
-            last_tok_char:  ' ',
-            file:           FileRef::new(filename),
-            ident_mode:     IdentMode::IdentSelector,
+            input: code.chars().collect(),
+            ch_ptr: 0,
+            line_no: 1,
+            col_no: 1,
+            indent: Some(0),
+            line_indent: 0,
+            last_tok_char: ' ',
+            file: FileRef::new(filename),
+            ident_mode: IdentMode::IdentSelector,
         }
     }
 
@@ -661,7 +681,7 @@ impl State {
     pub fn expect_some<T>(&self, o: Option<T>) -> Result<T, ParseError> {
         match o {
             None => Err(self.err(ParseErrorKind::EOF("Unexpected EOF"))),
-            Some(r) => Ok(r)
+            Some(r) => Ok(r),
         }
     }
 

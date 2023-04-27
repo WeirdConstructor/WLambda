@@ -5,41 +5,46 @@
 Implements the VM program and ops data structures for WLambda.
 */
 
-use crate::vval::*;
 use crate::compiler::*;
 use crate::nvec::NVec;
 use crate::str_int::*;
+use crate::vval::*;
 use std::fmt;
-use std::fmt::{Debug};
+use std::fmt::Debug;
 use std::rc::Rc;
 
 #[derive(Clone, Default)]
 pub struct Prog {
-    pub debug:     std::vec::Vec<Option<SynPos>>,
-    pub data:      std::vec::Vec<VVal>,
-    pub(crate) ops:       std::vec::Vec<Op>,
+    pub debug: std::vec::Vec<Option<SynPos>>,
+    pub data: std::vec::Vec<VVal>,
+    pub(crate) ops: std::vec::Vec<Op>,
     pub nxt_debug: Option<SynPos>,
 }
 
 fn patch_respos_data(rp: &mut ResPos, idx: u16) {
     match rp {
-        ResPos::Data(i)         => { *i += idx; },
-        ResPos::Global(i)       => { *i += idx; },
-        ResPos::GlobalRef(i)    => { *i += idx; },
+        ResPos::Data(i) => {
+            *i += idx;
+        }
+        ResPos::Global(i) => {
+            *i += idx;
+        }
+        ResPos::GlobalRef(i) => {
+            *i += idx;
+        }
         ResPos::Local(_)
         | ResPos::LocalRef(_)
         | ResPos::Up(_)
         | ResPos::UpRef(_)
         | ResPos::Arg(_)
         | ResPos::Stack(_)
-        | ResPos::Value(_)
-            => (),
+        | ResPos::Value(_) => (),
     }
 }
 
 impl Prog {
     pub(crate) fn append(&mut self, mut prog: Prog) {
-        let self_data_next_idx : u16 = self.data.len() as u16;
+        let self_data_next_idx: u16 = self.data.len() as u16;
 
         for o in prog.ops.iter_mut() {
             match o {
@@ -47,221 +52,229 @@ impl Prog {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Sub(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Mul(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Div(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Mod(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Le(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Lt(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Ge(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Gt(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Eq(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::NewPair(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::NewOpt(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::NewIter(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::NewNVec(vec, p1) => {
                     use std::borrow::BorrowMut;
                     match vec.borrow_mut() {
                         NVecPos::IVec2(a, b) => {
                             patch_respos_data(a, self_data_next_idx);
                             patch_respos_data(b, self_data_next_idx);
-                        },
+                        }
                         NVecPos::IVec3(a, b, c) => {
                             patch_respos_data(a, self_data_next_idx);
                             patch_respos_data(b, self_data_next_idx);
                             patch_respos_data(c, self_data_next_idx);
-                        },
+                        }
                         NVecPos::IVec4(a, b, c, d) => {
                             patch_respos_data(a, self_data_next_idx);
                             patch_respos_data(b, self_data_next_idx);
                             patch_respos_data(c, self_data_next_idx);
                             patch_respos_data(d, self_data_next_idx);
-                        },
+                        }
                         NVecPos::FVec2(a, b) => {
                             patch_respos_data(a, self_data_next_idx);
                             patch_respos_data(b, self_data_next_idx);
-                        },
+                        }
                         NVecPos::FVec3(a, b, c) => {
                             patch_respos_data(a, self_data_next_idx);
                             patch_respos_data(b, self_data_next_idx);
                             patch_respos_data(c, self_data_next_idx);
-                        },
+                        }
                         NVecPos::FVec4(a, b, c, d) => {
                             patch_respos_data(a, self_data_next_idx);
                             patch_respos_data(b, self_data_next_idx);
                             patch_respos_data(c, self_data_next_idx);
                             patch_respos_data(d, self_data_next_idx);
-                        },
+                        }
                     }
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::Mov(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::ToRef(p1, p2, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::NewErr(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::NewClos(p1, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::ListPush(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::ListSplice(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::MapSetKey(p1, p2, p3, p4) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                     patch_respos_data(p4, self_data_next_idx);
-                },
+                }
                 Op::MapSplice(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::JmpIfN(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::OrJmp(p1, _, p2, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::AndJmp(p1, _, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::JmpTbl(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::GetIdx(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::GetIdx2(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::GetIdx3(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::GetSym(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::GetSym2(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::GetSym3(p1, _, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::GetKey(p1, p2, _) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::Destr(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::Call(_, p1) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::CallDirect(fun) => {
                     patch_respos_data(
                         &mut Rc::get_mut(fun).expect("only rc").arg,
-                        self_data_next_idx);
+                        self_data_next_idx,
+                    );
                     patch_respos_data(
                         &mut Rc::get_mut(fun).expect("only rc").res,
-                        self_data_next_idx);
-                },
+                        self_data_next_idx,
+                    );
+                }
                 Op::CallMethodKey(p1, p2, _, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::CallMethodSym(p1, _, p2) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
-                },
+                }
                 Op::Apply(p1, p2, p3) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
-                },
+                }
                 Op::Builtin(Builtin::Export(_, p1)) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::CtrlFlow(CtrlFlow::Break(p1)) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::IterInit(p1, _) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
+                }
                 Op::IterNext(p1) => {
                     patch_respos_data(p1, self_data_next_idx);
-                },
-//                Op::UnwindMov(p1, p2) => {
-//                    patch_respos_data(p1, self_data_next_idx);
-//                    patch_respos_data(p2, self_data_next_idx);
-//                },
-                Op::NewMap(p1)    => { patch_respos_data(p1, self_data_next_idx); },
-                Op::NewList(p1)   => { patch_respos_data(p1, self_data_next_idx); },
-                Op::Argv(p1)      => { patch_respos_data(p1, self_data_next_idx); },
+                }
+                //                Op::UnwindMov(p1, p2) => {
+                //                    patch_respos_data(p1, self_data_next_idx);
+                //                    patch_respos_data(p2, self_data_next_idx);
+                //                },
+                Op::NewMap(p1) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                }
+                Op::NewList(p1) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                }
+                Op::Argv(p1) => {
+                    patch_respos_data(p1, self_data_next_idx);
+                }
                 Op::End
                 | Op::Builtin(Builtin::DumpStack(_))
                 | Op::Builtin(Builtin::DumpVM(_))
@@ -270,8 +283,7 @@ impl Prog {
                 | Op::Accumulator(_)
                 | Op::PushLoopInfo(_)
                 | Op::Jmp(_)
-                | Op::ClearLocals(_, _)
-                    => (),
+                | Op::ClearLocals(_, _) => (),
             }
         }
 
@@ -280,15 +292,12 @@ impl Prog {
         self.ops.append(&mut prog.ops);
     }
 
-    pub(crate) fn op_count(&self) -> usize { self.ops.len() }
+    pub(crate) fn op_count(&self) -> usize {
+        self.ops.len()
+    }
 
     pub(crate) fn new() -> Self {
-        Self {
-            data:       vec![],
-            ops:        vec![],
-            debug:      vec![],
-            nxt_debug:  None,
-        }
+        Self { data: vec![], ops: vec![], debug: vec![], nxt_debug: None }
     }
 
     pub(crate) fn global_ref_pos(&mut self, data: VVal) -> ResPos {
@@ -306,11 +315,11 @@ impl Prog {
         ResPos::Data((self.data.len() - 1) as u16)
     }
 
-//    fn unshift_op(&mut self, o: Op) -> &mut Self {
-//        self.ops.insert(0, o);
-//        self.debug.insert(0, std::mem::replace(&mut self.nxt_debug, None));
-//        self
-//    }
+    //    fn unshift_op(&mut self, o: Op) -> &mut Self {
+    //        self.ops.insert(0, o);
+    //        self.debug.insert(0, std::mem::replace(&mut self.nxt_debug, None));
+    //        self
+    //    }
 
     pub(crate) fn push_op(&mut self, o: Op) -> &mut Self {
         self.ops.push(o);
@@ -338,7 +347,14 @@ impl Prog {
         self.push_op(Op::AndJmp(a, jmp, r));
     }
 
-    pub(crate) fn op_or_jmp_mode(&mut self, sp: &SynPos, a: ResPos, jmp: i32, r: ResPos, mode: OrMode) {
+    pub(crate) fn op_or_jmp_mode(
+        &mut self,
+        sp: &SynPos,
+        a: ResPos,
+        jmp: i32,
+        r: ResPos,
+        mode: OrMode,
+    ) {
         self.set_dbg(sp.clone());
         self.push_op(Op::OrJmp(a, jmp, r, mode));
     }
@@ -378,7 +394,14 @@ impl Prog {
         self.push_op(Op::NewMap(r));
     }
 
-    pub(crate) fn op_map_set_key(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, r: ResPos) {
+    pub(crate) fn op_map_set_key(
+        &mut self,
+        sp: &SynPos,
+        a: ResPos,
+        b: ResPos,
+        c: ResPos,
+        r: ResPos,
+    ) {
         self.set_dbg(sp.clone());
         self.push_op(Op::MapSetKey(a, b, c, r));
     }
@@ -403,7 +426,15 @@ impl Prog {
         self.push_op(Op::GetIdx2(a, Box::new((i, i2)), r));
     }
 
-    pub(crate) fn op_get_idx3(&mut self, sp: &SynPos, a: ResPos, i: u32, i2: u32, i3: u32, r: ResPos) {
+    pub(crate) fn op_get_idx3(
+        &mut self,
+        sp: &SynPos,
+        a: ResPos,
+        i: u32,
+        i2: u32,
+        i3: u32,
+        r: ResPos,
+    ) {
         self.set_dbg(sp.clone());
         self.push_op(Op::GetIdx3(a, Box::new((i, i2, i3)), r));
     }
@@ -418,7 +449,15 @@ impl Prog {
         self.push_op(Op::GetSym2(a, Box::new((s, s2)), r));
     }
 
-    pub(crate) fn op_get_sym3(&mut self, sp: &SynPos, a: ResPos, s: Symbol, s2: Symbol, s3: Symbol, r: ResPos) {
+    pub(crate) fn op_get_sym3(
+        &mut self,
+        sp: &SynPos,
+        a: ResPos,
+        s: Symbol,
+        s2: Symbol,
+        s3: Symbol,
+        r: ResPos,
+    ) {
         self.set_dbg(sp.clone());
         self.push_op(Op::GetSym3(a, Box::new((s, s2, s3)), r));
     }
@@ -458,12 +497,26 @@ impl Prog {
         self.push_op(Op::NewClos(a, r));
     }
 
-    pub(crate) fn op_call_method_key(&mut self, sp: &SynPos, a: ResPos, b: ResPos, argc: u16, r: ResPos) {
+    pub(crate) fn op_call_method_key(
+        &mut self,
+        sp: &SynPos,
+        a: ResPos,
+        b: ResPos,
+        argc: u16,
+        r: ResPos,
+    ) {
         self.set_dbg(sp.clone());
         self.push_op(Op::CallMethodKey(a, b, argc, r));
     }
 
-    pub(crate) fn op_call_method_sym(&mut self, sp: &SynPos, a: ResPos, sym: String, argc: u16, r: ResPos) {
+    pub(crate) fn op_call_method_sym(
+        &mut self,
+        sp: &SynPos,
+        a: ResPos,
+        sym: String,
+        argc: u16,
+        r: ResPos,
+    ) {
         self.set_dbg(sp.clone());
         self.push_op(Op::CallMethodSym(a, Box::new((sym, argc)), r));
     }
@@ -491,7 +544,15 @@ impl Prog {
     }
 
     #[allow(clippy::many_single_char_names)]
-    pub(crate) fn op_new_ivec4(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, d: ResPos, r: ResPos) {
+    pub(crate) fn op_new_ivec4(
+        &mut self,
+        sp: &SynPos,
+        a: ResPos,
+        b: ResPos,
+        c: ResPos,
+        d: ResPos,
+        r: ResPos,
+    ) {
         self.set_dbg(sp.clone());
         self.push_op(Op::NewNVec(Box::new(NVecPos::IVec4(a, b, c, d)), r));
     }
@@ -507,7 +568,15 @@ impl Prog {
     }
 
     #[allow(clippy::many_single_char_names)]
-    pub(crate) fn op_new_fvec4(&mut self, sp: &SynPos, a: ResPos, b: ResPos, c: ResPos, d: ResPos, r: ResPos) {
+    pub(crate) fn op_new_fvec4(
+        &mut self,
+        sp: &SynPos,
+        a: ResPos,
+        b: ResPos,
+        c: ResPos,
+        d: ResPos,
+        r: ResPos,
+    ) {
         self.set_dbg(sp.clone());
         self.push_op(Op::NewNVec(Box::new(NVecPos::FVec4(a, b, c, d)), r));
     }
@@ -610,35 +679,35 @@ impl Debug for Prog {
 
 #[derive(Debug, Clone)]
 pub(crate) struct DestructureInfo {
-    pub vars:   VVal,
-    pub poses:  std::vec::Vec<VarPos>,
+    pub vars: VVal,
+    pub poses: std::vec::Vec<VarPos>,
     pub is_ref: bool,
 }
 
 fn set_env_at_varpos(e: &mut Env, pos: &VarPos, v: &VVal) {
     match pos {
-        VarPos::UpValue(d)           => e.set_up(*d, v.clone()),
-        VarPos::Local(d)             => e.set_consume(*d, v.clone()),
-        VarPos::Global(VVal::Ref(r)) => { r.replace(v.clone()); },
-        VarPos::Global(_)
-        | VarPos::Const(_)
-        | VarPos::NoPos
-            => panic!(
-                "Fatal error in WLambda, can't destructure to {:?}", pos),
+        VarPos::UpValue(d) => e.set_up(*d, v.clone()),
+        VarPos::Local(d) => e.set_consume(*d, v.clone()),
+        VarPos::Global(VVal::Ref(r)) => {
+            r.replace(v.clone());
+        }
+        VarPos::Global(_) | VarPos::Const(_) | VarPos::NoPos => {
+            panic!("Fatal error in WLambda, can't destructure to {:?}", pos)
+        }
     }
 }
 
 fn set_ref_at_varpos(e: &mut Env, pos: &VarPos, rv: &VVal) {
     let v = rv.clone();
     match pos {
-        VarPos::UpValue(d)           => e.assign_ref_up(*d, v),
-        VarPos::Local(d)             => e.assign_ref_local(*d, v),
-        VarPos::Global(VVal::Ref(r)) => { r.borrow().set_ref(v); },
-        VarPos::Global(_)
-        | VarPos::Const(_)
-        | VarPos::NoPos
-            => panic!(
-                "Fatal error in WLambda, can't ref destructure to {:?}", pos),
+        VarPos::UpValue(d) => e.assign_ref_up(*d, v),
+        VarPos::Local(d) => e.assign_ref_local(*d, v),
+        VarPos::Global(VVal::Ref(r)) => {
+            r.borrow().set_ref(v);
+        }
+        VarPos::Global(_) | VarPos::Const(_) | VarPos::NoPos => {
+            panic!("Fatal error in WLambda, can't ref destructure to {:?}", pos)
+        }
     }
 }
 
@@ -649,7 +718,7 @@ macro_rules! set_at_varpos {
         } else {
             set_env_at_varpos($env, $pos, $v);
         }
-    }
+    };
 }
 
 impl DestructureInfo {
@@ -659,10 +728,9 @@ impl DestructureInfo {
             VVal::Lst(l) => {
                 let nul = VVal::None;
                 for (i, pos) in self.poses.iter().enumerate() {
-                    set_at_varpos!(
-                        self, env, pos, l.borrow().get(i).unwrap_or(&nul));
+                    set_at_varpos!(self, env, pos, l.borrow().get(i).unwrap_or(&nul));
                 }
-            },
+            }
             VVal::Map(m) => {
                 for (i, pos) in self.poses.iter().enumerate() {
                     let sym = self.vars.at(i).unwrap().to_sym();
@@ -670,7 +738,7 @@ impl DestructureInfo {
 
                     set_at_varpos!(self, env, pos, &val);
                 }
-            },
+            }
             VVal::Pair(p) => {
                 let (lv, rv) = &*p;
 
@@ -681,91 +749,87 @@ impl DestructureInfo {
                 if let Some(pos) = self.poses.get(1) {
                     set_at_varpos!(self, env, pos, rv);
                 }
-            },
-            VVal::IVec(vb) => {
-                match vb.as_ref() {
-                    NVec::Vec2(a, b) => {
-                        if let Some(pos) = self.poses.get(0) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*a));
-                        }
+            }
+            VVal::IVec(vb) => match vb.as_ref() {
+                NVec::Vec2(a, b) => {
+                    if let Some(pos) = self.poses.get(0) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*a));
+                    }
 
-                        if let Some(pos) = self.poses.get(1) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*b));
-                        }
-                    },
-                    NVec::Vec3(a, b, c) => {
-                        if let Some(pos) = self.poses.get(0) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*a));
-                        }
+                    if let Some(pos) = self.poses.get(1) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*b));
+                    }
+                }
+                NVec::Vec3(a, b, c) => {
+                    if let Some(pos) = self.poses.get(0) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*a));
+                    }
 
-                        if let Some(pos) = self.poses.get(1) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*b));
-                        }
+                    if let Some(pos) = self.poses.get(1) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*b));
+                    }
 
-                        if let Some(pos) = self.poses.get(2) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*c));
-                        }
-                    },
-                    NVec::Vec4(a, b, c, d) => {
-                        if let Some(pos) = self.poses.get(0) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*a));
-                        }
+                    if let Some(pos) = self.poses.get(2) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*c));
+                    }
+                }
+                NVec::Vec4(a, b, c, d) => {
+                    if let Some(pos) = self.poses.get(0) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*a));
+                    }
 
-                        if let Some(pos) = self.poses.get(1) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*b));
-                        }
+                    if let Some(pos) = self.poses.get(1) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*b));
+                    }
 
-                        if let Some(pos) = self.poses.get(2) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*c));
-                        }
+                    if let Some(pos) = self.poses.get(2) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*c));
+                    }
 
-                        if let Some(pos) = self.poses.get(3) {
-                            set_at_varpos!(self, env, pos, &VVal::Int(*d));
-                        }
-                    },
+                    if let Some(pos) = self.poses.get(3) {
+                        set_at_varpos!(self, env, pos, &VVal::Int(*d));
+                    }
                 }
             },
-            VVal::FVec(vb) => {
-                match vb.as_ref() {
-                    NVec::Vec2(a, b) => {
-                        if let Some(pos) = self.poses.get(0) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*a));
-                        }
+            VVal::FVec(vb) => match vb.as_ref() {
+                NVec::Vec2(a, b) => {
+                    if let Some(pos) = self.poses.get(0) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*a));
+                    }
 
-                        if let Some(pos) = self.poses.get(1) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*b));
-                        }
-                    },
-                    NVec::Vec3(a, b, c) => {
-                        if let Some(pos) = self.poses.get(0) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*a));
-                        }
+                    if let Some(pos) = self.poses.get(1) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*b));
+                    }
+                }
+                NVec::Vec3(a, b, c) => {
+                    if let Some(pos) = self.poses.get(0) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*a));
+                    }
 
-                        if let Some(pos) = self.poses.get(1) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*b));
-                        }
+                    if let Some(pos) = self.poses.get(1) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*b));
+                    }
 
-                        if let Some(pos) = self.poses.get(2) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*c));
-                        }
-                    },
-                    NVec::Vec4(a, b, c, d) => {
-                        if let Some(pos) = self.poses.get(0) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*a));
-                        }
+                    if let Some(pos) = self.poses.get(2) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*c));
+                    }
+                }
+                NVec::Vec4(a, b, c, d) => {
+                    if let Some(pos) = self.poses.get(0) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*a));
+                    }
 
-                        if let Some(pos) = self.poses.get(1) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*b));
-                        }
+                    if let Some(pos) = self.poses.get(1) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*b));
+                    }
 
-                        if let Some(pos) = self.poses.get(2) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*c));
-                        }
+                    if let Some(pos) = self.poses.get(2) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*c));
+                    }
 
-                        if let Some(pos) = self.poses.get(3) {
-                            set_at_varpos!(self, env, pos, &VVal::Flt(*d));
-                        }
-                    },
+                    if let Some(pos) = self.poses.get(3) {
+                        set_at_varpos!(self, env, pos, &VVal::Flt(*d));
+                    }
                 }
             },
             _ => {
@@ -794,21 +858,21 @@ pub(crate) enum BinOp {
 impl BinOp {
     pub(crate) fn to_op(self, a: ResPos, b: ResPos, out: ResPos) -> Op {
         match self {
-            BinOp::Add       => Op::Add(a, b, out),
-            BinOp::Sub       => Op::Sub(a, b, out),
-            BinOp::Mul       => Op::Mul(a, b, out),
-            BinOp::Div       => Op::Div(a, b, out),
-            BinOp::Mod       => Op::Mod(a, b, out),
-            BinOp::Le        => Op::Le(a, b, out),
-            BinOp::Lt        => Op::Lt(a, b, out),
-            BinOp::Ge        => Op::Ge(a, b, out),
-            BinOp::Gt        => Op::Gt(a, b, out),
-            BinOp::Eq        => Op::Eq(a, b, out),
+            BinOp::Add => Op::Add(a, b, out),
+            BinOp::Sub => Op::Sub(a, b, out),
+            BinOp::Mul => Op::Mul(a, b, out),
+            BinOp::Div => Op::Div(a, b, out),
+            BinOp::Mod => Op::Mod(a, b, out),
+            BinOp::Le => Op::Le(a, b, out),
+            BinOp::Lt => Op::Lt(a, b, out),
+            BinOp::Ge => Op::Ge(a, b, out),
+            BinOp::Gt => Op::Gt(a, b, out),
+            BinOp::Eq => Op::Eq(a, b, out),
         }
     }
 }
 
-#[derive(Debug,Clone,Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum AccumType {
     String,
     Bytes,
@@ -818,7 +882,7 @@ pub(crate) enum AccumType {
     Vec,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum ToRefType {
     CaptureRef,
     ToRef,
@@ -827,7 +891,7 @@ pub(crate) enum ToRefType {
     Weak,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 #[allow(clippy::box_collection)]
 pub(crate) enum Builtin {
     Export(Box<String>, ResPos),
@@ -835,13 +899,13 @@ pub(crate) enum Builtin {
     DumpVM(Box<SynPos>),
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum CtrlFlow {
     Next,
     Break(ResPos),
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum NVecPos {
     IVec2(ResPos, ResPos),
     IVec3(ResPos, ResPos, ResPos),
@@ -860,11 +924,7 @@ pub(crate) struct DirectFun {
 
 impl DirectFun {
     pub fn new(fun: Rc<dyn Fn(VVal, &mut Env) -> VVal>) -> Self {
-        Self {
-            arg: ResPos::Stack(0),
-            res: ResPos::Stack(0),
-            fun,
-        }
+        Self { arg: ResPos::Stack(0), res: ResPos::Stack(0), fun }
     }
 }
 
@@ -874,7 +934,7 @@ impl Debug for DirectFun {
     }
 }
 
-#[derive(Debug,Clone,Copy)]
+#[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub(crate) enum OrMode {
     Bool,
@@ -886,7 +946,7 @@ pub(crate) enum OrMode {
 }
 
 #[allow(clippy::box_collection)]
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum Op {
     Mov(ResPos, ResPos),
     NewOpt(ResPos, ResPos),
@@ -938,7 +998,7 @@ pub(crate) enum Op {
     Builtin(Builtin),
     IterInit(ResPos, i32),
     IterNext(ResPos),
-//    UnwindMov(ResPos, ResPos),
+    //    UnwindMov(ResPos, ResPos),
     Unwind,
     End,
 }

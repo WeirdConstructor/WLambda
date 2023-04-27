@@ -22,13 +22,13 @@ use super::PendingResult;
 #[cfg(feature = "rouille")]
 use rouille::{Response, Server};
 #[cfg(feature = "rouille")]
+use std::collections::HashMap;
+#[cfg(feature = "rouille")]
 use std::sync::mpsc::{Receiver, Sender};
 #[cfg(feature = "rouille")]
 use std::sync::{Arc, Mutex};
 #[cfg(feature = "rouille")]
 use std::thread::JoinHandle;
-#[cfg(feature = "rouille")]
-use std::collections::HashMap;
 
 #[cfg(feature = "reqwest")]
 #[derive(Debug, Clone)]
@@ -277,7 +277,7 @@ impl HttpServer {
                     Err(_) => return Response::text("Failed to read body").with_status_code(500),
                 };
 
-                let mut headers : HashMap<String, Vec<String>> = HashMap::new();
+                let mut headers: HashMap<String, Vec<String>> = HashMap::new();
                 for (key, value) in request.headers() {
                     if let Some(vals) = headers.get_mut(key) {
                         vals.push(value.to_string());
@@ -330,8 +330,12 @@ impl HttpServer {
                                 res.v_(2)
                                     .with_bv_ref(|bv| Response::from_data(conttype.to_string(), bv))
                             }),
-                            "error" => Response::text(res.v_s_raw(2)).with_status_code(res.v_i(1) as u16),
-                            "internal_error" => Response::text(res.v_s_raw(1)).with_status_code(500),
+                            "error" => {
+                                Response::text(res.v_s_raw(2)).with_status_code(res.v_i(1) as u16)
+                            }
+                            "internal_error" => {
+                                Response::text(res.v_s_raw(1)).with_status_code(500)
+                            }
                             "no_file" => Response::text("Not Found").with_status_code(404),
                             _ => Response::text(format!("Unknown Response Type: {}", res.s())),
                         }
@@ -436,10 +440,10 @@ fn handle_request(
             Ok(VVal::None)
         }
         Err(panic) => {
-            let _ = pending_response.send(
-                &VVal::vec2(
-                    VVal::new_sym("internal_error"),
-                    VVal::new_str_mv(format!("Internal Server Error:\n{}", panic))));
+            let _ = pending_response.send(&VVal::vec2(
+                VVal::new_sym("internal_error"),
+                VVal::new_str_mv(format!("Internal Server Error:\n{}", panic)),
+            ));
             Ok(VVal::None)
         }
     }

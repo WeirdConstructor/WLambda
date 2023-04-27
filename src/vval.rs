@@ -1,4 +1,3 @@
-
 // This is a part of WLambda. See README.md and COPYING for details.
 
 /*!
@@ -8,16 +7,16 @@ compiler and evaluator of WLambda.
 
 */
 
-use std::rc::Rc;
-use std::rc::Weak;
 use std::cell::RefCell;
 use std::fmt;
-use std::fmt::{Display, Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
+use std::rc::Rc;
+use std::rc::Weak;
 
-use crate::str_int::*;
 use crate::compiler::{GlobalEnv, GlobalEnvRef};
-use crate::nvec::{NVec};
+use crate::nvec::NVec;
 use crate::ops::Prog;
+use crate::str_int::*;
 
 use fnv::FnvHashMap;
 
@@ -36,55 +35,57 @@ impl FileRef {
     pub fn new(s: &str) -> Self {
         FileRef { s: Rc::new(String::from(s)) }
     }
-    pub fn s(&self) -> &str { &(*self.s) }
+    pub fn s(&self) -> &str {
+        &(*self.s)
+    }
 }
 
 #[derive(Clone, PartialEq)]
 pub struct SynPosInfo {
-    pub line:       u32,
-    pub col:        u32,
-    pub file:       FileRef,
-    pub name:       Option<String>,
+    pub line: u32,
+    pub col: u32,
+    pub file: FileRef,
+    pub name: Option<String>,
 }
 
 /// Structure for holding information about origin
 /// of an AST node.
 #[derive(Clone, PartialEq)]
 pub struct SynPos {
-    pub syn:  Syntax,
+    pub syn: Syntax,
     pub info: Rc<SynPosInfo>,
 }
 
 impl SynPos {
     pub fn empty() -> Self {
         Self {
-            syn:  Syntax::Block,
-            info: Rc::new(SynPosInfo {
-                line: 0,
-                col:  0,
-                file: FileRef::new("?"),
-                name: None,
-            }),
+            syn: Syntax::Block,
+            info: Rc::new(SynPosInfo { line: 0, col: 0, file: FileRef::new("?"), name: None }),
         }
     }
 
     pub fn new(syn: Syntax, line: u32, col: u32, file: FileRef) -> Self {
-        Self {
-            syn,
-            info: Rc::new(SynPosInfo { line, col, file, name: None, }),
-        }
+        Self { syn, info: Rc::new(SynPosInfo { line, col, file, name: None }) }
     }
 
-    pub fn has_info(&self) -> bool { self.info.line > 0 }
+    pub fn has_info(&self) -> bool {
+        self.info.line > 0
+    }
 
-    pub fn line(&self) -> u32 { self.info.line }
-    pub fn col(&self) -> u32 { self.info.col }
+    pub fn line(&self) -> u32 {
+        self.info.line
+    }
+    pub fn col(&self) -> u32 {
+        self.info.col
+    }
 
     pub fn filename(&self) -> &str {
         self.info.file.s()
     }
 
-    pub fn syn(&self) -> Syntax { self.syn }
+    pub fn syn(&self) -> Syntax {
+        self.syn
+    }
 
     pub fn set_syn(&mut self, syn: Syntax) {
         self.syn = syn;
@@ -109,18 +110,24 @@ impl Display for SynPos {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         if self.has_info() {
             if self.info.name.is_some() && !self.info.name.as_ref().unwrap().is_empty() {
-                write!(f, "{}:{}:{} {:?}[{}]",
-                       self.info.file.s(),
-                       self.info.line,
-                       self.info.col,
-                       self.syn,
-                       self.info.name.as_ref().unwrap())
+                write!(
+                    f,
+                    "{}:{}:{} {:?}[{}]",
+                    self.info.file.s(),
+                    self.info.line,
+                    self.info.col,
+                    self.syn,
+                    self.info.name.as_ref().unwrap()
+                )
             } else {
-                write!(f, "{}:{}:{} {:?}",
-                       self.info.file.s(),
-                       self.info.line,
-                       self.info.col,
-                       self.syn)
+                write!(
+                    f,
+                    "{}:{}:{} {:?}",
+                    self.info.file.s(),
+                    self.info.line,
+                    self.info.col,
+                    self.syn
+                )
             }
         } else {
             write!(f, "")
@@ -136,8 +143,8 @@ impl Debug for SynPos {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompileError {
-    pub pos:    SynPos,
-    pub msg:    String,
+    pub pos: SynPos,
+    pub msg: String,
 }
 
 impl Display for CompileError {
@@ -145,13 +152,10 @@ impl Display for CompileError {
         write!(
             f,
             "{}:{}:{} Compilation Error: {}",
-            self.pos.info.file,
-            self.pos.info.line,
-            self.pos.info.col,
-            self.msg)
+            self.pos.info.file, self.pos.info.line, self.pos.info.col, self.msg
+        )
     }
 }
-
 
 /// Encodes the different types of AST nodes.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -238,80 +242,80 @@ impl std::str::FromStr for Syntax {
 
     fn from_str(s: &str) -> Result<Syntax, ()> {
         match s {
-            "Var"            => Ok(Syntax::Var),
-            "Key"            => Ok(Syntax::Key),
-            "SetKey"         => Ok(Syntax::SetKey),
-            "GetKey"         => Ok(Syntax::GetKey),
-            "GetKey2"        => Ok(Syntax::GetKey2),
-            "GetKey3"        => Ok(Syntax::GetKey3),
-            "GetSym"         => Ok(Syntax::GetSym),
-            "GetSym2"        => Ok(Syntax::GetSym2),
-            "GetSym3"        => Ok(Syntax::GetSym3),
-            "GetIdx"         => Ok(Syntax::GetIdx),
-            "GetIdx2"        => Ok(Syntax::GetIdx2),
-            "GetIdx3"        => Ok(Syntax::GetIdx3),
-            "BinOpAdd"       => Ok(Syntax::BinOpAdd),
-            "BinOpSub"       => Ok(Syntax::BinOpSub),
-            "BinOpMul"       => Ok(Syntax::BinOpMul),
-            "BinOpDiv"       => Ok(Syntax::BinOpDiv),
-            "BinOpMod"       => Ok(Syntax::BinOpMod),
-            "BinOpLe"        => Ok(Syntax::BinOpLe),
-            "BinOpLt"        => Ok(Syntax::BinOpLt),
-            "BinOpGe"        => Ok(Syntax::BinOpGe),
-            "BinOpGt"        => Ok(Syntax::BinOpGt),
-            "BinOpEq"        => Ok(Syntax::BinOpEq),
-            "BinOpSomeOr"    => Ok(Syntax::BinOpSomeOr),
+            "Var" => Ok(Syntax::Var),
+            "Key" => Ok(Syntax::Key),
+            "SetKey" => Ok(Syntax::SetKey),
+            "GetKey" => Ok(Syntax::GetKey),
+            "GetKey2" => Ok(Syntax::GetKey2),
+            "GetKey3" => Ok(Syntax::GetKey3),
+            "GetSym" => Ok(Syntax::GetSym),
+            "GetSym2" => Ok(Syntax::GetSym2),
+            "GetSym3" => Ok(Syntax::GetSym3),
+            "GetIdx" => Ok(Syntax::GetIdx),
+            "GetIdx2" => Ok(Syntax::GetIdx2),
+            "GetIdx3" => Ok(Syntax::GetIdx3),
+            "BinOpAdd" => Ok(Syntax::BinOpAdd),
+            "BinOpSub" => Ok(Syntax::BinOpSub),
+            "BinOpMul" => Ok(Syntax::BinOpMul),
+            "BinOpDiv" => Ok(Syntax::BinOpDiv),
+            "BinOpMod" => Ok(Syntax::BinOpMod),
+            "BinOpLe" => Ok(Syntax::BinOpLe),
+            "BinOpLt" => Ok(Syntax::BinOpLt),
+            "BinOpGe" => Ok(Syntax::BinOpGe),
+            "BinOpGt" => Ok(Syntax::BinOpGt),
+            "BinOpEq" => Ok(Syntax::BinOpEq),
+            "BinOpSomeOr" => Ok(Syntax::BinOpSomeOr),
             "BinOpExtSomeOr" => Ok(Syntax::BinOpExtSomeOr),
-            "BinOpNoneOr"    => Ok(Syntax::BinOpNoneOr),
-            "BinOpErrOr"     => Ok(Syntax::BinOpErrOr),
-            "BinOpOptOr"     => Ok(Syntax::BinOpOptOr),
-            "OpNewPair"      => Ok(Syntax::OpNewPair),
-            "OpCallLwR"      => Ok(Syntax::OpCallLwR),
-            "OpCallRwL"      => Ok(Syntax::OpCallRwL),
+            "BinOpNoneOr" => Ok(Syntax::BinOpNoneOr),
+            "BinOpErrOr" => Ok(Syntax::BinOpErrOr),
+            "BinOpOptOr" => Ok(Syntax::BinOpOptOr),
+            "OpNewPair" => Ok(Syntax::OpNewPair),
+            "OpCallLwR" => Ok(Syntax::OpCallLwR),
+            "OpCallRwL" => Ok(Syntax::OpCallRwL),
             "OpCallApplyLwR" => Ok(Syntax::OpCallApplyLwR),
             "OpCallApplyRwL" => Ok(Syntax::OpCallApplyRwL),
-            "OpColAddL"      => Ok(Syntax::OpColAddL),
-            "OpColAddR"      => Ok(Syntax::OpColAddR),
-            "Str"            => Ok(Syntax::Str),
-            "Lst"            => Ok(Syntax::Lst),
-            "IVec"           => Ok(Syntax::IVec),
-            "FVec"           => Ok(Syntax::FVec),
-            "Opt"            => Ok(Syntax::Opt),
-            "Iter"           => Ok(Syntax::Iter),
-            "Map"            => Ok(Syntax::Map),
-            "Expr"           => Ok(Syntax::Expr),
-            "Func"           => Ok(Syntax::Func),
-            "Block"          => Ok(Syntax::Block),
-            "Err"            => Ok(Syntax::Err),
-            "Call"           => Ok(Syntax::Call),
-            "Apply"          => Ok(Syntax::Apply),
-            "And"            => Ok(Syntax::And),
-            "Or"             => Ok(Syntax::Or),
-            "Assign"         => Ok(Syntax::Assign),
-            "Def"            => Ok(Syntax::Def),
-            "Ref"            => Ok(Syntax::Ref),
-            "HRef"           => Ok(Syntax::HRef),
-            "WRef"           => Ok(Syntax::WRef),
-            "Deref"          => Ok(Syntax::Deref),
-            "CaptureRef"     => Ok(Syntax::CaptureRef),
-            "AssignRef"      => Ok(Syntax::AssignRef),
-            "DefGlobRef"     => Ok(Syntax::DefGlobRef),
-            "DefConst"       => Ok(Syntax::DefConst),
-            "SelfObj"        => Ok(Syntax::SelfObj),
-            "SelfData"       => Ok(Syntax::SelfData),
-            "Import"         => Ok(Syntax::Import),
-            "Export"         => Ok(Syntax::Export),
-            "DumpStack"      => Ok(Syntax::DumpStack),
-            "DumpVM"         => Ok(Syntax::DumpVM),
-            "DebugPrint"     => Ok(Syntax::DebugPrint),
-            "MapSplice"      => Ok(Syntax::MapSplice),
-            "VecSplice"      => Ok(Syntax::VecSplice),
-            "Accum"          => Ok(Syntax::Accum),
-            "GlobVar"        => Ok(Syntax::GlobVar),
-            "Selector"       => Ok(Syntax::Selector),
-            "Pattern"        => Ok(Syntax::Pattern),
-            "StructPattern"  => Ok(Syntax::StructPattern),
-            "Formatter"      => Ok(Syntax::Formatter),
+            "OpColAddL" => Ok(Syntax::OpColAddL),
+            "OpColAddR" => Ok(Syntax::OpColAddR),
+            "Str" => Ok(Syntax::Str),
+            "Lst" => Ok(Syntax::Lst),
+            "IVec" => Ok(Syntax::IVec),
+            "FVec" => Ok(Syntax::FVec),
+            "Opt" => Ok(Syntax::Opt),
+            "Iter" => Ok(Syntax::Iter),
+            "Map" => Ok(Syntax::Map),
+            "Expr" => Ok(Syntax::Expr),
+            "Func" => Ok(Syntax::Func),
+            "Block" => Ok(Syntax::Block),
+            "Err" => Ok(Syntax::Err),
+            "Call" => Ok(Syntax::Call),
+            "Apply" => Ok(Syntax::Apply),
+            "And" => Ok(Syntax::And),
+            "Or" => Ok(Syntax::Or),
+            "Assign" => Ok(Syntax::Assign),
+            "Def" => Ok(Syntax::Def),
+            "Ref" => Ok(Syntax::Ref),
+            "HRef" => Ok(Syntax::HRef),
+            "WRef" => Ok(Syntax::WRef),
+            "Deref" => Ok(Syntax::Deref),
+            "CaptureRef" => Ok(Syntax::CaptureRef),
+            "AssignRef" => Ok(Syntax::AssignRef),
+            "DefGlobRef" => Ok(Syntax::DefGlobRef),
+            "DefConst" => Ok(Syntax::DefConst),
+            "SelfObj" => Ok(Syntax::SelfObj),
+            "SelfData" => Ok(Syntax::SelfData),
+            "Import" => Ok(Syntax::Import),
+            "Export" => Ok(Syntax::Export),
+            "DumpStack" => Ok(Syntax::DumpStack),
+            "DumpVM" => Ok(Syntax::DumpVM),
+            "DebugPrint" => Ok(Syntax::DebugPrint),
+            "MapSplice" => Ok(Syntax::MapSplice),
+            "VecSplice" => Ok(Syntax::VecSplice),
+            "Accum" => Ok(Syntax::Accum),
+            "GlobVar" => Ok(Syntax::GlobVar),
+            "Selector" => Ok(Syntax::Selector),
+            "Pattern" => Ok(Syntax::Pattern),
+            "StructPattern" => Ok(Syntax::StructPattern),
+            "Formatter" => Ok(Syntax::Formatter),
             _ => Err(()),
         }
     }
@@ -320,25 +324,22 @@ impl std::str::FromStr for Syntax {
 #[derive(Clone)]
 pub struct Stdio {
     pub write: Rc<RefCell<dyn std::io::Write>>,
-    pub read:  Rc<RefCell<dyn std::io::BufRead>>,
+    pub read: Rc<RefCell<dyn std::io::BufRead>>,
 }
 
 impl Stdio {
     pub fn new_rust_std() -> Self {
         Self {
             write: Rc::new(RefCell::new(std::io::stdout())),
-            read:  Rc::new(RefCell::new(std::io::BufReader::new(std::io::stdin()))),
+            read: Rc::new(RefCell::new(std::io::BufReader::new(std::io::stdin()))),
         }
     }
 
-    pub fn new_from_mem(input: Rc<RefCell<std::io::Cursor<Vec<u8>>>>,
-                        output: Rc<RefCell<Vec<u8>>>)
-        -> Self
-    {
-        Self {
-            write: output,
-            read: input,
-        }
+    pub fn new_from_mem(
+        input: Rc<RefCell<std::io::Cursor<Vec<u8>>>>,
+        output: Rc<RefCell<Vec<u8>>>,
+    ) -> Self {
+        Self { write: output, read: input }
     }
 }
 
@@ -351,13 +352,13 @@ impl std::fmt::Debug for Stdio {
 /// The maximum stack size.
 ///
 /// Currently hardcoded, but later the API user will be able to specify it.
-const START_STACK_SIZE : usize = 512;
+const START_STACK_SIZE: usize = 512;
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct LoopInfo {
-    pub pc:       usize,
+    pub pc: usize,
     pub uw_depth: usize,
-    pub sp:       usize,
+    pub sp: usize,
     pub break_pc: usize,
 }
 
@@ -415,9 +416,9 @@ pub struct Env {
     ///
     /// - `bp + n (n >= 0)` references a local variable
     /// - `bp - n (n > 0)` references an argument
-    pub bp:   usize,
+    pub bp: usize,
     /// The current stack pointer.
-    pub sp:   usize,
+    pub sp: usize,
     /// The argument count to the current call.
     pub argc: usize,
     /// A user defined variable that holds user context information.
@@ -452,22 +453,22 @@ pub struct Env {
 impl Env {
     pub fn new(global: GlobalEnvRef) -> Env {
         let mut e = Env {
-            args:               Vec::with_capacity(START_STACK_SIZE),
-            current_self:       VVal::None,
-            bp:                 0,
-            sp:                 0,
-            argc:               0,
-            user:               Rc::new(RefCell::new(VVal::vec())),
-            exports:            FnvHashMap::with_capacity_and_hasher(5, Default::default()),
-            stdio:              Stdio::new_rust_std(),
-            accum_fun:          VVal::None,
-            accum_val:          VVal::None,
-            call_stack:         vec![],
-            unwind_stack:       vec![],
-            loop_info:          LoopInfo::new(),
-            iter:               None,
-            vm_nest:            0,
-            global
+            args: Vec::with_capacity(START_STACK_SIZE),
+            current_self: VVal::None,
+            bp: 0,
+            sp: 0,
+            argc: 0,
+            user: Rc::new(RefCell::new(VVal::vec())),
+            exports: FnvHashMap::with_capacity_and_hasher(5, Default::default()),
+            stdio: Stdio::new_rust_std(),
+            accum_fun: VVal::None,
+            accum_val: VVal::None,
+            call_stack: vec![],
+            unwind_stack: vec![],
+            loop_info: LoopInfo::new(),
+            iter: None,
+            vm_nest: 0,
+            global,
         };
         e.args.resize(START_STACK_SIZE, VVal::None);
         e
@@ -475,20 +476,20 @@ impl Env {
 
     pub fn new_with_user(global: GlobalEnvRef, user: Rc<RefCell<dyn std::any::Any>>) -> Env {
         let mut e = Env {
-            args:               Vec::with_capacity(START_STACK_SIZE),
-            current_self:       VVal::None,
-            bp:                 0,
-            sp:                 0,
-            argc:               0,
-            exports:            FnvHashMap::with_capacity_and_hasher(2, Default::default()),
-            stdio:              Stdio::new_rust_std(),
-            accum_fun:          VVal::None,
-            accum_val:          VVal::None,
-            call_stack:         vec![],
-            unwind_stack:       std::vec::Vec::with_capacity(1000),
-            loop_info:          LoopInfo::new(),
-            iter:               None,
-            vm_nest:            0,
+            args: Vec::with_capacity(START_STACK_SIZE),
+            current_self: VVal::None,
+            bp: 0,
+            sp: 0,
+            argc: 0,
+            exports: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
+            stdio: Stdio::new_rust_std(),
+            accum_fun: VVal::None,
+            accum_val: VVal::None,
+            call_stack: vec![],
+            unwind_stack: std::vec::Vec::with_capacity(1000),
+            loop_info: LoopInfo::new(),
+            iter: None,
+            vm_nest: 0,
             user,
             global,
         };
@@ -578,7 +579,9 @@ impl Env {
     /// ```
     #[allow(dead_code)]
     pub fn with_user_do<T: 'static, F, X>(&mut self, f: F) -> X
-        where F: Fn(&mut T) -> X {
+    where
+        F: Fn(&mut T) -> X,
+    {
         let mut any = self.user.borrow_mut();
         let ref_reg = any.downcast_mut::<T>().unwrap();
         f(ref_reg)
@@ -603,7 +606,7 @@ impl Env {
         for i in self.bp..self.sp {
             self.args[i] = VVal::None;
         }
-//        self.sp -= env_size;
+        //        self.sp -= env_size;
         self.popn(env_size);
         self.bp = oldbp;
     }
@@ -614,7 +617,9 @@ impl Env {
 
     #[inline]
     pub fn with_object<T>(&mut self, object: VVal, f: T) -> Result<VVal, StackAction>
-        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+    where
+        T: Fn(&mut Env) -> Result<VVal, StackAction>,
+    {
         let old_self = std::mem::replace(&mut self.current_self, object);
         let ret = f(self);
         self.current_self = old_self;
@@ -623,10 +628,12 @@ impl Env {
 
     #[inline]
     pub fn with_local_call_info<T>(&mut self, argc: usize, f: T) -> Result<VVal, StackAction>
-        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
+    where
+        T: Fn(&mut Env) -> Result<VVal, StackAction>,
+    {
         let local_size = 0;
         let old_argc = std::mem::replace(&mut self.argc, argc);
-        let old_bp   = self.set_bp(local_size);
+        let old_bp = self.set_bp(local_size);
 
         let ret = f(self);
 
@@ -638,8 +645,9 @@ impl Env {
 
     #[inline]
     pub fn with_restore_sp<T>(&mut self, f: T) -> Result<VVal, StackAction>
-        where T: Fn(&mut Env) -> Result<VVal, StackAction> {
-
+    where
+        T: Fn(&mut Env) -> Result<VVal, StackAction>,
+    {
         let old_sp = self.sp;
         let ret = f(self);
         self.popn(self.sp - old_sp);
@@ -672,7 +680,7 @@ impl Env {
 
     #[inline]
     pub fn stk_i(&self, offs: usize) -> i64 {
-        if let VVal::Int(i) = &self.args[(self.sp - 1) +  offs] {
+        if let VVal::Int(i) = &self.args[(self.sp - 1) + offs] {
             *i
         } else {
             0
@@ -682,8 +690,11 @@ impl Env {
     #[inline]
     pub fn inc_local(&mut self, idx: usize, inc: i16) -> i64 {
         if let VVal::Int(i) = &mut self.args[self.bp + idx] {
-            if inc > 0 { *i += 1; }
-            else { *i -= 1; }
+            if inc > 0 {
+                *i += 1;
+            } else {
+                *i -= 1;
+            }
 
             *i
         } else {
@@ -728,12 +739,20 @@ impl Env {
         //d// println!("* SP={}, BP={}", self.sp, self.bp);
         for (i, v) in self.args.iter().enumerate() {
             let mut mark = String::from("");
-            if i == self.bp { mark = format!("{} BP", mark); }
-            if i == self.sp { mark = format!("{} SP", mark); }
-            if !mark.is_empty() { mark = format!("{} ->", mark); }
+            if i == self.bp {
+                mark = format!("{} BP", mark);
+            }
+            if i == self.sp {
+                mark = format!("{} SP", mark);
+            }
+            if !mark.is_empty() {
+                mark = format!("{} ->", mark);
+            }
 
             println!("    {:9} [{:3}] = {}", mark, i, v.s());
-            if i >= (1 + self.sp) { break; }
+            if i >= (1 + self.sp) {
+                break;
+            }
         }
         if !self.call_stack.is_empty() {
             for (i, u) in self.call_stack.last().unwrap().upvalues.iter().enumerate() {
@@ -750,7 +769,6 @@ impl Env {
         }
         v
     }
-
 
     #[inline]
     pub fn argv(&self) -> VVal {
@@ -776,12 +794,10 @@ impl Env {
     #[inline]
     pub fn get_up(&self, i: usize) -> VVal {
         match &self.call_stack.last().unwrap().upvalues[i] {
-            VVal::HRef(hr)  => hr.borrow().clone(),
-            VVal::WWRef(r) => {
-                match r.upgrade() {
-                    Some(v) => v.borrow().clone(),
-                    None    => VVal::None,
-                }
+            VVal::HRef(hr) => hr.borrow().clone(),
+            VVal::WWRef(r) => match r.upgrade() {
+                Some(v) => v.borrow().clone(),
+                None => VVal::None,
             },
             v => v.clone(),
         }
@@ -789,7 +805,9 @@ impl Env {
 
     #[inline]
     pub fn arg_ref(&self, i: usize) -> Option<&VVal> {
-        if i >= self.argc { return None; }
+        if i >= self.argc {
+            return None;
+        }
         Some(&self.args[(self.bp - self.argc) + i])
     }
 
@@ -798,14 +816,16 @@ impl Env {
         let v = &self.args[(self.bp - self.argc) + i];
         match v {
             VVal::Err(_) => Some(v.clone()),
-            _            => None,
+            _ => None,
         }
     }
 
     #[inline]
     pub fn arg(&self, i: usize) -> VVal {
         //d// println!("GET ARGC [{}] = {}", i, self.argc);
-        if i >= self.argc { return VVal::None; }
+        if i >= self.argc {
+            return VVal::None;
+        }
         let v = &self.args[(self.bp - self.argc) + i];
         //d// println!("GET ARG [{}/{}] = {}", i, self.sp - (i + 1), v.s());
         v.clone()
@@ -814,8 +834,8 @@ impl Env {
     pub fn get_local_up_promotion(&mut self, i: usize) -> VVal {
         let idx = self.bp + i;
         match &self.args[idx] {
-            VVal::HRef(r)  => VVal::HRef(r.clone()),
-//            VVal::Ref(r)   => VVal::Ref(r.clone()),
+            VVal::HRef(r) => VVal::HRef(r.clone()),
+            //            VVal::Ref(r)   => VVal::Ref(r.clone()),
             VVal::WWRef(r) => VVal::WWRef(r.clone()),
             v => {
                 let new_v = v.to_hidden_boxed_ref();
@@ -842,8 +862,8 @@ impl Env {
     #[inline]
     pub fn get_local(&self, i: usize) -> VVal {
         match &self.args[self.bp + i] {
-            VVal::HRef(r)  => r.borrow().clone(),
-            v              => v.clone(),
+            VVal::HRef(r) => r.borrow().clone(),
+            v => v.clone(),
         }
     }
 
@@ -852,13 +872,15 @@ impl Env {
         let upv = &fun.upvalues[i];
 
         match upv {
-//            VVal::Ref(r)     => { r.replace(value); }
-            VVal::HRef(r)    => { r.borrow_mut().assign_ref(value); }
-            VVal::WWRef(l)   => {
+            //            VVal::Ref(r)     => { r.replace(value); }
+            VVal::HRef(r) => {
+                r.borrow_mut().assign_ref(value);
+            }
+            VVal::WWRef(l) => {
                 if let Some(r) = l.upgrade() {
                     r.borrow_mut().assign_ref(value);
                 }
-            },
+            }
             _ => (),
         }
     }
@@ -873,13 +895,15 @@ impl Env {
         let upv = &fun.upvalues[index];
 
         match upv {
-//            VVal::Ref(r)   => { r.replace(value); }
-            VVal::HRef(r)  => { r.replace(value); }
+            //            VVal::Ref(r)   => { r.replace(value); }
+            VVal::HRef(r) => {
+                r.replace(value);
+            }
             VVal::WWRef(r) => {
                 if let Some(r) = Weak::upgrade(r) {
                     r.replace(value);
                 }
-            },
+            }
             _ => {}
         }
     }
@@ -891,8 +915,10 @@ impl Env {
             self.args.resize(idx * 2, VVal::None);
         }
         match &mut self.args[idx] {
-            VVal::HRef(r)  => { r.replace(value); }
-            v              => { *v = value }
+            VVal::HRef(r) => {
+                r.replace(value);
+            }
+            v => *v = value,
         }
     }
 
@@ -918,10 +944,7 @@ impl Env {
         let local_size = fu.local_size;
         let old_bp = self.set_bp(local_size);
         let uwa =
-            UnwindAction::FunctionCall(
-                std::mem::replace(&mut self.argc, argc),
-                old_bp,
-                local_size);
+            UnwindAction::FunctionCall(std::mem::replace(&mut self.argc, argc), old_bp, local_size);
         self.push_unwind(uwa);
         self.call_stack.push(fu);
     }
@@ -933,9 +956,7 @@ impl Env {
 
     #[inline]
     pub fn push_unwind_self(&mut self, new_self: VVal) {
-        let uwa =
-            UnwindAction::RestoreSelf(
-                std::mem::replace(&mut self.current_self, new_self));
+        let uwa = UnwindAction::RestoreSelf(std::mem::replace(&mut self.current_self, new_self));
         self.push_unwind(uwa);
     }
 
@@ -950,48 +971,36 @@ impl Env {
     #[inline]
     pub fn push_loop_info(&mut self, current_pc: usize, break_pc: usize, uw_depth_offs: usize) {
         let uw_depth = self.unwind_depth() + 1 + uw_depth_offs;
-        let uwa =
-            UnwindAction::RestoreLoopInfo(
-                std::mem::replace(&mut self.loop_info, LoopInfo {
-                    pc:       current_pc,
-                    sp:       self.sp,
-                    uw_depth,
-                    break_pc,
-                }));
+        let uwa = UnwindAction::RestoreLoopInfo(std::mem::replace(
+            &mut self.loop_info,
+            LoopInfo { pc: current_pc, sp: self.sp, uw_depth, break_pc },
+        ));
         self.push_unwind(uwa);
     }
 
     #[inline]
     pub fn push_iter(&mut self, iter: Rc<RefCell<VValIter>>) {
-        let uwa =
-            UnwindAction::RestoreIter(
-                std::mem::replace(
-                    &mut self.iter, Some(iter)));
+        let uwa = UnwindAction::RestoreIter(std::mem::replace(&mut self.iter, Some(iter)));
         self.push_unwind(uwa);
     }
 
     pub fn dump_unwind_stack(&self) -> String {
         let mut s = String::new();
         for i in 0..self.unwind_stack.len() {
-            let add =
-                match &self.unwind_stack[self.unwind_stack.len() - (i + 1)] {
-                    UnwindAction::RestoreSP(sp) =>
-                        format!("rsp({})", *sp),
-                    UnwindAction::ClearLocals(from, to) =>
-                        format!("cl({},{})", *from, *to),
-                    UnwindAction::RestoreLoopInfo(li) =>
-                        format!("loinf(uws:{},sp:{})", li.uw_depth, li.sp),
-                    UnwindAction::RestoreAccum(_fun, _val) =>
-                        "raccm".to_string(),
-                    UnwindAction::RestoreSelf(_slf) =>
-                        "rslf".to_string(),
-                    UnwindAction::RestoreIter(_i) =>
-                        "ritr".to_string(),
-                    UnwindAction::FunctionCall(argc, old_bp, local_size) =>
-                        format!("fcal({},{},{})", argc, old_bp, local_size),
-                    UnwindAction::Null =>
-                        "nul".to_string(),
-                };
+            let add = match &self.unwind_stack[self.unwind_stack.len() - (i + 1)] {
+                UnwindAction::RestoreSP(sp) => format!("rsp({})", *sp),
+                UnwindAction::ClearLocals(from, to) => format!("cl({},{})", *from, *to),
+                UnwindAction::RestoreLoopInfo(li) => {
+                    format!("loinf(uws:{},sp:{})", li.uw_depth, li.sp)
+                }
+                UnwindAction::RestoreAccum(_fun, _val) => "raccm".to_string(),
+                UnwindAction::RestoreSelf(_slf) => "rslf".to_string(),
+                UnwindAction::RestoreIter(_i) => "ritr".to_string(),
+                UnwindAction::FunctionCall(argc, old_bp, local_size) => {
+                    format!("fcal({},{},{})", argc, old_bp, local_size)
+                }
+                UnwindAction::Null => "nul".to_string(),
+            };
 
             if !s.is_empty() {
                 s += ";";
@@ -1008,28 +1017,28 @@ impl Env {
                 while self.sp > sp {
                     self.pop();
                 }
-            },
+            }
             UnwindAction::ClearLocals(from, to) => {
                 self.null_locals(from, to);
-            },
+            }
             UnwindAction::RestoreLoopInfo(li) => {
                 self.loop_info = li;
-            },
+            }
             UnwindAction::RestoreAccum(fun, val) => {
                 self.accum_fun = fun;
                 self.accum_val = val;
-            },
+            }
             UnwindAction::RestoreSelf(slf) => {
                 self.current_self = slf;
-            },
+            }
             UnwindAction::RestoreIter(i) => {
                 self.iter = i;
-            },
+            }
             UnwindAction::FunctionCall(argc, old_bp, local_size) => {
                 self.reset_bp(local_size, old_bp);
                 self.call_stack.pop();
                 self.argc = argc;
-            },
+            }
             UnwindAction::Null => (),
         }
     }
@@ -1041,36 +1050,40 @@ impl Env {
     }
 
     pub fn setup_accumulator(&mut self, v: VVal) {
-        let f =
-            match v {
-                VVal::Map(_) => {
-                    VValFun::new_fun(
-                        move |env: &mut Env, _argc: usize| {
-                            let k = env.arg(0);
-                            let v = env.arg(1);
-                            env.accum_val.set_key(&k, v.clone())?;
-                            Ok(v)
-                        }, Some(2), Some(2), false)
+        let f = match v {
+            VVal::Map(_) => VValFun::new_fun(
+                move |env: &mut Env, _argc: usize| {
+                    let k = env.arg(0);
+                    let v = env.arg(1);
+                    env.accum_val.set_key(&k, v.clone())?;
+                    Ok(v)
                 },
-                _ => {
-                    VValFun::new_fun(
-                        move |env: &mut Env, _argc: usize| {
-                            let v = env.arg(0);
-                            env.accum_val.accum(&v);
-                            Ok(v)
-                        }, Some(1), Some(1), false)
-                }
-            };
+                Some(2),
+                Some(2),
+                false,
+            ),
+            _ => VValFun::new_fun(
+                move |env: &mut Env, _argc: usize| {
+                    let v = env.arg(0);
+                    env.accum_val.accum(&v);
+                    Ok(v)
+                },
+                Some(1),
+                Some(1),
+                false,
+            ),
+        };
 
-        let uwa =
-            UnwindAction::RestoreAccum(
-                std::mem::replace(&mut self.accum_fun, f),
-                std::mem::replace(&mut self.accum_val, v));
+        let uwa = UnwindAction::RestoreAccum(
+            std::mem::replace(&mut self.accum_fun, f),
+            std::mem::replace(&mut self.accum_val, v),
+        );
         self.push_unwind(uwa);
     }
 
     pub fn with_accum<T>(&mut self, v: VVal, acfun: T) -> Result<VVal, StackAction>
-        where T: Fn(&mut Env) -> Result<VVal, StackAction>
+    where
+        T: Fn(&mut Env) -> Result<VVal, StackAction>,
     {
         self.setup_accumulator(v);
 
@@ -1116,18 +1129,21 @@ impl Env {
     pub fn new_err(&self, s: String) -> VVal {
         for i in self.call_stack.iter().rev() {
             if i.syn_pos.is_some() {
-                return
-                    VVal::err(
-                        VVal::new_str_mv(s),
-                        i.syn_pos.clone().unwrap());
+                return VVal::err(VVal::new_str_mv(s), i.syn_pos.clone().unwrap());
             }
-        };
+        }
 
         if self.call_stack.last().is_some() {
             VVal::err(
                 VVal::new_str_mv(s),
-                self.call_stack.last().unwrap().syn_pos.clone().or_else(
-                    || Some(SynPos::empty())).unwrap())
+                self.call_stack
+                    .last()
+                    .unwrap()
+                    .syn_pos
+                    .clone()
+                    .or_else(|| Some(SynPos::empty()))
+                    .unwrap(),
+            )
         } else {
             VVal::err(VVal::new_str_mv(s), SynPos::empty())
         }
@@ -1138,12 +1154,13 @@ impl Env {
             if i.syn_pos.is_some() {
                 return StackAction::panic(val, i.syn_pos.clone(), VVal::None);
             }
-        };
+        }
 
-        StackAction::panic(val,
-            self.call_stack.last().unwrap().syn_pos.clone().or_else(
-                || Some(SynPos::empty())),
-            VVal::None)
+        StackAction::panic(
+            val,
+            self.call_stack.last().unwrap().syn_pos.clone().or_else(|| Some(SynPos::empty())),
+            VVal::None,
+        )
     }
 
     pub fn new_panic_argv(&self, val: VVal, args: VVal) -> StackAction {
@@ -1151,12 +1168,13 @@ impl Env {
             if i.syn_pos.is_some() {
                 return StackAction::panic(val, i.syn_pos.clone(), args);
             }
-        };
+        }
 
-        StackAction::panic(val,
-            self.call_stack.last().unwrap().syn_pos.clone().or_else(
-                || Some(SynPos::empty())),
-            args)
+        StackAction::panic(
+            val,
+            self.call_stack.last().unwrap().syn_pos.clone().or_else(|| Some(SynPos::empty())),
+            args,
+        )
     }
 }
 
@@ -1212,18 +1230,23 @@ pub enum StackAction {
 }
 
 fn fmt_shorten_ellipses(f: &mut Formatter, len: &mut usize, s: String) -> std::fmt::Result {
-    if *len > 250 { return Ok(()); }
+    if *len > 250 {
+        return Ok(());
+    }
 
-    if s.len() > 35 { *len += 35 + 3;  write!(f, "{}...", &s[0..35]) }
-    else            { *len += s.len(); write!(f, "{}", s) }
+    if s.len() > 35 {
+        *len += 35 + 3;
+        write!(f, "{}...", &s[0..35])
+    } else {
+        *len += s.len();
+        write!(f, "{}", s)
+    }
 }
 
 fn fmt_argv(f: &mut Formatter, v: &VVal) -> std::fmt::Result {
     let mut cur_len = 0;
 
-    if !v.is_map()
-       && v.iter_over_vvals()
-    {
+    if !v.is_map() && v.iter_over_vvals() {
         write!(f, "[")?;
         v.with_iter(|it| {
             let mut first = true;
@@ -1250,7 +1273,6 @@ fn fmt_argv(f: &mut Formatter, v: &VVal) -> std::fmt::Result {
         }
 
         write!(f, "]")?;
-
     } else {
         fmt_shorten_ellipses(f, &mut cur_len, v.s())?
     }
@@ -1283,10 +1305,10 @@ impl Display for StackAction {
 
                     Ok(())
                 }
-            },
+            }
             StackAction::Return(ret) => write!(f, "Return[lbl={}] {}", ret.0.s(), ret.1.s()),
             StackAction::Break(v) => write!(f, "Break: {}", v.s()),
-            StackAction::Next     => write!(f, "Next"),
+            StackAction::Next => write!(f, "Next"),
         }
     }
 }
@@ -1303,18 +1325,15 @@ impl StackAction {
     }
 
     pub fn panic_msg(err: String) -> Self {
-        StackAction::Panic(Box::new(
-            (VVal::new_str_mv(err), vec![])))
+        StackAction::Panic(Box::new((VVal::new_str_mv(err), vec![])))
     }
 
     pub fn panic_str(err: String, sp: Option<SynPos>, args: VVal) -> Self {
-        StackAction::Panic(Box::new(
-            (VVal::new_str_mv(err), vec![(sp, args)])))
+        StackAction::Panic(Box::new((VVal::new_str_mv(err), vec![(sp, args)])))
     }
 
     pub fn panic(err: VVal, sp: Option<SynPos>, args: VVal) -> Self {
-        StackAction::Panic(Box::new(
-            (err, vec![(sp, args)])))
+        StackAction::Panic(Box::new((err, vec![(sp, args)])))
     }
 
     pub fn wrap_panic(self, sp: Option<SynPos>, args: VVal) -> Self {
@@ -1322,7 +1341,7 @@ impl StackAction {
             StackAction::Panic(mut panic) => {
                 panic.as_mut().1.push((sp, args));
                 StackAction::Panic(panic)
-            },
+            }
             _ => self,
         }
     }
@@ -1350,8 +1369,8 @@ pub enum VarPos {
     Const(VVal),
 }
 
-pub type EvalNode = Box<dyn Fn(&mut Env) -> Result<VVal,StackAction>>;
-pub type ClosNodeRef = Rc<RefCell<dyn Fn(&mut Env, usize) -> Result<VVal,StackAction>>>;
+pub type EvalNode = Box<dyn Fn(&mut Env) -> Result<VVal, StackAction>>;
+pub type ClosNodeRef = Rc<RefCell<dyn Fn(&mut Env, usize) -> Result<VVal, StackAction>>>;
 
 #[derive(Clone)]
 pub enum FunType {
@@ -1363,27 +1382,27 @@ pub enum FunType {
 /// This structure is the runtime representation of a WLambda function value.
 pub struct VValFun {
     /// The closure or vm program that runs the function.
-    pub fun:        FunType,
+    pub fun: FunType,
     /// The positions of the upvalues that are being captured by this function.
     pub upvalue_pos: Rc<std::vec::Vec<VarPos>>,
     /// Contains any caught upvalues.
-    pub upvalues:   std::vec::Vec<VVal>,
+    pub upvalues: std::vec::Vec<VVal>,
     /// The number of local variables defined in this functions.
     ///
     /// This value is used to reserve stack space for storing them.
     pub local_size: usize,
     /// Min number of arguments this functions requires.
-    pub min_args:   Option<usize>,
+    pub min_args: Option<usize>,
     /// Max number of arguments this functions requires.
-    pub max_args:   Option<usize>,
+    pub max_args: Option<usize>,
     /// If true, then this function accepts error values without panic.
     /// Functions by default don't accept errors as argument. It needs to be
     /// explicitly enabled.
     pub err_arg_ok: bool,
     /// The location of the definition of this function.
-    pub syn_pos:    Option<SynPos>,
+    pub syn_pos: Option<SynPos>,
     /// The return label of the function:
-    pub label:      VVal,
+    pub label: VVal,
 }
 
 impl VValFun {
@@ -1414,24 +1433,61 @@ impl VValFun {
     ///
     /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
     ///```
-    pub fn new_fun<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool) -> VVal
-        where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
-
-        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, err_arg_ok, None, Rc::new(vec![]))
+    pub fn new_fun<T>(
+        fun: T,
+        min_args: Option<usize>,
+        max_args: Option<usize>,
+        err_arg_ok: bool,
+    ) -> VVal
+    where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        VValFun::new_val(
+            Rc::new(RefCell::new(fun)),
+            Vec::new(),
+            0,
+            min_args,
+            max_args,
+            err_arg_ok,
+            None,
+            Rc::new(vec![]),
+        )
     }
 
-    pub fn new_fun_with_pos<T>(fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool, spos: SynPos) -> VVal
-        where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
-
-        VValFun::new_val(Rc::new(RefCell::new(fun)), Vec::new(), 0, min_args, max_args, err_arg_ok, Some(spos), Rc::new(vec![]))
+    pub fn new_fun_with_pos<T>(
+        fun: T,
+        min_args: Option<usize>,
+        max_args: Option<usize>,
+        err_arg_ok: bool,
+        spos: SynPos,
+    ) -> VVal
+    where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        VValFun::new_val(
+            Rc::new(RefCell::new(fun)),
+            Vec::new(),
+            0,
+            min_args,
+            max_args,
+            err_arg_ok,
+            Some(spos),
+            Rc::new(vec![]),
+        )
     }
 
     /// Internal utility function. Use at your own risk, API might change.
     #[allow(clippy::too_many_arguments)]
-    pub fn new_val(fun: ClosNodeRef, upvalues: std::vec::Vec<VVal>,
-                   env_size: usize, min_args: Option<usize>,
-                   max_args: Option<usize>, err_arg_ok: bool, syn_pos: Option<SynPos>,
-                   upvalue_pos: Rc<std::vec::Vec<VarPos>>) -> VVal {
+    pub fn new_val(
+        fun: ClosNodeRef,
+        upvalues: std::vec::Vec<VVal>,
+        env_size: usize,
+        min_args: Option<usize>,
+        max_args: Option<usize>,
+        err_arg_ok: bool,
+        syn_pos: Option<SynPos>,
+        upvalue_pos: Rc<std::vec::Vec<VarPos>>,
+    ) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalue_pos,
             upvalues,
@@ -1447,11 +1503,17 @@ impl VValFun {
 
     /// Internal utility function. Use at your own risk, API might change.
     #[allow(clippy::too_many_arguments)]
-    pub fn new_prog(prog: Rc<Prog>, upvalues: std::vec::Vec<VVal>,
-                   env_size: usize, min_args: Option<usize>,
-                   max_args: Option<usize>, err_arg_ok: bool, syn_pos: Option<SynPos>,
-                   upvalue_pos: Rc<std::vec::Vec<VarPos>>,
-                   label: VVal) -> VVal {
+    pub fn new_prog(
+        prog: Rc<Prog>,
+        upvalues: std::vec::Vec<VVal>,
+        env_size: usize,
+        min_args: Option<usize>,
+        max_args: Option<usize>,
+        err_arg_ok: bool,
+        syn_pos: Option<SynPos>,
+        upvalue_pos: Rc<std::vec::Vec<VarPos>>,
+        label: VVal,
+    ) -> VVal {
         VVal::Fun(Rc::new(VValFun {
             upvalue_pos,
             upvalues,
@@ -1461,22 +1523,24 @@ impl VValFun {
             max_args,
             err_arg_ok,
             syn_pos,
-            label
+            label,
         }))
     }
 
     /// Returns a dummy function that does nothing.
     pub fn new_dummy() -> Rc<VValFun> {
         Rc::new(VValFun {
-            fun:         FunType::ClosureNode(Rc::new(RefCell::new(|_: &mut Env, _a: usize| { Ok(VVal::None) }))),
+            fun: FunType::ClosureNode(Rc::new(RefCell::new(|_: &mut Env, _a: usize| {
+                Ok(VVal::None)
+            }))),
             upvalue_pos: Rc::new(vec![]),
-            upvalues:    Vec::new(),
-            local_size:  0,
-            min_args:    None,
-            max_args:    None,
-            err_arg_ok:  false,
-            syn_pos:     None,
-            label:       VVal::None,
+            upvalues: Vec::new(),
+            local_size: 0,
+            min_args: None,
+            max_args: None,
+            err_arg_ok: false,
+            syn_pos: None,
+            label: VVal::None,
         })
     }
 
@@ -1603,44 +1667,70 @@ impl VValFun {
 pub trait VValUserData {
     /// This method should return a human readable syntax representation
     /// of your VValUserData.
-    fn s(&self)     -> String { format!("$<userdata:{:p}>", self) }
+    fn s(&self) -> String {
+        format!("$<userdata:{:p}>", self)
+    }
     /// If your data has a plain string representation,
     /// you can return the string directly from here.
-    fn s_raw(&self) -> String { self.s() }
+    fn s_raw(&self) -> String {
+        self.s()
+    }
     /// Returns the i64 representation of your data.
-    fn i(&self)     -> i64    { -1 }
+    fn i(&self) -> i64 {
+        -1
+    }
     /// Returns the byte representation of your data.
-    fn byte(&self)  -> u8     { self.i() as u8 }
+    fn byte(&self) -> u8 {
+        self.i() as u8
+    }
     /// Returns the char representation of your data.
-    fn c(&self)     -> char   { std::char::from_u32(self.i() as u32).unwrap_or('?') }
+    fn c(&self) -> char {
+        std::char::from_u32(self.i() as u32).unwrap_or('?')
+    }
     /// Returns the f64 representation of your data.
-    fn f(&self)     -> f64    { self.i() as f64 }
+    fn f(&self) -> f64 {
+        self.i() as f64
+    }
     /// Returns the boolean representation of your data. Can for instance
     /// be used to check if your data is _valid_ or something.
-    fn b(&self)     -> bool   { true }
+    fn b(&self) -> bool {
+        true
+    }
     /// Allows you to specify how two instances of your data
     /// should be compared for equivalentness.
-    fn eqv(&self, _other: &Box<dyn VValUserData>) -> bool { false }
+    fn eqv(&self, _other: &Box<dyn VValUserData>) -> bool {
+        false
+    }
     /// Should clone your user data instance. Whether you are doing
     /// a deep clone or a shallow clone or something else is up to you.
     fn clone_ud(&self) -> Box<dyn VValUserData>;
     /// Makes your user data act like a map. This can be useful
     /// for implementing your own registries or data structures.
     /// Implement this method for setting a key to a value.
-    fn set_key(&self, _key: &VVal, _val: VVal) -> Result<(), StackAction> { Ok(()) }
+    fn set_key(&self, _key: &VVal, _val: VVal) -> Result<(), StackAction> {
+        Ok(())
+    }
     /// This method is called when the user wants to remove a key.
     /// Typically called when `std:delete` from the prelude is called.
-    fn delete_key(&self, _key: &VVal) -> Result<VVal, StackAction> { Ok(VVal::None) }
+    fn delete_key(&self, _key: &VVal) -> Result<VVal, StackAction> {
+        Ok(VVal::None)
+    }
     /// This method returns some value that your user data
     /// associates with the given key.
-    fn get_key(&self, _key: &str) -> Option<VVal> { None }
+    fn get_key(&self, _key: &str) -> Option<VVal> {
+        None
+    }
     /// This method is called, when the user data object is used in a method call directly.
     /// Use this to implement convenient APIs for the user of the user data object.
     /// To quickly get the arguments you may use `env.argv_ref()`.
-    fn call_method(&self, _key: &str, _env: &mut Env) -> Result<VVal, StackAction> { Ok(VVal::None) }
+    fn call_method(&self, _key: &str, _env: &mut Env) -> Result<VVal, StackAction> {
+        Ok(VVal::None)
+    }
     /// This method is called when the user data is called.
     /// To quickly get the arguments you may use `env.argv_ref()`.
-    fn call(&self, _env: &mut Env) -> Result<VVal, StackAction> { Ok(VVal::None) }
+    fn call(&self, _env: &mut Env) -> Result<VVal, StackAction> {
+        Ok(VVal::None)
+    }
     /// This should be implemented simply by returning
     /// a mutable reference to the concrete type self.
     /// It allows you to access your data structure from inside
@@ -1694,7 +1784,7 @@ impl Drop for DropFun {
 }
 
 /// This type gives the end where to add the `VVal::add` function.
-#[derive(Debug,Clone,Copy,PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CollectionAdd {
     Push,
     Unshift,
@@ -1713,10 +1803,11 @@ impl std::fmt::Display for VValChr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             VValChr::Char(c) => write!(f, "'{}'", format_escape_char(*c, false)),
-            VValChr::Byte(b) => write!(f, "$b'{}'",
-                format_escape_char(
-                    std::char::from_u32(*b as u32).unwrap_or('?'),
-                    true)),
+            VValChr::Byte(b) => write!(
+                f,
+                "$b'{}'",
+                format_escape_char(std::char::from_u32(*b as u32).unwrap_or('?'), true)
+            ),
         }
     }
 }
@@ -1726,8 +1817,12 @@ impl VValChr {
         match self {
             VValChr::Char(c) => {
                 let c = *c as u32;
-                if c > 0xFF { b'?' } else { c as u8 }
-            },
+                if c > 0xFF {
+                    b'?'
+                } else {
+                    c as u8
+                }
+            }
             VValChr::Byte(b) => *b,
         }
     }
@@ -1735,8 +1830,7 @@ impl VValChr {
     pub fn c(&self) -> char {
         match self {
             VValChr::Char(c) => *c,
-            VValChr::Byte(b) =>
-                std::char::from_u32(*b as u32).unwrap_or('?'),
+            VValChr::Byte(b) => std::char::from_u32(*b as u32).unwrap_or('?'),
         }
     }
 }
@@ -1820,31 +1914,38 @@ impl std::fmt::Debug for VValFun {
 
 pub fn format_escape_char(c: char, narrow_ascii: bool) -> String {
     match c {
-        '\\' => { String::from("\\\\") },
-        '\n' => { String::from("\\n")  },
-        '\t' => { String::from("\\t")  },
-        '\r' => { String::from("\\r")  },
-        '\0' => { String::from("\\0")  },
-        '\'' => { String::from("\\'")  },
-        '\"' => { String::from("\\\"") },
+        '\\' => String::from("\\\\"),
+        '\n' => String::from("\\n"),
+        '\t' => String::from("\\t"),
+        '\r' => String::from("\\r"),
+        '\0' => String::from("\\0"),
+        '\'' => String::from("\\'"),
+        '\"' => String::from("\\\""),
         _ if narrow_ascii
-             && c.is_ascii()
-             && (c.is_ascii_alphanumeric()
-                 || c.is_ascii_graphic()
-                 || c.is_ascii_punctuation()
-                 || c == ' ') => { format!("{}", c) },
-        _ if narrow_ascii => { format!("\\x{:02X}", c as u32) },
-        _ if !narrow_ascii && c.is_ascii_control() => { format!("\\x{:02X}", c as u32) },
-        _ if !narrow_ascii && c.is_control() => { c.escape_unicode().to_string() },
-        _ => { format!("{}", c) }
-
+            && c.is_ascii()
+            && (c.is_ascii_alphanumeric()
+                || c.is_ascii_graphic()
+                || c.is_ascii_punctuation()
+                || c == ' ') =>
+        {
+            format!("{}", c)
+        }
+        _ if narrow_ascii => {
+            format!("\\x{:02X}", c as u32)
+        }
+        _ if !narrow_ascii && c.is_ascii_control() => {
+            format!("\\x{:02X}", c as u32)
+        }
+        _ if !narrow_ascii && c.is_control() => c.escape_unicode().to_string(),
+        _ => {
+            format!("{}", c)
+        }
     }
 }
 
 pub fn format_vval_str(s: &str, narrow_ascii: bool) -> String {
     // TODO: FIXME: Use writers to write into a buffered writer.
-    let mut v : Vec<String> =
-        s.chars().map(|c| { format_escape_char(c, narrow_ascii) }).collect();
+    let mut v: Vec<String> = s.chars().map(|c| format_escape_char(c, narrow_ascii)).collect();
     v.insert(0, String::from("\""));
     v.push(String::from("\""));
     v.concat()
@@ -1872,45 +1973,55 @@ impl CycleCheck {
     }
 
     fn touch_walk(&mut self, v: &VVal) {
-        if self.touch(v).is_some() { return; }
+        if self.touch(v).is_some() {
+            return;
+        }
 
         match v {
             VVal::Err(e) => self.touch_walk(&(*e).borrow().0),
             VVal::Pair(b) => {
                 self.touch_walk(&b.0);
                 self.touch_walk(&b.1);
-            },
+            }
             VVal::Opt(b) => {
                 if let Some(x) = b {
                     self.touch_walk(x);
                 }
-            },
+            }
             VVal::Lst(l) => {
-                for v in l.borrow().iter() { self.touch_walk(v); }
-            },
+                for v in l.borrow().iter() {
+                    self.touch_walk(v);
+                }
+            }
             VVal::Map(l) => {
-                for (_k, v) in l.borrow().iter() { self.touch_walk(v); }
-            },
+                for (_k, v) in l.borrow().iter() {
+                    self.touch_walk(v);
+                }
+            }
             VVal::DropFun(f) => {
                 if let VVal::Fun(f) = &f.fun {
                     for v in f.upvalues.iter() {
                         self.touch_walk(v);
                     }
                 }
-            },
+            }
             VVal::Fun(f) => {
                 for v in f.upvalues.iter() {
                     self.touch_walk(v);
                 }
-            },
-            VVal::Ref(l)   => { self.touch_walk(&(*l).borrow()); },
-            VVal::HRef(l)  => { self.touch_walk(&(*l).borrow()); },
+            }
+            VVal::Ref(l) => {
+                self.touch_walk(&(*l).borrow());
+            }
+            VVal::HRef(l) => {
+                self.touch_walk(&(*l).borrow());
+            }
             VVal::WWRef(l) => {
                 if let Some(v) = l.upgrade() {
                     self.touch_walk(&(*v).borrow());
                 }
-            },
-              VVal::Str(_)
+            }
+            VVal::Str(_)
             | VVal::Byt(_)
             | VVal::None
             | VVal::Bol(_)
@@ -1922,7 +2033,7 @@ impl CycleCheck {
             | VVal::Int(_)
             | VVal::Flt(_)
             | VVal::Chr(_)
-            | VVal::Usr(_) => {},
+            | VVal::Usr(_) => {}
         }
     }
 
@@ -1947,7 +2058,9 @@ impl CycleCheck {
     fn backref(&mut self, v: &VVal) -> Option<(bool, String)> {
         // Do not generate back refs for symbols. they are interned
         // anyways!
-        if let VVal::Sym(_) = v { return None; }
+        if let VVal::Sym(_) = v {
+            return None;
+        }
 
         let id = v.ref_id()?;
 
@@ -1956,9 +2069,8 @@ impl CycleCheck {
                 br if br > 0 => {
                     self.refs.insert(id, -br);
                     Some((true, format!("$<{}=>", br)))
-                },
-                br if br < 0 =>
-                    Some((false, format!("$<{}>", -br))),
+                }
+                br if br < 0 => Some((false, format!("$<{}>", -br))),
                 _ => None,
             }
         } else {
@@ -1967,11 +2079,10 @@ impl CycleCheck {
     }
 }
 
-pub type VValIter =
-    std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>>;
+pub type VValIter = std::iter::FromFn<Box<dyn FnMut() -> Option<(VVal, Option<VVal>)>>>;
 
 macro_rules! swizzle_char2value {
-    ($c: expr, $i: expr, $x: ident, $y: ident, $z: ident, $w: ident) => (
+    ($c: expr, $i: expr, $x: ident, $y: ident, $z: ident, $w: ident) => {
         match $c.chars().nth($i).unwrap_or(' ') {
             'r' => $x,
             'g' => $y,
@@ -1990,27 +2101,27 @@ macro_rules! swizzle_char2value {
             'w' => $w,
             _ => return VVal::None,
         }
-    )
+    };
 }
 
 #[allow(clippy::many_single_char_names)]
 fn swizzle_i(s: &str, x: i64, y: i64, z: i64, w: i64) -> VVal {
     match s.len() {
-        2 =>
-            VVal::IVec(Box::new(NVec::Vec2(
-                swizzle_char2value!(s, 0, x, y, z, w),
-                swizzle_char2value!(s, 1, x, y, z, w)))),
-        3 =>
-            VVal::IVec(Box::new(NVec::Vec3(
-                swizzle_char2value!(s, 0, x, y, z, w),
-                swizzle_char2value!(s, 1, x, y, z, w),
-                swizzle_char2value!(s, 2, x, y, z, w)))),
-        4 =>
-            VVal::IVec(Box::new(NVec::Vec4(
-                swizzle_char2value!(s, 0, x, y, z, w),
-                swizzle_char2value!(s, 1, x, y, z, w),
-                swizzle_char2value!(s, 2, x, y, z, w),
-                swizzle_char2value!(s, 3, x, y, z, w)))),
+        2 => VVal::IVec(Box::new(NVec::Vec2(
+            swizzle_char2value!(s, 0, x, y, z, w),
+            swizzle_char2value!(s, 1, x, y, z, w),
+        ))),
+        3 => VVal::IVec(Box::new(NVec::Vec3(
+            swizzle_char2value!(s, 0, x, y, z, w),
+            swizzle_char2value!(s, 1, x, y, z, w),
+            swizzle_char2value!(s, 2, x, y, z, w),
+        ))),
+        4 => VVal::IVec(Box::new(NVec::Vec4(
+            swizzle_char2value!(s, 0, x, y, z, w),
+            swizzle_char2value!(s, 1, x, y, z, w),
+            swizzle_char2value!(s, 2, x, y, z, w),
+            swizzle_char2value!(s, 3, x, y, z, w),
+        ))),
         _ => VVal::None,
     }
 }
@@ -2018,21 +2129,21 @@ fn swizzle_i(s: &str, x: i64, y: i64, z: i64, w: i64) -> VVal {
 #[allow(clippy::many_single_char_names)]
 fn swizzle_f(s: &str, x: f64, y: f64, z: f64, w: f64) -> VVal {
     match s.len() {
-        2 =>
-            VVal::FVec(Box::new(NVec::Vec2(
-                swizzle_char2value!(s, 0, x, y, z, w),
-                swizzle_char2value!(s, 1, x, y, z, w)))),
-        3 =>
-            VVal::FVec(Box::new(NVec::Vec3(
-                swizzle_char2value!(s, 0, x, y, z, w),
-                swizzle_char2value!(s, 1, x, y, z, w),
-                swizzle_char2value!(s, 2, x, y, z, w)))),
-        4 =>
-            VVal::FVec(Box::new(NVec::Vec4(
-                swizzle_char2value!(s, 0, x, y, z, w),
-                swizzle_char2value!(s, 1, x, y, z, w),
-                swizzle_char2value!(s, 2, x, y, z, w),
-                swizzle_char2value!(s, 3, x, y, z, w)))),
+        2 => VVal::FVec(Box::new(NVec::Vec2(
+            swizzle_char2value!(s, 0, x, y, z, w),
+            swizzle_char2value!(s, 1, x, y, z, w),
+        ))),
+        3 => VVal::FVec(Box::new(NVec::Vec3(
+            swizzle_char2value!(s, 0, x, y, z, w),
+            swizzle_char2value!(s, 1, x, y, z, w),
+            swizzle_char2value!(s, 2, x, y, z, w),
+        ))),
+        4 => VVal::FVec(Box::new(NVec::Vec4(
+            swizzle_char2value!(s, 0, x, y, z, w),
+            swizzle_char2value!(s, 1, x, y, z, w),
+            swizzle_char2value!(s, 2, x, y, z, w),
+            swizzle_char2value!(s, 3, x, y, z, w),
+        ))),
         _ => VVal::None,
     }
 }
@@ -2048,28 +2159,32 @@ macro_rules! iter_next {
         } else {
             VVal::opt_none()
         }
-    }
+    };
 }
 
 macro_rules! iter_next_value {
     ($i: expr, $v: ident, $conv: block, $def: expr) => {
-        if let Some(($v, _)) = $i.next() { $conv } else { $def }
-    }
+        if let Some(($v, _)) = $i.next() {
+            $conv
+        } else {
+            $def
+        }
+    };
 }
 
 macro_rules! iter_int_a_to_b {
-    ($a: expr, $b: expr) => {
-        {
-            let mut i = $a;
-            let b = $b;
-            std::iter::from_fn(Box::new(move || {
-                if i >= b { return None; }
-                let ret = Some((VVal::Int(i), None));
-                i += 1;
-                ret
-            }))
-        }
-    }
+    ($a: expr, $b: expr) => {{
+        let mut i = $a;
+        let b = $b;
+        std::iter::from_fn(Box::new(move || {
+            if i >= b {
+                return None;
+            }
+            let ret = Some((VVal::Int(i), None));
+            i += 1;
+            ret
+        }))
+    }};
 }
 
 macro_rules! pair_key_to_iter {
@@ -2083,21 +2198,11 @@ macro_rules! pair_key_to_iter {
                 std::iter::from_fn(Box::new(move || {
                     let a = ai.borrow_mut().next();
                     if let Some((a, ak)) = a {
-                        let a =
-                            if let Some(ak) = ak {
-                                VVal::pair(a, ak)
-                            } else {
-                                a
-                            };
+                        let a = if let Some(ak) = ak { VVal::pair(a, ak) } else { a };
 
                         let b = bi.borrow_mut().next();
                         if let Some((b, bk)) = b {
-                            let b =
-                                if let Some(bk) = bk {
-                                    VVal::pair(b, bk)
-                                } else {
-                                    b
-                                };
+                            let b = if let Some(bk) = bk { VVal::pair(b, bk) } else { b };
 
                             Some((a, Some(b)))
                         } else {
@@ -2112,20 +2217,10 @@ macro_rules! pair_key_to_iter {
                 std::iter::from_fn(Box::new(move || {
                     let a = ai.borrow_mut().next();
                     if let Some((a, ak)) = a {
-                        let a =
-                            if let Some(ak) = ak {
-                                VVal::pair(a, ak)
-                            } else {
-                                a
-                            };
+                        let a = if let Some(ak) = ak { VVal::pair(a, ak) } else { a };
 
                         if let Some((b, bk)) = bi.next() {
-                            let b =
-                                if let Some(bk) = bk {
-                                    VVal::pair(b, bk)
-                                } else {
-                                    b
-                                };
+                            let b = if let Some(bk) = bk { VVal::pair(b, bk) } else { b };
 
                             Some((VVal::pair(a, b), None))
                         } else {
@@ -2138,19 +2233,14 @@ macro_rules! pair_key_to_iter {
             }
         } else if $p.0.is_int() {
             iter_int_a_to_b!($p.0.i(), $p.1.i())
-
         } else {
             $p.0.with_s_ref(|key: &str| -> VValIter {
-                let l =
-                    match &key[..] {
-                        "keys"      => $p.1.keys(),
-                        "values"    => $p.1.values(),
-                        "enumerate" => $p.1.enumerate(),
-                        _ => {
-                            return std::iter::from_fn(
-                                Box::new(move || { None }))
-                        }
-                    };
+                let l = match &key[..] {
+                    "keys" => $p.1.keys(),
+                    "values" => $p.1.values(),
+                    "enumerate" => $p.1.enumerate(),
+                    _ => return std::iter::from_fn(Box::new(move || None)),
+                };
                 if let VVal::Lst(l) = l {
                     let l = l.clone();
                     let mut idx = 0;
@@ -2163,11 +2253,11 @@ macro_rules! pair_key_to_iter {
                         r
                     }))
                 } else {
-                    std::iter::from_fn(Box::new(move || { None }))
+                    std::iter::from_fn(Box::new(move || None))
                 }
             })
         }
-    }
+    };
 }
 
 #[allow(clippy::cognitive_complexity)]
@@ -2178,23 +2268,17 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
         VVal::Chr(VValChr::Char(c)) => {
             let c = *c as i64;
             VVal::Bol(from <= c && cnt >= c)
-        },
+        }
         VVal::Chr(VValChr::Byte(c)) => {
             let c = *c as i64;
             VVal::Bol(from <= c && cnt >= c)
-        },
+        }
         VVal::Byt(s) => {
-            VVal::new_byt(
-                s.iter()
-                 .skip(from as usize)
-                 .take(cnt as usize).copied().collect())
-        },
+            VVal::new_byt(s.iter().skip(from as usize).take(cnt as usize).copied().collect())
+        }
         VVal::Str(s) => {
-            VVal::new_str_mv(
-                s.chars()
-                 .skip(from as usize)
-                 .take(cnt as usize).collect())
-        },
+            VVal::new_str_mv(s.chars().skip(from as usize).take(cnt as usize).collect())
+        }
         VVal::IVec(b) => {
             let mut out = vec![];
             match b.as_ref() {
@@ -2210,12 +2294,12 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                             0 => {
                                 out.push(VVal::Int(*a));
                                 out.push(VVal::Int(*b));
-                            },
+                            }
                             1 => out.push(VVal::Int(*b)),
                             _ => (),
                         }
                     }
-                },
+                }
                 NVec::Vec3(a, b, c) => {
                     if cnt == 1 {
                         match from {
@@ -2229,14 +2313,14 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                             0 => {
                                 out.push(VVal::Int(*a));
                                 out.push(VVal::Int(*b));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Int(*b));
                                 out.push(VVal::Int(*c));
-                            },
+                            }
                             2 => {
                                 out.push(VVal::Int(*c));
-                            },
+                            }
                             _ => (),
                         }
                     } else if cnt > 2 {
@@ -2245,7 +2329,7 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                                 out.push(VVal::Int(*a));
                                 out.push(VVal::Int(*b));
                                 out.push(VVal::Int(*c));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Int(*b));
                                 out.push(VVal::Int(*c));
@@ -2254,7 +2338,7 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                             _ => (),
                         }
                     }
-                },
+                }
                 NVec::Vec4(a, b, c, d) => {
                     if cnt == 1 {
                         match from {
@@ -2269,18 +2353,18 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                             0 => {
                                 out.push(VVal::Int(*a));
                                 out.push(VVal::Int(*b));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Int(*b));
                                 out.push(VVal::Int(*c));
-                            },
+                            }
                             2 => {
                                 out.push(VVal::Int(*c));
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             3 => {
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             _ => (),
                         }
                     } else if cnt == 3 {
@@ -2289,19 +2373,19 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                                 out.push(VVal::Int(*a));
                                 out.push(VVal::Int(*b));
                                 out.push(VVal::Int(*c));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Int(*b));
                                 out.push(VVal::Int(*c));
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             2 => {
                                 out.push(VVal::Int(*c));
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             3 => {
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             _ => (),
                         }
                     } else if cnt > 2 {
@@ -2311,19 +2395,19 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                                 out.push(VVal::Int(*b));
                                 out.push(VVal::Int(*c));
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Int(*b));
                                 out.push(VVal::Int(*c));
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             2 => {
                                 out.push(VVal::Int(*c));
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             3 => {
                                 out.push(VVal::Int(*d));
-                            },
+                            }
                             _ => (),
                         }
                     }
@@ -2331,7 +2415,7 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
             }
 
             VVal::vec_mv(out)
-        },
+        }
         VVal::FVec(b) => {
             let mut out = vec![];
             match b.as_ref() {
@@ -2347,12 +2431,12 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                             0 => {
                                 out.push(VVal::Flt(*a));
                                 out.push(VVal::Flt(*b));
-                            },
+                            }
                             1 => out.push(VVal::Flt(*b)),
                             _ => (),
                         }
                     }
-                },
+                }
                 NVec::Vec3(a, b, c) => {
                     if cnt == 1 {
                         match from {
@@ -2366,14 +2450,14 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                             0 => {
                                 out.push(VVal::Flt(*a));
                                 out.push(VVal::Flt(*b));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Flt(*b));
                                 out.push(VVal::Flt(*c));
-                            },
+                            }
                             2 => {
                                 out.push(VVal::Flt(*c));
-                            },
+                            }
                             _ => (),
                         }
                     } else if cnt > 2 {
@@ -2382,7 +2466,7 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                                 out.push(VVal::Flt(*a));
                                 out.push(VVal::Flt(*b));
                                 out.push(VVal::Flt(*c));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Flt(*b));
                                 out.push(VVal::Flt(*c));
@@ -2391,7 +2475,7 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                             _ => (),
                         }
                     }
-                },
+                }
                 NVec::Vec4(a, b, c, d) => {
                     if cnt == 1 {
                         match from {
@@ -2406,18 +2490,18 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                             0 => {
                                 out.push(VVal::Flt(*a));
                                 out.push(VVal::Flt(*b));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Flt(*b));
                                 out.push(VVal::Flt(*c));
-                            },
+                            }
                             2 => {
                                 out.push(VVal::Flt(*c));
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             3 => {
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             _ => (),
                         }
                     } else if cnt == 3 {
@@ -2426,19 +2510,19 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                                 out.push(VVal::Flt(*a));
                                 out.push(VVal::Flt(*b));
                                 out.push(VVal::Flt(*c));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Flt(*b));
                                 out.push(VVal::Flt(*c));
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             2 => {
                                 out.push(VVal::Flt(*c));
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             3 => {
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             _ => (),
                         }
                     } else if cnt > 2 {
@@ -2448,19 +2532,19 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                                 out.push(VVal::Flt(*b));
                                 out.push(VVal::Flt(*c));
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             1 => {
                                 out.push(VVal::Flt(*b));
                                 out.push(VVal::Flt(*c));
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             2 => {
                                 out.push(VVal::Flt(*c));
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             3 => {
                                 out.push(VVal::Flt(*d));
-                            },
+                            }
                             _ => (),
                         }
                     }
@@ -2468,17 +2552,12 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
             }
 
             VVal::vec_mv(out)
-        },
+        }
         VVal::Lst(l) => {
-            let v : Vec<VVal> =
-                l.borrow()
-                 .iter()
-                 .skip(from as usize)
-                 .take(cnt as usize)
-                 .cloned()
-                 .collect();
+            let v: Vec<VVal> =
+                l.borrow().iter().skip(from as usize).take(cnt as usize).cloned().collect();
             VVal::vec_mv(v)
-        },
+        }
         VVal::Iter(i) => {
             let mut out = Vec::with_capacity(cnt as usize);
             let mut i = i.borrow_mut();
@@ -2490,164 +2569,135 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
                 idx += 1;
             }
             VVal::vec_mv(out)
+        }
+        _ => VVal::None,
+    }
+}
+
+fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
+    match val {
+        VVal::Int(i) => {
+            if i % 2 == 0 {
+                a.clone()
+            } else {
+                b.clone()
+            }
+        }
+        VVal::Byt(_) => match (a, b) {
+            (VVal::Int(from), VVal::Int(cnt)) => range_extract(*from, *cnt, val),
+            (VVal::Int(start_idx), b)
+                if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() =>
+            {
+                val.find(b, *start_idx as usize, true)
+            }
+            (VVal::Chr(_splitstr), VVal::Int(max)) => val.split(a, *max as usize, true),
+            (VVal::Str(_splitstr), VVal::Int(max)) => val.split(a, *max as usize, true),
+            (VVal::Byt(_splitstr), VVal::Int(max)) => val.split(a, *max as usize, true),
+            (VVal::Str(_needle), b)
+                if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() =>
+            {
+                val.bytes_replace(a, b)
+            }
+            (VVal::Byt(_needle), b)
+                if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() =>
+            {
+                val.bytes_replace(a, b)
+            }
+            (VVal::Chr(_needle), b)
+                if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() =>
+            {
+                val.bytes_replace(a, b)
+            }
+            _ => VVal::None,
+        },
+        VVal::Str(s) => match (a, b) {
+            (VVal::Int(from), VVal::Int(cnt)) => range_extract(*from, *cnt, val),
+            (VVal::Int(start_idx), b)
+                if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() =>
+            {
+                val.find(b, *start_idx as usize, false)
+            }
+            (VVal::Chr(_splitstr), VVal::Int(max)) => val.split(a, *max as usize, false),
+            (VVal::Byt(_splitstr), VVal::Int(max)) => val.split(a, *max as usize, false),
+            (VVal::Str(_splitstr), VVal::Int(max)) => val.split(a, *max as usize, false),
+            (VVal::Chr(needle), VVal::Chr(replace)) => {
+                let mut buf = [0; 6];
+                let chrstr = replace.c().encode_utf8(&mut buf);
+                VVal::new_str_mv(s.as_ref().replace(needle.c(), chrstr))
+            }
+            (VVal::Str(needle), VVal::Str(replace)) => {
+                VVal::new_str_mv(s.as_ref().replace(needle.as_ref(), replace.as_ref()))
+            }
+            _ => VVal::None,
+        },
+        VVal::Lst(_) => match (a, b) {
+            (VVal::Int(from), VVal::Int(cnt)) => range_extract(*from, *cnt, val),
+            _ => VVal::None,
+        },
+        VVal::Iter(_) => match (a, b) {
+            (VVal::Int(from), VVal::Int(cnt)) => range_extract(*from, *cnt, val),
+            _ => VVal::None,
+        },
+        VVal::IVec(_) => match (a, b) {
+            (VVal::Int(from), VVal::Int(cnt)) => range_extract(*from, *cnt, val),
+            _ => VVal::None,
+        },
+        VVal::FVec(_) => match (a, b) {
+            (VVal::Int(from), VVal::Int(cnt)) => range_extract(*from, *cnt, val),
+            _ => VVal::None,
+        },
+        VVal::Chr(VValChr::Byte(c)) => match (a, b) {
+            (VVal::Chr(from), VVal::Chr(to)) => {
+                let a = from.c() as u32;
+                let b = to.c() as u32;
+                let c = *c as u32;
+                VVal::Bol(a <= c && b >= c)
+            }
+            (VVal::Int(a), VVal::Int(b)) => {
+                let c = *c as i64;
+                VVal::Bol(*a <= c && *b >= c)
+            }
+            _ => VVal::None,
+        },
+        VVal::Chr(VValChr::Char(c)) => match (a, b) {
+            (VVal::Chr(from), VVal::Chr(to)) => {
+                let a = from.c() as u32;
+                let b = to.c() as u32;
+                let c = *c as u32;
+                VVal::Bol(a <= c && b >= c)
+            }
+            (VVal::Int(a), VVal::Int(b)) => {
+                let c = *c as i64;
+                VVal::Bol(*a <= c && *b >= c)
+            }
+            _ => VVal::None,
         },
         _ => VVal::None,
     }
 }
 
-
-fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
-    match val {
-        VVal::Int(i) =>
-            if i % 2 == 0 { a.clone() }
-            else          { b.clone() },
-        VVal::Byt(_) => {
-            match (a, b) {
-                (VVal::Int(from), VVal::Int(cnt)) => {
-                    range_extract(*from, *cnt, val)
-                },
-                (VVal::Int(start_idx), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.find(b, *start_idx as usize, true)
-                },
-                (VVal::Chr(_splitstr), VVal::Int(max)) => {
-                    val.split(a, *max as usize, true)
-                },
-                (VVal::Str(_splitstr), VVal::Int(max)) => {
-                    val.split(a, *max as usize, true)
-                },
-                (VVal::Byt(_splitstr), VVal::Int(max)) => {
-                    val.split(a, *max as usize, true)
-                },
-                (VVal::Str(_needle), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.bytes_replace(a, b)
-                },
-                (VVal::Byt(_needle), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.bytes_replace(a, b)
-                },
-                (VVal::Chr(_needle), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.bytes_replace(a, b)
-                },
-                _ => VVal::None
-            }
-        },
-        VVal::Str(s) => {
-            match (a, b) {
-                (VVal::Int(from), VVal::Int(cnt)) => {
-                    range_extract(*from, *cnt, val)
-                },
-                (VVal::Int(start_idx), b) if b.is_sym() || b.is_str() || b.is_byte() || b.is_char() || b.is_bytes() => {
-                    val.find(b, *start_idx as usize, false)
-                },
-                (VVal::Chr(_splitstr), VVal::Int(max)) => {
-                    val.split(a, *max as usize, false)
-                },
-                (VVal::Byt(_splitstr), VVal::Int(max)) => {
-                    val.split(a, *max as usize, false)
-                },
-                (VVal::Str(_splitstr), VVal::Int(max)) => {
-                    val.split(a, *max as usize, false)
-                },
-                (VVal::Chr(needle), VVal::Chr(replace)) => {
-                    let mut buf = [0; 6];
-                    let chrstr = replace.c().encode_utf8(&mut buf);
-                    VVal::new_str_mv(
-                        s.as_ref()
-                         .replace(needle.c(), chrstr))
-                },
-                (VVal::Str(needle), VVal::Str(replace)) => {
-                    VVal::new_str_mv(
-                        s.as_ref()
-                         .replace(
-                            needle.as_ref(), replace.as_ref()))
-                },
-                _ => VVal::None
-            }
-        },
-        VVal::Lst(_) => {
-            match (a, b) {
-                (VVal::Int(from), VVal::Int(cnt)) => {
-                    range_extract(*from, *cnt, val)
-                },
-                _ => VVal::None,
-            }
-        },
-        VVal::Iter(_) => {
-            match (a, b) {
-                (VVal::Int(from), VVal::Int(cnt)) => {
-                    range_extract(*from, *cnt, val)
-                },
-                _ => VVal::None,
-            }
-        },
-        VVal::IVec(_) => {
-            match (a, b) {
-                (VVal::Int(from), VVal::Int(cnt)) => {
-                    range_extract(*from, *cnt, val)
-                },
-                _ => VVal::None,
-            }
-        },
-        VVal::FVec(_) => {
-            match (a, b) {
-                (VVal::Int(from), VVal::Int(cnt)) => {
-                    range_extract(*from, *cnt, val)
-                },
-                _ => VVal::None,
-            }
-        },
-        VVal::Chr(VValChr::Byte(c)) => {
-            match (a, b) {
-                (VVal::Chr(from), VVal::Chr(to)) => {
-                    let a = from.c() as u32;
-                    let b = to.c()   as u32;
-                    let c = *c       as u32;
-                    VVal::Bol(a <= c && b >= c)
-                },
-                (VVal::Int(a), VVal::Int(b)) => {
-                    let c = *c as i64;
-                    VVal::Bol(*a <= c && *b >= c)
-                },
-                _ => VVal::None,
-            }
-        },
-        VVal::Chr(VValChr::Char(c)) => {
-            match (a, b) {
-                (VVal::Chr(from), VVal::Chr(to)) => {
-                    let a = from.c() as u32;
-                    let b = to.c()   as u32;
-                    let c = *c       as u32;
-                    VVal::Bol(a <= c && b >= c)
-                },
-                (VVal::Int(a), VVal::Int(b)) => {
-                    let c = *c as i64;
-                    VVal::Bol(*a <= c && *b >= c)
-                },
-                _ => VVal::None,
-            }
-        },
-        _ => VVal::None
-    }
-}
-
 fn vval_rc_ptr_eq(v: &VVal, l: &Rc<RefCell<VVal>>) -> bool {
     match v {
-        VVal::Ref(r2)   => Rc::ptr_eq(l, r2),
-        VVal::HRef(r2)  => Rc::ptr_eq(l, r2),
-        VVal::WWRef(r2) =>
-            match r2.upgrade() {
-                Some(v2) => Rc::ptr_eq(l, &v2),
-                None => false,
-            },
+        VVal::Ref(r2) => Rc::ptr_eq(l, r2),
+        VVal::HRef(r2) => Rc::ptr_eq(l, r2),
+        VVal::WWRef(r2) => match r2.upgrade() {
+            Some(v2) => Rc::ptr_eq(l, &v2),
+            None => false,
+        },
         _ => false,
     }
 }
 
-fn concat_operation(bytes: bool, first: &VVal, argc: usize, env: &mut Env) -> Result<VVal, StackAction> {
+fn concat_operation(
+    bytes: bool,
+    first: &VVal,
+    argc: usize,
+    env: &mut Env,
+) -> Result<VVal, StackAction> {
     if bytes {
         let mut buf = first.with_bv_ref(|bv| bv.to_vec());
         for i in 0..argc {
-            env.arg_ref(i).unwrap().with_bv_ref(|bv|
-                buf.extend_from_slice(bv));
+            env.arg_ref(i).unwrap().with_bv_ref(|bv| buf.extend_from_slice(bv));
         }
         Ok(VVal::new_byt(buf))
     } else {
@@ -2657,7 +2707,6 @@ fn concat_operation(bytes: bool, first: &VVal, argc: usize, env: &mut Env) -> Re
         }
         Ok(VVal::new_str_mv(st))
     }
-
 }
 
 #[allow(dead_code)]
@@ -2703,8 +2752,7 @@ impl VVal {
     }
 
     pub fn err_msg(s: &str) -> VVal {
-        VVal::Err(Rc::new(RefCell::new(
-            (VVal::new_str(s), SynPos::empty()))))
+        VVal::Err(Rc::new(RefCell::new((VVal::new_str(s), SynPos::empty()))))
     }
 
     pub fn new_usr<T: VValUserData + 'static>(o: T) -> VVal {
@@ -2835,7 +2883,9 @@ impl VVal {
     }
 
     #[inline]
-    pub fn opt_none() -> VVal { VVal::Opt(None) }
+    pub fn opt_none() -> VVal {
+        VVal::Opt(None)
+    }
 
     #[inline]
     pub fn unwrap_opt(&self) -> VVal {
@@ -2859,7 +2909,7 @@ impl VVal {
 
     pub fn to_vec(&self) -> Vec<VVal> {
         if let VVal::Lst(l) = self {
-            let r : Vec<VVal> = l.borrow_mut().iter().cloned().collect();
+            let r: Vec<VVal> = l.borrow_mut().iter().cloned().collect();
             r
         } else {
             vec![self.clone()]
@@ -2894,16 +2944,25 @@ impl VVal {
     ///
     /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
     ///```
-    pub fn new_fun<T>(fun: T, min_args: Option<usize>,
-                      max_args: Option<usize>,
-                      err_arg_ok: bool) -> VVal
-        where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
-
+    pub fn new_fun<T>(
+        fun: T,
+        min_args: Option<usize>,
+        max_args: Option<usize>,
+        err_arg_ok: bool,
+    ) -> VVal
+    where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
         VValFun::new_val(
             Rc::new(RefCell::new(fun)),
             Vec::new(),
-            0, min_args, max_args, err_arg_ok, None,
-            Rc::new(vec![]))
+            0,
+            min_args,
+            max_args,
+            err_arg_ok,
+            None,
+            Rc::new(vec![]),
+        )
     }
 
     pub fn call(&self, env: &mut Env, args: &[VVal]) -> Result<VVal, StackAction> {
@@ -2924,9 +2983,11 @@ impl VVal {
         match self {
             VVal::Lst(l) => {
                 let out = VVal::vec();
-                for v in l.borrow().iter() { out.push(v.clone()); }
+                for v in l.borrow().iter() {
+                    out.push(v.clone());
+                }
                 out
-            },
+            }
             VVal::Map(m) => {
                 let out = VVal::map();
                 for (k, v) in m.borrow_mut().iter() {
@@ -2935,28 +2996,26 @@ impl VVal {
                     }
                 }
                 out
-            },
-            VVal::Str(s) => {
-                VVal::new_str_mv(s.as_ref().clone())
-            },
+            }
+            VVal::Str(s) => VVal::new_str_mv(s.as_ref().clone()),
             v => v.with_deref(
                 |v| v.shallow_clone(),
-                |v| if let Some(v) = v { v.clone() }
-                    else { VVal::None }),
+                |v| if let Some(v) = v { v.clone() } else { VVal::None },
+            ),
         }
     }
 
     pub fn compare_num(&self, b: &VVal) -> std::cmp::Ordering {
         if self.is_float() {
-            self.f().partial_cmp(&b.f())
-                .unwrap_or(std::cmp::Ordering::Greater)
+            self.f().partial_cmp(&b.f()).unwrap_or(std::cmp::Ordering::Greater)
         } else {
             self.i().cmp(&b.i())
         }
     }
 
     pub fn sort<F>(&self, compare: F)
-        where F: FnMut(&VVal, &VVal) -> std::cmp::Ordering
+    where
+        F: FnMut(&VVal, &VVal) -> std::cmp::Ordering,
     {
         if let VVal::Lst(v) = self {
             v.borrow_mut().sort_by(compare);
@@ -2964,11 +3023,14 @@ impl VVal {
     }
 
     pub fn fisher_yates_shuffle<I>(&mut self, mut rand: I)
-        where I: FnMut() -> i64
+    where
+        I: FnMut() -> i64,
     {
         if let VVal::Lst(list) = self {
             let len = list.borrow().len();
-            if len <= 1 { return; }
+            if len <= 1 {
+                return;
+            }
 
             for k in 1..len {
                 let i = len - k;
@@ -2984,33 +3046,27 @@ impl VVal {
         if bytes {
             self.with_bv_ref(|inp| {
                 pat.with_bv_ref(|pat| {
-                    let len    = inp.len();
+                    let len = inp.len();
                     let ss_len = pat.len();
 
                     if ss_len > len {
                         l.push(VVal::new_byt(inp[..].to_vec()));
                     } else {
-                        let mut i            = 0;
+                        let mut i = 0;
                         let mut last_split_i = 0;
 
                         while i < len {
-                            if i + ss_len > len { break; }
+                            if i + ss_len > len {
+                                break;
+                            }
                             if inp[i..(i + ss_len)] == *pat {
-                                l.push(
-                                    VVal::new_byt(
-                                        inp[last_split_i..i]
-                                        .to_vec()));
+                                l.push(VVal::new_byt(inp[last_split_i..i].to_vec()));
 
                                 i += ss_len;
                                 last_split_i = i;
 
-                                if max > 0
-                                   && (l.len() + 1) >= max as usize
-                                {
-                                    l.push(
-                                        VVal::new_byt(
-                                            inp[last_split_i..len]
-                                            .to_vec()));
+                                if max > 0 && (l.len() + 1) >= max as usize {
+                                    l.push(VVal::new_byt(inp[last_split_i..len].to_vec()));
                                     i += inp[last_split_i..len].len();
                                     last_split_i = i + 1; // total end!
                                     break;
@@ -3021,15 +3077,12 @@ impl VVal {
                         }
 
                         match last_split_i {
-                            ls if ls < i  => {
-                                l.push(
-                                    VVal::new_byt(
-                                        inp[last_split_i..len]
-                                        .to_vec()));
-                            },
+                            ls if ls < i => {
+                                l.push(VVal::new_byt(inp[last_split_i..len].to_vec()));
+                            }
                             ls if ls == i => {
                                 l.push(VVal::new_byt(vec![]));
-                            },
+                            }
                             _ => (),
                         }
                     }
@@ -3056,19 +3109,20 @@ impl VVal {
 
     pub fn find(&self, pat: &VVal, start_idx: usize, bytes: bool) -> VVal {
         if bytes {
-            self.with_s_ref(|s|
+            self.with_s_ref(|s| {
                 pat.with_s_ref(|pat| {
                     if start_idx >= s.len() {
                         return VVal::None;
                     }
 
                     match s[start_idx..].find(pat) {
-                        Some(idx)   => VVal::Int((start_idx + idx) as i64),
-                        None        => VVal::None,
+                        Some(idx) => VVal::Int((start_idx + idx) as i64),
+                        None => VVal::None,
                     }
-                }))
+                })
+            })
         } else {
-            self.with_bv_ref(|data|
+            self.with_bv_ref(|data| {
                 pat.with_bv_ref(|pat| {
                     if pat.len() > (data.len() + start_idx) {
                         return VVal::None;
@@ -3081,7 +3135,8 @@ impl VVal {
                     }
 
                     VVal::None
-                }))
+                })
+            })
         }
     }
 
@@ -3089,7 +3144,7 @@ impl VVal {
         use std::cmp::Ordering;
 
         let mut bv = self.as_bytes();
-        pat.with_bv_ref(|pat|
+        pat.with_bv_ref(|pat| {
             repl.with_bv_ref(|repl| {
                 let mut len = bv.len();
                 let mut i = 0;
@@ -3127,7 +3182,8 @@ impl VVal {
 
                     i += 1;
                 }
-            }));
+            })
+        });
 
         VVal::new_byt(bv)
     }
@@ -3135,34 +3191,18 @@ impl VVal {
     #[allow(clippy::while_let_on_iterator)]
     pub fn reverse(&self) -> VVal {
         match self.deref() {
-            VVal::Str(s) => {
-                VVal::new_str_mv(s.chars().rev().collect::<String>())
+            VVal::Str(s) => VVal::new_str_mv(s.chars().rev().collect::<String>()),
+            VVal::Byt(b) => VVal::new_byt(b.iter().rev().copied().collect::<Vec<u8>>()),
+            VVal::Lst(l) => VVal::vec_mv(l.borrow().iter().rev().cloned().collect::<Vec<VVal>>()),
+            VVal::IVec(b) => match b.as_ref() {
+                NVec::Vec2(a, b) => VVal::IVec(Box::new(NVec::Vec2(*b, *a))),
+                NVec::Vec3(a, b, c) => VVal::IVec(Box::new(NVec::Vec3(*c, *b, *a))),
+                NVec::Vec4(a, b, c, d) => VVal::IVec(Box::new(NVec::Vec4(*d, *c, *b, *a))),
             },
-            VVal::Byt(b) => {
-                VVal::new_byt(b.iter().rev().copied().collect::<Vec<u8>>())
-            },
-            VVal::Lst(l) => {
-                VVal::vec_mv(l.borrow().iter().rev().cloned().collect::<Vec<VVal>>())
-            },
-            VVal::IVec(b) => {
-                match b.as_ref() {
-                    NVec::Vec2(a, b)       =>
-                        VVal::IVec(Box::new(NVec::Vec2(*b, *a))),
-                    NVec::Vec3(a, b, c)    =>
-                        VVal::IVec(Box::new(NVec::Vec3(*c, *b, *a))),
-                    NVec::Vec4(a, b, c, d) =>
-                        VVal::IVec(Box::new(NVec::Vec4(*d, *c, *b, *a))),
-                }
-            },
-            VVal::FVec(b) => {
-                match b.as_ref() {
-                    NVec::Vec2(a, b)       =>
-                        VVal::FVec(Box::new(NVec::Vec2(*b, *a))),
-                    NVec::Vec3(a, b, c)    =>
-                        VVal::FVec(Box::new(NVec::Vec3(*c, *b, *a))),
-                    NVec::Vec4(a, b, c, d) =>
-                        VVal::FVec(Box::new(NVec::Vec4(*d, *c, *b, *a))),
-                }
+            VVal::FVec(b) => match b.as_ref() {
+                NVec::Vec2(a, b) => VVal::FVec(Box::new(NVec::Vec2(*b, *a))),
+                NVec::Vec3(a, b, c) => VVal::FVec(Box::new(NVec::Vec3(*c, *b, *a))),
+                NVec::Vec4(a, b, c, d) => VVal::FVec(Box::new(NVec::Vec4(*d, *c, *b, *a))),
             },
             VVal::Iter(i) => {
                 let mut out = vec![];
@@ -3172,8 +3212,8 @@ impl VVal {
                 }
                 out.reverse();
                 VVal::vec_mv(out)
-            },
-            _ => VVal::None
+            }
+            _ => VVal::None,
         }
     }
 
@@ -3186,7 +3226,7 @@ impl VVal {
                     out.push(VVal::new_str_mv(k.to_string()));
                 }
                 out
-            },
+            }
             VVal::Iter(i) => {
                 let out = VVal::vec();
                 let mut i = i.borrow_mut();
@@ -3196,37 +3236,29 @@ impl VVal {
                     }
                 }
                 out
-            },
+            }
             VVal::Lst(l) => {
                 let out = VVal::vec();
                 for (i, _) in l.borrow_mut().iter().enumerate() {
                     out.push(VVal::Int(i as i64));
                 }
                 out
-            },
-            VVal::IVec(b) => {
-                match b.as_ref() {
-                    NVec::Vec2(_, _) =>
-                        VVal::vec2(VVal::Int(0), VVal::Int(1)),
-                    NVec::Vec3(_, _, _) =>
-                        VVal::vec3(VVal::Int(0), VVal::Int(1), VVal::Int(2)),
-                    NVec::Vec4(_, _, _, _) =>
-                        VVal::vec4(VVal::Int(0), VVal::Int(1), VVal::Int(2), VVal::Int(3))
+            }
+            VVal::IVec(b) => match b.as_ref() {
+                NVec::Vec2(_, _) => VVal::vec2(VVal::Int(0), VVal::Int(1)),
+                NVec::Vec3(_, _, _) => VVal::vec3(VVal::Int(0), VVal::Int(1), VVal::Int(2)),
+                NVec::Vec4(_, _, _, _) => {
+                    VVal::vec4(VVal::Int(0), VVal::Int(1), VVal::Int(2), VVal::Int(3))
                 }
             },
-            VVal::FVec(b) => {
-                match b.as_ref() {
-                    NVec::Vec2(_, _) =>
-                        VVal::vec2(VVal::Int(0), VVal::Int(1)),
-                    NVec::Vec3(_, _, _) =>
-                        VVal::vec3(VVal::Int(0), VVal::Int(1), VVal::Int(2)),
-                    NVec::Vec4(_, _, _, _) =>
-                        VVal::vec4(VVal::Int(0), VVal::Int(1), VVal::Int(2), VVal::Int(3))
+            VVal::FVec(b) => match b.as_ref() {
+                NVec::Vec2(_, _) => VVal::vec2(VVal::Int(0), VVal::Int(1)),
+                NVec::Vec3(_, _, _) => VVal::vec3(VVal::Int(0), VVal::Int(1), VVal::Int(2)),
+                NVec::Vec4(_, _, _, _) => {
+                    VVal::vec4(VVal::Int(0), VVal::Int(1), VVal::Int(2), VVal::Int(3))
                 }
             },
-            v => v.with_deref(
-                |v| v.keys(),
-                |_| VVal::None),
+            v => v.with_deref(|v| v.keys(), |_| VVal::None),
         }
     }
 
@@ -3239,14 +3271,14 @@ impl VVal {
                     out.push(v.clone());
                 }
                 out
-            },
+            }
             VVal::Lst(l) => {
                 let out = VVal::vec();
                 for v in l.borrow_mut().iter() {
                     out.push(v.clone());
                 }
                 out
-            },
+            }
             VVal::Iter(i) => {
                 let out = VVal::vec();
                 let mut i = i.borrow_mut();
@@ -3254,19 +3286,19 @@ impl VVal {
                     out.push(v);
                 }
                 out
-            },
+            }
             VVal::IVec(b) => {
                 let out = VVal::vec();
                 match b.as_ref() {
                     NVec::Vec2(a, b) => {
                         out.push(VVal::Int(*a));
                         out.push(VVal::Int(*b));
-                    },
+                    }
                     NVec::Vec3(a, b, c) => {
                         out.push(VVal::Int(*a));
                         out.push(VVal::Int(*b));
                         out.push(VVal::Int(*c));
-                    },
+                    }
                     NVec::Vec4(a, b, c, d) => {
                         out.push(VVal::Int(*a));
                         out.push(VVal::Int(*b));
@@ -3275,19 +3307,19 @@ impl VVal {
                     }
                 }
                 out
-            },
+            }
             VVal::FVec(b) => {
                 let out = VVal::vec();
                 match b.as_ref() {
                     NVec::Vec2(a, b) => {
                         out.push(VVal::Flt(*a));
                         out.push(VVal::Flt(*b));
-                    },
+                    }
                     NVec::Vec3(a, b, c) => {
                         out.push(VVal::Flt(*a));
                         out.push(VVal::Flt(*b));
                         out.push(VVal::Flt(*c));
-                    },
+                    }
                     NVec::Vec4(a, b, c, d) => {
                         out.push(VVal::Flt(*a));
                         out.push(VVal::Flt(*b));
@@ -3296,10 +3328,8 @@ impl VVal {
                     }
                 }
                 out
-            },
-            v => v.with_deref(
-                |v| v.values(),
-                |_| VVal::None),
+            }
+            v => v.with_deref(|v| v.values(), |_| VVal::None),
         }
     }
 
@@ -3312,14 +3342,14 @@ impl VVal {
                     out.push(VVal::Int(i as i64));
                 }
                 out
-            },
+            }
             VVal::Lst(l) => {
                 let out = VVal::vec();
                 for (i, _) in l.borrow_mut().iter().enumerate() {
                     out.push(VVal::Int(i as i64));
                 }
                 out
-            },
+            }
             VVal::Iter(i) => {
                 let out = VVal::vec();
                 let mut i = i.borrow_mut();
@@ -3329,10 +3359,8 @@ impl VVal {
                     c += 1;
                 }
                 out
-            },
-            v => v.with_deref(
-                |v| v.enumerate(),
-                |_| VVal::None),
+            }
+            v => v.with_deref(|v| v.enumerate(), |_| VVal::None),
         }
     }
 
@@ -3345,7 +3373,8 @@ impl VVal {
     pub fn iter_over_vvals(&self) -> bool {
         self.with_deref(
             |v| matches!(v, VVal::Lst(_) | VVal::Map(_) | VVal::Opt(_)),
-            |v| matches!(v, Some(VVal::Lst(_)) | Some(VVal::Map(_)) | Some(VVal::Opt(_))))
+            |v| matches!(v, Some(VVal::Lst(_)) | Some(VVal::Map(_)) | Some(VVal::Opt(_))),
+        )
     }
 
     /// This function returns you an iterator over the VVal.
@@ -3385,134 +3414,140 @@ impl VVal {
                 let l = l.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    if idx >= l.borrow().len() { return None; }
+                    if idx >= l.borrow().len() {
+                        return None;
+                    }
                     let r = Some((l.borrow()[idx].clone(), None));
                     idx += 1;
                     r
                 }))
-            },
+            }
             VVal::Map(m) => {
                 let m = m.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    let r =
-                        m.borrow().iter().nth(idx)
-                         .map(|(k, v)|
-                            (v.clone(), Some(VVal::new_str(k.as_ref()))));
+                    let r = m
+                        .borrow()
+                        .iter()
+                        .nth(idx)
+                        .map(|(k, v)| (v.clone(), Some(VVal::new_str(k.as_ref()))));
                     idx += 1;
                     r
                 }))
-            },
+            }
             VVal::Byt(b) => {
                 let b = b.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    if idx >= b.len() { return None; }
+                    if idx >= b.len() {
+                        return None;
+                    }
                     let r = Some((VVal::new_byte(b[idx]), None));
                     idx += 1;
                     r
                 }))
-            },
+            }
             VVal::Sym(s) => {
                 let s = s.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
-                    let r =
-                        s.chars().nth(idx)
-                         .map(|chr| (VVal::new_char(chr), None));
+                    let r = s.chars().nth(idx).map(|chr| (VVal::new_char(chr), None));
                     idx += 1;
                     r
                 }))
-            },
+            }
             VVal::Str(s) => {
                 let s = s.clone();
                 let mut idx = 0;
-                std::iter::from_fn(Box::new(move || {
-                    match s[idx..].chars().next() {
-                        Some(chr) => {
-                            idx += chr.len_utf8();
-                            Some((VVal::new_char(chr), None))
-                        },
-                        None => None,
+                std::iter::from_fn(Box::new(move || match s[idx..].chars().next() {
+                    Some(chr) => {
+                        idx += chr.len_utf8();
+                        Some((VVal::new_char(chr), None))
                     }
+                    None => None,
                 }))
-            },
-            VVal::None => {
-                std::iter::from_fn(Box::new(move || { None }))
-            },
+            }
+            VVal::None => std::iter::from_fn(Box::new(move || None)),
             VVal::Pair(p) => {
                 pair_key_to_iter!(p, { p.1.iter() })
-            },
-            VVal::IVec(b) => {
-                match b.as_ref() {
-                    NVec::Vec2(a, b) => {
-                        iter_int_a_to_b!(*a, *b)
-                    },
-                    NVec::Vec3(a, b, skip) => {
-                        let mut i = *a;
-                        let b = *b;
-                        let skip = *skip;
-                        std::iter::from_fn(Box::new(move || {
-                            if i >= b { return None; }
-                            let ret = Some((VVal::Int(i), None));
-                            i += skip;
-                            ret
-                        }))
-                    },
-                    _ => { std::iter::from_fn(Box::new(move || { None })) },
+            }
+            VVal::IVec(b) => match b.as_ref() {
+                NVec::Vec2(a, b) => {
+                    iter_int_a_to_b!(*a, *b)
                 }
-            },
-            VVal::FVec(b) => {
-                match b.as_ref() {
-                    NVec::Vec2(a, b) => {
-                        let mut i = *a;
-                        let b = *b;
-                        std::iter::from_fn(Box::new(move || {
-                            if i >= b { return None; }
-                            let r = Some((VVal::Flt(i), None));
-                            i += 1.0;
-                            r
-                        }))
-                    },
-                    NVec::Vec3(a, b, s) => {
-                        let mut i = *a;
-                        let b = *b;
-                        let s = *s;
-                        std::iter::from_fn(Box::new(move || {
-                            if i >= b { return None; }
-                            let ret = Some((VVal::Flt(i), None));
-                            i += s;
-                            ret
-                        }))
-                    },
-                    _ => { std::iter::from_fn(Box::new(move || { None })) },
+                NVec::Vec3(a, b, skip) => {
+                    let mut i = *a;
+                    let b = *b;
+                    let skip = *skip;
+                    std::iter::from_fn(Box::new(move || {
+                        if i >= b {
+                            return None;
+                        }
+                        let ret = Some((VVal::Int(i), None));
+                        i += skip;
+                        ret
+                    }))
                 }
+                _ => std::iter::from_fn(Box::new(move || None)),
+            },
+            VVal::FVec(b) => match b.as_ref() {
+                NVec::Vec2(a, b) => {
+                    let mut i = *a;
+                    let b = *b;
+                    std::iter::from_fn(Box::new(move || {
+                        if i >= b {
+                            return None;
+                        }
+                        let r = Some((VVal::Flt(i), None));
+                        i += 1.0;
+                        r
+                    }))
+                }
+                NVec::Vec3(a, b, s) => {
+                    let mut i = *a;
+                    let b = *b;
+                    let s = *s;
+                    std::iter::from_fn(Box::new(move || {
+                        if i >= b {
+                            return None;
+                        }
+                        let ret = Some((VVal::Flt(i), None));
+                        i += s;
+                        ret
+                    }))
+                }
+                _ => std::iter::from_fn(Box::new(move || None)),
             },
             VVal::Opt(Some(v)) => {
                 let x = v.as_ref().clone();
                 let mut used = false;
                 std::iter::from_fn(Box::new(move || {
-                    if used { return None; }
+                    if used {
+                        return None;
+                    }
                     used = true;
                     Some((x.clone(), None))
                 }))
-            },
-            VVal::Opt(None) => {
-                std::iter::from_fn(Box::new(move || { None }))
-            },
+            }
+            VVal::Opt(None) => std::iter::from_fn(Box::new(move || None)),
             _ => self.with_deref(
-                |v| { v.iter() },
-                |v| if let Some(v) = v {
-                    let x = v.clone();
-                    let mut used = false;
-                    std::iter::from_fn(Box::new(move || {
-                        if used { return None; }
-                        used = true;
-                        Some((x.clone(), None))
-                    }))
-                } else {
-                    std::iter::from_fn(Box::new(move || { None }))
-                })
+                |v| v.iter(),
+                |v| {
+                    if let Some(v) = v {
+                        let x = v.clone();
+                        let mut used = false;
+                        std::iter::from_fn(Box::new(move || {
+                            if used {
+                                return None;
+                            }
+                            used = true;
+                            Some((x.clone(), None))
+                        }))
+                    } else {
+                        std::iter::from_fn(Box::new(move || None))
+                    }
+                },
+            ),
         }
     }
 
@@ -3523,34 +3558,26 @@ impl VVal {
         match self {
             VVal::Pair(p) => {
                 pair_key_to_iter!(p, { p.1.iter_env(env) })
-            },
+            }
             VVal::Fun(_) => {
                 let fu = self.clone();
                 let mut e = env.derive();
-                std::iter::from_fn(Box::new(move || {
-                    match fu.call(&mut e, &[]) {
-                        Err(err) => {
-                            let _ =
-                                write!(
-                                    *e.stdio.write.borrow_mut(),
-                                    "Error in iter function: {}",
-                                    err);
-                            None
-                        },
-                        Ok(v) => {
-                            match v {
-                                VVal::Opt(None)    => None,
-                                VVal::Opt(Some(v)) => Some((v.as_ref().clone(), None)),
-                                _                  => Some((v, None))
-                            }
-                        }
+                std::iter::from_fn(Box::new(move || match fu.call(&mut e, &[]) {
+                    Err(err) => {
+                        let _ =
+                            write!(*e.stdio.write.borrow_mut(), "Error in iter function: {}", err);
+                        None
                     }
+                    Ok(v) => match v {
+                        VVal::Opt(None) => None,
+                        VVal::Opt(Some(v)) => Some((v.as_ref().clone(), None)),
+                        _ => Some((v, None)),
+                    },
                 }))
-            },
-            _ => { self.iter() },
+            }
+            _ => self.iter(),
         }
     }
-
 
     /// Calls the given callback with an iterator through
     /// the vval. It catches the special case when the VVal itself
@@ -3576,8 +3603,9 @@ impl VVal {
     ///
     /// assert_eq!(sum, 30);
     /// ```
-    pub fn with_iter<F,R>(&self, mut f: F) -> R
-        where F: FnMut(&mut VValIter) -> R
+    pub fn with_iter<F, R>(&self, mut f: F) -> R
+    where
+        F: FnMut(&mut VValIter) -> R,
     {
         if let VVal::Iter(i) = self {
             f(&mut *i.borrow_mut())
@@ -3588,7 +3616,8 @@ impl VVal {
     }
 
     pub fn with_value_or_iter_values<T>(self, mut f: T)
-        where T: FnMut(VVal, Option<VVal>) -> bool
+    where
+        T: FnMut(VVal, Option<VVal>) -> bool,
     {
         if let VVal::Iter(i) = self {
             while let Some((v, k)) = i.borrow_mut().next() {
@@ -3621,7 +3650,8 @@ impl VVal {
     /// This function is an internal function that clones a function reference
     /// and assigns new upvalues to it for making a new closure instance.
     pub fn clone_and_rebind_upvalues<T>(&self, f: T) -> VVal
-        where T: FnOnce(&std::vec::Vec<VarPos>, &mut std::vec::Vec<VVal>)
+    where
+        T: FnOnce(&std::vec::Vec<VarPos>, &mut std::vec::Vec<VVal>),
     {
         if let VVal::Fun(fu) = self {
             let mut new_fu = fu.as_ref().clone();
@@ -3638,31 +3668,29 @@ impl VVal {
 
     pub(crate) fn call_internal(&self, env: &mut Env, argc: usize) -> Result<VVal, StackAction> {
         match self {
-            VVal::None =>
-                Err(StackAction::panic_str(
-                    "Calling $none is invalid".to_string(),
-                    None,
-                    env.stk2vec(argc))),
+            VVal::None => Err(StackAction::panic_str(
+                "Calling $none is invalid".to_string(),
+                None,
+                env.stk2vec(argc),
+            )),
             VVal::Fun(fu) => {
                 if let Some(i) = fu.min_args {
                     if argc < i {
                         return Err(StackAction::panic_str(
-                            format!(
-                                "function expects at least {} arguments, got {}",
-                                i, argc),
+                            format!("function expects at least {} arguments, got {}", i, argc),
                             fu.syn_pos.clone(),
-                            env.stk2vec(argc)));
+                            env.stk2vec(argc),
+                        ));
                     }
                 }
 
                 if let Some(i) = fu.max_args {
                     if argc > i {
                         return Err(StackAction::panic_str(
-                            format!(
-                                "function expects at most {} arguments, got {}",
-                                i, argc),
+                            format!("function expects at most {} arguments, got {}", i, argc),
                             fu.syn_pos.clone(),
-                            env.stk2vec(argc)));
+                            env.stk2vec(argc),
+                        ));
                     }
                 }
 
@@ -3670,40 +3698,32 @@ impl VVal {
                 if !(*fu).err_arg_ok {
                     for i in 0..argc {
                         if let Some(VVal::Err(ev)) = env.arg_err_internal(i) {
-                            return
-                                Err(StackAction::panic_str(
-                                    format!("Error value in parameter list: {}",
-                                            ev.borrow().0.s()),
-                                    Some(ev.borrow().1.clone()),
-                                    env.argv()));
+                            return Err(StackAction::panic_str(
+                                format!("Error value in parameter list: {}", ev.borrow().0.s()),
+                                Some(ev.borrow().1.clone()),
+                                env.argv(),
+                            ));
                         }
                     }
                 }
 
-                let ret =
-                    match &(*fu).fun {
-                        FunType::ClosureNode(cn) => (cn.borrow())(env, argc),
-                        FunType::VMProg(prog)    => {
-                            match crate::vm::vm(&*prog, env) {
-                                Ok(v) => Ok(v),
-                                Err(StackAction::Return(ret)) => {
-                                    if ret.0.eqv(&fu.label) {
-                                        Ok(ret.1)
-                                    } else {
-                                        Err(StackAction::Return(ret))
-                                    }
-                                },
-                                Err(e) => {
-                                    Err(e.wrap_panic(
-                                        fu.syn_pos.clone(),
-                                        env.argv()))
-                                },
+                let ret = match &(*fu).fun {
+                    FunType::ClosureNode(cn) => (cn.borrow())(env, argc),
+                    FunType::VMProg(prog) => match crate::vm::vm(&*prog, env) {
+                        Ok(v) => Ok(v),
+                        Err(StackAction::Return(ret)) => {
+                            if ret.0.eqv(&fu.label) {
+                                Ok(ret.1)
+                            } else {
+                                Err(StackAction::Return(ret))
                             }
-                        },
-                    };
+                        }
+                        Err(e) => Err(e.wrap_panic(fu.syn_pos.clone(), env.argv())),
+                    },
+                };
                 env.unwind_one();
                 ret
-            },
+            }
             VVal::Bol(b) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     let first = e.arg(0);
@@ -3726,44 +3746,50 @@ impl VVal {
                                 } else {
                                     Ok(VVal::None)
                                 }
-                            } else { Ok(self.clone()) }
+                            } else {
+                                Ok(self.clone())
+                            }
                         }
                     }
                 })
-            },
+            }
             VVal::Err(e) => {
-                Err(StackAction::panic_msg(
-                    format!("Called an error value: {}", e.borrow().0.s())))
-            },
-            VVal::Sym(sym) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc > 0 {
-                        let v = e.arg(0);
-                        Ok(v.get_key(&*sym).unwrap_or(VVal::None))
-                    } else { Ok(self.clone()) }
-                })
-            },
-            VVal::Map(m) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    let f = e.arg(0);
+                Err(StackAction::panic_msg(format!("Called an error value: {}", e.borrow().0.s())))
+            }
+            VVal::Sym(sym) => env.with_local_call_info(argc, |e: &mut Env| {
+                if argc > 0 {
+                    let v = e.arg(0);
+                    Ok(v.get_key(&*sym).unwrap_or(VVal::None))
+                } else {
+                    Ok(self.clone())
+                }
+            }),
+            VVal::Map(m) => env.with_local_call_info(argc, |e: &mut Env| {
+                let f = e.arg(0);
 
-                    let mut ret = VVal::None;
-                    for (k, v) in m.borrow().iter() {
-                        e.push(v.clone());
-                        e.push(VVal::new_str(k));
-                        let el = f.call_internal(e, 2);
-                        e.popn(2);
+                let mut ret = VVal::None;
+                for (k, v) in m.borrow().iter() {
+                    e.push(v.clone());
+                    e.push(VVal::new_str(k));
+                    let el = f.call_internal(e, 2);
+                    e.popn(2);
 
-                        match el {
-                            Ok(v)                      => { ret = v; },
-                            Err(StackAction::Break(v)) => { ret = *v; break; },
-                            Err(StackAction::Next)     => { },
-                            Err(e)                     => { return Err(e); },
+                    match el {
+                        Ok(v) => {
+                            ret = v;
+                        }
+                        Err(StackAction::Break(v)) => {
+                            ret = *v;
+                            break;
+                        }
+                        Err(StackAction::Next) => {}
+                        Err(e) => {
+                            return Err(e);
                         }
                     }
-                    Ok(ret)
-                })
-            },
+                }
+                Ok(ret)
+            }),
             VVal::Lst(l) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     // calling a list with any other value is an implicit map, meaning that for
@@ -3778,200 +3804,214 @@ impl VVal {
                         e.popn(1);
 
                         match el {
-                            Ok(v)                      => { ret = v; },
-                            Err(StackAction::Break(v)) => { ret = *v; break; },
-                            Err(StackAction::Next)     => { },
-                            Err(e)                     => { return Err(e); },
+                            Ok(v) => {
+                                ret = v;
+                            }
+                            Err(StackAction::Break(v)) => {
+                                ret = *v;
+                                break;
+                            }
+                            Err(StackAction::Next) => {}
+                            Err(e) => {
+                                return Err(e);
+                            }
                         }
                     }
                     Ok(ret)
                 })
-            },
-            VVal::Chr(VValChr::Char(_)) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc > 0 {
-                        let first_arg = e.arg(0);
-                        match first_arg {
-                            VVal::Pair(p) => {
-                                Ok(pair_extract(&p.0, &p.1, self))
-                            },
-                            _ => {
-                                concat_operation(false, self, argc, e)
-                            },
+            }
+            VVal::Chr(VValChr::Char(_)) => env.with_local_call_info(argc, |e: &mut Env| {
+                if argc > 0 {
+                    let first_arg = e.arg(0);
+                    match first_arg {
+                        VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
+                        _ => concat_operation(false, self, argc, e),
+                    }
+                } else {
+                    Ok(self.clone())
+                }
+            }),
+            VVal::Chr(VValChr::Byte(_)) => env.with_local_call_info(argc, |e: &mut Env| {
+                if argc > 0 {
+                    let first_arg = e.arg(0);
+                    match first_arg {
+                        VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
+                        _ => concat_operation(true, self, argc, e),
+                    }
+                } else {
+                    Ok(self.clone())
+                }
+            }),
+            VVal::Byt(vval_bytes) => env.with_local_call_info(argc, |e: &mut Env| {
+                if argc > 0 {
+                    let first_arg = e.arg(0);
+                    match first_arg {
+                        VVal::Chr(_) | VVal::Byt(_) | VVal::Str(_) => {
+                            concat_operation(true, self, argc, e)
                         }
-                    } else { Ok(self.clone()) }
-                })
-            },
-            VVal::Chr(VValChr::Byte(_)) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc > 0 {
-                        let first_arg = e.arg(0);
-                        match first_arg {
-                            VVal::Pair(p) => {
-                                Ok(pair_extract(&p.0, &p.1, self))
-                            },
-                            _ => {
-                                concat_operation(true, self, argc, e)
-                            },
-                        }
-                    } else { Ok(self.clone()) }
-                })
-            },
-            VVal::Byt(vval_bytes) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc > 0 {
-                        let first_arg = e.arg(0);
-                        match first_arg {
-                            VVal::Chr(_) | VVal::Byt(_) | VVal::Str(_) => {
-                                concat_operation(true, self, argc, e)
-                            },
-                            VVal::Int(arg_int) => {
-                                if argc > 1 {
-                                    let from = arg_int as usize;
-                                    let cnt  = e.arg(1).i() as usize;
-                                    let r : Vec<u8> =
-                                        vval_bytes.iter()
-                                            .skip(from).take(cnt).copied()
-                                            .collect();
-                                    Ok(VVal::new_byt(r))
-                                } else if arg_int as usize >= vval_bytes.len() {
-                                    Ok(VVal::None)
-                                } else {
-                                    Ok(VVal::new_byte(vval_bytes[arg_int as usize]))
-                                }
-                            },
-                            VVal::Fun(_) => {
-                                let mut ret = VVal::None;
-                                for c in vval_bytes.iter() {
-                                    e.push(VVal::new_byt(vec![*c]));
-                                    let el = first_arg.call_internal(e, 1);
-                                    e.popn(1);
-                                    match el {
-                                        Ok(v)                      => { ret = v; },
-                                        Err(StackAction::Break(v)) => { ret = *v; break; },
-                                        Err(StackAction::Next)     => { },
-                                        Err(e)                     => { return Err(e); },
-                                    }
-                                }
-                                Ok(ret)
-                            },
-                            VVal::Lst(_) => {
-                                let from =
-                                    first_arg.at(0).unwrap_or(VVal::Int(0))
-                                             .i() as usize;
-                                let cnt  =
-                                    first_arg.at(1).unwrap_or_else(
-                                        || VVal::Int((vval_bytes.len() - from) as i64))
-                                    .i() as usize;
-                                let r : Vec<u8> =
-                                    vval_bytes.iter()
-                                        .skip(from).take(cnt).copied().collect();
+                        VVal::Int(arg_int) => {
+                            if argc > 1 {
+                                let from = arg_int as usize;
+                                let cnt = e.arg(1).i() as usize;
+                                let r: Vec<u8> =
+                                    vval_bytes.iter().skip(from).take(cnt).copied().collect();
                                 Ok(VVal::new_byt(r))
-                            },
-                            VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
-                            VVal::IVec(iv) => Ok(range_extract(iv.x_raw(), iv.y_raw(), self)),
-                            VVal::Map(_) => Ok(self.with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::None))),
-                            _ => Ok(VVal::None)
+                            } else if arg_int as usize >= vval_bytes.len() {
+                                Ok(VVal::None)
+                            } else {
+                                Ok(VVal::new_byte(vval_bytes[arg_int as usize]))
+                            }
                         }
-                    } else { Ok(self.clone()) }
-                })
-            },
-            VVal::Str(vval_str) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc > 0 {
-                        let first_arg = e.arg(0);
-                        match first_arg {
-                            VVal::Int(arg_int) => {
-                                if argc > 1 {
-                                    let from = arg_int as usize;
-                                    let cnt  = e.arg(1).i() as usize;
-                                    Ok(VVal::new_str_mv(
-                                        vval_str
-                                            .chars().skip(from).take(cnt)
-                                            .collect()))
-                                } else {
-                                    let r = vval_str.chars().nth(arg_int as usize);
-                                    match r {
-                                        None    => Ok(VVal::None),
-                                        Some(c) => Ok(VVal::new_char(c)),
+                        VVal::Fun(_) => {
+                            let mut ret = VVal::None;
+                            for c in vval_bytes.iter() {
+                                e.push(VVal::new_byt(vec![*c]));
+                                let el = first_arg.call_internal(e, 1);
+                                e.popn(1);
+                                match el {
+                                    Ok(v) => {
+                                        ret = v;
+                                    }
+                                    Err(StackAction::Break(v)) => {
+                                        ret = *v;
+                                        break;
+                                    }
+                                    Err(StackAction::Next) => {}
+                                    Err(e) => {
+                                        return Err(e);
                                     }
                                 }
-                            },
-                            VVal::Fun(_) => {
-                                let mut ret = VVal::None;
-                                for c in vval_str.chars() {
-                                    e.push(VVal::new_str_mv(c.to_string()));
-                                    let el = first_arg.call_internal(e, 1);
-                                    e.popn(1);
-                                    match el {
-                                        Ok(v)                      => { ret = v; },
-                                        Err(StackAction::Break(v)) => { ret = *v; break; },
-                                        Err(StackAction::Next)     => { },
-                                        Err(e)                     => { return Err(e); },
+                            }
+                            Ok(ret)
+                        }
+                        VVal::Lst(_) => {
+                            let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
+                            let cnt = first_arg
+                                .at(1)
+                                .unwrap_or_else(|| VVal::Int((vval_bytes.len() - from) as i64))
+                                .i() as usize;
+                            let r: Vec<u8> =
+                                vval_bytes.iter().skip(from).take(cnt).copied().collect();
+                            Ok(VVal::new_byt(r))
+                        }
+                        VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
+                        VVal::IVec(iv) => Ok(range_extract(iv.x_raw(), iv.y_raw(), self)),
+                        VVal::Map(_) => Ok(self
+                            .with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::None))),
+                        _ => Ok(VVal::None),
+                    }
+                } else {
+                    Ok(self.clone())
+                }
+            }),
+            VVal::Str(vval_str) => env.with_local_call_info(argc, |e: &mut Env| {
+                if argc > 0 {
+                    let first_arg = e.arg(0);
+                    match first_arg {
+                        VVal::Int(arg_int) => {
+                            if argc > 1 {
+                                let from = arg_int as usize;
+                                let cnt = e.arg(1).i() as usize;
+                                Ok(VVal::new_str_mv(
+                                    vval_str.chars().skip(from).take(cnt).collect(),
+                                ))
+                            } else {
+                                let r = vval_str.chars().nth(arg_int as usize);
+                                match r {
+                                    None => Ok(VVal::None),
+                                    Some(c) => Ok(VVal::new_char(c)),
+                                }
+                            }
+                        }
+                        VVal::Fun(_) => {
+                            let mut ret = VVal::None;
+                            for c in vval_str.chars() {
+                                e.push(VVal::new_str_mv(c.to_string()));
+                                let el = first_arg.call_internal(e, 1);
+                                e.popn(1);
+                                match el {
+                                    Ok(v) => {
+                                        ret = v;
+                                    }
+                                    Err(StackAction::Break(v)) => {
+                                        ret = *v;
+                                        break;
+                                    }
+                                    Err(StackAction::Next) => {}
+                                    Err(e) => {
+                                        return Err(e);
                                     }
                                 }
-                                Ok(ret)
-                            },
-                            VVal::Lst(_) => {
-                                let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
-                                let cnt  = first_arg.at(1).unwrap_or_else(|| VVal::Int((vval_str.len() - from) as i64)).i() as usize;
-                                let r : String = vval_str.chars().skip(from).take(cnt).collect();
-                                Ok(VVal::new_str_mv(r))
-                            },
-                            VVal::Chr(_) | VVal::Byt(_) | VVal::Str(_) => {
-                                concat_operation(false, self, argc, e)
-                            },
-                            VVal::Map(_) => Ok(
-                                first_arg
-                                    .get_key(vval_str.as_ref())
-                                    .unwrap_or(VVal::None)),
-                            VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
-                            VVal::IVec(iv) => Ok(range_extract(iv.x_raw(), iv.y_raw(), self)),
-                            _ => Ok(VVal::None)
+                            }
+                            Ok(ret)
                         }
-                    } else { Ok(self.clone()) }
-                })
-            },
-            VVal::Int(i) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    let v = e.arg(0);
-                    if argc > 0 { Ok(v.at(*i as usize).unwrap_or(VVal::None)) }
-                    else { Ok(self.clone()) }
-                })
-            },
-            VVal::Pair(p) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc == 0 {
-                        match (&p.0, &p.1) {
-                              (VVal::Chr(c), VVal::Int(cnt))
-                            | (VVal::Int(cnt), VVal::Chr(c)) => {
-                                let cnt = *cnt as usize;
-                                match c {
-                                    VValChr::Char(c) => {
-                                        let mut s = String::with_capacity(cnt);
-                                        for _ in 0..cnt { s.push(*c); }
-                                        return Ok(VVal::new_str_mv(s));
-                                    },
-                                    VValChr::Byte(b) => {
-                                        let mut v = Vec::with_capacity(cnt);
-                                        v.resize(cnt, *b);
-                                        return Ok(VVal::new_byt(v));
-                                    },
+                        VVal::Lst(_) => {
+                            let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
+                            let cnt = first_arg
+                                .at(1)
+                                .unwrap_or_else(|| VVal::Int((vval_str.len() - from) as i64))
+                                .i() as usize;
+                            let r: String = vval_str.chars().skip(from).take(cnt).collect();
+                            Ok(VVal::new_str_mv(r))
+                        }
+                        VVal::Chr(_) | VVal::Byt(_) | VVal::Str(_) => {
+                            concat_operation(false, self, argc, e)
+                        }
+                        VVal::Map(_) => {
+                            Ok(first_arg.get_key(vval_str.as_ref()).unwrap_or(VVal::None))
+                        }
+                        VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
+                        VVal::IVec(iv) => Ok(range_extract(iv.x_raw(), iv.y_raw(), self)),
+                        _ => Ok(VVal::None),
+                    }
+                } else {
+                    Ok(self.clone())
+                }
+            }),
+            VVal::Int(i) => env.with_local_call_info(argc, |e: &mut Env| {
+                let v = e.arg(0);
+                if argc > 0 {
+                    Ok(v.at(*i as usize).unwrap_or(VVal::None))
+                } else {
+                    Ok(self.clone())
+                }
+            }),
+            VVal::Pair(p) => env.with_local_call_info(argc, |e: &mut Env| {
+                if argc == 0 {
+                    match (&p.0, &p.1) {
+                        (VVal::Chr(c), VVal::Int(cnt)) | (VVal::Int(cnt), VVal::Chr(c)) => {
+                            let cnt = *cnt as usize;
+                            match c {
+                                VValChr::Char(c) => {
+                                    let mut s = String::with_capacity(cnt);
+                                    for _ in 0..cnt {
+                                        s.push(*c);
+                                    }
+                                    return Ok(VVal::new_str_mv(s));
                                 }
-                            },
-                            _ => { return Ok(self.clone()); }
+                                VValChr::Byte(b) => {
+                                    let mut v = Vec::with_capacity(cnt);
+                                    v.resize(cnt, *b);
+                                    return Ok(VVal::new_byt(v));
+                                }
+                            }
+                        }
+                        _ => {
+                            return Ok(self.clone());
                         }
                     }
-                    if argc != 1 { return Ok(self.clone()) }
-                    Ok(pair_extract(&p.0, &p.1, e.arg_ref(0).unwrap()))
-                })
-            },
-            VVal::IVec(iv) => {
-                env.with_local_call_info(argc, |e: &mut Env| {
-                    if argc != 1 { return Ok(self.clone()) }
-                    Ok(range_extract(iv.x_raw(), iv.y_raw(), e.arg_ref(0).unwrap()))
-                })
-            },
+                }
+                if argc != 1 {
+                    return Ok(self.clone());
+                }
+                Ok(pair_extract(&p.0, &p.1, e.arg_ref(0).unwrap()))
+            }),
+            VVal::IVec(iv) => env.with_local_call_info(argc, |e: &mut Env| {
+                if argc != 1 {
+                    return Ok(self.clone());
+                }
+                Ok(range_extract(iv.x_raw(), iv.y_raw(), e.arg_ref(0).unwrap()))
+            }),
             VVal::Iter(i) => {
                 if argc == 1 {
                     env.with_local_call_info(argc, |e: &mut Env| {
@@ -3980,26 +4020,32 @@ impl VVal {
                         let mut ret = VVal::None;
                         #[allow(clippy::while_let_loop)]
                         loop {
-                            let v =
-                                if let Some((v, k)) = i.borrow_mut().next() {
-                                    if let Some(k) = k {
-                                        VVal::pair(v, k)
-                                    } else {
-                                        v
-                                    }
+                            let v = if let Some((v, k)) = i.borrow_mut().next() {
+                                if let Some(k) = k {
+                                    VVal::pair(v, k)
                                 } else {
-                                    break;
-                                };
+                                    v
+                                }
+                            } else {
+                                break;
+                            };
 
                             e.push(v);
                             let el = f.call_internal(e, 1);
                             e.popn(1);
 
                             match el {
-                                Ok(v)                      => { ret = v; },
-                                Err(StackAction::Break(v)) => { ret = *v; break; },
-                                Err(StackAction::Next)     => { },
-                                Err(e)                     => { return Err(e); },
+                                Ok(v) => {
+                                    ret = v;
+                                }
+                                Err(StackAction::Break(v)) => {
+                                    ret = *v;
+                                    break;
+                                }
+                                Err(StackAction::Next) => {}
+                                Err(e) => {
+                                    return Err(e);
+                                }
                             }
                         }
                         Ok(ret)
@@ -4007,7 +4053,7 @@ impl VVal {
                 } else {
                     Ok(iter_next!(i.borrow_mut()))
                 }
-            },
+            }
             VVal::Opt(v) => {
                 if argc == 0 {
                     if let Some(v) = v {
@@ -4016,36 +4062,36 @@ impl VVal {
                         Ok(VVal::None)
                     }
                 } else {
-                    let v =
-                        if let Some(v) = v { v.as_ref().clone() }
-                        else               { VVal::None };
+                    let v = if let Some(v) = v { v.as_ref().clone() } else { VVal::None };
 
                     v.call_internal(env, argc)
                 }
-            },
-            VVal::Usr(ud) => {
-                env.with_local_call_info(argc, |e: &mut Env| ud.call(e))
-            },
-            VVal::Ref(v)     => v.borrow().call_internal(env, argc),
-            VVal::HRef(v)    => v.borrow().call_internal(env, argc),
-            VVal::WWRef(v)   =>
+            }
+            VVal::Usr(ud) => env.with_local_call_info(argc, |e: &mut Env| ud.call(e)),
+            VVal::Ref(v) => v.borrow().call_internal(env, argc),
+            VVal::HRef(v) => v.borrow().call_internal(env, argc),
+            VVal::WWRef(v) => {
                 if let Some(r) = v.upgrade() {
                     r.borrow().call_internal(env, argc)
-                } else { Ok(VVal::None) },
-            _ => { Ok(self.clone()) },
+                } else {
+                    Ok(VVal::None)
+                }
+            }
+            _ => Ok(self.clone()),
         }
     }
 
     pub fn to_ref(&self) -> VVal {
         match self {
-            VVal::HRef(r)    => VVal::Ref(r.clone()),
-            VVal::Ref(r)     => VVal::Ref(r.clone()),
-            VVal::WWRef(v)   =>
+            VVal::HRef(r) => VVal::Ref(r.clone()),
+            VVal::Ref(r) => VVal::Ref(r.clone()),
+            VVal::WWRef(v) => {
                 if let Some(r) = v.upgrade() {
                     VVal::Ref(r)
                 } else {
                     VVal::Ref(Rc::new(RefCell::new(VVal::None)))
-                },
+                }
+            }
             _ => VVal::Ref(Rc::new(RefCell::new(self.clone()))),
         }
     }
@@ -4056,39 +4102,47 @@ impl VVal {
 
     pub fn assign_ref(&mut self, value: VVal) {
         match self {
-            VVal::Ref(_)   => { self.set_ref(value); },
-            VVal::HRef(_)  => { self.set_ref(value); },
-            VVal::WWRef(_) => { self.set_ref(value); },
-            v              => { *v = value; },
+            VVal::Ref(_) => {
+                self.set_ref(value);
+            }
+            VVal::HRef(_) => {
+                self.set_ref(value);
+            }
+            VVal::WWRef(_) => {
+                self.set_ref(value);
+            }
+            v => {
+                *v = value;
+            }
         }
     }
 
     pub fn set_ref(&self, v: VVal) -> VVal {
         match self {
-            VVal::Ref(r)     => r.replace(v),
-            VVal::HRef(r)    => r.replace(v),
-            VVal::WWRef(l)   => {
+            VVal::Ref(r) => r.replace(v),
+            VVal::HRef(r) => r.replace(v),
+            VVal::WWRef(l) => {
                 if let Some(r) = l.upgrade() {
                     r.replace(v)
                 } else {
                     VVal::None
                 }
-            },
-            _ => VVal::None
+            }
+            _ => VVal::None,
         }
     }
 
     pub fn hide_ref(self) -> VVal {
         match self {
             VVal::HRef(f) => VVal::HRef(f),
-            VVal::Ref(f)  => VVal::HRef(f),
+            VVal::Ref(f) => VVal::HRef(f),
             VVal::WWRef(f) => {
                 if let Some(r) = f.upgrade() {
                     VVal::HRef(r)
                 } else {
                     VVal::None.to_ref().hide_ref()
                 }
-            },
+            }
             _ => self.to_ref().hide_ref(),
         }
     }
@@ -4102,21 +4156,24 @@ impl VVal {
                 } else {
                     VVal::None.to_ref()
                 }
-            },
+            }
             _ => self.to_ref(),
         }
     }
 
     pub fn downgrade(self) -> VVal {
         match self {
-            VVal::Ref(f)  => VVal::WWRef(Rc::downgrade(&f)),
+            VVal::Ref(f) => VVal::WWRef(Rc::downgrade(&f)),
             VVal::HRef(f) => VVal::WWRef(Rc::downgrade(&f)),
             _ => self,
         }
     }
 
     pub fn map() -> VVal {
-        VVal::Map(Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(2, Default::default()))))
+        VVal::Map(Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(
+            2,
+            Default::default(),
+        ))))
     }
 
     pub fn map1(k: &str, v: VVal) -> VVal {
@@ -4155,47 +4212,106 @@ impl VVal {
     #[allow(clippy::cast_ptr_alignment)]
     pub fn ref_id(&self) -> Option<i64> {
         Some(match self {
-            VVal::Err(r)     => { &*r.borrow() as *const (VVal, SynPos) as i64 },
-            VVal::Str(s)     => { &*s.as_ref() as *const String as i64 },
-            VVal::Byt(s)     => { &*s.as_ref() as *const Vec<u8> as i64 },
-            VVal::Sym(s)     => { s.ref_id() },
-            VVal::Lst(v)     => { &*v.borrow() as *const Vec<VVal> as i64 },
-            VVal::Map(v)     => { &*v.borrow() as *const FnvHashMap<Symbol, VVal> as i64 },
-            VVal::Iter(v)    => { &*v.borrow() as *const VValIter as i64 },
-            VVal::Opt(p)     => { if let Some(p) = p { &*p.as_ref() as *const VVal as i64 } else { 0 } },
-            VVal::Fun(f)     => { &**f as *const VValFun as i64 },
-            VVal::DropFun(f) => { &**f as *const DropFun as i64 },
-            VVal::Pair(v)    => { &**v as *const (VVal, VVal) as i64 },
-            VVal::Ref(v)     => { &*v.borrow() as *const VVal as i64 },
-            VVal::HRef(v)    => { &*v.borrow() as *const VVal as i64 },
-            VVal::Usr(b)     => { &**b as *const dyn VValUserData as *const usize as i64 },
-            VVal::WWRef(r)   => {
+            VVal::Err(r) => &*r.borrow() as *const (VVal, SynPos) as i64,
+            VVal::Str(s) => &*s.as_ref() as *const String as i64,
+            VVal::Byt(s) => &*s.as_ref() as *const Vec<u8> as i64,
+            VVal::Sym(s) => s.ref_id(),
+            VVal::Lst(v) => &*v.borrow() as *const Vec<VVal> as i64,
+            VVal::Map(v) => &*v.borrow() as *const FnvHashMap<Symbol, VVal> as i64,
+            VVal::Iter(v) => &*v.borrow() as *const VValIter as i64,
+            VVal::Opt(p) => {
+                if let Some(p) = p {
+                    &*p.as_ref() as *const VVal as i64
+                } else {
+                    0
+                }
+            }
+            VVal::Fun(f) => &**f as *const VValFun as i64,
+            VVal::DropFun(f) => &**f as *const DropFun as i64,
+            VVal::Pair(v) => &**v as *const (VVal, VVal) as i64,
+            VVal::Ref(v) => &*v.borrow() as *const VVal as i64,
+            VVal::HRef(v) => &*v.borrow() as *const VVal as i64,
+            VVal::Usr(b) => &**b as *const dyn VValUserData as *const usize as i64,
+            VVal::WWRef(r) => {
                 if let Some(l) = r.upgrade() {
                     &*l.borrow() as *const VVal as i64
                 } else {
                     return None;
                 }
-            },
+            }
             _ => return None,
         })
     }
 
     pub fn eqv(&self, v: &VVal) -> bool {
         match self {
-            VVal::None    => { matches!(v, VVal::None) },
-            VVal::Bol(ia) => { if let VVal::Bol(ib) = v { ia == ib } else { false } },
-            VVal::Int(ia) => { if let VVal::Int(ib) = v { ia == ib } else { false } },
-            VVal::Chr(ca) => { if let VVal::Chr(cb) = v { ca == cb } else { false } },
-            VVal::Flt(ia) => { if let VVal::Flt(ib) = v { (ia - ib).abs() < std::f64::EPSILON } else { false } },
-            VVal::Sym(s)  => { if let VVal::Sym(ib) = v { s == ib } else { false } },
-            VVal::Syn(s)  => { if let VVal::Syn(ib) = v { s.syn == ib.syn } else { false } },
-            VVal::Str(s)  => { if let VVal::Str(ib) = v { *s == *ib } else { false } },
-            VVal::Byt(s)  => { if let VVal::Byt(s2) = v { s[..] == s2[..] } else { false } },
-            VVal::Pair(b)  => {
-                if let VVal::Pair(b2) = v { b.0.eqv(&b2.0) && b.1.eqv(&b2.1) }
-                else { false }
-            },
-            VVal::Opt(a)  => {
+            VVal::None => {
+                matches!(v, VVal::None)
+            }
+            VVal::Bol(ia) => {
+                if let VVal::Bol(ib) = v {
+                    ia == ib
+                } else {
+                    false
+                }
+            }
+            VVal::Int(ia) => {
+                if let VVal::Int(ib) = v {
+                    ia == ib
+                } else {
+                    false
+                }
+            }
+            VVal::Chr(ca) => {
+                if let VVal::Chr(cb) = v {
+                    ca == cb
+                } else {
+                    false
+                }
+            }
+            VVal::Flt(ia) => {
+                if let VVal::Flt(ib) = v {
+                    (ia - ib).abs() < std::f64::EPSILON
+                } else {
+                    false
+                }
+            }
+            VVal::Sym(s) => {
+                if let VVal::Sym(ib) = v {
+                    s == ib
+                } else {
+                    false
+                }
+            }
+            VVal::Syn(s) => {
+                if let VVal::Syn(ib) = v {
+                    s.syn == ib.syn
+                } else {
+                    false
+                }
+            }
+            VVal::Str(s) => {
+                if let VVal::Str(ib) = v {
+                    *s == *ib
+                } else {
+                    false
+                }
+            }
+            VVal::Byt(s) => {
+                if let VVal::Byt(s2) = v {
+                    s[..] == s2[..]
+                } else {
+                    false
+                }
+            }
+            VVal::Pair(b) => {
+                if let VVal::Pair(b2) = v {
+                    b.0.eqv(&b2.0) && b.1.eqv(&b2.1)
+                } else {
+                    false
+                }
+            }
+            VVal::Opt(a) => {
                 if let VVal::Opt(b) = v {
                     if let Some(a) = a {
                         if let Some(b) = b {
@@ -4209,32 +4325,58 @@ impl VVal {
                 } else {
                     false
                 }
+            }
+            VVal::Lst(l) => {
+                if let VVal::Lst(l2) = v {
+                    Rc::ptr_eq(l, l2)
+                } else {
+                    false
+                }
+            }
+            VVal::Map(l) => {
+                if let VVal::Map(l2) = v {
+                    Rc::ptr_eq(l, l2)
+                } else {
+                    false
+                }
+            }
+            VVal::Fun(l) => {
+                if let VVal::Fun(l2) = v {
+                    Rc::ptr_eq(l, l2)
+                } else {
+                    false
+                }
+            }
+            VVal::IVec(iv) => match v {
+                VVal::IVec(v) => *v == *iv,
+                _ => false,
             },
-            VVal::Lst(l)  => {
-                if let VVal::Lst(l2) = v { Rc::ptr_eq(l, l2) } else { false }
+            VVal::FVec(fv) => match v {
+                VVal::FVec(v) => *v == *fv,
+                _ => false,
             },
-            VVal::Map(l)  => {
-                if let VVal::Map(l2) = v { Rc::ptr_eq(l, l2) } else { false }
-            },
-            VVal::Fun(l)  => {
-                if let VVal::Fun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
-            },
-            VVal::IVec(iv) => match v { VVal::IVec(v) => *v == *iv, _ => false },
-            VVal::FVec(fv) => match v { VVal::FVec(v) => *v == *fv, _ => false },
-            VVal::DropFun(l)  => {
-                if let VVal::DropFun(l2) = v { Rc::ptr_eq(l, l2) } else { false }
-            },
-            VVal::Err(l)  => {
-                if let VVal::Err(l2) = v { Rc::ptr_eq(l, l2) } else { false }
-            },
+            VVal::DropFun(l) => {
+                if let VVal::DropFun(l2) = v {
+                    Rc::ptr_eq(l, l2)
+                } else {
+                    false
+                }
+            }
+            VVal::Err(l) => {
+                if let VVal::Err(l2) = v {
+                    Rc::ptr_eq(l, l2)
+                } else {
+                    false
+                }
+            }
             VVal::Iter(i) => {
                 if let VVal::Iter(i2) = v {
                     Rc::ptr_eq(i, i2)
                 } else {
                     false
                 }
-            },
-            VVal::Ref(l)  => vval_rc_ptr_eq(v, l),
+            }
+            VVal::Ref(l) => vval_rc_ptr_eq(v, l),
             VVal::HRef(l) => vval_rc_ptr_eq(v, l),
             VVal::WWRef(lw) => {
                 if let Some(l) = lw.upgrade() {
@@ -4242,8 +4384,8 @@ impl VVal {
                 } else {
                     false
                 }
-            },
-            VVal::Usr(u)  => {
+            }
+            VVal::Usr(u) => {
                 if let VVal::Usr(u2) = v {
                     u.eqv(u2)
                 } else {
@@ -4254,12 +4396,15 @@ impl VVal {
     }
 
     fn dump_vec_as_str(v: &Rc<RefCell<std::vec::Vec<VVal>>>, c: &mut CycleCheck) -> String {
-        let mut out : Vec<String> = Vec::new();
+        let mut out: Vec<String> = Vec::new();
         let mut first = true;
         out.push(String::from("$["));
         for s in v.borrow().iter().map(|v| v.s_cy(c)) {
-            if !first { out.push(String::from(",")); }
-            else { first = false; }
+            if !first {
+                out.push(String::from(","));
+            } else {
+                first = false;
+            }
             out.push(s);
         }
         out.push(String::from("]"));
@@ -4267,29 +4412,30 @@ impl VVal {
     }
 
     fn dump_sym(s: &str) -> String {
-        if s.chars().all(|c|
-            c.is_alphanumeric()
-            || c == '_' || c == '-' || c == '+'
-            || c == '&' || c == '@')
-        {
+        if s.chars().all(|c| {
+            c.is_alphanumeric() || c == '_' || c == '-' || c == '+' || c == '&' || c == '@'
+        }) {
             format!(":{}", s)
         } else {
             format!(":\"{}\"", s)
         }
     }
 
-    fn dump_map_as_str(m: &Rc<RefCell<FnvHashMap<Symbol,VVal>>>, c: &mut CycleCheck) -> String {
-        let mut out : Vec<String> = Vec::new();
+    fn dump_map_as_str(m: &Rc<RefCell<FnvHashMap<Symbol, VVal>>>, c: &mut CycleCheck) -> String {
+        let mut out: Vec<String> = Vec::new();
         let mut first = true;
         out.push(String::from("${"));
         let hm = m.borrow();
 
-        let mut keys : Vec<&Symbol> = hm.keys().collect();
+        let mut keys: Vec<&Symbol> = hm.keys().collect();
         keys.sort();
         for k in keys {
             let v = hm.get(k).unwrap();
-            if !first { out.push(String::from(",")); }
-            else { first = false; }
+            if !first {
+                out.push(String::from(","));
+            } else {
+                first = false;
+            }
             if k.as_ref().chars().any(char::is_whitespace) {
                 out.push(format!("\"{}\"", k.as_ref()));
             } else {
@@ -4303,9 +4449,10 @@ impl VVal {
     }
 
     pub fn map_ok_skip<T, R>(&self, mut op: T, skip: usize) -> Vec<R>
-        where T: FnMut(&VVal) -> R {
-
-        let mut res : Vec<R> = Vec::new();
+    where
+        T: FnMut(&VVal) -> R,
+    {
+        let mut res: Vec<R> = Vec::new();
         if let VVal::Lst(b) = &self {
             for i in b.borrow().iter().skip(skip) {
                 res.push(op(i));
@@ -4315,9 +4462,10 @@ impl VVal {
     }
 
     pub fn map_skip<R, E, T>(&self, mut op: T, skip: usize) -> Result<Vec<R>, E>
-        where T: FnMut(&VVal) -> Result<R, E> {
-
-        let mut res : Vec<R> = Vec::new();
+    where
+        T: FnMut(&VVal) -> Result<R, E>,
+    {
+        let mut res: Vec<R> = Vec::new();
         if let VVal::Lst(b) = &self {
             for i in b.borrow().iter().skip(skip) {
                 res.push(op(i)?);
@@ -4331,7 +4479,12 @@ impl VVal {
             b.borrow_mut().insert(0, val);
             self
         } else {
-            self.with_deref(move |v| { v.unshift(val); }, |_| ());
+            self.with_deref(
+                move |v| {
+                    v.unshift(val);
+                },
+                |_| (),
+            );
             self
         }
     }
@@ -4347,15 +4500,15 @@ impl VVal {
                         match list_add {
                             CollectionAdd::Push => {
                                 lst.borrow_mut().push(v);
-                            },
+                            }
                             CollectionAdd::Unshift => {
                                 lst.borrow_mut().insert(0, v);
-                            },
+                            }
                         }
                         true
                     });
                 }
-            },
+            }
             VVal::Map(map) => {
                 for v in vals.iter() {
                     v.clone().with_value_or_iter_values(|v, k| {
@@ -4364,33 +4517,36 @@ impl VVal {
                                 v.at(0).unwrap().with_s_ref(|k| {
                                     map.borrow_mut().insert(s2sym(k), v.at(1).unwrap())
                                 });
-                            },
+                            }
                             VVal::Lst(_) => {
-                                v.v_(0).with_s_ref(|k|
-                                    map.borrow_mut().insert(s2sym(k), v.clone()));
-                            },
+                                v.v_(0)
+                                    .with_s_ref(|k| map.borrow_mut().insert(s2sym(k), v.clone()));
+                            }
                             VVal::Map(_) => {
                                 for (vm, km) in v.iter() {
                                     if let Some(k) = km {
-                                        k.with_s_ref(|ks|
-                                            map.borrow_mut().insert(s2sym(ks), vm.clone()));
+                                        k.with_s_ref(|ks| {
+                                            map.borrow_mut().insert(s2sym(ks), vm.clone())
+                                        });
                                     }
                                 }
-                            },
+                            }
                             _ => {
                                 if let Some(k) = k {
-                                    k.with_s_ref(|kv|
-                                        map.borrow_mut().insert(s2sym(kv), v.clone()));
+                                    k.with_s_ref(|kv| {
+                                        map.borrow_mut().insert(s2sym(kv), v.clone())
+                                    });
                                 } else {
-                                    v.with_s_ref(|kv|
-                                        map.borrow_mut().insert(s2sym(kv), v.clone()));
+                                    v.with_s_ref(|kv| {
+                                        map.borrow_mut().insert(s2sym(kv), v.clone())
+                                    });
                                 }
-                            },
+                            }
                         }
                         true
                     })
                 }
-            },
+            }
             VVal::Str(_) => {
                 let mut out = collection.with_s_ref(|s| s.to_string());
                 for v in vals.iter() {
@@ -4400,7 +4556,7 @@ impl VVal {
                     });
                 }
                 collection = VVal::new_str_mv(out);
-            },
+            }
             VVal::Byt(_) => {
                 let mut out = collection.with_bv_ref(|b| b.to_vec());
                 for v in vals.iter() {
@@ -4410,60 +4566,61 @@ impl VVal {
                     })
                 }
                 collection = VVal::new_byt(out);
-            },
+            }
             v => {
-                return VVal::err_msg(
-                    &format!("Can't add to non collection, got '{}' (type {})",
-                             v.s(),
-                             v.type_name()));
-            },
+                return VVal::err_msg(&format!(
+                    "Can't add to non collection, got '{}' (type {})",
+                    v.s(),
+                    v.type_name()
+                ));
+            }
         }
 
         collection
-//        let collection =
-//            if (b.is_ref() && b.deref().is_vec() {
-//               b.deref()
-//            } else if !b.is_vec() {
-//               VVal::vec1(b)
-//            } else {
-//                b
-//            };
-//
-//        if !b.is_vec() {
-//        }
-//
-//        match list_add {
-//            CollectionAdd::Push => {
-//                if let VVal::Iter(_) = a {
-//                    a.for_each(|v| b.push(v));
-//
-//                } else if a.is_ref() {
-//                    if let VVal::Iter(_) = a.deref() {
-//                        a.deref().for_each(|v| b.push(v));
-//                    } else {
-//                        b.push(a);
-//                    }
-//                } else {
-//                    b.push(a);
-//                }
-//            },
-//            CollectionAdd::Unshift => {
-//                if let VVal::Iter(_) = a {
-//                    a.for_each(|v| b.unshift(v));
-//
-//                } else if a.is_ref() {
-//                    if let VVal::Iter(_) = a.deref() {
-//                        a.deref().for_each(|v| b.unshift(v));
-//                    } else {
-//                        b.unshift(a);
-//                    }
-//                } else {
-//                    b.unshift(a);
-//                }
-//            },
-//        }
-//
-//        self
+        //        let collection =
+        //            if (b.is_ref() && b.deref().is_vec() {
+        //               b.deref()
+        //            } else if !b.is_vec() {
+        //               VVal::vec1(b)
+        //            } else {
+        //                b
+        //            };
+        //
+        //        if !b.is_vec() {
+        //        }
+        //
+        //        match list_add {
+        //            CollectionAdd::Push => {
+        //                if let VVal::Iter(_) = a {
+        //                    a.for_each(|v| b.push(v));
+        //
+        //                } else if a.is_ref() {
+        //                    if let VVal::Iter(_) = a.deref() {
+        //                        a.deref().for_each(|v| b.push(v));
+        //                    } else {
+        //                        b.push(a);
+        //                    }
+        //                } else {
+        //                    b.push(a);
+        //                }
+        //            },
+        //            CollectionAdd::Unshift => {
+        //                if let VVal::Iter(_) = a {
+        //                    a.for_each(|v| b.unshift(v));
+        //
+        //                } else if a.is_ref() {
+        //                    if let VVal::Iter(_) = a.deref() {
+        //                        a.deref().for_each(|v| b.unshift(v));
+        //                    } else {
+        //                        b.unshift(a);
+        //                    }
+        //                } else {
+        //                    b.unshift(a);
+        //                }
+        //            },
+        //        }
+        //
+        //        self
     }
 
     pub fn insert_at(&self, index: usize, val: VVal) {
@@ -4497,54 +4654,48 @@ impl VVal {
                 } else {
                     Some(VVal::new_byte(vval_bytes[index as usize]))
                 }
-            },
-            VVal::Str(vval_str) => {
-                vval_str.chars().nth(index as usize).map(VVal::new_char)
-            },
-            VVal::Pair(b) => {
-                Some(if index % 2 == 0 { b.0.clone() } else { b.1.clone() })
-            },
+            }
+            VVal::Str(vval_str) => vval_str.chars().nth(index as usize).map(VVal::new_char),
+            VVal::Pair(b) => Some(if index % 2 == 0 { b.0.clone() } else { b.1.clone() }),
             VVal::Iter(i) => {
                 let mut i = i.borrow_mut();
-                for _ in 0..index { i.next(); }
+                for _ in 0..index {
+                    i.next();
+                }
                 iter_next_value!(i, v, { Some(v) }, None)
-            },
+            }
             VVal::Opt(ref b) => {
                 if let Some(b) = b {
                     b.as_ref().at(index)
                 } else {
                     None
                 }
-            },
-            VVal::IVec(b) => {
-                Some(match index {
-                    0 => b.x(),
-                    1 => b.y(),
-                    2 => b.z().unwrap_or(VVal::None),
-                    3 => b.w().unwrap_or(VVal::None),
-                    _ => VVal::None
-                })
-            },
-            VVal::FVec(b) => {
-                Some(match index {
-                    0 => b.x(),
-                    1 => b.y(),
-                    2 => b.z().unwrap_or(VVal::None),
-                    3 => b.w().unwrap_or(VVal::None),
-                    _ => VVal::None
-                })
-            },
+            }
+            VVal::IVec(b) => Some(match index {
+                0 => b.x(),
+                1 => b.y(),
+                2 => b.z().unwrap_or(VVal::None),
+                3 => b.w().unwrap_or(VVal::None),
+                _ => VVal::None,
+            }),
+            VVal::FVec(b) => Some(match index {
+                0 => b.x(),
+                1 => b.y(),
+                2 => b.z().unwrap_or(VVal::None),
+                3 => b.w().unwrap_or(VVal::None),
+                _ => VVal::None,
+            }),
             VVal::Lst(b) => {
                 if b.borrow().len() > index {
                     Some(b.borrow()[index].clone())
                 } else {
                     None
                 }
-            },
+            }
             v => v.with_deref(
                 |v| v.at(index),
-                |v| if let Some(v) = v { v.get_key(&format!("{}", index)) }
-                    else { None }),
+                |v| if let Some(v) = v { v.get_key(&format!("{}", index)) } else { None },
+            ),
         }
     }
 
@@ -4557,10 +4708,8 @@ impl VVal {
                 } else {
                     VVal::None
                 }
-            },
-            v => v.with_deref(
-                |v| v.proto_data(),
-                |_| VVal::None),
+            }
+            v => v.with_deref(|v| v.proto_data(), |_| VVal::None),
         }
     }
 
@@ -4574,7 +4723,7 @@ impl VVal {
                 } else {
                     None
                 }
-            },
+            }
             VVal::Lst(l) => {
                 let l = l.borrow();
                 if l.is_empty() {
@@ -4582,7 +4731,7 @@ impl VVal {
                 } else {
                     l[0].proto_lookup(key)
                 }
-            },
+            }
             v => v.with_deref(|v| v.proto_lookup(key), |_| None),
         }
     }
@@ -4590,63 +4739,65 @@ impl VVal {
     pub fn get_key_sym(&self, key: &Symbol) -> Option<VVal> {
         match self {
             VVal::Map(m) => m.borrow().get(key).cloned(),
-            _            => self.get_key(key.as_ref()),
+            _ => self.get_key(key.as_ref()),
         }
     }
 
     pub fn get_key(&self, key: &str) -> Option<VVal> {
         match self {
             VVal::Map(m) => m.borrow().get(&s2sym(key)).cloned(),
-            VVal::IVec(b) => {
-                Some(match key {
-                    "0" | "first"  | "x" | "r" | "h" => b.x(),
-                    "1" | "second" | "y" | "g" | "s" => b.y(),
-                    "2" | "third"  | "z" | "b" | "v" => b.z().unwrap_or(VVal::None),
-                    "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::None),
-                    _ =>
-                        swizzle_i(
-                            key,
-                            b.x_raw(),
-                            b.y_raw(),
-                            b.z_raw().unwrap_or(0),
-                            b.w_raw().unwrap_or(0)),
-                })
-            },
-            VVal::FVec(b) => {
-                Some(match key {
-                    "0" | "first"  | "x" | "r" | "h" => b.x(),
-                    "1" | "second" | "y" | "g" | "s" => b.y(),
-                    "2" | "third"  | "z" | "b" | "v" => b.z().unwrap_or(VVal::None),
-                    "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::None),
-                    _ =>
-                        swizzle_f(
-                            key,
-                            b.x_raw(),
-                            b.y_raw(),
-                            b.z_raw().unwrap_or(0.0),
-                            b.w_raw().unwrap_or(0.0)),
-                })
-            },
-            VVal::Pair(_) => {
-                self.at(match key {
-                    "0" | "value" | "v" | "car" | "head" | "first"  => 0,
-                    "1" | "key"   | "k" | "cdr" | "tail" | "second" => 1,
-                    _ => {
-                        if !key.chars().all(|c| c.is_digit(10)) { return None; }
-                        key.parse::<usize>().unwrap_or(0)
+            VVal::IVec(b) => Some(match key {
+                "0" | "first" | "x" | "r" | "h" => b.x(),
+                "1" | "second" | "y" | "g" | "s" => b.y(),
+                "2" | "third" | "z" | "b" | "v" => b.z().unwrap_or(VVal::None),
+                "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::None),
+                _ => swizzle_i(
+                    key,
+                    b.x_raw(),
+                    b.y_raw(),
+                    b.z_raw().unwrap_or(0),
+                    b.w_raw().unwrap_or(0),
+                ),
+            }),
+            VVal::FVec(b) => Some(match key {
+                "0" | "first" | "x" | "r" | "h" => b.x(),
+                "1" | "second" | "y" | "g" | "s" => b.y(),
+                "2" | "third" | "z" | "b" | "v" => b.z().unwrap_or(VVal::None),
+                "3" | "fourth" | "w" | "a" => b.w().unwrap_or(VVal::None),
+                _ => swizzle_f(
+                    key,
+                    b.x_raw(),
+                    b.y_raw(),
+                    b.z_raw().unwrap_or(0.0),
+                    b.w_raw().unwrap_or(0.0),
+                ),
+            }),
+            VVal::Pair(_) => self.at(match key {
+                "0" | "value" | "v" | "car" | "head" | "first" => 0,
+                "1" | "key" | "k" | "cdr" | "tail" | "second" => 1,
+                _ => {
+                    if !key.chars().all(|c| c.is_digit(10)) {
+                        return None;
                     }
-                })
-            },
+                    key.parse::<usize>().unwrap_or(0)
+                }
+            }),
             VVal::Iter(i) => {
-                if !key.chars().all(|c| c.is_digit(10)) { return None; }
+                if !key.chars().all(|c| c.is_digit(10)) {
+                    return None;
+                }
 
                 let idx = key.parse::<usize>().unwrap_or(0);
                 let mut i = i.borrow_mut();
-                for _ in 0..idx { i.next(); }
+                for _ in 0..idx {
+                    i.next();
+                }
                 iter_next_value!(i, v, { Some(v) }, None)
-            },
+            }
             VVal::Lst(l) => {
-                if !key.chars().all(|c| c.is_digit(10)) { return None; }
+                if !key.chars().all(|c| c.is_digit(10)) {
+                    return None;
+                }
 
                 let idx = key.parse::<usize>().unwrap_or(0);
                 if idx < l.borrow().len() {
@@ -4654,60 +4805,67 @@ impl VVal {
                 } else {
                     Some(VVal::None)
                 }
-            },
+            }
             VVal::Usr(u) => u.get_key(key),
             v => v.with_deref(|v| v.get_key(key), |_| None),
         }
     }
 
-    pub fn set_map_key_fun<T>(&self, key: &str, fun: T, min_args: Option<usize>, max_args: Option<usize>, err_arg_ok: bool)
-        where T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction> {
-        self.set_key_sym(
-                s2sym(key),
-                VValFun::new_fun(fun, min_args, max_args, err_arg_ok))
+    pub fn set_map_key_fun<T>(
+        &self,
+        key: &str,
+        fun: T,
+        min_args: Option<usize>,
+        max_args: Option<usize>,
+        err_arg_ok: bool,
+    ) where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        self.set_key_sym(s2sym(key), VValFun::new_fun(fun, min_args, max_args, err_arg_ok))
             .expect("Map not borrowed when using set_map_key_fun");
     }
 
     pub fn deref(&self) -> VVal {
-        self.with_deref(
-            |v| v.clone(),
-            |v| v.map_or(VVal::None, |v| v.clone()))
+        self.with_deref(|v| v.clone(), |v| v.map_or(VVal::None, |v| v.clone()))
     }
 
     #[inline]
     pub fn with_deref<O, D, R>(&self, op: O, default: D) -> R
-        where O: FnOnce(&VVal) -> R, D: FnOnce(Option<&VVal>) -> R
+    where
+        O: FnOnce(&VVal) -> R,
+        D: FnOnce(Option<&VVal>) -> R,
     {
         match self {
-            VVal::Opt(Some(v))  => op(v.as_ref()),
-            VVal::Opt(None)     => op(&VVal::None),
-            VVal::Ref(l)        => op(&(*l).borrow()),
-            VVal::HRef(l)       => op(&(*l).borrow()),
-            VVal::WWRef(l)      => {
-                match l.upgrade() {
-                    Some(v) => op(&v.borrow()),
-                    None    => default(None),
-                }
+            VVal::Opt(Some(v)) => op(v.as_ref()),
+            VVal::Opt(None) => op(&VVal::None),
+            VVal::Ref(l) => op(&(*l).borrow()),
+            VVal::HRef(l) => op(&(*l).borrow()),
+            VVal::WWRef(l) => match l.upgrade() {
+                Some(v) => op(&v.borrow()),
+                None => default(None),
             },
             _ => default(Some(self)),
         }
     }
 
     pub fn list_operation<O, R>(&self, mut op: O) -> Result<R, StackAction>
-        where O: FnMut(&mut std::cell::RefMut<std::vec::Vec<VVal>>) -> R
+    where
+        O: FnMut(&mut std::cell::RefMut<std::vec::Vec<VVal>>) -> R,
     {
         match self {
-            VVal::Lst(l) => {
-                match l.try_borrow_mut() {
-                    Ok(mut v) => { Ok(op(&mut v)) },
-                    Err(_) => Err(StackAction::panic_borrow(self)),
-                }
+            VVal::Lst(l) => match l.try_borrow_mut() {
+                Ok(mut v) => Ok(op(&mut v)),
+                Err(_) => Err(StackAction::panic_borrow(self)),
             },
-            v => v.with_deref(|v| {
-                v.list_operation(op)
-            }, |v| Err(StackAction::panic_msg(format!(
-                    "Can't do list operation with non list value: {}",
-                    v.map_or("".to_string(), |v| v.s())))))
+            v => v.with_deref(
+                |v| v.list_operation(op),
+                |v| {
+                    Err(StackAction::panic_msg(format!(
+                        "Can't do list operation with non list value: {}",
+                        v.map_or("".to_string(), |v| v.s())
+                    )))
+                },
+            ),
         }
     }
 
@@ -4716,10 +4874,10 @@ impl VVal {
             VVal::Map(m) => {
                 let ks = key.to_sym();
                 match m.try_borrow_mut() {
-                    Ok(mut r)  => Ok(r.remove(&ks).unwrap_or(VVal::None)),
-                    Err(_)     => Err(StackAction::panic_borrow(self)),
+                    Ok(mut r) => Ok(r.remove(&ks).unwrap_or(VVal::None)),
+                    Err(_) => Err(StackAction::panic_borrow(self)),
                 }
-            },
+            }
             VVal::Lst(l) => {
                 if key.i() < 0 {
                     return Ok(VVal::None);
@@ -4733,14 +4891,12 @@ impl VVal {
                         } else {
                             Ok(VVal::None)
                         }
-                    },
+                    }
                     Err(_) => Err(StackAction::panic_borrow(self)),
                 }
-            },
+            }
             VVal::Usr(u) => u.delete_key(key),
-            v => v.with_deref(
-                |v| v.delete_key(key),
-                |_| Ok(VVal::None)),
+            v => v.with_deref(|v| v.delete_key(key), |_| Ok(VVal::None)),
         }
     }
 
@@ -4750,27 +4906,29 @@ impl VVal {
 
     pub fn set_key_sym(&self, key: Symbol, val: VVal) -> Result<(), StackAction> {
         match self {
-            VVal::Map(m) => {
-                match m.try_borrow_mut() {
-                    Ok(mut r)  => { r.insert(key, val); Ok(()) },
-                    Err(_)     => Err(StackAction::panic_borrow(self)),
+            VVal::Map(m) => match m.try_borrow_mut() {
+                Ok(mut r) => {
+                    r.insert(key, val);
+                    Ok(())
                 }
+                Err(_) => Err(StackAction::panic_borrow(self)),
             },
             _ => self.set_key(&VVal::Sym(key), val),
         }
     }
-
-
 
     pub fn set_key(&self, key: &VVal, val: VVal) -> Result<(), StackAction> {
         match self {
             VVal::Map(m) => {
                 let ks = key.to_sym();
                 match m.try_borrow_mut() {
-                    Ok(mut r)  => { r.insert(ks, val); Ok(()) },
-                    Err(_)     => Err(StackAction::panic_borrow(self)),
+                    Ok(mut r) => {
+                        r.insert(ks, val);
+                        Ok(())
+                    }
+                    Err(_) => Err(StackAction::panic_borrow(self)),
                 }
-            },
+            }
             VVal::Lst(l) => {
                 if key.i() < 0 {
                     return Ok(());
@@ -4784,23 +4942,15 @@ impl VVal {
                         }
                         v[idx] = val;
                         Ok(())
-                    },
+                    }
                     Err(_) => Err(StackAction::panic_borrow(self)),
                 }
-            },
-            VVal::FVec(_) =>
-                Err(StackAction::panic_msg(
-                    "Can't mutate float vector".to_string())),
-            VVal::IVec(_) =>
-                Err(StackAction::panic_msg(
-                    "Can't mutate integer vector".to_string())),
-            VVal::Pair(_) =>
-                Err(StackAction::panic_msg(
-                    "Can't mutate pair".to_string())),
+            }
+            VVal::FVec(_) => Err(StackAction::panic_msg("Can't mutate float vector".to_string())),
+            VVal::IVec(_) => Err(StackAction::panic_msg("Can't mutate integer vector".to_string())),
+            VVal::Pair(_) => Err(StackAction::panic_msg("Can't mutate pair".to_string())),
             VVal::Usr(u) => u.set_key(key, val),
-            v => v.with_deref(
-                |v| v.set_key(key, val),
-                |_| Ok(())),
+            v => v.with_deref(|v| v.set_key(key, val), |_| Ok(())),
         }
     }
 
@@ -4814,39 +4964,55 @@ impl VVal {
 
     pub fn accum(&mut self, val: &VVal) {
         match self {
-            VVal::Byt(ref mut b) => {
-                match val {
-                    VVal::Int(i) => { Rc::make_mut(b).push(*i as u8); },
-                    VVal::Flt(f) => { Rc::make_mut(b).push(*f as u8); },
-                    VVal::Str(s) => { Rc::make_mut(b).extend_from_slice(s.as_bytes()); },
-                    VVal::Sym(s) => { Rc::make_mut(b).extend_from_slice(s.as_bytes()); },
-                    VVal::Byt(s) => { Rc::make_mut(b).extend_from_slice(s.as_ref()); },
-                    VVal::Bol(o) => { Rc::make_mut(b).push(*o as u8); },
-                    _ => {
-                        val.with_bv_ref(
-                            |s: &[u8]| Rc::make_mut(b).extend_from_slice(s));
-                    }
+            VVal::Byt(ref mut b) => match val {
+                VVal::Int(i) => {
+                    Rc::make_mut(b).push(*i as u8);
+                }
+                VVal::Flt(f) => {
+                    Rc::make_mut(b).push(*f as u8);
+                }
+                VVal::Str(s) => {
+                    Rc::make_mut(b).extend_from_slice(s.as_bytes());
+                }
+                VVal::Sym(s) => {
+                    Rc::make_mut(b).extend_from_slice(s.as_bytes());
+                }
+                VVal::Byt(s) => {
+                    Rc::make_mut(b).extend_from_slice(s.as_ref());
+                }
+                VVal::Bol(o) => {
+                    Rc::make_mut(b).push(*o as u8);
+                }
+                _ => {
+                    val.with_bv_ref(|s: &[u8]| Rc::make_mut(b).extend_from_slice(s));
                 }
             },
-            VVal::Str(ref mut a) => {
-                match val {
-                    VVal::Str(s) => { Rc::make_mut(a).push_str(s.as_ref()); },
-                    VVal::Sym(s) => { Rc::make_mut(a).push_str(&*s); },
-                    VVal::Byt(s) => {
-                        for b in s.as_ref().iter() {
-                            let b = *b as char;
-                            Rc::make_mut(a).push(b);
-                        }
-                    },
-                    _ => {
-                        val.with_s_ref(|s: &str|
-                            Rc::make_mut(a).push_str(s));
+            VVal::Str(ref mut a) => match val {
+                VVal::Str(s) => {
+                    Rc::make_mut(a).push_str(s.as_ref());
+                }
+                VVal::Sym(s) => {
+                    Rc::make_mut(a).push_str(&*s);
+                }
+                VVal::Byt(s) => {
+                    for b in s.as_ref().iter() {
+                        let b = *b as char;
+                        Rc::make_mut(a).push(b);
                     }
                 }
+                _ => {
+                    val.with_s_ref(|s: &str| Rc::make_mut(a).push_str(s));
+                }
             },
-            VVal::Int(i) => { *i += val.i(); },
-            VVal::Flt(f) => { *f += val.f(); },
-            VVal::Lst(v) => { v.borrow_mut().push(val.clone()); },
+            VVal::Int(i) => {
+                *i += val.i();
+            }
+            VVal::Flt(f) => {
+                *f += val.f();
+            }
+            VVal::Lst(v) => {
+                v.borrow_mut().push(val.clone());
+            }
             _ => (),
         }
     }
@@ -4857,12 +5023,19 @@ impl VVal {
             //d// println!("FN ! PUSH {} v {}", self.s(), val.s());
             b.borrow_mut().push(val);
         } else {
-            self.with_deref(|v| { v.push(val); }, |_| ())
+            self.with_deref(
+                |v| {
+                    v.push(val);
+                },
+                |_| (),
+            )
         }
         self
     }
 
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     pub fn len(&self) -> usize {
         match self {
@@ -4878,13 +5051,13 @@ impl VVal {
 
     pub fn s_len(&self) -> usize {
         match self {
-            VVal::Chr(_)  => 1,
-            VVal::Str(s)  => s.chars().count(),
-            VVal::Sym(s)  => s.chars().count(),
-            VVal::Usr(s)  => s.s_raw().chars().count(),
-            VVal::Byt(b)  => b.len(),
-            VVal::None    => 0,
-            _             => self.s().chars().count(),
+            VVal::Chr(_) => 1,
+            VVal::Str(s) => s.chars().count(),
+            VVal::Sym(s) => s.chars().count(),
+            VVal::Usr(s) => s.s_raw().chars().count(),
+            VVal::Byt(b) => b.len(),
+            VVal::None => 0,
+            _ => self.s().chars().count(),
         }
     }
 
@@ -4909,25 +5082,31 @@ impl VVal {
     /// ```
     pub fn s_raw(&self) -> String {
         match self {
-            VVal::Chr(c)  => {
+            VVal::Chr(c) => {
                 let mut buf = [0; 6];
                 let chrstr = c.c().encode_utf8(&mut buf);
                 chrstr.to_string()
-            },
-            VVal::Str(s)  => s.as_ref().clone(),
-            VVal::Sym(s)  => String::from(s.as_ref()),
-            VVal::Usr(s)  => s.s_raw(),
-            VVal::Byt(s)  => s.iter().map(|b| *b as char).collect(),
-            VVal::None    => String::from(""),
-            v => v.with_deref(|v| {
-                if v.is_none() { "".to_string() }
-                else { v.s_raw() }
-            }, |v| {
-                v.map_or_else(
-                    || "".to_string(),
-                    |v| if v.is_none() { "".to_string() }
-                        else { v.s() })
-            }),
+            }
+            VVal::Str(s) => s.as_ref().clone(),
+            VVal::Sym(s) => String::from(s.as_ref()),
+            VVal::Usr(s) => s.s_raw(),
+            VVal::Byt(s) => s.iter().map(|b| *b as char).collect(),
+            VVal::None => String::from(""),
+            v => v.with_deref(
+                |v| {
+                    if v.is_none() {
+                        "".to_string()
+                    } else {
+                        v.s_raw()
+                    }
+                },
+                |v| {
+                    v.map_or_else(
+                        || "".to_string(),
+                        |v| if v.is_none() { "".to_string() } else { v.s() },
+                    )
+                },
+            ),
         }
     }
 
@@ -4950,34 +5129,33 @@ impl VVal {
     /// ```
     #[inline]
     pub fn with_s_ref<T, R>(&self, f: T) -> R
-        where T: FnOnce(&str) -> R
+    where
+        T: FnOnce(&str) -> R,
     {
         match self {
-            VVal::Chr(c)  => {
+            VVal::Chr(c) => {
                 let mut buf = [0; 6];
                 let chrstr = c.c().encode_utf8(&mut buf);
                 f(chrstr)
-            },
-            VVal::Str(s)  => f(s.as_ref()),
-            VVal::Sym(s)  => f(&*s),
-            VVal::Usr(s)  => f(&s.s_raw()),
-            VVal::Byt(_)  => f(&self.s_raw()),
-            VVal::None    => f(""),
-            _             => f(&self.s_raw()),
+            }
+            VVal::Str(s) => f(s.as_ref()),
+            VVal::Sym(s) => f(&*s),
+            VVal::Usr(s) => f(&s.s_raw()),
+            VVal::Byt(_) => f(&self.s_raw()),
+            VVal::None => f(""),
+            _ => f(&self.s_raw()),
         }
     }
 
-
     #[inline]
     pub fn with_bv_ref<T, R>(&self, f: T) -> R
-        where T: FnOnce(&[u8]) -> R
+    where
+        T: FnOnce(&[u8]) -> R,
     {
         match self {
             VVal::Chr(c) => f(&[c.byte()]),
             VVal::Byt(v) => f(&v.as_ref()[..]),
-            VVal::Str(_) => {
-                self.with_s_ref(|s| f(s.as_bytes()))
-            },
+            VVal::Str(_) => self.with_s_ref(|s| f(s.as_bytes())),
             _ => {
                 let vec = self.as_bytes();
                 f(&vec[..])
@@ -5046,10 +5224,7 @@ impl VVal {
     }
 
     pub fn compile_err(&self, msg: String) -> CompileError {
-        CompileError {
-            msg,
-            pos: self.at(0).unwrap_or(VVal::None).get_syn_pos(),
-        }
+        CompileError { msg, pos: self.at(0).unwrap_or(VVal::None).get_syn_pos() }
     }
 
     pub fn to_compile_err(&self, msg: String) -> Result<EvalNode, CompileError> {
@@ -5130,12 +5305,13 @@ impl VVal {
     }
 
     pub fn map_some<T, R>(&self, r: R, f: T) -> R
-        where T: FnOnce(R, &VVal) -> R
+    where
+        T: FnOnce(R, &VVal) -> R,
     {
         match self {
             VVal::None => r,
-            VVal::Opt(Some(v)) => { f(r, &*v) },
-            _ => { f(r, self) }
+            VVal::Opt(Some(v)) => f(r, &*v),
+            _ => f(r, self),
         }
     }
 
@@ -5150,80 +5326,80 @@ impl VVal {
     pub fn syntax_type(&self) -> &str {
         if let VVal::Syn(sp) = self {
             match sp.syn {
-                Syntax::Var            => "Var",
-                Syntax::Key            => "Key",
-                Syntax::SetKey         => "SetKey",
-                Syntax::GetKey         => "GetKey",
-                Syntax::GetKey2        => "GetKey2",
-                Syntax::GetKey3        => "GetKey3",
-                Syntax::GetSym         => "GetSym",
-                Syntax::GetSym2        => "GetSym2",
-                Syntax::GetSym3        => "GetSym3",
-                Syntax::GetIdx         => "GetIdx",
-                Syntax::GetIdx2        => "GetIdx2",
-                Syntax::GetIdx3        => "GetIdx3",
-                Syntax::BinOpAdd       => "BinOpAdd",
-                Syntax::BinOpSub       => "BinOpSub",
-                Syntax::BinOpMul       => "BinOpMul",
-                Syntax::BinOpDiv       => "BinOpDiv",
-                Syntax::BinOpMod       => "BinOpMod",
-                Syntax::BinOpLe        => "BinOpLe",
-                Syntax::BinOpLt        => "BinOpLt",
-                Syntax::BinOpGe        => "BinOpGe",
-                Syntax::BinOpGt        => "BinOpGt",
-                Syntax::BinOpEq        => "BinOpEq",
-                Syntax::BinOpSomeOr    => "BinOpSomeOr",
+                Syntax::Var => "Var",
+                Syntax::Key => "Key",
+                Syntax::SetKey => "SetKey",
+                Syntax::GetKey => "GetKey",
+                Syntax::GetKey2 => "GetKey2",
+                Syntax::GetKey3 => "GetKey3",
+                Syntax::GetSym => "GetSym",
+                Syntax::GetSym2 => "GetSym2",
+                Syntax::GetSym3 => "GetSym3",
+                Syntax::GetIdx => "GetIdx",
+                Syntax::GetIdx2 => "GetIdx2",
+                Syntax::GetIdx3 => "GetIdx3",
+                Syntax::BinOpAdd => "BinOpAdd",
+                Syntax::BinOpSub => "BinOpSub",
+                Syntax::BinOpMul => "BinOpMul",
+                Syntax::BinOpDiv => "BinOpDiv",
+                Syntax::BinOpMod => "BinOpMod",
+                Syntax::BinOpLe => "BinOpLe",
+                Syntax::BinOpLt => "BinOpLt",
+                Syntax::BinOpGe => "BinOpGe",
+                Syntax::BinOpGt => "BinOpGt",
+                Syntax::BinOpEq => "BinOpEq",
+                Syntax::BinOpSomeOr => "BinOpSomeOr",
                 Syntax::BinOpExtSomeOr => "BinOpExtSomeOr",
-                Syntax::BinOpNoneOr    => "BinOpNoneOr",
-                Syntax::BinOpErrOr     => "BinOpErrOr",
-                Syntax::BinOpOptOr     => "BinOpOptOr",
-                Syntax::OpNewPair      => "OpNewPair",
-                Syntax::OpCallLwR      => "OpCallLwR",
-                Syntax::OpCallRwL      => "OpCallRwL",
+                Syntax::BinOpNoneOr => "BinOpNoneOr",
+                Syntax::BinOpErrOr => "BinOpErrOr",
+                Syntax::BinOpOptOr => "BinOpOptOr",
+                Syntax::OpNewPair => "OpNewPair",
+                Syntax::OpCallLwR => "OpCallLwR",
+                Syntax::OpCallRwL => "OpCallRwL",
                 Syntax::OpCallApplyLwR => "OpCallApplyLwR",
                 Syntax::OpCallApplyRwL => "OpCallApplyRwL",
-                Syntax::OpColAddL      => "OpColAddL",
-                Syntax::OpColAddR      => "OpColAddR",
-                Syntax::Str            => "Str",
-                Syntax::Lst            => "Lst",
-                Syntax::IVec           => "IVec",
-                Syntax::FVec           => "FVec",
-                Syntax::Opt            => "Opt",
-                Syntax::Iter           => "Iter",
-                Syntax::Map            => "Map",
-                Syntax::Expr           => "Expr",
-                Syntax::Func           => "Func",
-                Syntax::Block          => "Block",
-                Syntax::Err            => "Err",
-                Syntax::Call           => "Call",
-                Syntax::Apply          => "Apply",
-                Syntax::And            => "And",
-                Syntax::Or             => "Or",
-                Syntax::Assign         => "Assign",
-                Syntax::Def            => "Def",
-                Syntax::Ref            => "Ref",
-                Syntax::HRef           => "HRef",
-                Syntax::WRef           => "WRef",
-                Syntax::Deref          => "Deref",
-                Syntax::CaptureRef     => "CaptureRef",
-                Syntax::AssignRef      => "AssignRef",
-                Syntax::DefGlobRef     => "DefGlobRef",
-                Syntax::DefConst       => "DefConst",
-                Syntax::SelfObj        => "SelfObj",
-                Syntax::SelfData       => "SelfData",
-                Syntax::Import         => "Import",
-                Syntax::Export         => "Export",
-                Syntax::DumpStack      => "DumpStack",
-                Syntax::DumpVM         => "DumpVM",
-                Syntax::DebugPrint     => "DebugPrint",
-                Syntax::MapSplice      => "MapSplice",
-                Syntax::VecSplice      => "VecSplice",
-                Syntax::Accum          => "Accum",
-                Syntax::GlobVar        => "GlobVar",
-                Syntax::Selector       => "Selector",
-                Syntax::Pattern        => "Pattern",
-                Syntax::StructPattern  => "StructPattern",
-                Syntax::Formatter      => "Formatter",
+                Syntax::OpColAddL => "OpColAddL",
+                Syntax::OpColAddR => "OpColAddR",
+                Syntax::Str => "Str",
+                Syntax::Lst => "Lst",
+                Syntax::IVec => "IVec",
+                Syntax::FVec => "FVec",
+                Syntax::Opt => "Opt",
+                Syntax::Iter => "Iter",
+                Syntax::Map => "Map",
+                Syntax::Expr => "Expr",
+                Syntax::Func => "Func",
+                Syntax::Block => "Block",
+                Syntax::Err => "Err",
+                Syntax::Call => "Call",
+                Syntax::Apply => "Apply",
+                Syntax::And => "And",
+                Syntax::Or => "Or",
+                Syntax::Assign => "Assign",
+                Syntax::Def => "Def",
+                Syntax::Ref => "Ref",
+                Syntax::HRef => "HRef",
+                Syntax::WRef => "WRef",
+                Syntax::Deref => "Deref",
+                Syntax::CaptureRef => "CaptureRef",
+                Syntax::AssignRef => "AssignRef",
+                Syntax::DefGlobRef => "DefGlobRef",
+                Syntax::DefConst => "DefConst",
+                Syntax::SelfObj => "SelfObj",
+                Syntax::SelfData => "SelfData",
+                Syntax::Import => "Import",
+                Syntax::Export => "Export",
+                Syntax::DumpStack => "DumpStack",
+                Syntax::DumpVM => "DumpVM",
+                Syntax::DebugPrint => "DebugPrint",
+                Syntax::MapSplice => "MapSplice",
+                Syntax::VecSplice => "VecSplice",
+                Syntax::Accum => "Accum",
+                Syntax::GlobVar => "GlobVar",
+                Syntax::Selector => "Selector",
+                Syntax::Pattern => "Pattern",
+                Syntax::StructPattern => "StructPattern",
+                Syntax::Formatter => "Formatter",
             }
         } else {
             "VVal"
@@ -5232,30 +5408,30 @@ impl VVal {
 
     pub fn type_name(&self) -> &str {
         match self {
-            VVal::Str(_)                 => "string",
-            VVal::Byt(_)                 => "bytes",
-            VVal::Chr(VValChr::Char(_))  => "char",
-            VVal::Chr(VValChr::Byte(_))  => "byte",
-            VVal::None                   => "none",
-            VVal::Err(_)                 => "error",
-            VVal::Bol(_)                 => "bool",
-            VVal::Sym(_)                 => "symbol",
-            VVal::Syn(_)                 => "syntax",
-            VVal::Int(_)                 => "integer",
-            VVal::Flt(_)                 => "float",
-            VVal::Pair(_)                => "pair",
-            VVal::Iter(_)                => "iter",
-            VVal::Opt(_)                 => "optional",
-            VVal::Lst(_)                 => "vector",
-            VVal::Map(_)                 => "map",
-            VVal::Usr(_)                 => "userdata",
-            VVal::Fun(_)                 => "function",
-            VVal::IVec(_)                => "integer_vector",
-            VVal::FVec(_)                => "float_vector",
-            VVal::DropFun(_)             => "drop_function",
-            VVal::Ref(_)                 => "ref_strong",
-            VVal::HRef(_)                => "ref_hidden",
-            VVal::WWRef(_)               => "ref_weak",
+            VVal::Str(_) => "string",
+            VVal::Byt(_) => "bytes",
+            VVal::Chr(VValChr::Char(_)) => "char",
+            VVal::Chr(VValChr::Byte(_)) => "byte",
+            VVal::None => "none",
+            VVal::Err(_) => "error",
+            VVal::Bol(_) => "bool",
+            VVal::Sym(_) => "symbol",
+            VVal::Syn(_) => "syntax",
+            VVal::Int(_) => "integer",
+            VVal::Flt(_) => "float",
+            VVal::Pair(_) => "pair",
+            VVal::Iter(_) => "iter",
+            VVal::Opt(_) => "optional",
+            VVal::Lst(_) => "vector",
+            VVal::Map(_) => "map",
+            VVal::Usr(_) => "userdata",
+            VVal::Fun(_) => "function",
+            VVal::IVec(_) => "integer_vector",
+            VVal::FVec(_) => "float_vector",
+            VVal::DropFun(_) => "drop_function",
+            VVal::Ref(_) => "ref_strong",
+            VVal::HRef(_) => "ref_hidden",
+            VVal::WWRef(_) => "ref_weak",
         }
     }
 
@@ -5271,7 +5447,9 @@ impl VVal {
     /// Accesses the user data of type T directly.
     /// If the user data is not of that type it returns `None`.
     pub fn with_usr_ref<T: 'static, F, X>(&mut self, f: F) -> Option<X>
-        where F: FnOnce(&mut T) -> X {
+    where
+        F: FnOnce(&mut T) -> X,
+    {
         if let VVal::Usr(bx) = self {
             bx.as_any().downcast_mut::<T>().map(f)
         } else {
@@ -5292,7 +5470,9 @@ impl VVal {
     /// assert_eq!(v.v_(1).i(), 11);
     /// assert_eq!(v.v_i(1),    11);
     ///```
-    pub fn v_(&self, idx: usize) -> VVal { self.at(idx).unwrap_or(VVal::None) }
+    pub fn v_(&self, idx: usize) -> VVal {
+        self.at(idx).unwrap_or(VVal::None)
+    }
 
     /// Quick access method for retrieving the VVal at key `idx`.
     /// Returns VVal::None if the VVal is not a VVal::Map or no such index exists.
@@ -5309,7 +5489,9 @@ impl VVal {
     /// assert_eq!(v.v_ik("aaa"),    12);
     /// assert_eq!(v.v_ik("zyy"),    14);
     ///```
-    pub fn v_k(&self, key: &str) -> VVal { self.get_key(key).unwrap_or(VVal::None) }
+    pub fn v_k(&self, key: &str) -> VVal {
+        self.get_key(key).unwrap_or(VVal::None)
+    }
     /// Quick access of an integer at the given `idx`.
     /// See also `v_`.
     ///
@@ -5318,7 +5500,9 @@ impl VVal {
     /// v.push(wlambda::VVal::Int(11));
     /// assert_eq!(v.v_i(0),    11);
     ///```
-    pub fn v_i(&self, idx: usize)     -> i64 { self.v_(idx).i() }
+    pub fn v_i(&self, idx: usize) -> i64 {
+        self.v_(idx).i()
+    }
     /// Quick access of the integer at the given `key`.
     /// See also `v_k`.
     ///
@@ -5327,7 +5511,9 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::new_str("10"));
     /// assert_eq!(v.v_ik("aaa"), 10);
     ///```
-    pub fn v_ik(&self, key: &str)     -> i64 { self.v_k(key).i() }
+    pub fn v_ik(&self, key: &str) -> i64 {
+        self.v_k(key).i()
+    }
     /// Quick access of an bool at the given `idx`.
     /// See also `v_`.
     ///
@@ -5336,7 +5522,9 @@ impl VVal {
     /// v.push(wlambda::VVal::Bol(true));
     /// assert_eq!(v.v_b(0),    true);
     ///```
-    pub fn v_b(&self, idx: usize)     -> bool { self.v_(idx).b() }
+    pub fn v_b(&self, idx: usize) -> bool {
+        self.v_(idx).b()
+    }
     /// Quick access of the integer at the given `key`.
     /// See also `v_k`.
     ///
@@ -5345,7 +5533,9 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::Bol(true));
     /// assert_eq!(v.v_bk("aaa"), true);
     ///```
-    pub fn v_bk(&self, key: &str)     -> bool { self.v_k(key).b() }
+    pub fn v_bk(&self, key: &str) -> bool {
+        self.v_k(key).b()
+    }
     /// Quick access of a character at the given `idx`.
     /// See also `v_`.
     ///
@@ -5354,7 +5544,9 @@ impl VVal {
     /// v.push(wlambda::VVal::Int(11));
     /// assert_eq!(v.v_c(0),    '\u{0b}');
     ///```
-    pub fn v_c(&self, idx: usize)     -> char { self.v_(idx).c() }
+    pub fn v_c(&self, idx: usize) -> char {
+        self.v_(idx).c()
+    }
     /// Quick access of the character at the given `key`.
     /// See also `v_k`.
     ///
@@ -5363,7 +5555,9 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::new_char('@'));
     /// assert_eq!(v.v_ck("aaa"), '@');
     ///```
-    pub fn v_ck(&self, key: &str)     -> char { self.v_k(key).c() }
+    pub fn v_ck(&self, key: &str) -> char {
+        self.v_k(key).c()
+    }
     /// Quick access of a byte at the given `idx`.
     /// See also `v_`.
     ///
@@ -5372,7 +5566,9 @@ impl VVal {
     /// v.push(wlambda::VVal::Int(11));
     /// assert_eq!(v.v_byte(0), b'\x0b');
     ///```
-    pub fn v_byte(&self, idx: usize)     -> u8 { self.v_(idx).byte() }
+    pub fn v_byte(&self, idx: usize) -> u8 {
+        self.v_(idx).byte()
+    }
     /// Quick access of the byte at the given `key`.
     /// See also `v_k`.
     ///
@@ -5381,7 +5577,9 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::new_byte(b'@'));
     /// assert_eq!(v.v_bytek("aaa"), b'@');
     ///```
-    pub fn v_bytek(&self, key: &str)     -> u8 { self.v_k(key).byte() }
+    pub fn v_bytek(&self, key: &str) -> u8 {
+        self.v_k(key).byte()
+    }
     /// Quick access of a raw string at the given `idx`.
     /// See also `v_`.
     ///
@@ -5390,7 +5588,9 @@ impl VVal {
     /// v.push(wlambda::VVal::Int(12));
     /// assert_eq!(v.v_s_raw(0), "12");
     ///```
-    pub fn v_s_raw(&self, idx: usize) -> String { self.v_(idx).s_raw() }
+    pub fn v_s_raw(&self, idx: usize) -> String {
+        self.v_(idx).s_raw()
+    }
     /// Quick access of a raw string as reference at the given `idx`.
     /// See also `v_`.
     ///
@@ -5400,7 +5600,8 @@ impl VVal {
     /// assert_eq!(v.v_with_s_ref(0, |s: &str| s.chars().nth(0).unwrap()), '1');
     ///```
     pub fn v_with_s_ref<T, R>(&self, idx: usize, f: T) -> R
-        where T: FnOnce(&str) -> R
+    where
+        T: FnOnce(&str) -> R,
     {
         self.v_(idx).with_s_ref(f)
     }
@@ -5412,7 +5613,9 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::new_str("XYX"));
     /// assert_eq!(v.v_s_rawk("aaa"), "XYX");
     ///```
-    pub fn v_s_rawk(&self, key: &str) -> String { self.v_k(key).s_raw() }
+    pub fn v_s_rawk(&self, key: &str) -> String {
+        self.v_k(key).s_raw()
+    }
     /// Quick access of the string as reference at the given `key`.
     /// See also `v_k`.
     ///
@@ -5422,7 +5625,8 @@ impl VVal {
     /// assert!(v.v_with_s_refk("aaa", |s: &str| s == "XYX"));
     ///```
     pub fn v_with_s_refk<T, R>(&self, key: &str, f: T) -> R
-        where T: FnOnce(&str) -> R
+    where
+        T: FnOnce(&str) -> R,
     {
         self.v_k(key).with_s_ref(f)
     }
@@ -5434,7 +5638,9 @@ impl VVal {
     /// v.push(wlambda::VVal::Int(13));
     /// assert_eq!(v.v_s(0), "13");
     ///```
-    pub fn v_s(&self, idx: usize)     -> String { self.v_(idx).s() }
+    pub fn v_s(&self, idx: usize) -> String {
+        self.v_(idx).s()
+    }
     /// Quick access of the string represenation at the given `key`.
     /// See also `v_k`.
     ///
@@ -5443,7 +5649,9 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::Flt(12.2));
     /// assert_eq!(v.v_sk("aaa"), "12.2");
     ///```
-    pub fn v_sk(&self, key: &str)     -> String { self.v_k(key).s() }
+    pub fn v_sk(&self, key: &str) -> String {
+        self.v_k(key).s()
+    }
     /// Quick access of the float at the given `idx`.
     /// See also `v_`.
     ///
@@ -5452,7 +5660,9 @@ impl VVal {
     /// v.push(wlambda::VVal::Flt(13.2));
     /// assert_eq!(v.v_f(0), 13.2);
     ///```
-    pub fn v_f(&self, idx: usize)     -> f64 { self.v_(idx).f() }
+    pub fn v_f(&self, idx: usize) -> f64 {
+        self.v_(idx).f()
+    }
     /// Quick access of the float at the given `key`.
     /// See also `v_k`.
     ///
@@ -5461,45 +5671,65 @@ impl VVal {
     /// v.set_key_str("aaa", wlambda::VVal::Flt(12.2));
     /// assert_eq!(v.v_fk("aaa"), 12.2);
     ///```
-    pub fn v_fk(&self, key: &str)     -> f64 { self.v_k(key).f() }
+    pub fn v_fk(&self, key: &str) -> f64 {
+        self.v_k(key).f()
+    }
 
     pub fn for_each<T>(&self, mut op: T)
-        where T: FnMut(&VVal)
+    where
+        T: FnMut(&VVal),
     {
         if let VVal::Lst(b) = &self {
-            for i in b.borrow().iter() { op(i); }
+            for i in b.borrow().iter() {
+                op(i);
+            }
         }
     }
 
     pub fn for_eachk<T>(&self, mut op: T)
-        where T: FnMut(&str, &VVal)
+    where
+        T: FnMut(&str, &VVal),
     {
         if let VVal::Map(b) = &self {
-            for (k, v) in b.borrow().iter() { op(k, v); }
+            for (k, v) in b.borrow().iter() {
+                op(k, v);
+            }
         }
     }
 
     #[allow(clippy::cast_lossless)]
     pub fn f(&self) -> f64 {
         match self {
-            VVal::Str(s)     => (*s).parse::<f64>().unwrap_or(0.0),
-            VVal::Sym(s)     => (*s).parse::<f64>().unwrap_or(0.0),
-            VVal::Byt(s)     => if s.len() > 0 { s[0] as f64 } else { 0.0 },
-            VVal::Chr(c)     => c.c() as u32 as f64,
-            VVal::None       => 0.0,
-            VVal::Err(_)     => 0.0,
-            VVal::Bol(b)     => if *b { 1.0 } else { 0.0 },
-            VVal::Syn(s)     => (s.syn() as i64) as f64,
-            VVal::Int(i)     => *i as f64,
-            VVal::Flt(f)     => *f,
-            VVal::Pair(b)    => b.0.f(),
-            VVal::Lst(l)     => l.borrow().len() as f64,
-            VVal::Map(l)     => l.borrow().len() as f64,
-            VVal::Usr(u)     => u.f(),
-            VVal::Fun(_)     => 1.0,
-            VVal::IVec(iv)   => iv.x_raw() as f64,
-            VVal::FVec(fv)   => fv.x_raw(),
-            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.f() }, 0.0),
+            VVal::Str(s) => (*s).parse::<f64>().unwrap_or(0.0),
+            VVal::Sym(s) => (*s).parse::<f64>().unwrap_or(0.0),
+            VVal::Byt(s) => {
+                if s.len() > 0 {
+                    s[0] as f64
+                } else {
+                    0.0
+                }
+            }
+            VVal::Chr(c) => c.c() as u32 as f64,
+            VVal::None => 0.0,
+            VVal::Err(_) => 0.0,
+            VVal::Bol(b) => {
+                if *b {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            VVal::Syn(s) => (s.syn() as i64) as f64,
+            VVal::Int(i) => *i as f64,
+            VVal::Flt(f) => *f,
+            VVal::Pair(b) => b.0.f(),
+            VVal::Lst(l) => l.borrow().len() as f64,
+            VVal::Map(l) => l.borrow().len() as f64,
+            VVal::Usr(u) => u.f(),
+            VVal::Fun(_) => 1.0,
+            VVal::IVec(iv) => iv.x_raw() as f64,
+            VVal::FVec(fv) => fv.x_raw(),
+            VVal::Iter(i) => iter_next_value!(i.borrow_mut(), v, { v.f() }, 0.0),
             v => v.with_deref(|v| v.f(), |_| 0.0),
         }
     }
@@ -5507,24 +5737,36 @@ impl VVal {
     #[allow(clippy::cast_lossless)]
     pub fn i(&self) -> i64 {
         match self {
-            VVal::Str(s)     => (*s).parse::<i64>().unwrap_or(0),
-            VVal::Sym(s)     => (*s).parse::<i64>().unwrap_or(0),
-            VVal::Chr(c)     => c.c() as u32 as i64,
-            VVal::Byt(s)     => if s.len() > 0 { s[0] as i64 } else { 0 },
-            VVal::None       => 0,
-            VVal::Err(_)     => 0,
-            VVal::Bol(b)     => if *b { 1 } else { 0 },
-            VVal::Syn(s)     => s.syn() as i64,
-            VVal::Int(i)     => *i,
-            VVal::Flt(f)     => *f as i64,
-            VVal::Pair(b)    => b.0.i(),
-            VVal::Lst(l)     => l.borrow().len() as i64,
-            VVal::Map(l)     => l.borrow().len() as i64,
-            VVal::Usr(u)     => u.i(),
-            VVal::Fun(_)     => 1,
-            VVal::IVec(iv)   => iv.x_raw(),
-            VVal::FVec(fv)   => fv.x_raw() as i64,
-            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.i() }, 0),
+            VVal::Str(s) => (*s).parse::<i64>().unwrap_or(0),
+            VVal::Sym(s) => (*s).parse::<i64>().unwrap_or(0),
+            VVal::Chr(c) => c.c() as u32 as i64,
+            VVal::Byt(s) => {
+                if s.len() > 0 {
+                    s[0] as i64
+                } else {
+                    0
+                }
+            }
+            VVal::None => 0,
+            VVal::Err(_) => 0,
+            VVal::Bol(b) => {
+                if *b {
+                    1
+                } else {
+                    0
+                }
+            }
+            VVal::Syn(s) => s.syn() as i64,
+            VVal::Int(i) => *i,
+            VVal::Flt(f) => *f as i64,
+            VVal::Pair(b) => b.0.i(),
+            VVal::Lst(l) => l.borrow().len() as i64,
+            VVal::Map(l) => l.borrow().len() as i64,
+            VVal::Usr(u) => u.i(),
+            VVal::Fun(_) => 1,
+            VVal::IVec(iv) => iv.x_raw(),
+            VVal::FVec(fv) => fv.x_raw() as i64,
+            VVal::Iter(i) => iter_next_value!(i.borrow_mut(), v, { v.i() }, 0),
             v => v.with_deref(|v| v.i(), |_| 0),
         }
     }
@@ -5532,50 +5774,97 @@ impl VVal {
     #[allow(clippy::cast_lossless)]
     pub fn byte(&self) -> u8 {
         match self {
-            VVal::Str(s)     => { if (*s).len() > 0 { (*s).as_bytes()[0] } else { 0 } },
-            VVal::Sym(s)     => { if (*s).len() > 0 { (*s).as_bytes()[0] } else { 0 } },
-            VVal::Chr(c)     => c.byte(),
-            VVal::Byt(s)     => if s.len() > 0 { s[0] } else { b'0' },
-            VVal::None       => b'\0',
-            VVal::Err(_)     => b'\0',
-            VVal::Bol(b)     => if *b { b'\x01' } else { b'\0' },
-            VVal::Syn(s)     => s.syn() as i64 as u32 as u8,
-            VVal::Int(i)     => if *i <= 255 { *i as u8 } else { b'?' },
-            VVal::Flt(f)     => if (*f as u32) <= 255 { *f as u8 } else { b'?' },
-            VVal::Pair(b)    => b.0.byte(),
-            VVal::Lst(l)     => l.borrow().len() as u8,
-            VVal::Map(l)     => l.borrow().len() as u8,
-            VVal::Usr(u)     => u.byte(),
-            VVal::Fun(_)     => b'\x01',
-            VVal::IVec(iv)   => iv.x_raw() as u8,
-            VVal::FVec(fv)   => fv.x_raw() as u8,
-            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.byte() }, b'\0'),
+            VVal::Str(s) => {
+                if (*s).len() > 0 {
+                    (*s).as_bytes()[0]
+                } else {
+                    0
+                }
+            }
+            VVal::Sym(s) => {
+                if (*s).len() > 0 {
+                    (*s).as_bytes()[0]
+                } else {
+                    0
+                }
+            }
+            VVal::Chr(c) => c.byte(),
+            VVal::Byt(s) => {
+                if s.len() > 0 {
+                    s[0]
+                } else {
+                    b'0'
+                }
+            }
+            VVal::None => b'\0',
+            VVal::Err(_) => b'\0',
+            VVal::Bol(b) => {
+                if *b {
+                    b'\x01'
+                } else {
+                    b'\0'
+                }
+            }
+            VVal::Syn(s) => s.syn() as i64 as u32 as u8,
+            VVal::Int(i) => {
+                if *i <= 255 {
+                    *i as u8
+                } else {
+                    b'?'
+                }
+            }
+            VVal::Flt(f) => {
+                if (*f as u32) <= 255 {
+                    *f as u8
+                } else {
+                    b'?'
+                }
+            }
+            VVal::Pair(b) => b.0.byte(),
+            VVal::Lst(l) => l.borrow().len() as u8,
+            VVal::Map(l) => l.borrow().len() as u8,
+            VVal::Usr(u) => u.byte(),
+            VVal::Fun(_) => b'\x01',
+            VVal::IVec(iv) => iv.x_raw() as u8,
+            VVal::FVec(fv) => fv.x_raw() as u8,
+            VVal::Iter(i) => iter_next_value!(i.borrow_mut(), v, { v.byte() }, b'\0'),
             v => v.with_deref(|v| v.byte(), |_| b'\0'),
         }
     }
 
-
     #[allow(clippy::cast_lossless)]
     pub fn c(&self) -> char {
         match self {
-            VVal::Str(s)     => (*s).chars().next().unwrap_or('\0'),
-            VVal::Sym(s)     => (*s).chars().next().unwrap_or('\0'),
-            VVal::Chr(c)     => c.c(),
-            VVal::Byt(s)     => if s.len() > 0 { s[0] as char } else { '\0' },
-            VVal::None       => '\0',
-            VVal::Err(_)     => '\0',
-            VVal::Bol(b)     => if *b { '\u{01}' } else { '\0' },
-            VVal::Syn(s)     => std::char::from_u32(s.syn() as i64 as u32).unwrap_or('\0'),
-            VVal::Int(i)     => std::char::from_u32(*i as u32).unwrap_or('\0'),
-            VVal::Flt(f)     => std::char::from_u32(*f as u32).unwrap_or('\0'),
-            VVal::Pair(b)    => b.0.c(),
-            VVal::Lst(l)     => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
-            VVal::Map(l)     => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
-            VVal::Usr(u)     => u.c(),
-            VVal::Fun(_)     => '\u{01}',
-            VVal::IVec(iv)   => std::char::from_u32(iv.x_raw() as u32).unwrap_or('\0'),
-            VVal::FVec(fv)   => std::char::from_u32(fv.x_raw() as u32).unwrap_or('\0'),
-            VVal::Iter(i)    => iter_next_value!(i.borrow_mut(), v, { v.c() }, '\0'),
+            VVal::Str(s) => (*s).chars().next().unwrap_or('\0'),
+            VVal::Sym(s) => (*s).chars().next().unwrap_or('\0'),
+            VVal::Chr(c) => c.c(),
+            VVal::Byt(s) => {
+                if s.len() > 0 {
+                    s[0] as char
+                } else {
+                    '\0'
+                }
+            }
+            VVal::None => '\0',
+            VVal::Err(_) => '\0',
+            VVal::Bol(b) => {
+                if *b {
+                    '\u{01}'
+                } else {
+                    '\0'
+                }
+            }
+            VVal::Syn(s) => std::char::from_u32(s.syn() as i64 as u32).unwrap_or('\0'),
+            VVal::Int(i) => std::char::from_u32(*i as u32).unwrap_or('\0'),
+            VVal::Flt(f) => std::char::from_u32(*f as u32).unwrap_or('\0'),
+            VVal::Pair(b) => b.0.c(),
+            VVal::Lst(l) => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
+            VVal::Map(l) => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
+            VVal::Usr(u) => u.c(),
+            VVal::Fun(_) => '\u{01}',
+            VVal::IVec(iv) => std::char::from_u32(iv.x_raw() as u32).unwrap_or('\0'),
+            VVal::FVec(fv) => std::char::from_u32(fv.x_raw() as u32).unwrap_or('\0'),
+            VVal::Iter(i) => iter_next_value!(i.borrow_mut(), v, { v.c() }, '\0'),
             v => v.with_deref(|v| v.c(), |_| '\0'),
         }
     }
@@ -5583,27 +5872,27 @@ impl VVal {
     #[allow(clippy::cast_lossless)]
     pub fn b(&self) -> bool {
         match self {
-            VVal::Str(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
-            VVal::Sym(s)       => (*s).parse::<i64>().unwrap_or(0) != 0,
-            VVal::Chr(c)       => (c.c() as u32) > 0,
-            VVal::Byt(s)       => (if s.len() > 0 { s[0] as i64 } else { 0 }) != 0,
-            VVal::None         => false,
-            VVal::Err(_)       => false,
-            VVal::Bol(b)       => *b,
-            VVal::Syn(s)       => (s.syn() as i64) != 0,
-            VVal::Pair(b)      => b.0.b() || b.1.b(),
-            VVal::Int(i)       => (*i) != 0,
-            VVal::Flt(f)       => (*f as i64) != 0,
-            VVal::Lst(l)       => (l.borrow().len() as i64) != 0,
-            VVal::Map(l)       => (l.borrow().len() as i64) != 0,
-            VVal::Usr(u)       => u.b(),
-            VVal::Fun(_)       => true,
-            VVal::Opt(None)    => false,
+            VVal::Str(s) => (*s).parse::<i64>().unwrap_or(0) != 0,
+            VVal::Sym(s) => (*s).parse::<i64>().unwrap_or(0) != 0,
+            VVal::Chr(c) => (c.c() as u32) > 0,
+            VVal::Byt(s) => (if s.len() > 0 { s[0] as i64 } else { 0 }) != 0,
+            VVal::None => false,
+            VVal::Err(_) => false,
+            VVal::Bol(b) => *b,
+            VVal::Syn(s) => (s.syn() as i64) != 0,
+            VVal::Pair(b) => b.0.b() || b.1.b(),
+            VVal::Int(i) => (*i) != 0,
+            VVal::Flt(f) => (*f as i64) != 0,
+            VVal::Lst(l) => (l.borrow().len() as i64) != 0,
+            VVal::Map(l) => (l.borrow().len() as i64) != 0,
+            VVal::Usr(u) => u.b(),
+            VVal::Fun(_) => true,
+            VVal::Opt(None) => false,
             VVal::Opt(Some(_)) => true,
-            VVal::IVec(iv)     => iv.x().b(),
-            VVal::FVec(fv)     => fv.x().b(),
-            VVal::Iter(i)      => iter_next_value!(i.borrow_mut(), v, { v.b() }, false),
-            v                  => v.with_deref(|v| v.b(), |_| false),
+            VVal::IVec(iv) => iv.x().b(),
+            VVal::FVec(fv) => fv.x().b(),
+            VVal::Iter(i) => iter_next_value!(i.borrow_mut(), v, { v.b() }, false),
+            v => v.with_deref(|v| v.b(), |_| false),
         }
     }
 
@@ -5612,27 +5901,29 @@ impl VVal {
         match self {
             VVal::IVec(i) => N::from_ivec(**i),
             VVal::FVec(f) => N::from_fvec(**f),
-            VVal::Map(map)  => {
+            VVal::Map(map) => {
                 let m = map.borrow();
                 let o = N::zero().into_vval();
-                NVec::from_vval_tpl(
-                    (m.get(&s2sym("x")).unwrap_or(&o),
-                     m.get(&s2sym("y")).unwrap_or(&o),
-                     m.get(&s2sym("z")),
-                     m.get(&s2sym("w")))
-                ).unwrap_or_else(|| {
+                NVec::from_vval_tpl((
+                    m.get(&s2sym("x")).unwrap_or(&o),
+                    m.get(&s2sym("y")).unwrap_or(&o),
+                    m.get(&s2sym("z")),
+                    m.get(&s2sym("w")),
+                ))
+                .unwrap_or_else(|| {
                     // The only way from_vval_tpl can fail is if the fourth
                     // parameter is Some(_) but the third is None.
                     // That means that the following will always succeed
                     // (even if the above did not):
-                    NVec::from_vval_tpl(
-                        (m.get(&s2sym("x")).unwrap_or(&o),
-                         m.get(&s2sym("y")).unwrap_or(&o),
-                         Some(&o),
-                         m.get(&s2sym("w")))
-                    ).unwrap()
+                    NVec::from_vval_tpl((
+                        m.get(&s2sym("x")).unwrap_or(&o),
+                        m.get(&s2sym("y")).unwrap_or(&o),
+                        Some(&o),
+                        m.get(&s2sym("w")),
+                    ))
+                    .unwrap()
                 })
-            },
+            }
             VVal::Lst(lst) => {
                 let list = lst.borrow();
                 let mut lst = list.iter();
@@ -5642,83 +5933,98 @@ impl VVal {
                 // parameter is Some(_) but the third is None.
                 // That means that the following will always succeed,
                 // because lists can't have holes.
-                NVec::from_vval_tpl(
-                    (x.unwrap_or(&zero), y.unwrap_or(&zero), z, w))
-                .unwrap()
-            },
-            VVal::Pair(p) => {
-                NVec::from_vval_tpl((p.0.clone(), p.1.clone(), None, None)).unwrap()
-            },
+                NVec::from_vval_tpl((x.unwrap_or(&zero), y.unwrap_or(&zero), z, w)).unwrap()
+            }
+            VVal::Pair(p) => NVec::from_vval_tpl((p.0.clone(), p.1.clone(), None, None)).unwrap(),
             VVal::Iter(i) => {
                 iter_next_value!(
-                    i.borrow_mut(), v, { v.nvec::<N>() },
-                    NVec::from_vval_tpl(
-                        (VVal::Int(0), VVal::Int(0), None, None)).unwrap())
-            },
+                    i.borrow_mut(),
+                    v,
+                    { v.nvec::<N>() },
+                    NVec::from_vval_tpl((VVal::Int(0), VVal::Int(0), None, None)).unwrap()
+                )
+            }
             _ => Vec2(N::from_vval(self), N::zero()),
         }
     }
 
     fn s_cy(&self, c: &mut CycleCheck) -> String {
         let br = if let Some((do_continue, backref_str)) = c.backref(self) {
-            if !do_continue { return backref_str; }
+            if !do_continue {
+                return backref_str;
+            }
             backref_str
         } else {
             String::from("")
         };
         let s = match self {
-            VVal::Str(_)     => self.with_s_ref(|s| format_vval_str(s, false)),
-            VVal::Sym(s)     => VVal::dump_sym(&*s),
-            VVal::Byt(s)     => format!("$b{}", format_vval_byt(s.as_ref())),
-            VVal::None       => "$n".to_string(),
-            VVal::Err(e)     =>
+            VVal::Str(_) => self.with_s_ref(|s| format_vval_str(s, false)),
+            VVal::Sym(s) => VVal::dump_sym(&*s),
+            VVal::Byt(s) => format!("$b{}", format_vval_byt(s.as_ref())),
+            VVal::None => "$n".to_string(),
+            VVal::Err(e) => {
                 if (*e).borrow().1.has_info() {
                     format!("$e {} [@ {}]", (*e).borrow().0.s_cy(c), (*e).borrow().1)
                 } else {
                     format!("$e {}", (*e).borrow().0.s_cy(c))
-                },
-            VVal::Bol(b)     => if *b { "$true".to_string() } else { "$false".to_string() },
-            VVal::Syn(s)     => format!("$%:{:?}", s.syn()),
-            VVal::Chr(c)     => c.to_string(),
-            VVal::Int(i)     => i.to_string(),
-            VVal::Flt(f)     => f.to_string(),
-            VVal::Pair(b)    => format!("$p({},{})", b.0.s_cy(c), b.1.s_cy(c)),
-            VVal::Iter(_)    => "$iter(&)".to_string(),
-            VVal::Opt(b)     =>
-                if let Some(b) = b { format!("$o({})", b.s_cy(c)) }
-                else { "$o()".to_string() },
-            VVal::Lst(l)     => VVal::dump_vec_as_str(l, c),
-            VVal::Map(l)     => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
-            VVal::Usr(u)     => u.s(),
-            VVal::Fun(f)     => {
-                let min = if f.min_args.is_none() { "any".to_string() }
-                          else { format!("{}", f.min_args.unwrap()) };
-                let max = if f.max_args.is_none() { "any".to_string() }
-                          else { format!("{}", f.max_args.unwrap()) };
-                let upvalues : String =
-                    f.upvalues
-                     .iter()
-                     .map(|v| v.s_cy(c))
-                     .collect::<Vec<String>>()
-                     .join(",");
-                if let Some(ref sp) = f.syn_pos {
-                    format!("&F{{@{},amin={},amax={},locals={},upvalues=$[{}]}}",
-                            sp, min, max, f.local_size, upvalues)
-                } else {
-                    format!("&F{{@[0,0:?()],amin={},amax={},locals={},upvalues=$[{}]}}",
-                            min, max, f.local_size, upvalues)
                 }
-            },
+            }
+            VVal::Bol(b) => {
+                if *b {
+                    "$true".to_string()
+                } else {
+                    "$false".to_string()
+                }
+            }
+            VVal::Syn(s) => format!("$%:{:?}", s.syn()),
+            VVal::Chr(c) => c.to_string(),
+            VVal::Int(i) => i.to_string(),
+            VVal::Flt(f) => f.to_string(),
+            VVal::Pair(b) => format!("$p({},{})", b.0.s_cy(c), b.1.s_cy(c)),
+            VVal::Iter(_) => "$iter(&)".to_string(),
+            VVal::Opt(b) => {
+                if let Some(b) = b {
+                    format!("$o({})", b.s_cy(c))
+                } else {
+                    "$o()".to_string()
+                }
+            }
+            VVal::Lst(l) => VVal::dump_vec_as_str(l, c),
+            VVal::Map(l) => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
+            VVal::Usr(u) => u.s(),
+            VVal::Fun(f) => {
+                let min = if f.min_args.is_none() {
+                    "any".to_string()
+                } else {
+                    format!("{}", f.min_args.unwrap())
+                };
+                let max = if f.max_args.is_none() {
+                    "any".to_string()
+                } else {
+                    format!("{}", f.max_args.unwrap())
+                };
+                let upvalues: String =
+                    f.upvalues.iter().map(|v| v.s_cy(c)).collect::<Vec<String>>().join(",");
+                if let Some(ref sp) = f.syn_pos {
+                    format!(
+                        "&F{{@{},amin={},amax={},locals={},upvalues=$[{}]}}",
+                        sp, min, max, f.local_size, upvalues
+                    )
+                } else {
+                    format!(
+                        "&F{{@[0,0:?()],amin={},amax={},locals={},upvalues=$[{}]}}",
+                        min, max, f.local_size, upvalues
+                    )
+                }
+            }
             VVal::DropFun(f) => format!("std:to_drop[{}]", f.fun.s_cy(c)),
-            VVal::Ref(l)     => format!("$&&{}", (*l).borrow().s_cy(c)),
-            VVal::HRef(l)    => format!("$&{}", (*l).borrow().s_cy(c)),
+            VVal::Ref(l) => format!("$&&{}", (*l).borrow().s_cy(c)),
+            VVal::HRef(l) => format!("$&{}", (*l).borrow().s_cy(c)),
             VVal::FVec(nvec) => nvec.s(),
             VVal::IVec(nvec) => nvec.s(),
-            VVal::WWRef(l)   => {
-                match l.upgrade() {
-                    Some(v) => format!("$w&{}", v.borrow().s_cy(c)),
-                    None => "$n".to_string(),
-                }
+            VVal::WWRef(l) => match l.upgrade() {
+                Some(v) => format!("$w&{}", v.borrow().s_cy(c)),
+                None => "$n".to_string(),
             },
         };
         format!("{}{}", br, s)
@@ -5730,9 +6036,8 @@ impl VVal {
             VVal::Byt(b) => b.as_ref().clone(),
             v => v.with_deref(
                 |v| v.as_bytes(),
-                |v| v.map_or_else(
-                    Vec::new,
-                    |v| v.with_s_ref(|s: &str| s.as_bytes().to_vec()))),
+                |v| v.map_or_else(Vec::new, |v| v.with_s_ref(|s: &str| s.as_bytes().to_vec())),
+            ),
         }
     }
 
@@ -5743,15 +6048,14 @@ impl VVal {
                 let a = &b.0;
                 let b = &b.1;
 
-                a.with_s_ref(|astr|
-                    match astr {
-                        "s"  => Ok(std::time::Duration::from_secs(b.i() as u64)),
-                        "ms" => Ok(std::time::Duration::from_millis(b.i() as u64)),
-                        "us" => Ok(std::time::Duration::from_micros(b.i() as u64)),
-                        "ns" => Ok(std::time::Duration::from_nanos(b.i() as u64)),
-                        _    => Err(VVal::err_msg(&format!("Bad duration: {}", self.s()))),
-                    })
-            },
+                a.with_s_ref(|astr| match astr {
+                    "s" => Ok(std::time::Duration::from_secs(b.i() as u64)),
+                    "ms" => Ok(std::time::Duration::from_millis(b.i() as u64)),
+                    "us" => Ok(std::time::Duration::from_micros(b.i() as u64)),
+                    "ns" => Ok(std::time::Duration::from_nanos(b.i() as u64)),
+                    _ => Err(VVal::err_msg(&format!("Bad duration: {}", self.s()))),
+                })
+            }
             _ => Err(VVal::err_msg(&format!("Bad duration: {}", self.s()))),
         }
     }
@@ -5779,16 +6083,16 @@ impl VVal {
     }
 
     /// Serializes the VVal (non cyclic) structure to a msgpack byte vector.
-    #[cfg(feature="rmp-serde")]
+    #[cfg(feature = "rmp-serde")]
     pub fn to_msgpack(&self) -> Result<Vec<u8>, String> {
         match rmp_serde::to_vec(self) {
             Ok(s) => Ok(s),
-            Err(e) => Err(format!("to_msgpack failed: {}", e))
+            Err(e) => Err(format!("to_msgpack failed: {}", e)),
         }
     }
 
     /// Creates a VVal structure from a msgpack byte vector.
-    #[cfg(feature="rmp-serde")]
+    #[cfg(feature = "rmp-serde")]
     pub fn from_msgpack(s: &[u8]) -> Result<VVal, String> {
         match rmp_serde::from_slice(s) {
             Ok(v) => Ok(v),
@@ -5797,23 +6101,23 @@ impl VVal {
     }
 
     /// Serializes the VVal (non cyclic) structure to a JSON string.
-    #[cfg(feature="serde_json")]
+    #[cfg(feature = "serde_json")]
     pub fn to_json(&self, not_pretty: bool) -> Result<String, String> {
         if not_pretty {
             match serde_json::to_string(self) {
                 Ok(s) => Ok(s),
-                Err(e) => Err(format!("to_json failed: {}", e))
+                Err(e) => Err(format!("to_json failed: {}", e)),
             }
         } else {
             match serde_json::to_string_pretty(self) {
                 Ok(s) => Ok(s),
-                Err(e) => Err(format!("to_json failed: {}", e))
+                Err(e) => Err(format!("to_json failed: {}", e)),
             }
         }
     }
 
     /// Creates a VVal structure from a JSON string.
-    #[cfg(feature="serde_json")]
+    #[cfg(feature = "serde_json")]
     pub fn from_json(s: &str) -> Result<VVal, String> {
         match serde_json::from_str(s) {
             Ok(v) => Ok(v),
@@ -5822,30 +6126,28 @@ impl VVal {
     }
 
     /// Serializes the VVal (non cyclic) structure to a JSON string.
-    #[cfg(feature="toml")]
+    #[cfg(feature = "toml")]
     pub fn to_toml(&self, not_pretty: bool) -> Result<String, String> {
         match toml::value::Value::try_from(self) {
             Ok(v) => {
                 if not_pretty {
                     match toml::to_string(&v) {
                         Ok(s) => Ok(s),
-                        Err(e) => Err(format!("to_toml failed: {}", e))
+                        Err(e) => Err(format!("to_toml failed: {}", e)),
                     }
                 } else {
                     match toml::to_string_pretty(&v) {
                         Ok(s) => Ok(s),
-                        Err(e) => Err(format!("to_toml failed: {}", e))
+                        Err(e) => Err(format!("to_toml failed: {}", e)),
                     }
                 }
             }
-            Err(e) => {
-                Err(format!("to_toml value failed: {}", e))
-            }
+            Err(e) => Err(format!("to_toml value failed: {}", e)),
         }
     }
 
     /// Creates a VVal structure from a JSON string.
-    #[cfg(feature="toml")]
+    #[cfg(feature = "toml")]
     pub fn from_toml(s: &str) -> Result<VVal, String> {
         match toml::from_str(s) {
             Ok(v) => Ok(v),
@@ -5854,38 +6156,39 @@ impl VVal {
     }
 }
 
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 impl serde::ser::Serialize for VVal {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: serde::ser::Serializer {
-        use serde::ser::{SerializeSeq, SerializeMap};
+    where
+        S: serde::ser::Serializer,
+    {
+        use serde::ser::{SerializeMap, SerializeSeq};
 
         match self {
-            VVal::Str(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
-            VVal::Sym(_)     => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
-            VVal::Byt(b)     => serializer.serialize_bytes(&b[..]),
-            VVal::Chr(b)     =>
-                match b {
-                    VValChr::Char(c) => {
-                        let mut buf = [0; 6];
-                        serializer.serialize_str(c.encode_utf8(&mut buf))
-                    },
-                    VValChr::Byte(b) => { serializer.serialize_u8(*b) },
-                },
-            VVal::None       => serializer.serialize_none(),
-            VVal::Iter(_)    => serializer.serialize_none(),
-            VVal::Err(_)     => serializer.serialize_str(&self.s()),
-            VVal::Bol(b)     => serializer.serialize_bool(*b),
-            VVal::Syn(_)     => serializer.serialize_str(&self.s()),
-            VVal::Int(i)     => serializer.serialize_i64(*i),
-            VVal::Flt(f)     => serializer.serialize_f64(*f),
-            VVal::Pair(b)    => {
+            VVal::Str(_) => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
+            VVal::Sym(_) => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
+            VVal::Byt(b) => serializer.serialize_bytes(&b[..]),
+            VVal::Chr(b) => match b {
+                VValChr::Char(c) => {
+                    let mut buf = [0; 6];
+                    serializer.serialize_str(c.encode_utf8(&mut buf))
+                }
+                VValChr::Byte(b) => serializer.serialize_u8(*b),
+            },
+            VVal::None => serializer.serialize_none(),
+            VVal::Iter(_) => serializer.serialize_none(),
+            VVal::Err(_) => serializer.serialize_str(&self.s()),
+            VVal::Bol(b) => serializer.serialize_bool(*b),
+            VVal::Syn(_) => serializer.serialize_str(&self.s()),
+            VVal::Int(i) => serializer.serialize_i64(*i),
+            VVal::Flt(f) => serializer.serialize_f64(*f),
+            VVal::Pair(b) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
                 seq.serialize_element(&b.0)?;
                 seq.serialize_element(&b.1)?;
                 seq.end()
-            },
-            VVal::Opt(b)    => {
+            }
+            VVal::Opt(b) => {
                 if let Some(b) = b {
                     let mut seq = serializer.serialize_seq(Some(1))?;
                     seq.serialize_element(b.as_ref())?;
@@ -5894,14 +6197,14 @@ impl serde::ser::Serialize for VVal {
                     let seq = serializer.serialize_seq(Some(0))?;
                     seq.end()
                 }
-            },
-            VVal::Lst(l)     => {
+            }
+            VVal::Lst(l) => {
                 let mut seq = serializer.serialize_seq(Some(l.borrow().len()))?;
                 for v in l.borrow().iter() {
                     seq.serialize_element(v)?;
                 }
                 seq.end()
-            },
+            }
             VVal::Map(l) => {
                 let hm = l.borrow();
 
@@ -5910,71 +6213,67 @@ impl serde::ser::Serialize for VVal {
                     map.serialize_entry(k.as_ref(), v)?;
                 }
                 map.end()
-            },
-            VVal::Usr(_)     => serializer.serialize_str(&self.s()),
-            VVal::Fun(_)     => serializer.serialize_str(&self.s()),
-            VVal::FVec(fv)   => {
-                match fv.as_ref() {
-                    NVec::Vec2(x, y) => {
-                        let mut seq = serializer.serialize_seq(Some(2))?;
-                        seq.serialize_element(x)?;
-                        seq.serialize_element(y)?;
-                        seq.end()
-                    },
-                    NVec::Vec3(x, y, z) => {
-                        let mut seq = serializer.serialize_seq(Some(3))?;
-                        seq.serialize_element(x)?;
-                        seq.serialize_element(y)?;
-                        seq.serialize_element(z)?;
-                        seq.end()
-                    },
-                    NVec::Vec4(x, y, z, w) => {
-                        let mut seq = serializer.serialize_seq(Some(4))?;
-                        seq.serialize_element(x)?;
-                        seq.serialize_element(y)?;
-                        seq.serialize_element(z)?;
-                        seq.serialize_element(w)?;
-                        seq.end()
-                    },
+            }
+            VVal::Usr(_) => serializer.serialize_str(&self.s()),
+            VVal::Fun(_) => serializer.serialize_str(&self.s()),
+            VVal::FVec(fv) => match fv.as_ref() {
+                NVec::Vec2(x, y) => {
+                    let mut seq = serializer.serialize_seq(Some(2))?;
+                    seq.serialize_element(x)?;
+                    seq.serialize_element(y)?;
+                    seq.end()
+                }
+                NVec::Vec3(x, y, z) => {
+                    let mut seq = serializer.serialize_seq(Some(3))?;
+                    seq.serialize_element(x)?;
+                    seq.serialize_element(y)?;
+                    seq.serialize_element(z)?;
+                    seq.end()
+                }
+                NVec::Vec4(x, y, z, w) => {
+                    let mut seq = serializer.serialize_seq(Some(4))?;
+                    seq.serialize_element(x)?;
+                    seq.serialize_element(y)?;
+                    seq.serialize_element(z)?;
+                    seq.serialize_element(w)?;
+                    seq.end()
                 }
             },
-            VVal::IVec(iv)   => {
-                match iv.as_ref() {
-                    NVec::Vec2(x, y) => {
-                        let mut seq = serializer.serialize_seq(Some(2))?;
-                        seq.serialize_element(x)?;
-                        seq.serialize_element(y)?;
-                        seq.end()
-                    },
-                    NVec::Vec3(x, y, z) => {
-                        let mut seq = serializer.serialize_seq(Some(3))?;
-                        seq.serialize_element(x)?;
-                        seq.serialize_element(y)?;
-                        seq.serialize_element(z)?;
-                        seq.end()
-                    },
-                    NVec::Vec4(x, y, z, w) => {
-                        let mut seq = serializer.serialize_seq(Some(4))?;
-                        seq.serialize_element(x)?;
-                        seq.serialize_element(y)?;
-                        seq.serialize_element(z)?;
-                        seq.serialize_element(w)?;
-                        seq.end()
-                    },
+            VVal::IVec(iv) => match iv.as_ref() {
+                NVec::Vec2(x, y) => {
+                    let mut seq = serializer.serialize_seq(Some(2))?;
+                    seq.serialize_element(x)?;
+                    seq.serialize_element(y)?;
+                    seq.end()
+                }
+                NVec::Vec3(x, y, z) => {
+                    let mut seq = serializer.serialize_seq(Some(3))?;
+                    seq.serialize_element(x)?;
+                    seq.serialize_element(y)?;
+                    seq.serialize_element(z)?;
+                    seq.end()
+                }
+                NVec::Vec4(x, y, z, w) => {
+                    let mut seq = serializer.serialize_seq(Some(4))?;
+                    seq.serialize_element(x)?;
+                    seq.serialize_element(y)?;
+                    seq.serialize_element(z)?;
+                    seq.serialize_element(w)?;
+                    seq.end()
                 }
             },
             VVal::DropFun(_) => serializer.serialize_str(&self.s()),
-            VVal::Ref(_)     => self.deref().serialize(serializer),
-            VVal::HRef(_)    => self.deref().serialize(serializer),
-            VVal::WWRef(_)   => self.deref().serialize(serializer),
+            VVal::Ref(_) => self.deref().serialize(serializer),
+            VVal::HRef(_) => self.deref().serialize(serializer),
+            VVal::WWRef(_) => self.deref().serialize(serializer),
         }
     }
 }
 
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 struct VValVisitor;
 
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 impl<'de> serde::de::Visitor<'de> for VValVisitor {
     type Value = VVal;
 
@@ -5983,48 +6282,117 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
     }
 
     fn visit_i128<E>(self, value: i128) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(value as i64))
+    }
     fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value)) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(value))
+    }
     fn visit_i32<E>(self, value: i32) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(i64::from(value)))
+    }
     fn visit_i16<E>(self, value: i16) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(i64::from(value)))
+    }
     fn visit_i8<E>(self, value: i8) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(i64::from(value)))
+    }
     fn visit_u128<E>(self, value: u128) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(value as i64))
+    }
     fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(value as i64)) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(value as i64))
+    }
     fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(i64::from(value)))
+    }
     fn visit_u16<E>(self, value: u16) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(i64::from(value)))
+    }
     fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Int(i64::from(value))) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Int(i64::from(value)))
+    }
 
     fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Flt(value)) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Flt(value))
+    }
     fn visit_f32<E>(self, value: f32) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Flt(f64::from(value))) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Flt(f64::from(value)))
+    }
 
     fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::Bol(value)) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::Bol(value))
+    }
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::new_str(value)) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::new_str(value))
+    }
 
     fn visit_bytes<E>(self, value: &[u8]) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::new_byt(value.to_vec())) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::new_byt(value.to_vec()))
+    }
 
     fn visit_none<E>(self) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::None) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::None)
+    }
     fn visit_unit<E>(self) -> Result<Self::Value, E>
-        where E: serde::de::Error { Ok(VVal::None) }
+    where
+        E: serde::de::Error,
+    {
+        Ok(VVal::None)
+    }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where A: serde::de::SeqAccess<'de> {
-
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
         let v = VVal::vec();
 
         while let Some(ve) = seq.next_element()? {
@@ -6035,24 +6403,25 @@ impl<'de> serde::de::Visitor<'de> for VValVisitor {
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-        where A: serde::de::MapAccess<'de> {
-
+    where
+        A: serde::de::MapAccess<'de>,
+    {
         let v = VVal::map();
 
         while let Some((ke, ve)) = map.next_entry()? {
-            let k : VVal = ke;
-            v.set_key(&k, ve)
-             .expect("Deserialized map not used more than once");
+            let k: VVal = ke;
+            v.set_key(&k, ve).expect("Deserialized map not used more than once");
         }
 
         Ok(v)
     }
 }
 
-#[cfg(feature="serde")]
+#[cfg(feature = "serde")]
 impl<'de> serde::de::Deserialize<'de> for VVal {
     fn deserialize<D>(deserializer: D) -> Result<VVal, D::Error>
-        where D: serde::de::Deserializer<'de>,
+    where
+        D: serde::de::Deserializer<'de>,
     {
         deserializer.deserialize_any(VValVisitor)
     }
