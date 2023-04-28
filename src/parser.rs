@@ -960,6 +960,38 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
     }
 }
 
+fn parse_type_ident(ps: &mut State) -> Result<VVal, ParseError> {
+    if !ps.consume_if_eq_wsc('@') {
+        return Err(ps.err(ParseErrorKind::ExpectedToken('@', "type identifier start")));
+    }
+
+    let type_name = VVal::new_sym_mv(parse_identifier(ps)?);
+
+    if ps.consume_if_eq_wsc('[') {
+        let type_args = VVal::vec();
+
+        while let Some(c) = ps.peek() {
+            if c == ']' {
+                break;
+            }
+
+            type_args.push(VVal::new_sym_mv(parse_identifier(ps)?));
+
+            if !ps.consume_if_eq_wsc(',') {
+                break;
+            }
+        }
+
+        if !ps.consume_if_eq_wsc(']') {
+            return Err(ps.err(ParseErrorKind::ExpectedToken('>', "type generic end")));
+        }
+
+        Ok(VVal::pair(type_name, type_args))
+    } else {
+        Ok(type_name)
+    }
+}
+
 fn is_ident_start(c: char) -> bool {
     c.is_alphabetic() || c == '_' || c == '@' || c == '`' || c == '?'
 }
@@ -1619,6 +1651,8 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
     let mut destructuring = false;
     let ids = VVal::vec();
+    let types = VVal::vec();
+    let mut has_any_type = false;
 
     match ps.expect_some(ps.peek())? {
         '(' => {
@@ -1630,6 +1664,15 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     break;
                 }
                 ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
+                if is_def {
+                    if ps.lookahead("@") {
+                        has_any_type = true;
+                        types.push(parse_type_ident(ps)?);
+                    } else {
+                        types.push(VVal::None);
+                    }
+                }
+
                 if !ps.consume_if_eq_wsc(',') {
                     break;
                 }
@@ -1647,6 +1690,15 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
         }
         _ => {
             ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
+
+            if is_def {
+                if ps.lookahead("@") {
+                    has_any_type = true;
+                    types.push(parse_type_ident(ps)?);
+                } else {
+                    types.push(VVal::None);
+                }
+            }
         }
     }
 
@@ -1680,6 +1732,12 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
     if destructuring {
         assign.push(VVal::Bol(destructuring));
+        if has_any_type {
+            assign.push(types);
+        }
+    } else if has_any_type {
+        assign.push(VVal::Bol(false));
+        assign.push(types);
     }
 
     Ok(assign)
@@ -2171,6 +2229,12 @@ mod tests {
             "$[$%:Block,$[$%:DefGlobRef,$[:y,:x],$[$%:Var,:@],$true]]"
         );
         assert_eq!(parse(". (a,b) = 10"), "$[$%:Block,$[$%:Assign,$[:a,:b],10,$true]]");
+
+        assert_eq!(parse("!x @Int = 10;"), "$[$%:Block,$[$%:Def,$[:x],10,$false,$[:Int]]]");
+        assert_eq!(
+            parse("!x @House[Int,Bool] = 10;"),
+            "$[$%:Block,$[$%:Def,$[:x],10,$false,$[$p(:House,$[:Int,:Bool])]]]"
+        );
     }
 
     #[test]

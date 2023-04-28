@@ -157,6 +157,62 @@ impl Display for CompileError {
     }
 }
 
+/// Represents a type
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+pub enum Type {
+    Err,
+    Syn,
+    Int,
+    Flt,
+    Chr,
+    Str,
+    Byt,
+    Sym,
+    Bol,
+    FVec(u8),
+    IVec(u8),
+    Opt(Rc<Type>),
+    Pair(Rc<Type>, Rc<Type>),
+    ListAny(Rc<Type>),
+    ListFixed(Vec<Rc<Type>>),
+    Map(Rc<FnvHashMap<Symbol, Rc<Type>>>),
+    Function(Rc<Type>, Rc<Type>),
+    //    Var(Symbol),
+    //    Name(Symbol, Option<Vec<Symbol>>),
+}
+
+pub type TypeId = usize;
+
+/// The unfinished type information about something that has a type.
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+pub enum TypeInfo {
+    Unknown,
+    Type(Type),
+    Opt(TypeId),
+    Pair(TypeId, TypeId),
+    ListAny(TypeId),
+    ListFixed(Vec<TypeId>),
+    Map(Rc<FnvHashMap<Symbol, TypeId>>),
+    Function(TypeId, TypeId),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct TypeEnvironment {
+    id_counter: usize,
+    vars: FnvHashMap<TypeId, TypeInfo>,
+}
+
+impl TypeEnvironment {
+    pub fn insert(&mut self, info: TypeInfo) -> TypeId {
+        self.id_counter += 1;
+        let id = self.id_counter;
+        self.vars.insert(id, info);
+        id
+    }
+}
+
 /// Encodes the different types of AST nodes.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)]
@@ -224,6 +280,9 @@ pub enum Syntax {
     SelfData,
     Import,
     Export,
+    TypeDef,
+    Type,
+    Cast,
     DumpStack,
     DumpVM,
     DebugPrint,
@@ -305,6 +364,9 @@ impl std::str::FromStr for Syntax {
             "SelfData" => Ok(Syntax::SelfData),
             "Import" => Ok(Syntax::Import),
             "Export" => Ok(Syntax::Export),
+            "TypeDef" => Ok(Syntax::TypeDef),
+            "Type" => Ok(Syntax::Type),
+            "Cast" => Ok(Syntax::Cast),
             "DumpStack" => Ok(Syntax::DumpStack),
             "DumpVM" => Ok(Syntax::DumpVM),
             "DebugPrint" => Ok(Syntax::DebugPrint),
@@ -5389,6 +5451,9 @@ impl VVal {
                 Syntax::SelfData => "SelfData",
                 Syntax::Import => "Import",
                 Syntax::Export => "Export",
+                Syntax::TypeDef => "TypeDef",
+                Syntax::Type => "Type",
+                Syntax::Cast => "Cast",
                 Syntax::DumpStack => "DumpStack",
                 Syntax::DumpVM => "DumpVM",
                 Syntax::DebugPrint => "DebugPrint",

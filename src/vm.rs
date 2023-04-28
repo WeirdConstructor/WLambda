@@ -397,10 +397,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         env.get_local_captured_ref(*i as usize)
                     }),
                     ResPos::Global(i) => {
-                        out_reg!(env, ret, retv, data, r, { prog.data[*i as usize].clone() })
+                        out_reg!(env, ret, retv, data, r, prog.data[*i as usize].clone())
                     }
                     ResPos::Up(i) => {
-                        out_reg!(env, ret, retv, data, r, { env.get_up_captured_ref(*i as usize) })
+                        out_reg!(env, ret, retv, data, r, env.get_up_captured_ref(*i as usize))
                     }
                     _ => op_a_r!(env, ret, retv, data, a, r, { a.to_ref() }),
                 },

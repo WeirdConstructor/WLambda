@@ -9737,6 +9737,37 @@ In the following grammar, white space and comments are omitted:
                   ;
     export        = "@export", ident, [ "=" ], expr
                   ;
+    type_name     = ident
+                  ;
+    type_var      = "$", ident
+                  ;
+    type_list     = type_expr, { ",", type_expr }, [ "," ]
+                  ;
+    type_generic  = "[", type_var, { type_var }, "]"
+    type_signature = type_list, [ "[", [ type_list ], "]" ], [ "->", type_expr ]
+                   ;
+    basic_type    = "Error" | "Syntax" | "Int" | "Float" | "Char" | "String" | "Bytes"
+                  | "Symbol" | "Bool" | "MaybeError"
+                  | ( "FloatVec", ( "2" | "3" | "4" ) )
+                  | ( "IntVec", ( "2" | "3" | "4" ) )
+                  ;
+    type_expr     = "$[*", type_expr, "]"
+                  | "$[", "]"
+                  | "$[", type_list, "]"
+                  | "${", { ident, "=", type_expr }, "}"
+                  | "{", type_signature, "}"
+                  | "(", type_expr, "|", type_expr, { "|", type_expr }, ")"
+                  | "$o(", type_expr , ")"
+                  | "$p(", type_expr, type_expr , ")"
+                  | type_var
+                  | basic_type
+                  | type_name, [ type_generic ]
+                  ;
+    type_def      = "@type", ident, [ type_generic ], [ "=" ], type_expr
+                  ;
+    type_ident    = "@", basic_type
+                  | "@", type_name, [ "[", type_name, { type_name }, "]" ]
+                  ;
     capture_ref   = ":", var
                   ;
     deref         = "*", value
@@ -9765,6 +9796,7 @@ In the following grammar, white space and comments are omitted:
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
                   | "|", "|"                      (* no enforcement *)
+                  | "[", type_signature, "]"
                   ;
     function      = [ "\:", ident ], "{", [ arity_def ], block, "}"
                   | "\", [ arity_def ], statement
@@ -9782,7 +9814,7 @@ In the following grammar, white space and comments are omitted:
     value         = number
                   | string_lit
                   | "$", special_value
-                  | "(", expr, ")"
+                  | "(", [ type_ident ], expr, ")"
                   | function
                   | symbol
                   | var
@@ -9844,9 +9876,11 @@ In the following grammar, white space and comments are omitted:
                   | call, { "|>", call }
                   | call, { "||", call }
                   ;
-    simple_assign = qident, [ op ], "=", expr
+    simple_assign = qident, [ type_ident ], [ op ], "=", expr
+                  (* type_ident only permissible in definitions *)
                   ;
-    destr_assign  = "(", [ qident, { ",", qident } ], ")", "=" expr
+    destr_assign  = "(", [ qident, [ type_ident ], { ",", qident, [ type_ident ] } ], ")", "=" expr
+                  (* type_ident only permissible in definitions *)
                   ;
     definition    = [ ref_specifier ], ( simple_assign | destr_assign )
                   ;

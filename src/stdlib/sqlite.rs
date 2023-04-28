@@ -159,6 +159,7 @@ impl VValUserData for VSqliteConnection {
     }
 }
 
+#[cfg(feature = "sqlite")]
 impl crate::threads::ThreadSafeUsr for VSqliteConnection {
     fn to_vval(&self) -> VVal {
         VVal::new_usr(VSqliteConnection { con: self.con.clone() })

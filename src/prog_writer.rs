@@ -2,6 +2,7 @@ use crate::compiler::ResPos;
 use crate::compiler::ResValue;
 use crate::ops::*;
 use crate::vval::SynPos;
+use crate::vval::{SynPos, TypeId};
 
 #[derive(Debug, Clone)]
 pub(crate) enum ResultSink {
@@ -48,6 +49,7 @@ impl ResultSink {
 pub(crate) type ProgWriteNode = Box<dyn Fn(&mut Prog, ResultSink) -> ResPos>;
 
 pub(crate) struct ProgWriter {
+    result_type: TypeId,
     node: ProgWriteNode,
 }
 
@@ -74,6 +76,21 @@ impl ProgWriter {
 
 pub(crate) fn pw(f: ProgWriteNode) -> ProgWriter {
     ProgWriter { node: Box::new(f) }
+}
+
+/// Attaches a type to the value the ProgWriter is going to generate.
+macro_rules! typed {
+    ($typeid: expr, $pwres: expr) => {
+        {
+            match $pwres {
+                Ok(mut pw) => {
+                    pw.result_type = $typeid;
+                    Ok(pw)
+                }
+                pw => pw,
+            }
+        }
+    }
 }
 
 /// Internal helper macro for the code generator. It creates a `ProgWriter`
