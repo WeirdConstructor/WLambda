@@ -1,7 +1,6 @@
 use crate::compiler::ResPos;
 use crate::compiler::ResValue;
 use crate::ops::*;
-use crate::vval::SynPos;
 use crate::vval::{SynPos, TypeId};
 
 #[derive(Debug, Clone)]
@@ -49,7 +48,7 @@ impl ResultSink {
 pub(crate) type ProgWriteNode = Box<dyn Fn(&mut Prog, ResultSink) -> ResPos>;
 
 pub(crate) struct ProgWriter {
-    result_type: TypeId,
+    pub result_type: TypeId,
     node: ProgWriteNode,
 }
 
@@ -75,10 +74,11 @@ impl ProgWriter {
 }
 
 pub(crate) fn pw(f: ProgWriteNode) -> ProgWriter {
-    ProgWriter { node: Box::new(f) }
+    ProgWriter { node: Box::new(f), result_type: 0 }
 }
 
 /// Attaches a type to the value the ProgWriter is going to generate.
+#[macro_export]
 macro_rules! typed {
     ($typeid: expr, $pwres: expr) => {
         {

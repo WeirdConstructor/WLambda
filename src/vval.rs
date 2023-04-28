@@ -161,11 +161,13 @@ impl Display for CompileError {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum Type {
+    Dyn,
     Err,
     Syn,
     Int,
-    Flt,
-    Chr,
+    Float,
+    Char,
+    Byte,
     Str,
     Byt,
     Sym,
@@ -176,6 +178,7 @@ pub enum Type {
     Pair(Rc<Type>, Rc<Type>),
     ListAny(Rc<Type>),
     ListFixed(Vec<Rc<Type>>),
+    MapAny(Rc<Type>),
     Map(Rc<FnvHashMap<Symbol, Rc<Type>>>),
     Function(Rc<Type>, Rc<Type>),
     //    Var(Symbol),
@@ -189,27 +192,58 @@ pub type TypeId = usize;
 #[allow(dead_code)]
 pub enum TypeInfo {
     Unknown,
+    Ref(TypeId),
     Type(Type),
     Opt(TypeId),
     Pair(TypeId, TypeId),
     ListAny(TypeId),
     ListFixed(Vec<TypeId>),
+    MapAny(TypeId),
     Map(Rc<FnvHashMap<Symbol, TypeId>>),
     Function(TypeId, TypeId),
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct TypeEnvironment {
+pub struct TypeEnv {
     id_counter: usize,
     vars: FnvHashMap<TypeId, TypeInfo>,
 }
 
-impl TypeEnvironment {
+impl TypeEnv {
     pub fn insert(&mut self, info: TypeInfo) -> TypeId {
         self.id_counter += 1;
         let id = self.id_counter;
         self.vars.insert(id, info);
         id
+    }
+
+    pub fn unify(&mut self, left: TypeId, other: TypeId) -> Result<(), String> {
+        use TypeInfo::*;
+
+        let ta = if left == 0 { TypeInfo::Unknown } else { self.vars[&left].clone() };
+        let tb = if other == 0 { TypeInfo::Unknown } else { self.vars[&other].clone() };
+
+        match (ta, tb) {
+            (Ref(a), _) => self.unify(a, other),
+            (_, Ref(b)) => self.unify(left, b),
+            (Unknown, _) => {
+                self.vars.insert(left, TypeInfo::Ref(other));
+                Ok(())
+            }
+            (_, Unknown) => {
+                self.vars.insert(other, TypeInfo::Ref(left));
+                Ok(())
+            }
+            (Type(crate::vval::Type::Dyn), Type(_)) => Ok(()),
+            (Type(a), Type(b)) => {
+                if a != b {
+                    // TODO: Make proper type stringification!
+                    return Err(format!("Incompatible types: {:?} <=> {:?}", a, b));
+                }
+                Ok(())
+            }
+            x => Err(format!("UNIMPLEMENTED UNIFICATION: {:?}", x)),
+        }
     }
 }
 

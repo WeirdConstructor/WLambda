@@ -54,9 +54,9 @@ use crate::vval::EvalNode;
 use crate::vval::StackAction;
 use crate::vval::SynPos;
 use crate::vval::Syntax;
-use crate::vval::VVal;
-use crate::vval::VValFun;
 use crate::vval::VarPos;
+use crate::vval::{Type, TypeEnv, TypeId, TypeInfo};
+use crate::vval::{VVal, VValChr, VValFun};
 
 use crate::ops::*;
 use crate::prog_writer::*;
@@ -65,6 +65,7 @@ use crate::pw_needs_storage;
 use crate::pw_null;
 use crate::pw_provides_result_pos;
 use crate::pw_store_if_needed;
+use crate::typed;
 
 use crate::io::debug_print_value;
 
@@ -790,6 +791,9 @@ impl EvalContext {
             local_compile: Rc::new(RefCell::new(CompileEnv {
                 parent: None,
                 global: global.clone(),
+                // TODO: Check if this environment should really be here?
+                //       Or if we have to inherit it.
+                type_env: Rc::new(RefCell::new(TypeEnv::default())),
                 block_env: BlockEnv::new(),
                 upvals: Vec::new(),
                 locals_space: 0,
@@ -1127,6 +1131,8 @@ impl BlockEnv {
 pub(crate) struct CompileEnv {
     /// Reference to the global environment
     pub global: GlobalEnvRef,
+    /// Reference to the type environment of this compilation
+    pub type_env: Rc<RefCell<TypeEnv>>,
     /// Reference to the environment of the _parent_ function.
     parent: Option<Rc<RefCell<CompileEnv>>>,
     /// Holds all function local variables and manages nesting of blocks.
@@ -1156,6 +1162,7 @@ impl CompileEnv {
     pub fn new(g: GlobalEnvRef) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(CompileEnv {
             parent: None,
+            type_env: Rc::new(RefCell::new(TypeEnv::default())),
             global: g,
             block_env: BlockEnv::new(),
             upvals: Vec::new(),
@@ -1169,10 +1176,15 @@ impl CompileEnv {
     }
 
     pub fn create_env(parent: Option<CompileEnvRef>) -> Rc<RefCell<CompileEnv>> {
-        let global =
-            if let Some(p) = &parent { p.borrow_mut().global.clone() } else { GlobalEnv::new() };
+        let (global, type_env) = if let Some(p) = &parent {
+            (p.borrow().global.clone(), p.borrow().type_env.clone())
+        } else {
+            (GlobalEnv::new(), Rc::new(RefCell::new(TypeEnv::default())))
+        };
+
         Rc::new(RefCell::new(CompileEnv {
             parent,
+            type_env,
             global,
             block_env: BlockEnv::new(),
             upvals: Vec::new(),
@@ -1302,6 +1314,36 @@ impl CompileEnv {
             _ => pos,
         }
     }
+
+    pub fn type_info(&self, ti: TypeInfo) -> TypeId {
+        self.type_env.borrow_mut().insert(ti)
+    }
+
+    pub fn basic_type(&self, basic_type: Type) -> TypeId {
+        self.type_info(TypeInfo::Type(basic_type))
+    }
+
+    pub fn compile_type_info(&self, vv_ti: &VVal) -> Result<TypeId, String> {
+        vv_ti.with_s_ref(|s| {
+            match &s[..] {
+                "Dyn" => Ok(self.basic_type(Type::Dyn)),
+                "Symbol" => Ok(self.basic_type(Type::Sym)),
+                "Syntax" => Ok(self.basic_type(Type::Syn)),
+                "Float" => Ok(self.basic_type(Type::Float)),
+                "Int" => Ok(self.basic_type(Type::Int)),
+                "Byte" => Ok(self.basic_type(Type::Byte)),
+                "Char" => Ok(self.basic_type(Type::Char)),
+                "String" => Ok(self.basic_type(Type::Str)),
+                "Bytes" => Ok(self.basic_type(Type::Byt)),
+                "Bool" => Ok(self.basic_type(Type::Bol)),
+                n => Err(format!("Unknown Typename: {}", n)),
+            }
+        })
+    }
+
+    pub fn unify_types(&self, left: TypeId, other: TypeId) -> Result<(), String> {
+        self.type_env.borrow_mut().unify(left, other)
+    }
 }
 
 fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
@@ -1398,6 +1440,27 @@ pub(crate) fn copy_upvs(upvs: &[VarPos], e: &mut Env, upvalues: &mut std::vec::V
     }
 }
 
+fn compile_list_of_types(
+    ast: &VVal,
+    vv_types: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>
+) -> Result<Vec<TypeId>, CompileError> {
+    let mut out = vec![];
+
+    vv_types.with_iter(|it| {
+        for (ty, _) in it {
+            match ce.borrow_mut().compile_type_info(&ty) {
+                Ok(tid) => out.push(tid),
+                Err(e) => return Err(ast.compile_err(e)),
+            }
+        }
+
+        Ok(())
+    })?;
+
+    Ok(out)
+}
+
 fn compile_def(
     ast: &VVal,
     ce: &mut Rc<RefCell<CompileEnv>>,
@@ -1411,6 +1474,11 @@ fn compile_def(
     let vars = ast.at(1).unwrap();
     let value = ast.at(2).unwrap();
     let destr = ast.at(3).unwrap_or(VVal::None);
+    let types = ast.at(4).unwrap_or(VVal::None);
+
+    let types = compile_list_of_types(ast, &types, ce)?;
+
+    println!("DEF TYPES: {:?}", types);
 
     //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
@@ -1436,6 +1504,8 @@ fn compile_def(
         if is_global {
             let val_pw = compile(&value, ce)?;
 
+            println!("GLOBVAL: {:?}", val_pw.result_type);
+
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
                 pw_null!(prog, {
                     let gp = prog.global_pos(r.clone());
@@ -1447,6 +1517,14 @@ fn compile_def(
         } else {
             let next_local = ce.borrow_mut().find_or_new_local(&varname);
             let val_pw = compile(&value, ce)?;
+
+            println!("GLOBVAL: {:?}", val_pw.result_type);
+            let var_tid = if let Some(tid) = types.get(0) { *tid } else { 0 };
+            match ce.borrow_mut().unify_types(var_tid, val_pw.result_type) {
+                Ok(()) => (),
+                Err(e) => return Err(ast.compile_err(e)),
+            }
+
             ce.borrow_mut().def_local(&varname, next_local);
 
             pw_null!(prog, {
@@ -1581,6 +1659,9 @@ fn compile_assign(
     let vars = ast.at(1).unwrap();
     let value = ast.at(2).unwrap();
     let destr = ast.at(3).unwrap_or(VVal::None);
+    let types = ast.at(4).unwrap_or(VVal::None);
+
+    println!("ASSIGN TYPES: {:?}", types);
 
     if destr.b() {
         let val_pw = compile(&value, ce)?;
@@ -2307,6 +2388,7 @@ pub(crate) fn compile(
     ast: &VVal,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<ProgWriter, CompileError> {
+    println!("COMPILE: {}", ast.s());
     match ast {
         VVal::Lst(_) => {
             let syn = ast.at(0).unwrap_or(VVal::None);
@@ -2668,12 +2750,14 @@ pub(crate) fn compile(
                 Syntax::Key => {
                     let sym = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = sym.s_raw();
-                    pw_provides_result_pos!(prog, { prog.data_pos(sym.clone()) })
+                    let tid = ce.borrow_mut().basic_type(Type::Sym);
+                    typed!(tid, pw_provides_result_pos!(prog, { prog.data_pos(sym.clone()) }))
                 }
                 Syntax::Str => {
                     let string = ast.at(1).unwrap();
                     ce.borrow_mut().recent_sym = string.s_raw();
-                    pw_provides_result_pos!(prog, { prog.data_pos(string.clone()) })
+                    let tid = ce.borrow_mut().basic_type(Type::Str);
+                    typed!(tid, pw_provides_result_pos!(prog, { prog.data_pos(string.clone()) }))
                 }
                 Syntax::IVec => {
                     let lc: Vec<ProgWriter> = ast.map_skip(|e| compile(e, ce), 1)?;
@@ -3087,7 +3171,31 @@ pub(crate) fn compile(
         }
         _ => {
             let ast = ast.clone();
-            pw_provides_result_pos!(prog, { prog.data_pos(ast.clone()) })
+
+            let ti = match ast {
+                VVal::Bol(_) => TypeInfo::Type(Type::Bol),
+                VVal::Int(_) => TypeInfo::Type(Type::Int),
+                VVal::Flt(_) => TypeInfo::Type(Type::Float),
+                VVal::Str(_) => TypeInfo::Type(Type::Str),
+                VVal::Sym(_) => TypeInfo::Type(Type::Sym),
+                VVal::Chr(VValChr::Byte(_)) => TypeInfo::Type(Type::Byte),
+                VVal::Chr(VValChr::Char(_)) => TypeInfo::Type(Type::Char),
+                // TODO: Make maps strictly defined!
+                VVal::Map(_) => TypeInfo::Type(Type::Dyn),
+                // TODO: Make lists strictly defined!
+                VVal::Lst(_) => TypeInfo::Type(Type::Dyn),
+                VVal::None => {
+                    let tid = ce.borrow_mut().type_info(TypeInfo::Unknown);
+                    TypeInfo::Opt(tid)
+                }
+                _ => return Err(ast.compile_err(format!(
+                    "have not implemented type for atomic value: {}",
+                    ast.s()
+                ))),
+            };
+
+            let tid = ce.borrow_mut().type_info(ti);
+            typed!(tid, pw_provides_result_pos!(prog, { prog.data_pos(ast.clone()) }))
         }
     }
 }

@@ -9746,10 +9746,11 @@ In the following grammar, white space and comments are omitted:
     type_generic  = "[", type_var, { type_var }, "]"
     type_signature = type_list, [ "[", [ type_list ], "]" ], [ "->", type_expr ]
                    ;
-    basic_type    = "Error" | "Syntax" | "Int" | "Float" | "Char" | "String" | "Bytes"
+    basic_type    = "Error" | "Syntax" | "Int" | "Float" | "Byte" | "Char" | "String" | "Bytes"
                   | "Symbol" | "Bool" | "MaybeError"
                   | ( "FloatVec", ( "2" | "3" | "4" ) )
                   | ( "IntVec", ( "2" | "3" | "4" ) )
+                  | "Dyn"
                   ;
     type_expr     = "$[*", type_expr, "]"
                   | "$[", "]"
