@@ -1326,7 +1326,7 @@ impl CompileEnv {
     pub fn compile_type_info(&self, vv_ti: &VVal) -> Result<TypeId, String> {
         vv_ti.with_s_ref(|s| {
             match &s[..] {
-                "Dyn" => Ok(self.basic_type(Type::Dyn)),
+                "Any" => Ok(self.basic_type(Type::Any)),
                 "Symbol" => Ok(self.basic_type(Type::Sym)),
                 "Syntax" => Ok(self.basic_type(Type::Syn)),
                 "Float" => Ok(self.basic_type(Type::Float)),
@@ -3181,9 +3181,9 @@ pub(crate) fn compile(
                 VVal::Chr(VValChr::Byte(_)) => TypeInfo::Type(Type::Byte),
                 VVal::Chr(VValChr::Char(_)) => TypeInfo::Type(Type::Char),
                 // TODO: Make maps strictly defined!
-                VVal::Map(_) => TypeInfo::Type(Type::Dyn),
+                VVal::Map(_) => TypeInfo::Type(Type::Map),
                 // TODO: Make lists strictly defined!
-                VVal::Lst(_) => TypeInfo::Type(Type::Dyn),
+                VVal::Lst(_) => TypeInfo::Type(Type::List),
                 VVal::None => {
                     let tid = ce.borrow_mut().type_info(TypeInfo::Unknown);
                     TypeInfo::Opt(tid)

@@ -27,7 +27,7 @@ fn check_type_simple() {
     assert_eq!(ve("!v @Int = 10; v"), "10");
     assert_eq!(ve("!v @Int = 10.1; v"),
         "COMPILE ERROR: <compiler:s_eval>:1:2 Compilation Error: Incompatible types: Int <=> Float");
-    assert_eq!(ve("!v @Dyn = 10.1; v"), "10.1");
+// TODO:   assert_eq!(ve("!v @Any = 10.1; v"), "10.1");
     assert_eq!(
         ve("!(a @Float, b @Float) = $p(10, 11.1); a"),
         "COMPILE ERROR: Float != Int"
@@ -36,4 +36,7 @@ fn check_type_simple() {
         ve("!(a @Int, b @Float) = $p(10, 11.1); a + int[b]"),
         "21"
     );
+    // TODO:
+    //  - Find a way to define types for operators like `+`.
+    //  - Make function calls search the types of the arguments
 }

@@ -161,7 +161,7 @@ impl Display for CompileError {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum Type {
-    Dyn,
+    Any,
     Err,
     Syn,
     Int,
@@ -172,14 +172,16 @@ pub enum Type {
     Byt,
     Sym,
     Bol,
+    Map,
+    List,
     FVec(u8),
     IVec(u8),
     Opt(Rc<Type>),
     Pair(Rc<Type>, Rc<Type>),
-    ListAny(Rc<Type>),
+    ListMono(Rc<Type>),
     ListFixed(Vec<Rc<Type>>),
-    MapAny(Rc<Type>),
-    Map(Rc<FnvHashMap<Symbol, Rc<Type>>>),
+    MapMono(Rc<Type>),
+    MapFixed(Rc<FnvHashMap<Symbol, Rc<Type>>>),
     Function(Rc<Type>, Rc<Type>),
     //    Var(Symbol),
     //    Name(Symbol, Option<Vec<Symbol>>),
@@ -196,10 +198,10 @@ pub enum TypeInfo {
     Type(Type),
     Opt(TypeId),
     Pair(TypeId, TypeId),
-    ListAny(TypeId),
+    ListMono(TypeId),
     ListFixed(Vec<TypeId>),
-    MapAny(TypeId),
-    Map(Rc<FnvHashMap<Symbol, TypeId>>),
+    MapMono(TypeId),
+    MapFixed(Rc<FnvHashMap<Symbol, TypeId>>),
     Function(TypeId, TypeId),
 }
 
@@ -234,7 +236,7 @@ impl TypeEnv {
                 self.vars.insert(other, TypeInfo::Ref(left));
                 Ok(())
             }
-            (Type(crate::vval::Type::Dyn), Type(_)) => Ok(()),
+            // (Type(crate::vval::Type::Any), Type(_)) => Ok(()),
             (Type(a), Type(b)) => {
                 if a != b {
                     // TODO: Make proper type stringification!
