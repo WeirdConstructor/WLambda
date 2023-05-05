@@ -4197,6 +4197,25 @@ impl VVal {
         m
     }
 
+    pub fn map4(k: &str, v: VVal, k2: &str, v2: VVal, k3: &str, v3: VVal, k4: &str, v4: VVal) -> VVal {
+        let m = VVal::map();
+        m.set_key_str(k, v).expect("single use");
+        m.set_key_str(k2, v2).expect("single use");
+        m.set_key_str(k3, v3).expect("single use");
+        m.set_key_str(k4, v4).expect("single use");
+        m
+    }
+
+    pub fn map5(k: &str, v: VVal, k2: &str, v2: VVal, k3: &str, v3: VVal, k4: &str, v4: VVal, k5: &str, v5: VVal) -> VVal {
+        let m = VVal::map();
+        m.set_key_str(k, v).expect("single use");
+        m.set_key_str(k2, v2).expect("single use");
+        m.set_key_str(k3, v3).expect("single use");
+        m.set_key_str(k4, v4).expect("single use");
+        m.set_key_str(k5, v5).expect("single use");
+        m
+    }
+
     pub fn sym(s: &str) -> VVal {
         VVal::Sym(s2sym(s))
     }
