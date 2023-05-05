@@ -13722,7 +13722,6 @@ pub fn std_symbol_table() -> SymbolTable {
         "chrono:format_utc",
         |env: &mut Env, _argc: usize| {
             use chrono::offset::*;
-            use chrono::prelude::*;
             match Utc.timestamp_opt(env.arg(0).i(), 0) {
                 LocalResult::Single(dt) | LocalResult::Ambiguous(dt, _) => {
                     let fmt = env.arg(1);
@@ -13746,7 +13745,6 @@ pub fn std_symbol_table() -> SymbolTable {
         "chrono:format_local",
         |env: &mut Env, _argc: usize| {
             use chrono::offset::*;
-            use chrono::prelude::*;
             match Local.timestamp_opt(env.arg(0).i(), 0) {
                 LocalResult::Single(dt) | LocalResult::Ambiguous(dt, _) => {
                     let fmt = env.arg(1);

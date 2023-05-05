@@ -33,12 +33,14 @@ struct VImapSession {
     session: Arc<Mutex<Session<native_tls::TlsStream<std::net::TcpStream>>>>,
 }
 
+#[cfg(feature = "imap")]
 impl crate::threads::ThreadSafeUsr for VImapSession {
     fn to_vval(&self) -> VVal {
         VVal::new_usr(VImapSession { session: self.session.clone() })
     }
 }
 
+#[cfg(feature = "imap")]
 fn body_cont2vv<'a>(bcc: &'a BodyContentCommon) -> VVal {
     let mut params = VVal::None;
     if let Some(p) = &bcc.ty.params {
@@ -51,6 +53,7 @@ fn body_cont2vv<'a>(bcc: &'a BodyContentCommon) -> VVal {
     VVal::pair(VVal::new_str_mv(format!("{}/{}", bcc.ty.ty, bcc.ty.subtype)), params)
 }
 
+#[cfg(feature = "imap")]
 fn bodystructure2vv<'a>(bs: &'a BodyStructure) -> VVal {
     match bs {
         BodyStructure::Basic { common, .. } => {
@@ -78,6 +81,7 @@ fn bodystructure2vv<'a>(bs: &'a BodyStructure) -> VVal {
     }
 }
 
+#[cfg(feature = "imap")]
 fn vv2section_path(vv: &VVal) -> Option<SectionPath> {
     if vv.is_kind_of_string() {
         vv.with_s_ref(|s| match s {
@@ -116,6 +120,7 @@ fn vv2section_path(vv: &VVal) -> Option<SectionPath> {
     }
 }
 
+#[cfg(feature = "imap")]
 fn fetch2vv(env: &mut Env, f: &Fetch, arg: VVal) -> VVal {
     let uid = if let Some(uid) = f.uid { VVal::Int(uid.into()) } else { VVal::None };
 
@@ -314,6 +319,7 @@ impl VValUserData for VImapSession {
     }
 }
 
+#[cfg(feature = "imap")]
 fn mail_part2vv(env: &mut Env, part: &ParsedMail) -> Result<VVal, VVal> {
     let m = VVal::map();
     for header in part.get_headers().into_iter() {
@@ -355,6 +361,7 @@ fn mail_part2vv(env: &mut Env, part: &ParsedMail) -> Result<VVal, VVal> {
     Ok(VVal::vec2(m, body))
 }
 
+#[cfg(feature = "imap")]
 fn mail2vv(env: &mut Env, mail: &ParsedMail) -> Result<VVal, VVal> {
     let parts = VVal::vec();
 
