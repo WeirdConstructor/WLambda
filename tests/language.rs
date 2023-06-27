@@ -7438,3 +7438,13 @@ fn check_test_min_max() {
     assert_eq!(ve("std:min 0.1"), "0.1");
     assert_eq!(ve("std:min 10 11.1 11.2"), "10");
 }
+
+#[test]
+fn check_multi_def() {
+    assert_eq!(ve("!r = 14; if $t { !o = 12; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o }; r"), "12");
+    assert_eq!(ve("!o = 15; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o"), "15");
+    assert_eq!(ve("!y = 13; if $t { !(x, c) = 1 => 2; }; y"), "13");
+    assert_eq!(ve("!y = 12; if $t { !(x, y) = 1 => 2; }; y"), "12");
+    assert_eq!(ve("!y = 11; if $t { !(x, x) = 1 => 2; }; y"), "11");
+    assert_eq!(ve("!y = 10; if $t { !x = 1; !x = 2; }; y"), "10");
+}
