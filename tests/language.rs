@@ -7429,8 +7429,8 @@ fn check_chem() {
 
 #[test]
 fn check_test_min_max() {
-    assert_eq!(ve("std:max :a :C :D :A"), ":D");
     assert_eq!(ve("std:max 0.1 0.4 -0.2 0.6"), "0.6");
+    assert_eq!(ve("std:max :a :C :D :A"), ":D");
     assert_eq!(ve("std:max 0.1"), "0.1");
     assert_eq!(ve("std:max 10 11.1 11.2"), "11");
     assert_eq!(ve("std:min :a :C :D :A"), "a");
@@ -7441,7 +7441,7 @@ fn check_test_min_max() {
 
 #[test]
 fn check_multi_def() {
-    assert_eq!(ve("!r = 14; if $t { !o = 12; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o }; r"), "12");
+    assert_eq!(ve("!r = 14; if $t { !o = 12; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o }; r"), "14");
     assert_eq!(ve("!o = 15; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o"), "15");
     assert_eq!(ve("!y = 13; if $t { !(x, c) = 1 => 2; }; y"), "13");
     assert_eq!(ve("!y = 12; if $t { !(x, y) = 1 => 2; }; y"), "12");

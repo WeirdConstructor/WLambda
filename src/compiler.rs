@@ -1070,11 +1070,9 @@ impl BlockEnv {
         let block_env_vars = self.local_map_stack.pop().unwrap();
 
         let local_count = block_env_vars.0;
-        println!("popenv locals 1: {:?}", self.locals);
         for _ in 0..local_count {
             self.locals.pop();
         }
-        println!("popenv locals 2: {:?}", self.locals);
 
         (self.locals.len(), self.locals.len() + local_count)
     }
@@ -1088,22 +1086,10 @@ impl BlockEnv {
     fn next_local(&mut self) -> usize {
         let next_index = self.locals.len();
         self.locals.push((String::from(""), CompileLocal {}));
-        println!("next local {}", next_index);
         next_index
     }
 
-    fn find_local_in_current_block(&self, var: &str) -> Option<usize> {
-        let last_idx = self.local_map_stack.len() - 1;
-        let v = self.local_map_stack[last_idx].1.get(var)?;
-        if let VarPos::Local(idx) = v {
-            Some(*idx)
-        } else {
-            None
-        }
-    }
-
     fn def_local(&mut self, var: &str, idx: usize) {
-        println!("def local {} = {}", var, idx);
         self.locals[idx].0 = String::from(var);
         let last_idx = self.local_map_stack.len() - 1;
         self.local_map_stack[last_idx].1.insert(String::from(var), VarPos::Local(idx));
@@ -1203,19 +1189,6 @@ impl CompileEnv {
         self.block_env.def_local(s, idx);
     }
 
-    pub fn find_or_new_local(&mut self, var: &str) -> usize {
-        let idx = if let Some(idx) = self.block_env.find_local_in_current_block(var) {
-            idx
-        } else {
-            self.block_env.next_local()
-        };
-        if (idx + 1) > self.locals_space {
-            self.locals_space = idx + 1;
-        }
-        println!("find or new local: {} => idx={} (locals_space={})", var, idx, self.locals_space);
-        idx
-    }
-
     pub fn next_local(&mut self) -> usize {
         let idx = self.block_env.next_local();
         if (idx + 1) > self.locals_space {
@@ -1235,7 +1208,7 @@ impl CompileEnv {
             self.global.borrow_mut().env.insert(String::from(s), r.clone());
             VarPos::Global(r)
         } else {
-            let idx = self.find_or_new_local(s);
+            let idx = self.next_local();
             self.block_env.def_local(s, idx);
             VarPos::Local(idx)
         }
@@ -1265,13 +1238,11 @@ impl CompileEnv {
     }
 
     pub fn push_block_env(&mut self) {
-        println!("push env");
         self.block_env.push_env();
     }
 
     pub fn pop_block_env(&mut self) -> (usize, usize) {
         let r = self.block_env.pop_env();
-        println!("pop env {:?}", r);
         r
     }
 
@@ -1453,7 +1424,7 @@ fn compile_def(
                 panic!("Defining global did not return a global!");
             }
         } else {
-            let next_local = ce.borrow_mut().find_or_new_local(&varname);
+            let next_local = ce.borrow_mut().next_local();
             let val_pw = compile(&value, ce)?;
             ce.borrow_mut().def_local(&varname, next_local);
 
@@ -1704,8 +1675,6 @@ fn compile_block(
     ce.borrow_mut().push_block_env();
     let stmts = compile_stmts(ast, skip_cnt, ce)?;
     let (from_local_idx, to_local_idx) = ce.borrow_mut().pop_block_env();
-
-    println!("Compile block: from {} to {}", from_local_idx, to_local_idx);
 
     pw!(prog, store, {
         match store {

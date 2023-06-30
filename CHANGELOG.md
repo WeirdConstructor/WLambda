@@ -1,6 +1,8 @@
 0.8.2 (unreleased)
 ==================
 
+* **Bugfix:** If you defined multiple variables in a local scope, variables from the outer
+scope were cleared.
 * **Feature:** `$iter` and `iter` are now accepting functions as arguments
 and can create an iterator over a WLambda generator function from that.
 * **Feature:** Extended `std:http:*` requests with `@dump` option to dump
