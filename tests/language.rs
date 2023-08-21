@@ -5286,6 +5286,12 @@ fn check_op_assignment() {
 
     assert_eq!(ve("!x = \\_ * 10; .x <&= 10; x"), "100");
     assert_eq!(ve("!x = 10; .x &>= \\_ * 20; x"), "200");
+
+    assert_eq!(ve("!x = ${ y = ${ o = ${ l = $[0] } } }; x.y.o.l.0 += 4; x.y.o.l.0"), "4");
+    assert_eq!(ve("!x = ${ y = ${ o = ${ l = $[0, 0] } } }; x.y.o.l.1 += 4; x.y.o.l.1"), "4");
+    assert_eq!(ve("!x = ${ y = ${ o = 0 } }; x.y.o += 2; x.y.o"), "2");
+    assert_eq!(ve("!x = ${ y = ${ o = ${ l = 0 } } }; x.y.o.l += 3; x.y.o.l"), "3");
+    assert_eq!(ve("!x = ${ y = 0 }; x.y += 10; x.y"), "10");
 }
 
 #[test]

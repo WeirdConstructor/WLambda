@@ -66,6 +66,42 @@ impl VValUserData for VTcpStream {
     }
 }
 
+fn with_write_usr<R, F: FnMut(&mut dyn std::io::Write) -> R>(mut fd: VVal, mut f: F) -> Option<R> {
+    if fd.is_usr::<VTcpStream>() {
+        return fd.with_usr_ref(|vts: &mut VTcpStream| {
+            f(&mut *vts.stream.borrow_mut())
+        });
+    }
+
+    None
+//
+//            Ok(fd
+//                .with_usr_ref(|vts: &mut VTcpStream| {
+//                    use std::io::Write;
+//
+//                    data.with_bv_ref(|bytes| {
+//                        if offs >= bytes.len() {
+//                            return env.new_err("std:io:write_some: bad buffer offset".to_string());
+//                        }
+//
+//                        let r = vts.stream.borrow_mut().write_all(&bytes[offs..]);
+//                        match r {
+//                            Ok(()) => VVal::Int(bytes.len() as i64),
+//                            Err(e) => match e.kind() {
+//                                std::io::ErrorKind::Interrupted => VVal::None,
+//                                _ => env.new_err(format!("std:io:write_some: {}", e)),
+//                            },
+//                        }
+//                    })
+//                })
+//                .unwrap_or_else(|| {
+//                    env.new_err(format!(
+//                        "std:io:write: First argument not an IO handle! {}",
+//                        fd.s()
+//                    ))
+//                }))
+}
+
 #[derive(Debug, Clone)]
 struct VUdpSocket {
     socket: Rc<RefCell<std::net::UdpSocket>>,
