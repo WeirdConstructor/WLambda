@@ -7436,11 +7436,13 @@ fn check_chem() {
 #[test]
 fn check_test_min_max() {
     assert_eq!(ve("std:max 0.1 0.4 -0.2 0.6"), "0.6");
-    assert_eq!(ve("std:max :a :C :D :A"), ":D");
+    assert_eq!(ve("std:max :a :C :D :A"), ":a");
+    assert_eq!(ve("std:max \"a\" \"C\" \"D\" \"A\""), "\"a\"");
     assert_eq!(ve("std:max 0.1"), "0.1");
     assert_eq!(ve("std:max 10 11.1 11.2"), "11");
-    assert_eq!(ve("std:min :a :C :D :A"), "a");
     assert_eq!(ve("std:min 0.1 0.4 -0.2 0.6"), "-0.2");
+    assert_eq!(ve("std:min :a :C :D :A"), ":A");
+    assert_eq!(ve("std:min \"a\" \"C\" \"D\" \"A\""), "\"A\"");
     assert_eq!(ve("std:min 0.1"), "0.1");
     assert_eq!(ve("std:min 10 11.1 11.2"), "10");
 }

@@ -1204,7 +1204,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     ps.consume_wsc_n(op_len);
                     ps.consume_wsc(); // consume '=' too!
 
-                    let get_value = optimize_get_key(ps, obj.clone(), value.clone());
+                    let get_value = optimize_get_key(ps, obj.shallow_clone(), value.clone());
 
                     let field_set = ps.syn(Syntax::SetKey);
                     field_set.push(obj);
@@ -2459,6 +2459,12 @@ mod tests {
 
         assert_eq!(parse("a + x +> b + x"),  "$[$%:Block,$[$%:Call,$%:OpColAddR,$[$%:BinOpAdd,$[$%:Var,:a],$[$%:Var,:x]],$[$%:BinOpAdd,$[$%:Var,:b],$[$%:Var,:x]]]]");
         assert_eq!(parse("a + c <+ b + c"),  "$[$%:Block,$[$%:Call,$%:OpColAddL,$[$%:BinOpAdd,$[$%:Var,:b],$[$%:Var,:c]],$[$%:BinOpAdd,$[$%:Var,:a],$[$%:Var,:c]]]]");
+    }
+
+    #[test]
+    fn check_assign_op() {
+        assert_eq!(parse("o.x += 1"),    "$[$%:Block,$[$%:SetKey,$[$%:Var,:o],$[$%:Key,:x],$[$%:BinOpAdd,$[$%:GetSym,$[$%:Var,:o],:x],1]]]");
+        assert_eq!(parse("o.x.y += 1"),  "$[$%:Block,$[$%:SetKey,$[$%:GetSym,$<1=>$[$%:Var,:o],:x],$[$%:Key,:y],$[$%:BinOpAdd,$[$%:GetSym2,$<1>,:x,:y],1]]]");
     }
 
     #[test]

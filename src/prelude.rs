@@ -14876,7 +14876,11 @@ pub fn std_symbol_table() -> SymbolTable {
                     r = r.min(env.arg(i).s_raw());
                 }
 
-                Ok(VVal::new_str_mv(r))
+                if env.arg(0).is_sym() {
+                    Ok(VVal::new_sym_mv(r))
+                } else {
+                    Ok(VVal::new_str_mv(r))
+                }
             }
         },
         None,
@@ -14911,7 +14915,11 @@ pub fn std_symbol_table() -> SymbolTable {
                     r = r.max(env.arg(i).s_raw());
                 }
 
-                Ok(VVal::new_str_mv(r))
+                if env.arg(0).is_sym() {
+                    Ok(VVal::new_sym_mv(r))
+                } else {
+                    Ok(VVal::new_str_mv(r))
+                }
             }
         },
         None,
