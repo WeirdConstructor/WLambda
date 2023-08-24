@@ -7530,7 +7530,7 @@ std:io:stdout:write "xxx"; # => Writes `"xxx"` to standard output
 #### <a name="11111-stdioflush-handle"></a>11.1.11 - std:io:flush _handle_
 
 Flushes the internal buffers of _handle_. _handle_ can be any kind of IO handle,
-like a file handle or networking socket.
+like a file handle, a child pipe handle or networking socket.
 
 ```text
 !socket = unwrap ~ std:net:tcp:connect "127.0.0.1:80";
@@ -7786,11 +7786,14 @@ nor input is passed:
 
 * _default_ - child process gets _null_ handles for stdin, stdout and stderr.
 * `:inherit_out` - child process inherits stdout and stderr, but stdin will be _null_.
-* `:inherit_all` - child process inherits all (stdout, stderr and stdin) from the
-parent and uses them until it exits.
+* `:inherit_all` - child process inherits all (stdout, stderr and stdin) from the parent and uses them until it exits.
+* `:ioe` - create pipes for stdin, stdout and stderr.
+* `:io` - create pipes only for stdin and stdout.
+* `:i` - create pipes only for stdin.
+* `:o` - create pipes only for stdout.
+* `:e` - create pipes only for stderr.
 
-TODO: Implement pipe to/from the child process to be
-read/written to via `std:io:read_some` and `std:io:write`.
+You can retrieve the pipes once via `std:process:get_pipes`.
 
 ```wlambda
 !hdl = unwrap ~ std:process:spawn "bash" $[
@@ -7803,6 +7806,40 @@ read/written to via `std:io:read_some` and `std:io:write`.
 
 std:assert ~ not result.success;
 std:assert result.status == 20;
+```
+
+#### - std:process:get\_pipes _child-handle_
+
+Retrieves the pipes of the child process handle once. A map will be returned with 3 keys in them,
+each with either a `$none` value, a `$<ChildReadPipe>` or `$<ChildWritePipe>` handle.
+
+If you drop the pipe handles they will be closed. That means if you drop the `$<ChildWritePipe>`
+the `stdin` of the child process will be closed.
+
+If you repeatedly call `std:process:get_pipes` on the same child handle, you will not get the pipes
+again.
+
+```wlambda
+!hdl = unwrap ~ std:process:spawn "bash" $[] :io;
+!handles = std:process:get_pipes hdl;
+
+std:io:write handles.stdin "echo 123";
+std:io:flush handles.stdin;
+
+# Close the input handle:
+handles.stdin = $none;
+
+# After the application receives an EOF on stdin, it should
+# eventually quit. Here we read the output from the echo on stdout:
+!output = std:io:read_all handles.stdout;
+
+std:assert_eq output "123\n";
+
+# Eventually the application should quit:
+!result = unwrap ~ std:process:wait hdl;
+
+std:assert result.success;
+std:assert result.status == 0;
 ```
 
 #### <a name="1133-stdprocesstrywait-child-handle"></a>11.3.3 - std:process:try\_wait _child-handle_

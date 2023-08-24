@@ -16,7 +16,7 @@ file I/O could be done outside the WLambda control flow.
 
 use crate::compiler::*;
 use crate::threads::*;
-use crate::vval::*;
+use crate::vval::{Env, VValFun, VVal};
 
 const RPC_MSG_CALL: i64 = 1;
 const RPC_MSG_SEND: i64 = 2;
@@ -251,7 +251,6 @@ mod tests {
     #[test]
     fn check_rpc() {
         use crate::rpc_helper::*;
-        use crate::vval::*;
 
         // Get some random user thread:
         let mut ctx = crate::compiler::EvalContext::new_default();

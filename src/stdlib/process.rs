@@ -42,6 +42,26 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
             if env.arg(2).with_s_ref(|s| s == "inherit_out") {
                 cmd.stdin(Stdio::null());
+            } else if env.arg(2).with_s_ref(|s| s == "ioe") {
+                cmd.stdin(Stdio::piped());
+                cmd.stdout(Stdio::piped());
+                cmd.stderr(Stdio::piped());
+            } else if env.arg(2).with_s_ref(|s| s == "io") {
+                cmd.stdin(Stdio::piped());
+                cmd.stdout(Stdio::piped());
+                cmd.stderr(Stdio::null());
+            } else if env.arg(2).with_s_ref(|s| s == "i") {
+                cmd.stdin(Stdio::piped());
+                cmd.stdout(Stdio::null());
+                cmd.stderr(Stdio::null());
+            } else if env.arg(2).with_s_ref(|s| s == "o") {
+                cmd.stdin(Stdio::null());
+                cmd.stdout(Stdio::piped());
+                cmd.stderr(Stdio::null());
+            } else if env.arg(2).with_s_ref(|s| s == "e") {
+                cmd.stdin(Stdio::null());
+                cmd.stdout(Stdio::null());
+                cmd.stderr(Stdio::piped());
             } else if env.arg(2).with_s_ref(|s| s == "inherit_all") {
                 // nop
             } else {

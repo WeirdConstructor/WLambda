@@ -16,6 +16,7 @@ mod imap;
 #[cfg(feature = "html")]
 mod rcdom;
 mod sqlite;
+mod io_types;
 pub use helpers::PendingResult;
 
 pub fn add_to_symtable(st: &mut SymbolTable) {
