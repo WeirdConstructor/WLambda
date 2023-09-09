@@ -433,6 +433,57 @@ fn check_to_drop() {
     "),
         "10"
     );
+    assert_eq!(
+        ve("
+        !destroyed = $false;
+
+        !MyClass = ${
+            new = {
+                $&& ${
+                    _proto = $self,
+                    _data  = $&& ${
+                        x = 1
+                    },
+                    dropper = std:to_drop { .destroyed = $t; },
+                }
+            },
+            inc_x = { $data.x += 1 },
+            install_on = {!(callchain) = @;
+                !self = $w& $self;
+                std:push callchain { self.inc_x[]; };
+            },
+            install_getter = {!(callchain) = @;
+                !data = $w& $data;
+                std:push callchain { data.x };
+            },
+        };
+
+        ## Create instance:
+        !my_obj = MyClass.new[];
+
+        my_obj.inc_x[];
+
+        !chain = $[];
+        my_obj.install_on     chain;
+        my_obj.install_getter chain;
+
+        ## There are now 3 references to 'my_obj':
+        ## - my_obj variable
+        ## - first callback in chain
+        ## - second callback in chain
+
+        std:assert_eq my_obj._data.x 2;
+        chain.0[]; # calls my_ocj.inc_x[];
+        std:assert_eq my_obj._data.x 3;
+
+        ## Second callback gets x:
+        std:assert_eq chain.1[] 3;
+
+        .my_obj = $n; # destroy only strong reference
+        destroyed
+    "),
+        "$true"
+    );
 }
 
 #[test]
@@ -7449,7 +7500,10 @@ fn check_test_min_max() {
 
 #[test]
 fn check_multi_def() {
-    assert_eq!(ve("!r = 14; if $t { !o = 12; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o }; r"), "14");
+    assert_eq!(
+        ve("!r = 14; if $t { !o = 12; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o }; r"),
+        "14"
+    );
     assert_eq!(ve("!o = 15; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o"), "15");
     assert_eq!(ve("!y = 13; if $t { !(x, c) = 1 => 2; }; y"), "13");
     assert_eq!(ve("!y = 12; if $t { !(x, y) = 1 => 2; }; y"), "12");

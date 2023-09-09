@@ -673,7 +673,7 @@
       "## Second callback gets x:",
       "std:assert_eq chain.1[] 3;",
       "",
-      "!my_obj = $n; # destroy only strong reference",
+      ".my_obj = $n; # destroy only strong reference",
       "std:assert destroyed;",
       "```",
       "",
@@ -901,7 +901,7 @@
     ]
   ],
   [
-    "2.5.8 - Reverse Argument Apply Pipe `list &@> fun`",
+    "2.5.8 - Reverse Argument Apply Pipe `fun <@& list`",
     [
       "",
       "This operator is like `<&`. But it will call the function with the elements",
@@ -6905,7 +6905,7 @@
       "- [Forward Argument Pipe `arg &> fun`](#255-forward-argument-pipe-arg--fun)",
       "- [Forward Argument Apply Pipe `list &@> fun`](256-forward-argument-apply-pipe-list--fun)",
       "- [Reverse Argument Pipe `fun <& arg`](#257-reverse-argument-pipe-fun--arg)",
-      "- [Reverse Argument Apply Pipe `list &@> fun`](#258-reverse-argument-apply-pipe-list--fun)",
+      "- [Reverse Argument Apply Pipe `list &@> fun`](#258-reverse-argument-apply-pipe-fun--list)",
       ""
     ]
   ],
@@ -10286,7 +10286,7 @@
     "12.9 - HTTP Client",
     [
       "",
-      "WLambda offers an optional integrated HTTP client by enabling the `reqwest`",
+      "WLambda offers an optional integrated HTTP client by enabling the `reqwest` or `http`",
       "feature at compile time. With this you can create a new client using `std:http:client:new` and make HTTP requests using `std:http:get`, `std:http:post` and `std:http:request`. Also support for basic authentication and token based bearer authentication",
       "is there.",
       ""
@@ -10425,7 +10425,81 @@
     ]
   ],
   [
-    "12.10 - Operating System Utilities",
+    "12.10 - HTTP Server",
+    [
+      "",
+      "WLambda offers an optional integrated HTTP server by enabling the `http`",
+      "feature at compile time. With this you can create a new server using `std:http:server:new`.",
+      ""
+    ]
+  ],
+  [
+    "12.10.1 - std:http:server:new _endpoint-string_ -> $\\<HttpServer\\> | $error",
+    [
+      "",
+      "This creates a new http server handle. If you drop that handle, meaning if you remove the last",
+      "reference to it the HTTP server will be stopped.",
+      "",
+      "You can use the following methods to handle requests:",
+      "",
+      "- `$<HttpServer>.try_respond _respond-func_` to check quickly if some request can be answered.",
+      "- `$<HttpServer>.wait_respond _respond-func_` to wait indefinitely until a request arrives",
+      "- `$<HttpServer>.timeout_respond _duration_ _respond-func_` to wait the specified _duration_ until a request arrives.",
+      "",
+      "All three methods call the _respond-func_ when a new request arrives. The first argument is a request",
+      "map with the following keys:",
+      "",
+      "- `:url` contains the URL (no query, unescaped)",
+      "- `:method` contains the HTTP method",
+      "- `:body` contains the request body bytes",
+      "",
+      "Here is a more elaborate example to get you started. It also starts a client request, for",
+      "stopping the code (as it is executed by the test suite):",
+      "",
+      "```wlambda",
+      "!srv = std:http:server:new \"localhost:28080\";",
+      "",
+      "!client_thread = std:thread:spawn $code{",
+      "    !@import std;",
+      "    !@wlambda;",
+      "    std:thread:sleep :ms => 500;",
+      "    !cl = std:http:client:new[];",
+      "    !resp = std:http:get cl \"http://localhost:28080/quit\";",
+      "    std:displayln resp;",
+      "    resp.status",
+      "};",
+      "",
+      "!running = $true;",
+      "while running {",
+      "    srv.timeout_respond :ms => 1000 {!(req) = @;",
+      "        std:displayln \"Req \" req.method req.url;",
+      "",
+      "        if req.url == \"/\" {",
+      "            return :redirect => \"/files/xxx.txt\";",
+      "        };",
+      "",
+      "        if req.url == \"/quit\" {",
+      "            .running = $false;",
+      "            return $[:data, \"application/json\", std:ser:json $[\"quit\"]];",
+      "        };",
+      "",
+      "        if req.url &> $r($^\\/files\\/) {",
+      "            $[:file, \"/files\", \"/var/www/\"]",
+      "        } {",
+      "            $[:data, \"application/json\", std:ser:json $[\"ok\", 1, 2, 3]]",
+      "        };",
+      "    };",
+      "",
+      "    std:displayln \":tick:\";",
+      "};",
+      "",
+      "std:assert_eq client_thread.join[] 200;",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "12.11 - Operating System Utilities",
     [
       "",
       "Some operating system utility functions. Some might only be available if",
@@ -10434,7 +10508,7 @@
     ]
   ],
   [
-    "12.10.1 - std:os:get_clipboard_text",
+    "12.11.1 - std:os:get_clipboard_text",
     [
       "",
       "Only available if WLambda was compiled with the `clipboard` feature.",
@@ -10443,7 +10517,7 @@
     ]
   ],
   [
-    "12.10.2 - std:os:set_clipboard_text _string_",
+    "12.11.2 - std:os:set_clipboard_text _string_",
     [
       "",
       "Only available if WLambda was compiled with the `clipboard` feature.",
@@ -10452,7 +10526,7 @@
     ]
   ],
   [
-    "12.11 - MQTT Messaging",
+    "12.12 - MQTT Messaging",
     [
       "",
       "WLambda offers an optional support for the MQTT protocol. You can setup a MQTT client",
@@ -10465,7 +10539,7 @@
     ]
   ],
   [
-    "12.11.1 - std:mqtt:broker:new _config_",
+    "12.12.1 - std:mqtt:broker:new _config_",
     [
       "",
       "This function sets up an embedded MQTT broker. A handle is returned that you can use",
@@ -10521,7 +10595,7 @@
     ]
   ],
   [
-    "12.11.1.1 - broker.publish _topic-string_ _payload-bytes_",
+    "12.12.1.1 - broker.publish _topic-string_ _payload-bytes_",
     [
       "",
       "Publishes the _payload-bytes_ under the _topic-string_. Returns an error",
@@ -10531,7 +10605,7 @@
     ]
   ],
   [
-    "12.11.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_",
+    "12.12.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_",
     [
       "",
       "This sets up a MQTT client that connects to the given _broker-host_ and _broker-port_.",
@@ -10589,7 +10663,7 @@
     ]
   ],
   [
-    "12.11.2.1 - mqtt_client.publish _topic-string_ _payload-bytes_",
+    "12.12.2.1 - mqtt_client.publish _topic-string_ _payload-bytes_",
     [
       "",
       "Publishes the _payload-bytes_ under the _topic-string_. Returns an error",
@@ -10599,7 +10673,7 @@
     ]
   ],
   [
-    "12.11.2.2 - mqtt_client.subscribe _topic-string_",
+    "12.12.2.2 - mqtt_client.subscribe _topic-string_",
     [
       "",
       "Subscribes to the _topic-string_. Returns an error if something went wrong.",
@@ -10608,7 +10682,7 @@
     ]
   ],
   [
-    "12.12 - Cursive Console/Terminal Text User Interface",
+    "12.13 - Cursive Console/Terminal Text User Interface",
     [
       "",
       "WLambda comes with a text based user interface library binding to the `cursive` crate.",
@@ -10620,7 +10694,7 @@
     ]
   ],
   [
-    "12.12.1 - std:cursive:new -> $\\<Cursive\\>",
+    "12.13.1 - std:cursive:new -> $\\<Cursive\\>",
     [
       "",
       "Create a new Cursive instance. You can call the following functions on it:",
@@ -10638,7 +10712,7 @@
     ]
   ],
   [
-    "12.12.2 - std:cursive:install_cursive_stdio",
+    "12.13.2 - std:cursive:install_cursive_stdio",
     [
       "",
       "Sets up WLambda to output things that would go to the standard output, to go to the `stdout`",
@@ -10647,13 +10721,13 @@
     ]
   ],
   [
-    "12.12.3 - $\\<Cursive\\> Object",
+    "12.13.3 - $\\<Cursive\\> Object",
     [
       ""
     ]
   ],
   [
-    "12.12.3.1 - $\\<Cursive\\>.run -> $none | $error",
+    "12.13.3.1 - $\\<Cursive\\>.run -> $none | $error",
     [
       "",
       "Start the event loop. You can only exit this event loop using `$<Cursive>.quit[]`.",
@@ -10661,7 +10735,7 @@
     ]
   ],
   [
-    "12.12.3.2 - $\\<Cursive\\>.add_layer _view-def_",
+    "12.13.3.2 - $\\<Cursive\\>.add_layer _view-def_",
     [
       "",
       "Adds a layer on top of the current screen and instanciates a _view-def_.",
@@ -10670,7 +10744,7 @@
     ]
   ],
   [
-    "12.12.3.3 - $\\<Cursive\\>.pop_layer",
+    "12.13.3.3 - $\\<Cursive\\>.pop_layer",
     [
       "",
       "Removes the top most layer of the current screen.",
@@ -10678,7 +10752,7 @@
     ]
   ],
   [
-    "12.12.3.4 - $\\<Cursive\\>.get _name-of-view_ -> $none | $\\<NamedView:Name:Type\\>",
+    "12.13.3.4 - $\\<Cursive\\>.get _name-of-view_ -> $none | $\\<NamedView:Name:Type\\>",
     [
       "",
       "Retrieves the handle of a specific view. You must not store this handle anywhere except",
@@ -10702,7 +10776,7 @@
     ]
   ],
   [
-    "12.12.3.5 - $\\<Cursive\\>.popup _popup-def_ _view-def_",
+    "12.13.3.5 - $\\<Cursive\\>.popup _popup-def_ _view-def_",
     [
       "",
       "This opens a popup dialog that shows the view _view-def_. It has a frame, a title and you can",
@@ -10744,7 +10818,7 @@
     ]
   ],
   [
-    "12.12.3.6 - $\\<Cursive\\>.add_screen _view-def_ -> _screen-id_",
+    "12.13.3.6 - $\\<Cursive\\>.add_screen _view-def_ -> _screen-id_",
     [
       "",
       "Creates a new screen (not visible) and instanciates the _view-def_ on a new",
@@ -10754,7 +10828,7 @@
     ]
   ],
   [
-    "12.12.3.7 - $\\<Cursive\\>.*set_screen* _screen-id_",
+    "12.13.3.7 - $\\<Cursive\\>.*set_screen* _screen-id_",
     [
       "",
       "Sets the currently visible screen by it's ID as returned by `$<Cursive>.add_screen`.",
@@ -10763,7 +10837,7 @@
     ]
   ],
   [
-    "12.12.3.8 - $\\<Cursive\\>.active_screen -> _screen-id_",
+    "12.13.3.8 - $\\<Cursive\\>.active_screen -> _screen-id_",
     [
       "",
       "Returns the current active/visible screen's ID.",
@@ -10771,7 +10845,7 @@
     ]
   ],
   [
-    "12.12.3.9 - $\\<Cursive\\>.sender -> $\\<Cursive:SendMsgCb\\>",
+    "12.13.3.9 - $\\<Cursive\\>.sender -> $\\<Cursive:SendMsgCb\\>",
     [
       "",
       "Creates an event sender callback to communicate with the Cursive UI thread/event loop from",
@@ -10780,7 +10854,7 @@
     ]
   ],
   [
-    "12.12.3.9.1 - $\\<Cursive:SendMsgCb\\> _event-tag_ _value_ -> $true | $error",
+    "12.13.3.9.1 - $\\<Cursive:SendMsgCb\\> _event-tag_ _value_ -> $true | $error",
     [
       "",
       "Sends the _value_ to the Cursive UI thread's event loop. The _event-tag_",
@@ -10792,7 +10866,7 @@
     ]
   ],
   [
-    "12.12.3.10 - $\\<Cursive\\>.default_cb _widget-name_ _function_",
+    "12.13.3.10 - $\\<Cursive\\>.default_cb _widget-name_ _function_",
     [
       "",
       "Installs a default callback for handling events from the correspondig _widget-name_.",
@@ -10818,7 +10892,7 @@
     ]
   ],
   [
-    "12.12.3.11 - $\\<Cursive\\>.set_window_title _string_",
+    "12.13.3.11 - $\\<Cursive\\>.set_window_title _string_",
     [
       "",
       "Sets the window title of the application. That title will usually appear in the window title bar of",
@@ -10827,7 +10901,7 @@
     ]
   ],
   [
-    "12.12.4 - $\\<Cursive\\>.init_console_logging",
+    "12.13.4 - $\\<Cursive\\>.init_console_logging",
     [
       "",
       "Enables logging of Cursive debugging information to the console. Use `$<Cursive>.toggle_debug_console[]`",
@@ -10836,7 +10910,7 @@
     ]
   ],
   [
-    "12.12.5 - $\\<Cursive\\>.toggle_debug_console",
+    "12.13.5 - $\\<Cursive\\>.toggle_debug_console",
     [
       "",
       "Shows/Hides the Cursive debugging console. See also `$<Cursive>.init_console_logging[]`.",
@@ -10844,7 +10918,7 @@
     ]
   ],
   [
-    "12.12.6 - $\\<Cursive\\>.show_debug_console",
+    "12.13.6 - $\\<Cursive\\>.show_debug_console",
     [
       "",
       "Shows the Cursive debugging console. See also `$<Cursive>.init_console_logging[]`.",
@@ -10852,7 +10926,7 @@
     ]
   ],
   [
-    "12.12.6.1 - $\\<Cursive\\>.quit",
+    "12.13.6.1 - $\\<Cursive\\>.quit",
     [
       "",
       "Quit the main event loop.",
@@ -10860,7 +10934,7 @@
     ]
   ],
   [
-    "12.12.6.2 - $\\<Cursive\\>.counter -> $\\<Cursive:Counter\\>",
+    "12.13.6.2 - $\\<Cursive\\>.counter -> $\\<Cursive:Counter\\>",
     [
       "",
       "Creates a counter instance to be used by the `progress` view-def. It's initialized with 0.",
@@ -10889,7 +10963,7 @@
     ]
   ],
   [
-    "12.12.7 - $\\<Cursive:Counter\\> Object",
+    "12.13.7 - $\\<Cursive:Counter\\> Object",
     [
       "",
       "This section describes the `$<Cursive:Counter>` object API. It is instanciated",
@@ -10898,7 +10972,7 @@
     ]
   ],
   [
-    "12.12.7.1 - $\\<Cursive:Counter\\>.get",
+    "12.13.7.1 - $\\<Cursive:Counter\\>.get",
     [
       "",
       "Returns the current counter integer value.",
@@ -10906,7 +10980,7 @@
     ]
   ],
   [
-    "12.12.7.2 - $\\<Cursive:Counter\\>.set _integer_",
+    "12.13.7.2 - $\\<Cursive:Counter\\>.set _integer_",
     [
       "",
       "Sets the current counter integer value.",
@@ -10914,7 +10988,7 @@
     ]
   ],
   [
-    "12.12.7.3 - $\\<Cursive:Counter\\>.set_update _integer_",
+    "12.13.7.3 - $\\<Cursive:Counter\\>.set_update _integer_",
     [
       "",
       "Sets the current counter integer value and sends a signal to the Cursive UI thread",
@@ -10925,7 +10999,7 @@
     ]
   ],
   [
-    "12.12.7.4 - $\\<Cursive:Counter\\>.tick _integer_",
+    "12.13.7.4 - $\\<Cursive:Counter\\>.tick _integer_",
     [
       "",
       "Increments the counter by _integer_.",
@@ -10933,7 +11007,7 @@
     ]
   ],
   [
-    "12.12.7.5 - $\\<Cursive:Counter\\>.tick_update _integer_",
+    "12.13.7.5 - $\\<Cursive:Counter\\>.tick_update _integer_",
     [
       "",
       "Increments the counter by _integer_ and updates the Cursive UI thread.",

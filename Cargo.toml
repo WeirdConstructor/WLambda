@@ -42,8 +42,8 @@ quick-xml  = { version = "0.27.1",  optional = true }
 socket2    = { version = "0.5.1",  optional = true, features = ["all"] }
 reqwest    = { version = "0.11.9",  optional = true, features = ["blocking"] }
 rouille    = { version = "3.6.1",   optional = true }
-rumqttc    = { version = "0.20.0",  optional = true }
-rumqttd    = { version = "0.14.0",  optional = true }
+rumqttc    = { version = "0.22.0",  optional = true }
+rumqttd    = { version = "0.17.0",  optional = true }
 cursive    = { version = "0.20.0",  optional = true, features = ["crossterm-backend"], default-features = false }
 sqlite     = { version = "0.30.4",  optional = true }
 imap       = { version = "2.4.1",   optional = true }

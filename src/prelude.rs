@@ -56,7 +56,7 @@ Smalltalk, LISP and Perl.
     - [2.5.5](#255-forward-argument-pipe-arg--fun) Forward Argument Pipe `arg &> fun`
     - [2.5.6](#256-forward-argument-apply-pipe-list--fun) Forward Argument Apply Pipe `list &@> fun`
     - [2.5.7](#257-reverse-argument-pipe-fun--arg) Reverse Argument Pipe `fun <& arg`
-    - [2.5.8](#258-reverse-argument-apply-pipe-list--fun) Reverse Argument Apply Pipe `list &@> fun`
+    - [2.5.8](#258-reverse-argument-apply-pipe-fun--list) Reverse Argument Apply Pipe `fun <@& list`
   - [2.6](#26-control-flow---returning) Control Flow - Returning
     - [2.6.1](#261-return-label-value) return \[_label_\] _value_
     - [2.6.2](#262-block-label-function) block \[label\] _function_
@@ -493,42 +493,44 @@ Smalltalk, LISP and Perl.
     - [12.9.2](#1292-stdhttpget-http-client-url-string-headers-and-options-map) std:http:get _http-client_ _url-string_ [_headers-and-options-map_]
     - [12.9.3](#1293-stdhttppost-http-client-url-string-body-bytes-headers-and-options-map) std:http:post _http-client_ _url-string_ _body-bytes_ [_headers-and-options-map_]
     - [12.9.4](#1294-stdhttprequest-http-client-method-string-url-string-body-bytes-headers-and-options-map) std:http:request _http-client_ _method-string_ _url-string_ [_body-bytes_ [_headers-and-options-map_]]
-  - [12.10](#1210-operating-system-utilities) Operating System Utilities
-    - [12.10.1](#12101-stdosgetclipboardtext) std:os:get\_clipboard\_text
-    - [12.10.2](#12102-stdossetclipboardtext-string) std:os:set\_clipboard\_text _string_
-  - [12.11](#1211-mqtt-messaging) MQTT Messaging
-    - [12.11.1](#12111-stdmqttbrokernew-config) std:mqtt:broker:new _config_
-      - [12.11.1.1](#121111-brokerpublish-topic-string-payload-bytes) broker.publish _topic-string_ _payload-bytes_
-    - [12.11.2](#12112-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
-      - [12.11.2.1](#121121-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
-      - [12.11.2.2](#121122-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
-  - [12.12](#1212-cursive-consoleterminal-text-user-interface) Cursive Console/Terminal Text User Interface
-    - [12.12.1](#12121-stdcursivenew---cursive) std:cursive:new -> $\<Cursive\>
-    - [12.12.2](#12122-stdcursiveinstallcursivestdio) std:cursive:install\_cursive\_stdio
-    - [12.12.3](#12123-cursive-object) $\<Cursive\> Object
-      - [12.12.3.1](#121231-cursiverun---none--error) $\<Cursive\>.run -> $none | $error
-      - [12.12.3.2](#121232-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer _view-def_
-      - [12.12.3.3](#121233-cursivepoplayer) $\<Cursive\>.pop\_layer
-      - [12.12.3.4](#121234-cursiveget-name-of-view---none--namedviewnametype) $\<Cursive\>.get _name-of-view_ -> $none | $\<NamedView:Name:Type\>
-      - [12.12.3.5](#121235-cursivepopup-popup-def-view-def) $\<Cursive\>.popup _popup-def_ _view-def_
-      - [12.12.3.6](#121236-cursiveaddscreen-view-def---screen-id) $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
-      - [12.12.3.7](#121237-cursivesetscreen-screen-id) $\<Cursive\>.*set\_screen* _screen-id_
-      - [12.12.3.8](#121238-cursiveactivescreen---screen-id) $\<Cursive\>.active\_screen -> _screen-id_
-      - [12.12.3.9](#121239-cursivesender---cursivesendmsgcb) $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
-        - [12.12.3.9.1](#1212391-cursivesendmsgcb-event-tag-value---true--error) $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
-      - [12.12.3.10](#1212310-cursivedefaultcb-widget-name-function) $\<Cursive\>.default\_cb _widget-name_ _function_
-      - [12.12.3.11](#1212311-cursivesetwindowtitle-string) $\<Cursive\>.set\_window\_title _string_
-    - [12.12.4](#12124-cursiveinitconsolelogging) $\<Cursive\>.init\_console\_logging
-    - [12.12.5](#12125-cursivetoggledebugconsole) $\<Cursive\>.toggle\_debug\_console
-    - [12.12.6](#12126-cursiveshowdebugconsole) $\<Cursive\>.show\_debug\_console
-      - [12.12.6.1](#121261-cursivequit) $\<Cursive\>.quit
-      - [12.12.6.2](#121262-cursivecounter---cursivecounter) $\<Cursive\>.counter -> $\<Cursive:Counter\>
-    - [12.12.7](#12127-cursivecounter-object) $\<Cursive:Counter\> Object
-      - [12.12.7.1](#121271-cursivecounterget) $\<Cursive:Counter\>.get
-      - [12.12.7.2](#121272-cursivecounterset-integer) $\<Cursive:Counter\>.set _integer_
-      - [12.12.7.3](#121273-cursivecountersetupdate-integer) $\<Cursive:Counter\>.set\_update _integer_
-      - [12.12.7.4](#121274-cursivecountertick-integer) $\<Cursive:Counter\>.tick _integer_
-      - [12.12.7.5](#121275-cursivecountertickupdate-integer) $\<Cursive:Counter\>.tick\_update _integer_
+  - [12.10](#1210-http-server) HTTP Server
+    - [12.10.1](#12101-stdhttpservernew-endpoint-string---httpserver--error) std:http:server:new _endpoint-string_ -> $\<HttpServer\> | $error
+  - [12.11](#1211-operating-system-utilities) Operating System Utilities
+    - [12.11.1](#12111-stdosgetclipboardtext) std:os:get\_clipboard\_text
+    - [12.11.2](#12112-stdossetclipboardtext-string) std:os:set\_clipboard\_text _string_
+  - [12.12](#1212-mqtt-messaging) MQTT Messaging
+    - [12.12.1](#12121-stdmqttbrokernew-config) std:mqtt:broker:new _config_
+      - [12.12.1.1](#121211-brokerpublish-topic-string-payload-bytes) broker.publish _topic-string_ _payload-bytes_
+    - [12.12.2](#12122-stdmqttclientnew-channel-client-id-broker-host-broker-port) std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
+      - [12.12.2.1](#121221-mqttclientpublish-topic-string-payload-bytes) mqtt\_client.publish _topic-string_ _payload-bytes_
+      - [12.12.2.2](#121222-mqttclientsubscribe-topic-string) mqtt\_client.subscribe _topic-string_
+  - [12.13](#1213-cursive-consoleterminal-text-user-interface) Cursive Console/Terminal Text User Interface
+    - [12.13.1](#12131-stdcursivenew---cursive) std:cursive:new -> $\<Cursive\>
+    - [12.13.2](#12132-stdcursiveinstallcursivestdio) std:cursive:install\_cursive\_stdio
+    - [12.13.3](#12133-cursive-object) $\<Cursive\> Object
+      - [12.13.3.1](#121331-cursiverun---none--error) $\<Cursive\>.run -> $none | $error
+      - [12.13.3.2](#121332-cursiveaddlayer-view-def) $\<Cursive\>.add\_layer _view-def_
+      - [12.13.3.3](#121333-cursivepoplayer) $\<Cursive\>.pop\_layer
+      - [12.13.3.4](#121334-cursiveget-name-of-view---none--namedviewnametype) $\<Cursive\>.get _name-of-view_ -> $none | $\<NamedView:Name:Type\>
+      - [12.13.3.5](#121335-cursivepopup-popup-def-view-def) $\<Cursive\>.popup _popup-def_ _view-def_
+      - [12.13.3.6](#121336-cursiveaddscreen-view-def---screen-id) $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
+      - [12.13.3.7](#121337-cursivesetscreen-screen-id) $\<Cursive\>.*set\_screen* _screen-id_
+      - [12.13.3.8](#121338-cursiveactivescreen---screen-id) $\<Cursive\>.active\_screen -> _screen-id_
+      - [12.13.3.9](#121339-cursivesender---cursivesendmsgcb) $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
+        - [12.13.3.9.1](#1213391-cursivesendmsgcb-event-tag-value---true--error) $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
+      - [12.13.3.10](#1213310-cursivedefaultcb-widget-name-function) $\<Cursive\>.default\_cb _widget-name_ _function_
+      - [12.13.3.11](#1213311-cursivesetwindowtitle-string) $\<Cursive\>.set\_window\_title _string_
+    - [12.13.4](#12134-cursiveinitconsolelogging) $\<Cursive\>.init\_console\_logging
+    - [12.13.5](#12135-cursivetoggledebugconsole) $\<Cursive\>.toggle\_debug\_console
+    - [12.13.6](#12136-cursiveshowdebugconsole) $\<Cursive\>.show\_debug\_console
+      - [12.13.6.1](#121361-cursivequit) $\<Cursive\>.quit
+      - [12.13.6.2](#121362-cursivecounter---cursivecounter) $\<Cursive\>.counter -> $\<Cursive:Counter\>
+    - [12.13.7](#12137-cursivecounter-object) $\<Cursive:Counter\> Object
+      - [12.13.7.1](#121371-cursivecounterget) $\<Cursive:Counter\>.get
+      - [12.13.7.2](#121372-cursivecounterset-integer) $\<Cursive:Counter\>.set _integer_
+      - [12.13.7.3](#121373-cursivecountersetupdate-integer) $\<Cursive:Counter\>.set\_update _integer_
+      - [12.13.7.4](#121374-cursivecountertick-integer) $\<Cursive:Counter\>.tick _integer_
+      - [12.13.7.5](#121375-cursivecountertickupdate-integer) $\<Cursive:Counter\>.tick\_update _integer_
 - [13](#13-wlambda-lexical-syntax-and-grammar) WLambda Lexical Syntax and Grammar
   - [13.1](#131-special-forms) Special Forms
   - [13.2](#132-string-formatting-syntax) String Formatting Syntax
@@ -1167,7 +1169,7 @@ std:assert_eq my_obj._data.x 3;
 ## Second callback gets x:
 std:assert_eq chain.1[] 3;
 
-!my_obj = $n; # destroy only strong reference
+.my_obj = $n; # destroy only strong reference
 std:assert destroyed;
 ```
 
@@ -1360,7 +1362,7 @@ std:assert_eq r "0000000abc";
 
 That means, writing `f <& a <& x` becomes `f[a[x]]` or `(f (a x))`.
 
-#### <a name="258-reverse-argument-apply-pipe-list--fun"></a>2.5.8 - Reverse Argument Apply Pipe `list &@> fun`
+#### <a name="258-reverse-argument-apply-pipe-fun--list"></a>2.5.8 - Reverse Argument Apply Pipe `fun <@& list`
 
 This operator is like `<&`. But it will call the function with the elements
 in the given _list_ as arguments.
@@ -2519,7 +2521,7 @@ std:assert ~ (ivec $f(1.3, 2.7, -5.8))  == $i(1, 2, -5);
 There are eight functions for converting other values into vectors
 and vectors of integers into vectors of floats:
 
-- `ivec`
+- `ivec` 
 - `ivec2`
 - `ivec3`
 - `ivec4`
@@ -4287,7 +4289,7 @@ The following example demonstrates it:
 ```wlambda
 !add20 = { _ + 20 };
 
-!some_vec = $[1, 2 * 10, add20 10];
+!some_vec = $[1, 2 * 10, add20 10]; 
 
 ## Index calling:
 std:assert_eq (0 some_vec) 1;
@@ -5221,7 +5223,7 @@ while $true {
 std:assert_eq i 4;
 ```
 
-The first
+The first 
 
 #### <a name="512-iter-var-iterable-body"></a>5.1.2 - iter _var_ _iterable_ _body_
 
@@ -6295,7 +6297,7 @@ See also:
 - [Forward Argument Pipe `arg &> fun`](#255-forward-argument-pipe-arg--fun)
 - [Forward Argument Apply Pipe `list &@> fun`](256-forward-argument-apply-pipe-list--fun)
 - [Reverse Argument Pipe `fun <& arg`](#257-reverse-argument-pipe-fun--arg)
-- [Reverse Argument Apply Pipe `list &@> fun`](#258-reverse-argument-apply-pipe-list--fun)
+- [Reverse Argument Apply Pipe `list &@> fun`](#258-reverse-argument-apply-pipe-fun--list)
 
 ### <a name="67-default-value-operators---n-o-and-e"></a>6.7 - Default Value Operators //, /?, /$n, /$o and /$e
 
@@ -9016,7 +9018,7 @@ std:assert_str_eq
 
 ### <a name="129-http-client"></a>12.9 - HTTP Client
 
-WLambda offers an optional integrated HTTP client by enabling the `reqwest`
+WLambda offers an optional integrated HTTP client by enabling the `reqwest` or `http`
 feature at compile time. With this you can create a new client using `std:http:client:new` and make HTTP requests using `std:http:get`, `std:http:post` and `std:http:request`. Also support for basic authentication and token based bearer authentication
 is there.
 
@@ -9136,22 +9138,88 @@ std:assert_str_eq body.json  $[ $["x", 10], ${ y = 20 } ];
 std:assert_eq response.status 200;
 ```
 
-### <a name="1210-operating-system-utilities"></a>12.10 - Operating System Utilities
+### <a name="1210-http-server"></a>12.10 - HTTP Server
+
+WLambda offers an optional integrated HTTP server by enabling the `http`
+feature at compile time. With this you can create a new server using `std:http:server:new`.
+
+#### <a name="12101-stdhttpservernew-endpoint-string---httpserver--error"></a>12.10.1 - std:http:server:new _endpoint-string_ -> $\<HttpServer\> | $error
+
+This creates a new http server handle. If you drop that handle, meaning if you remove the last
+reference to it the HTTP server will be stopped.
+
+You can use the following methods to handle requests:
+
+- `$<HttpServer>.try_respond _respond-func_` to check quickly if some request can be answered.
+- `$<HttpServer>.wait_respond _respond-func_` to wait indefinitely until a request arrives
+- `$<HttpServer>.timeout_respond _duration_ _respond-func_` to wait the specified _duration_ until a request arrives.
+
+All three methods call the _respond-func_ when a new request arrives. The first argument is a request
+map with the following keys:
+
+- `:url` contains the URL (no query, unescaped)
+- `:method` contains the HTTP method
+- `:body` contains the request body bytes
+
+Here is a more elaborate example to get you started. It also starts a client request, for
+stopping the code (as it is executed by the test suite):
+
+```wlambda
+!srv = std:http:server:new "localhost:28080";
+
+!client_thread = std:thread:spawn $code{
+    !@import std;
+    !@wlambda;
+    std:thread:sleep :ms => 500;
+    !cl = std:http:client:new[];
+    !resp = std:http:get cl "http://localhost:28080/quit";
+    std:displayln resp;
+    resp.status
+};
+
+!running = $true;
+while running {
+    srv.timeout_respond :ms => 1000 {!(req) = @;
+        std:displayln "Req " req.method req.url;
+
+        if req.url == "/" {
+            return :redirect => "/files/xxx.txt";
+        };
+
+        if req.url == "/quit" {
+            .running = $false;
+            return $[:data, "application/json", std:ser:json $["quit"]];
+        };
+
+        if req.url &> $r($^\/files\/) {
+            $[:file, "/files", "/var/www/"]
+        } {
+            $[:data, "application/json", std:ser:json $["ok", 1, 2, 3]]
+        };
+    };
+
+    std:displayln ":tick:";
+};
+
+std:assert_eq client_thread.join[] 200;
+```
+
+### <a name="1211-operating-system-utilities"></a>12.11 - Operating System Utilities
 
 Some operating system utility functions. Some might only be available if
 WLambda was compiled with the corresponding features.
 
-#### <a name="12101-stdosgetclipboardtext"></a>12.10.1 - std:os:get\_clipboard\_text
+#### <a name="12111-stdosgetclipboardtext"></a>12.11.1 - std:os:get\_clipboard\_text
 
 Only available if WLambda was compiled with the `clipboard` feature.
 Retrieves the text contents of the operating system clipboard.
 
-#### <a name="12102-stdossetclipboardtext-string"></a>12.10.2 - std:os:set\_clipboard\_text _string_
+#### <a name="12112-stdossetclipboardtext-string"></a>12.11.2 - std:os:set\_clipboard\_text _string_
 
 Only available if WLambda was compiled with the `clipboard` feature.
 Sets the clipboard text contents.
 
-### <a name="1211-mqtt-messaging"></a>12.11 - MQTT Messaging
+### <a name="1212-mqtt-messaging"></a>12.12 - MQTT Messaging
 
 WLambda offers an optional support for the MQTT protocol. You can setup a MQTT client
 as well as an embedded MQTT broker. The very simple integration offers you a very
@@ -9160,7 +9228,7 @@ easy way to setup inter process communication between WLambda applications.
 Support for MQTT has to be explicitly compiled into WLambda by selecting the
 `mqtt` feature.
 
-#### <a name="12111-stdmqttbrokernew-config"></a>12.11.1 - std:mqtt:broker:new _config_
+#### <a name="12121-stdmqttbrokernew-config"></a>12.12.1 - std:mqtt:broker:new _config_
 
 This function sets up an embedded MQTT broker. A handle is returned that you can use
 to publish messages using the locally connected client link.
@@ -9212,13 +9280,13 @@ std:assert_str_eq chan.recv[] $p(:"$WL/subscribed", $n);
 std:assert_str_eq chan.recv[] $p("test/me", $b"test123\xFF");
 ```
 
-##### <a name="121111-brokerpublish-topic-string-payload-bytes"></a>12.11.1.1 - broker.publish _topic-string_ _payload-bytes_
+##### <a name="121211-brokerpublish-topic-string-payload-bytes"></a>12.12.1.1 - broker.publish _topic-string_ _payload-bytes_
 
 Publishes the _payload-bytes_ under the _topic-string_. Returns an error
 if something went wrong (client not connected, or some other error). It might
 block.
 
-#### <a name="12112-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.11.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
+#### <a name="12122-stdmqttclientnew-channel-client-id-broker-host-broker-port"></a>12.12.2 - std:mqtt:client:new _channel_ _client-id_ _broker-host_ _broker-port_
 
 This sets up a MQTT client that connects to the given _broker-host_ and _broker-port_.
 It will connect and reconnect upon connection failure in the background automatically
@@ -9272,18 +9340,18 @@ std:assert_eq got_some_stuff.data  $b"test";
 
 The returned client handle understands the following methods:
 
-##### <a name="121121-mqttclientpublish-topic-string-payload-bytes"></a>12.11.2.1 - mqtt\_client.publish _topic-string_ _payload-bytes_
+##### <a name="121221-mqttclientpublish-topic-string-payload-bytes"></a>12.12.2.1 - mqtt\_client.publish _topic-string_ _payload-bytes_
 
 Publishes the _payload-bytes_ under the _topic-string_. Returns an error
 if something went wrong (client not connected, or some other error). It might
 block.
 
-##### <a name="121122-mqttclientsubscribe-topic-string"></a>12.11.2.2 - mqtt\_client.subscribe _topic-string_
+##### <a name="121222-mqttclientsubscribe-topic-string"></a>12.12.2.2 - mqtt\_client.subscribe _topic-string_
 
 Subscribes to the _topic-string_. Returns an error if something went wrong.
 It might block.
 
-### <a name="1212-cursive-consoleterminal-text-user-interface"></a>12.12 - Cursive Console/Terminal Text User Interface
+### <a name="1213-cursive-consoleterminal-text-user-interface"></a>12.13 - Cursive Console/Terminal Text User Interface
 
 WLambda comes with a text based user interface library binding to the `cursive` crate.
 You will need to enable the feature `cursive` when compiling WLambda. It's not included
@@ -9291,7 +9359,7 @@ in the default feature set of WLambda.
 
 The `view-def` view definition format is defined in an extra section of this reference at the end.
 
-#### <a name="12121-stdcursivenew---cursive"></a>12.12.1 - std:cursive:new -> $\<Cursive\>
+#### <a name="12131-stdcursivenew---cursive"></a>12.13.1 - std:cursive:new -> $\<Cursive\>
 
 Create a new Cursive instance. You can call the following functions on it:
 
@@ -9305,27 +9373,27 @@ c.add_layer :panel => ${} =>
 c.run[];
 ```
 
-#### <a name="12122-stdcursiveinstallcursivestdio"></a>12.12.2 - std:cursive:install\_cursive\_stdio
+#### <a name="12132-stdcursiveinstallcursivestdio"></a>12.13.2 - std:cursive:install\_cursive\_stdio
 
 Sets up WLambda to output things that would go to the standard output, to go to the `stdout`
 text view. This allows eg. `std:displayln` to be rerouted to the Cursive UI.
 
-#### <a name="12123-cursive-object"></a>12.12.3 - $\<Cursive\> Object
+#### <a name="12133-cursive-object"></a>12.13.3 - $\<Cursive\> Object
 
-##### <a name="121231-cursiverun---none--error"></a>12.12.3.1 - $\<Cursive\>.run -> $none | $error
+##### <a name="121331-cursiverun---none--error"></a>12.13.3.1 - $\<Cursive\>.run -> $none | $error
 
 Start the event loop. You can only exit this event loop using `$<Cursive>.quit[]`.
 
-##### <a name="121232-cursiveaddlayer-view-def"></a>12.12.3.2 - $\<Cursive\>.add\_layer _view-def_
+##### <a name="121332-cursiveaddlayer-view-def"></a>12.13.3.2 - $\<Cursive\>.add\_layer _view-def_
 
 Adds a layer on top of the current screen and instanciates a _view-def_.
 You can remove the layer using `$<Cursive>.pop_layer[]`.
 
-##### <a name="121233-cursivepoplayer"></a>12.12.3.3 - $\<Cursive\>.pop\_layer
+##### <a name="121333-cursivepoplayer"></a>12.13.3.3 - $\<Cursive\>.pop\_layer
 
 Removes the top most layer of the current screen.
 
-##### <a name="121234-cursiveget-name-of-view---none--namedviewnametype"></a>12.12.3.4 - $\<Cursive\>.get _name-of-view_ -> $none | $\<NamedView:Name:Type\>
+##### <a name="121334-cursiveget-name-of-view---none--namedviewnametype"></a>12.13.3.4 - $\<Cursive\>.get _name-of-view_ -> $none | $\<NamedView:Name:Type\>
 
 Retrieves the handle of a specific view. You must not store this handle anywhere except
 in a local variable. This handle is only available inside a context where you have
@@ -9345,7 +9413,7 @@ cursive.add_layer :vbox => $[
 ];
 ```
 
-##### <a name="121235-cursivepopup-popup-def-view-def"></a>12.12.3.5 - $\<Cursive\>.popup _popup-def_ _view-def_
+##### <a name="121335-cursivepopup-popup-def-view-def"></a>12.13.3.5 - $\<Cursive\>.popup _popup-def_ _view-def_
 
 This opens a popup dialog that shows the view _view-def_. It has a frame, a title and you can
 supply multiple buttons for the user to interact with the popup.
@@ -9383,27 +9451,27 @@ cursive.popup
 
 See also _view-def_ example for the "list" view futher below.
 
-##### <a name="121236-cursiveaddscreen-view-def---screen-id"></a>12.12.3.6 - $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
+##### <a name="121336-cursiveaddscreen-view-def---screen-id"></a>12.13.3.6 - $\<Cursive\>.add\_screen _view-def_ -> _screen-id_
 
 Creates a new screen (not visible) and instanciates the _view-def_ on a new
 layer there.  The new screen ID is returned. To activate the screen use
 `$<Cursive>.set_screen id`.
 
-##### <a name="121237-cursivesetscreen-screen-id"></a>12.12.3.7 - $\<Cursive\>.*set\_screen* _screen-id_
+##### <a name="121337-cursivesetscreen-screen-id"></a>12.13.3.7 - $\<Cursive\>.*set\_screen* _screen-id_
 
 Sets the currently visible screen by it's ID as returned by `$<Cursive>.add_screen`.
 The first screen has the ID 0.
 
-##### <a name="121238-cursiveactivescreen---screen-id"></a>12.12.3.8 - $\<Cursive\>.active\_screen -> _screen-id_
+##### <a name="121338-cursiveactivescreen---screen-id"></a>12.13.3.8 - $\<Cursive\>.active\_screen -> _screen-id_
 
 Returns the current active/visible screen's ID.
 
-##### <a name="121239-cursivesender---cursivesendmsgcb"></a>12.12.3.9 - $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
+##### <a name="121339-cursivesender---cursivesendmsgcb"></a>12.13.3.9 - $\<Cursive\>.sender -> $\<Cursive:SendMsgCb\>
 
 Creates an event sender callback to communicate with the Cursive UI thread/event loop from
 another thread. You can call the `$<Cursive:SendMsgCb>` like a regular function.
 
-###### <a name="1212391-cursivesendmsgcb-event-tag-value---true--error"></a>12.12.3.9.1 - $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
+###### <a name="1213391-cursivesendmsgcb-event-tag-value---true--error"></a>12.13.3.9.1 - $\<Cursive:SendMsgCb\> _event-tag_ _value_ -> $true | $error
 
 Sends the _value_ to the Cursive UI thread's event loop. The _event-tag_
 can be used as event name to dispatch specific callbacks that have been installed
@@ -9411,7 +9479,7 @@ using `$<Cursive>.send_cb _event-tag_ { ... }`.
 
 Returns a true value if sending was successful or an `$error`.
 
-##### <a name="1212310-cursivedefaultcb-widget-name-function"></a>12.12.3.10 - $\<Cursive\>.default\_cb _widget-name_ _function_
+##### <a name="1213310-cursivedefaultcb-widget-name-function"></a>12.13.3.10 - $\<Cursive\>.default\_cb _widget-name_ _function_
 
 Installs a default callback for handling events from the correspondig _widget-name_.
 The _widget-name_ `"*"` is a wildcard for all widgets without a name assigned.
@@ -9433,29 +9501,29 @@ cursive.default_cb :* {
 };
 ```
 
-##### <a name="1212311-cursivesetwindowtitle-string"></a>12.12.3.11 - $\<Cursive\>.set\_window\_title _string_
+##### <a name="1213311-cursivesetwindowtitle-string"></a>12.13.3.11 - $\<Cursive\>.set\_window\_title _string_
 
 Sets the window title of the application. That title will usually appear in the window title bar of
 the console or terminal the application runs in.
 
-#### <a name="12124-cursiveinitconsolelogging"></a>12.12.4 - $\<Cursive\>.init\_console\_logging
+#### <a name="12134-cursiveinitconsolelogging"></a>12.13.4 - $\<Cursive\>.init\_console\_logging
 
 Enables logging of Cursive debugging information to the console. Use `$<Cursive>.toggle_debug_console[]`
 to show/hide the debug console.
 
-#### <a name="12125-cursivetoggledebugconsole"></a>12.12.5 - $\<Cursive\>.toggle\_debug\_console
+#### <a name="12135-cursivetoggledebugconsole"></a>12.13.5 - $\<Cursive\>.toggle\_debug\_console
 
 Shows/Hides the Cursive debugging console. See also `$<Cursive>.init_console_logging[]`.
 
-#### <a name="12126-cursiveshowdebugconsole"></a>12.12.6 - $\<Cursive\>.show\_debug\_console
+#### <a name="12136-cursiveshowdebugconsole"></a>12.13.6 - $\<Cursive\>.show\_debug\_console
 
 Shows the Cursive debugging console. See also `$<Cursive>.init_console_logging[]`.
 
-##### <a name="121261-cursivequit"></a>12.12.6.1 - $\<Cursive\>.quit
+##### <a name="121361-cursivequit"></a>12.13.6.1 - $\<Cursive\>.quit
 
 Quit the main event loop.
 
-##### <a name="121262-cursivecounter---cursivecounter"></a>12.12.6.2 - $\<Cursive\>.counter -> $\<Cursive:Counter\>
+##### <a name="121362-cursivecounter---cursivecounter"></a>12.13.6.2 - $\<Cursive\>.counter -> $\<Cursive:Counter\>
 
 Creates a counter instance to be used by the `progress` view-def. It's initialized with 0.
 It returns a `$<Cursive:Counter>` object. See further below about an API definition of that
@@ -9480,31 +9548,31 @@ counter.tick 11;
 std:assert counter.get[] > 0;
 ```
 
-#### <a name="12127-cursivecounter-object"></a>12.12.7 - $\<Cursive:Counter\> Object
+#### <a name="12137-cursivecounter-object"></a>12.13.7 - $\<Cursive:Counter\> Object
 
 This section describes the `$<Cursive:Counter>` object API. It is instanciated
 by the `$<Cursive>.counter` method.
 
-##### <a name="121271-cursivecounterget"></a>12.12.7.1 - $\<Cursive:Counter\>.get
+##### <a name="121371-cursivecounterget"></a>12.13.7.1 - $\<Cursive:Counter\>.get
 
 Returns the current counter integer value.
 
-##### <a name="121272-cursivecounterset-integer"></a>12.12.7.2 - $\<Cursive:Counter\>.set _integer_
+##### <a name="121372-cursivecounterset-integer"></a>12.13.7.2 - $\<Cursive:Counter\>.set _integer_
 
 Sets the current counter integer value.
 
-##### <a name="121273-cursivecountersetupdate-integer"></a>12.12.7.3 - $\<Cursive:Counter\>.set\_update _integer_
+##### <a name="121373-cursivecountersetupdate-integer"></a>12.13.7.3 - $\<Cursive:Counter\>.set\_update _integer_
 
 Sets the current counter integer value and sends a signal to the Cursive UI thread
 to update it's views. This can be used to update a `progress` bar from another thread.
 
 It may returns an error if the Cursive UI thread is not available anymore.
 
-##### <a name="121274-cursivecountertick-integer"></a>12.12.7.4 - $\<Cursive:Counter\>.tick _integer_
+##### <a name="121374-cursivecountertick-integer"></a>12.13.7.4 - $\<Cursive:Counter\>.tick _integer_
 
 Increments the counter by _integer_.
 
-##### <a name="121275-cursivecountertickupdate-integer"></a>12.12.7.5 - $\<Cursive:Counter\>.tick\_update _integer_
+##### <a name="121375-cursivecountertickupdate-integer"></a>12.13.7.5 - $\<Cursive:Counter\>.tick\_update _integer_
 
 Increments the counter by _integer_ and updates the Cursive UI thread.
 

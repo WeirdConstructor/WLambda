@@ -4,6 +4,7 @@
 * **Bugfix:** If you defined multiple variables in a local scope, variables from the outer
 scope were cleared.
 * **Bugfix:** Assignment ops did not work in deeper object structures eg. `o.x.y += 1`.
+* **Maintenance:** Updated the rumqttd version.
 * **Feature:** `std:min` and `std:max` work on symbols too now.
 * **Feature:** `$iter` and `iter` are now accepting functions as arguments
 and can create an iterator over a WLambda generator function from that.

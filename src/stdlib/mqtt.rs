@@ -262,10 +262,8 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal> {
         next_connection_delay_ms: 1,
         connections: rumqttd::ConnectionSettings {
             connection_timeout_ms: 1000,
-            throttle_delay_ms: 0,
             max_payload_size: 10240,
             max_inflight_count: 500,
-            max_inflight_size: 10240,
             auth: None,
             dynamic_filters: false,
         },
@@ -307,12 +305,13 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal> {
         metrics: None,
         console,
         router: rumqttd::RouterConfig {
-            instant_ack: true,
-            max_segment_size: 1024,
-            max_connections: 10,
+            max_connections: 100,
+            max_outgoing_packet_count: 200,
+            max_segment_size: 1024 * 1024 * 100,
             max_segment_count: 10,
-            max_read_len: 1024,
+            custom_segment: None,
             initialized_filters: None,
+            ..Default::default()
         },
     };
 
@@ -425,15 +424,15 @@ impl MQTTBroker {
                                 VVal::new_byt(forward.publish.payload.as_ref().to_vec()),
                             ));
                         }
-                        Notification::ForwardWithProperties(forward, _) => {
-                            let topic = VVal::new_str_mv(
-                                String::from_utf8_lossy(forward.publish.topic.as_ref()).to_string(),
-                            );
-                            chan.send(&VVal::pair(
-                                topic,
-                                VVal::new_byt(forward.publish.payload.as_ref().to_vec()),
-                            ));
-                        }
+//                        Notification::ForwardWithProperties(forward, _) => {
+//                            let topic = VVal::new_str_mv(
+//                                String::from_utf8_lossy(forward.publish.topic.as_ref()).to_string(),
+//                            );
+//                            chan.send(&VVal::pair(
+//                                topic,
+//                                VVal::new_byt(forward.publish.payload.as_ref().to_vec()),
+//                            ));
+//                        }
                         _ => {}
                     },
                     Ok(None) => (),
