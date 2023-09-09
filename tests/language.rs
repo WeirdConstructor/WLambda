@@ -6387,9 +6387,15 @@ fn check_edit_distance() {
 fn check_process_wait() {
     assert_eq!(
         ve(r#"
-        !hdl = unwrap ~ std:process:spawn "bash" $[
-            "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
-        ];
+        !hdl = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $[
+                "/C", "FOR /L %i IN (0, 1, 2) DO ping -n 2 127.0.0.1 & exit 20"
+            ];
+        } {
+            unwrap ~ std:process:spawn "bash" $[
+                "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
+            ];
+        };
 
         !res = std:process:wait hdl;
 
@@ -6404,14 +6410,48 @@ fn check_process_wait() {
 fn check_process_kill_wait() {
     assert_eq!(
         ve(r#"
-        !hdl = unwrap ~ std:process:spawn "bash" $[
-            "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
-        ];
+        !hdl = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $[
+                "/C", "FOR /L %i IN (0, 1, 10) DO ping -n 2 127.0.0.1 & exit 20"
+            ];
+        } {
+            unwrap ~ std:process:spawn "bash" $[
+                "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
+            ];
+        };
 
         !res = std:process:kill_wait hdl;
 
+        std:displayln res;
+
         std:assert ~ not res.success;
-        std:assert_eq res.status -1;
+        if std:sys:os[] == "windows" {
+            std:assert_eq res.status 1;
+        } {
+            std:assert_eq res.status -1;
+        };
+    "#),
+        "$true"
+    );
+}
+
+#[test]
+fn check_process_read_write() {
+    assert_eq!(
+        ve(r#"
+        !hdl = unwrap ~ std:process:spawn "cmd.exe" $[] :io;
+        !handles = std:process:get_pipes hdl;
+
+        std:io:write handles.stdin "echo 123";
+        std:io:flush handles.stdin;
+        handles.stdin = $none;
+
+        !output = std:io:read_all handles.stdout;
+        std:assert_eq output "123\n";
+
+        !result = unwrap ~ std:process:wait hdl;
+        std:assert result.success;
+        std:assert result.status == 0;
     "#),
         "$true"
     );
@@ -6421,9 +6461,15 @@ fn check_process_kill_wait() {
 fn check_process_try_wait() {
     assert_eq!(
         ve(r#"
-        !hdl = unwrap ~ std:process:spawn "bash" $[
-            "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
-        ];
+        !hdl = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $[
+                "/C", "FOR /L %i IN (0, 1, 10) DO ping -n 2 127.0.0.1 & exit 20"
+            ];
+        } {
+            unwrap ~ std:process:spawn "bash" $[
+                "-c", "for i in `seq 0 10`; do echo $i; sleep 0.1; done; exit 20"
+            ];
+        };
 
         !counter = 0;
         !ret = $none;
