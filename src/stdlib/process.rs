@@ -1,8 +1,10 @@
 use crate::compiler::*;
+use crate::stdlib::io_types::{ChildHandle, VChildHandle};
 use crate::vval::*;
 use std::cell::RefCell;
 use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 struct VChildProcess {
@@ -87,6 +89,47 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     );
 
     st.fun(
+        "process:take_pipes",
+        |env: &mut Env, _argc: usize| {
+            let mut chld = env.arg(0);
+            chld.with_usr_ref(|vts: &mut VChildProcess| {
+                let stdin = vts.child.borrow_mut().stdin.take();
+                let stdout = vts.child.borrow_mut().stdout.take();
+                let stderr = vts.child.borrow_mut().stderr.take();
+                let ret = VVal::map();
+                if let Some(stdin) = stdin {
+                    let stdin = VVal::Usr(Box::new(VChildHandle {
+                        handle: ChildHandle::Stdin(Arc::new(Mutex::new(stdin))),
+                    }));
+                    ret.set_key_str("stdin", stdin).expect("single use");
+                }
+                if let Some(stdout) = stdout {
+                    let stdout = VVal::Usr(Box::new(VChildHandle {
+                        handle: ChildHandle::Stdout(Arc::new(Mutex::new(stdout))),
+                    }));
+                    ret.set_key_str("stdout", stdout).expect("single use");
+                }
+                if let Some(stderr) = stderr {
+                    let stderr = VVal::Usr(Box::new(VChildHandle {
+                        handle: ChildHandle::Stderr(Arc::new(Mutex::new(stderr))),
+                    }));
+                    ret.set_key_str("stderr", stderr).expect("single use");
+                }
+                Ok(ret)
+            })
+            .unwrap_or_else(|| {
+                Ok(env.new_err(format!(
+                    "std:process:take_pipes: First argument not a child process handle! {}",
+                    chld.s()
+                )))
+            })
+        },
+        Some(1),
+        Some(1),
+        false,
+    );
+
+    st.fun(
         "process:try_wait",
         |env: &mut Env, _argc: usize| {
             let mut chld = env.arg(0);
@@ -103,7 +146,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
             })
             .unwrap_or_else(|| {
                 Ok(env.new_err(format!(
-                    "std:process:try_wait: First argument not an IO handle! {}",
+                    "std:process:try_wait: First argument not a child process handle! {}",
                     chld.s()
                 )))
             })
@@ -129,7 +172,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
             })
             .unwrap_or_else(|| {
                 Ok(env.new_err(format!(
-                    "std:process:wait: First argument not an IO handle! {}",
+                    "std:process:wait: First argument not a child process handle! {}",
                     chld.s()
                 )))
             })
@@ -164,7 +207,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
             })
             .unwrap_or_else(|| {
                 Ok(env.new_err(format!(
-                    "std:process:kill_wait: First argument not an IO handle! {}",
+                    "std:process:kill_wait: First argument not a child process handle! {}",
                     chld.s()
                 )))
             })

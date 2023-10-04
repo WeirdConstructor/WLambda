@@ -7795,7 +7795,7 @@ nor input is passed:
 * `:o` - create pipes only for stdout.
 * `:e` - create pipes only for stderr.
 
-You can retrieve the pipes once via `std:process:get_pipes`.
+You can retrieve the pipes once via `std:process:take_pipes`.
 
 ```wlambda
 !hdl = unwrap ~ std:process:spawn "bash" $[
@@ -7818,12 +7818,12 @@ each with either a `$none` value, a `$<ChildReadPipe>` or `$<ChildWritePipe>` ha
 If you drop the pipe handles they will be closed. That means if you drop the `$<ChildWritePipe>`
 the `stdin` of the child process will be closed.
 
-If you repeatedly call `std:process:get_pipes` on the same child handle, you will not get the pipes
+If you repeatedly call `std:process:take_pipes` on the same child handle, you will not get the pipes
 again.
 
 ```wlambda
 !hdl = unwrap ~ std:process:spawn "bash" $[] :io;
-!handles = std:process:get_pipes hdl;
+!handles = std:process:take_pipes hdl;
 
 std:io:write handles.stdin "echo 123";
 std:io:flush handles.stdin;
