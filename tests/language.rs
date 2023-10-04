@@ -6492,6 +6492,170 @@ fn check_process_try_wait() {
 }
 
 #[test]
+fn check_process_io() {
+    // checking take_pipes and read_all:
+    assert_eq!(
+        ve(r#"
+        !proc = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $[
+                "/C", "echo TEST123"
+            ] :io;
+        } {
+            unwrap ~ std:process:spawn "bash" $[
+                "-c", "echo TEST123"
+            ] :io;
+        };
+
+        !hdls = std:process:take_pipes proc;
+        !output = std:io:read_all hdls.stdout;
+        std:assert output &> $r/TEST123/ "Found echo output";
+
+        !ret = unwrap ~ std:process:wait proc;
+        ret.success
+    "#),
+        "$true"
+    );
+
+    // checking take_pipes and read_some:
+    assert_eq!(
+        ve(r#"
+        !proc = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $[
+                "/C", "echo TEST123"
+            ] :io;
+        } {
+            unwrap ~ std:process:spawn "bash" $[
+                "-c", "echo TEST123"
+            ] :io;
+        };
+
+        !hdls = std:process:take_pipes proc;
+        !output = unwrap ~ std:io:read_some hdls.stdout;
+        std:assert output &> $r/TEST123/ "Found echo output";
+
+        !ret = unwrap ~ std:process:wait proc;
+        ret.success
+    "#),
+        "$true"
+    );
+
+    // checking take_pipes and read_all on stderr:
+    assert_eq!(
+        ve(r#"
+        !proc = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $[
+                "/C", "echo TEST123 1>&2"
+            ] :ie;
+        } {
+            unwrap ~ std:process:spawn "bash" $[
+                "-c", "echo TEST123 1>&2"
+            ] :ie;
+        };
+
+        !hdls = std:process:take_pipes proc;
+        !output = unwrap ~ std:io:read_all hdls.stderr;
+        std:assert output &> $r/TEST123/ "Found echo output";
+
+        !ret = unwrap ~ std:process:wait proc;
+        ret.success
+    "#),
+        "$true"
+    );
+
+    // checking take_pipes, read_all and write:
+    assert_eq!(
+        ve(r#"
+        !proc = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $["/Q"] :ioe;
+        } {
+            unwrap ~ std:process:spawn "bash" $[] :ioe;
+        };
+
+        !hdls = std:process:take_pipes proc;
+        std:io:write hdls.stdin "echo TEST123\r\n";
+        std:io:flush hdls.stdin;
+        hdls.stdin = $n;
+        !output = unwrap ~ std:io:read_all hdls.stdout;
+        std:assert output &> $r/TEST123/ "Found echo output";
+
+        !ret = unwrap ~ std:process:wait proc;
+        ret.success
+    "#),
+        "$true"
+    );
+
+    // checking take_pipes, read_all on stderr and write:
+    assert_eq!(
+        ve(r#"
+        !proc = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $["/Q"] :ioe;
+        } {
+            unwrap ~ std:process:spawn "bash" $[] :ioe;
+        };
+
+        !hdls = std:process:take_pipes proc;
+        std:io:write hdls.stdin "echo TEST123 1>&2\r\n";
+        std:io:flush hdls.stdin;
+        hdls.stdin = $n;
+        !output = unwrap ~ std:io:read_all hdls.stderr;
+        std:assert output &> $r/TEST123/ "Found echo output";
+
+        !ret = unwrap ~ std:process:wait proc;
+        ret.success
+    "#),
+        "$true"
+    );
+
+    // checking take_pipes, threaded read_some on stdout and write_some:
+    assert_eq!(
+        ve(r#"
+        !proc = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $["/Q"] :ioe;
+        } {
+            unwrap ~ std:process:spawn "bash" $[] :ioe;
+        };
+
+        !hdls = std:process:take_pipes proc;
+
+        !th = std:thread:spawn $code{
+            _READY.send :ok;
+            std:displayln "O:" stdout;
+            !text = "";
+            while $t {
+                !rd = std:io:read_some stdout;
+                if is_none[rd] {
+                    break[];
+                } {
+                    if len[rd] > 0 {
+                        std:displayln "READ:" rd;
+                        .text = text unwrap[rd];
+                    };
+                }
+            };
+
+            $rs/$?\r\n/ text { "{CRLF}" }
+        } ${ stdout = hdls.stdout };
+        std:assert_eq th.recv_ready[] :ok;
+
+        std:io:write_some hdls.stdin "echo ";
+        std:io:flush hdls.stdin;
+        std:thread:sleep :ms => 500;
+        std:io:write_some hdls.stdin "TEST123\r\n";
+        std:io:flush hdls.stdin;
+        std:io:write hdls.stdin "exit\r\n";
+        std:io:flush hdls.stdin;
+
+        !thrdout = th.join[];
+        std:assert thrdout &> $r/TEST123/ "Found echo output in thread output";
+
+        !ret = unwrap ~ std:process:wait proc;
+        ret.success
+    "#),
+        "$true"
+    );
+}
+
+#[test]
 fn check_div_zero() {
     assert_eq!(ve("1 % 0"),
         "EXEC ERR: Caught Panic: Remainder with divisor of 0: 1%0\n    <compiler:s_eval>:1:3 BinOpMod [1, 0]\n");

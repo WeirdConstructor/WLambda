@@ -7791,6 +7791,7 @@ nor input is passed:
 * `:inherit_all` - child process inherits all (stdout, stderr and stdin) from the parent and uses them until it exits.
 * `:ioe` - create pipes for stdin, stdout and stderr.
 * `:io` - create pipes only for stdin and stdout.
+* `:ie` - create pipes only for stdin and stderr.
 * `:i` - create pipes only for stdin.
 * `:o` - create pipes only for stdout.
 * `:e` - create pipes only for stderr.

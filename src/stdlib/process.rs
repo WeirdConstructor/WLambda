@@ -48,6 +48,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 cmd.stdin(Stdio::piped());
                 cmd.stdout(Stdio::piped());
                 cmd.stderr(Stdio::piped());
+            } else if env.arg(2).with_s_ref(|s| s == "ie") {
+                cmd.stdin(Stdio::piped());
+                cmd.stdout(Stdio::null());
+                cmd.stderr(Stdio::piped());
             } else if env.arg(2).with_s_ref(|s| s == "io") {
                 cmd.stdin(Stdio::piped());
                 cmd.stdout(Stdio::piped());
