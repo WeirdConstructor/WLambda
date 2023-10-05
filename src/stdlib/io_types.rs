@@ -169,32 +169,6 @@ pub fn with_write_usr<R, F: FnMut(&mut dyn std::io::Write) -> R>(
     }
 
     Err(RWHandleError("not a writable handle".to_string()))
-
-    //            Ok(fd
-    //                .with_usr_ref(|vts: &mut VTcpStream| {
-    //                    use std::io::Write;
-    //
-    //                    data.with_bv_ref(|bytes| {
-    //                        if offs >= bytes.len() {
-    //                            return env.new_err("std:io:write_some: bad buffer offset".to_string());
-    //                        }
-    //
-    //                        let r = vts.stream.borrow_mut().write_all(&bytes[offs..]);
-    //                        match r {
-    //                            Ok(()) => VVal::Int(bytes.len() as i64),
-    //                            Err(e) => match e.kind() {
-    //                                std::io::ErrorKind::Interrupted => VVal::None,
-    //                                _ => env.new_err(format!("std:io:write_some: {}", e)),
-    //                            },
-    //                        }
-    //                    })
-    //                })
-    //                .unwrap_or_else(|| {
-    //                    env.new_err(format!(
-    //                        "std:io:write: First argument not an IO handle! {}",
-    //                        fd.s()
-    //                    ))
-    //                }))
 }
 
 #[derive(Debug, Clone)]
@@ -246,9 +220,7 @@ pub fn io_add_to_symtable(st: &mut SymbolTable) {
     st.fun(
         "io:flush",
         |env: &mut Env, _argc: usize| {
-            use std::io::Write;
-
-            let mut fd = env.arg(0);
+            let fd = env.arg(0);
 
             Ok(with_write_usr(fd.clone(), |wr: &mut dyn std::io::Write| match wr.flush() {
                 Ok(_) => VVal::Bol(true),
@@ -298,37 +270,37 @@ pub fn io_add_to_symtable(st: &mut SymbolTable) {
     st.fun(
         "io:write_some",
         |env: &mut Env, _argc: usize| {
-            let mut fd = env.arg(0);
+            let fd = env.arg(0);
             let data = env.arg(1);
             let offs = env.arg(2).i() as usize;
 
             Ok(with_write_usr(fd.clone(), |wr: &mut dyn std::io::Write| {
-                    data.with_bv_ref(|bytes| {
-                        if offs >= bytes.len() {
-                            return env.new_err("std:io:write_some: bad buffer offset".to_string());
-                        }
+                data.with_bv_ref(|bytes| {
+                    if offs >= bytes.len() {
+                        return env.new_err("std:io:write_some: bad buffer offset".to_string());
+                    }
 
-                        let r = wr.write(&bytes[offs..]);
-                        match r {
-                            Ok(n) => {
-                                if n == 0 {
-                                    VVal::opt_none()
-                                } else {
-                                    VVal::opt(VVal::Int(n as i64))
-                                }
+                    let r = wr.write(&bytes[offs..]);
+                    match r {
+                        Ok(n) => {
+                            if n == 0 {
+                                VVal::opt_none()
+                            } else {
+                                VVal::opt(VVal::Int(n as i64))
                             }
-                            Err(e) => match e.kind() {
-                                std::io::ErrorKind::WouldBlock
-                                | std::io::ErrorKind::TimedOut
-                                | std::io::ErrorKind::Interrupted => VVal::None,
-                                _ => env.new_err(format!("std:io:write_some: {}", e)),
-                            },
                         }
-                    })
+                        Err(e) => match e.kind() {
+                            std::io::ErrorKind::WouldBlock
+                            | std::io::ErrorKind::TimedOut
+                            | std::io::ErrorKind::Interrupted => VVal::None,
+                            _ => env.new_err(format!("std:io:write_some: {}", e)),
+                        },
+                    }
                 })
-                .unwrap_or_else(|err| {
-                    env.new_err(format!("std:io:write_some: RWHandleError on {}: {:?}", fd.s(), err))
-                }))
+            })
+            .unwrap_or_else(|err| {
+                env.new_err(format!("std:io:write_some: RWHandleError on {}: {:?}", fd.s(), err))
+            }))
         },
         Some(2),
         Some(3),
@@ -375,7 +347,7 @@ pub fn io_add_to_symtable(st: &mut SymbolTable) {
                 let mut buf = Vec::new();
                 let r = rd.read_to_end(&mut buf);
                 match r {
-                    Ok(n) => VVal::new_byt(buf),
+                    Ok(_n) => VVal::new_byt(buf),
                     Err(e) => env.new_err(format!("std:io:read_all: {}", e)),
                 }
             })

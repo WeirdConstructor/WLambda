@@ -6436,28 +6436,6 @@ fn check_process_kill_wait() {
 }
 
 #[test]
-fn check_process_read_write() {
-    assert_eq!(
-        ve(r#"
-        !hdl = unwrap ~ std:process:spawn "cmd.exe" $[] :io;
-        !handles = std:process:get_pipes hdl;
-
-        std:io:write handles.stdin "echo 123";
-        std:io:flush handles.stdin;
-        handles.stdin = $none;
-
-        !output = std:io:read_all handles.stdout;
-        std:assert_eq output "123\n";
-
-        !result = unwrap ~ std:process:wait hdl;
-        std:assert result.success;
-        std:assert result.status == 0;
-    "#),
-        "$true"
-    );
-}
-
-#[test]
 fn check_process_try_wait() {
     assert_eq!(
         ve(r#"
@@ -6587,6 +6565,7 @@ fn check_process_io() {
     // checking take_pipes, read_all on stderr and write:
     assert_eq!(
         ve(r#"
+        !nl = if std:sys:os[] == "windows" "\r\n" "\n";
         !proc = if std:sys:os[] == "windows" {
             unwrap ~ std:process:spawn "cmd.exe" $["/Q"] :ioe;
         } {
@@ -6594,7 +6573,7 @@ fn check_process_io() {
         };
 
         !hdls = std:process:take_pipes proc;
-        std:io:write hdls.stdin "echo TEST123 1>&2\r\n";
+        std:io:write hdls.stdin ("echo TEST123 1>&2" nl);
         std:io:flush hdls.stdin;
         hdls.stdin = $n;
         !output = unwrap ~ std:io:read_all hdls.stderr;
