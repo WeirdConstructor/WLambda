@@ -6053,6 +6053,88 @@ fn check_tcp() {
 }
 
 #[test]
+fn check_tcp_buffered() {
+    let thrd = std::thread::spawn(move || {
+        ve(r#"
+            std:net:tcp:listen "127.0.0.1" => 19324 {!(con) = @;
+                std:io:write con "HELLO!\r\n";
+                !end = $false;
+                while not[end] {
+                    match std:io:read_some[con]
+                        $o(buf) => {
+                            ? is_some <& (std:bytes:find $b"q" $\.buf) {
+                                std:io:write con "QUIT";
+                                std:io:flush con;
+                                return :all $none;
+                            } { };
+                            std:io:write con $\.buf;
+                            std:io:flush con;
+                        }
+                        { .end = $true; };
+                };
+            };
+        "#);
+    });
+
+    assert_eq!(
+        ve(r#"
+        !socket = $n;
+        iter _ (0 => 100) {
+            .socket = std:net:tcp:connect "127.0.0.1:19324";
+            ? is_err[socket] {
+                std:thread:sleep $p(:ms, 50);
+                next[];
+            };
+        };
+        !buf_rd = std:io:buffered:reader socket;
+        std:io:write socket "TEST\n";
+        std:io:flush socket;
+        !line1 = std:io:read_line buf_rd;
+        !line2 = std:io:read_line buf_rd;
+        line1 line2
+    "#),
+        "\"HELLO!\\r\\nTEST\\n\""
+    );
+
+    // testing buffered writing and reading
+    assert_eq!(
+        ve(r#"
+        !socket = $n;
+        iter _ (0 => 100) {
+            .socket = std:net:tcp:connect "127.0.0.1:19324";
+            ? is_err[socket] {
+                std:thread:sleep $p(:ms, 50);
+                next[];
+            };
+        };
+        std:net:tcp:set_timeouts socket :ms => 100 :ms => 100;
+
+        !buf_rd = std:io:buffered:reader socket;
+        !buf_wr = std:io:buffered:writer socket;
+        !line1 = std:io:read_line buf_rd;
+        std:io:write buf_wr "TEST2\n";
+        std:thread:sleep $p(:ms, 200);
+        !line2 = ? is_err[std:io:read_line buf_rd] "OK_TIMEOUT" "NOTOK";
+        std:io:flush buf_wr;
+        std:thread:sleep $p(:ms, 200);
+        !line3 = std:io:read_line buf_rd;
+
+        std:io:write socket "TEST3\n";
+        std:thread:sleep $p(:ms, 200);
+        !line4 = ? is_err[std:io:read_line buf_rd] "NOTOK_TOUT" "OK_NO_TOUT";
+
+        std:io:write socket "q";
+        std:io:flush socket;
+
+        line1 "," line2 "," line3 "," line4
+    "#),
+        "\"HELLO!\\r\\n,OK_TIMEOUT,TEST2\\n,OK_NO_TOUT\""
+    );
+
+    thrd.join().unwrap();
+}
+
+#[test]
 fn check_chars_and_bytes() {
     assert_eq!(ve("type        'x'"), "\"char\"");
     assert_eq!(ve("type        $b'x'"), "\"byte\"");
@@ -6470,6 +6552,72 @@ fn check_process_try_wait() {
 }
 
 #[test]
+fn check_buffered_io() {
+    // checking read_line:
+    assert_eq!(
+        ve(r#"
+        !proc = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $[
+                "/C", "echo TEST123"
+            ] :io;
+        } {
+            unwrap ~ std:process:spawn "bash" $[
+                "-c", "echo TEST123"
+            ] :io;
+        };
+
+        !hdls = std:process:take_pipes proc;
+        std:io:buffered:reader hdls.stdout;
+        !lines = "";
+        while $t {
+            !line = std:io:read_line hdls.stdout;
+            if len[line] == 0 {
+                break[];
+            };
+            .lines = lines "(" (std:str:trim line) ")";
+        };
+        std:assert lines &> $r/\(TEST123\)/ "Found echo output";
+
+        !ret = unwrap ~ std:process:wait proc;
+        ret.success
+    "#),
+        "$true"
+    );
+
+    // checking read_until:
+    assert_eq!(
+        ve(r#"
+        !proc = if std:sys:os[] == "windows" {
+            unwrap ~ std:process:spawn "cmd.exe" $[
+                "/C", "echo TEST123"
+            ] :io;
+        } {
+            unwrap ~ std:process:spawn "bash" $[
+                "-c", "echo TEST123"
+            ] :io;
+        };
+
+        !hdls = std:process:take_pipes proc;
+        std:io:buffered:reader hdls.stdout;
+        !lines = "";
+        while $t {
+            !line = std:io:read_until hdls.stdout "\n";
+            if len[line] == 0 {
+                break[];
+            };
+            .lines = lines "(" (std:str:trim line) ")";
+        };
+        std:assert lines &> $r/\(TEST123\)/ "Found echo output";
+
+        !ret = unwrap ~ std:process:wait proc;
+        ret.success
+    "#),
+        "$true"
+    );
+}
+
+
+#[test]
 fn check_process_io() {
     // checking take_pipes and read_all:
     assert_eq!(
@@ -6588,6 +6736,7 @@ fn check_process_io() {
     // checking take_pipes, threaded read_some on stdout and write_some:
     assert_eq!(
         ve(r#"
+        !nl = if std:sys:os[] == "windows" "\r\n" "\n";
         !proc = if std:sys:os[] == "windows" {
             unwrap ~ std:process:spawn "cmd.exe" $["/Q"] :ioe;
         } {
@@ -6598,7 +6747,6 @@ fn check_process_io() {
 
         !th = std:thread:spawn $code{
             _READY.send :ok;
-            std:displayln "O:" stdout;
             !text = "";
             while $t {
                 !rd = std:io:read_some stdout;
@@ -6619,9 +6767,9 @@ fn check_process_io() {
         std:io:write_some hdls.stdin "echo ";
         std:io:flush hdls.stdin;
         std:thread:sleep :ms => 500;
-        std:io:write_some hdls.stdin "TEST123\r\n";
+        std:io:write_some hdls.stdin ("TEST123" nl);
         std:io:flush hdls.stdin;
-        std:io:write hdls.stdin "exit\r\n";
+        std:io:write hdls.stdin ("exit" nl);
         std:io:flush hdls.stdin;
 
         !thrdout = th.join[];
