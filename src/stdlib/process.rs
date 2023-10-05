@@ -1,5 +1,5 @@
 use crate::compiler::*;
-use crate::stdlib::io_types::{ChildHandle, VChildHandle};
+use crate::stdlib::io_types::*;
 use crate::vval::*;
 use std::cell::RefCell;
 use std::process::{Child, Command, Stdio};
@@ -102,21 +102,21 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 let stderr = vts.child.borrow_mut().stderr.take();
                 let ret = VVal::map();
                 if let Some(stdin) = stdin {
-                    let stdin = VVal::Usr(Box::new(VChildHandle {
-                        handle: ChildHandle::Stdin(Arc::new(Mutex::new(stdin))),
-                    }));
+                    let stdin = VVal::new_usr(VIOHandle(Arc::new(Mutex::new(
+                        IOHandle::ChildStdin(stdin)
+                    ))));
                     ret.set_key_str("stdin", stdin).expect("single use");
                 }
                 if let Some(stdout) = stdout {
-                    let stdout = VVal::Usr(Box::new(VChildHandle {
-                        handle: ChildHandle::Stdout(Arc::new(Mutex::new(stdout))),
-                    }));
+                    let stdout = VVal::new_usr(VIOHandle(Arc::new(Mutex::new(
+                        IOHandle::ChildStdout(stdout)
+                    ))));
                     ret.set_key_str("stdout", stdout).expect("single use");
                 }
                 if let Some(stderr) = stderr {
-                    let stderr = VVal::Usr(Box::new(VChildHandle {
-                        handle: ChildHandle::Stderr(Arc::new(Mutex::new(stderr))),
-                    }));
+                    let stderr = VVal::new_usr(VIOHandle(Arc::new(Mutex::new(
+                        IOHandle::ChildStderr(stderr)
+                    ))));
                     ret.set_key_str("stderr", stderr).expect("single use");
                 }
                 Ok(ret)

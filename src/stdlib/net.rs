@@ -1,10 +1,11 @@
 // Copyright (c) 2021-2022 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 use crate::compiler::*;
+use crate::stdlib::io_types::*;
 use crate::vval::*;
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::stdlib::io_types::*;
+use std::sync::{Arc, Mutex};
 
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 
@@ -129,9 +130,9 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                                     return Ok(env.new_err(format!("Couldn't get client: {}", e)));
                                 }
                                 Ok(stream) => {
-                                    let stream = VVal::new_usr(VTcpStream {
-                                        stream: Rc::new(RefCell::new(stream)),
-                                    });
+                                    let stream = VVal::new_usr(VIOHandle(Arc::new(Mutex::new(
+                                        IOHandle::TcpStream(stream),
+                                    ))));
                                     env.push(stream);
                                     match fun.call_internal(env, 1) {
                                         Ok(_) => {
@@ -179,12 +180,11 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
                 match stream {
                     Ok(stream) => {
-                        //                    stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
-                        //                    stream.set_write_timeout(Some(std::time::Duration::from_secs(10)));
-                        //
-                        return Ok(VVal::Usr(Box::new(VTcpStream {
-                            stream: Rc::new(RefCell::new(stream)),
-                        })));
+                        // stream.set_read_timeout(Some(std::time::Duration::from_secs(10)));
+                        // stream.set_write_timeout(Some(std::time::Duration::from_secs(10)));
+                        return Ok(VVal::new_usr(VIOHandle(Arc::new(Mutex::new(
+                            IOHandle::TcpStream(stream),
+                        )))));
                     }
                     Err(e) => {
                         last_err = format!("Couldn't connect to {}: {}", ep, e);
@@ -304,49 +304,6 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         },
         Some(1),
         Some(2),
-        false,
-    );
-
-    st.fun(
-        "net:tcp:set_timeouts",
-        |env: &mut Env, _argc: usize| {
-            let mut socket = env.arg(0);
-            let read_t = env.arg(1);
-            let write_t = env.arg(2);
-
-            let read_t = if read_t.is_some() {
-                match read_t.to_duration() {
-                    Ok(dur) => Some(dur),
-                    Err(e) => return Ok(e),
-                }
-            } else {
-                None
-            };
-
-            let write_t = if write_t.is_some() {
-                match write_t.to_duration() {
-                    Ok(dur) => Some(dur),
-                    Err(e) => return Ok(e),
-                }
-            } else {
-                None
-            };
-
-            socket
-                .with_usr_ref(|vts: &mut VTcpStream| {
-                    let _ = vts.stream.borrow_mut().set_read_timeout(read_t);
-                    let _ = vts.stream.borrow_mut().set_write_timeout(write_t);
-                    Ok(VVal::Bol(true))
-                })
-                .unwrap_or_else(|| {
-                    Ok(env.new_err(format!(
-                        "std:net:tcp:set_timeouts: First argument not a socket! {}",
-                        socket.s()
-                    )))
-                })
-        },
-        Some(2),
-        Some(3),
         false,
     );
 
