@@ -73,6 +73,7 @@ struct DetachedMQTTClient {
 impl DetachedMQTTClient {
     pub fn new(chan: crate::threads::AValChannel, id: &str, host: &str, port: u16) -> Self {
         let mut options = MqttOptions::new(id, host, port);
+        options.set_max_packet_size(100 * 1024 * 1024, 100 * 1024 * 1024);
         options.set_keep_alive(std::time::Duration::from_secs(5));
         Self {
             options,
