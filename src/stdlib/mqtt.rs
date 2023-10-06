@@ -253,6 +253,11 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal> {
     //        let mut i = 0;
     //        for (v, k) in it {
     //            i += 1;
+    let max_payload_size = if cfg.v_k("max_payload_bytes").is_some() {
+        cfg.v_ik("max_payload_bytes") as usize
+    } else {
+        10240 // 10k
+    };
 
     let mut servers = std::collections::HashMap::new();
     let listen = first_addr!(cfg.v_k("listen"), env)?;
@@ -262,7 +267,7 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal> {
         next_connection_delay_ms: 1,
         connections: rumqttd::ConnectionSettings {
             connection_timeout_ms: 1000,
-            max_payload_size: 10240,
+            max_payload_size,
             max_inflight_count: 500,
             auth: None,
             dynamic_filters: false,
@@ -413,7 +418,6 @@ impl MQTTBroker {
             std::thread::spawn(move || {
                 chan.send(&VVal::pair(VVal::new_sym("$WL/connected"), VVal::None));
                 loop {
-
                     match link_rx.recv() {
                         Ok(Some(msg)) => match msg {
                             Notification::Forward(forward) => {
