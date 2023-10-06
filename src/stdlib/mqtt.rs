@@ -410,38 +410,41 @@ impl MQTTBroker {
                 }
             }
 
-            std::thread::spawn(move || loop {
+            std::thread::spawn(move || {
                 chan.send(&VVal::pair(VVal::new_sym("$WL/connected"), VVal::None));
+                loop {
 
-                match link_rx.recv() {
-                    Ok(Some(msg)) => match msg {
-                        Notification::Forward(forward) => {
-                            let topic = VVal::new_str_mv(
-                                String::from_utf8_lossy(forward.publish.topic.as_ref()).to_string(),
-                            );
+                    match link_rx.recv() {
+                        Ok(Some(msg)) => match msg {
+                            Notification::Forward(forward) => {
+                                let topic = VVal::new_str_mv(
+                                    String::from_utf8_lossy(forward.publish.topic.as_ref())
+                                        .to_string(),
+                                );
+                                chan.send(&VVal::pair(
+                                    topic,
+                                    VVal::new_byt(forward.publish.payload.as_ref().to_vec()),
+                                ));
+                            }
+                            //                        Notification::ForwardWithProperties(forward, _) => {
+                            //                            let topic = VVal::new_str_mv(
+                            //                                String::from_utf8_lossy(forward.publish.topic.as_ref()).to_string(),
+                            //                            );
+                            //                            chan.send(&VVal::pair(
+                            //                                topic,
+                            //                                VVal::new_byt(forward.publish.payload.as_ref().to_vec()),
+                            //                            ));
+                            //                        }
+                            _ => {}
+                        },
+                        Ok(None) => (),
+                        Err(e) => {
                             chan.send(&VVal::pair(
-                                topic,
-                                VVal::new_byt(forward.publish.payload.as_ref().to_vec()),
+                                VVal::new_sym("$WL/error"),
+                                VVal::new_str_mv(format!("{}", e)),
                             ));
+                            break;
                         }
-//                        Notification::ForwardWithProperties(forward, _) => {
-//                            let topic = VVal::new_str_mv(
-//                                String::from_utf8_lossy(forward.publish.topic.as_ref()).to_string(),
-//                            );
-//                            chan.send(&VVal::pair(
-//                                topic,
-//                                VVal::new_byt(forward.publish.payload.as_ref().to_vec()),
-//                            ));
-//                        }
-                        _ => {}
-                    },
-                    Ok(None) => (),
-                    Err(e) => {
-                        chan.send(&VVal::pair(
-                            VVal::new_sym("$WL/error"),
-                            VVal::new_str_mv(format!("{}", e)),
-                        ));
-                        break;
                     }
                 }
             });
