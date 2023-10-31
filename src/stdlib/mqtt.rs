@@ -269,7 +269,7 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal> {
         connections: rumqttd::ConnectionSettings {
             connection_timeout_ms: 1000,
             max_payload_size,
-            max_inflight_count: 500,
+            max_inflight_count: 10,
             auth: None,
             dynamic_filters: false,
         },
@@ -312,7 +312,7 @@ fn cfg2broker_config(env: &mut Env, cfg: VVal) -> Result<Config, VVal> {
         console,
         router: rumqttd::RouterConfig {
             max_connections: 100,
-            max_outgoing_packet_count: 200,
+            max_outgoing_packet_count: 20,
             max_segment_size: 1024 * 1024 * 100,
             max_segment_count: 10,
             custom_segment: None,
