@@ -500,10 +500,10 @@ pub fn io_add_to_symtable(st: &mut SymbolTable) {
         "io:read_line",
         |env: &mut Env, _argc: usize| {
             get_bufread_handle!("std:io:read_line", env, env.arg(0), rd, {
-                let mut buf = String::new();
-                let r = rd.read_line(&mut buf);
+                let mut buf = Vec::new();
+                let r = rd.read_until(b'\x0A', &mut buf);
                 Ok(match r {
-                    Ok(_n) => VVal::new_str_mv(buf),
+                    Ok(_n) => VVal::new_byt(buf),
                     Err(e) => env.new_err(format!("std:io:read_line: {}", e)),
                 })
             })
