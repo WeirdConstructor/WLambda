@@ -7917,7 +7917,7 @@ fn check_auto_correlate() {
 
     assert_eq!(
         ve(r#"
-            std:str:auto_correlate_lists $[
+            std:str:auto_correlate_longest_sublist $[
                 $[1,2,3,4,5,6,7,8,0,0,0,1,2],
                 $[9,4,3,2,76,65,4,1,2,3,4,5,7,5,5,45,6,7],
                 $[0,0,0,0,1,2,3,0,0,0,1,2,3,4,5,6],

@@ -427,26 +427,30 @@ impl<'a> PartMatcher<'a> {
         let mut found_len = 0;
         let mut cur_i = 0;
 
+//        println!("FIND {:?} in {:?}", self.part, checked_part);
         for elem in checked_part.iter() {
             if cur_i >= self.part.len() {
                 break;
             }
 
             if self.part[cur_i] == *elem {
+                if found_len == 0 {
+                    part_i = cur_i;
+                }
+
                 found_len += 1;
                 cur_i += 1;
             } else if found_len > 0 {
                 break;
-            } else {
-                part_i += 1;
             }
         }
-
-        if found_len > self.longest_match {
-            self.longest_match = found_len;
-        }
+//        println!("RES: pi={} found_len={}", part_i, found_len);
 
         if found_len >= self.min_len {
+            if found_len > self.longest_match {
+                self.longest_match = found_len;
+            }
+
             Some((part_i, found_len))
         } else {
             None
@@ -462,6 +466,15 @@ pub struct AutoCorrSubseq {
     pub len: usize,
 }
 
+impl AutoCorrSubseq {
+    fn in_list_matches(&self, list_idx: usize, idx: usize, len: usize) -> bool {
+        return
+            list_idx == self.in_list_idx
+            && idx >= self.in_list_start_idx
+            && (idx + len) <= self.in_list_start_idx + self.len;
+    }
+}
+
 pub fn auto_correlate_lists(list_of_lists: Vec<Vec<u64>>, min_len: usize) -> Vec<AutoCorrSubseq> {
     let mut subsequences : Vec<AutoCorrSubseq> = Vec::new();
 
@@ -469,33 +482,50 @@ pub fn auto_correlate_lists(list_of_lists: Vec<Vec<u64>>, min_len: usize) -> Vec
         let cur_list = &list_of_lists[list_i];
         println!("CURLIST: {:?}", cur_list);
 
-        for i in 0..cur_list.len() {
+        let mut i = 0;
+        while i < cur_list.len() {
             println!("SUBL: {:?}", &cur_list[i..]);
             let mut pm = PartMatcher::new(&cur_list[i..], min_len);
 
             for next_list_i in (list_i + 1)..list_of_lists.len() {
                 let mut subseq_i = 0;
-                println!("list_i={} subseq_i={}: {:?}", next_list_i, subseq_i, &list_of_lists[next_list_i][subseq_i..]);
+                while subseq_i < list_of_lists[next_list_i].len() {
+//                println!("list_i={} subseq_i={}: {:?}", next_list_i, subseq_i, &list_of_lists[next_list_i][subseq_i..]);
 
-                while let Some((find_i, find_len)) =
-                    pm.find_subsequence_in(&list_of_lists[next_list_i][subseq_i..]) {
-                println!("find_i={}, find_len={}", find_i, find_len);
+                    while let Some((find_i, find_len)) =
+                        pm.find_subsequence_in(&list_of_lists[next_list_i][subseq_i..]) {
+                        let find_i = subseq_i + find_i;
 
-                    subsequences.push(AutoCorrSubseq {
-                        from_list_idx: list_i,
-                        from_list_start_idx: i,
-                        in_list_idx: next_list_i,
-                        in_list_start_idx: find_i,
-                        len: find_len,
-                    });
-                    subseq_i = find_i + find_len;
-                    println!("new list_i={} subseq_i={}: {:?}", next_list_i, subseq_i, &list_of_lists[next_list_i][subseq_i..]);
+//                    println!("find_i={}, find_len={}", find_i, find_len);
 
-                    if subseq_i >= list_of_lists[next_list_i].len() {
-                        break;
+                        let mut found = false;
+                        for ss in subsequences.iter() {
+                            if ss.in_list_matches(next_list_i, find_i, find_len) {
+                                found = true;
+                            }
+                        }
+                        if !found {
+                            subsequences.push(AutoCorrSubseq {
+                                from_list_idx: list_i,
+                                from_list_start_idx: i,
+                                in_list_idx: next_list_i,
+                                in_list_start_idx: find_i,
+                                len: find_len,
+                            });
+                        }
+                        subseq_i = find_i + find_len;
+//                        println!("new list_i={} subseq_i={}: {:?}", next_list_i, subseq_i, &list_of_lists[next_list_i][subseq_i..]);
+
+                        if subseq_i >= list_of_lists[next_list_i].len() {
+                            break;
+                        }
                     }
+
+                    subseq_i += 1;
                 }
             }
+
+            i += 1;
         }
     }
     subsequences

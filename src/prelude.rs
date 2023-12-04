@@ -11497,7 +11497,7 @@ fn dir_entry_to_vval(
     Ok(ve)
 }
 
-fn auto_correlate_lists_of_vv(v: &VVal, min_len: usize) -> VVal {
+fn auto_correlate_longest_sublists_of_vv(v: &VVal, min_len: usize) -> VVal {
     use std::collections::HashMap;
 
     let mut elem_id : u64 = 1;
@@ -13734,9 +13734,9 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(
         st,
-        "str:auto_correlate_lists",
+        "str:auto_correlate_longest_sublist",
         |env: &mut Env, _argc: usize| {
-            Ok(auto_correlate_lists_of_vv(&env.arg(0), env.arg(1).i() as usize))
+            Ok(auto_correlate_longest_sublists_of_vv(&env.arg(0), env.arg(1).i() as usize))
         },
         Some(2),
         Some(2),
