@@ -4650,6 +4650,14 @@ impl VVal {
         }
     }
 
+    pub fn remove_at(&self, index: usize) -> VVal {
+        if let VVal::Lst(b) = &self {
+            b.borrow_mut().remove(index)
+        } else {
+            self.with_deref(|v| v.remove_at(index), |_| VVal::None)
+        }
+    }
+
     pub fn set(&self, index: usize, val: VVal) {
         if let VVal::Lst(b) = &self {
             if index >= b.borrow().len() {

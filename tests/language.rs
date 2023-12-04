@@ -6616,7 +6616,6 @@ fn check_buffered_io() {
     );
 }
 
-
 #[test]
 fn check_process_io() {
     // checking take_pipes and read_all:
@@ -7846,4 +7845,84 @@ fn check_multi_def() {
     assert_eq!(ve("!y = 12; if $t { !(x, y) = 1 => 2; }; y"), "12");
     assert_eq!(ve("!y = 11; if $t { !(x, x) = 1 => 2; }; y"), "11");
     assert_eq!(ve("!y = 10; if $t { !x = 1; !x = 2; }; y"), "10");
+}
+
+#[test]
+fn check_insert_remove_shift() {
+    assert_eq!(ve("std:remove 100 $[1,2,3,4,5,6]"), "$o()");
+    assert_eq!(ve("std:remove 1 $[1,2,3,4,5,6]"), "$o(2)");
+    assert_eq!(ve("std:remove 0 $[1,2,3,4,5,6]"), "$o(1)");
+    assert_eq!(ve("std:remove -1 $[1,2,3,4,5,6]"), "$o(6)");
+    assert_eq!(ve("std:remove -100 $[1,2,3,4,5,6]"), "$o(1)");
+
+    assert_eq!(ve("!x = $[1,2,3,4,5,6]; $[std:shift x, std:shift x]"), "$[$o(1),$o(2)]");
+    assert_eq!(ve("std:shift $[]"), "$o()");
+    assert_eq!(ve("std:insert $[1,2,3,4] 2 \"a\""), "$[1,2,\"a\",3,4]");
+    assert_eq!(ve("std:insert $[1,2,3,4] -1 \"a\""), "$[1,2,3,4,\"a\"]");
+    assert_eq!(ve("std:insert $[1,2,3,4] -2 \"a\""), "$[1,2,3,\"a\",4]");
+    assert_eq!(ve("std:insert $[1,2,3,4] -100 \"a\""), "$[\"a\",1,2,3,4]");
+}
+
+#[test]
+fn check_string_splits() {
+    assert_eq!(
+        ve("std:str:split_any \";, \" \"abc;;;feofoefe,, fewfioewfw;, 333\""),
+        "$[\"abc\",\"\",\"\",\"feofoefe\",\"\",\"\",\"fewfioewfw\",\"\",\"\",\"333\"]");
+    assert_eq!(ve("std:str:split_any \";, \" \"\""), "$[\"\"]");
+    assert_eq!(ve("std:str:split_any \";, \" \"A; ,,\""), "$[\"A\",\"\",\"\",\"\",\"\"]");
+    assert_eq!(ve("std:str:split_any \";, \" \"; ,,\""), "$[\"\",\"\",\"\",\"\",\"\"]");
+
+    assert_eq!(
+        ve("std:str:split_any_non_empty \";, \" \"abc;;;feofoefe,, fewfioewfw;, 333\""),
+        "$[\"abc\",\"feofoefe\",\"fewfioewfw\",\"333\"]");
+    assert_eq!(ve("std:str:split_any_non_empty \";, \" \"\""), "$[]");
+    assert_eq!(ve("std:str:split_any_non_empty \";, \" \"A; ,,\""), "$[\"A\"]");
+    assert_eq!(ve("std:str:split_any_non_empty \";, \" \"; ,,\""), "$[]");
+
+    assert_eq!(
+        ve("std:str:split_whitespace \"He told her    to get lost!\""),
+        "$[\"He\",\"told\",\"her\",\"to\",\"get\",\"lost!\"]");
+
+    assert_eq!(
+        ve("std:str:nlp:en:extract_pure_words \"He told her    to get lost, saying \\\"You lol\\\" *chuckling under his statements*!\""),
+        "$[\"He\",\"told\",\"her\",\"to\",\"get\",\"lost\",\"saying\",\"You\",\"lol\",\"chuckling\",\"under\",\"his\",\"statements\",\"!\"]");
+
+    assert_eq!(
+        ve("std:str:nlp:en:extract_pure_words \"You're You'rea it' it's\""),
+        "$[\"Youre\",\"You\",\"rea\",\"it\",\"its\"]");
+
+    assert_eq!(
+        ve("std:str:nlp:extract_quoted \"'\" \"He told her    to get lost, saying \\\'You lol\\\' *chuckling under his statements*!\""),
+        "$[$p($n,\"He told her    to get lost, saying \"),$p(\"\\'\",\"You lol\"),\" *chuckling under his statements*!\"]");
+
+    assert_eq!(
+        ve("std:str:nlp:extract_quoted \"'\" \"'X'Y'''X'\""),
+        "$[$p($<1=>\"\\'\",\"X\"),$p($n,\"Y\"),$p($<1>,\"X\")]");
+
+    assert_eq!(
+        ve("std:str:nlp:extract_quoted \"'\" \"'OOOO\""),
+        "$[\"OOOO\"]");
+
+    assert_eq!(
+        ve("std:str:nlp:extract_quoted \"'\" \"'\""),
+        "$[]");
+
+    assert_eq!(
+        ve("std:str:nlp:extract_quoted \"He told her, \\\"You are fine!\\\"   \""),
+        "$[]");
+}
+
+#[test]
+fn check_auto_correlate() {
+
+    assert_eq!(
+        ve(r#"
+            std:str:auto_correlate_lists $[
+                $[1,2,3,4,5,6,7,8,0,0,0,1,2],
+                $[9,4,3,2,76,65,4,1,2,3,4,5,7,5,5,45,6,7],
+                $[0,0,0,0,1,2,3,0,0,0,1,2,3,4,5,6],
+            ] 4;
+        "#),
+        "$[]");
+
 }

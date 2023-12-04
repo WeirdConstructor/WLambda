@@ -10456,6 +10456,68 @@ macro_rules! process_vec_input {
     };
 }
 
+fn extract_pure_words(s: &str) -> VVal {
+    let words = VVal::vec();
+
+    // Remove ' from words like "it's" or "you're" by merging
+    // them to "its" or "youre"
+    let mut cleaned = String::new();
+    let mut in_seq = false;
+    let mut pre_chars : Vec<char> = Vec::new();
+    let mut count_postfix = 0;
+    for c in s.chars() {
+        if c.is_whitespace() {
+            in_seq = false;
+
+            if pre_chars.len() > 0 {
+                for k in pre_chars.iter() {
+                    if !(count_postfix <= 3 && *k == '\'') {
+                        cleaned.push(*k);
+                    }
+                }
+                count_postfix = 0;
+                pre_chars.clear();
+            }
+
+            cleaned.push(c);
+        } else if in_seq {
+            if count_postfix > 0 {
+                count_postfix += 1;
+            }
+
+            if c == '\'' {
+                count_postfix += 1;
+            }
+            pre_chars.push(c);
+
+        } else {
+            in_seq = true;
+            pre_chars.push(c);
+        }
+    }
+
+    if pre_chars.len() > 0 {
+        for k in pre_chars.iter() {
+            if !(count_postfix <= 3 && *k == '\'') {
+                cleaned.push(*k);
+            }
+        }
+        pre_chars.clear();
+    }
+
+    let s =
+        cleaned.replacen(
+            &['\n', '\r', '\'', '\"', '*', '-', ':', '.', ',', ';', '~', '_'][..],
+            " ",
+            s.len());
+
+    for w in s.split_whitespace() {
+        words.push(VVal::new_str(w));
+    }
+
+    words
+}
+
 /// Returns a SymbolTable with all WLambda core language symbols.
 #[allow(clippy::cast_lossless, clippy::assign_op_pattern)]
 pub fn core_symbol_table() -> SymbolTable {
@@ -11435,6 +11497,51 @@ fn dir_entry_to_vval(
     Ok(ve)
 }
 
+fn auto_correlate_lists_of_vv(v: &VVal, min_len: usize) -> VVal {
+    use std::collections::HashMap;
+
+    let mut elem_id : u64 = 1;
+    let mut elem_id_map : HashMap<String, u64> = HashMap::new();
+    let mut id_elem_map : HashMap<u64, VVal> = HashMap::new();
+
+    let mut list_of_lists : Vec<Vec<u64>> = Vec::new();
+    for (v, _) in v.iter() {
+        let mut cur_vec : Vec<u64> = Vec::new();
+
+        for (sv, _) in v.iter() {
+            sv.with_s_ref(|s| {
+                if let Some(id) = elem_id_map.get(s) {
+                    cur_vec.push(*id);
+                } else {
+                    elem_id_map.insert(s.to_string(), elem_id);
+                    id_elem_map.insert(elem_id, sv.clone());
+                    cur_vec.push(elem_id);
+                    elem_id += 1;
+                }
+            });
+        }
+
+        list_of_lists.push(cur_vec);
+    }
+
+    let autores : Vec<util::AutoCorrSubseq> =
+        util::auto_correlate_lists(list_of_lists, min_len);
+
+    let result = VVal::vec();
+    for ar in autores {
+        let v = VVal::vec4(
+            VVal::Int(ar.from_list_idx as i64),
+            VVal::Int(ar.from_list_start_idx as i64),
+            VVal::Int(ar.in_list_idx as i64),
+            VVal::Int(ar.in_list_start_idx as i64),
+        );
+        v.push(VVal::Int(ar.len as i64));
+        result.push(v);
+    }
+
+    result
+}
+
 /// Returns a SymbolTable with all WLambda standard library language symbols.
 #[allow(clippy::question_mark)]
 pub fn std_symbol_table() -> SymbolTable {
@@ -11477,6 +11584,19 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(
         st,
+        "shift",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            v.unshift(env.arg(1));
+            Ok(v)
+        },
+        Some(2),
+        Some(2),
+        false
+    );
+
+    func!(
+        st,
         "unshift",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);
@@ -11485,6 +11605,31 @@ pub fn std_symbol_table() -> SymbolTable {
         },
         Some(2),
         Some(2),
+        false
+    );
+
+    func!(
+        st,
+        "insert",
+        |env: &mut Env, _argc: usize| {
+            let list = env.arg(0);
+            let i = env.arg(1).i();
+            let v = env.arg(2);
+            let i : usize = if i < 0 {
+                let i = list.len() as i64 + (i + 1);
+                if i < 0 {
+                    0
+                } else {
+                    i as usize
+                }
+            } else {
+                i as usize
+            };
+            list.insert_at(i, v);
+            Ok(list)
+        },
+        Some(3),
+        Some(3),
         false
     );
 
@@ -11633,6 +11778,48 @@ pub fn std_symbol_table() -> SymbolTable {
         },
         Some(1),
         None,
+        false
+    );
+
+    func!(
+        st,
+        "remove",
+        |env: &mut Env, _argc: usize| {
+            let i = env.arg(0).i();
+            let v = env.arg(1);
+            let i : usize = if i < 0 {
+                let i = v.len() as i64 + i;
+                if i < 0 {
+                    0
+                } else {
+                    i as usize
+                }
+            } else {
+                i as usize
+            };
+            if i >= v.len() {
+                return Ok(VVal::opt_none());
+            }
+            Ok(VVal::opt(v.remove_at(i)))
+        },
+        Some(2),
+        Some(2),
+        false
+    );
+
+    func!(
+        st,
+        "shift",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            if v.len() == 0 {
+                Ok(VVal::opt_none())
+            } else {
+                Ok(VVal::opt(v.remove_at(0)))
+            }
+        },
+        Some(1),
+        Some(1),
         false
     );
 
@@ -12011,6 +12198,127 @@ pub fn std_symbol_table() -> SymbolTable {
             Ok(VVal::vec_mv(env.arg_ref(0).unwrap().with_s_ref(|arg: &str| {
                 arg.chars().map(|c| VVal::Int(i64::from(c as u32))).collect()
             })))
+        },
+        Some(1),
+        Some(1),
+        false
+    );
+    func!(
+        st,
+        "str:split_any",
+        |env: &mut Env, _argc: usize| {
+            let parts = VVal::vec();
+            env.arg(0).with_s_ref(|chars| {
+                let chars_class : Vec<char> = chars.chars().collect();
+
+                env.arg(1).with_s_ref(|s| {
+                    for p in s.split(&chars_class[..]) {
+                        parts.push(VVal::new_str(p));
+                    }
+                });
+            });
+            Ok(parts)
+        },
+        Some(2),
+        Some(2),
+        false
+    );
+    func!(
+        st,
+        "str:split_any_non_empty",
+        |env: &mut Env, _argc: usize| {
+            let parts = VVal::vec();
+            env.arg(0).with_s_ref(|chars| {
+                let chars_class : Vec<char> = chars.chars().collect();
+
+                env.arg(1).with_s_ref(|s| {
+                    for p in s.split(&chars_class[..]) {
+                        if p.len() > 0 {
+                            parts.push(VVal::new_str(p));
+                        }
+                    }
+                });
+            });
+            Ok(parts)
+        },
+        Some(2),
+        Some(2),
+        false
+    );
+    func!(
+        st,
+        "str:split_whitespace",
+        |env: &mut Env, _argc: usize| {
+            let words = VVal::vec();
+            env.arg(0).with_s_ref(|s| {
+                for word in s.split_whitespace() {
+                    words.push(VVal::new_str(word));
+                }
+            });
+            Ok(words)
+        },
+        Some(1),
+        Some(1),
+        false
+    );
+    func!(
+        st,
+        "str:nlp:extract_quoted",
+        |env: &mut Env, argc: usize| {
+            let qchar = env.arg(0).s_raw();
+            let qchar = if argc == 1 {
+                '"'
+            } else {
+                qchar.chars().nth(0).unwrap_or('\"')
+            };
+
+            let sy = env.arg(0);
+
+            let parts = VVal::vec();
+            env.arg(1).with_s_ref(|s| {
+                let mut cur_part = String::new();
+                let mut in_quote = false;
+                for c in s.chars() {
+                    if in_quote && c == qchar {
+                        in_quote = false;
+                        if cur_part.len() > 0 {
+                            parts.push(
+                                VVal::pair(sy.clone(),
+                                    VVal::new_str_mv(
+                                        std::mem::replace(&mut cur_part, String::new()))));
+                        }
+                    } else if c == qchar {
+                        in_quote = true;
+                        if cur_part.len() > 0 {
+                            parts.push(
+                                VVal::pair(VVal::None,
+                                    VVal::new_str_mv(
+                                        std::mem::replace(&mut cur_part, String::new()))));
+                        }
+                    } else {
+                        cur_part.push(c);
+                    }
+                }
+                if cur_part.len() > 0 {
+                    parts.push(
+                        VVal::new_str_mv(
+                            std::mem::replace(&mut cur_part, String::new())));
+                }
+            });
+
+            Ok(parts)
+        },
+        Some(1),
+        Some(2),
+        false
+    );
+    func!(
+        st,
+        "str:nlp:en:extract_pure_words",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_s_ref(|s| {
+                Ok(extract_pure_words(s))
+            })
         },
         Some(1),
         Some(1),
@@ -13421,6 +13729,17 @@ pub fn std_symbol_table() -> SymbolTable {
         },
         Some(1),
         Some(1),
+        false
+    );
+
+    func!(
+        st,
+        "str:auto_correlate_lists",
+        |env: &mut Env, _argc: usize| {
+            Ok(auto_correlate_lists_of_vv(&env.arg(0), env.arg(1).i() as usize))
+        },
+        Some(2),
+        Some(2),
         false
     );
 
