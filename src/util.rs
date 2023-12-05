@@ -475,16 +475,16 @@ impl AutoCorrSubseq {
     }
 }
 
-pub fn auto_correlate_lists(list_of_lists: Vec<Vec<u64>>, min_len: usize) -> Vec<AutoCorrSubseq> {
+pub fn auto_correlate_lists(list_of_lists: &Vec<Vec<u64>>, min_len: usize) -> Vec<AutoCorrSubseq> {
     let mut subsequences : Vec<AutoCorrSubseq> = Vec::new();
 
     for list_i in 0..list_of_lists.len() {
         let cur_list = &list_of_lists[list_i];
-        println!("CURLIST: {:?}", cur_list);
+//        println!("CURLIST: {:?}", cur_list);
 
         let mut i = 0;
         while i < cur_list.len() {
-            println!("SUBL: {:?}", &cur_list[i..]);
+//            println!("SUBL: {:?}", &cur_list[i..]);
             let mut pm = PartMatcher::new(&cur_list[i..], min_len);
 
             for next_list_i in (list_i + 1)..list_of_lists.len() {

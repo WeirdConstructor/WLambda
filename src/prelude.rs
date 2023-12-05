@@ -11525,7 +11525,7 @@ fn auto_correlate_longest_sublists_of_vv(v: &VVal, min_len: usize) -> VVal {
     }
 
     let autores : Vec<util::AutoCorrSubseq> =
-        util::auto_correlate_lists(list_of_lists, min_len);
+        util::auto_correlate_lists(&list_of_lists, min_len);
 
     let result = VVal::vec();
     for ar in autores {
@@ -11536,6 +11536,11 @@ fn auto_correlate_longest_sublists_of_vv(v: &VVal, min_len: usize) -> VVal {
             VVal::Int(ar.in_list_start_idx as i64),
         );
         v.push(VVal::Int(ar.len as i64));
+        let sv = VVal::vec();
+        v.push(sv.clone());
+        for el in &list_of_lists[ar.from_list_idx][ar.from_list_start_idx..(ar.from_list_start_idx + ar.len)] {
+            sv.push(id_elem_map.get(el).expect("correct internal indices").clone());
+        }
         result.push(v);
     }
 
