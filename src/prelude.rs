@@ -11504,11 +11504,24 @@ fn auto_correlate_longest_sublists_of_vv(v: &VVal, min_len: usize) -> VVal {
     let mut elem_id_map : HashMap<String, u64> = HashMap::new();
     let mut id_elem_map : HashMap<u64, VVal> = HashMap::new();
 
+    let mut list_of_extra_values : Option<Vec<(usize, VVal)>> = None;
     let mut list_of_lists : Vec<Vec<u64>> = Vec::new();
-    for (v, _) in v.iter() {
+    for (i, (v, _)) in v.iter().enumerate() {
         let mut cur_vec : Vec<u64> = Vec::new();
 
-        for (sv, _) in v.iter() {
+        let list = if v.is_pair() {
+            if list_of_extra_values.is_none() {
+                list_of_extra_values = Some(Vec::new());
+            }
+            if let Some(ll) = &mut list_of_extra_values {
+                ll.push((i, v.v_(0)));
+            }
+            v.v_(1)
+        } else {
+            v
+        };
+
+        for (sv, _) in list.iter() {
             sv.with_s_ref(|s| {
                 if let Some(id) = elem_id_map.get(s) {
                     cur_vec.push(*id);
@@ -11537,7 +11550,22 @@ fn auto_correlate_longest_sublists_of_vv(v: &VVal, min_len: usize) -> VVal {
         );
         v.push(VVal::Int(ar.len as i64));
         let sv = VVal::vec();
-        v.push(sv.clone());
+        if let Some(ll) = &list_of_extra_values {
+            let p1 = if let Some(from_v) = ll.iter().find(|x| x.0 == ar.from_list_idx) {
+                from_v.1.clone()
+            } else {
+                VVal::None
+            };
+            let p2 = if let Some(in_v) = ll.iter().find(|x| x.0 == ar.in_list_idx) {
+                in_v.1.clone()
+            } else {
+                VVal::None
+            };
+
+            v.push(VVal::pair(VVal::pair(p1, p2), sv.clone()));
+        } else {
+            v.push(sv.clone());
+        }
         for el in &list_of_lists[ar.from_list_idx][ar.from_list_start_idx..(ar.from_list_start_idx + ar.len)] {
             sv.push(id_elem_map.get(el).expect("correct internal indices").clone());
         }
