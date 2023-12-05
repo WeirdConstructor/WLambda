@@ -423,19 +423,24 @@ impl<'a> PartMatcher<'a> {
     }
 
     fn find_subsequence_in(&mut self, checked_part: &[u64]) -> Option<(usize, usize)> {
-        let mut part_i = 0;
+        let mut start_i = 0;
         let mut found_len = 0;
         let mut cur_i = 0;
 
+        if checked_part.len() < self.min_len {
+            return None;
+        }
+
 //        println!("FIND {:?} in {:?}", self.part, checked_part);
-        for elem in checked_part.iter() {
+        for (part_i, elem) in checked_part.iter().enumerate() {
             if cur_i >= self.part.len() {
                 break;
             }
 
             if self.part[cur_i] == *elem {
                 if found_len == 0 {
-                    part_i = cur_i;
+                    start_i = part_i;
+//            println!("MATCH cur_i={}, part_i={}", cur_i, part_i);
                 }
 
                 found_len += 1;
@@ -451,7 +456,7 @@ impl<'a> PartMatcher<'a> {
                 self.longest_match = found_len;
             }
 
-            Some((part_i, found_len))
+            Some((start_i, found_len))
         } else {
             None
         }
@@ -485,6 +490,10 @@ pub fn auto_correlate_lists(list_of_lists: &Vec<Vec<u64>>, min_len: usize) -> Ve
         let mut i = 0;
         while i < cur_list.len() {
 //            println!("SUBL: {:?}", &cur_list[i..]);
+            if cur_list[i..].len() < min_len {
+                break;
+            }
+
             let mut pm = PartMatcher::new(&cur_list[i..], min_len);
 
             for next_list_i in (list_i + 1)..list_of_lists.len() {
