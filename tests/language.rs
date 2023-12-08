@@ -7893,15 +7893,15 @@ fn check_string_splits() {
 
     assert_eq!(
         ve("std:str:nlp:extract_quoted \"'\" \"He told her    to get lost, saying \\\'You lol\\\' *chuckling under his statements*!\""),
-        "$[$p($n,\"He told her    to get lost, saying \"),$p(\"\\'\",\"You lol\"),\" *chuckling under his statements*!\"]");
+        "$[$p($n,\"He told her    to get lost, saying \"),$p(\'\\'\',\"You lol\"),$p($n,\" *chuckling under his statements*!\")]");
 
     assert_eq!(
         ve("std:str:nlp:extract_quoted \"'\" \"'X'Y'''X'\""),
-        "$[$p($<1=>\"\\'\",\"X\"),$p($n,\"Y\"),$p($<1>,\"X\")]");
+        "$[$p(\'\\'\',\"X\"),$p($n,\"Y\"),$p('\\'',\"X\")]");
 
     assert_eq!(
         ve("std:str:nlp:extract_quoted \"'\" \"'OOOO\""),
-        "$[\"OOOO\"]");
+        "$[$p(\'\\'\',\"OOOO\")]");
 
     assert_eq!(
         ve("std:str:nlp:extract_quoted \"'\" \"'\""),
@@ -7909,7 +7909,7 @@ fn check_string_splits() {
 
     assert_eq!(
         ve("std:str:nlp:extract_quoted \"He told her, \\\"You are fine!\\\"   \""),
-        "$[]");
+        "$[$p($n,\"He told her, \"),$p('\\\"',\"You are fine!\"),$p($n,\"   \")]");
 }
 
 #[test]

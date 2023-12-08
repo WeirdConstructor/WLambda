@@ -10507,7 +10507,8 @@ fn extract_pure_words(s: &str) -> VVal {
 
     let s =
         cleaned.replacen(
-            &['\n', '\r', '\'', '\"', '*', '-', ':', '.', ',', ';', '~', '_'][..],
+            &['\n', '\r', '`', '´', '°', '^', '\\', '/', '\'', '\"',
+              '*', '-', ':', '.', ',', ';', '~', '_'][..],
             " ",
             s.len());
 
@@ -12299,16 +12300,18 @@ pub fn std_symbol_table() -> SymbolTable {
         "str:nlp:extract_quoted",
         |env: &mut Env, argc: usize| {
             let qchar = env.arg(0).s_raw();
+            let mut text = env.arg(1);
             let qchar = if argc == 1 {
+                text = env.arg(0);
                 '"'
             } else {
                 qchar.chars().nth(0).unwrap_or('\"')
             };
 
-            let sy = env.arg(0);
+            let sy = VVal::new_char(qchar);
 
             let parts = VVal::vec();
-            env.arg(1).with_s_ref(|s| {
+            text.with_s_ref(|s| {
                 let mut cur_part = String::new();
                 let mut in_quote = false;
                 for c in s.chars() {
@@ -12334,8 +12337,10 @@ pub fn std_symbol_table() -> SymbolTable {
                 }
                 if cur_part.len() > 0 {
                     parts.push(
-                        VVal::new_str_mv(
-                            std::mem::replace(&mut cur_part, String::new())));
+                        VVal::pair(
+                            if in_quote { sy.clone() } else { VVal::None },
+                            VVal::new_str_mv(
+                                std::mem::replace(&mut cur_part, String::new()))));
                 }
             });
 
