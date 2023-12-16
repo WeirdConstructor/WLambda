@@ -7947,7 +7947,7 @@ fn check_match_prefix_and_split_sequences() {
                 "ack",
                 "bla",
             ];
-            std:str:match_prefix_and_split_sequences list
+            std:str:nlp:match_prefix_and_split_sequences list
                 "eine wurst kackwurst ackla ackle ackbla blaack";
         "#),
         "");

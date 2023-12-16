@@ -10538,14 +10538,11 @@ fn extract_pure_words(s: &str) -> VVal {
 fn match_prefix_in(prefix_list: &[Vec<char>], seq: &[char]) -> Option<(usize, usize)> {
     for (i, pfx) in prefix_list.iter().enumerate() {
         if seq.starts_with(&pfx[..]) {
-            let mut end_of_seq_index = pfx.len();
-            // TODO: Search until end of word
-            // TODO: Then continue search until last whitespace
-            // TODO: Record the length of the word and the complete length
-            while seq.len() < end_of_seq_index && seq[end_of_seq_index].is_whitespace() {
-                end_of_seq_index += 1;
+            let mut word_len = pfx.len();
+            while word_len < seq.len() && seq[word_len].is_alphabetic() {
+                word_len += 1;
             }
-            return Some((i, end_of_seq_index));
+            return Some((i, word_len));
         }
     }
 
@@ -10565,7 +10562,8 @@ fn match_prefix_and_split_sequences(prefix_list: &[Vec<char>], s: &str) -> VVal 
     let mut unused_start : Option<usize> = None;
     let mut unused_len = 0;
     while i < input.len() {
-        if let Some((pfx_idx, len)) = match_prefix_in(prefix_list, &input[i..]) {
+        if let Some((pfx_idx, word_len)) = match_prefix_in(prefix_list, &input[i..]) {
+
             if let Some(start) = unused_start {
                 let mut seq = Vec::new();
                 seq.extend(&input[start..(start + unused_len)]);
@@ -10575,10 +10573,10 @@ fn match_prefix_and_split_sequences(prefix_list: &[Vec<char>], s: &str) -> VVal 
             }
 
             let mut seq = Vec::new();
-            seq.extend(&input[i..(i + len)]);
+            seq.extend(&input[i..(i + word_len)]);
             sequences.push((Some(pfx_idx), seq));
 
-            i += len;
+            i += word_len;
         } else {
             if unused_start.is_some() {
                 unused_len += 1;
@@ -10587,7 +10585,6 @@ fn match_prefix_and_split_sequences(prefix_list: &[Vec<char>], s: &str) -> VVal 
                 unused_len = 1;
             }
 
-            // Advance unused sequence or create it
             i += 1;
         }
     }
