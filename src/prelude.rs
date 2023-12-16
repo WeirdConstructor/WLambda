@@ -10456,22 +10456,6 @@ macro_rules! process_vec_input {
     };
 }
 
-fn is_non_word_char(c: char) -> bool {
-    if c.is_whitespace() {
-        return true;
-    }
-
-    for m in ['\n', '\r', '`', '´', '°', '^', '\\', '/', '\'', '\"',
-              '*', '-', ':', '.', ',', ';', '~', '_'] {
-
-        if m == c {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 fn extract_pure_words(s: &str) -> VVal {
     let words = VVal::vec();
 
@@ -10537,7 +10521,7 @@ fn extract_pure_words(s: &str) -> VVal {
 
 fn match_prefix_in(prefix_list: &[Vec<char>], seq: &[char]) -> Option<(usize, usize)> {
     for (i, pfx) in prefix_list.iter().enumerate() {
-        if seq.starts_with(&pfx[..]) {
+        if pfx.len() > 0 && seq.starts_with(&pfx[..]) {
             let mut word_len = pfx.len();
             while word_len < seq.len() && seq[word_len].is_alphabetic() {
                 word_len += 1;
@@ -10556,54 +10540,44 @@ fn match_prefix_and_split_sequences(prefix_list: &[Vec<char>], s: &str) -> VVal 
          .map(|c| if let Some(lc) = c.to_lowercase().next() { lc } else { c })
          .collect();
 
-    let mut sequences : Vec<(Option<usize>, Vec<char>)> = Vec::new();
+    let mut sequences : Vec<(i64, Vec<char>)> = Vec::new();
+    let mut cur_unused_seq : Vec<char> = Vec::new();
 
     let mut i = 0;
-    let mut unused_start : Option<usize> = None;
-    let mut unused_len = 0;
     while i < input.len() {
-        if let Some((pfx_idx, word_len)) = match_prefix_in(prefix_list, &input[i..]) {
+        // gobble up non word stuff, so the match_prefix_in() only matches word starts!
+        while i < input.len() && !input[i].is_alphabetic() {
+            cur_unused_seq.push(input[i]);
+            i += 1;
+        }
+        if cur_unused_seq.len() > 0 {
+            sequences.push((-2, cur_unused_seq.clone()));
+            cur_unused_seq.clear();
+        }
 
-            if let Some(start) = unused_start {
-                let mut seq = Vec::new();
-                seq.extend(&input[start..(start + unused_len)]);
-                sequences.push((None, seq));
-                unused_start = None;
-                unused_len = 0;
-            }
-
+        if let Some((pfx_idx, word_len)) = match_prefix_in(prefix_list, &scan_input[i..]) {
             let mut seq = Vec::new();
             seq.extend(&input[i..(i + word_len)]);
-            sequences.push((Some(pfx_idx), seq));
+            sequences.push((pfx_idx as i64, seq));
 
             i += word_len;
         } else {
-            if unused_start.is_some() {
-                unused_len += 1;
-            } else {
-                unused_start = Some(i);
-                unused_len = 1;
+            // gobble up the whole word, so match_prefix_in() only gets the start of a word
+            while i < input.len() && input[i].is_alphabetic() {
+                cur_unused_seq.push(input[i]);
+                i += 1;
             }
-
-            i += 1;
+            if cur_unused_seq.len() > 0 {
+                sequences.push((-1, cur_unused_seq.clone()));
+                cur_unused_seq.clear();
+            }
         }
-    }
-
-    if let Some(unused_start) = unused_start {
-        let mut seq = Vec::new();
-        seq.extend(&input[unused_start..(unused_start + unused_len)]);
-        sequences.push((None, seq));
     }
 
     let ret = VVal::vec();
     for seq in sequences {
         let s : String = seq.1.into_iter().collect();
-
-        if let Some(pfx_idx) = seq.0 {
-            ret.push(VVal::pair(VVal::Int(pfx_idx as i64), VVal::new_str_mv(s)));
-        } else {
-            ret.push(VVal::pair(VVal::None, VVal::new_str_mv(s)));
-        }
+        ret.push(VVal::pair(VVal::Int(seq.0), VVal::new_str_mv(s)));
     }
 
     return ret;

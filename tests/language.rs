@@ -7948,7 +7948,8 @@ fn check_match_prefix_and_split_sequences() {
                 "bla",
             ];
             std:str:nlp:match_prefix_and_split_sequences list
-                "eine wurst kackwurst ackla ackle ackbla blaack";
+                ("eine wurst \"kackwurst\", ackla. wowowurstla. ACKwurst Wurst! "
+                    "ackle ackbla blaack");
         "#),
-        "");
+        "$[$p(-1,\"eine\"),$p(-2,\" \"),$p(0,\"wurst\"),$p(-2,\" \\\"\"),$p(-1,\"kackwurst\"),$p(-2,\"\\\", \"),$p(1,\"ackla\"),$p(-2,\". \"),$p(-1,\"wowowurstla\"),$p(-2,\". \"),$p(1,\"ACKwurst\"),$p(-2,\" \"),$p(0,\"Wurst\"),$p(-2,\"! \"),$p(1,\"ackle\"),$p(-2,\" \"),$p(1,\"ackbla\"),$p(-2,\" \"),$p(2,\"blaack\")]");
 }
