@@ -10456,6 +10456,22 @@ macro_rules! process_vec_input {
     };
 }
 
+fn is_non_word_char(c: char) -> bool {
+    if c.is_whitespace() {
+        return true;
+    }
+
+    for m in ['\n', '\r', '`', '´', '°', '^', '\\', '/', '\'', '\"',
+              '*', '-', ':', '.', ',', ';', '~', '_'] {
+
+        if m == c {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 fn extract_pure_words(s: &str) -> VVal {
     let words = VVal::vec();
 
@@ -10517,6 +10533,83 @@ fn extract_pure_words(s: &str) -> VVal {
     }
 
     words
+}
+
+fn match_prefix_in(prefix_list: &[Vec<char>], seq: &[char]) -> Option<(usize, usize)> {
+    for (i, pfx) in prefix_list.iter().enumerate() {
+        if seq.starts_with(&pfx[..]) {
+            let mut end_of_seq_index = pfx.len();
+            // TODO: Search until end of word
+            // TODO: Then continue search until last whitespace
+            // TODO: Record the length of the word and the complete length
+            while seq.len() < end_of_seq_index && seq[end_of_seq_index].is_whitespace() {
+                end_of_seq_index += 1;
+            }
+            return Some((i, end_of_seq_index));
+        }
+    }
+
+    return None;
+}
+
+fn match_prefix_and_split_sequences(prefix_list: &[Vec<char>], s: &str) -> VVal {
+    let input : Vec<char> = s.chars().collect();
+    let scan_input : Vec<char> =
+        s.chars()
+         .map(|c| if let Some(lc) = c.to_lowercase().next() { lc } else { c })
+         .collect();
+
+    let mut sequences : Vec<(Option<usize>, Vec<char>)> = Vec::new();
+
+    let mut i = 0;
+    let mut unused_start : Option<usize> = None;
+    let mut unused_len = 0;
+    while i < input.len() {
+        if let Some((pfx_idx, len)) = match_prefix_in(prefix_list, &input[i..]) {
+            if let Some(start) = unused_start {
+                let mut seq = Vec::new();
+                seq.extend(&input[start..(start + unused_len)]);
+                sequences.push((None, seq));
+                unused_start = None;
+                unused_len = 0;
+            }
+
+            let mut seq = Vec::new();
+            seq.extend(&input[i..(i + len)]);
+            sequences.push((Some(pfx_idx), seq));
+
+            i += len;
+        } else {
+            if unused_start.is_some() {
+                unused_len += 1;
+            } else {
+                unused_start = Some(i);
+                unused_len = 1;
+            }
+
+            // Advance unused sequence or create it
+            i += 1;
+        }
+    }
+
+    if let Some(unused_start) = unused_start {
+        let mut seq = Vec::new();
+        seq.extend(&input[unused_start..(unused_start + unused_len)]);
+        sequences.push((None, seq));
+    }
+
+    let ret = VVal::vec();
+    for seq in sequences {
+        let s : String = seq.1.into_iter().collect();
+
+        if let Some(pfx_idx) = seq.0 {
+            ret.push(VVal::pair(VVal::Int(pfx_idx as i64), VVal::new_str_mv(s)));
+        } else {
+            ret.push(VVal::pair(VVal::None, VVal::new_str_mv(s)));
+        }
+    }
+
+    return ret;
 }
 
 /// Returns a SymbolTable with all WLambda core language symbols.
@@ -12360,6 +12453,30 @@ pub fn std_symbol_table() -> SymbolTable {
         },
         Some(1),
         Some(1),
+        false
+    );
+
+    func!(
+        st,
+        "str:nlp:match_prefix_and_split_sequences",
+        |env: &mut Env, _argc: usize| {
+            let mut prefix_list : Vec<Vec<char>> = Vec::new();
+            for (v, _) in env.arg(0).iter() {
+                v.with_s_ref(|s| {
+                    let chars =
+                        s.chars()
+                         .map(|c| if let Some(lc) = c.to_lowercase().next() { lc } else { c })
+                         .collect();
+                    prefix_list.push(chars);
+                });
+            }
+
+            env.arg(1).with_s_ref(|s| {
+                Ok(match_prefix_and_split_sequences(&prefix_list[..], s))
+            })
+        },
+        Some(2),
+        Some(2),
         false
     );
 
