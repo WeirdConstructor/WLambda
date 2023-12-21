@@ -7952,4 +7952,14 @@ fn check_match_prefix_and_split_sequences() {
                     "ackle ackbla blaack");
         "#),
         "$[$p(-1,\"eine\"),$p(-2,\" \"),$p(0,\"wurst\"),$p(-2,\" \\\"\"),$p(-1,\"kackwurst\"),$p(-2,\"\\\", \"),$p(1,\"ackla\"),$p(-2,\". \"),$p(-1,\"wowowurstla\"),$p(-2,\". \"),$p(1,\"ACKwurst\"),$p(-2,\" \"),$p(0,\"Wurst\"),$p(-2,\"! \"),$p(1,\"ackle\"),$p(-2,\" \"),$p(1,\"ackbla\"),$p(-2,\" \"),$p(2,\"blaack\")]");
+
+    assert_eq!(
+        ve(r#"
+            !list = $[
+                "ack$",
+                "bla",
+            ];
+            std:str:nlp:match_prefix_and_split_sequences list "ackbla blaack ack bla ack";
+        "#),
+        "$[$p(-1,\"ackbla\"),$p(-2,\" \"),$p(1,\"blaack\"),$p(-2,\" \"),$p(0,\"ack\"),$p(-2,\" \"),$p(1,\"bla\"),$p(-2,\" \"),$p(0,\"ack\")]");
 }

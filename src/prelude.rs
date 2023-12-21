@@ -10521,7 +10521,18 @@ fn extract_pure_words(s: &str) -> VVal {
 
 fn match_prefix_in(prefix_list: &[Vec<char>], seq: &[char]) -> Option<(usize, usize)> {
     for (i, pfx) in prefix_list.iter().enumerate() {
-        if pfx.len() > 0 && seq.starts_with(&pfx[..]) {
+        if pfx.len() > 0 && pfx[pfx.len() - 1] == '$' {
+            if seq.starts_with(&pfx[0..(pfx.len() - 1)])  {
+                let idx_next_char = pfx.len() - 1;
+
+                if idx_next_char < seq.len() && !seq[idx_next_char].is_alphabetic() {
+                    return Some((i, pfx.len() - 1));
+                } else if idx_next_char >= seq.len() {
+                    return Some((i, pfx.len() - 1));
+                }
+            }
+
+        } else if pfx.len() > 0 && seq.starts_with(&pfx[..]) {
             let mut word_len = pfx.len();
             while word_len < seq.len() && seq[word_len].is_alphabetic() {
                 word_len += 1;
