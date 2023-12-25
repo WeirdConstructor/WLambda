@@ -874,6 +874,19 @@ impl EvalContext {
     /// ```
     #[allow(dead_code)]
     pub fn eval_file(&mut self, filename: &str) -> Result<VVal, EvalError> {
+        let path = std::path::Path::new(filename);
+        let dir_path = path.parent();
+
+        self.set_global_var(
+            "@path",
+            &VVal::new_str(
+                path.to_str().unwrap_or_else(|| filename)));
+        if let Some(s) = dir_path.map(|dp| dp.to_str()).flatten() {
+            self.set_global_var("@dir", &VVal::new_str(s));
+        } else {
+            self.set_global_var("@dir", &VVal::None);
+        }
+
         let contents = std::fs::read_to_string(filename);
         if let Err(err) = contents {
             Err(EvalError::IOError(filename.to_string(), err))

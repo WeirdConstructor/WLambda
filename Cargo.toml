@@ -13,6 +13,7 @@ exclude      = ["res/*"]
 
 [features]
 default = [
+    "clap",
     "rustyline", "regex", "chrono", "serde", "serde_json",
     "rmp-serde", "toml", "quick-xml", "socket2", "base64", "flate2"
 ]
@@ -28,6 +29,7 @@ all = ["mqtt", "http", "cursive", "zip", "odbc", "clipboard", "sqlite", "mail", 
 [dependencies]
 fnv        = "1.0.7"
 weezl      = "0.1.7"
+clap       = { version = "4.4.11",  features = ["string"], optional = true }
 rustyline  = { version = "6.1.2",   optional = true }
 zip        = { version = "0.6.3",   optional = true, features = ["deflate"], default-features = false }
 flate2     = { version = "1.0.25",  optional = true }

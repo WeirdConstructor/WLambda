@@ -166,6 +166,8 @@ fn main() {
         v_argv.push(VVal::new_str(a));
     }
     ctx.set_global_var("@@", &v_argv);
+    ctx.set_global_var("@path", &VVal::None);
+    ctx.set_global_var("@dir", &VVal::None);
 
     if let Ok(exe_path) = std::env::current_exe() {
         let buf: Vec<u8> = std::fs::read(exe_path).expect("wlambda.exe can open own EXE file");
@@ -337,6 +339,11 @@ fn main() {
             }
         } else {
             v_argv.delete_key(&VVal::Int(0)).expect("file argument");
+
+            // TODO: X add @script_dir_path and @script_path
+            //       - then add appropriate loading params to the generate_erp4_prompt
+            //       - then debug shift context problem and try out new prompt formatting
+            //       - then run benchmark with two prompts
 
             match ctx.eval_file(&argv[1]) {
                 Ok(v) => {
