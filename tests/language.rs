@@ -7963,3 +7963,242 @@ fn check_match_prefix_and_split_sequences() {
         "#),
         "$[$p(-1,\"ackbla\"),$p(-2,\" \"),$p(1,\"blaack\"),$p(-2,\" \"),$p(0,\"ack\"),$p(-2,\" \"),$p(1,\"bla\"),$p(-2,\" \"),$p(0,\"ack\")]");
 }
+
+#[test]
+#[cfg(feature = "clap")]
+fn check_app_simple_cli() {
+    assert_eq!(
+        ve(r#"
+            !args = $[ ];
+            std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+        "#), "${}");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ ];
+            !err = unwrap_err ~ std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-f", "--file", :FILE, :$required, "Input file"];
+            bool ~ err &> $r/required\ arguments/
+        "#), "$true");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "-f", "XX" ];
+            std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-f", "--file", :FILE, :$required, "Input file"]
+        "#), "${f=\"XX\"}");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "--file=XXX" ];
+            std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-f", "--file", :FILE, :$required, "Input file"]
+        "#), "${f=\"XXX\"}");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "-s", "XX", "abc" ];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-s", "--sort"]
+                $["--"];
+            $[cfg.s, cfg.:--]
+        "#), "$[$true,$[\"XX\",\"abc\"]]");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "-s" ];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-s", "--sort"]
+                $["--"];
+            $[cfg.s, cfg.:--]
+        "#), "$[$true,$n]");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "-s" ];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-s", "--sort"]
+                $["--1"];
+            bool ~ (unwrap_err cfg) &> $r/required\ arg/;
+        "#), "$true");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "X" ];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-s", "--sort"]
+                $["--1"];
+            $[cfg.s, cfg.:--1]
+        "#), "$[$false,$[\"X\"]]");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ ];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", "--ex", $f]
+                $["-o", "--o", $t];
+            $[cfg.x, cfg.o]
+        "#), "$[$true,$false]");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "--ex", "--o" ];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", "--ex", $f]
+                $["-o", "--o", $t];
+            $[cfg.x, cfg.o]
+        "#), "$[$false,$true]");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "-x=2", "-x=4", "-x=5" ];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", :ARG];
+            bool ~ (unwrap_err cfg) &> $r/multiple\ times/;
+        "#), "$true");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[ "-x=2", "-x=4", "-x=5" ];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", :ARG, :$append];
+            cfg.x
+        "#), "$[\"2\",\"4\",\"5\"]");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-x"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", :X, :$default => "X"];
+            cfg.x
+        "#), "\"X\"");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-x", "O"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", :X, :$default => "X"];
+            cfg.x
+        "#), "\"O\"");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-x"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", :X];
+            bool ~ (unwrap_err cfg) &> $r/value\ is\ required/;
+        "#), "$true");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", :X, $o("Y")];
+            cfg.x
+        "#), "\"Y\"");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-x"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-x", :X, $o("Y")];
+            cfg.x
+        "#), "\"Y\"");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-p=10"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-p", :PORT, 0 => 65535, :$default => 80];
+            cfg.p
+        "#), "10");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-p"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-p", :PORT, 0 => 65535, :$default => 80];
+            cfg.p
+        "#), "80");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-p", :PORT, 0 => 65535, :$default => 80];
+            cfg.p
+        "#), "$n");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-p"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-p", :PORT, 0 => 65535, $o(80)];
+            cfg.p
+        "#), "80");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-r=-2"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-r", :RANGE, -10 => 0];
+            cfg.r
+        "#), "-2");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-r", "-2"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-r", :RANGE, -10 => 0];
+            cfg.r
+        "#), "-2");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-r", "-2", "-r=0", "-r", "-10"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-r", :RANGE, -10 => 0, :$append];
+            cfg.r
+        "#), "$[-2,0,-10]");
+
+    std::env::set_var("EV_PORT", "123");
+    assert_eq!(
+        ve(r#"
+            !args = $[];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-r", :RANGE, 0 => 200, :$env => :EV_PORT];
+            cfg
+        "#), "${r=123}");
+
+    assert_eq!(
+        ve(r#"
+            !args = $[];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-r", :RANGE, 0 => 10, :$env => :EV_PORT];
+            bool ~ (unwrap_err cfg) &> $r/123\ is\ not\ in/;
+        "#), "$true");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["--mode=auto"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["--mode", :MODE, $[:auto, :manual, :set]];
+            cfg.mode
+        "#), "\"auto\"");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["--help"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["--mode", :MODE, $[:auto, :manual, :set]];
+            bool ~ (unwrap_err cfg) &> $r/possible\ values\:*auto*manual*set/
+        "#), "$true");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["--mode=unset"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["--mode", :MODE, $[:auto, :manual, :set]];
+            bool ~ (unwrap_err cfg) &> $r/invalid\ value*unset*auto*manual*set/
+        "#), "$true");
+}

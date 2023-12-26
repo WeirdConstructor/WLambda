@@ -22,6 +22,218 @@ thread_local! {
     pub static CLIP_CTX: RefCell<ClipboardContext> = RefCell::new(ClipboardContext::new().unwrap());
 }
 
+enum ClapCmdArg {
+    Bool(String, bool),
+    Str(String, bool),
+    Number(String, bool),
+}
+
+impl ClapCmdArg {
+    #[allow(unused)]
+    fn set_id(&self, id: String) -> Self {
+        match self {
+            ClapCmdArg::Bool(_, b) => ClapCmdArg::Bool(id, *b),
+            ClapCmdArg::Str(_, b) => ClapCmdArg::Str(id, *b),
+            ClapCmdArg::Number(_, b) => ClapCmdArg::Number(id, *b),
+        }
+    }
+
+    fn set_many(&self) -> Self {
+        match self {
+            ClapCmdArg::Bool(id, _) => ClapCmdArg::Bool(id.to_string(), true),
+            ClapCmdArg::Str(id, _) => ClapCmdArg::Str(id.to_string(), true),
+            ClapCmdArg::Number(id, _) => ClapCmdArg::Number(id.to_string(), true),
+        }
+    }
+
+    #[allow(unused)]
+    fn many(&self) -> bool {
+        match self {
+            ClapCmdArg::Bool(_, b) => *b,
+            ClapCmdArg::Str(_, b) => *b,
+            ClapCmdArg::Number(_, b) => *b,
+        }
+    }
+
+    fn id(&self) -> &str {
+        match self {
+            ClapCmdArg::Bool(id, _) => &id,
+            ClapCmdArg::Str(id, _) => &id,
+            ClapCmdArg::Number(id, _) => &id,
+        }
+    }
+}
+
+#[cfg(feature = "clap")]
+fn vv2command(
+    name: String,
+    v_list: &[VVal],
+    _cfg: VVal,
+) -> Result<(clap::Command, Vec<ClapCmdArg>), StackAction> {
+    use clap::{Arg, ArgAction, Command};
+
+    let mut m = Command::new(name);
+
+    let mut arg_typs = Vec::new();
+
+    for arg in v_list.iter() {
+        if arg.is_sym() {
+            arg.with_s_ref(|s| {
+                if s == "$toml_config" {
+                    Ok(())
+                } else {
+                    return Err(StackAction::panic_msg(format!("Unknown symbolic CLI arg: {}", s)));
+                }
+            })?;
+        } else if arg.is_pair() {
+        } else if arg.is_vec() {
+            let build_arg = arg.with_iter(|iter| {
+                let mut build_arg = None;
+                let mut arg_type_set = false;
+                let mut arg_typ = ClapCmdArg::Bool(String::from(""), false);
+
+                for (i, _) in iter {
+                    if i.is_str() {
+                        let s = i.s_raw();
+
+                        if s == "--" {
+                            build_arg =
+                                Some(Arg::new(s.to_string()).trailing_var_arg(true).num_args(0..));
+                            arg_type_set = true;
+                            arg_typ = ClapCmdArg::Str(s.to_string(), true);
+                        } else if s == "--1" {
+                            build_arg = Some(
+                                Arg::new(s.to_string())
+                                    .trailing_var_arg(true)
+                                    .required(true)
+                                    .num_args(1..),
+                            );
+                            arg_type_set = true;
+                            arg_typ = ClapCmdArg::Str(s.to_string(), true);
+                        } else if s.starts_with("--") {
+                            if build_arg.is_none() {
+                                let sn: String = s.chars().skip(2).collect();
+                                arg_typ = ClapCmdArg::Bool(sn.clone(), false);
+                                build_arg = Some(Arg::new(sn));
+                            }
+
+                            build_arg =
+                                build_arg.map(|a| a.long(s.chars().skip(2).collect::<String>()));
+                        } else if s.starts_with("-") {
+                            if build_arg.is_none() {
+                                let sn: String = s.chars().skip(1).collect();
+                                arg_typ = ClapCmdArg::Bool(sn.clone(), false);
+                                build_arg = Some(Arg::new(sn));
+                            }
+
+                            build_arg =
+                                build_arg.map(|a| a.short(s.chars().skip(1).next().unwrap_or('x')));
+                        } else {
+                            build_arg = build_arg.map(|a| a.help(s));
+                        }
+                    } else if i.is_bool() {
+                        arg_type_set = true;
+
+                        if i.b() {
+                            build_arg = build_arg.map(|a| a.action(ArgAction::SetTrue));
+                        } else {
+                            build_arg = build_arg.map(|a| a.action(ArgAction::SetFalse));
+                        }
+                    } else if i.is_sym() && !i.s_raw().starts_with("$") {
+                        if !arg_type_set {
+                            arg_typ = ClapCmdArg::Str(arg_typ.id().to_string(), false);
+                        }
+
+                        arg_type_set = true;
+
+                        build_arg =
+                            build_arg.map(|a| a.action(ArgAction::Set).value_name(i.s_raw()));
+                    } else if i.is_sym() && i.s_raw() == "$required" {
+                        build_arg = build_arg.map(|a| a.required(true));
+                    } else if i.is_sym() && i.s_raw() == "$append" {
+                        if !arg_type_set {
+                            arg_typ = ClapCmdArg::Str(arg_typ.id().to_string(), true);
+                        } else {
+                            arg_typ = arg_typ.set_many();
+                        }
+
+                        arg_type_set = true;
+
+                        build_arg = build_arg.map(|a| a.action(ArgAction::Append));
+                    } else if i.is_pair() {
+                        if i.v_(0).is_sym() && i.v_s_raw(0) == "$default" {
+                            build_arg = build_arg
+                                .map(|a| a.default_missing_value(i.v_s_raw(1)).num_args(0..=1));
+                        } else if i.v_(0).is_sym() && i.v_s_raw(0) == "$env" {
+                            build_arg = build_arg.map(|a| a.env(i.v_s_raw(1)));
+                        } else if i.v_(0).is_int() {
+                            arg_type_set = true;
+                            arg_typ = ClapCmdArg::Number(arg_typ.id().to_string(), false);
+
+                            build_arg = build_arg.map(|a| a.action(ArgAction::Set));
+
+                            if i.v_i(0) < 0 || i.v_i(1) < 0 {
+                                build_arg = build_arg.map(|a| {
+                                    a.allow_hyphen_values(true).allow_negative_numbers(true)
+                                });
+                            }
+
+                            if i.v_(1).is_some() {
+                                build_arg = build_arg.map(|a| {
+                                    a.value_parser(
+                                        clap::builder::RangedI64ValueParser::<i64>::new().range(
+                                            std::ops::Range { start: i.v_i(0), end: i.v_i(1) + 1 },
+                                        ),
+                                    )
+                                });
+                            } else {
+                                build_arg = build_arg.map(|a| {
+                                    a.value_parser(
+                                        clap::builder::RangedI64ValueParser::<i64>::new().range(
+                                            std::ops::Range { start: i.v_i(0), end: std::i64::MAX },
+                                        ),
+                                    )
+                                });
+                            }
+                        }
+                    } else if i.is_vec() {
+                        let mut values = Vec::new();
+                        i.with_iter(|it| {
+                            for (v, _) in it {
+                                values.push(v.s_raw());
+                            }
+                        });
+
+                        build_arg = build_arg.map(|a| {
+                            a.value_parser(clap::builder::PossibleValuesParser::new(values))
+                        });
+                    } else if i.is_optional() {
+                        build_arg = build_arg.map(|a| {
+                            a.default_missing_value(i.unwrap_opt().s_raw())
+                                .default_value(i.unwrap_opt().s_raw())
+                                .num_args(0..=1)
+                        });
+                    }
+                }
+
+                if !arg_type_set {
+                    build_arg = build_arg.map(|a| a.action(ArgAction::SetTrue));
+                    arg_typ = ClapCmdArg::Bool(arg_typ.id().to_string(), false);
+                }
+
+                arg_typs.push(arg_typ);
+
+                build_arg
+            });
+
+            if let Some(ba) = build_arg {
+                m = m.arg(ba);
+            }
+        }
+    }
+
+    Ok((m, arg_typs))
+}
 
 #[allow(unused_variables)]
 pub fn add_to_symtable(st: &mut SymbolTable) {
@@ -75,164 +287,109 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         false,
     );
 
-
     #[cfg(feature = "toml")]
-
     #[cfg(feature = "clap")]
     st.fun(
         "app:simple_cli",
         |env: &mut Env, argc: usize| {
-            use clap::{Command, Arg, ArgAction};
-            let name = env.arg(0).s_raw();
-            let version = env.arg(1).s_raw();
-            let about = env.arg(2).s_raw();
-            let mut m = Command::new(name.clone());
-            m = m.version(version);
+            let mut i = 0;
 
             let cfg = VVal::map();
+            let mut app_mode = true;
 
-            let mut arg_ids = Vec::new();
-
-            for i in 3..argc {
-                let arg = env.arg(i);
-                if arg.is_sym() {
-                    arg.with_s_ref(|s| {
-                        if s == "$toml_config" {
-                            Ok(())
-                        } else {
-                            return Err(StackAction::panic_msg(
-                                format!("Unknown symbolic CLI arg: {}", s)));
-                        }
-                    })?;
-                } else if arg.is_pair() {
-                } else if arg.is_vec() {
-                    let build_arg = arg.with_iter(|iter| {
-                        let mut build_arg = None;
-                        let mut arg_type_set = false;
-                        let mut arg_id = String::from("");
-                        let mut arg_typ = 0;
-
-                        for (i, _) in iter {
-                            if i.is_str() {
-                                let s = i.s_raw();
-
-                                if s == "--" {
-                                    build_arg = Some(
-                                        Arg::new(s.to_string()).trailing_var_arg(true).num_args(0..));
-                                    arg_id = s.to_string();
-                                    arg_type_set = true;
-                                    arg_typ = 3;
-
-                                } else if s == "--1" {
-                                    build_arg = Some(
-                                        Arg::new(s.to_string()).trailing_var_arg(true).required(true)
-                                            .num_args(1..));
-                                    arg_id = s.to_string();
-                                    arg_type_set = true;
-                                    arg_typ = 3;
-
-                                } else if s.starts_with("--") {
-                                    if build_arg.is_none() {
-                                        let sn : String = s.chars().skip(2).collect();
-                                        arg_id = sn.clone();
-                                        build_arg = Some(Arg::new(sn));
-                                    }
-
-                                    build_arg = build_arg.map(
-                                        |a| a.long(s.chars().skip(2).collect::<String>()));
-
-                                } else if s.starts_with("-") {
-                                    if build_arg.is_none() {
-                                        let sn : String = s.chars().skip(1).collect();
-                                        arg_id = sn.clone();
-                                        build_arg = Some(Arg::new(sn));
-                                    }
-
-                                    build_arg = build_arg.map(
-                                        |a| a.short(s.chars().skip(1).next().unwrap_or('x')));
-
-                                } else {
-                                    build_arg = build_arg.map(|a| a.help(s));
-                                }
-                            } else if !arg_type_set && i.is_bool() {
-                                arg_type_set = true;
-
-                                if i.b() {
-                                    build_arg = build_arg.map(|a| a.action(ArgAction::SetTrue));
-                                } else {
-                                    build_arg = build_arg.map(|a| a.action(ArgAction::SetFalse));
-                                }
-                            } else if !arg_type_set && i.is_sym() && !i.s_raw().starts_with("$") {
-                                arg_type_set = true;
-
-                                arg_typ = 2;
-
-                                build_arg = build_arg.map(
-                                    |a| a.action(ArgAction::Set).value_name(i.s_raw()));
-
-                            } else if i.is_sym() && i.s_raw() == "$required" {
-                                build_arg = build_arg.map(|a| a.required(true));
-
-                            } else if i.is_optional() {
-                                build_arg = build_arg.map(
-                                    |a| a.default_missing_value(
-                                            i.unwrap_opt().s_raw()).num_args(0..=1));
-                            }
-                        }
-
-                        if !arg_type_set {
-                            build_arg = build_arg.map(|a| a.action(ArgAction::SetTrue));
-                            arg_typ = 0;
-                        }
-
-                        arg_ids.push((arg_id, arg_typ));
-
-                        build_arg
-                    });
-
-                    if let Some(ba) = build_arg {
-                        m = m.arg(ba);
-                    }
+            let args = if env.arg(0).is_vec() {
+                i += 1;
+                app_mode = false;
+                env.arg(0)
+            } else {
+                let args = env.global.borrow_mut().get_var_ref("@@").unwrap_or(VVal::None);
+                if args.is_none() {
+                    return Ok(cfg);
                 }
-            }
+                args
+            };
 
-            let args = env.global.borrow_mut().get_var_ref("@@").unwrap_or(VVal::None);
-            if args.is_none() {
-                return Ok(cfg);
-            }
+            let name = env.arg(i).s_raw();
+
             let mut arg_vec = Vec::new();
-            arg_vec.push(name);
+            arg_vec.push(name.clone());
             args.with_iter(|it| {
                 for (s, _) in it {
                     arg_vec.push(s.s_raw());
                 }
             });
 
-            let matches = m.get_matches_from(arg_vec);
+            let version = env.arg(i + 1).s_raw();
+            let about = env.arg(i + 2).s_raw();
 
-            for (id, typ) in arg_ids {
-                if typ == 0 || typ == 1 {
-                    if let Some(v) = matches.get_one::<bool>(&id) {
-                        let _ = cfg.set_key_str(&id, VVal::Bol(*v));
+            let (mut m, arg_typs) = vv2command(name, &env.argv_ref()[(i + 3)..], cfg.clone())?;
+            m = m.version(version).about(about);
+
+            let matches = if app_mode {
+                m.get_matches_from(arg_vec)
+            } else {
+                let matches = m.try_get_matches_from(arg_vec);
+                match matches {
+                    Err(err) => {
+                        return Ok(env.new_err(format!("std:app:simple_cli error: {}", err)));
                     }
-                } else if typ == 2 {
-                    if let Some(v) = matches.get_one::<String>(&id) {
-                        let _ = cfg.set_key_str(&id, VVal::new_str_mv(v.clone()));
-                    }
-                } else if typ == 3 {
-                    if let Some(v) = matches.get_many::<String>(&id) {
-                        let xargs = VVal::vec();
-                        for sarg in v {
-                            xargs.push(VVal::new_str(sarg.as_str()));
+                    Ok(m) => m,
+                }
+            };
+
+            for typ in arg_typs {
+                match typ {
+                    ClapCmdArg::Bool(id, many) => {
+                        if many {
+                            if let Some(v) = matches.get_many::<bool>(&id) {
+                                let xargs = VVal::vec();
+                                for sarg in v {
+                                    xargs.push(VVal::Bol(*sarg));
+                                }
+                                let _ = cfg.set_key_str(&id, xargs);
+                            }
+                        } else {
+                            if let Some(v) = matches.get_one::<bool>(&id) {
+                                let _ = cfg.set_key_str(&id, VVal::Bol(*v));
+                            }
                         }
-                        let _ = cfg.set_key_str(&id, xargs);
+                    }
+                    ClapCmdArg::Str(id, many) => {
+                        if many {
+                            if let Some(v) = matches.get_many::<String>(&id) {
+                                let xargs = VVal::vec();
+                                for sarg in v {
+                                    xargs.push(VVal::new_str(sarg.as_str()));
+                                }
+                                let _ = cfg.set_key_str(&id, xargs);
+                            }
+                        } else {
+                            if let Some(v) = matches.get_one::<String>(&id) {
+                                let _ = cfg.set_key_str(&id, VVal::new_str_mv(v.clone()));
+                            }
+                        }
+                    }
+                    ClapCmdArg::Number(id, many) => {
+                        if many {
+                            if let Some(v) = matches.get_many::<i64>(&id) {
+                                let xargs = VVal::vec();
+                                for sarg in v {
+                                    xargs.push(VVal::Int(*sarg));
+                                }
+                                let _ = cfg.set_key_str(&id, xargs);
+                            }
+                        } else {
+                            if let Some(v) = matches.get_one::<i64>(&id) {
+                                let _ = cfg.set_key_str(&id, VVal::Int(*v));
+                            }
+                        }
                     }
                 }
             }
 
             Ok(cfg)
         },
-        Some(3),
+        Some(4),
         None,
         false,
     );
