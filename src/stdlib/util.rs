@@ -22,10 +22,12 @@ thread_local! {
     pub static CLIP_CTX: RefCell<ClipboardContext> = RefCell::new(ClipboardContext::new().unwrap());
 }
 
+#[derive(Clone)]
 enum ClapCmdArg {
     Bool(String, bool),
     Str(String, bool),
     Number(String, bool),
+    Subcmd(String, Vec<ClapCmdArg>),
 }
 
 impl ClapCmdArg {
@@ -35,6 +37,7 @@ impl ClapCmdArg {
             ClapCmdArg::Bool(_, b) => ClapCmdArg::Bool(id, *b),
             ClapCmdArg::Str(_, b) => ClapCmdArg::Str(id, *b),
             ClapCmdArg::Number(_, b) => ClapCmdArg::Number(id, *b),
+            ClapCmdArg::Subcmd(a, b) => ClapCmdArg::Subcmd(a.clone(), b.clone()),
         }
     }
 
@@ -43,6 +46,7 @@ impl ClapCmdArg {
             ClapCmdArg::Bool(id, _) => ClapCmdArg::Bool(id.to_string(), true),
             ClapCmdArg::Str(id, _) => ClapCmdArg::Str(id.to_string(), true),
             ClapCmdArg::Number(id, _) => ClapCmdArg::Number(id.to_string(), true),
+            ClapCmdArg::Subcmd(a, b) => ClapCmdArg::Subcmd(a.clone(), b.clone()),
         }
     }
 
@@ -52,6 +56,7 @@ impl ClapCmdArg {
             ClapCmdArg::Bool(_, b) => *b,
             ClapCmdArg::Str(_, b) => *b,
             ClapCmdArg::Number(_, b) => *b,
+            ClapCmdArg::Subcmd(_, _) => false,
         }
     }
 
@@ -60,6 +65,7 @@ impl ClapCmdArg {
             ClapCmdArg::Bool(id, _) => &id,
             ClapCmdArg::Str(id, _) => &id,
             ClapCmdArg::Number(id, _) => &id,
+            ClapCmdArg::Subcmd(id, _) => &id,
         }
     }
 }
@@ -68,7 +74,7 @@ impl ClapCmdArg {
 fn vv2command(
     name: String,
     v_list: &[VVal],
-    _cfg: VVal,
+    cfg: VVal,
 ) -> Result<(clap::Command, Vec<ClapCmdArg>), StackAction> {
     use clap::{Arg, ArgAction, Command};
 
@@ -86,6 +92,23 @@ fn vv2command(
                 }
             })?;
         } else if arg.is_pair() {
+            let mut cmdvec = Vec::new();
+            arg.v_(1).with_iter(|it| {
+                for (s, _) in it {
+                    cmdvec.push(s);
+                }
+            });
+
+            let (cmdname, about) = if arg.v_(0).is_kind_of_string() {
+                (arg.v_s_raw(0), None)
+            } else {
+                (arg.v_(0).v_s_raw(0), Some(arg.v_(0).v_s_raw(1)))
+            };
+
+            let (subcmd, subcmd_args) = vv2command(cmdname, &cmdvec[..], cfg.clone())?;
+            let subcmd = if let Some(about) = about { subcmd.about(about) } else { subcmd };
+            m = m.subcommand(subcmd);
+            arg_typs.push(ClapCmdArg::Subcmd(arg.v_s_raw(0), subcmd_args));
         } else if arg.is_vec() {
             let build_arg = arg.with_iter(|iter| {
                 let mut build_arg = None;
@@ -337,6 +360,23 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 }
             };
 
+            let (matches, arg_typs) = if let Some((subcmd, sc_matches)) = matches.subcommand() {
+                let mut ret_matches = matches.clone();
+                let mut ret_args = arg_typs.clone();
+                for at in arg_typs {
+                    if let ClapCmdArg::Subcmd(cmdname, args) = at {
+                        if cmdname == subcmd {
+                            let _ = cfg.set_key_str("_cmd", VVal::new_str(subcmd));
+                            ret_matches = sc_matches.clone();
+                            ret_args = args.clone();
+                        }
+                    }
+                }
+                (ret_matches, ret_args)
+            } else {
+                (matches, arg_typs)
+            };
+
             for typ in arg_typs {
                 match typ {
                     ClapCmdArg::Bool(id, many) => {
@@ -384,6 +424,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                             }
                         }
                     }
+                    ClapCmdArg::Subcmd(cmd, args) => {}
                 }
             }
 

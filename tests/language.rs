@@ -8201,4 +8201,36 @@ fn check_app_simple_cli() {
                 $["--mode", :MODE, $[:auto, :manual, :set]];
             bool ~ (unwrap_err cfg) &> $r/invalid\ value*unset*auto*manual*set/
         "#), "$true");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["print", "-x"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                :print => $[
+                    $["-x"]
+                ];
+            cfg._cmd => cfg.x
+        "#), "$p(\"print\",$true)");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["-y"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-y"]
+                :print => $[
+                    $["-x"]
+                ];
+            cfg._cmd => cfg.y
+        "#), "$p($n,$true)");
+
+    assert_eq!(
+        ve(r#"
+            !args = $["--help"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $["-y"]
+                $[:print, "Prints something nice"] => $[
+                    $["-x"]
+                ];
+            bool ~ (unwrap_err cfg) &> $r/Prints*nice/
+        "#), "$true");
 }
