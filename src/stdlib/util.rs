@@ -75,10 +75,11 @@ fn vv2command(
     name: String,
     v_list: &[VVal],
     cfg: VVal,
+    dir_path: &str,
 ) -> Result<(clap::Command, Vec<ClapCmdArg>), StackAction> {
     use clap::{Arg, ArgAction, Command};
 
-    let mut m = Command::new(name);
+    let mut m = Command::new(name.clone());
 
     let mut arg_typs = Vec::new();
 
@@ -86,6 +87,59 @@ fn vv2command(
         if arg.is_sym() {
             arg.with_s_ref(|s| {
                 if s == "$toml_config" {
+                    let filename = String::from(dir_path) + "/" + &name + ".toml";
+                    let exists = match std::path::Path::new(&filename).try_exists() {
+                        Ok(bol) => bol,
+                        Err(e) => {
+                            return Err(StackAction::panic_msg(format!(
+                                "Error checking for toml file '{}' existence: {}",
+                                filename, e
+                            )));
+                        }
+                    };
+
+                    if !exists {
+                        eprintln!("warn: '{}' not found.", filename);
+                        return Ok(());
+                    }
+
+                    use std::fs::OpenOptions;
+                    use std::io::prelude::*;
+
+                    let file =
+                        OpenOptions::new().write(false).create(false).read(true).open(&filename);
+
+                    match file {
+                        Err(e) => {
+                            return Err(StackAction::panic_msg(format!(
+                                "Error opening toml file '{}': {}",
+                                filename, e
+                            )));
+                        }
+                        Ok(mut f) => {
+                            let mut contents = String::new();
+                            if let Err(e) = f.read_to_string(&mut contents) {
+                                return Err(StackAction::panic_msg(format!(
+                                    "Error reading toml file '{}': {}",
+                                    filename, e
+                                )));
+                            } else {
+                                match VVal::from_toml(&contents) {
+                                    Ok(v) => {
+                                        eprintln!("'{}' found.", filename);
+                                        let _ = cfg.set_key_str("_cfg", v);
+                                    }
+                                    Err(e) => {
+                                        return Err(StackAction::panic_msg(format!(
+                                            "Error parsing toml file '{}': {}",
+                                            filename, e
+                                        )));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Ok(())
                 } else {
                     return Err(StackAction::panic_msg(format!("Unknown symbolic CLI arg: {}", s)));
@@ -105,7 +159,7 @@ fn vv2command(
                 (arg.v_(0).v_s_raw(0), Some(arg.v_(0).v_s_raw(1)))
             };
 
-            let (subcmd, subcmd_args) = vv2command(cmdname, &cmdvec[..], cfg.clone())?;
+            let (subcmd, subcmd_args) = vv2command(cmdname, &cmdvec[..], cfg.clone(), dir_path)?;
             let subcmd = if let Some(about) = about { subcmd.about(about) } else { subcmd };
             m = m.subcommand(subcmd);
             arg_typs.push(ClapCmdArg::Subcmd(arg.v_s_raw(0), subcmd_args));
@@ -332,6 +386,9 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 args
             };
 
+            let dir_path = env.global.borrow_mut().get_var_ref("@dir").unwrap_or(VVal::None);
+            let dir_path = dir_path.s_raw();
+
             let name = env.arg(i).s_raw();
 
             let mut arg_vec = Vec::new();
@@ -345,7 +402,8 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
             let version = env.arg(i + 1).s_raw();
             let about = env.arg(i + 2).s_raw();
 
-            let (mut m, arg_typs) = vv2command(name, &env.argv_ref()[(i + 3)..], cfg.clone())?;
+            let (mut m, arg_typs) =
+                vv2command(name, &env.argv_ref()[(i + 3)..], cfg.clone(), &dir_path)?;
             m = m.version(version).about(about);
 
             let matches = if app_mode {

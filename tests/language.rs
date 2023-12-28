@@ -8233,4 +8233,14 @@ fn check_app_simple_cli() {
                 ];
             bool ~ (unwrap_err cfg) &> $r/Prints*nice/
         "#), "$true");
+
+    assert_eq!(
+        ve(r#"
+            !:global @dir = ".";
+            std:io:file:write_safe "test.toml" "[x]\ny=\"z\"\n";
+            !args = $[];
+            !cfg = std:app:simple_cli args "test" "1.0.0" "A simple cli"
+                :$toml_config;
+            cfg
+        "#), "${_cfg=${x=${y=\"z\"}}}");
 }
