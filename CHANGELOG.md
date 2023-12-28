@@ -19,6 +19,8 @@ Rust binary later.
 * **Feature:** Added `std:str:strip_utf8_bom`.
 * **Feature:** Added default compression algorithm LZW to WLambda,
 available via `std:bytes:lzw:encode` and `std:bytes:lzw:decode`.
+* **Feature:** Added `std:merge`, `std:shift`
+* **Feature:** Added `std:app:simple_cli` for quickly implementing CLI applications.
 
 0.8.1 (2022-03-05)
 ==================

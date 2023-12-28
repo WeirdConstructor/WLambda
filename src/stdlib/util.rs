@@ -24,9 +24,9 @@ thread_local! {
 
 #[derive(Clone)]
 enum ClapCmdArg {
-    Bool(String, bool),
-    Str(String, bool),
-    Number(String, bool),
+    Bool(String, bool, bool),
+    Str(String, bool, bool),
+    Number(String, bool, bool),
     Subcmd(String, Vec<ClapCmdArg>),
 }
 
@@ -34,38 +34,110 @@ impl ClapCmdArg {
     #[allow(unused)]
     fn set_id(&self, id: String) -> Self {
         match self {
-            ClapCmdArg::Bool(_, b) => ClapCmdArg::Bool(id, *b),
-            ClapCmdArg::Str(_, b) => ClapCmdArg::Str(id, *b),
-            ClapCmdArg::Number(_, b) => ClapCmdArg::Number(id, *b),
+            ClapCmdArg::Bool(_, b, c) => ClapCmdArg::Bool(id, *b, *c),
+            ClapCmdArg::Str(_, b, c) => ClapCmdArg::Str(id, *b, *c),
+            ClapCmdArg::Number(_, b, c) => ClapCmdArg::Number(id, *b, *c),
             ClapCmdArg::Subcmd(a, b) => ClapCmdArg::Subcmd(a.clone(), b.clone()),
         }
     }
 
     fn set_many(&self) -> Self {
         match self {
-            ClapCmdArg::Bool(id, _) => ClapCmdArg::Bool(id.to_string(), true),
-            ClapCmdArg::Str(id, _) => ClapCmdArg::Str(id.to_string(), true),
-            ClapCmdArg::Number(id, _) => ClapCmdArg::Number(id.to_string(), true),
+            ClapCmdArg::Bool(id, _, c) => ClapCmdArg::Bool(id.to_string(), true, *c),
+            ClapCmdArg::Str(id, _, c) => ClapCmdArg::Str(id.to_string(), true, *c),
+            ClapCmdArg::Number(id, _, c) => ClapCmdArg::Number(id.to_string(), true, *c),
             ClapCmdArg::Subcmd(a, b) => ClapCmdArg::Subcmd(a.clone(), b.clone()),
+        }
+    }
+
+    fn set_load_toml(&self) -> Self {
+        match self {
+            ClapCmdArg::Bool(id, b, _) => ClapCmdArg::Bool(id.to_string(), *b, true),
+            ClapCmdArg::Str(id, b, _) => ClapCmdArg::Str(id.to_string(), *b, true),
+            ClapCmdArg::Number(id, b, _) => ClapCmdArg::Number(id.to_string(), *b, true),
+            ClapCmdArg::Subcmd(a, b) => ClapCmdArg::Subcmd(a.clone(), b.clone()),
+        }
+    }
+
+    #[allow(unused)]
+    fn load_toml(&self) -> bool {
+        match self {
+            ClapCmdArg::Bool(_, _, c) => *c,
+            ClapCmdArg::Str(_, _, c) => *c,
+            ClapCmdArg::Number(_, _, c) => *c,
+            ClapCmdArg::Subcmd(_, _) => false,
         }
     }
 
     #[allow(unused)]
     fn many(&self) -> bool {
         match self {
-            ClapCmdArg::Bool(_, b) => *b,
-            ClapCmdArg::Str(_, b) => *b,
-            ClapCmdArg::Number(_, b) => *b,
+            ClapCmdArg::Bool(_, b, _) => *b,
+            ClapCmdArg::Str(_, b, _) => *b,
+            ClapCmdArg::Number(_, b, _) => *b,
             ClapCmdArg::Subcmd(_, _) => false,
         }
     }
 
     fn id(&self) -> &str {
         match self {
-            ClapCmdArg::Bool(id, _) => &id,
-            ClapCmdArg::Str(id, _) => &id,
-            ClapCmdArg::Number(id, _) => &id,
+            ClapCmdArg::Bool(id, _, _) => &id,
+            ClapCmdArg::Str(id, _, _) => &id,
+            ClapCmdArg::Number(id, _, _) => &id,
             ClapCmdArg::Subcmd(id, _) => &id,
+        }
+    }
+}
+
+fn read_cfg(filepath: &str) -> Result<VVal, StackAction> {
+    let exists = match std::path::Path::new(&filepath).try_exists() {
+        Ok(bol) => bol,
+        Err(e) => {
+            return Err(StackAction::panic_msg(format!(
+                "Error checking for toml file '{}' existence: {}",
+                filepath, e
+            )));
+        }
+    };
+
+    if !exists {
+        eprintln!("warn: '{}' not found.", filepath);
+        return Ok(VVal::None);
+    }
+
+    use std::fs::OpenOptions;
+    use std::io::prelude::*;
+
+    let file = OpenOptions::new().write(false).create(false).read(true).open(&filepath);
+
+    match file {
+        Err(e) => {
+            return Err(StackAction::panic_msg(format!(
+                "Error opening toml file '{}': {}",
+                filepath, e
+            )));
+        }
+        Ok(mut f) => {
+            let mut contents = String::new();
+            if let Err(e) = f.read_to_string(&mut contents) {
+                return Err(StackAction::panic_msg(format!(
+                    "Error reading toml file '{}': {}",
+                    filepath, e
+                )));
+            } else {
+                match VVal::from_toml(&contents) {
+                    Ok(v) => {
+                        eprintln!("'{}' found.", filepath);
+                        return Ok(v);
+                    }
+                    Err(e) => {
+                        return Err(StackAction::panic_msg(format!(
+                            "Error parsing toml file '{}': {}",
+                            filepath, e
+                        )));
+                    }
+                }
+            }
         }
     }
 }
@@ -88,57 +160,8 @@ fn vv2command(
             arg.with_s_ref(|s| {
                 if s == "$toml_config" {
                     let filename = String::from(dir_path) + "/" + &name + ".toml";
-                    let exists = match std::path::Path::new(&filename).try_exists() {
-                        Ok(bol) => bol,
-                        Err(e) => {
-                            return Err(StackAction::panic_msg(format!(
-                                "Error checking for toml file '{}' existence: {}",
-                                filename, e
-                            )));
-                        }
-                    };
-
-                    if !exists {
-                        eprintln!("warn: '{}' not found.", filename);
-                        return Ok(());
-                    }
-
-                    use std::fs::OpenOptions;
-                    use std::io::prelude::*;
-
-                    let file =
-                        OpenOptions::new().write(false).create(false).read(true).open(&filename);
-
-                    match file {
-                        Err(e) => {
-                            return Err(StackAction::panic_msg(format!(
-                                "Error opening toml file '{}': {}",
-                                filename, e
-                            )));
-                        }
-                        Ok(mut f) => {
-                            let mut contents = String::new();
-                            if let Err(e) = f.read_to_string(&mut contents) {
-                                return Err(StackAction::panic_msg(format!(
-                                    "Error reading toml file '{}': {}",
-                                    filename, e
-                                )));
-                            } else {
-                                match VVal::from_toml(&contents) {
-                                    Ok(v) => {
-                                        eprintln!("'{}' found.", filename);
-                                        let _ = cfg.set_key_str("_cfg", v);
-                                    }
-                                    Err(e) => {
-                                        return Err(StackAction::panic_msg(format!(
-                                            "Error parsing toml file '{}': {}",
-                                            filename, e
-                                        )));
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    let v = read_cfg(&filename)?;
+                    cfg.shallow_merge_from(&v);
 
                     Ok(())
                 } else {
@@ -167,7 +190,7 @@ fn vv2command(
             let build_arg = arg.with_iter(|iter| {
                 let mut build_arg = None;
                 let mut arg_type_set = false;
-                let mut arg_typ = ClapCmdArg::Bool(String::from(""), false);
+                let mut arg_typ = ClapCmdArg::Bool(String::from(""), false, false);
 
                 for (i, _) in iter {
                     if i.is_str() {
@@ -177,7 +200,7 @@ fn vv2command(
                             build_arg =
                                 Some(Arg::new(s.to_string()).trailing_var_arg(true).num_args(0..));
                             arg_type_set = true;
-                            arg_typ = ClapCmdArg::Str(s.to_string(), true);
+                            arg_typ = ClapCmdArg::Str(s.to_string(), true, false);
                         } else if s == "--1" {
                             build_arg = Some(
                                 Arg::new(s.to_string())
@@ -186,11 +209,11 @@ fn vv2command(
                                     .num_args(1..),
                             );
                             arg_type_set = true;
-                            arg_typ = ClapCmdArg::Str(s.to_string(), true);
+                            arg_typ = ClapCmdArg::Str(s.to_string(), true, false);
                         } else if s.starts_with("--") {
                             if build_arg.is_none() {
                                 let sn: String = s.chars().skip(2).collect();
-                                arg_typ = ClapCmdArg::Bool(sn.clone(), false);
+                                arg_typ = ClapCmdArg::Bool(sn.clone(), false, false);
                                 build_arg = Some(Arg::new(sn));
                             }
 
@@ -199,7 +222,7 @@ fn vv2command(
                         } else if s.starts_with("-") {
                             if build_arg.is_none() {
                                 let sn: String = s.chars().skip(1).collect();
-                                arg_typ = ClapCmdArg::Bool(sn.clone(), false);
+                                arg_typ = ClapCmdArg::Bool(sn.clone(), false, false);
                                 build_arg = Some(Arg::new(sn));
                             }
 
@@ -218,7 +241,7 @@ fn vv2command(
                         }
                     } else if i.is_sym() && !i.s_raw().starts_with("$") {
                         if !arg_type_set {
-                            arg_typ = ClapCmdArg::Str(arg_typ.id().to_string(), false);
+                            arg_typ = ClapCmdArg::Str(arg_typ.id().to_string(), false, false);
                         }
 
                         arg_type_set = true;
@@ -227,9 +250,15 @@ fn vv2command(
                             build_arg.map(|a| a.action(ArgAction::Set).value_name(i.s_raw()));
                     } else if i.is_sym() && i.s_raw() == "$required" {
                         build_arg = build_arg.map(|a| a.required(true));
+                    } else if i.is_sym() && i.s_raw() == "$toml_config" {
+                        arg_typ = arg_typ.set_load_toml();
                     } else if i.is_sym() && i.s_raw() == "$append" {
                         if !arg_type_set {
-                            arg_typ = ClapCmdArg::Str(arg_typ.id().to_string(), true);
+                            arg_typ = ClapCmdArg::Str(
+                                arg_typ.id().to_string(),
+                                true,
+                                arg_typ.load_toml(),
+                            );
                         } else {
                             arg_typ = arg_typ.set_many();
                         }
@@ -245,7 +274,7 @@ fn vv2command(
                             build_arg = build_arg.map(|a| a.env(i.v_s_raw(1)));
                         } else if i.v_(0).is_int() {
                             arg_type_set = true;
-                            arg_typ = ClapCmdArg::Number(arg_typ.id().to_string(), false);
+                            arg_typ = ClapCmdArg::Number(arg_typ.id().to_string(), false, false);
 
                             build_arg = build_arg.map(|a| a.action(ArgAction::Set));
 
@@ -295,7 +324,8 @@ fn vv2command(
 
                 if !arg_type_set {
                     build_arg = build_arg.map(|a| a.action(ArgAction::SetTrue));
-                    arg_typ = ClapCmdArg::Bool(arg_typ.id().to_string(), false);
+                    arg_typ =
+                        ClapCmdArg::Bool(arg_typ.id().to_string(), false, arg_typ.load_toml());
                 }
 
                 arg_typs.push(arg_typ);
@@ -437,7 +467,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
             for typ in arg_typs {
                 match typ {
-                    ClapCmdArg::Bool(id, many) => {
+                    ClapCmdArg::Bool(id, many, _) => {
                         if many {
                             if let Some(v) = matches.get_many::<bool>(&id) {
                                 let xargs = VVal::vec();
@@ -452,22 +482,38 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                             }
                         }
                     }
-                    ClapCmdArg::Str(id, many) => {
-                        if many {
-                            if let Some(v) = matches.get_many::<String>(&id) {
-                                let xargs = VVal::vec();
-                                for sarg in v {
-                                    xargs.push(VVal::new_str(sarg.as_str()));
+                    ClapCmdArg::Str(id, many, load_toml) => {
+                        if load_toml {
+                            if many {
+                                if let Some(v) = matches.get_many::<String>(&id) {
+                                    for sarg in v {
+                                        let v = read_cfg(sarg.as_str())?;
+                                        cfg.shallow_merge_from(&v);
+                                    }
                                 }
-                                let _ = cfg.set_key_str(&id, xargs);
+                            } else {
+                                if let Some(v) = matches.get_one::<String>(&id) {
+                                    let v = read_cfg(v)?;
+                                    cfg.shallow_merge_from(&v);
+                                }
                             }
                         } else {
-                            if let Some(v) = matches.get_one::<String>(&id) {
-                                let _ = cfg.set_key_str(&id, VVal::new_str_mv(v.clone()));
+                            if many {
+                                if let Some(v) = matches.get_many::<String>(&id) {
+                                    let xargs = VVal::vec();
+                                    for sarg in v {
+                                        xargs.push(VVal::new_str(sarg.as_str()));
+                                    }
+                                    let _ = cfg.set_key_str(&id, xargs);
+                                }
+                            } else {
+                                if let Some(v) = matches.get_one::<String>(&id) {
+                                    let _ = cfg.set_key_str(&id, VVal::new_str_mv(v.clone()));
+                                }
                             }
                         }
                     }
-                    ClapCmdArg::Number(id, many) => {
+                    ClapCmdArg::Number(id, many, _) => {
                         if many {
                             if let Some(v) = matches.get_many::<i64>(&id) {
                                 let xargs = VVal::vec();

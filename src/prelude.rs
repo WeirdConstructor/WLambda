@@ -11706,6 +11706,21 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(
         st,
+        "merge",
+        |env: &mut Env, argc: usize| {
+            let v = env.arg(0);
+            for i in 1..argc {
+                v.shallow_merge_from(env.arg_ref(i).expect("all argc present"));
+            }
+            Ok(v)
+        },
+        Some(2),
+        None,
+        false
+    );
+
+    func!(
+        st,
         "unshift",
         |env: &mut Env, _argc: usize| {
             let v = env.arg(0);

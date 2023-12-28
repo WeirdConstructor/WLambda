@@ -8242,5 +8242,39 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "test" "1.0.0" "A simple cli"
                 :$toml_config;
             cfg
-        "#), "${_cfg=${x=${y=\"z\"}}}");
+        "#), "${x=${y=\"z\"}}");
+
+    assert_eq!(
+        ve(r#"
+            !:global @dir = ".";
+            std:io:file:write_safe "test.toml" "[x]\ny=\"z\"\n";
+            !args = $["--config", "test.toml"];
+            !cfg = std:app:simple_cli args "test" "1.0.0" "A simple cli"
+                $["-c", "--config", :PATH, :$toml_config];
+            cfg
+        "#), "${x=${y=\"z\"}}");
+
+    assert_eq!(
+        ve(r#"
+            !:global @dir = ".";
+            std:io:file:write_safe "test.toml" "[x]\ny=\"z\"\n";
+            std:io:file:write_safe "test2.toml" "[j]\na=\"b\"\n";
+            !args = $["--config", "test.toml", "-c=test2.toml"];
+            !cfg = std:app:simple_cli args "test" "1.0.0" "A simple cli"
+                $["-c", "--config", :PATH, :$toml_config, :$append];
+            cfg.x => cfg.j
+        "#), "$p(${y=\"z\"},${a=\"b\"})");
+}
+
+#[test]
+fn check_merge() {
+    assert_eq!(
+        ve(r#"
+            std:merge ${} ${a=:x};
+        "#), "${a=:x}");
+
+    assert_eq!(
+        ve(r#"
+            std:merge $[] ${1=:x, 2=:i, 0=:f} $[:b, :c];
+        "#), "$[:f,:x,:i]");
 }

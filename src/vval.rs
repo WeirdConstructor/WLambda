@@ -5724,6 +5724,18 @@ impl VVal {
         }
     }
 
+    pub fn shallow_merge_from(&self, other: &VVal) {
+        other.with_iter(|it| {
+            for (v, k) in it {
+                if let Some(k) = k {
+                    k.with_s_ref(|sk| {
+                        let _ = self.set_key_str(sk, v);
+                    })
+                }
+            }
+        });
+    }
+
     #[allow(clippy::cast_lossless)]
     pub fn f(&self) -> f64 {
         match self {
