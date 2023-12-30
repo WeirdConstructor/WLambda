@@ -182,10 +182,11 @@ fn vv2command(
                 (arg.v_(0).v_s_raw(0), Some(arg.v_(0).v_s_raw(1)))
             };
 
-            let (subcmd, subcmd_args) = vv2command(cmdname, &cmdvec[..], cfg.clone(), dir_path)?;
+            let (subcmd, subcmd_args) =
+                vv2command(cmdname.clone(), &cmdvec[..], cfg.clone(), dir_path)?;
             let subcmd = if let Some(about) = about { subcmd.about(about) } else { subcmd };
             m = m.subcommand(subcmd);
-            arg_typs.push(ClapCmdArg::Subcmd(arg.v_s_raw(0), subcmd_args));
+            arg_typs.push(ClapCmdArg::Subcmd(cmdname, subcmd_args));
         } else if arg.is_vec() {
             let build_arg = arg.with_iter(|iter| {
                 let mut build_arg = None;

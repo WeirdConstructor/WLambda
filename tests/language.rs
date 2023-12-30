@@ -8214,6 +8214,16 @@ fn check_app_simple_cli() {
 
     assert_eq!(
         ve(r#"
+            !args = $["print", "-x"];
+            !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
+                $[:print, "Prints stuff"] => $[
+                    $["-x"]
+                ];
+            cfg._cmd => cfg.x
+        "#), "$p(\"print\",$true)");
+
+    assert_eq!(
+        ve(r#"
             !args = $["-y"];
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-y"]

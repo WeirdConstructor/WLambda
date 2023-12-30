@@ -882,9 +882,14 @@ impl EvalContext {
             &VVal::new_str(
                 path.to_str().unwrap_or_else(|| filename)));
         if let Some(s) = dir_path.map(|dp| dp.to_str()).flatten() {
+            let s = if s.is_empty() {
+                "."
+            } else {
+                s
+            };
             self.set_global_var("@dir", &VVal::new_str(s));
         } else {
-            self.set_global_var("@dir", &VVal::None);
+            self.set_global_var("@dir", &VVal::new_str("."));
         }
 
         let contents = std::fs::read_to_string(filename);

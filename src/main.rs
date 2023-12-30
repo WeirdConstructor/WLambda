@@ -340,11 +340,6 @@ fn main() {
         } else {
             v_argv.delete_key(&VVal::Int(0)).expect("file argument");
 
-            // TODO: X add @script_dir_path and @script_path
-            //       - then add appropriate loading params to the generate_erp4_prompt
-            //       - then debug shift context problem and try out new prompt formatting
-            //       - then run benchmark with two prompts
-
             match ctx.eval_file(&argv[1]) {
                 Ok(v) => {
                     std::process::exit(v.i() as i32);
