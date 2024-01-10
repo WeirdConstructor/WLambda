@@ -8288,3 +8288,69 @@ fn check_merge() {
             std:merge $[] ${1=:x, 2=:i, 0=:f} $[:b, :c];
         "#), "$[:f,:x,:i]");
 }
+
+#[test]
+fn check_num_stats() {
+    assert_eq!(
+    ve(r#"
+        !stats_of_list = {|1<2|!(list) = @;
+            !avg = ($@f iter a list \$+ a) / float[len[list]];
+            !avg_dev = std:num:sqrt ~ ($@f iter a list \$+ (a - avg)^2) / float[len[list]];
+
+            !unsorted_list = std:copy list;
+
+            std:sort { std:cmp:num:asc _ _1 } list;
+
+            !min = float ~ list.(0);
+            !max = float ~ list.(len[list] - 1);
+
+            !(q1, median, q3) = if len[list] % 2 == 0 {
+                !i = len[list] / 2;
+                !median = float[list.(i)] * 0.5 + float[list.(i - 1)] * 0.5;
+                !q1_i = i / 2;
+                !q3_i = i + i / 2;
+                !q1 = float[list.(q1_i)];
+                !q3 = float[list.(q3_i)];
+                $[q1, median, q3]
+            } {
+                !i = len[list] / 2;
+                !median = float[list.(i)];
+                !q1_i = i / 2;
+                !q3_i = i + i / 2 + 1;
+                !q1 = float[list.(q1_i)] * 0.5 + float[list.(q1_i - 1)] * 0.5;
+                !q3 = float[list.(q3_i)] * 0.5 + float[list.(q3_i - 1)] * 0.5;
+                $[q1, median, q3]
+            };
+
+            !median_dev = std:num:sqrt ~ ($@f iter a list \$+ (a - median)^2) / float[len[list]];
+
+            !r = ${
+                avg = avg,
+                avg_dev = avg_dev,
+                q1 = q1,
+                median = median,
+                median_dev = median_dev,
+                q3 = q3,
+                min = min,
+                max = max,
+                count = len list,
+            };
+            r
+        };
+
+        #!vec = $[6, 7, 15, 36, 39, 40, 41, 42, 43, 47, 49];
+        !vec = $[7, 15, 36, 39, 40, 41];
+
+        !r = stats_of_list vec;
+        !v1 = $@vec iter k $[:avg, :avg_dev, :median, :median_dev, :q1, :q3, :min, :max, :count] {
+            $+ r.(k);
+        };
+        !r2 = std:num:statistics vec;
+        !v2 = $@vec iter k $[:avg, :avg_dev, :median, :median_dev, :q1, :q3, :min, :max, :count] {
+            $+ r2.(k);
+        };
+
+        v1 => v2
+    "#), "");
+
+}

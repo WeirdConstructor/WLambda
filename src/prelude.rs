@@ -12938,6 +12938,81 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(
         st,
+        "num:statistics",
+        |env: &mut Env, _argc: usize| {
+            let mut num : Vec<f64> = vec![];
+            env.arg(0).with_iter(|iter| {
+                for (v, _k) in iter {
+                    let f = v.f();
+                    if !(f.is_nan() || f.is_infinite()) {
+                        num.push(f);
+                    }
+                }
+            });
+
+            num.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            if num.len() == 0 {
+                return Ok(VVal::map());
+            }
+
+            let min : f64 = num[0];
+            let max : f64 = num[num.len() - 1];
+            let mut sum : f64 = 0.0;
+            let count : f64 = num.len() as f64;
+
+            for n in &num {
+                sum += *n;
+            }
+
+            let sample_points = [0.25, 0.5, 0.75];
+            let mut out_samples = vec![];
+            for sp in sample_points {
+                let i = count * sp;
+                let i_f = i.floor() as usize;
+                let i_c = i.ceil() as usize;
+                let alpha = if i_f == i_c { 0.0 } else { 0.5 };
+
+                let i1 = i_f - 1;
+                let i2 = ((i1 + i1 + 1) / 2) - 1;
+                println!("if={} ic={} i={} i1={} i2={}", i_f, i, alpha, i1, i2);
+
+                let i = if i_f >= num.len() { i_f - 1 } else { i_f };
+                out_samples.push(num[i] + alpha * (num[i + 1] - num[i]));
+            };
+
+            let avg = sum / count;
+            let median = out_samples[1];
+            let (mut avg_dev, mut median_dev) = (0.0, 0.0);
+            for n in &num {
+                avg_dev += (*n - avg).powf(2.0);
+                median_dev += (*n - median).powf(2.0);
+            }
+            avg_dev = (avg_dev / count).sqrt();
+            median_dev = (median_dev / count).sqrt();
+
+            let ret = VVal::map();
+            let _ = ret.set_key_str("min", VVal::Flt(min));
+            let _ = ret.set_key_str("max", VVal::Flt(max));
+            let _ = ret.set_key_str("sum", VVal::Flt(sum));
+            let _ = ret.set_key_str("count", VVal::Int(num.len() as i64));
+            let _ = ret.set_key_str("avg", VVal::Flt(sum / count));
+            let _ = ret.set_key_str("avg_dev", VVal::Flt(avg_dev));
+            let _ = ret.set_key_str("q1", VVal::Flt(out_samples[0]));
+            let _ = ret.set_key_str("median", VVal::Flt(median));
+            let _ = ret.set_key_str("median_dev", VVal::Flt(median_dev));
+            let _ = ret.set_key_str("range", VVal::Flt(max - min));
+            let _ = ret.set_key_str("midrange", VVal::Flt(out_samples[1] - out_samples[0]));
+            let _ = ret.set_key_str("q3", VVal::Flt(out_samples[2]));
+            Ok(ret)
+        },
+        Some(1),
+        Some(1),
+        false
+    );
+
+    func!(
+        st,
         "fs:path:exists",
         |env: &mut Env, _argc: usize| {
             match env.arg(0).with_s_ref(|filename| std::path::Path::new(filename).try_exists()) {
