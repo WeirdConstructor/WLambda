@@ -12939,7 +12939,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(
         st,
         "num:statistics",
-        |env: &mut Env, _argc: usize| {
+        |env: &mut Env, argc: usize| {
             let mut num : Vec<f64> = vec![];
             env.arg(0).with_iter(|iter| {
                 for (v, _k) in iter {
@@ -12949,6 +12949,18 @@ pub fn std_symbol_table() -> SymbolTable {
                     }
                 }
             });
+
+            let mut percentiles : Vec<f64> = vec![0.25, 0.5, 0.75];
+            if argc > 1 {
+                env.arg(1).with_iter(|iter| {
+                    for (v, _k) in iter {
+                        let f = v.f();
+                        if !(f.is_nan() || f.is_infinite()) {
+                            percentiles.push(f);
+                        }
+                    }
+                });
+            }
 
             num.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
@@ -12965,20 +12977,16 @@ pub fn std_symbol_table() -> SymbolTable {
                 sum += *n;
             }
 
-            let sample_points = [0.25, 0.5, 0.75];
             let mut out_samples = vec![];
-            for sp in sample_points {
-                let i = count * sp;
-                let i_f = i.floor() as usize;
-                let i_c = i.ceil() as usize;
-                let alpha = if i_f == i_c { 0.0 } else { 0.5 };
+            for sp in percentiles {
+                let r = ((count - 1.0) * sp) + 1.0;
+                let i = r.floor() as usize;
+                let j = r.floor() as usize + 1;
+                let g = if (r - r.floor()) < 0.000001 { 0.0 } else { 0.5 };
+                let j = if j > num.len() { num.len() } else { j };
+                let i = if i > num.len() { num.len() } else { i };
 
-                let i1 = i_f - 1;
-                let i2 = ((i1 + i1 + 1) / 2) - 1;
-                println!("if={} ic={} i={} i1={} i2={}", i_f, i, alpha, i1, i2);
-
-                let i = if i_f >= num.len() { i_f - 1 } else { i_f };
-                out_samples.push(num[i] + alpha * (num[i + 1] - num[i]));
+                out_samples.push((num[j - 1] - num[i - 1]) * g + num[i - 1]);
             };
 
             let avg = sum / count;
@@ -13002,12 +13010,19 @@ pub fn std_symbol_table() -> SymbolTable {
             let _ = ret.set_key_str("median", VVal::Flt(median));
             let _ = ret.set_key_str("median_dev", VVal::Flt(median_dev));
             let _ = ret.set_key_str("range", VVal::Flt(max - min));
-            let _ = ret.set_key_str("midrange", VVal::Flt(out_samples[1] - out_samples[0]));
+            let _ = ret.set_key_str("midrange", VVal::Flt(out_samples[2] - out_samples[0]));
             let _ = ret.set_key_str("q3", VVal::Flt(out_samples[2]));
+            if out_samples.len() > 3 {
+                let percs = VVal::vec();
+                for v in out_samples[3..].iter() {
+                    percs.push(VVal::Flt(*v));
+                }
+                let _ = ret.set_key_str("percentiles", percs);
+            }
             Ok(ret)
         },
         Some(1),
-        Some(1),
+        Some(2),
         false
     );
 

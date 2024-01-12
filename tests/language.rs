@@ -8293,64 +8293,59 @@ fn check_merge() {
 fn check_num_stats() {
     assert_eq!(
     ve(r#"
-        !stats_of_list = {|1<2|!(list) = @;
-            !avg = ($@f iter a list \$+ a) / float[len[list]];
-            !avg_dev = std:num:sqrt ~ ($@f iter a list \$+ (a - avg)^2) / float[len[list]];
+        !r = std:num:statistics $[7, 15, 36, 39, 40, 41];
+        $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count] {
+            $+ ~ $F"{:4.2!f}" r.(k);
+        }
 
-            !unsorted_list = std:copy list;
-
-            std:sort { std:cmp:num:asc _ _1 } list;
-
-            !min = float ~ list.(0);
-            !max = float ~ list.(len[list] - 1);
-
-            !(q1, median, q3) = if len[list] % 2 == 0 {
-                !i = len[list] / 2;
-                !median = float[list.(i)] * 0.5 + float[list.(i - 1)] * 0.5;
-                !q1_i = i / 2;
-                !q3_i = i + i / 2;
-                !q1 = float[list.(q1_i)];
-                !q3 = float[list.(q3_i)];
-                $[q1, median, q3]
-            } {
-                !i = len[list] / 2;
-                !median = float[list.(i)];
-                !q1_i = i / 2;
-                !q3_i = i + i / 2 + 1;
-                !q1 = float[list.(q1_i)] * 0.5 + float[list.(q1_i - 1)] * 0.5;
-                !q3 = float[list.(q3_i)] * 0.5 + float[list.(q3_i - 1)] * 0.5;
-                $[q1, median, q3]
-            };
-
-            !median_dev = std:num:sqrt ~ ($@f iter a list \$+ (a - median)^2) / float[len[list]];
-
-            !r = ${
-                avg = avg,
-                avg_dev = avg_dev,
-                q1 = q1,
-                median = median,
-                median_dev = median_dev,
-                q3 = q3,
-                min = min,
-                max = max,
-                count = len list,
-            };
-            r
-        };
-
-        #!vec = $[6, 7, 15, 36, 39, 40, 41, 42, 43, 47, 49];
-        !vec = $[7, 15, 36, 39, 40, 41];
-
-        !r = stats_of_list vec;
-        !v1 = $@vec iter k $[:avg, :avg_dev, :median, :median_dev, :q1, :q3, :min, :max, :count] {
-            $+ r.(k);
-        };
-        !r2 = std:num:statistics vec;
-        !v2 = $@vec iter k $[:avg, :avg_dev, :median, :median_dev, :q1, :q3, :min, :max, :count] {
-            $+ r2.(k);
-        };
-
-        v1 => v2
-    "#), "");
-
+    "#), "$[\"25.50\",\"37.50\",\"39.50\",\"29.67\",\"13.49\",\"15.60\",\"7.00\",\"41.00\",\"6.00\"]");
+    assert_eq!(
+    ve(r#"
+        !r = std:num:statistics $[6, 7, 15, 36, 39, 40, 41, 42, 43, 47, 49];
+        $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count] {
+            $+ ~ $F"{:4.2!f}" r.(k);
+        }
+    "#), "$[\"25.50\",\"40.00\",\"42.50\",\"33.18\",\"15.13\",\"16.60\",\"6.00\",\"49.00\",\"11.00\"]");
+    assert_eq!(
+    ve(r#"
+        !r = std:num:statistics $[];
+        $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count] {
+            $+ ~ $F"{:4.2!f}" r.(k);
+        }
+    "#), "$[\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\"]");
+    assert_eq!(
+    ve(r#"
+        !r = std:num:statistics $[1];
+        $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count] {
+            $+ ~ $F"{:4.2!f}" r.(k);
+        }
+    "#), "$[\"1.00\",\"1.00\",\"1.00\",\"1.00\",\"0.00\",\"0.00\",\"1.00\",\"1.00\",\"1.00\"]");
+    assert_eq!(
+    ve(r#"
+        !r = std:num:statistics $[1,2];
+        $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count] {
+            $+ ~ $F"{:4.2!f}" r.(k);
+        }
+    "#), "$[\"1.50\",\"1.50\",\"1.50\",\"1.50\",\"0.50\",\"0.50\",\"1.00\",\"2.00\",\"2.00\"]");
+    assert_eq!(
+    ve(r#"
+        !r = std:num:statistics $[1,2,3];
+        $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count, :percentiles] {
+            $+ ~ $F"{:4.2!f}" r.(k);
+        }
+    "#), "$[\"1.50\",\"2.00\",\"2.50\",\"2.00\",\"0.82\",\"0.82\",\"1.00\",\"3.00\",\"3.00\",\"0.00\"]");
+    assert_eq!(
+    ve(r#"
+        !r = std:num:statistics $[1,2,3] $[0.0, 1.0];
+        $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count, :percentiles] {
+            $+ ~ $F"{:4.2!f}" r.(k);
+        }
+    "#), "$[\"1.50\",\"2.00\",\"2.50\",\"2.00\",\"0.82\",\"0.82\",\"1.00\",\"3.00\",\"3.00\",\"[1.00,3.00]\"]");
+    assert_eq!(
+    ve(r#"
+        !r = std:num:statistics $[1,2,3];
+        $@vec iter k $[:range, :midrange] {
+            $+ ~ $F"{:4.2!f}" r.(k);
+        }
+    "#), "$[\"2.00\",\"1.00\"]");
 }
