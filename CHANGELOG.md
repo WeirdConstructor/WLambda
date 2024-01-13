@@ -22,6 +22,7 @@ available via `std:bytes:lzw:encode` and `std:bytes:lzw:decode`.
 * **Feature:** Added `std:merge`, `std:shift`
 * **Feature:** Added `std:app:simple_cli` for quickly implementing CLI applications.
 * **Feature:** Added `std:num:statistics` for common statistical data over a vector of floats.
+* **Feature:** Added `std:str:markdown_to_html` for a simple markdown to HTML converter.
 
 0.8.1 (2022-03-05)
 ==================

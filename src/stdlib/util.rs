@@ -539,4 +539,17 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
         None,
         false,
     );
+
+    #[cfg(feature = "markdown")]
+    st.fun(
+        "str:markdown_to_html",
+        |env: &mut Env, argc: usize| {
+            env.arg(0).with_s_ref(|s| {
+                Ok(VVal::new_str_mv(markdown::to_html(s)))
+            })
+        },
+        Some(1),
+        None,
+        false,
+    );
 }

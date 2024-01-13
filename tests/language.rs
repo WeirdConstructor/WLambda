@@ -8349,3 +8349,14 @@ fn check_num_stats() {
         }
     "#), "$[\"2.00\",\"1.00\"]");
 }
+
+#[test]
+#[cfg(feature = "markdown")]
+fn check_markdown() {
+    assert_eq!(
+    ve(r#"
+        std:str:markdown_to_html
+            "\n# Hello!\n\n**Lol**\n\nThis is nice:\n- A\n- B\n - C\n ";
+    "#),
+    "\"<h1 id=\\'hello!\\'>Hello!</h1>\\n\\n<p><strong>Lol</strong></p>\\n\\n<p>This is nice:</p>\\n\\n<ul>\\n<li>A</li>\\n\\n<li>B</li>\\n\\n<li>C</li>\\n</ul>\\n\"");
+}
