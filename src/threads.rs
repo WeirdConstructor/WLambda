@@ -496,7 +496,7 @@ impl std::fmt::Display for ForkSenderError {
 }
 
 impl AValChannel {
-    pub(crate) fn new_direct() -> AValChannel {
+    pub fn new_direct() -> AValChannel {
         let (send, recv) = std::sync::mpsc::channel();
         Self { sender: Arc::new(Mutex::new(send)), receiver: Arc::new(Mutex::new(recv)) }
     }
