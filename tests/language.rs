@@ -8360,3 +8360,12 @@ fn check_markdown() {
     "#),
     "\"<h1 id=\\'hello!\\'>Hello!</h1>\\n\\n<p><strong>Lol</strong></p>\\n\\n<p>This is nice:</p>\\n\\n<ul>\\n<li>A</li>\\n\\n<li>B</li>\\n\\n<li>C</li>\\n</ul>\\n\"");
 }
+
+//#[test]
+//fn check_syntaxforms() {
+//    assert_eq!(
+//    ve(r#"
+//        !@form if = $%:Block $%:Block;
+//    "#),
+//    "");
+//}

@@ -28,6 +28,16 @@ pub struct RPCHandle {
     request_queue: AValChannel,
 }
 
+pub struct RPCHandleStopper {
+    handle: RPCHandle,
+}
+
+impl Drop for RPCHandleStopper {
+    fn drop(&mut self) {
+        self.handle.call("thread:quit", VVal::None);
+    }
+}
+
 impl Default for RPCHandle {
     fn default() -> Self {
         Self::new()
@@ -40,6 +50,12 @@ impl RPCHandle {
             free_queue: AValChannel::new_direct(),
             error_channel: AValChannel::new_direct(),
             request_queue: AValChannel::new_direct(),
+        }
+    }
+
+    pub fn make_stopper_handle(&self) -> RPCHandleStopper {
+        RPCHandleStopper {
+            handle: self.clone(),
         }
     }
 
@@ -278,5 +294,36 @@ mod tests {
         assert_eq!(err.s(), "$o($e $[\"No such global on send: mfeofe\",\"\"])");
 
         t.join().unwrap();
+    }
+
+    #[test]
+    fn check_rpc_destroy() {
+        use crate::rpc_helper::*;
+
+        let t = {
+            // Get some random user thread:
+            let mut ctx = crate::compiler::EvalContext::new_default();
+
+            let msg_handle = RPCHandle::new();
+            let sender = msg_handle.clone();
+            sender.register_global_functions("worker", &mut ctx);
+            let mut stopper = Some(sender.make_stopper_handle());
+
+            let t = std::thread::spawn(move || {
+                let mut ctx = crate::compiler::EvalContext::new_default();
+                rpc_handler(&mut ctx, &msg_handle, std::time::Duration::from_secs(1));
+                10
+            });
+
+            ctx.eval("worker_send :mfeofe").unwrap();
+
+            // implicit destroy
+            stopper.take();
+
+            t
+        };
+
+        let x = t.join().unwrap();
+        assert_eq!(x, 10, "Thread returned properly!");
     }
 }
