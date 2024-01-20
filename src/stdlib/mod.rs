@@ -17,6 +17,7 @@ mod imap;
 mod rcdom;
 mod sqlite;
 mod io_types;
+mod consts;
 pub use helpers::PendingResult;
 
 pub fn add_to_symtable(st: &mut SymbolTable) {
@@ -30,4 +31,5 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     util::add_to_symtable(st);
     sqlite::add_to_symtable(st);
     imap::add_to_symtable(st);
+    consts::add_to_symtable(st);
 }

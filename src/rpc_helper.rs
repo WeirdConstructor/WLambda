@@ -20,6 +20,7 @@ use crate::vval::{Env, VValFun, VVal};
 
 const RPC_MSG_CALL: i64 = 1;
 const RPC_MSG_SEND: i64 = 2;
+const RPC_MSG_EVAL: i64 = 3;
 
 #[derive(Clone)]
 pub struct RPCHandle {
@@ -124,6 +125,21 @@ impl RPCHandle {
         }
     }
 
+    pub fn eval(&self, code: &str) -> VVal {
+        let resp = self.get_request().expect("AtomicAValSlot allocation");
+
+        let v = VVal::vec();
+        v.push(VVal::Int(RPC_MSG_EVAL));
+        v.push(VVal::Usr(Box::new(resp.clone())));
+        v.push(VVal::new_str(code));
+        v.push(VVal::None);
+
+        self.request_queue.send(&v);
+        let ret = resp.recv_timeout(None);
+        self.free_queue.send(&v.at(1).expect("the AtomicAValSlot"));
+        ret
+    }
+
     pub fn call(&self, target: &str, args: VVal) -> VVal {
         let resp = self.get_request().expect("AtomicAValSlot allocation");
 
@@ -211,6 +227,26 @@ pub fn rpc_handler_step(
         let args = m.at(3).unwrap_or(VVal::None);
 
         match cmd {
+            RPC_MSG_EVAL => {
+                if let VVal::Usr(mut resp) = resp {
+                    let resp = resp
+                        .as_any()
+                        .downcast_mut::<AtomicAValSlot>()
+                        .expect("AtomicAValSlot in RPC_MSG_EVAL");
+
+                    name.with_s_ref(|code| {
+                        let ret = match ctx.eval(&code) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                VVal::err_msg(&format!("Panic in eval: {:?}", e))
+                            }
+                        };
+                        resp.send(&ret);
+                    });
+                } else {
+                    panic!("Didn't get a AtomicAValSlot in RPC_MSG_EVAL");
+                }
+            }
             RPC_MSG_CALL => {
                 if let VVal::Usr(mut resp) = resp {
                     let resp = resp
