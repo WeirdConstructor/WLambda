@@ -63,6 +63,19 @@ impl RPCHandle {
     pub fn register_global_functions(&self, prefix: &str, ctx: &mut EvalContext) {
         let caller = self.clone();
         ctx.set_global_var(
+            &format!("{}_eval", prefix),
+            &VValFun::new_fun(
+                move |env: &mut Env, _argc: usize| {
+                    Ok(caller.eval(&env.arg(0).s_raw()))
+                },
+                Some(1),
+                Some(1),
+                false,
+            ),
+        );
+
+        let caller = self.clone();
+        ctx.set_global_var(
             &format!("{}_call", prefix),
             &VValFun::new_fun(
                 move |env: &mut Env, argc: usize| {
