@@ -367,97 +367,170 @@ fn exec_and_retrieve_sql_legacy(
 
             for col_i in 0..batch.num_cols() {
                 let data = batch.column(col_i);
+                use odbc_api::buffers::AnySlice;
 
-                let rs = if let Some(buf) = data.as_text_view() {
-                    if let Some(s) = buf.get(row_index) {
-                        if let Ok(s) = std::str::from_utf8(s) {
-                            VVal::new_str(s)
-                        } else {
-                            VVal::new_byt(s.to_vec())
-                        }
-                    } else {
-                        continue;
-                    }
-                } else if let Some(buf) = data.as_w_text_view() {
-                    if let Some(s) = buf.get(row_index) {
-                        VVal::new_str_mv(U16String::from_vec(s).to_string_lossy())
-                    } else {
-                        continue;
-                    }
-                } else if let Some(buf) = data.as_bin_view() {
-                    if let Some(s) = buf.get(row_index) {
-                        VVal::new_byt(s.to_vec())
-                    } else {
-                        continue;
-                    }
-                } else {
-                    panic!("Unknown col: {:?}", data);
-                };
+                let rs =
+                    match data {
+                        AnySlice::Text(x) => {
+                            x.get(row_index).map(|s| {
+                                if let Ok(s) = std::str::from_utf8(s) {
+                                    VVal::new_str(s)
+                                } else {
+                                    VVal::new_byt(s.to_vec())
+                                }
+                            })
+                        },
+                        AnySlice::WText(x) => {
+                            x.get(row_index).map(|s| {
+                                VVal::new_str_mv(U16String::from_vec(s).to_string_lossy())
+                            })
+                        },
+                        AnySlice::Binary(x) => {
+                            x.get(row_index).map(|s| {
+                                VVal::new_byt(s.to_vec())
+                            })
+                        },
+                        AnySlice::Date(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::vec3(
+                                    VVal::Int(i.year as i64),
+                                    VVal::Int(i.month as i64),
+                                    VVal::Int(i.day as i64))
+                            })
+                        },
+                        AnySlice::Time(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::vec3(
+                                    VVal::Int(i.hour as i64),
+                                    VVal::Int(i.minute as i64),
+                                    VVal::Int(i.second as i64))
+                            })
+                        },
+                        AnySlice::Timestamp(x) => {
+                            x.get(row_index).map(|i| {
+                                let ts =
+                                    VVal::vec3(
+                                        VVal::Int(i.year as i64),
+                                        VVal::Int(i.month as i64),
+                                        VVal::Int(i.day as i64));
+                                ts.push(VVal::Int(i.hour as i64));
+                                ts.push(VVal::Int(i.minute as i64));
+                                ts.push(VVal::Int(i.second as i64));
+                                ts
+                            })
+                        },
+                        AnySlice::F64(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::Flt(*i as f64)
+                            })
+                        },
+                        AnySlice::F32(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::Flt(*i as f64)
+                            })
+                        },
+                        AnySlice::I8(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::I16(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::I32(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::I64(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::U8(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::Bit(x) => {
+                            x.get(row_index).map(|i| {
+                                VVal::Bol(i.as_bool())
+                            })
+                        },
+                        AnySlice::NullableDate(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::vec3(
+                                    VVal::Int(i.year as i64),
+                                    VVal::Int(i.month as i64),
+                                    VVal::Int(i.day as i64))
+                            })
+                        },
+                        AnySlice::NullableTime(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::vec3(
+                                    VVal::Int(i.hour as i64),
+                                    VVal::Int(i.minute as i64),
+                                    VVal::Int(i.second as i64))
+                            })
+                        },
+                        AnySlice::NullableTimestamp(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                let ts =
+                                    VVal::vec3(
+                                        VVal::Int(i.year as i64),
+                                        VVal::Int(i.month as i64),
+                                        VVal::Int(i.day as i64));
+                                ts.push(VVal::Int(i.hour as i64));
+                                ts.push(VVal::Int(i.minute as i64));
+                                ts.push(VVal::Int(i.second as i64));
+                                ts
+                            })
+                        },
+                        AnySlice::NullableF64(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::Flt(*i as f64)
+                            })
+                        },
+                        AnySlice::NullableF32(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::Flt(*i as f64)
+                            })
+                        },
+                        AnySlice::NullableI8(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::NullableI16(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::NullableI32(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::NullableI64(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::NullableU8(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::Int(*i as i64)
+                            })
+                        },
+                        AnySlice::NullableBit(mut x) => {
+                            x.nth(row_index).flatten().map(|i| {
+                                VVal::Bol(i.as_bool())
+                            })
+                        },
+                    };
 
-                //d// println!("DATA col={} {:?} = {:?}", col_i, types.get(col_i), rs.s_raw());
-                let v = rs;
-
-                //                    match types.get(col_i) {
-                //                        Some(&DataType::Integer) => {
-                //                            VVal::Int(s.parse::<i64>().unwrap_or(0))
-                //                        }
-                //                        Some(&DataType::SmallInt) => {
-                //                            VVal::Int(s.parse::<i64>().unwrap_or(0))
-                //                        }
-                //                        Some(&DataType::TinyInt) => {
-                //                            VVal::Int(s.parse::<i64>().unwrap_or(0))
-                //                        }
-                //                        Some(&DataType::Bit) => {
-                //                            VVal::Bol(s.parse::<i64>().unwrap_or(0) == 1)
-                //                        }
-                ////                        Some(&DataType::Varbinary { .. }) => VVal::new_byt(s.to_vec()),
-                ////                        Some(&DataType::LongVarbinary { .. }) => {
-                ////                            VVal::new_byt(data.to_vec())
-                ////                        }
-                //                        Some(&DataType::WVarchar { .. }) => {
-                //                        }
-                //                        _ => {
-                //                            println!("DEFAULTED: {}", s);
-                //                            VVal::new_str(s)
-                //                        }
-                //                    }
-                //                } else {
-                //                    VVal::new_byt(s.to_vec())
-                //                };
-
-                //                let v = match batch.indicator_at(col_i, row_index) {
-                //                    Indicator::Null => VVal::None,
-                //                    _ => {
-                //                        println!("DATA: col={} {:?} {:?}", col_i, types.get(col_i), data);
-                //                        if let Ok(s) = std::str::from_utf8(data) {
-                //                            match types.get(col_i) {
-                //                                Some(&DataType::Integer) => {
-                //                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
-                //                                }
-                //                                Some(&DataType::SmallInt) => {
-                //                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
-                //                                }
-                //                                Some(&DataType::TinyInt) => {
-                //                                    VVal::Int(s.parse::<i64>().unwrap_or(0))
-                //                                }
-                //                                Some(&DataType::Bit) => {
-                //                                    VVal::Bol(s.parse::<i64>().unwrap_or(0) == 1)
-                //                                }
-                //                                Some(&DataType::Varbinary { .. }) => VVal::new_byt(data.to_vec()),
-                //                                Some(&DataType::LongVarbinary { .. }) => {
-                //                                    VVal::new_byt(data.to_vec())
-                //                                }
-                //                                Some(&DataType::Binary { .. }) => VVal::new_byt(data.to_vec()),
-                //                                _ => {
-                //                                    println!("DEFAULTED: {}", s);
-                //                                    VVal::new_str(s)
-                //                                }
-                //                            }
-                //                        } else {
-                //                            VVal::new_byt(data.to_vec())
-                //                        }
-                //                    }
-                //                };
+                let v = rs.unwrap_or(VVal::None);
 
                 if let Some(key) = names.get(col_i) {
                     let _ = row.set_key_str(key, v);

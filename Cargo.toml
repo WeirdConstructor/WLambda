@@ -73,6 +73,8 @@ regex-syntax = { version = "0.6.18" }
 
 [profile.release]
 debug = true
+strip = "debuginfo"
+
 #opt-level="z"
 #lto = true
 #panic = 'abort'
