@@ -376,7 +376,10 @@ fn exec_and_retrieve_sql_legacy(
                                 if let Ok(s) = std::str::from_utf8(s) {
                                     VVal::new_str(s)
                                 } else {
-                                    VVal::new_byt(s.to_vec())
+                                    VVal::new_str_mv(
+                                        s.iter().map(
+                                            |chr| std::char::from_u32(*chr as u32).unwrap_or('?'))
+                                        .collect::<String>())
                                 }
                             })
                         },

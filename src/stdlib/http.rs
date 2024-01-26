@@ -254,6 +254,7 @@ impl HttpServer {
         let sender = Arc::new(Mutex::new(sender));
 
         match Server::new(listen_ip_port, move |request| {
+            //d// println!("REQ {} (thread {:?})", request.url(), std::thread::current().id());
             if request.url() == "/favicon.ico" {
                 Response::from_data(
                     "image/x-icon",
@@ -310,8 +311,10 @@ impl HttpServer {
                     }
                 }
 
+                //d// println!("waiting {}  (thread {:?}) ...", request.url(), std::thread::current().id());
                 match pending.wait() {
                     Ok(res) => {
+                        //d// println!("responding to {}  (thread {:?})", request.url(), std::thread::current().id());
                         let resp_type = res.v_s_raw(0);
                         match &resp_type[..] {
                             "file" => {
@@ -319,7 +322,9 @@ impl HttpServer {
                                 let path = res.v_(2).s_raw();
 
                                 if let Some(req) = request.remove_prefix(&prefix) {
-                                    rouille::match_assets(&req, &path)
+                                    let ass = rouille::match_assets(&req, &path);
+                                    //d// println!("got asset {}/{}", path, req.url());
+                                    ass
                                 } else {
                                     Response::text(format!("Invalid file response: {}", res.s()))
                                         .with_status_code(500)
@@ -419,10 +424,13 @@ fn handle_request(
     let _ = req.set_key_str("headers", headers);
 
     match fun.call(env, &[req.clone()]) {
-        Ok(val) => match pending_response.send(&val) {
-            Ok(()) => Ok(req),
-            Err(e) => {
-                Ok(env.new_err(format!("http:server:try_respond error on responding: {}", e)))
+        Ok(val) => {
+            //d// println!("got wl resp {}", req.v_s_rawk("url"));
+            match pending_response.send(&val) {
+                Ok(()) => Ok(req),
+                Err(e) => {
+                    Ok(env.new_err(format!("http:server:try_respond error on responding: {}", e)))
+                }
             }
         },
         Err(StackAction::Return(val)) => match pending_response.send(&val.1) {
