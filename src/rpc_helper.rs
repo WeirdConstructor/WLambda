@@ -35,7 +35,7 @@ pub struct RPCHandleStopper {
 
 impl Drop for RPCHandleStopper {
     fn drop(&mut self) {
-        self.handle.call("thread:quit", VVal::None);
+        self.handle.send("thread:quit", VVal::None);
     }
 }
 
@@ -197,6 +197,15 @@ pub fn rpc_handler(
     handle: &RPCHandle,
     interval_timeout: std::time::Duration,
 ) {
+    rpc_handler_cb(ctx, handle, interval_timeout, |_| ());
+}
+
+pub fn rpc_handler_cb<F: FnMut(&mut EvalContext)>(
+    ctx: &mut EvalContext,
+    handle: &RPCHandle,
+    interval_timeout: std::time::Duration,
+    mut cb: F,
+) {
     let quit = std::rc::Rc::new(std::cell::RefCell::new(false));
 
     let qr = quit.clone();
@@ -214,6 +223,8 @@ pub fn rpc_handler(
     );
 
     loop {
+        cb(ctx);
+
         if let Err(RPCHandlerError::Disconnected) = rpc_handler_step(ctx, handle, interval_timeout)
         {
             break;
@@ -224,6 +235,7 @@ pub fn rpc_handler(
         }
     }
 }
+
 
 pub fn rpc_handler_step(
     ctx: &mut EvalContext,
