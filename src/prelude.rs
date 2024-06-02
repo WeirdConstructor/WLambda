@@ -129,6 +129,25 @@ Smalltalk, LISP and Perl.
     - [3.6.34](#3634-stdnumlerp-a-b-x) std:num:lerp _a_ _b_ _x_
     - [3.6.35](#3635-stdnumsmoothstep-a-b-x) std:num:smoothstep _a_ _b_ _x_
     - [3.6.36](#3636-stdnumfract-float) std:num:fract _float_
+    - [3.6.37](#3637-stdconstpi) std:const:PI
+    - [3.6.38](#3638-stdconsttau) std:const:TAU
+    - [3.6.39](#3639-stdconste) std:const:E
+    - [3.6.40](#3640-stdconstfrac1pi) std:const:FRAC\_1_PI
+    - [3.6.41](#3641-stdconstfrac1sqrt2) std:const:FRAC\_1_SQRT\_2
+    - [3.6.42](#3642-stdconstfrac2pi) std:const:FRAC\_2_PI
+    - [3.6.43](#3643-stdconstfrac2sqrtpi) std:const:FRAC\_2_SQRT\_PI
+    - [3.6.44](#3644-stdconstfracpi2) std:const:FRAC\_PI\_2
+    - [3.6.45](#3645-stdconstfracpi3) std:const:FRAC\_PI\_3
+    - [3.6.46](#3646-stdconstfracpi4) std:const:FRAC\_PI\_4
+    - [3.6.47](#3647-stdconstfracpi6) std:const:FRAC\_PI\_6
+    - [3.6.48](#3648-stdconstfracpi8) std:const:FRAC\_PI\_8
+    - [3.6.49](#3649-stdconstln10) std:const:LN\_10
+    - [3.6.50](#3650-stdconstln2) std:const:LN\_2
+    - [3.6.51](#3651-stdconstlog102) std:const:LOG10\_2
+    - [3.6.52](#3652-stdconstlog10e) std:const:LOG10\_E
+    - [3.6.53](#3653-stdconstlog210) std:const:LOG2\_10
+    - [3.6.54](#3654-stdconstlog2e) std:const:LOG2\_E
+    - [3.6.55](#3655-stdconstsqrt2) std:const:SQRT\_2
   - [3.7](#37-numeric-functions) Numeric Functions
     - [3.7.1](#371-stdnumabs-number) std:num:abs _number_
     - [3.7.2](#372-stdnumsignum-number) std:num:signum _number_
@@ -236,17 +255,21 @@ Smalltalk, LISP and Perl.
     - [3.14.5](#3145-ispair-value) is\_pair _value_
   - [3.15](#315-vectors-or-lists) Vectors (or Lists)
     - [3.15.1](#3151-stdpush-vector-item) std:push _vector_ _item_
-    - [3.15.2](#3152-stdpop-vector) std:pop _vector_
-    - [3.15.3](#3153-stdunshift-vector-item) std:unshift _vector_ _item_
-    - [3.15.4](#3154-isvec-value) is\_vec _value_
-    - [3.15.5](#3155-vector-splicing) Vector Splicing
-    - [3.15.6](#3156-stdappend-vec-a-value-or-vec-) std:append _vec-a_ _value-or-vec_ ...
-    - [3.15.7](#3157-stdprepend-vec-a-value-or-vec-) std:prepend _vec-a_ _value-or-vec_ ...
-    - [3.15.8](#3158-stdtake-count-vector) std:take _count_ _vector_
-    - [3.15.9](#3159-stddrop-count-vector) std:drop _count_ _vector_
+    - [3.15.2](#3152-stdremove-index-vector) std:remove _index_ _vector_
+    - [3.15.3](#3153-stdinsert-vector-index-element) std:insert _vector_ _index_ _element_
+    - [3.15.4](#3154-stdshift-vector) std:shift _vector_
+    - [3.15.5](#3155-stdpop-vector) std:pop _vector_
+    - [3.15.6](#3156-stdunshift-vector-item) std:unshift _vector_ _item_
+    - [3.15.7](#3157-isvec-value) is\_vec _value_
+    - [3.15.8](#3158-vector-splicing) Vector Splicing
+    - [3.15.9](#3159-stdappend-vec-a-value-or-vec-) std:append _vec-a_ _value-or-vec_ ...
+    - [3.15.10](#31510-stdprepend-vec-a-value-or-vec-) std:prepend _vec-a_ _value-or-vec_ ...
+    - [3.15.11](#31511-stdtake-count-vector) std:take _count_ _vector_
+    - [3.15.12](#31512-stddrop-count-vector) std:drop _count_ _vector_
   - [3.16](#316-associative-maps-or-string-to-value-mappings) Associative Maps (or String to Value mappings)
     - [3.16.1](#3161-map-splicing) Map Splicing
     - [3.16.2](#3162-ismap-value) is\_map _value_
+    - [3.16.3](#3163-stdmerge-map-map-a-) std:merge _map_ _map-a_ ...
   - [3.17](#317-references) References
     - [3.17.1](#3171-stdtoref-value) std:to\_ref _value_
     - [3.17.2](#3172-stdrefweaken-ref) std:ref:weaken _ref_
@@ -550,7 +573,8 @@ Smalltalk, LISP and Perl.
   - [14.6](#146-view-def-vbox-vertical-layout) view-def `vbox` Vertical Layout
   - [14.7](#147-view-def-progress-progress-bar) view-def `progress` Progress Bar
 - [15](#15-wlambda-interpreter-cli-command-line-interface) WLambda Interpreter (CLI) Command Line Interface
-  - [15.1](#151-wlambda-script-to-executable-packing) WLambda Script To Executable Packing
+  - [15.1](#151-stdappsimplecli-args-name-version-string-description-param-def1-) std:app:simple\_cli _args_ _name_ _version-string_ _description_ _param-def1_ ...
+  - [15.2](#152-wlambda-script-to-executable-packing) WLambda Script To Executable Packing
 
 -----
 
@@ -2435,6 +2459,82 @@ Returns the fractional part of the floating point number _float_.
 ```wlambda
 std:assert ((std:num:fract 4.25) - 0.25) < 0.00001
 ```
+
+#### <a name="3637-stdconstpi"></a>3.6.37 - std:const:PI
+
+Mathematical constant of PI
+
+#### <a name="3638-stdconsttau"></a>3.6.38 - std:const:TAU
+
+Mathematical constant of 2\*PI
+
+#### <a name="3639-stdconste"></a>3.6.39 - std:const:E
+
+Mathematical constant of e.
+
+#### <a name="3640-stdconstfrac1pi"></a>3.6.40 - std:const:FRAC\_1_PI
+
+Mathematical constant of 1/PI.
+
+#### <a name="3641-stdconstfrac1sqrt2"></a>3.6.41 - std:const:FRAC\_1_SQRT\_2
+
+Mathematical constant of 1/sqrt(2).
+
+#### <a name="3642-stdconstfrac2pi"></a>3.6.42 - std:const:FRAC\_2_PI
+
+Mathematical constant of 2/PI.
+
+#### <a name="3643-stdconstfrac2sqrtpi"></a>3.6.43 - std:const:FRAC\_2_SQRT\_PI
+
+Mathematical constant of 2/sqrt(2).
+
+#### <a name="3644-stdconstfracpi2"></a>3.6.44 - std:const:FRAC\_PI\_2
+
+Mathematical constant of PI/2.
+
+#### <a name="3645-stdconstfracpi3"></a>3.6.45 - std:const:FRAC\_PI\_3
+
+Mathematical constant of PI/3.
+
+#### <a name="3646-stdconstfracpi4"></a>3.6.46 - std:const:FRAC\_PI\_4
+
+Mathematical constant of PI/4.
+
+#### <a name="3647-stdconstfracpi6"></a>3.6.47 - std:const:FRAC\_PI\_6
+
+Mathematical constant of PI/6.
+
+#### <a name="3648-stdconstfracpi8"></a>3.6.48 - std:const:FRAC\_PI\_8
+
+Mathematical constant of PI/8.
+
+#### <a name="3649-stdconstln10"></a>3.6.49 - std:const:LN\_10
+
+Mathematical constant of ln(10).
+
+#### <a name="3650-stdconstln2"></a>3.6.50 - std:const:LN\_2
+
+Mathematical constant of ln(2).
+
+#### <a name="3651-stdconstlog102"></a>3.6.51 - std:const:LOG10\_2
+
+Mathematical constant of log_10(2).
+
+#### <a name="3652-stdconstlog10e"></a>3.6.52 - std:const:LOG10\_E
+
+Mathematical constant of log_10(e).
+
+#### <a name="3653-stdconstlog210"></a>3.6.53 - std:const:LOG2\_10
+
+Mathematical constant of log_2(10).
+
+#### <a name="3654-stdconstlog2e"></a>3.6.54 - std:const:LOG2\_E
+
+Mathematical constant of log_2(e).
+
+#### <a name="3655-stdconstsqrt2"></a>3.6.55 - std:const:SQRT\_2
+
+Mathematical constant of sqrt(2).
 
 ### <a name="37-numeric-functions"></a>3.7 - Numeric Functions
 
@@ -4329,7 +4429,51 @@ std:push v 3;
 std:assert_eq (str v) (str $[1,2,3]);
 ```
 
-#### <a name="3152-stdpop-vector"></a>3.15.2 - std:pop _vector_
+#### <a name="3152-stdremove-index-vector"></a>3.15.2 - std:remove _index_ _vector_
+
+Removes the element at _index_ from _vector_ and mutates it inplace.
+This function returns the removed element as an option `$o(elem)` or if nothing
+is at _index_ it returns `$o()`.
+
+A negative index is counted from the end of the _vector_, with -1 being the last element.
+
+```wlambda
+std:assert_str_eq (std:remove 100 $[1,2,3,4,5,6])  $o();
+std:assert_str_eq (std:remove 1 $[1,2,3,4,5,6])    $o(2);
+std:assert_str_eq (std:remove 0 $[1,2,3,4,5,6])    $o(1);
+std:assert_str_eq (std:remove -1 $[1,2,3,4,5,6])   $o(6);
+std:assert_str_eq (std:remove -100 $[1,2,3,4,5,6]) $o(1);
+```
+
+#### <a name="3153-stdinsert-vector-index-element"></a>3.15.3 - std:insert _vector_ _index_ _element_
+
+Inserts an element into _vector_ and mutates it inplace.
+It will be inserted at _index_ and the elements at that position and following will be pushed back.
+If _index_ does not exist, the previous elements will be initialized with `$none`.
+
+**BEWARE: `std:insert $[] 10000000000 $n` will easily fill up your RAM!**
+
+```wlambda
+std:assert_str_eq (std:insert $[1,2,3,4] 2 "a") $[1,2,"a",3,4];
+std:assert_str_eq (std:insert $[1,2,3,4] 10 "a") $[1,2,3,4,$n,$n,$n,$n,$n,$n,"a"];
+std:assert_str_eq (std:insert $[1,2,3,4] -1 "a") $[1,2,3,4,"a"];
+std:assert_str_eq (std:insert $[1,2,3,4] -2 "a") $[1,2,3,"a",4];
+std:assert_str_eq (std:insert $[1,2,3,4] -100 "a") $["a",1,2,3,4];
+```
+
+#### <a name="3154-stdshift-vector"></a>3.15.4 - std:shift _vector_
+
+Removes the first element and mutates the vector inplace.
+It returns the element as option `$o(element)`, and if the _vector_ is empty, it returns `$o()`.
+
+```wlambda
+!v = $[1,2,3,4];
+std:assert_str_eq $[std:shift v, std:shift v] $[$o(1), $o(2)];
+
+std:assert_str_eq (std:shift $[]) $o();
+```
+
+#### <a name="3155-stdpop-vector"></a>3.15.5 - std:pop _vector_
 
 Pops off the last element of _vector_. Returns `$none` if the vector is empty
 or if _vector_ is not a vector.
@@ -4341,7 +4485,7 @@ std:assert_eq (std:pop v) 3;
 std:assert_eq (str v) (str $[1,2]);
 ```
 
-#### <a name="3153-stdunshift-vector-item"></a>3.15.3 - std:unshift _vector_ _item_
+#### <a name="3156-stdunshift-vector-item"></a>3.15.6 - std:unshift _vector_ _item_
 
 Inserts _item_ at the front of _vector_. Returns _item_ and mutates _vector_
 inplace. Be aware that this operation is of O(n) complexity.
@@ -4356,7 +4500,7 @@ std:unshift v 3;
 std:assert_eq (str v) (str $[3,1,2]);
 ```
 
-#### <a name="3154-isvec-value"></a>3.15.4 - is\_vec _value_
+#### <a name="3157-isvec-value"></a>3.15.7 - is\_vec _value_
 
 Returns `$true` if _value_ is a vector.
 
@@ -4373,7 +4517,7 @@ std:assert ~ not ~ is_vec $f(1,2);
 std:assert ~ not ~ is_vec ${a = 10};
 ```
 
-#### <a name="3155-vector-splicing"></a>3.15.5 - Vector Splicing
+#### <a name="3158-vector-splicing"></a>3.15.8 - Vector Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -4393,7 +4537,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-#### <a name="3156-stdappend-vec-a-value-or-vec-"></a>3.15.6 - std:append _vec-a_ _value-or-vec_ ...
+#### <a name="3159-stdappend-vec-a-value-or-vec-"></a>3.15.9 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
 If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
@@ -4412,7 +4556,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) "$[1,:a,:b,:c,:d]";
 ```
 
-#### <a name="3157-stdprepend-vec-a-value-or-vec-"></a>3.15.7 - std:prepend _vec-a_ _value-or-vec_ ...
+#### <a name="31510-stdprepend-vec-a-value-or-vec-"></a>3.15.10 - std:prepend _vec-a_ _value-or-vec_ ...
 
 Prepends _value-or-vec_ and all following items to the front of _vec-a_.
 If _value-or-vec_ is a vector, all its items will be prepended to _vec-a_.
@@ -4431,7 +4575,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) (str $[:d, :c, :b, :a, 1]);
 ```
 
-#### <a name="3158-stdtake-count-vector"></a>3.15.8 - std:take _count_ _vector_
+#### <a name="31511-stdtake-count-vector"></a>3.15.11 - std:take _count_ _vector_
 
 Takes and returns the first _count_ elements of _vector_. Does not
 mutate _vector_.
@@ -4445,7 +4589,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[1,2,3,4]";
 ```
 
-#### <a name="3159-stddrop-count-vector"></a>3.15.9 - std:drop _count_ _vector_
+#### <a name="31512-stddrop-count-vector"></a>3.15.12 - std:drop _count_ _vector_
 
 Drops _count_ elements from _vector_ and returns them as new vector.
 Does not mutate _vector_.
@@ -4537,6 +4681,21 @@ std:assert ~ not ~ is_map $[:a, 10];
 std:assert ~ not ~ is_map $p(:a, 10);
 std:assert ~ not ~ is_map $none;
 std:assert ~ not ~ is_map $true;
+```
+
+#### <a name="3163-stdmerge-map-map-a-"></a>3.16.3 - std:merge _map_ _map-a_ ...
+
+Merges the keys of _map-a_ and following into _map_ and mutates _map_ inplace.
+It returns _map_.
+
+```wlambda
+!m = ${};
+std:merge m ${a=10,b=20};
+std:merge m ${c=30};
+
+std:assert_eq m.a 10;
+std:assert_eq m.b 20;
+std:assert_eq m.c 30;
 ```
 
 ### <a name="317-references"></a>3.17 - References
@@ -10223,7 +10382,52 @@ There are currently the following command line parameters available:
 <file>                                      # Execute the <file>
 ```
 
-### <a name="151-wlambda-script-to-executable-packing"></a>15.1 - WLambda Script To Executable Packing
+### <a name="151-stdappsimplecli-args-name-version-string-description-param-def1-"></a>15.1 - std:app:simple\_cli _args_ _name_ _version-string_ _description_ _param-def1_ ...
+
+This function parses the vector _args_ (commonly you can use `@@` when executing the `wlambda` CLI)
+and puts all the options definied by _param-defs_ into a map and returns that.
+
+The parameters _name_, _version_ and _description_ should describe the program/application,
+version and purpose.
+
+It returns an error if a command line parameter is invalid or `--help` was given.
+
+A simple example is here:
+
+```wlambda
+!args = $["-x", 10];
+!cfg = std:app:simple_cli args "test" "1.0" "Test application"
+         $["--ex", "-x", :A_NUMBER, "Pass a number to the application"];
+
+std:assert_eq cfg.ex "10";
+```
+
+**Note: `@@` from the wlambda executable contains the arguments that follow the script file!**
+
+Here is a simple example how to use it with the wlambda executable:
+```
+~$ wlambda -e "std:app:simple_cli @@ \"app\" \"1.0\" \"\" \$[\$q'-x']" -x
+${x=$true}
+```
+
+Here is a description and example of possible _param-def_ arguments at the end:
+
+- Long and short form of a parameter: `$["--port", "-p", :PORT, $o(80)]`
+- You can use `$o(...)` to define a default value in any _param-def_ array.
+- You can use `:SYMBOL` to tell simple\_cli that a parameter value is required.
+- Define a set of possible values for a parameter: `$["--mode", :MODE, $[:auto, :manual, :set]]`
+- Define a range of possible numeric values: `$["--range", :PERCENTAGE_RANGE, 0 => 100]`
+- Define a range of possible numeric values with default: `$["--range", :PERCENTAGE_RANGE, 0 => 100, $o(75)]`
+- Default value, if a range parameter has no argument
+(different from `$o(...)` because the paramter will be `$none` if the argument is not given):
+`$["--range", :PERCENTAGE_RANGE, 0 => 100, :$default => 75]`
+- Read TOML configuration files:
+    - Define to read a TOML configuration from `<program-name>.toml`: `:$toml_config`
+    - Define a configuration file to read options from in TOML format: `$["-c", :PATH, :$toml_config]`
+    - Allow to read from multiple configuration files in TOML format: `$["-c", :PATH, :$toml_config, :$append]`
+- Define sub commands to be used like `git push`: `:push => $[ _param-def1_, ... ]`.
+
+### <a name="152-wlambda-script-to-executable-packing"></a>15.2 - WLambda Script To Executable Packing
 
 You can append WLambda scripts to the WLambda binary using the `-p` command line parameter.
 This feature makes your script easily portable as single binary.

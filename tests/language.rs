@@ -7861,6 +7861,7 @@ fn check_insert_remove_shift() {
     assert_eq!(ve("std:insert $[1,2,3,4] -1 \"a\""), "$[1,2,3,4,\"a\"]");
     assert_eq!(ve("std:insert $[1,2,3,4] -2 \"a\""), "$[1,2,3,\"a\",4]");
     assert_eq!(ve("std:insert $[1,2,3,4] -100 \"a\""), "$[\"a\",1,2,3,4]");
+    assert_eq!(ve("std:insert $[1,2,3,4] 10 \"a\""), "$[\"a\",1,2,3,4]");
 }
 
 #[test]

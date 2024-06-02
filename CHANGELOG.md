@@ -25,6 +25,8 @@ available via `std:bytes:lzw:encode` and `std:bytes:lzw:decode`.
 * **Feature:** Added `std:app:simple_cli` for quickly implementing CLI applications.
 * **Feature:** Added `std:num:statistics` for common statistical data over a vector of floats.
 * **Feature:** Added `std:str:markdown_to_html` for a simple markdown to HTML converter.
+* **Feature:** Added some vector functions, such as `std:insert`, `std:remove` and `std:shift`.
+* **Feature:** Added a lot of math constants, such as `std:const:PI`, `std:const:TAU`, ...
 
 0.8.1 (2022-03-05)
 ==================

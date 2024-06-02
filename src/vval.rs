@@ -4644,6 +4644,10 @@ impl VVal {
 
     pub fn insert_at(&self, index: usize, val: VVal) {
         if let VVal::Lst(b) = &self {
+            if index > b.borrow().len() {
+                b.borrow_mut().resize_with(index, || VVal::None);
+            }
+
             b.borrow_mut().insert(index, val);
         } else {
             self.with_deref(|v| v.insert_at(index, val), |_| ())
