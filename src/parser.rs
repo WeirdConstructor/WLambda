@@ -1207,6 +1207,9 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     let get_value = optimize_get_key(ps, obj.shallow_clone(), value.clone());
 
                     let field_set = ps.syn(Syntax::SetKey);
+                    if let Some(Syntax::Func) = obj.v_(0).syn() {
+                        return Err(ps.err(ParseErrorKind::BadSetKey("Can't set key on a function!")));
+                    }
                     field_set.push(obj);
                     field_set.push(value);
                     field_set.push(reform_binop(construct_op(binop, get_value, parse_expr(ps)?)));
@@ -1217,6 +1220,9 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                     if ps.peek_op().is_none() {
                         ps.consume_wsc();
                         let field_set = ps.syn(Syntax::SetKey);
+                        if let Some(Syntax::Func) = obj.v_(0).syn() {
+                            return Err(ps.err(ParseErrorKind::BadSetKey("Can't set key on a function!")));
+                        }
                         field_set.push(obj);
                         field_set.push(value);
                         field_set.push(parse_expr(ps)?);

@@ -1509,7 +1509,7 @@ fn check_prelude_str() {
 #[test]
 fn check_prelude_chrono() {
     if cfg!(feature = "chrono") {
-        assert_eq!(ve("std:chrono:timestamp $q$%Y$ | int"), "2023");
+        assert_eq!(ve("std:chrono:timestamp $q$%Y$ | int"), "2024");
     }
 }
 
@@ -6093,7 +6093,7 @@ fn check_tcp_buffered() {
         !line2 = std:io:read_line buf_rd;
         line1 line2
     "#),
-        "\"HELLO!\\r\\nTEST\\n\""
+        "$b\"HELLO!\\r\\nTEST\\n\""
     );
 
     // testing buffered writing and reading
@@ -6128,7 +6128,7 @@ fn check_tcp_buffered() {
 
         line1 "," line2 "," line3 "," line4
     "#),
-        "\"HELLO!\\r\\n,OK_TIMEOUT,TEST2\\n,OK_NO_TOUT\""
+        "$b\"HELLO!\\r\\n,OK_TIMEOUT,TEST2\\n,OK_NO_TOUT\""
     );
 
     thrd.join().unwrap();

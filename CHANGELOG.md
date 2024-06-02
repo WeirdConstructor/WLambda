@@ -4,6 +4,8 @@
 * **Bugfix:** If you defined multiple variables in a local scope, variables from the outer
 scope were cleared.
 * **Bugfix:** Assignment ops did not work in deeper object structures eg. `o.x.y += 1`.
+* **Change:** `{ } .FIELD = ...` is no longer allowed syntax. This is helpful if you forget a
+`;` after an `if`, `while` or `!fun = { } .XYT = 10` for instance.
 * **Maintenance:** Updated the rumqttd version.
 * **Feature:** `std:min` and `std:max` work on symbols too now.
 * **Feature:** `$iter` and `iter` are now accepting functions as arguments

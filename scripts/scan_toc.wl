@@ -60,7 +60,7 @@ std:fs:copy "doc/wlambda_reference.md" "doc/wlambda_reference.bak";
 !check_code_hash = {!(code) = @;
     iter line ("\n" => 0) <& code {
         if line &> $r/$^ $*$s \# $+[^#] $$/ {
-            std:displayln "ERROR: Bad comment in code example: " line;
+            std:displayln "ERROR: Bad comment in code example (prefix with '#' => '##'): " line;
         };
     };
 };
