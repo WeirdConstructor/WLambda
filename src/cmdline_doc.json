@@ -4830,7 +4830,26 @@
     ]
   ],
   [
-    "3.15.7 - is_vec _value_",
+    "3.15.7 - std:add_uniq _vector-map-or-string_ _item_",
+    [
+      "",
+      "Adds the _item_ to the collection _vector-map-or-string_ (byte vectors work too),",
+      "if the item is not already present (determined using the `==` operator, and in maps using",
+      "the string representation of _item_ as key).",
+      "",
+      "```wlambda",
+      "!v = $[:a, 10];",
+      "",
+      "std:add_uniq v :b;",
+      "std:add_uniq v 12;",
+      "",
+      "std:assert_eq (str v) (str $[:a, 10, :b, 12]);",
+      "```",
+      ""
+    ]
+  ],
+  [
+    "3.15.8 - is_vec _value_",
     [
       "",
       "Returns `$true` if _value_ is a vector.",
@@ -4851,7 +4870,7 @@
     ]
   ],
   [
-    "3.15.8 - Vector Splicing",
+    "3.15.9 - Vector Splicing",
     [
       "",
       "You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`",
@@ -4875,7 +4894,7 @@
     ]
   ],
   [
-    "3.15.9 - std:append _vec-a_ _value-or-vec_ ...",
+    "3.15.10 - std:append _vec-a_ _value-or-vec_ ...",
     [
       "",
       "Appends _value-or-vec_ and all following items to _vec-a_.",
@@ -4898,7 +4917,7 @@
     ]
   ],
   [
-    "3.15.10 - std:prepend _vec-a_ _value-or-vec_ ...",
+    "3.15.11 - std:prepend _vec-a_ _value-or-vec_ ...",
     [
       "",
       "Prepends _value-or-vec_ and all following items to the front of _vec-a_.",
@@ -4921,7 +4940,7 @@
     ]
   ],
   [
-    "3.15.11 - std:take _count_ _vector_",
+    "3.15.12 - std:take _count_ _vector_",
     [
       "",
       "Takes and returns the first _count_ elements of _vector_. Does not",
@@ -4939,7 +4958,7 @@
     ]
   ],
   [
-    "3.15.12 - std:drop _count_ _vector_",
+    "3.15.13 - std:drop _count_ _vector_",
     [
       "",
       "Drops _count_ elements from _vector_ and returns them as new vector.",

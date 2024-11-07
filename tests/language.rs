@@ -8291,6 +8291,31 @@ fn check_merge() {
 }
 
 #[test]
+fn check_add_uniq() {
+    assert_eq!(
+        ve(r#"
+            !x = $[:a, 10];
+            std:add_uniq x :a;
+            std:add_uniq x :b;
+            std:add_uniq x :c;
+            std:add_uniq x 10;
+            std:add_uniq x 12;
+            x
+        "#), "$[:a,10,:b,:c,12]");
+
+    assert_eq!(
+        ve(r#"
+            !x = ${a = 10};
+            std:add_uniq x :a;
+            std:add_uniq x :b;
+            std:add_uniq x :c;
+            std:add_uniq x 10;
+            std:add_uniq x 12;
+            x
+        "#), "${10=$true,12=$true,a=10,b=$true,c=$true}");
+}
+
+#[test]
 fn check_num_stats() {
     assert_eq!(
     ve(r#"

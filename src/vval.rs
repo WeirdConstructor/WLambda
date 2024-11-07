@@ -1788,6 +1788,7 @@ impl Drop for DropFun {
 pub enum CollectionAdd {
     Push,
     Unshift,
+    Uniq,
 }
 
 /// The internal distinction between a character and a byte.
@@ -4508,6 +4509,28 @@ impl VVal {
         }
     }
 
+    pub fn has(&self, elem: &VVal) -> bool {
+        let collection = if self.is_ref() { self.deref() } else { self.clone() };
+
+        if collection.is_map(){
+            return elem.with_s_ref(|key| {
+                if let Some(_) = collection.get_key(key) {
+                    return true;
+                }
+                return false;
+            });
+        } else {
+            return collection.with_iter(|it| {
+                for (v, _k) in it {
+                    if v.eqv(elem) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        }
+    }
+
     pub fn add(&self, vals: &[VVal], list_add: CollectionAdd) -> VVal {
         let mut collection = if self.is_ref() { self.deref() } else { self.clone() };
         //d// println!("ADD: {:?}", vals);
@@ -4523,6 +4546,11 @@ impl VVal {
                             CollectionAdd::Unshift => {
                                 lst.borrow_mut().insert(0, v);
                             }
+                            CollectionAdd::Uniq => {
+                                if !collection.has(&v) {
+                                    lst.borrow_mut().push(v);
+                                }
+                            }
                         }
                         true
                     });
@@ -4531,34 +4559,45 @@ impl VVal {
             VVal::Map(map) => {
                 for v in vals.iter() {
                     v.clone().with_value_or_iter_values(|v, k| {
-                        match v {
-                            VVal::Pair(_) => {
-                                v.at(0).unwrap().with_s_ref(|k| {
-                                    map.borrow_mut().insert(s2sym(k), v.at(1).unwrap())
-                                });
-                            }
-                            VVal::Lst(_) => {
-                                v.v_(0)
-                                    .with_s_ref(|k| map.borrow_mut().insert(s2sym(k), v.clone()));
-                            }
-                            VVal::Map(_) => {
-                                for (vm, km) in v.iter() {
-                                    if let Some(k) = km {
-                                        k.with_s_ref(|ks| {
-                                            map.borrow_mut().insert(s2sym(ks), vm.clone())
-                                        });
-                                    }
+                        match list_add {
+                            CollectionAdd::Uniq => {
+                                if !collection.has(&v) {
+                                    v.with_s_ref(|s| {
+                                        map.borrow_mut().insert(s2sym(s), VVal::Bol(true));
+                                    })
                                 }
                             }
                             _ => {
-                                if let Some(k) = k {
-                                    k.with_s_ref(|kv| {
-                                        map.borrow_mut().insert(s2sym(kv), v.clone())
-                                    });
-                                } else {
-                                    v.with_s_ref(|kv| {
-                                        map.borrow_mut().insert(s2sym(kv), v.clone())
-                                    });
+                                match v {
+                                    VVal::Pair(_) => {
+                                        v.at(0).unwrap().with_s_ref(|k| {
+                                            map.borrow_mut().insert(s2sym(k), v.at(1).unwrap())
+                                        });
+                                    }
+                                    VVal::Lst(_) => {
+                                        v.v_(0)
+                                            .with_s_ref(|k| map.borrow_mut().insert(s2sym(k), v.clone()));
+                                    }
+                                    VVal::Map(_) => {
+                                        for (vm, km) in v.iter() {
+                                            if let Some(k) = km {
+                                                k.with_s_ref(|ks| {
+                                                    map.borrow_mut().insert(s2sym(ks), vm.clone())
+                                                });
+                                            }
+                                        }
+                                    }
+                                    _ => {
+                                        if let Some(k) = k {
+                                            k.with_s_ref(|kv| {
+                                                map.borrow_mut().insert(s2sym(kv), v.clone())
+                                            });
+                                        } else {
+                                            v.with_s_ref(|kv| {
+                                                map.borrow_mut().insert(s2sym(kv), v.clone())
+                                            });
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -4570,7 +4609,18 @@ impl VVal {
                 let mut out = collection.with_s_ref(|s| s.to_string());
                 for v in vals.iter() {
                     v.clone().with_value_or_iter_values(|v, _k| {
-                        v.with_s_ref(|s| out.push_str(s));
+                        match list_add {
+                            CollectionAdd::Uniq => {
+                                if !collection.has(&v) {
+                                    v.with_s_ref(|s| {
+                                        out.push_str(s);
+                                    });
+                                }
+                            }
+                            _ => {
+                                v.with_s_ref(|s| out.push_str(s));
+                            }
+                        }
                         true
                     });
                 }
@@ -4580,7 +4630,16 @@ impl VVal {
                 let mut out = collection.with_bv_ref(|b| b.to_vec());
                 for v in vals.iter() {
                     v.clone().with_value_or_iter_values(|v, _k| {
-                        v.with_bv_ref(|b| out.extend_from_slice(b));
+                        match list_add {
+                            CollectionAdd::Uniq => {
+                                if !collection.has(&v) {
+                                    v.with_bv_ref(|b| out.extend_from_slice(b));
+                                }
+                            }
+                            _ => {
+                                v.with_bv_ref(|b| out.extend_from_slice(b));
+                            }
+                        }
                         true
                     })
                 }

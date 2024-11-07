@@ -260,12 +260,13 @@ Smalltalk, LISP and Perl.
     - [3.15.4](#3154-stdshift-vector) std:shift _vector_
     - [3.15.5](#3155-stdpop-vector) std:pop _vector_
     - [3.15.6](#3156-stdunshift-vector-item) std:unshift _vector_ _item_
-    - [3.15.7](#3157-isvec-value) is\_vec _value_
-    - [3.15.8](#3158-vector-splicing) Vector Splicing
-    - [3.15.9](#3159-stdappend-vec-a-value-or-vec-) std:append _vec-a_ _value-or-vec_ ...
-    - [3.15.10](#31510-stdprepend-vec-a-value-or-vec-) std:prepend _vec-a_ _value-or-vec_ ...
-    - [3.15.11](#31511-stdtake-count-vector) std:take _count_ _vector_
-    - [3.15.12](#31512-stddrop-count-vector) std:drop _count_ _vector_
+    - [3.15.7](#3157-stdadduniq-vector-map-or-string-item) std:add\_uniq _vector-map-or-string_ _item_
+    - [3.15.8](#3158-isvec-value) is\_vec _value_
+    - [3.15.9](#3159-vector-splicing) Vector Splicing
+    - [3.15.10](#31510-stdappend-vec-a-value-or-vec-) std:append _vec-a_ _value-or-vec_ ...
+    - [3.15.11](#31511-stdprepend-vec-a-value-or-vec-) std:prepend _vec-a_ _value-or-vec_ ...
+    - [3.15.12](#31512-stdtake-count-vector) std:take _count_ _vector_
+    - [3.15.13](#31513-stddrop-count-vector) std:drop _count_ _vector_
   - [3.16](#316-associative-maps-or-string-to-value-mappings) Associative Maps (or String to Value mappings)
     - [3.16.1](#3161-map-splicing) Map Splicing
     - [3.16.2](#3162-ismap-value) is\_map _value_
@@ -4500,7 +4501,22 @@ std:unshift v 3;
 std:assert_eq (str v) (str $[3,1,2]);
 ```
 
-#### <a name="3157-isvec-value"></a>3.15.7 - is\_vec _value_
+#### <a name="3157-stdadduniq-vector-map-or-string-item"></a>3.15.7 - std:add\_uniq _vector-map-or-string_ _item_
+
+Adds the _item_ to the collection _vector-map-or-string_ (byte vectors work too),
+if the item is not already present (determined using the `==` operator, and in maps using
+the string representation of _item_ as key).
+
+```wlambda
+!v = $[:a, 10];
+
+std:add_uniq v :b;
+std:add_uniq v 12;
+
+std:assert_eq (str v) (str $[:a, 10, :b, 12]);
+```
+
+#### <a name="3158-isvec-value"></a>3.15.8 - is\_vec _value_
 
 Returns `$true` if _value_ is a vector.
 
@@ -4517,7 +4533,7 @@ std:assert ~ not ~ is_vec $f(1,2);
 std:assert ~ not ~ is_vec ${a = 10};
 ```
 
-#### <a name="3158-vector-splicing"></a>3.15.8 - Vector Splicing
+#### <a name="3159-vector-splicing"></a>3.15.9 - Vector Splicing
 
 You can splice vectors directly into their literal form with the `$[..., * vec_expr, ...]`
 syntax. Here is an example:
@@ -4537,7 +4553,7 @@ std:assert_eq some_vec.(1 + 1) 3;
 std:assert_eq (str $[1,2,*$[3,4]]) "$[1,2,3,4]";
 ```
 
-#### <a name="3159-stdappend-vec-a-value-or-vec-"></a>3.15.9 - std:append _vec-a_ _value-or-vec_ ...
+#### <a name="31510-stdappend-vec-a-value-or-vec-"></a>3.15.10 - std:append _vec-a_ _value-or-vec_ ...
 
 Appends _value-or-vec_ and all following items to _vec-a_.
 If _value-or-vec_ is a vector, all its items will be appended to _vec-a_.
@@ -4556,7 +4572,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) "$[1,:a,:b,:c,:d]";
 ```
 
-#### <a name="31510-stdprepend-vec-a-value-or-vec-"></a>3.15.10 - std:prepend _vec-a_ _value-or-vec_ ...
+#### <a name="31511-stdprepend-vec-a-value-or-vec-"></a>3.15.11 - std:prepend _vec-a_ _value-or-vec_ ...
 
 Prepends _value-or-vec_ and all following items to the front of _vec-a_.
 If _value-or-vec_ is a vector, all its items will be prepended to _vec-a_.
@@ -4575,7 +4591,7 @@ If _vec-a_ is not a vector, a vector containing it will be created:
 std:assert_eq (str v) (str $[:d, :c, :b, :a, 1]);
 ```
 
-#### <a name="31511-stdtake-count-vector"></a>3.15.11 - std:take _count_ _vector_
+#### <a name="31512-stdtake-count-vector"></a>3.15.12 - std:take _count_ _vector_
 
 Takes and returns the first _count_ elements of _vector_. Does not
 mutate _vector_.
@@ -4589,7 +4605,7 @@ std:assert_eq (str v) "$[1,2,3,4,5,6]";
 std:assert_eq (str t) "$[1,2,3,4]";
 ```
 
-#### <a name="31512-stddrop-count-vector"></a>3.15.12 - std:drop _count_ _vector_
+#### <a name="31513-stddrop-count-vector"></a>3.15.13 - std:drop _count_ _vector_
 
 Drops _count_ elements from _vector_ and returns them as new vector.
 Does not mutate _vector_.
@@ -11997,6 +12013,18 @@ pub fn std_symbol_table() -> SymbolTable {
         },
         Some(3),
         Some(3),
+        false
+    );
+
+    func!(
+        st,
+        "add_uniq",
+        |env: &mut Env, _argc: usize| {
+            let v = env.arg(0);
+            Ok(v.add(&[env.arg(1)], CollectionAdd::Uniq))
+        },
+        Some(2),
+        Some(2),
         false
     );
 
