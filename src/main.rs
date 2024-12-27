@@ -7,6 +7,7 @@ use wlambda::vval::{StackAction, VVal};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[allow(unused)]
 const DOCUMENTATION_JSON: &str = include_str!("cmdline_doc.json");
 
 struct DocSection {

@@ -629,6 +629,7 @@ without any additional terms or conditions.
 
 */
 
+#[cfg(feature = "serde_json")]
 pub mod chemistry;
 pub mod compiler;
 pub mod formatter;

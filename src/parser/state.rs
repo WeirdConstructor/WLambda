@@ -7,6 +7,65 @@ use crate::vval::Syntax;
 use crate::vval::VVal;
 use std::fmt;
 
+/// This structure is used to track which parts of the input text correspond to a
+/// specific syntactical feature. It is setup by the parser.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SourceAnnotation {
+    /// The `id` is the index in the parse state table. It can be used to refer to this
+    /// specific annotation.
+    #[allow(unused)]
+    id: usize,
+    /// The syntax associated with this annotation.
+    #[allow(unused)]
+    syn: Syntax,
+    /// If the annotation marks a token that starts an area corresponding to `syn`.
+    is_area_start: bool,
+    /// If the annotation marks a token that ends an area corresponding to `syn`.
+    is_area_end: bool,
+    /// The AST node corresponding to this annotation.
+    ast_node: VVal,
+    /// Start index in the corresponding input string.
+    ch_ptr_start: usize,
+    /// The syntactic position at the start of the annotation
+    pos_start: SynPos,
+    /// End index in the corresponding input string.
+    ch_ptr_end: usize,
+    /// The syntactic position at the end of the annotation
+    pos_end: SynPos,
+    /// Vector of other SourceAnnotation IDs, which are a child of this one.
+    childs: Option<Vec<usize>>,
+}
+
+impl SourceAnnotation {
+    pub fn new(id: usize, ch_ptr: usize, syn: Syntax, pos: SynPos) -> Self {
+        return SourceAnnotation {
+            id,
+            syn,
+            pos_start: pos.clone(),
+            pos_end: pos,
+            ast_node: VVal::None,
+            ch_ptr_start: ch_ptr,
+            ch_ptr_end: ch_ptr,
+            is_area_start: false,
+            is_area_end: false,
+            childs: None,
+        };
+    }
+
+    pub fn append_child_id(&mut self, id: usize) {
+        if self.childs.is_none() {
+            self.childs = Some(Vec::new());
+        }
+        if let Some(childs) = self.childs.as_mut() {
+            childs.push(id);
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.ch_ptr_end - self.ch_ptr_start
+    }
+}
+
 /// This is the parser state data structure. It holds the to be read source
 /// code and keeps track of the parser head position.
 ///
@@ -21,9 +80,12 @@ use std::fmt;
 /// // ...
 /// ```
 #[allow(dead_code)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct State {
     input: Vec<char>,
     ch_ptr: usize,
+    /// Records the last known pointer to a non whitespace or comment character
+    last_non_wsc_ch_ptr: usize,
     line_no: u32,
     col_no: u32,
     indent: Option<u32>,
@@ -31,6 +93,39 @@ pub struct State {
     last_tok_char: char,
     file: FileRef,
     ident_mode: IdentMode,
+    annotations: Vec<SourceAnnotation>,
+    annotation_stack: Vec<usize>,
+    last_syn: VVal,
+}
+
+pub fn annotate_node<T, E>(ps: &mut State, syn: Syntax, f: T) -> Result<VVal, E>
+where
+    T: Fn(&mut State) -> Result<VVal, E>,
+{
+    let ann_id = ps.annot(syn);
+    ps.annotation_stack.push(ann_id);
+    ps.last_syn = ps.syn(syn);
+    let res = f(ps);
+    ps.annotation_stack.pop();
+    if let Ok(node) = res {
+        ps.annot_end(ann_id, node.clone());
+        return Ok(node);
+    } else {
+        return res;
+    }
+}
+
+pub fn annotate<T, R>(ps: &mut State, syn: Syntax, f: T) -> R
+where
+    T: Fn(&mut State) -> R,
+{
+    let ann_id = ps.annot(syn);
+    ps.annotation_stack.push(ann_id);
+    ps.last_syn = ps.syn(syn);
+    let res = f(ps);
+    ps.annotation_stack.pop();
+    ps.annot_end(ann_id, VVal::None);
+    return res;
 }
 
 /// This is a special mode for selector parsing.
@@ -215,6 +310,9 @@ impl<'a, 'b> PartialEq<&'a str> for StrPart<'a> {
 
 #[allow(clippy::inherent_to_string)]
 impl<'a> StrPart<'a> {
+    pub fn to_string_no_nl(&self) -> String {
+        self.slice.iter().map(|c| if *c == '\n' || *c == '\r' { ' ' } else { *c }).collect()
+    }
     pub fn to_string(&self) -> String {
         self.slice.iter().collect()
     }
@@ -241,6 +339,13 @@ impl State {
         }
     }
 
+    /// Returns the last/most recent AST syntax node, that was implicitly created by
+    /// operations such as `State::annotate`, `State::annotate_node`, `State::consume_token`
+    /// or `State::consume_token_wsc`.
+    pub fn last_syn(&self) -> VVal {
+        self.last_syn.clone()
+    }
+
     /// Creates a `SynPos` annotated with the current parse head position.
     pub fn syn_pos(&self, s: Syntax) -> SynPos {
         SynPos::new(s, self.line_no, self.col_no, self.file.clone())
@@ -256,6 +361,59 @@ impl State {
         let vec = VVal::vec();
         vec.push(self.syn_raw(s));
         vec
+    }
+
+    /// Creates an annotation node for the `SourceAnnotation` that annotate the input text for
+    /// later syntactical operations on source code and individual character level.
+    ///
+    /// Please also look at the helper function called `annotate`.
+    fn annot(&mut self, syn: Syntax) -> usize {
+        let id = self.annotations.len();
+        self.annotations.push(SourceAnnotation::new(id, self.ch_ptr, syn, self.syn_pos(syn)));
+        return id;
+    }
+
+    pub fn with_new_annotation<T, R>(&mut self, syn: Syntax, f: T) -> R
+    where
+        T: Fn(&mut Self, &mut SourceAnnotation) -> R,
+    {
+        let id = self.annot(syn);
+        let mut elem = self.annotations.get(id).unwrap().clone();
+        let res = f(self, &mut elem);
+        self.annotations[id] = elem;
+
+        if let Some(parent_ann_id) = self.annotation_stack.last() {
+            self.annotations[*parent_ann_id].append_child_id(id);
+        }
+
+        res
+    }
+
+    pub fn with_annotation<T, R>(&mut self, id: usize, f: T) -> Option<R>
+    where
+        T: Fn(&mut Self, &mut SourceAnnotation) -> R,
+    {
+        if let Some(elem) = self.annotations.get(id) {
+            let mut e = elem.clone();
+            let res = Some(f(self, &mut e));
+            self.annotations[id] = e;
+            res
+        } else {
+            None
+        }
+    }
+
+    /// Finishes an annotation. Please also look at the helper function called `annotate`.
+    pub fn annot_end(&mut self, id: usize, ast_node: VVal) {
+        if id < self.annotations.len() {
+            self.annotations[id].pos_end = self.syn_pos(self.annotations[id].pos_start.syn);
+            self.annotations[id].ch_ptr_end = self.last_non_wsc_ch_ptr;
+            self.annotations[id].ast_node = ast_node;
+
+            if let Some(parent_ann_id) = self.annotation_stack.last_mut() {
+                self.annotations[*parent_ann_id].append_child_id(id);
+            }
+        }
     }
 
     /// Returns the next character under the parse head.
@@ -441,6 +599,56 @@ impl State {
         did_match_once
     }
 
+    pub fn consume_token(&mut self, expected_char: char, syn: Syntax) -> bool {
+        if self.consume_if_eq(expected_char) {
+            self.with_new_annotation(syn, |ps, ann| {
+                ann.is_area_start = true;
+                ann.ch_ptr_start = ps.ch_ptr - 1;
+                ann.ch_ptr_end = ps.ch_ptr;
+            });
+            self.last_syn = self.syn(syn);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn consume_token_wsc(&mut self, expected_char: char, syn: Syntax) -> bool {
+        let res = self.consume_token(expected_char, syn);
+        self.skip_ws_and_comments();
+        return res;
+    }
+
+    pub fn consume_area_start_token_wsc(&mut self, expected_char: char, syn: Syntax) -> bool {
+        let mut res = false;
+        if self.consume_if_eq(expected_char) {
+            self.with_new_annotation(syn, |ps, ann| {
+                ann.is_area_start = true;
+                ann.ch_ptr_start = ps.ch_ptr - 1;
+                ann.ch_ptr_end = ps.ch_ptr;
+            });
+            self.last_syn = self.syn(syn);
+            res = true;
+        }
+        self.skip_ws_and_comments();
+        res
+    }
+
+    pub fn consume_area_end_token_wsc(&mut self, expected_char: char, syn: Syntax) -> bool {
+        let mut res = false;
+        if self.consume_if_eq(expected_char) {
+            self.with_new_annotation(syn, |ps, ann| {
+                ann.is_area_end = true;
+                ann.ch_ptr_start = ps.ch_ptr - 1;
+                ann.ch_ptr_end = ps.ch_ptr;
+            });
+            self.last_syn = self.syn(syn);
+            res = true;
+        }
+        self.skip_ws_and_comments();
+        res
+    }
+
     /// Consumes the `expected_char` and possibly following
     /// white space and comments following it. Returns true if
     /// `expected_char` was found.
@@ -602,6 +810,7 @@ impl State {
         } else {
             self.indent = None;
             self.last_tok_char = c;
+            self.last_non_wsc_ch_ptr = self.ch_ptr + 1;
         }
 
         self.ch_ptr += 1;
@@ -612,6 +821,12 @@ impl State {
     }
 
     pub fn skip_ws_and_comments(&mut self) {
+        let start_ch_ptr = if self.ch_ptr > self.last_non_wsc_ch_ptr {
+            self.last_non_wsc_ch_ptr
+        } else {
+            self.ch_ptr
+        };
+
         self.skip_ws();
         while let Some(c) = self.peek() {
             if c == '#' {
@@ -624,6 +839,7 @@ impl State {
                 break;
             }
         }
+        self.last_non_wsc_ch_ptr = start_ch_ptr;
     }
 
     /// The constructor for the `parser::State`.
@@ -662,6 +878,7 @@ impl State {
         State {
             input: code.chars().collect(),
             ch_ptr: 0,
+            last_non_wsc_ch_ptr: 0,
             line_no: 1,
             col_no: 1,
             indent: Some(0),
@@ -669,6 +886,9 @@ impl State {
             last_tok_char: ' ',
             file: FileRef::new(filename),
             ident_mode: IdentMode::IdentSelector,
+            annotations: Vec::new(),
+            annotation_stack: Vec::new(),
+            last_syn: VVal::None,
         }
     }
 
@@ -693,5 +913,77 @@ impl State {
 
     pub fn collect(&mut self, start: usize, end: usize) -> StrPart {
         self.spart(start, end)
+    }
+
+    pub fn dump_annotation(&self, id: usize, indent: Option<u32>) -> String {
+        let an = if let Some(an) = self.annotations.get(id).clone() {
+            an
+        } else {
+            return String::from("");
+        };
+
+        let mut pad = String::from("");
+        let end = if let Some(indent) = indent {
+            for _ in 0..indent {
+                pad.push(' ');
+            }
+            "\n"
+        } else {
+            ""
+        };
+        if let Some(childs) = an.childs.as_ref() {
+            let mut res = format!(
+                "{}<{:?}{}:{}:{}>{}",
+                pad,
+                an.syn,
+                if an.is_area_start {
+                    "S"
+                } else if an.is_area_end {
+                    "E"
+                } else {
+                    ""
+                },
+                an.ch_ptr_start,
+                an.ch_ptr_end,
+                end
+            );
+
+            if indent.is_none() {
+                res += "{";
+            }
+            let mut first = true;
+            for v in childs.iter() {
+                if indent.is_none() && !first {
+                    res += ",";
+                }
+                res += &self.dump_annotation(*v, indent.map(|i| i + 1));
+                first = false;
+            }
+            if indent.is_none() {
+                res += "}";
+            }
+            res
+        } else {
+            format!(
+                "{}<{:?}{}:{}:{}|{}|>{}",
+                pad,
+                an.syn,
+                if an.is_area_start {
+                    "S"
+                } else if an.is_area_end {
+                    "E"
+                } else {
+                    ""
+                },
+                an.ch_ptr_start,
+                an.ch_ptr_end,
+                self.spart(an.ch_ptr_start, an.ch_ptr_end).to_string_no_nl(),
+                end
+            )
+        }
+    }
+
+    pub fn get_annotations(&self) -> Vec<SourceAnnotation> {
+        return self.annotations.clone();
     }
 }

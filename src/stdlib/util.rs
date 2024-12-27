@@ -22,6 +22,8 @@ thread_local! {
     pub static CLIP_CTX: RefCell<ClipboardContext> = RefCell::new(ClipboardContext::new().unwrap());
 }
 
+#[cfg(feature = "toml")]
+#[cfg(feature = "clap")]
 #[derive(Clone)]
 enum ClapCmdArg {
     Bool(String, bool, bool),
@@ -30,6 +32,8 @@ enum ClapCmdArg {
     Subcmd(String, Vec<ClapCmdArg>),
 }
 
+#[cfg(feature = "toml")]
+#[cfg(feature = "clap")]
 impl ClapCmdArg {
     #[allow(unused)]
     fn set_id(&self, id: String) -> Self {
@@ -89,6 +93,8 @@ impl ClapCmdArg {
     }
 }
 
+#[cfg(feature = "toml")]
+#[cfg(feature = "clap")]
 fn read_cfg(filepath: &str) -> Result<VVal, StackAction> {
     let exists = match std::path::Path::new(&filepath).try_exists() {
         Ok(bol) => bol,
@@ -125,6 +131,12 @@ fn read_cfg(filepath: &str) -> Result<VVal, StackAction> {
                     filepath, e
                 )));
             } else {
+                #[cfg(not(feature = "toml"))]
+                return Err(StackAction::panic_msg(format!(
+                    "Can't parse toml file. TOML support not compiled in!"
+                )));
+
+                #[cfg(feature = "toml")]
                 match VVal::from_toml(&contents) {
                     Ok(v) => {
                         eprintln!("'{}' found.", filepath);
@@ -544,9 +556,7 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
     st.fun(
         "str:markdown_to_html",
         |env: &mut Env, argc: usize| {
-            env.arg(0).with_s_ref(|s| {
-                Ok(VVal::new_str_mv(markdown::to_html(s)))
-            })
+            env.arg(0).with_s_ref(|s| Ok(VVal::new_str_mv(markdown::to_html(s))))
         },
         Some(1),
         None,

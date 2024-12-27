@@ -20,13 +20,20 @@ to parse in this hand written parser.
 
 use crate::vval::Syntax;
 use crate::vval::VVal;
+use std::cell::RefCell;
 use std::str::FromStr;
 
 pub mod state;
 
 pub use state::State;
 use state::StrPart;
-pub use state::{ParseError, ParseErrorKind, ParseNumberError, ParseValueError};
+pub use state::{
+    annotate, annotate_node, ParseError, ParseErrorKind, ParseNumberError, ParseValueError,
+};
+
+thread_local! {
+    pub static LAST_PARSE_STATE: RefCell<Option<State>> = const { RefCell::new(None) };
+}
 
 /// Helper function for recording characters into a byte buffer.
 fn add_c_to_vec(v: &mut Vec<u8>, c: char) {
@@ -415,117 +422,122 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 #[allow(clippy::collapsible_else_if)]
 #[allow(clippy::cast_lossless)]
 fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
-    if ps.at_end() {
-        return Err(ps.err(ParseErrorKind::EOF("number")));
-    }
+    annotate_node(ps, Syntax::TNum, |ps| {
+        if ps.at_end() {
+            return Err(ps.err(ParseErrorKind::EOF("number")));
+        }
 
-    let c = ps.expect_some(ps.peek())?;
-    let sign = match c {
-        '-' => {
-            ps.consume();
-            if !ps.peek().unwrap_or(' ').is_digit(10) {
-                ps.skip_ws_and_comments();
-                return Ok(make_var(ps, "-"));
+        let c = ps.expect_some(ps.peek())?;
+        let sign = match c {
+            '-' => {
+                ps.consume();
+                if !ps.peek().unwrap_or(' ').is_digit(10) {
+                    ps.skip_ws_and_comments();
+                    return Ok(make_var(ps, "-"));
+                }
+                -1
             }
-            -1
-        }
-        '+' => {
-            ps.consume();
-            if !ps.peek().unwrap_or(' ').is_digit(10) {
-                ps.skip_ws_and_comments();
-                return Ok(make_var(ps, "+"));
+            '+' => {
+                ps.consume();
+                if !ps.peek().unwrap_or(' ').is_digit(10) {
+                    ps.skip_ws_and_comments();
+                    return Ok(make_var(ps, "+"));
+                }
+                1
             }
-            1
-        }
-        _ => 1,
-    };
+            _ => 1,
+        };
 
-    let radix_or_num = ps.take_while(|c| c.is_digit(10)).to_string();
+        let radix_or_num = ps.take_while(|c| c.is_digit(10)).to_string();
 
-    let (radix, num) = if ps.consume_if_eq('r') {
-        let radix = radix_or_num.parse::<u8>().unwrap_or(10);
-        if !(2..=36).contains(&radix) {
-            return Err(ps.err(ParseNumberError::UnsupportedRadix(radix)));
-        }
+        let (radix, num) = if ps.consume_if_eq('r') {
+            let radix = radix_or_num.parse::<u8>().unwrap_or(10);
+            if !(2..=36).contains(&radix) {
+                return Err(ps.err(ParseNumberError::UnsupportedRadix(radix)));
+            }
 
-        (radix, ps.take_while(|c| c.is_digit(radix as u32)).to_string())
-    } else if ps.consume_if_eq('x') {
-        if radix_or_num != "0" {
-            return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('x', radix_or_num)));
-        }
-        (16, ps.take_while(|c| c.is_digit(16)).to_string())
-    } else if ps.consume_if_eq('b') {
-        if radix_or_num != "0" {
-            return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('b', radix_or_num)));
-        }
-        (2, ps.take_while(|c| c.is_digit(2)).to_string())
-    } else if ps.consume_if_eq('o') {
-        if radix_or_num != "0" {
-            return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('o', radix_or_num)));
-        }
-        (8, ps.take_while(|c| c.is_digit(8)).to_string())
-    } else {
-        (10, radix_or_num)
-    };
-
-    let (is_float, fract_num) = if ps.consume_if_eq('.') {
-        let fract_digits = ps.take_while(|c| c.is_digit(radix as u32)).to_string();
-        if let Ok(fract_num) = u64::from_str_radix(&fract_digits, radix as u32) {
-            (true, (fract_num as f64) / (radix as f64).powf(fract_digits.len() as f64))
+            (radix, ps.take_while(|c| c.is_digit(radix as u32)).to_string())
+        } else if ps.consume_if_eq('x') {
+            if radix_or_num != "0" {
+                return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('x', radix_or_num)));
+            }
+            (16, ps.take_while(|c| c.is_digit(16)).to_string())
+        } else if ps.consume_if_eq('b') {
+            if radix_or_num != "0" {
+                return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('b', radix_or_num)));
+            }
+            (2, ps.take_while(|c| c.is_digit(2)).to_string())
+        } else if ps.consume_if_eq('o') {
+            if radix_or_num != "0" {
+                return Err(ps.err(ParseNumberError::UnsupportedRadixPrefix('o', radix_or_num)));
+            }
+            (8, ps.take_while(|c| c.is_digit(8)).to_string())
         } else {
-            return Err(ps.err(ParseNumberError::InvalidFractionalDigits(fract_digits)));
-        }
-    } else {
-        (false, 0.0)
-    };
+            (10, radix_or_num)
+        };
 
-    ps.skip_ws_and_comments();
-
-    match u64::from_str_radix(&num, radix as u32) {
-        Ok(num) => {
-            if is_float {
-                if sign == -1 {
-                    Ok(VVal::Flt(-((num as f64) + fract_num)))
-                } else {
-                    Ok(VVal::Flt((num as f64) + fract_num))
-                }
+        let (is_float, fract_num) = if ps.consume_if_eq('.') {
+            let fract_digits = ps.take_while(|c| c.is_digit(radix as u32)).to_string();
+            if let Ok(fract_num) = u64::from_str_radix(&fract_digits, radix as u32) {
+                (true, (fract_num as f64) / (radix as f64).powf(fract_digits.len() as f64))
             } else {
-                if sign == -1 {
-                    Ok(VVal::Int((num as i64).wrapping_neg()))
+                return Err(ps.err(ParseNumberError::InvalidFractionalDigits(fract_digits)));
+            }
+        } else {
+            (false, 0.0)
+        };
+
+        ps.skip_ws_and_comments();
+
+        match u64::from_str_radix(&num, radix as u32) {
+            Ok(num) => {
+                if is_float {
+                    if sign == -1 {
+                        Ok(VVal::Flt(-((num as f64) + fract_num)))
+                    } else {
+                        Ok(VVal::Flt((num as f64) + fract_num))
+                    }
                 } else {
-                    Ok(VVal::Int(num as i64))
+                    if sign == -1 {
+                        Ok(VVal::Int((num as i64).wrapping_neg()))
+                    } else {
+                        Ok(VVal::Int(num as i64))
+                    }
                 }
             }
+            Err(e) => Err(ps.err(ParseNumberError::InvalidRadix(num, radix, e))),
         }
-        Err(e) => Err(ps.err(ParseNumberError::InvalidRadix(num, radix, e))),
-    }
+    })
 }
 
 fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
-    if !ps.consume_if_eq_wsc('[') {
-        return Err(ps.err(ParseErrorKind::ExpectedToken('[', "list start")));
-    }
+    annotate_node(ps, Syntax::Lst, |ps| {
+        let list = ps.last_syn();
 
-    let list = ps.syn(Syntax::Lst);
-
-    while ps.expect_some(ps.peek())? != ']' {
-        if ps.consume_if_eq_wsc('*') {
-            let r = ps.syn(Syntax::VecSplice);
-            r.push(parse_expr(ps)?);
-            list.push(r);
-        } else {
-            list.push(parse_expr(ps)?);
+        if !ps.consume_area_start_token_wsc('[', Syntax::Lst) {
+            return Err(ps.err(ParseErrorKind::ExpectedToken('[', "list start")));
         }
-        if !ps.consume_if_eq_wsc(',') {
-            break;
+
+        while ps.expect_some(ps.peek())? != ']' {
+            if ps.consume_token('*', Syntax::VecSplice) {
+                let r = ps.last_syn();
+                r.push(parse_expr(ps)?);
+                list.push(r);
+            } else {
+                list.push(parse_expr(ps)?);
+            }
+            if !ps.consume_token_wsc(',', Syntax::TDelim) {
+                break;
+            }
         }
-    }
 
-    if !ps.consume_if_eq_wsc(']') {
-        return Err(ps.err(ParseErrorKind::ExpectedToken(']', "list end")));
-    }
+        if !ps.consume_area_end_token_wsc(']', Syntax::Lst) {
+            return Err(ps.err(ParseErrorKind::ExpectedToken(']', "list end")));
+        }
+        println!("PARSE LSIT: {}", list.s());
 
-    Ok(list)
+        Ok(list)
+    })
 }
 
 fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
@@ -1185,9 +1197,11 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                 return Err(ps.err(ParseNumberError::InvalidIndexDigits(idx)));
             }
         } else if is_ident_start(c) {
-            let id = ps.syn(Syntax::Key);
-            id.push(VVal::new_sym_mv(parse_identifier(ps)?));
-            id
+            annotate(ps, Syntax::Key, |ps| {
+                let id = ps.last_syn();
+                id.push(VVal::new_sym_mv(parse_identifier(ps)?));
+                Ok(id)
+            })?
         } else {
             parse_value(ps)?
         };
@@ -1208,7 +1222,9 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
 
                     let field_set = ps.syn(Syntax::SetKey);
                     if let Some(Syntax::Func) = obj.v_(0).syn() {
-                        return Err(ps.err(ParseErrorKind::BadSetKey("Can't set key on a function!")));
+                        return Err(
+                            ps.err(ParseErrorKind::BadSetKey("Can't set key on a function!"))
+                        );
                     }
                     field_set.push(obj);
                     field_set.push(value);
@@ -1221,7 +1237,9 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                         ps.consume_wsc();
                         let field_set = ps.syn(Syntax::SetKey);
                         if let Some(Syntax::Func) = obj.v_(0).syn() {
-                            return Err(ps.err(ParseErrorKind::BadSetKey("Can't set key on a function!")));
+                            return Err(
+                                ps.err(ParseErrorKind::BadSetKey("Can't set key on a function!"))
+                            );
                         }
                         field_set.push(obj);
                         field_set.push(value);
@@ -1428,7 +1446,7 @@ fn parse_binop(left: Option<VVal>, ps: &mut State, bind_pow: i32) -> Result<VVal
 
         let binop = make_binop(ps, op);
         let op_len = op.len();
-        ps.consume_wsc_n(op_len);
+        annotate(ps, Syntax::TOp, |ps| ps.consume_wsc_n(op_len));
 
         let right = parse_binop(None, ps, r_bp)?;
         left = construct_op(binop, left, right);
@@ -1542,53 +1560,55 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
 }
 
 fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
-    let mut call = parse_call(ps, false)?;
-    if ps.at_end() {
-        return Ok(call);
-    }
+    annotate(ps, Syntax::Expr, |ps| {
+        let mut call = parse_call(ps, false)?;
+        if ps.at_end() {
+            return Ok(call);
+        }
 
-    while let Some(c) = ps.peek() {
-        match c {
-            '|' => {
-                if ps.lookahead("|>") {
-                    ps.consume();
-                    ps.consume_wsc();
-
-                    let call_right = parse_call(ps, false)?;
-
-                    let new_call = make_to_call(ps, call);
-                    new_call.push(call_right);
-                    call = new_call;
-                } else {
-                    let push_front = if ps.lookahead("||") {
+        while let Some(c) = ps.peek() {
+            match c {
+                '|' => {
+                    if ps.lookahead("|>") {
                         ps.consume();
-                        true
+                        ps.consume_wsc();
+
+                        let call_right = parse_call(ps, false)?;
+
+                        let new_call = make_to_call(ps, call);
+                        new_call.push(call_right);
+                        call = new_call;
                     } else {
-                        false
-                    };
-                    ps.consume_wsc();
+                        let push_front = if ps.lookahead("||") {
+                            ps.consume();
+                            true
+                        } else {
+                            false
+                        };
+                        ps.consume_wsc();
 
-                    let mut fn_expr = parse_call(ps, false)?;
-                    if !is_call(&fn_expr) {
-                        fn_expr = make_to_call(ps, fn_expr);
+                        let mut fn_expr = parse_call(ps, false)?;
+                        if !is_call(&fn_expr) {
+                            fn_expr = make_to_call(ps, fn_expr);
+                        }
+
+                        if push_front {
+                            fn_expr.insert_at(2, call);
+                        } else {
+                            fn_expr.push(call);
+                        }
+
+                        call = fn_expr;
                     }
-
-                    if push_front {
-                        fn_expr.insert_at(2, call);
-                    } else {
-                        fn_expr.push(call);
-                    }
-
-                    call = fn_expr;
+                }
+                _ => {
+                    break;
                 }
             }
-            _ => {
-                break;
-            }
         }
-    }
 
-    Ok(call)
+        Ok(call)
+    })
 }
 
 #[allow(clippy::unnecessary_unwrap)]
@@ -1598,97 +1618,95 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
         return Err(ps.err(ParseErrorKind::EOF("assignment")));
     }
 
-    let mut assign = VVal::vec();
-    if is_def {
-        assign.push(ps.syn_raw(Syntax::Def));
-    } else {
-        assign.push(ps.syn_raw(Syntax::Assign));
-    }
+    let syntax = if is_def { Syntax::Def } else { Syntax::Assign };
+    annotate_node(ps, syntax, |ps| {
+        let mut assign = ps.last_syn();
 
-    let mut is_ref = false;
+        let mut is_ref = false;
 
-    if is_def {
-        if ps.consume_if_eq_wsc(':') {
-            let key = parse_identifier(ps)?;
-            if key == "global" {
-                assign = ps.syn(Syntax::DefGlobRef);
-            } else if key == "const" {
-                assign = ps.syn(Syntax::DefConst);
+        if is_def {
+            if ps.consume_if_eq_wsc(':') {
+                let key = annotate(ps, Syntax::TIdent, |ps| parse_identifier(ps))?;
+                if key == "global" {
+                    assign = ps.syn(Syntax::DefGlobRef);
+                } else if key == "const" {
+                    assign = ps.syn(Syntax::DefConst);
+                }
+            }
+        } else {
+            if ps.consume_if_eq_wsc('*') {
+                assign = ps.syn(Syntax::AssignRef);
+                is_ref = true;
             }
         }
-    } else {
-        if ps.consume_if_eq_wsc('*') {
-            assign = ps.syn(Syntax::AssignRef);
-            is_ref = true;
-        }
-    }
 
-    let mut destructuring = false;
-    let ids = VVal::vec();
+        let mut destructuring = false;
+        let ids = VVal::vec();
 
-    match ps.expect_some(ps.peek())? {
-        '(' => {
-            ps.consume_wsc();
-            destructuring = true;
+        match ps.expect_some(ps.peek())? {
+            '(' => {
+                ps.consume_wsc();
+                destructuring = true;
 
-            while let Some(c) = ps.peek() {
-                if c == ')' {
-                    break;
+                while let Some(c) = ps.peek() {
+                    if c == ')' {
+                        break;
+                    }
+                    ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
+                    if !ps.consume_if_eq_wsc(',') {
+                        break;
+                    }
                 }
+
+                if ps.at_end() {
+                    return Err(ps.err(ParseErrorKind::EOF("destructuring assignment")));
+                }
+
+                if !ps.consume_if_eq_wsc(')') {
+                    return Err(
+                        ps.err(ParseErrorKind::ExpectedToken(')', "destructuring assignment end"))
+                    );
+                }
+            }
+            _ => {
                 ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
-                if !ps.consume_if_eq_wsc(',') {
-                    break;
-                }
-            }
-
-            if ps.at_end() {
-                return Err(ps.err(ParseErrorKind::EOF("destructuring assignment")));
-            }
-
-            if !ps.consume_if_eq_wsc(')') {
-                return Err(
-                    ps.err(ParseErrorKind::ExpectedToken(')', "destructuring assignment end"))
-                );
             }
         }
-        _ => {
-            ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
-        }
-    }
 
-    let op = ps.peek_op_ws_la("=");
-    if !is_def && !destructuring && op.is_some() && ids.len() == 1 {
-        let op = op.unwrap();
-        let op_len = op.len();
-        let binop = make_binop(ps, op);
-        ps.consume_wsc_n(op_len);
-        ps.consume_wsc(); // consume '=' too!
+        let op = ps.peek_op_ws_la("=");
+        if !is_def && !destructuring && op.is_some() && ids.len() == 1 {
+            let op = op.unwrap();
+            let op_len = op.len();
+            let binop = make_binop(ps, op);
+            ps.consume_wsc_n(op_len);
+            ps.consume_wsc(); // consume '=' too!
 
-        let mut var = ids.at(0).unwrap().with_s_ref(|var_name| make_var(ps, var_name));
+            let mut var = ids.at(0).unwrap().with_s_ref(|var_name| make_var(ps, var_name));
 
-        if is_ref {
-            let r = ps.syn(Syntax::Deref);
-            r.push(var);
-            var = r;
+            if is_ref {
+                let r = ps.syn(Syntax::Deref);
+                r.push(var);
+                var = r;
+            }
+
+            assign.push(ids);
+            assign.push(reform_binop(construct_op(binop, var, parse_expr(ps)?)));
+
+            return Ok(assign);
+        } else if !ps.consume_if_eq_wsc('=') {
+            return Err(ps.err(ParseErrorKind::ExpectedToken('=', "assignment")));
         }
 
         assign.push(ids);
-        assign.push(reform_binop(construct_op(binop, var, parse_expr(ps)?)));
 
-        return Ok(assign);
-    } else if !ps.consume_if_eq_wsc('=') {
-        return Err(ps.err(ParseErrorKind::ExpectedToken('=', "assignment")));
-    }
+        assign.push(parse_expr(ps)?);
 
-    assign.push(ids);
+        if destructuring {
+            assign.push(VVal::Bol(destructuring));
+        }
 
-    assign.push(parse_expr(ps)?);
-
-    if destructuring {
-        assign.push(VVal::Bol(destructuring));
-    }
-
-    Ok(assign)
+        Ok(assign)
+    })
 }
 
 fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
@@ -1756,7 +1774,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
 
 /// Parses an arity definition for a function.
 fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
-    if !ps.consume_if_eq_wsc('|') {
+    if !ps.consume_area_start_token_wsc('|', Syntax::Block) {
         return Err(ps.err(ParseErrorKind::ExpectedToken('|', "arity definition start")));
     }
 
@@ -1791,7 +1809,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
         arity
     };
 
-    if !ps.consume_if_eq_wsc('|') {
+    if !ps.consume_area_end_token_wsc('|', Syntax::Block) {
         return Err(ps.err(ParseErrorKind::ExpectedToken('|', "arity definition end")));
     }
 
@@ -1828,53 +1846,55 @@ pub fn parse_block(
     delimited: bool,
     end_delim: bool,
 ) -> Result<VVal, ParseError> {
-    if delimited {
-        if !ps.consume_if_eq_wsc('{') {
-            return Err(ps.err(ParseErrorKind::ExpectedToken('{', "block start")));
-        }
-    }
+    annotate_node(ps, Syntax::Block, |ps| {
+        let block = ps.last_syn();
 
-    let block = ps.syn(Syntax::Block);
-
-    if with_arity && ps.lookahead("|") {
-        block.push(parse_arity(ps)?);
-    } else if with_arity {
-        block.push(VVal::None);
-    }
-
-    while let Some(c) = ps.peek() {
-        if end_delim {
-            if c == '}' {
-                break;
+        if delimited {
+            if !ps.consume_area_start_token_wsc('{', Syntax::Block) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('{', "block start")));
             }
         }
 
-        let next_stmt = parse_stmt(ps)?;
-        block.push(next_stmt);
+        if with_arity && ps.lookahead("|") {
+            block.push(parse_arity(ps)?);
+        } else if with_arity {
+            block.push(VVal::None);
+        }
 
-        while ps.consume_if_eq_wsc(';') {
-            while ps.consume_if_eq_wsc(';') {}
-            if ps.at_end() || (end_delim && ps.peek().unwrap_or(' ') == '}') {
-                if delimited {
-                    ps.consume_if_eq_wsc('}');
+        while let Some(c) = ps.peek() {
+            if end_delim {
+                if c == '}' {
+                    break;
                 }
-                return Ok(block);
             }
+
             let next_stmt = parse_stmt(ps)?;
             block.push(next_stmt);
-        }
-    }
 
-    if delimited {
-        if ps.at_end() {
-            return Err(ps.err(ParseErrorKind::EOF("parsing block")));
+            while ps.consume_if_eq_wsc(';') {
+                while ps.consume_if_eq_wsc(';') {}
+                if ps.at_end() || (end_delim && ps.peek().unwrap_or(' ') == '}') {
+                    if delimited {
+                        ps.consume_if_eq_wsc('}');
+                    }
+                    return Ok(block);
+                }
+                let next_stmt = parse_stmt(ps)?;
+                block.push(next_stmt);
+            }
         }
-        if !ps.consume_if_eq_wsc('}') {
-            return Err(ps.err(ParseErrorKind::ExpectedToken('}', "block end")));
-        }
-    }
 
-    Ok(block)
+        if delimited {
+            if ps.at_end() {
+                return Err(ps.err(ParseErrorKind::EOF("parsing block")));
+            }
+            if !ps.consume_area_end_token_wsc('}', Syntax::Block) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('}', "block end")));
+            }
+        }
+
+        Ok(block)
+    })
 }
 
 /// Facade function for an undelimited `parse_block`.
@@ -1889,7 +1909,13 @@ pub fn parse_block(
 /// ```
 pub fn parse(s: &str, filename: &str) -> Result<VVal, String> {
     let mut ps = State::new(s, filename);
-    parse_block(&mut ps, false, false, true).map_err(|e| format!("{}", e))
+    let res = parse_block(&mut ps, false, false, true).map_err(|e| format!("{}", e));
+    LAST_PARSE_STATE.set(Some(ps));
+    res
+}
+
+pub fn get_last_parse_state() -> Option<State> {
+    LAST_PARSE_STATE.with_borrow(|ps| ps.clone())
 }
 
 #[cfg(test)]
@@ -1898,18 +1924,22 @@ mod tests {
 
     fn parse(s: &str) -> String {
         let mut ps = State::new(s, "<parser_test>");
-        match parse_block(&mut ps, false, false, true) {
+        let res = match parse_block(&mut ps, false, false, true) {
             Ok(v) => v.s(),
             Err(e) => panic!("Parse error: {}", e),
-        }
+        };
+        LAST_PARSE_STATE.set(Some(ps));
+        res
     }
 
     fn parse_error(s: &str) -> String {
         let mut ps = State::new(s, "<parser_test>");
-        match parse_block(&mut ps, false, false, true) {
+        let res = match parse_block(&mut ps, false, false, true) {
             Ok(v) => panic!("Expected error but got result: {} for input '{}'", v.s(), s),
             Err(e) => format!("Parse error: {}", e),
-        }
+        };
+        LAST_PARSE_STATE.set(Some(ps));
+        res
     }
 
     #[test]
@@ -2484,5 +2514,15 @@ mod tests {
         assert_eq!(parse("'\\u{FF}'"), "$[$%:Block,\'ÿ\']");
         assert_eq!(parse("$b'\\u{3132}'"), "$[$%:Block,$b\'?\']");
         assert_eq!(parse("$b'\\u{FF}'"), "$[$%:Block,$b\'\\xFF\']");
+    }
+
+    #[test]
+    fn check_annotations() {
+        let r = parse("$[1230 +\n 120,\n# test 123\n     50]\n");
+        let ps = get_last_parse_state().unwrap();
+        println!("{}", ps.dump_annotation(0, Some(1)));
+        assert_eq!(r, "$[$%:Block,$[$%:Lst,$[$%:BinOpAdd,1230,120]]]");
+        assert_eq!(ps.dump_annotation(0, None),
+            "<Block:0:17>{<Expr:0:17>{<Lst:1:17>{<LstS:1:2|[|>,<Expr:2:13>{<TNum:2:6|1230|>,<TOp:7:8|+|>,<TNum:10:13|120|>},<TDelimS:13:14|,|>,<Expr:14:16>{<TNum:14:16|50|>},<LstE:16:17|]|>}}}");
     }
 }

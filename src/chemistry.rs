@@ -163,7 +163,7 @@ fn load_elems() {
     match Decoder::new(BitOrder::Msb, 8).decode(elems_data_packed) {
         Ok(data) => {
             let s = String::from_utf8(data).unwrap();
-            let chemical_data_tree = VVal::from_json(&s).expect("No malformed json compiled in!");
+            let chemical_data_tree = VVal::from_json(&s).expect("No! Malformed json compiled in!");
             let mut elems_vec = vec![];
 
             chemical_data_tree.with_iter(|iter| {

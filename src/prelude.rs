@@ -15726,6 +15726,7 @@ pub fn std_symbol_table() -> SymbolTable {
         false
     );
 
+    #[cfg(feature = "serde_json")]
     func!(
         st,
         "chem:data",
@@ -15735,6 +15736,7 @@ pub fn std_symbol_table() -> SymbolTable {
         false
     );
 
+    #[cfg(feature = "serde_json")]
     func!(
         st,
         "chem:parse",
