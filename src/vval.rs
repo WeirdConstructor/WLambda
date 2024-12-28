@@ -1872,6 +1872,12 @@ pub enum Type {
     Bool,
     None,
     String,
+    Bytes,
+    Sym,
+    Char,
+    Syntax,
+    Type,
+    Userdata,
     Number,
     Integer,
     Float,
@@ -1884,7 +1890,8 @@ pub enum Type {
     List(Rc<Type>),
     Map(Rc<Type>),
     Record(Rc<TypeRecord>),
-    Function(Rc<Type>, Rc<Vec<Rc<Type>>>),
+    Union(Rc<Vec<Rc<Type>>>),
+    Function(Rc<Type>, Rc<Vec<(Rc<Type>, bool)>>),
     Name(Rc<String>),
     Var(Rc<String>),
 }
@@ -1896,6 +1903,12 @@ impl Type {
             Type::Bool => "bool".to_string(),
             Type::None => "none".to_string(),
             Type::String => "string".to_string(),
+            Type::Bytes => "bytes".to_string(),
+            Type::Sym => "symbol".to_string(),
+            Type::Char => "char".to_string(),
+            Type::Syntax => "syntax".to_string(),
+            Type::Type => "type".to_string(),
+            Type::Userdata => "userdata".to_string(),
             Type::Number => "number".to_string(),
             Type::Integer => "integer".to_string(),
             Type::Float => "float".to_string(),
@@ -1908,6 +1921,18 @@ impl Type {
             Type::List(t) => format!("[{}]", t.s()),
             Type::Map(t) => format!("{{{}}}", t.s()),
             Type::Record(record) => format!("record {}", record.s()),
+            Type::Union(types) => {
+                let mut res = String::from("");
+                let mut first = true;
+                for t in types.iter() {
+                    if !first {
+                        res += " | ";
+                    }
+                    res += &t.s();
+                    first = false;
+                }
+                res
+            }
             Type::Function(ret, types) => format!("({:?}) -> {}", *types, ret.s()),
             Type::Name(name) => format!("{}", *name),
             Type::Var(name) => format!("<{}>", *name),
@@ -1920,6 +1945,12 @@ impl Type {
             Type::Bool => return TypeResolve::Resolved,
             Type::None => return TypeResolve::Resolved,
             Type::String => return TypeResolve::Resolved,
+            Type::Bytes => return TypeResolve::Resolved,
+            Type::Sym => return TypeResolve::Resolved,
+            Type::Char => return TypeResolve::Resolved,
+            Type::Syntax => return TypeResolve::Resolved,
+            Type::Type => return TypeResolve::Resolved,
+            Type::Userdata => return TypeResolve::Resolved,
             Type::Number => return TypeResolve::Resolved,
             Type::Integer => return TypeResolve::Resolved,
             Type::Float => return TypeResolve::Resolved,
@@ -1940,10 +1971,21 @@ impl Type {
             Type::List(t) => t.resolve_check(),
             Type::Map(t) => t.resolve_check(),
             Type::Record(record) => record.resolve_check(),
+            Type::Union(types) => {
+                let mut res = TypeResolve::Resolved;
+                for t in types.iter() {
+                    match t.resolve_check() {
+                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+                        TypeResolve::Named => res = TypeResolve::Named,
+                        TypeResolve::Resolved => (),
+                    }
+                }
+                res
+            }
             Type::Function(ret, types) => {
                 let mut res = ret.resolve_check();
                 for t in types.iter() {
-                    match t.resolve_check() {
+                    match t.0.resolve_check() {
                         TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
                         TypeResolve::Named => res = TypeResolve::Named,
                         TypeResolve::Resolved => (),

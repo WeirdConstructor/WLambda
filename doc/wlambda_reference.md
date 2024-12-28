@@ -9998,6 +9998,9 @@ In the following grammar, white space and comments are omitted:
                      and lots of other places as stringy sentinel values
                   *)
                   ;
+    cast          = "as", type, (":", value | "(" expr ")")
+                  | "is", type, (":", value | "(" expr ")")
+                  ;
     value         = number
                   | string_lit
                   | "$", special_value
@@ -10005,10 +10008,10 @@ In the following grammar, white space and comments are omitted:
                   | function
                   | symbol
                   | var
+                  | cast
                   ;
     op            = (* here all operators are listed line by line regarding
                        their precedence, top to bottom *)
-                  | "as" type         (* type conversion *)
                   | "&>" | "&@>"      (* call rhs with lhs operator *)
                   | "<&" | "<@&"      (* call lhs with rhs operator *)
                   | "//" | "/?" | "/$n" | "/$o" | "/$e" (* default value operators *)
@@ -10075,7 +10078,7 @@ In the following grammar, white space and comments are omitted:
                   ;
     type_switch   = "types", ("on" | "off")
                   ;
-    export        = "!", "@export", symbol, [ "=" ], expr
+    export        = "!", "@export", symbol, [ ":", type ], [ "=" ], expr
                   ;
     statement     = "!" definition
                   | "." simple_assign
@@ -10205,6 +10208,7 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | "enum", "{", enumbody, "}"
                   ;
     basetype      = "any" | "bool" | "none" | "string" | "number" | "integer" | "float"
+                  | "bytes" | "symbol" | "char" | "syntax" | "type" | "userdata"
                   | "ref", type
                   | "ref_weak", type
                   | "ref_hidden", type
@@ -10213,6 +10217,7 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | "nvec2", ("integer" | "float")
                   | "nvec3", ("integer" | "float")
                   | "nvec4", ("integer" | "float")
+                  | "iter", type
                   | fun_type
                   | "{", [ type ], "}" (* map type *)
                   | "[", [ type ], "]" (* list type *)
