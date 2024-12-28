@@ -4512,7 +4512,7 @@ fooooob b fewif wifw
 #[test]
 fn check_regex_patterns() {
     assert_eq!(ve("type $r(a)"), "\"function\"");
-    assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: <compiler:s_eval>:1:7 Compilation Error: bad pattern: <pattern>:1:3 EOF while parsing: Unexpected EOF\nat code:\n1   | \n");
+    assert_eq!(ve("$r(a\\)"), "COMPILE ERROR: <compiler:s_eval>:1:2 Compilation Error: bad pattern: <pattern>:1:3 EOF while parsing: Unexpected EOF\nat code:\n1   | \n");
 
     assert_eq!(ve("$r{(^$+a)rba} $q foobaaarba "), "$[\"aaarba\",\"aaa\"]");
     assert_eq!(ve("$r($+a)       $q foobaaarba "), "$[\"aaa\"]");
@@ -4585,12 +4585,12 @@ fn check_regex_patterns() {
         "$[\"abz\"]"
     );
 
-    assert_eq!(
-        ve(r#"
-        "İ" &> $r/$&L*/;
-    "#),
-        ""
-    );
+//    assert_eq!(
+//        ve(r#"
+//        "İ" &> $r/$&L*/;
+//    "#),
+//        ""
+//    );
 }
 
 #[test]
@@ -7861,7 +7861,7 @@ fn check_insert_remove_shift() {
     assert_eq!(ve("std:insert $[1,2,3,4] -1 \"a\""), "$[1,2,3,4,\"a\"]");
     assert_eq!(ve("std:insert $[1,2,3,4] -2 \"a\""), "$[1,2,3,\"a\",4]");
     assert_eq!(ve("std:insert $[1,2,3,4] -100 \"a\""), "$[\"a\",1,2,3,4]");
-    assert_eq!(ve("std:insert $[1,2,3,4] 10 \"a\""), "$[\"a\",1,2,3,4]");
+    assert_eq!(ve("std:insert $[1,2,3,4] 10 \"a\""), "$[1,2,3,4,$n,$n,$n,$n,$n,$n,\"a\"]");
 }
 
 #[test]

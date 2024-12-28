@@ -16,6 +16,7 @@ struct XXX {
     d: f64,
 }
 
+#[allow(unused)]
 enum Val {
     None,
     N(AR1),

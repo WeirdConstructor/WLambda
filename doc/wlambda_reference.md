@@ -10384,7 +10384,7 @@ There are currently the following command line parameters available:
 <file>                                      # Execute the <file>
 ```
 
-### <a name="151-stdappsimplecli-args-name-version-string-description-param-def1-"></a>15.1 - std:app:simple\_cli _args_ _name_ _version-string_ _description_ _param-def1_ ...
+#### <a name="151-stdappsimplecli-args-name-version-string-description-param-def1-"></a>15.1 - std:app:simple\_cli _args_ _name_ _version-string_ _description_ _param-def1_ ...
 
 This function parses the vector _args_ (commonly you can use `@@` when executing the `wlambda` CLI)
 and puts all the options definied by _param-defs_ into a map and returns that.

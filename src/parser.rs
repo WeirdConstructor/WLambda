@@ -80,29 +80,34 @@ where
     }
 
     let quote_char = ps.expect_some(ps.peek())?;
-    ps.consume();
+    annotate(ps, Syntax::TQ, |ps, _new_syn| {
+        ps.consume_area_start_token(quote_char, Syntax::TQ);
 
-    let quote_char = match quote_char {
-        '[' => ']',
-        '(' => ')',
-        '{' => '}',
-        '<' => '>',
-        _ => quote_char,
-    };
+        let quote_char = match quote_char {
+            '[' => ']',
+            '(' => ')',
+            '{' => '}',
+            '<' => '>',
+            _ => quote_char,
+        };
 
-    while ps.peek().unwrap_or(quote_char) != quote_char {
-        let c = ps.expect_some(ps.peek())?;
-        ps.consume();
-        add_char(&mut v, c);
-    }
+        annotate(ps, Syntax::T, |ps, _new_syn| {
+            while ps.peek().unwrap_or(quote_char) != quote_char {
+                let c = ps.expect_some(ps.peek())?;
+                ps.consume();
+                add_char(&mut v, c);
+            }
+            Ok(())
+        })?;
 
-    if !ps.consume_if_eq(quote_char) {
-        return Err(ps.err(ParseErrorKind::ExpectedToken(quote_char, "quote string end")));
-    }
+        if !ps.consume_area_end_token(quote_char, Syntax::TQ) {
+            return Err(ps.err(ParseErrorKind::ExpectedToken(quote_char, "quote string end")));
+        }
 
-    ps.skip_ws_and_comments();
+        ps.skip_ws_and_comments();
 
-    Ok(v)
+        Ok(v)
+    })
 }
 
 enum NVecKind {
@@ -422,7 +427,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 #[allow(clippy::collapsible_else_if)]
 #[allow(clippy::cast_lossless)]
 fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
-    annotate_node(ps, Syntax::TNum, |ps| {
+    annotate_node(ps, Syntax::TNum, |ps, _new_syn| {
         if ps.at_end() {
             return Err(ps.err(ParseErrorKind::EOF("number")));
         }
@@ -511,7 +516,7 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
 }
 
 fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
-    annotate_node(ps, Syntax::Lst, |ps| {
+    annotate_node(ps, Syntax::Lst, |ps, _new_syn| {
         let list = ps.last_syn();
 
         if !ps.consume_area_start_token_wsc('[', Syntax::Lst) {
@@ -590,22 +595,24 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
     let c = ps.expect_some(ps.peek())?;
 
     match c {
-        'r' => {
-            ps.consume();
-            let mode = if ps.consume_if_eq('g') {
-                "g"
-            } else if ps.consume_if_eq('s') {
-                "s"
-            } else {
-                "f"
-            };
+        'r' => annotate_node(ps, Syntax::Pattern, |ps, _new_syn| {
+            let vec = ps.last_syn();
+            let mode = annotate(ps, Syntax::T, |ps, _new_syn| {
+                ps.consume(); // 'r'
+                if ps.consume_if_eq('g') {
+                    "g"
+                } else if ps.consume_if_eq('s') {
+                    "s"
+                } else {
+                    "f"
+                }
+            });
 
             let pattern_source = parse_quoted(ps, String::new(), |s, c| s.push(c))?;
-            let vec = ps.syn(Syntax::Pattern);
             vec.push(VVal::new_str_mv(pattern_source));
             vec.push(VVal::new_str_mv(String::from(mode)));
             Ok(vec)
-        }
+        }),
         'S' => {
             ps.consume();
             let selector_source = parse_quoted(ps, String::new(), |s, c| s.push(c))?;
@@ -1048,18 +1055,18 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
         {
             parse_string_lit(ps)
         }
-        '$' => {
-            ps.consume_wsc();
+        '$' => annotate_node(ps, Syntax::TValue, |ps, _new_syn| {
+            ps.consume_token_wsc('$', Syntax::T);
             parse_special_value(ps)
-        }
-        '(' => {
-            ps.consume_wsc();
+        }),
+        '(' => annotate_node(ps, Syntax::TValue, |ps, _new_syn| {
+            ps.consume_area_start_token_wsc('(', Syntax::TDelim);
             let expr = parse_expr(ps)?;
-            if !ps.consume_if_eq_wsc(')') {
+            if !ps.consume_area_end_token_wsc(')', Syntax::TDelim) {
                 return Err(ps.err(ParseErrorKind::ExpectedToken(')', "sub expression end")));
             }
             Ok(expr)
-        }
+        }),
         '{' => {
             let syn = ps.syn_raw(Syntax::Func);
             let block = parse_block(ps, true, true, true)?;
@@ -1092,7 +1099,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(block)
             }
         }
-        ':' => {
+        ':' => annotate_node(ps, Syntax::Key, |ps, _new_syn| {
             ps.consume_wsc();
             if ps.lookahead("\"") {
                 let s = parse_string(ps, false)?;
@@ -1101,7 +1108,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 let id = parse_identifier(ps)?;
                 Ok(make_sym(ps, &id))
             }
-        }
+        }),
         c if is_ident_start(c) => {
             let id = parse_identifier(ps)?;
             Ok(make_var(ps, &id))
@@ -1197,7 +1204,7 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                 return Err(ps.err(ParseNumberError::InvalidIndexDigits(idx)));
             }
         } else if is_ident_start(c) {
-            annotate(ps, Syntax::Key, |ps| {
+            annotate(ps, Syntax::Key, |ps, _new_syn| {
                 let id = ps.last_syn();
                 id.push(VVal::new_sym_mv(parse_identifier(ps)?));
                 Ok(id)
@@ -1438,6 +1445,7 @@ fn construct_op(binop: VVal, left: VVal, right: VVal) -> VVal {
 fn parse_binop(left: Option<VVal>, ps: &mut State, bind_pow: i32) -> Result<VVal, ParseError> {
     let mut left = if let Some(l) = left { l } else { parse_call(ps, true)? };
 
+    //    let mut had_right_operand = false;
     while let Some(op) = ps.peek_op() {
         let (l_bp, r_bp) = get_op_binding_power(ps, op)?;
         if l_bp < bind_pow {
@@ -1446,121 +1454,139 @@ fn parse_binop(left: Option<VVal>, ps: &mut State, bind_pow: i32) -> Result<VVal
 
         let binop = make_binop(ps, op);
         let op_len = op.len();
-        annotate(ps, Syntax::TOp, |ps| ps.consume_wsc_n(op_len));
+        annotate(ps, Syntax::TOp, |ps, _new_syn| ps.consume_wsc_n(op_len));
 
         let right = parse_binop(None, ps, r_bp)?;
+        //        had_right_operand = true;
         left = construct_op(binop, left, right);
     }
+
+    //    if !had_right_operand {
+    //        *new_syn = Some(Syntax::TNone);
+    //    }
 
     Ok(left)
 }
 
 fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
-    //println!("parse_expr [{}] np={}", ps.rest(), no_pipe);
-    let call_indent = ps.indent_pos();
-    //d// println!("CALL INDENT: {:?} @'{}'", call_indent, ps.rest());
-    let mut value = parse_value(ps)?;
+    let fun = |ps: &mut State, new_syn: &mut Option<Syntax>| {
+        //println!("parse_expr [{}] np={}", ps.rest(), no_pipe);
+        let call_indent = ps.indent_pos();
+        //d// println!("CALL INDENT: {:?} @'{}'", call_indent, ps.rest());
+        let mut value = parse_value(ps)?;
 
-    // look ahead, if we see an expression delimiter.
-    // because then, this is not going to be a call!
-    // Also exception to parse_expr, we are excluding the '|'.
-    if ps.lookahead_one_of(";),]}|") || ps.at_end() {
-        return Ok(value);
-    }
+        // look ahead, if we see an expression delimiter.
+        // because then, this is not going to be a call!
+        // Also: Exception to parse_expr, we are excluding the '|'.
+        if ps.lookahead_one_of(";),]}|") || ps.at_end() {
+            *new_syn = Some(Syntax::TNone);
+            return Ok(value);
+        }
 
-    let mut res_call = VVal::None;
+        let mut res_call = VVal::None;
 
-    while let Some(c) = ps.peek() {
-        let op = ps.peek_op();
+        while let Some(c) = ps.peek() {
+            let op = ps.peek_op();
 
-        match c {
-            '[' => {
-                let mut call = make_to_call(ps, value);
-                match parse_arg_list(&mut call, ps) {
-                    Ok(_) => {
-                        value = call;
+            match c {
+                '[' => {
+                    value = {
+                        let mut call = make_to_call(ps, value);
+                        match parse_arg_list(&mut call, ps) {
+                            Ok(_) => call,
+                            Err(err) => return Err(err),
+                        }
+                    };
+                }
+                '.' => {
+                    value = parse_field_access(value, ps)?;
+                }
+                '~' => {
+                    if binop_mode {
+                        break;
                     }
-                    Err(err) => return Err(err),
+
+                    ps.consume_wsc();
+                    if let VVal::None = res_call {
+                        res_call = make_to_call(ps, value);
+                    } else {
+                        res_call.push(value);
+                    }
+                    res_call.push(parse_expr(ps)?);
+                    // We don't set value here, because it will not be
+                    // used by '(' or '.' cases anymore!
+                    // Those will be covered by parse_expr() presumably.
+                    return Ok(res_call);
                 }
-            }
-            '.' => {
-                value = parse_field_access(value, ps)?;
-            }
-            '~' => {
-                if binop_mode {
+                ';' | ')' | ',' | ']' | '|' | '}' => {
                     break;
                 }
+                _ if op.is_some() => {
+                    if binop_mode {
+                        break;
+                    }
 
-                ps.consume_wsc();
-                if let VVal::None = res_call {
-                    res_call = make_to_call(ps, value);
-                } else {
-                    res_call.push(value);
+                    //                let op        = op.unwrap();
+                    //                let binop     = make_binop(ps, op);
+                    //                let (_, r_bp) = get_op_binding_power(op);
+                    //
+                    //                let op_len = op.len();
+                    //                ps.consume_wsc_n(op_len);
+
+                    // TODO: Need to fix the pratt parser to properly handle
+                    //       the binding power of the first op here.
+                    //       There is missing a loop here.
+                    // https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
+                    *new_syn = Some(Syntax::TBinOp);
+                    value = reform_binop(parse_binop(Some(value), ps, 0)?);
                 }
-                res_call.push(parse_expr(ps)?);
-                // We don't set value here, because it will not be
-                // used by '(' or '.' cases anymore!
-                // Those will be covered by parse_expr() presumably.
-                return Ok(res_call);
-            }
-            ';' | ')' | ',' | ']' | '|' | '}' => {
-                break;
-            }
-            _ if op.is_some() => {
-                if binop_mode {
+                '=' => {
                     break;
+                } // '=' from parsing map keys
+                _ => {
+                    if binop_mode {
+                        break;
+                    }
+
+                    value = {
+                        if let VVal::None = res_call {
+                            res_call = make_to_call(ps, value);
+                        } else {
+                            res_call.push(value);
+                        }
+
+                        //d// println!("INDENT: {:?} VS {:?} '{}'", ps.indent_pos(), call_indent, ps.rest());
+                        if !ps.indent_pos().belongs_to(&call_indent) {
+                            return Err(ps.err(ParseErrorKind::BadIndent(
+                            "Call argument does not belong to call, it needs a higher indentation.",
+                        )));
+                        }
+
+                        parse_value(ps)?
+                    };
                 }
-
-                //                let op        = op.unwrap();
-                //                let binop     = make_binop(ps, op);
-                //                let (_, r_bp) = get_op_binding_power(op);
-                //
-                //                let op_len = op.len();
-                //                ps.consume_wsc_n(op_len);
-
-                // TODO: Need to fix the pratt parser to properly handle
-                //       the binding power of the first op here.
-                //       There is missing a loop here.
-                // https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
-                value = reform_binop(parse_binop(Some(value), ps, 0)?);
-            }
-            '=' => {
-                break;
-            } // '=' from parsing map keys
-            _ => {
-                if binop_mode {
-                    break;
-                }
-
-                if let VVal::None = res_call {
-                    res_call = make_to_call(ps, value);
-                } else {
-                    res_call.push(value);
-                }
-
-                //d// println!("INDENT: {:?} VS {:?} '{}'", ps.indent_pos(), call_indent, ps.rest());
-                if !ps.indent_pos().belongs_to(&call_indent) {
-                    return Err(ps.err(ParseErrorKind::BadIndent(
-                        "Call argument does not belong to call, it needs a higher indentation.",
-                    )));
-                }
-
-                value = parse_value(ps)?;
             }
         }
-    }
 
-    if let VVal::None = res_call {
-        res_call = value;
+        if let VVal::None = res_call {
+            res_call = value;
+        } else {
+            res_call.push(value);
+        }
+
+        Ok(res_call)
+    };
+
+    if binop_mode {
+        let mut x = None;
+        fun(ps, &mut x)
     } else {
-        res_call.push(value);
+        annotate(ps, Syntax::Call, fun)
     }
-
-    Ok(res_call)
 }
 
 fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
-    annotate(ps, Syntax::Expr, |ps| {
+    annotate(ps, Syntax::Expr, |ps, _new_syn| {
         let mut call = parse_call(ps, false)?;
         if ps.at_end() {
             return Ok(call);
@@ -1619,14 +1645,14 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
     }
 
     let syntax = if is_def { Syntax::Def } else { Syntax::Assign };
-    annotate_node(ps, syntax, |ps| {
+    annotate_node(ps, syntax, |ps, _new_syn| {
         let mut assign = ps.last_syn();
 
         let mut is_ref = false;
 
         if is_def {
             if ps.consume_if_eq_wsc(':') {
-                let key = annotate(ps, Syntax::TIdent, |ps| parse_identifier(ps))?;
+                let key = annotate(ps, Syntax::TIdent, |ps, _new_syn| parse_identifier(ps))?;
                 if key == "global" {
                     assign = ps.syn(Syntax::DefGlobRef);
                 } else if key == "const" {
@@ -1846,7 +1872,7 @@ pub fn parse_block(
     delimited: bool,
     end_delim: bool,
 ) -> Result<VVal, ParseError> {
-    annotate_node(ps, Syntax::Block, |ps| {
+    annotate_node(ps, Syntax::Block, |ps, _new_syn| {
         let block = ps.last_syn();
 
         if delimited {
@@ -1909,7 +1935,9 @@ pub fn parse_block(
 /// ```
 pub fn parse(s: &str, filename: &str) -> Result<VVal, String> {
     let mut ps = State::new(s, filename);
-    let res = parse_block(&mut ps, false, false, true).map_err(|e| format!("{}", e));
+    let res = annotate(&mut ps, Syntax::TRoot, |ps, _new_syn| {
+        parse_block(ps, false, false, true).map_err(|e| format!("{}", e))
+    });
     LAST_PARSE_STATE.set(Some(ps));
     res
 }
@@ -1924,20 +1952,24 @@ mod tests {
 
     fn parse(s: &str) -> String {
         let mut ps = State::new(s, "<parser_test>");
-        let res = match parse_block(&mut ps, false, false, true) {
-            Ok(v) => v.s(),
-            Err(e) => panic!("Parse error: {}", e),
-        };
+        let res = annotate(&mut ps, Syntax::TRoot, |ps, _new_syn| {
+            match parse_block(ps, false, false, true) {
+                Ok(v) => v.s(),
+                Err(e) => panic!("Parse error: {}", e),
+            }
+        });
         LAST_PARSE_STATE.set(Some(ps));
         res
     }
 
     fn parse_error(s: &str) -> String {
         let mut ps = State::new(s, "<parser_test>");
-        let res = match parse_block(&mut ps, false, false, true) {
-            Ok(v) => panic!("Expected error but got result: {} for input '{}'", v.s(), s),
-            Err(e) => format!("Parse error: {}", e),
-        };
+        let res = annotate(&mut ps, Syntax::TRoot, |ps, _new_syn| {
+            match parse_block(ps, false, false, true) {
+                Ok(v) => panic!("Expected error but got result: {} for input '{}'", v.s(), s),
+                Err(e) => format!("Parse error: {}", e),
+            }
+        });
         LAST_PARSE_STATE.set(Some(ps));
         res
     }
@@ -2518,11 +2550,29 @@ mod tests {
 
     #[test]
     fn check_annotations() {
-        let r = parse("$[1230 +\n 120,\n# test 123\n     50]\n");
+        let r = parse("1 + (2 + 3) * 4 + 5");
+        let ps = get_last_parse_state().unwrap();
+        assert_eq!(
+            r,
+            "$[$%:Block,$[$%:BinOpAdd,$[$%:BinOpAdd,1,$[$%:BinOpMul,$[$%:BinOpAdd,2,3],4]],5]]"
+        );
+        assert_eq!(ps.dump_annotation(0, None),
+            "<TRoot:0:19>{<Block:0:19>{<Expr:0:19>{<TBinOp:0:19>{<TNum:0:1|1|>,<TOp:2:3|+|>,<TValue:4:11>{<TDelimS:4:5|(|>,<Expr:5:10>{<TBinOp:5:10>{<TNum:5:6|2|>,<TOp:7:8|+|>,<TNum:9:10|3|>}},<TDelimE:10:11|)|>},<TOp:12:13|*|>,<TNum:14:15|4|>,<TOp:16:17|+|>,<TNum:18:19|5|>}}}}");
+
+        let r = parse("\nX\n\n;\n$[1230 +\n 120,\n     \t\n  \n# test 123\n     50]\n");
+        let ps = get_last_parse_state().unwrap();
+        println!("{}", ps.dump_annotation(1, Some(1)));
+        assert_eq!(r, "$[$%:Block,$[$%:Var,:X],$[$%:Lst,$[$%:BinOpAdd,1230,120],50]]");
+        assert_eq!(ps.dump_annotation(1, None),
+            "<TRoot:1:50>{<Block:1:50>{<Expr:1:2>{<TNL:2:2>},<Expr:6:50>{<TValue:6:50>{<T:6:7|$|>,<Lst:7:50>{<LstS:7:8|[|>,<Expr:8:19>{<TBinOp:8:19>{<TNum:8:12|1230|>,<TOp:13:14|+|>,<TNum:16:19|120|>}},<TDelim:19:20|,|>,<TNL:20:20>,<TNL:27:27>,<TComment:31:41|# test 123|>,<Expr:47:49>{<TNum:47:49|50|>},<LstE:49:50|]|>}}}}}");
+        let r2 = parse("$rg/123 303\\ xooo/ :123");
         let ps = get_last_parse_state().unwrap();
         println!("{}", ps.dump_annotation(0, Some(1)));
-        assert_eq!(r, "$[$%:Block,$[$%:Lst,$[$%:BinOpAdd,1230,120]]]");
+        assert_eq!(
+            r2,
+            "$[$%:Block,$[$%:Call,$[$%:Pattern,\"123 303\\\\ xooo\",\"g\"],$[$%:Key,:123]]]"
+        );
         assert_eq!(ps.dump_annotation(0, None),
-            "<Block:0:17>{<Expr:0:17>{<Lst:1:17>{<LstS:1:2|[|>,<Expr:2:13>{<TNum:2:6|1230|>,<TOp:7:8|+|>,<TNum:10:13|120|>},<TDelimS:13:14|,|>,<Expr:14:16>{<TNum:14:16|50|>},<LstE:16:17|]|>}}}");
+            "<TRoot:0:23>{<Block:0:23>{<Expr:0:23>{<Call:0:23>{<TValue:0:18>{<T:0:1|$|>,<Pattern:1:18>{<T:1:3|rg|>,<TQ:3:18>{<TQS:3:4|/|>,<T:4:17|123 303\\ xooo|>,<TQE:17:18|/|>}}},<Key:19:23|:123|>}}}}");
     }
 }

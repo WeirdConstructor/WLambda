@@ -100,14 +100,20 @@ pub struct State {
 
 pub fn annotate_node<T, E>(ps: &mut State, syn: Syntax, f: T) -> Result<VVal, E>
 where
-    T: Fn(&mut State) -> Result<VVal, E>,
+    T: FnOnce(&mut State, &mut Option<Syntax>) -> Result<VVal, E>,
 {
     let ann_id = ps.annot(syn);
     ps.annotation_stack.push(ann_id);
     ps.last_syn = ps.syn(syn);
-    let res = f(ps);
+    let mut new_syn = None;
+    let res = f(ps, &mut new_syn);
     ps.annotation_stack.pop();
     if let Ok(node) = res {
+        if let Some(new_syn) = new_syn {
+            ps.with_annotation(ann_id, |_ps, ann| {
+                ann.syn = new_syn;
+            });
+        }
         ps.annot_end(ann_id, node.clone());
         return Ok(node);
     } else {
@@ -117,13 +123,19 @@ where
 
 pub fn annotate<T, R>(ps: &mut State, syn: Syntax, f: T) -> R
 where
-    T: Fn(&mut State) -> R,
+    T: FnOnce(&mut State, &mut Option<Syntax>) -> R,
 {
     let ann_id = ps.annot(syn);
     ps.annotation_stack.push(ann_id);
     ps.last_syn = ps.syn(syn);
-    let res = f(ps);
+    let mut new_syn = None;
+    let res = f(ps, &mut new_syn);
     ps.annotation_stack.pop();
+    if let Some(new_syn) = new_syn {
+        ps.with_annotation(ann_id, |_ps, ann| {
+            ann.syn = new_syn;
+        });
+    }
     ps.annot_end(ann_id, VVal::None);
     return res;
 }
@@ -602,7 +614,6 @@ impl State {
     pub fn consume_token(&mut self, expected_char: char, syn: Syntax) -> bool {
         if self.consume_if_eq(expected_char) {
             self.with_new_annotation(syn, |ps, ann| {
-                ann.is_area_start = true;
                 ann.ch_ptr_start = ps.ch_ptr - 1;
                 ann.ch_ptr_end = ps.ch_ptr;
             });
@@ -619,7 +630,7 @@ impl State {
         return res;
     }
 
-    pub fn consume_area_start_token_wsc(&mut self, expected_char: char, syn: Syntax) -> bool {
+    pub fn consume_area_start_token(&mut self, expected_char: char, syn: Syntax) -> bool {
         let mut res = false;
         if self.consume_if_eq(expected_char) {
             self.with_new_annotation(syn, |ps, ann| {
@@ -630,11 +641,10 @@ impl State {
             self.last_syn = self.syn(syn);
             res = true;
         }
-        self.skip_ws_and_comments();
         res
     }
 
-    pub fn consume_area_end_token_wsc(&mut self, expected_char: char, syn: Syntax) -> bool {
+    pub fn consume_area_end_token(&mut self, expected_char: char, syn: Syntax) -> bool {
         let mut res = false;
         if self.consume_if_eq(expected_char) {
             self.with_new_annotation(syn, |ps, ann| {
@@ -645,6 +655,17 @@ impl State {
             self.last_syn = self.syn(syn);
             res = true;
         }
+        res
+    }
+
+    pub fn consume_area_start_token_wsc(&mut self, expected_char: char, syn: Syntax) -> bool {
+        let res = self.consume_area_start_token(expected_char, syn);
+        self.skip_ws_and_comments();
+        res
+    }
+
+    pub fn consume_area_end_token_wsc(&mut self, expected_char: char, syn: Syntax) -> bool {
+        let res = self.consume_area_end_token(expected_char, syn);
         self.skip_ws_and_comments();
         res
     }
@@ -798,6 +819,15 @@ impl State {
         let c = self.peek().unwrap();
         self.col_no = self.col_no.wrapping_add(1);
         if c == '\n' {
+            if self.indent.is_some() {
+                // The previous line was an empty line.
+                let col = (self.col_no - 1) as usize;
+                let nl_ptr = if self.ch_ptr < col { self.ch_ptr } else { self.ch_ptr - col };
+                self.with_new_annotation(Syntax::TNL, |_ps, ann| {
+                    ann.ch_ptr_start = nl_ptr;
+                    ann.ch_ptr_end = nl_ptr;
+                });
+            }
             self.line_no += 1;
             self.indent = Some(0);
             self.line_indent = 0;
@@ -830,11 +860,16 @@ impl State {
         self.skip_ws();
         while let Some(c) = self.peek() {
             if c == '#' {
-                self.consume_while(|c| c != '\n');
-                if !self.consume_if_eq('\n') {
+                if annotate(self, Syntax::TComment, |ps, _new_syn| {
+                    ps.consume_while(|c| c != '\n');
+                    if !ps.consume_if_eq('\n') {
+                        return true;
+                    }
+                    ps.skip_ws();
+                    false
+                }) {
                     return;
                 }
-                self.skip_ws();
             } else {
                 break;
             }
@@ -844,7 +879,7 @@ impl State {
 
     /// The constructor for the `parser::State`.
     ///
-    /// If you need to have a parser state for a syntax that
+    /// If you need to have a parser state for a syntax
     /// with different white space and comment rules as WLambda
     /// please use [State::new_verbatim].
     ///
@@ -947,23 +982,36 @@ impl State {
                 an.ch_ptr_end,
                 end
             );
+            let nop_node = if an.syn == Syntax::TNone {
+                res = String::from("");
+                true
+            } else {
+                false
+            };
 
-            if indent.is_none() {
+            if !nop_node && indent.is_none() {
                 res += "{";
             }
             let mut first = true;
             for v in childs.iter() {
-                if indent.is_none() && !first {
-                    res += ",";
+                let app_str = &self
+                    .dump_annotation(*v, if nop_node { indent } else { indent.map(|i| i + 1) });
+                if !app_str.is_empty() {
+                    if indent.is_none() && !first {
+                        res += ",";
+                    }
+                    res += app_str;
+                    first = false;
                 }
-                res += &self.dump_annotation(*v, indent.map(|i| i + 1));
-                first = false;
             }
-            if indent.is_none() {
+            if !nop_node && indent.is_none() {
                 res += "}";
             }
             res
-        } else {
+        } else if an.ch_ptr_start != an.ch_ptr_end {
+            if an.syn == Syntax::TNone {
+                return String::from("");
+            }
             format!(
                 "{}<{:?}{}:{}:{}|{}|>{}",
                 pad,
@@ -978,6 +1026,25 @@ impl State {
                 an.ch_ptr_start,
                 an.ch_ptr_end,
                 self.spart(an.ch_ptr_start, an.ch_ptr_end).to_string_no_nl(),
+                end
+            )
+        } else {
+            if an.syn == Syntax::TNone {
+                return String::from("");
+            }
+            format!(
+                "{}<{:?}{}:{}:{}>{}",
+                pad,
+                an.syn,
+                if an.is_area_start {
+                    "S"
+                } else if an.is_area_end {
+                    "E"
+                } else {
+                    ""
+                },
+                an.ch_ptr_start,
+                an.ch_ptr_end,
                 end
             )
         }
