@@ -10207,16 +10207,15 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
     struct_type   = "record", "{", recordbody, "}"
                   | "enum", "{", enumbody, "}"
                   ;
-    basetype      = "any" | "bool" | "none" | "string" | "number" | "integer" | "float"
-                  | "bytes" | "symbol" | "char" | "syntax" | "type" | "userdata"
+    basetype      = "any" | "bool" | "none" | "str" | "num" | "int" | "float"
+                  | "bytes" | "sym" | "char" | "syntax" | "type" | "userdata"
                   | "ref", type
                   | "ref_weak", type
                   | "ref_hidden", type
                   | "pair", type, ",", type
                   | "optional", type
-                  | "nvec2", ("integer" | "float")
-                  | "nvec3", ("integer" | "float")
-                  | "nvec4", ("integer" | "float")
+                  | "ivec2" | "ivec3" | "ivec4"
+                  | "fvec2" | "fvec3" | "fvec4"
                   | "iter", type
                   | fun_type
                   | "{", [ type ], "}" (* map type *)
