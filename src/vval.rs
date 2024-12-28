@@ -219,6 +219,7 @@ pub enum Syntax {
     Block,
     Err,
     Call,
+    Type,
     Apply,
     And,
     Or,
@@ -312,6 +313,7 @@ impl std::str::FromStr for Syntax {
             "Block" => Ok(Syntax::Block),
             "Err" => Ok(Syntax::Err),
             "Call" => Ok(Syntax::Call),
+            "Type" => Ok(Syntax::Type),
             "Apply" => Ok(Syntax::Apply),
             "And" => Ok(Syntax::And),
             "Or" => Ok(Syntax::Or),
@@ -1815,6 +1817,146 @@ pub enum CollectionAdd {
     Uniq,
 }
 
+/// A type to describe if a type is fully resolved/determined.
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum TypeResolve {
+    UnboundVars, // Contains unbound variable types
+    Named,       // Contains names of unknown types
+    Resolved     // All types are resolved, and no names or variables are present
+}
+
+/// A record type
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeRecord {
+    typedefs: Vec<(String, Rc<Type>)>,
+    fields: Vec<(String, Rc<Type>)>,
+}
+
+impl TypeRecord {
+    fn s(&self) -> String {
+        let mut res = String::from("");
+        for v in self.typedefs.iter() {
+            res += &format!(" type {}: {}", v.0, v.1.s());
+        }
+        for v in self.fields.iter() {
+            res += &format!(" {}: {}", v.0, v.1.s());
+        }
+        res
+    }
+
+    fn resolve_check(&self) -> TypeResolve {
+        let mut res = TypeResolve::Resolved;
+        for v in self.typedefs.iter() {
+            match v.1.resolve_check() {
+                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+                TypeResolve::Named => res = TypeResolve::Named,
+                TypeResolve::Resolved => (),
+            }
+        }
+        for v in self.fields.iter() {
+            match v.1.resolve_check() {
+                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+                TypeResolve::Named => res = TypeResolve::Named,
+                TypeResolve::Resolved => (),
+            }
+        }
+        res
+    }
+}
+
+/// The definition of a type, that can be attached to functions, variables
+/// and values.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+    Any,
+    Bool,
+    None,
+    String,
+    Number,
+    Integer,
+    Float,
+    Opt(Rc<Type>),
+    Err(Rc<Type>),
+    NVec2(Rc<Type>),
+    NVec3(Rc<Type>),
+    NVec4(Rc<Type>),
+    Pair(Rc<Type>, Rc<Type>),
+    List(Rc<Type>),
+    Map(Rc<Type>),
+    Record(Rc<TypeRecord>),
+    Function(Rc<Type>, Rc<Vec<Rc<Type>>>),
+    Name(Rc<String>),
+    Var(Rc<String>),
+}
+
+impl Type {
+    fn s(&self) -> String {
+        match self {
+            Type::Any => "any".to_string(),
+            Type::Bool => "bool".to_string(),
+            Type::None => "none".to_string(),
+            Type::String => "string".to_string(),
+            Type::Number => "number".to_string(),
+            Type::Integer => "integer".to_string(),
+            Type::Float => "float".to_string(),
+            Type::Opt(t) => format!("optional {}", t.s()),
+            Type::Err(t) => format!("error {}", t.s()),
+            Type::NVec2(t) => format!("nvec2 {}", t.s()),
+            Type::NVec3(t) => format!("nvec3 {}", t.s()),
+            Type::NVec4(t) => format!("nvec4 {}", t.s()),
+            Type::Pair(t, t2) => format!("pair {}, {}", t.s(), t2.s()),
+            Type::List(t) => format!("[{}]", t.s()),
+            Type::Map(t) => format!("{{{}}}", t.s()),
+            Type::Record(record) => format!("record {}", record.s()),
+            Type::Function(ret, types) => format!("({:?}) -> {}", *types, ret.s()),
+            Type::Name(name) => format!("{}", *name),
+            Type::Var(name) => format!("<{}>", *name),
+        }
+    }
+
+    fn resolve_check(&self) -> TypeResolve {
+        match self {
+            Type::Any => return TypeResolve::Resolved,
+            Type::Bool => return TypeResolve::Resolved,
+            Type::None => return TypeResolve::Resolved,
+            Type::String => return TypeResolve::Resolved,
+            Type::Number => return TypeResolve::Resolved,
+            Type::Integer => return TypeResolve::Resolved,
+            Type::Float => return TypeResolve::Resolved,
+            Type::Opt(t) => return t.resolve_check(),
+            Type::Err(t) => return t.resolve_check(),
+            Type::NVec2(t) => return t.resolve_check(),
+            Type::NVec3(t) => return t.resolve_check(),
+            Type::NVec4(t) => return t.resolve_check(),
+            Type::Pair(t, t2) => {
+                let mut res = t.resolve_check();
+                match t2.resolve_check() {
+                    TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+                    TypeResolve::Named => res = TypeResolve::Named,
+                    TypeResolve::Resolved => (),
+                }
+                res
+            }
+            Type::List(t) => t.resolve_check(),
+            Type::Map(t) => t.resolve_check(),
+            Type::Record(record) => record.resolve_check(),
+            Type::Function(ret, types) => {
+                let mut res = ret.resolve_check();
+                for t in types.iter() {
+                    match t.resolve_check() {
+                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+                        TypeResolve::Named => res = TypeResolve::Named,
+                        TypeResolve::Resolved => (),
+                    }
+                }
+                res
+            }
+            Type::Name(_name) => TypeResolve::Named,
+            Type::Var(_name) => TypeResolve::UnboundVars,
+        }
+    }
+}
+
 /// The internal distinction between a character and a byte.
 /// They share parts of the lexical represenation and also the
 /// semantic purspose is similar.
@@ -1924,7 +2066,11 @@ pub enum VVal {
     /// A vval that can box some user data which can later be accessed
     /// from inside user supplied Rust functions via std::any::Any.
     Usr(Box<dyn VValUserData>),
+    /// A vval that describes a type from typed WLambda. This is mostly used internally
+    /// by the compiler and type checker, because our AST is basically a VVal structure.
+    Type(Rc<Type>),
 }
+
 impl PartialEq for VVal {
     fn eq(&self, rhs: &Self) -> bool {
         self.eqv(rhs)
@@ -2058,6 +2204,7 @@ impl CycleCheck {
             | VVal::Int(_)
             | VVal::Flt(_)
             | VVal::Chr(_)
+            | VVal::Type(_)
             | VVal::Usr(_) => {}
         }
     }
@@ -4303,6 +4450,7 @@ impl VVal {
                     return None;
                 }
             }
+            VVal::Type(v) => &**v as *const Type as i64,
             _ => return None,
         })
     }
@@ -4456,6 +4604,13 @@ impl VVal {
                     false
                 }
             }
+            VVal::Type(t) => {
+                if let VVal::Type(t2) = v {
+                    t == t2
+                } else {
+                    false
+                }
+            }
         }
     }
 
@@ -4556,7 +4711,7 @@ impl VVal {
     pub fn has(&self, elem: &VVal) -> bool {
         let collection = if self.is_ref() { self.deref() } else { self.clone() };
 
-        if collection.is_map(){
+        if collection.is_map() {
             return elem.with_s_ref(|key| {
                 if let Some(_) = collection.get_key(key) {
                     return true;
@@ -4611,39 +4766,38 @@ impl VVal {
                                     })
                                 }
                             }
-                            _ => {
-                                match v {
-                                    VVal::Pair(_) => {
-                                        v.at(0).unwrap().with_s_ref(|k| {
-                                            map.borrow_mut().insert(s2sym(k), v.at(1).unwrap())
-                                        });
-                                    }
-                                    VVal::Lst(_) => {
-                                        v.v_(0)
-                                            .with_s_ref(|k| map.borrow_mut().insert(s2sym(k), v.clone()));
-                                    }
-                                    VVal::Map(_) => {
-                                        for (vm, km) in v.iter() {
-                                            if let Some(k) = km {
-                                                k.with_s_ref(|ks| {
-                                                    map.borrow_mut().insert(s2sym(ks), vm.clone())
-                                                });
-                                            }
-                                        }
-                                    }
-                                    _ => {
-                                        if let Some(k) = k {
-                                            k.with_s_ref(|kv| {
-                                                map.borrow_mut().insert(s2sym(kv), v.clone())
-                                            });
-                                        } else {
-                                            v.with_s_ref(|kv| {
-                                                map.borrow_mut().insert(s2sym(kv), v.clone())
+                            _ => match v {
+                                VVal::Pair(_) => {
+                                    v.at(0).unwrap().with_s_ref(|k| {
+                                        map.borrow_mut().insert(s2sym(k), v.at(1).unwrap())
+                                    });
+                                }
+                                VVal::Lst(_) => {
+                                    v.v_(0).with_s_ref(|k| {
+                                        map.borrow_mut().insert(s2sym(k), v.clone())
+                                    });
+                                }
+                                VVal::Map(_) => {
+                                    for (vm, km) in v.iter() {
+                                        if let Some(k) = km {
+                                            k.with_s_ref(|ks| {
+                                                map.borrow_mut().insert(s2sym(ks), vm.clone())
                                             });
                                         }
                                     }
                                 }
-                            }
+                                _ => {
+                                    if let Some(k) = k {
+                                        k.with_s_ref(|kv| {
+                                            map.borrow_mut().insert(s2sym(kv), v.clone())
+                                        });
+                                    } else {
+                                        v.with_s_ref(|kv| {
+                                            map.borrow_mut().insert(s2sym(kv), v.clone())
+                                        });
+                                    }
+                                }
+                            },
                         }
                         true
                     })
@@ -5518,6 +5672,7 @@ impl VVal {
                 Syntax::Block => "Block",
                 Syntax::Err => "Err",
                 Syntax::Call => "Call",
+                Syntax::Type => "Type",
                 Syntax::Apply => "Apply",
                 Syntax::And => "And",
                 Syntax::Or => "Or",
@@ -5578,6 +5733,7 @@ impl VVal {
             VVal::Ref(_) => "ref_strong",
             VVal::HRef(_) => "ref_hidden",
             VVal::WWRef(_) => "ref_weak",
+            VVal::Type(_) => "type",
         }
     }
 
@@ -6178,6 +6334,7 @@ impl VVal {
             VVal::DropFun(f) => format!("std:to_drop[{}]", f.fun.s_cy(c)),
             VVal::Ref(l) => format!("$&&{}", (*l).borrow().s_cy(c)),
             VVal::HRef(l) => format!("$&{}", (*l).borrow().s_cy(c)),
+            VVal::Type(t) => format!("type[{}]", (*t).s()),
             VVal::FVec(nvec) => nvec.s(),
             VVal::IVec(nvec) => nvec.s(),
             VVal::WWRef(l) => match l.upgrade() {

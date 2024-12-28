@@ -9957,6 +9957,8 @@ In the following grammar, white space and comments are omitted:
                   ;
     deref         = "*", value
                   ;
+    typevalue     = "type", type
+                  ;
     special_value = list
                   | map
                   | none
@@ -9976,13 +9978,14 @@ In the following grammar, white space and comments are omitted:
                   | pattern
                   | struct_match
                   | debug_print
+                  | typevalue
                   | "\"             (* The global variable with the name "\" *)
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
                   | "|", "|"                      (* no enforcement *)
                   ;
-    function      = [ "\:", ident ], "{", [ arity_def ], block, "}"
+    function      = [ "\:", ident ], [ ":", fun_type ], "{", [ arity_def ], block, "}"
                   | "\", [ arity_def ], statement
                   ;
     var           = ident
@@ -10005,7 +10008,8 @@ In the following grammar, white space and comments are omitted:
                   ;
     op            = (* here all operators are listed line by line regarding
                        their precedence, top to bottom *)
-                    "&>" | "&@>"      (* call rhs with lhs operator *)
+                  | "as" type         (* type conversion *)
+                  | "&>" | "&@>"      (* call rhs with lhs operator *)
                   | "<&" | "<@&"      (* call lhs with rhs operator *)
                   | "//" | "/?" | "/$n" | "/$o" | "/$e" (* default value operators *)
                   | "^"
@@ -10060,14 +10064,16 @@ In the following grammar, white space and comments are omitted:
                   | call, { "|>", call }
                   | call, { "||", call }
                   ;
-    simple_assign = qident, [ op ], "=", expr
+    simple_assign = qident, [ ":", type ], [ op ], "=", expr
                   ;
-    destr_assign  = "(", [ qident, { ",", qident } ], ")", "=" expr
+    destr_assign  = "(", [ qident, [ ":", type ], { ",", qident, [ ":", type ] } ], ")", "=" expr
                   ;
     definition    = [ ref_specifier ], ( simple_assign | destr_assign )
                   ;
     import        = "!", "@import", symbol, [ [ "=" ], symbol ]
                   | "!", "@wlambda"
+                  ;
+    type_switch   = "types", ("on" | "off")
                   ;
     export        = "!", "@export", symbol, [ "=" ], expr
                   ;
@@ -10076,6 +10082,7 @@ In the following grammar, white space and comments are omitted:
                   | "." destr_assign
                   | import
                   | export
+                  | type_switch
                   | expr
                   ;
     block         = "{", { statement, ";", {";"}}, [ statement, {";"} ], "}"
@@ -10175,6 +10182,50 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
 
 - `<n>` can be any number.
 - `<bits>` can be 8, 16, 32, 64 or 128.
+
+### - WLambda Type Syntax
+
+```ebnf
+    typeargs      = "<", ident, { ",", ident }, ">"
+                  ;
+    nominal_type  = ident, { ".", ident }, [ typeargs ]
+                  ;
+    interfacelist = nominal_type, { ",", nominal_type }
+                  | "{", type "}", { ",", nominal_type }
+                  ;
+    record_entry  = "type", ident, "=", type
+                  | ident, ":", type
+                  | "\"", (? any char, quoted \\ and \" ?), "\"", ":", type
+                  ;
+    enumbody      = ident, { "," ident }
+                  ;
+    recordbody    = [ typeargs ], [ "is", interfacelist ], { record_entry }
+                  ;
+    struct_type   = "record", "{", recordbody, "}"
+                  | "enum", "{", enumbody, "}"
+                  ;
+    basetype      = "any" | "bool" | "none" | "string" | "number" | "integer" | "float"
+                  | "ref", type
+                  | "ref_weak", type
+                  | "ref_hidden", type
+                  | "pair", type, ",", type
+                  | "optional", type
+                  | "nvec2", ("integer" | "float")
+                  | "nvec3", ("integer" | "float")
+                  | "nvec4", ("integer" | "float")
+                  | fun_type
+                  | "{", [ type ], "}" (* map type *)
+                  | "[", [ type ], "]" (* list type *)
+                  | struct_type
+                  | nominal_type
+                  ;
+    type          = "(", type, ")"
+                  | basetype { "|", basetype }     (* "|" is for type options *)
+                  ;
+    fun_type      = "(", [ [ ident, ":" ], type, { ",", [ ident, ":" ], type }, ], ")",
+                         [ "->", type ]
+                  ;
+```
 
 ## <a name="14-cursive-view-definition"></a>14 - Cursive View Definition
 
