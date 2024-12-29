@@ -102,6 +102,7 @@ pub fn annotate_node<T, E>(ps: &mut State, syn: Syntax, f: T) -> Result<VVal, E>
 where
     T: FnOnce(&mut State, &mut Option<Syntax>) -> Result<VVal, E>,
 {
+    let cur_last = ps.last_syn.clone();
     let ann_id = ps.annot(syn);
     ps.annotation_stack.push(ann_id);
     ps.last_syn = ps.syn(syn);
@@ -115,8 +116,10 @@ where
             });
         }
         ps.annot_end(ann_id, node.clone());
+        ps.last_syn = cur_last;
         return Ok(node);
     } else {
+        ps.last_syn = cur_last;
         return res;
     }
 }
@@ -125,6 +128,7 @@ pub fn annotate<T, R>(ps: &mut State, syn: Syntax, f: T) -> R
 where
     T: FnOnce(&mut State, &mut Option<Syntax>) -> R,
 {
+    let cur_last = ps.last_syn.clone();
     let ann_id = ps.annot(syn);
     ps.annotation_stack.push(ann_id);
     ps.last_syn = ps.syn(syn);
@@ -137,6 +141,7 @@ where
         });
     }
     ps.annot_end(ann_id, VVal::None);
+    ps.last_syn = cur_last;
     return res;
 }
 
@@ -624,6 +629,25 @@ impl State {
         }
     }
 
+    pub fn consume_tokens(&mut self, expected: &str, syn: Syntax) -> bool {
+        if self.consume_lookahead(expected) {
+            self.with_new_annotation(syn, |ps, ann| {
+                ann.ch_ptr_start = ps.ch_ptr - expected.len();
+                ann.ch_ptr_end = ps.ch_ptr;
+            });
+            self.last_syn = self.syn(syn);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn consume_tokens_wsc(&mut self, expected: &str, syn: Syntax) -> bool {
+        let res = self.consume_tokens(expected, syn);
+        self.skip_ws_and_comments();
+        res
+    }
+
     pub fn consume_token_wsc(&mut self, expected_char: char, syn: Syntax) -> bool {
         let res = self.consume_token(expected_char, syn);
         self.skip_ws_and_comments();
@@ -889,7 +913,7 @@ impl State {
     /// let code    = "{ 123 }";
     /// let mut ps  = State::new(code, "filenamehere");
     /// // ...
-    /// wlambda::parser::parse_block(&mut ps, true, true, true);
+    /// wlambda::parser::parse_block(&mut ps, true, true);
     /// // ...
     /// ```
     pub fn new(code: &str, filename: &str) -> State {
@@ -950,7 +974,20 @@ impl State {
         self.spart(start, end)
     }
 
-    pub fn dump_annotation(&self, id: usize, indent: Option<u32>) -> String {
+    pub fn dump_annotation(&self, id: Option<usize>, indent: Option<u32>) -> String {
+        let id = if let Some(id) = id {
+            id
+        } else {
+            let mut id = 0;
+            for v in self.annotations.iter() {
+                if v.syn != Syntax::TNL {
+                    id = v.id;
+                    break;
+                }
+            }
+            id
+        };
+
         let an = if let Some(an) = self.annotations.get(id).clone() {
             an
         } else {
@@ -994,8 +1031,10 @@ impl State {
             }
             let mut first = true;
             for v in childs.iter() {
-                let app_str = &self
-                    .dump_annotation(*v, if nop_node { indent } else { indent.map(|i| i + 1) });
+                let app_str = &self.dump_annotation(
+                    Some(*v),
+                    if nop_node { indent } else { indent.map(|i| i + 1) },
+                );
                 if !app_str.is_empty() {
                     if indent.is_none() && !first {
                         res += ",";

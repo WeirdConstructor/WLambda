@@ -427,7 +427,7 @@ fn parse_string(ps: &mut State, bytes: bool) -> Result<VVal, ParseError> {
 #[allow(clippy::collapsible_else_if)]
 #[allow(clippy::cast_lossless)]
 fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
-    annotate_node(ps, Syntax::TNum, |ps, _new_syn| {
+    annotate_node(ps, Syntax::TNum, |ps, new_syn| {
         if ps.at_end() {
             return Err(ps.err(ParseErrorKind::EOF("number")));
         }
@@ -438,6 +438,7 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume();
                 if !ps.peek().unwrap_or(' ').is_digit(10) {
                     ps.skip_ws_and_comments();
+                    *new_syn = Some(Syntax::Var);
                     return Ok(make_var(ps, "-"));
                 }
                 -1
@@ -446,6 +447,7 @@ fn parse_num(ps: &mut State) -> Result<VVal, ParseError> {
                 ps.consume();
                 if !ps.peek().unwrap_or(' ').is_digit(10) {
                     ps.skip_ws_and_comments();
+                    *new_syn = Some(Syntax::Var);
                     return Ok(make_var(ps, "+"));
                 }
                 1
@@ -562,7 +564,9 @@ fn parse_map(ps: &mut State) -> Result<VVal, ParseError> {
             r
         } else {
             let key = if is_ident_start(c) {
-                VVal::new_sym_mv(parse_identifier(ps)?)
+                let ret = VVal::new_sym_mv(parse_identifier(ps)?);
+                ps.skip_ws_and_comments();
+                ret
             } else {
                 parse_expr(ps)?
             };
@@ -613,31 +617,31 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             vec.push(VVal::new_str_mv(String::from(mode)));
             Ok(vec)
         }),
-        'S' => {
-            ps.consume();
+        'S' => annotate_node(ps, Syntax::Selector, |ps, _new_syn| {
+            let vec = ps.last_syn();
+            ps.consume_token('S', Syntax::T);
             let selector_source = parse_quoted(ps, String::new(), |s, c| s.push(c))?;
-            let vec = ps.syn(Syntax::Selector);
             vec.push(VVal::new_str_mv(selector_source));
             Ok(vec)
-        }
-        'M' => {
-            ps.consume_wsc();
+        }),
+        'M' => annotate_node(ps, Syntax::StructPattern, |ps, _new_syn| {
+            let vec = ps.last_syn();
+            ps.consume_token('M', Syntax::T);
             let pat_expr = parse_expr(ps)?;
-            let vec = ps.syn(Syntax::StructPattern);
             vec.push(pat_expr);
             Ok(vec)
-        }
-        'F' => {
-            ps.consume_wsc();
+        }),
+        'F' => annotate_node(ps, Syntax::Formatter, |ps, _new_syn| {
+            let vec = ps.last_syn();
+            ps.consume_token('F', Syntax::T);
             let str_lit = parse_string_lit(ps)?;
-            let vec = ps.syn(Syntax::Formatter);
             vec.push(str_lit);
             Ok(vec)
-        }
-        '\\' => {
-            ps.consume_wsc();
-            Ok(make_var(ps, "\\"))
-        }
+        }),
+        '\\' => annotate_node(ps, Syntax::Var, |ps, _new_syn| {
+            ps.consume_token('\\', Syntax::T);
+            Ok(make_var_from_last(ps, "\\"))
+        }),
         '[' => parse_list(ps),
         '{' => parse_map(ps),
         'n' => {
@@ -870,6 +874,12 @@ fn make_to_call(ps: &State, expr: VVal) -> VVal {
     call
 }
 
+fn make_var_from_last(ps: &State, identifier: &str) -> VVal {
+    let id = ps.last_syn();
+    id.push(VVal::new_sym(identifier));
+    id
+}
+
 fn make_var(ps: &State, identifier: &str) -> VVal {
     let id = ps.syn(Syntax::Var);
     id.push(VVal::new_sym(identifier));
@@ -967,11 +977,9 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
             return Err(ps.err(ParseErrorKind::ExpectedToken('`', "quoted identifier end")));
         }
 
-        ps.skip_ws_and_comments();
-
         Ok(identifier)
     } else {
-        let identifier = ps.take_while_wsc(|c| match c {
+        let identifier = ps.take_while(|c| match c {
             '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
             _ => !c.is_whitespace(),
         });
@@ -985,9 +993,9 @@ fn is_ident_start(c: char) -> bool {
 
 fn parse_string_lit(ps: &mut State) -> Result<VVal, ParseError> {
     match ps.expect_some(ps.peek())? {
-        '"' => parse_string(ps, false),
-        '\'' => parse_char(ps, false),
-        '$' => {
+        '"' => annotate_node(ps, Syntax::TLiteral, |ps, _| parse_string(ps, false)),
+        '\'' => annotate_node(ps, Syntax::TLiteral, |ps, _| parse_char(ps, false)),
+        '$' => annotate_node(ps, Syntax::TLiteral, |ps, _new_syn| {
             ps.consume();
             match ps.expect_some(ps.peek())? {
                 'b' => {
@@ -1015,7 +1023,7 @@ fn parse_string_lit(ps: &mut State) -> Result<VVal, ParseError> {
 
                     let code = if ps.consume_if_eq_wsc('{') {
                         let code_start_pos = ps.remember();
-                        parse_block(ps, false, false, true)?;
+                        parse_block(ps, false, false)?;
                         let code_end_pos = ps.remember();
                         let code = ps.collect(code_start_pos, code_end_pos).to_string();
 
@@ -1037,7 +1045,7 @@ fn parse_string_lit(ps: &mut State) -> Result<VVal, ParseError> {
                 }
                 _ => Err(ps.err(ParseValueError::Expected("literal string"))),
             }
-        }
+        }),
         _ => Err(ps.err(ParseValueError::Expected("literal string"))),
     }
 }
@@ -1069,7 +1077,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
         }),
         '{' => {
             let syn = ps.syn_raw(Syntax::Func);
-            let block = parse_block(ps, true, true, true)?;
+            let block = parse_block(ps, true, true)?;
             block.set_at(0, syn);
             block.insert_at(1, VVal::None);
             Ok(block)
@@ -1082,7 +1090,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
 
                 let block_name = parse_identifier(ps)?;
                 ps.skip_ws_and_comments();
-                let block = parse_block(ps, true, true, true)?;
+                let block = parse_block(ps, true, true)?;
 
                 block.set_at(0, syn);
                 block.insert_at(1, VVal::new_sym_mv(block_name));
@@ -1106,12 +1114,17 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
                 s.at(1).unwrap().with_s_ref(|s: &str| Ok(make_sym(ps, s)))
             } else {
                 let id = parse_identifier(ps)?;
+                ps.skip_ws_and_comments();
                 Ok(make_sym(ps, &id))
             }
         }),
         c if is_ident_start(c) => {
-            let id = parse_identifier(ps)?;
-            Ok(make_var(ps, &id))
+            let ret = annotate_node(ps, Syntax::Var, |ps, _| {
+                let id = parse_identifier(ps)?;
+                Ok(make_var_from_last(ps, &id))
+            });
+            ps.skip_ws_and_comments();
+            ret
         }
         _ => Err(ps.err(ParseValueError::Expected(
             "literal value, sub \
@@ -1204,11 +1217,13 @@ fn parse_field_access(obj_val: VVal, ps: &mut State) -> Result<VVal, ParseError>
                 return Err(ps.err(ParseNumberError::InvalidIndexDigits(idx)));
             }
         } else if is_ident_start(c) {
-            annotate(ps, Syntax::Key, |ps, _new_syn| {
+            let ret = annotate(ps, Syntax::Key, |ps, _new_syn| {
                 let id = ps.last_syn();
                 id.push(VVal::new_sym_mv(parse_identifier(ps)?));
                 Ok(id)
-            })?
+            })?;
+            ps.skip_ws_and_comments();
+            ret
         } else {
             parse_value(ps)?
         };
@@ -1595,23 +1610,19 @@ fn parse_expr(ps: &mut State) -> Result<VVal, ParseError> {
         while let Some(c) = ps.peek() {
             match c {
                 '|' => {
-                    if ps.lookahead("|>") {
-                        ps.consume();
-                        ps.consume_wsc();
-
+                    if ps.consume_tokens_wsc("|>", Syntax::T) {
                         let call_right = parse_call(ps, false)?;
 
                         let new_call = make_to_call(ps, call);
                         new_call.push(call_right);
                         call = new_call;
                     } else {
-                        let push_front = if ps.lookahead("||") {
-                            ps.consume();
+                        let push_front = if ps.consume_tokens_wsc("||", Syntax::T) {
                             true
                         } else {
+                            ps.consume_token_wsc('|', Syntax::T);
                             false
                         };
-                        ps.consume_wsc();
 
                         let mut fn_expr = parse_call(ps, false)?;
                         if !is_call(&fn_expr) {
@@ -1651,7 +1662,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
         let mut is_ref = false;
 
         if is_def {
-            if ps.consume_if_eq_wsc(':') {
+            if ps.consume_token_wsc(':', Syntax::T) {
                 let key = annotate(ps, Syntax::TIdent, |ps, _new_syn| parse_identifier(ps))?;
                 if key == "global" {
                     assign = ps.syn(Syntax::DefGlobRef);
@@ -1660,7 +1671,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                 }
             }
         } else {
-            if ps.consume_if_eq_wsc('*') {
+            if ps.consume_token_wsc('*', Syntax::T) {
                 assign = ps.syn(Syntax::AssignRef);
                 is_ref = true;
             }
@@ -1671,7 +1682,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
         match ps.expect_some(ps.peek())? {
             '(' => {
-                ps.consume_wsc();
+                ps.consume_area_start_token_wsc('(', Syntax::TDelim);
                 destructuring = true;
 
                 while let Some(c) = ps.peek() {
@@ -1679,7 +1690,8 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                         break;
                     }
                     ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
-                    if !ps.consume_if_eq_wsc(',') {
+                    ps.skip_ws_and_comments();
+                    if !ps.consume_token_wsc(',', Syntax::TDelim) {
                         break;
                     }
                 }
@@ -1688,7 +1700,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     return Err(ps.err(ParseErrorKind::EOF("destructuring assignment")));
                 }
 
-                if !ps.consume_if_eq_wsc(')') {
+                if !ps.consume_area_end_token_wsc(')', Syntax::TDelim) {
                     return Err(
                         ps.err(ParseErrorKind::ExpectedToken(')', "destructuring assignment end"))
                     );
@@ -1696,6 +1708,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
             }
             _ => {
                 ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
+                ps.skip_ws_and_comments();
             }
         }
 
@@ -1746,6 +1759,7 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                         return Err(ps.err(ParseErrorKind::EOF("special assignment")));
                     }
                     let id = parse_identifier(ps)?;
+                    ps.skip_ws_and_comments();
                     match &id[..] {
                         "wlambda" => {
                             let imp = ps.syn(Syntax::Import);
@@ -1760,7 +1774,9 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
                                 prefix.clone()
                             } else {
                                 ps.consume_if_eq_wsc('=');
-                                VVal::new_sym_mv(parse_identifier(ps)?)
+                                let ret = VVal::new_sym_mv(parse_identifier(ps)?);
+                                ps.skip_ws_and_comments();
+                                ret
                             };
 
                             let imp = ps.syn(Syntax::Import);
@@ -1846,8 +1862,6 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 ///
 /// If _with_arity_ is set, the arity declaration `|a<b|` is parsed.
 /// If _delimited_ is set, "{" and "}" are expected at the end/beginning of a block.
-/// If _end_delim_ is set, the parsing loop for the statement ends when a "}"
-/// is encountered.
 ///
 /// ```rust
 /// use wlambda::parser::{State, parse_block};
@@ -1856,7 +1870,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 /// let mut ps = State::new(&code, "somefilename");
 ///
 /// // Parse a bare block without '{' ... '}' delimiters:
-/// match parse_block(&mut ps, false, false, false) {
+/// match parse_block(&mut ps, false, false) {
 ///     Ok(v)  => { println!("Result: {}", v.s()); },
 ///     Err(e) => { panic!("ERROR: {}", e); },
 /// }
@@ -1866,12 +1880,7 @@ fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
 /// that is ready for the `compiler` to be compiled. It consists mostly of
 /// `VVal::Lst` and `VVal::Syn` nodes. The latter hold the position information
 /// of the AST nodes.
-pub fn parse_block(
-    ps: &mut State,
-    with_arity: bool,
-    delimited: bool,
-    end_delim: bool,
-) -> Result<VVal, ParseError> {
+pub fn parse_block(ps: &mut State, with_arity: bool, delimited: bool) -> Result<VVal, ParseError> {
     annotate_node(ps, Syntax::Block, |ps, _new_syn| {
         let block = ps.last_syn();
 
@@ -1888,7 +1897,7 @@ pub fn parse_block(
         }
 
         while let Some(c) = ps.peek() {
-            if end_delim {
+            if delimited {
                 if c == '}' {
                     break;
                 }
@@ -1897,11 +1906,11 @@ pub fn parse_block(
             let next_stmt = parse_stmt(ps)?;
             block.push(next_stmt);
 
-            while ps.consume_if_eq_wsc(';') {
+            while ps.consume_token_wsc(';', Syntax::TDelim) {
                 while ps.consume_if_eq_wsc(';') {}
-                if ps.at_end() || (end_delim && ps.peek().unwrap_or(' ') == '}') {
+                if ps.at_end() || ps.peek().unwrap_or(' ') == '}' {
                     if delimited {
-                        ps.consume_if_eq_wsc('}');
+                        ps.consume_area_end_token_wsc('}', Syntax::TDelim);
                     }
                     return Ok(block);
                 }
@@ -1936,7 +1945,7 @@ pub fn parse_block(
 pub fn parse(s: &str, filename: &str) -> Result<VVal, String> {
     let mut ps = State::new(s, filename);
     let res = annotate(&mut ps, Syntax::TRoot, |ps, _new_syn| {
-        parse_block(ps, false, false, true).map_err(|e| format!("{}", e))
+        parse_block(ps, false, false).map_err(|e| format!("{}", e))
     });
     LAST_PARSE_STATE.set(Some(ps));
     res
@@ -1952,24 +1961,22 @@ mod tests {
 
     fn parse(s: &str) -> String {
         let mut ps = State::new(s, "<parser_test>");
-        let res = annotate(&mut ps, Syntax::TRoot, |ps, _new_syn| {
-            match parse_block(ps, false, false, true) {
+        let res =
+            annotate(&mut ps, Syntax::TRoot, |ps, _new_syn| match parse_block(ps, false, false) {
                 Ok(v) => v.s(),
                 Err(e) => panic!("Parse error: {}", e),
-            }
-        });
+            });
         LAST_PARSE_STATE.set(Some(ps));
         res
     }
 
     fn parse_error(s: &str) -> String {
         let mut ps = State::new(s, "<parser_test>");
-        let res = annotate(&mut ps, Syntax::TRoot, |ps, _new_syn| {
-            match parse_block(ps, false, false, true) {
+        let res =
+            annotate(&mut ps, Syntax::TRoot, |ps, _new_syn| match parse_block(ps, false, false) {
                 Ok(v) => panic!("Expected error but got result: {} for input '{}'", v.s(), s),
                 Err(e) => format!("Parse error: {}", e),
-            }
-        });
+            });
         LAST_PARSE_STATE.set(Some(ps));
         res
     }
@@ -2548,6 +2555,13 @@ mod tests {
         assert_eq!(parse("$b'\\u{FF}'"), "$[$%:Block,$b\'\\xFF\']");
     }
 
+    fn annot_parse(s: &str) -> (String, String) {
+        let r = parse(s);
+        let ps = get_last_parse_state().unwrap();
+        println!("{} => {{\n{}}}", s, ps.dump_annotation(None, Some(1)));
+        (r, ps.dump_annotation(None, None))
+    }
+
     #[test]
     fn check_annotations() {
         let r = parse("1 + (2 + 3) * 4 + 5");
@@ -2556,23 +2570,54 @@ mod tests {
             r,
             "$[$%:Block,$[$%:BinOpAdd,$[$%:BinOpAdd,1,$[$%:BinOpMul,$[$%:BinOpAdd,2,3],4]],5]]"
         );
-        assert_eq!(ps.dump_annotation(0, None),
+        assert_eq!(ps.dump_annotation(None, None),
             "<TRoot:0:19>{<Block:0:19>{<Expr:0:19>{<TBinOp:0:19>{<TNum:0:1|1|>,<TOp:2:3|+|>,<TValue:4:11>{<TDelimS:4:5|(|>,<Expr:5:10>{<TBinOp:5:10>{<TNum:5:6|2|>,<TOp:7:8|+|>,<TNum:9:10|3|>}},<TDelimE:10:11|)|>},<TOp:12:13|*|>,<TNum:14:15|4|>,<TOp:16:17|+|>,<TNum:18:19|5|>}}}}");
 
-        let r = parse("\nX\n\n;\n$[1230 +\n 120,\n     \t\n  \n# test 123\n     50]\n");
-        let ps = get_last_parse_state().unwrap();
-        println!("{}", ps.dump_annotation(1, Some(1)));
+        let (r, an) = annot_parse("+10 -10; -; +; x");
+        assert_eq!(r, "$[$%:Block,$[$%:Call,10,-10],$[$%:Var,:-],$[$%:Var,:+],$[$%:Var,:x]]");
+        assert_eq!(an,
+            "<TRoot:0:16>{<Block:0:16>{<Expr:0:7>{<Call:0:7>{<TNum:0:3|+10|>,<TNum:4:7|-10|>}},<TDelim:7:8|;|>,<Expr:9:10>{<Var:9:10|-|>},<TDelim:10:11|;|>,<Expr:12:13>{<Var:12:13|+|>},<TDelim:13:14|;|>,<Expr:15:16>{<Var:15:16|x|>}}}");
+
+        let (r, an) = annot_parse("\nX\n\n;\n$[1230 +\n 120,\n     \t\n  \n# test 123\n     50]\n");
         assert_eq!(r, "$[$%:Block,$[$%:Var,:X],$[$%:Lst,$[$%:BinOpAdd,1230,120],50]]");
-        assert_eq!(ps.dump_annotation(1, None),
-            "<TRoot:1:50>{<Block:1:50>{<Expr:1:2>{<TNL:2:2>},<Expr:6:50>{<TValue:6:50>{<T:6:7|$|>,<Lst:7:50>{<LstS:7:8|[|>,<Expr:8:19>{<TBinOp:8:19>{<TNum:8:12|1230|>,<TOp:13:14|+|>,<TNum:16:19|120|>}},<TDelim:19:20|,|>,<TNL:20:20>,<TNL:27:27>,<TComment:31:41|# test 123|>,<Expr:47:49>{<TNum:47:49|50|>},<LstE:49:50|]|>}}}}}");
+        assert_eq!(an,
+            "<TRoot:1:50>{<Block:1:50>{<Expr:1:2>{<Var:1:2|X|>,<TNL:2:2>},<TDelim:4:5|;|>,<Expr:6:50>{<TValue:6:50>{<T:6:7|$|>,<Lst:7:50>{<LstS:7:8|[|>,<Expr:8:19>{<TBinOp:8:19>{<TNum:8:12|1230|>,<TOp:13:14|+|>,<TNum:16:19|120|>}},<TDelim:19:20|,|>,<TNL:20:20>,<TNL:27:27>,<TComment:31:41|# test 123|>,<Expr:47:49>{<TNum:47:49|50|>},<LstE:49:50|]|>}}}}}");
+
         let r2 = parse("$rg/123 303\\ xooo/ :123");
         let ps = get_last_parse_state().unwrap();
-        println!("{}", ps.dump_annotation(0, Some(1)));
         assert_eq!(
             r2,
             "$[$%:Block,$[$%:Call,$[$%:Pattern,\"123 303\\\\ xooo\",\"g\"],$[$%:Key,:123]]]"
         );
-        assert_eq!(ps.dump_annotation(0, None),
+        assert_eq!(ps.dump_annotation(None, None),
             "<TRoot:0:23>{<Block:0:23>{<Expr:0:23>{<Call:0:23>{<TValue:0:18>{<T:0:1|$|>,<Pattern:1:18>{<T:1:3|rg|>,<TQ:3:18>{<TQS:3:4|/|>,<T:4:17|123 303\\ xooo|>,<TQE:17:18|/|>}}},<Key:19:23|:123|>}}}}");
+
+        let (r, an) = annot_parse("$S(*/x)");
+        assert_eq!(r, "$[$%:Block,$[$%:Selector,\"*/x\"]]");
+        assert_eq!(an,
+            "<TRoot:0:7>{<Block:0:7>{<Expr:0:7>{<TValue:0:7>{<T:0:1|$|>,<Selector:1:7>{<T:1:2|S|>,<TQ:2:7>{<TQS:2:3|(|>,<T:3:6|*/x|>,<TQE:6:7|)|>}}}}}}");
+
+        let (r, an) = annot_parse("$M($[10, 30])");
+        assert_eq!(r, "$[$%:Block,$[$%:StructPattern,$[$%:Lst,10,30]]]");
+        assert_eq!(an,
+            "<TRoot:0:13>{<Block:0:13>{<Expr:0:13>{<TValue:0:13>{<T:0:1|$|>,<StructPattern:1:13>{<T:1:2|M|>,<Expr:2:13>{<TValue:2:13>{<TDelimS:2:3|(|>,<Expr:3:12>{<TValue:3:12>{<T:3:4|$|>,<Lst:4:12>{<LstS:4:5|[|>,<Expr:5:7>{<TNum:5:7|10|>},<TDelim:7:8|,|>,<Expr:9:11>{<TNum:9:11|30|>},<LstE:11:12|]|>}}},<TDelimE:12:13|)|>}}}}}}}");
+
+        let (r, an) = annot_parse("$F\"{} foo\" 120");
+        assert_eq!(r, "$[$%:Block,$[$%:Call,$[$%:Formatter,$[$%:Str,\"{} foo\"]],120]]");
+        assert_eq!(an,
+            "<TRoot:0:14>{<Block:0:14>{<Expr:0:14>{<Call:0:14>{<TValue:0:10>{<T:0:1|$|>,<Formatter:1:10>{<T:1:2|F|>,<TLiteral:2:10|\"{} foo\"|>}},<TNum:11:14|120|>}}}}");
+
+        let (r, an) = annot_parse(
+            r#""test123";
+            't';
+            $b'X';
+            $b"TEST";
+            $code{"test" + 120}
+        "#,
+        );
+
+        assert_eq!(r,
+            "$[$%:Block,$[$%:Str,\"test123\"],'t',$b'X',$[$%:Str,$b\"TEST\"],$[$%:Str,\"\\\"test\\\" + 120\"]]");
+        assert_eq!(an, "");
     }
 }
