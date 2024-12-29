@@ -541,7 +541,6 @@ fn parse_list(ps: &mut State) -> Result<VVal, ParseError> {
         if !ps.consume_area_end_token_wsc(']', Syntax::Lst) {
             return Err(ps.err(ParseErrorKind::ExpectedToken(']', "list end")));
         }
-        println!("PARSE LSIT: {}", list.s());
 
         Ok(list)
     })
@@ -1021,9 +1020,10 @@ fn parse_string_lit(ps: &mut State) -> Result<VVal, ParseError> {
                         ps.consume_wsc();
                     }
 
-                    let code = if ps.consume_if_eq_wsc('{') {
+                    let code = if ps.consume_lookahead("{") {
                         let code_start_pos = ps.remember();
                         parse_block(ps, false, false)?;
+                        ps.skip_ws_and_comments();
                         let code_end_pos = ps.remember();
                         let code = ps.collect(code_start_pos, code_end_pos).to_string();
 
@@ -1061,7 +1061,7 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
             || ps.lookahead("'")
             || ps.lookahead("\"") =>
         {
-            parse_string_lit(ps)
+            annotate_node(ps, Syntax::TValue, |ps, _| parse_string_lit(ps))
         }
         '$' => annotate_node(ps, Syntax::TValue, |ps, _new_syn| {
             ps.consume_token_wsc('$', Syntax::T);
@@ -1292,47 +1292,56 @@ fn parse_arg_list<'a, 'b>(
     call: &'a mut VVal,
     ps: &'b mut State,
 ) -> Result<&'a mut VVal, ParseError> {
-    if !ps.consume_if_eq_wsc('[') {
-        return Err(ps.err(ParseErrorKind::ExpectedToken('[', "call arguments start")));
-    }
-
-    let is_apply = ps.consume_if_eq_wsc('[');
-
-    if is_apply {
-        if let VVal::Syn(mut sp) = call.at(0).unwrap_or(VVal::None) {
-            sp.set_syn(Syntax::Apply);
-            call.set_at(0, VVal::Syn(sp));
-        }
-        let call_argv = parse_expr(ps)?;
-        call.push(call_argv);
-    } else {
-        while let Some(c) = ps.peek() {
-            if c == ']' {
-                break;
+    annotate(ps, Syntax::TArgList, |ps, _| {
+        let is_apply = if ps.lookahead("[[") {
+            if !ps.consume_area_start_tokens_wsc("[[", Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('[', "apply arguments start")));
             }
+            true
+        } else {
+            if !ps.consume_area_start_token_wsc('[', Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('[', "call arguments start")));
+            }
+            false
+        };
 
-            let call_arg = parse_expr(ps)?;
-            call.push(call_arg);
+        if is_apply {
+            if let VVal::Syn(mut sp) = call.at(0).unwrap_or(VVal::None) {
+                sp.set_syn(Syntax::Apply);
+                call.set_at(0, VVal::Syn(sp));
+            }
+            let call_argv = parse_expr(ps)?;
+            call.push(call_argv);
+        } else {
+            while let Some(c) = ps.peek() {
+                if c == ']' {
+                    break;
+                }
 
-            if !ps.consume_if_eq_wsc(',') {
-                break;
+                let call_arg = parse_expr(ps)?;
+                call.push(call_arg);
+
+                if !ps.consume_token_wsc(',', Syntax::TDelim) {
+                    break;
+                }
             }
         }
-    }
 
-    if ps.at_end() {
-        return Err(ps.err(ParseErrorKind::EOF("call args")));
-    }
+        if ps.at_end() {
+            return Err(ps.err(ParseErrorKind::EOF("call args")));
+        }
 
-    if is_apply && !ps.consume_if_eq_wsc(']') {
-        return Err(ps.err(ParseErrorKind::ExpectedToken(']', "apply arguments end")));
-    }
+        println!("parse [{}]", ps.rest().to_string());
+        if is_apply && !ps.consume_area_end_tokens_wsc("]]", Syntax::TQ) {
+            return Err(ps.err(ParseErrorKind::ExpectedToken(']', "apply arguments end")));
+        } else if !is_apply {
+            if !ps.consume_area_end_token(']', Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken(']', "call arguments end")));
+            }
+        }
 
-    if !ps.consume_if_eq_wsc(']') {
-        return Err(ps.err(ParseErrorKind::ExpectedToken(']', "call arguments end")));
-    }
-
-    Ok(call)
+        Ok(call)
+    })
 }
 
 fn get_op_binding_power(ps: &State, op: StrPart) -> Result<(i32, i32), ParseError> {
@@ -1508,7 +1517,10 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                     value = {
                         let mut call = make_to_call(ps, value);
                         match parse_arg_list(&mut call, ps) {
-                            Ok(_) => call,
+                            Ok(_) => {
+                                *new_syn = Some(call.v_(0).get_syn());
+                                call
+                            }
                             Err(err) => return Err(err),
                         }
                     };
@@ -1521,7 +1533,7 @@ fn parse_call(ps: &mut State, binop_mode: bool) -> Result<VVal, ParseError> {
                         break;
                     }
 
-                    ps.consume_wsc();
+                    ps.consume_token_wsc('~', Syntax::T);
                     if let VVal::None = res_call {
                         res_call = make_to_call(ps, value);
                     } else {
@@ -1682,7 +1694,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
         match ps.expect_some(ps.peek())? {
             '(' => {
-                ps.consume_area_start_token_wsc('(', Syntax::TDelim);
+                ps.consume_area_start_token_wsc('(', Syntax::TQ);
                 destructuring = true;
 
                 while let Some(c) = ps.peek() {
@@ -1700,7 +1712,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     return Err(ps.err(ParseErrorKind::EOF("destructuring assignment")));
                 }
 
-                if !ps.consume_area_end_token_wsc(')', Syntax::TDelim) {
+                if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
                     return Err(
                         ps.err(ParseErrorKind::ExpectedToken(')', "destructuring assignment end"))
                     );
@@ -1897,10 +1909,8 @@ pub fn parse_block(ps: &mut State, with_arity: bool, delimited: bool) -> Result<
         }
 
         while let Some(c) = ps.peek() {
-            if delimited {
-                if c == '}' {
-                    break;
-                }
+            if c == '}' {
+                break;
             }
 
             let next_stmt = parse_stmt(ps)?;
@@ -2562,6 +2572,15 @@ mod tests {
         (r, ps.dump_annotation(None, None))
     }
 
+    fn refmt(s: &str) -> String {
+        use crate::code_fmt::SourceFormatter;
+        let r = parse(s);
+        let ps = Box::new(get_last_parse_state().unwrap());
+        let mut sf = Box::new(SourceFormatter::new());
+        let res = sf.format_source(&ps);
+        res
+    }
+
     #[test]
     fn check_annotations() {
         let r = parse("1 + (2 + 3) * 4 + 5");
@@ -2572,6 +2591,11 @@ mod tests {
         );
         assert_eq!(ps.dump_annotation(None, None),
             "<TRoot:0:19>{<Block:0:19>{<Expr:0:19>{<TBinOp:0:19>{<TNum:0:1|1|>,<TOp:2:3|+|>,<TValue:4:11>{<TDelimS:4:5|(|>,<Expr:5:10>{<TBinOp:5:10>{<TNum:5:6|2|>,<TOp:7:8|+|>,<TNum:9:10|3|>}},<TDelimE:10:11|)|>},<TOp:12:13|*|>,<TNum:14:15|4|>,<TOp:16:17|+|>,<TNum:18:19|5|>}}}}");
+
+        let (r, an) = annot_parse("$code{10}");
+        assert_eq!(an,
+            "<TRoot:0:9>{<Block:0:9>{<Expr:0:9>{<TValue:0:9>{<TLiteral:0:9>{<Block:6:8>{<Expr:6:8>{<TNum:6:8|10|>}}}}}}}");
+        assert_eq!(r, "$[$%:Block,$[$%:Str,\"10\"]]");
 
         let (r, an) = annot_parse("+10 -10; -; +; x");
         assert_eq!(r, "$[$%:Block,$[$%:Call,10,-10],$[$%:Var,:-],$[$%:Var,:+],$[$%:Var,:x]]");
@@ -2618,6 +2642,18 @@ mod tests {
 
         assert_eq!(r,
             "$[$%:Block,$[$%:Str,\"test123\"],'t',$b'X',$[$%:Str,$b\"TEST\"],$[$%:Str,\"\\\"test\\\" + 120\"]]");
-        assert_eq!(an, "");
+        assert_eq!(an,
+            "<TRoot:0:100>{<Block:0:100>{<Expr:0:9>{<TValue:0:9>{<TLiteral:0:9|\"test123\"|>}},<TDelim:9:10|;|>,<Expr:23:26>{<TValue:23:26>{<TLiteral:23:26|'t'|>}},<TDelim:26:27|;|>,<Expr:40:45>{<TValue:40:45>{<TLiteral:40:45|$b'X'|>}},<TDelim:45:46|;|>,<Expr:59:67>{<TValue:59:67>{<TLiteral:59:67|$b\"TEST\"|>}},<TDelim:67:68|;|>,<Expr:81:100>{<TValue:81:100>{<TLiteral:81:100>{<Block:87:99>{<Expr:87:99>{<TBinOp:87:99>{<TValue:87:93>{<TLiteral:87:93|\"test\"|>},<TOp:94:95|+|>,<TNum:96:99|120|>}}}}}}}}");
+    }
+
+    #[test]
+    fn check_annotations_refmt() {
+        assert_eq!(refmt("1\n + 2\n + 3"), "1 + 2 + 3");
+        assert_eq!(refmt("1\n+ 2\n+ 3"), "1 + 2 + 3");
+        assert_eq!(refmt("1 +2    +3"), "1 +2 +3");
+        assert_eq!(refmt("1 ~ +2    +3"), "1 ~ +2 +3");
+        assert_eq!(refmt("x\n  [1\n,     \n2]"), "x[1, 2]");
+        assert_eq!(refmt("x\n  [[    1\n]]"), "x[[1]]");
+        assert_eq!(refmt("$F\"{}\ntest\" <& 10"), "$F\"{}\ntest\" <& 10");
     }
 }

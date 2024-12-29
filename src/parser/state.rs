@@ -34,6 +34,8 @@ pub struct SourceAnnotation {
     pos_end: SynPos,
     /// Vector of other SourceAnnotation IDs, which are a child of this one.
     childs: Option<Vec<usize>>,
+    /// Vector of other SourceAnnotation IDs, which are a child of this one.
+    toplevel: bool,
 }
 
 impl SourceAnnotation {
@@ -49,7 +51,17 @@ impl SourceAnnotation {
             is_area_start: false,
             is_area_end: false,
             childs: None,
+            toplevel: false,
         };
+    }
+
+    pub fn is_start(&self) -> bool { return self.is_area_start; }
+    pub fn is_end(&self) -> bool { return self.is_area_end; }
+
+    pub fn get_syntax(&self) -> Syntax { return self.syn; }
+
+    pub fn get_childs(&self) -> Option<Vec<usize>> {
+        return self.childs.clone()
     }
 
     pub fn append_child_id(&mut self, id: usize) {
@@ -58,6 +70,14 @@ impl SourceAnnotation {
         }
         if let Some(childs) = self.childs.as_mut() {
             childs.push(id);
+        }
+    }
+
+    pub fn get_text(&self, ps: &State) -> Option<String> {
+        if self.ch_ptr_start != self.ch_ptr_end {
+            Some(ps.spart(self.ch_ptr_start, self.ch_ptr_end).to_string())
+        } else {
+            None
         }
     }
 
@@ -428,7 +448,10 @@ impl State {
             self.annotations[id].ast_node = ast_node;
 
             if let Some(parent_ann_id) = self.annotation_stack.last_mut() {
+                self.annotations[id].toplevel = false;
                 self.annotations[*parent_ann_id].append_child_id(id);
+            } else {
+                self.annotations[id].toplevel = true;
             }
         }
     }
@@ -654,6 +677,46 @@ impl State {
         return res;
     }
 
+    pub fn consume_area_start_tokens(&mut self, expected: &str, syn: Syntax) -> bool {
+        let mut res = false;
+        if self.consume_lookahead(expected) {
+            self.with_new_annotation(syn, |ps, ann| {
+                ann.is_area_start = true;
+                ann.ch_ptr_start = ps.ch_ptr - expected.len();
+                ann.ch_ptr_end = ps.ch_ptr;
+            });
+            self.last_syn = self.syn(syn);
+            res = true;
+        }
+        res
+    }
+
+    pub fn consume_area_start_tokens_wsc(&mut self, expected: &str, syn: Syntax) -> bool {
+        let r = self.consume_area_start_tokens(expected, syn);
+        self.skip_ws_and_comments();
+        r
+    }
+
+    pub fn consume_area_end_tokens(&mut self, expected: &str, syn: Syntax) -> bool {
+        let mut res = false;
+        if self.consume_lookahead(expected) {
+            self.with_new_annotation(syn, |ps, ann| {
+                ann.is_area_end = true;
+                ann.ch_ptr_start = ps.ch_ptr - expected.len();
+                ann.ch_ptr_end = ps.ch_ptr;
+            });
+            self.last_syn = self.syn(syn);
+            res = true;
+        }
+        res
+    }
+
+    pub fn consume_area_end_tokens_wsc(&mut self, expected: &str, syn: Syntax) -> bool {
+        let r = self.consume_area_end_tokens(expected, syn);
+        self.skip_ws_and_comments();
+        r
+    }
+
     pub fn consume_area_start_token(&mut self, expected_char: char, syn: Syntax) -> bool {
         let mut res = false;
         if self.consume_if_eq(expected_char) {
@@ -784,7 +847,9 @@ impl State {
 
     pub fn consume_lookahead(&mut self, s: &str) -> bool {
         if self.lookahead(s) {
-            self.ch_ptr += s.len();
+            for _ in 0..s.len() {
+                self.consume();
+            }
             return true;
         }
         false
@@ -974,6 +1039,20 @@ impl State {
         self.spart(start, end)
     }
 
+    pub fn get_toplevel_annotations(&self) -> Vec<usize> {
+        let mut v = Vec::new();
+        for an in self.annotations.iter() {
+            if an.toplevel {
+                v.push(an.id);
+            }
+        }
+        v
+    }
+
+    pub fn get_annotation(&self, id: usize) -> Option<&SourceAnnotation> {
+        self.annotations.get(id)
+    }
+
     pub fn dump_annotation(&self, id: Option<usize>, indent: Option<u32>) -> String {
         let id = if let Some(id) = id {
             id
@@ -1019,7 +1098,7 @@ impl State {
                 an.ch_ptr_end,
                 end
             );
-            let nop_node = if an.syn == Syntax::TNone {
+            let nop_node = if indent.is_none() && an.syn == Syntax::TNone {
                 res = String::from("");
                 true
             } else {
@@ -1048,7 +1127,7 @@ impl State {
             }
             res
         } else if an.ch_ptr_start != an.ch_ptr_end {
-            if an.syn == Syntax::TNone {
+            if indent.is_none() && an.syn == Syntax::TNone {
                 return String::from("");
             }
             format!(

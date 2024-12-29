@@ -638,6 +638,7 @@ pub mod nvec;
 pub mod ops;
 mod packer;
 pub mod parser;
+pub mod code_fmt;
 pub mod prelude;
 mod prog_writer;
 pub mod rpc_helper;
