@@ -9,11 +9,18 @@ as code.
 pub use crate::parser::state::State;
 use crate::vval::Syntax;
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum ItemType {
+    TOK,
+    SP,
+    NBSP,
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct SourceItem {
     idx: usize,
     char_count: usize,
-    is_ws: bool,
+    typ: ItemType,
 }
 
 impl SourceItem {}
@@ -33,7 +40,15 @@ fn chld_syn(ps: &State, childs: &[usize], idx: usize) -> Syntax {
 }
 
 fn sp() -> SourceItem {
-    SourceItem { idx: 0, is_ws: true, char_count: 1 }
+    SourceItem { idx: 0, char_count: 1, typ: ItemType::SP }
+}
+
+fn nbsp() -> SourceItem {
+    SourceItem { idx: 0, char_count: 1, typ: ItemType::NBSP }
+}
+
+fn tok(idx: usize, cc: usize) -> SourceItem {
+    SourceItem { idx, char_count: cc, typ: ItemType::TOK }
 }
 
 impl SourceFormatter {
@@ -42,11 +57,7 @@ impl SourceFormatter {
     }
 
     pub fn item(&mut self, s: String) -> SourceItem {
-        let ret = SourceItem {
-            idx: self.part_buffer.len(),
-            is_ws: s.chars().fold(true, |is_ws, c| if !is_ws { false } else { c.is_whitespace() }),
-            char_count: s.chars().count(),
-        };
+        let ret = tok(self.part_buffer.len(), s.chars().count());
         self.part_buffer.push(s);
         ret
     }
@@ -115,7 +126,7 @@ impl SourceFormatter {
                 line = String::from("");
                 line_chars = 0;
             }
-            if !(it.is_ws && line_chars == 0) {
+            if !((it.typ == ItemType::SP || it.typ == ItemType::NBSP) && line_chars == 0) {
                 line += &self.part_buffer[it.idx];
                 line_chars += it.char_count;
             }
@@ -131,7 +142,11 @@ impl SourceFormatter {
     pub fn items2string(&self, items: &[SourceItem]) -> String {
         let mut out = String::from("");
         for si in items.iter() {
-            out += &self.part_buffer[si.idx];
+            match si.typ {
+                ItemType::SP => out += " ",
+                ItemType::NBSP => out += " ",
+                ItemType::TOK => out += &self.part_buffer[si.idx],
+            }
         }
         out
     }
@@ -185,7 +200,7 @@ impl SourceFormatter {
                         out.push(self.item(txt));
                     }
                     Syntax::TOp => {
-                        out.push(sp());
+                        out.push(nbsp());
                         out.push(self.item(txt));
                         out.push(sp());
                     }
