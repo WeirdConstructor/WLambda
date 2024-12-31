@@ -4765,6 +4765,23 @@ impl VVal {
         Ok(res)
     }
 
+    pub fn map_skip_vval<E, T>(&self, mut op: T, skip: usize) -> Result<VVal, E>
+    where
+        T: FnMut(&VVal, bool) -> Result<VVal, E>,
+    {
+        let res = VVal::vec();
+        if let VVal::Lst(b) = &self {
+            let len = b.borrow().len();
+            let len = if len > skip { len - skip } else { 0 };
+
+            for (i, v) in b.borrow().iter().enumerate().skip(skip) {
+                let is_last = (i + 1) == len;
+                res.push(op(v, is_last)?);
+            }
+        }
+        Ok(res)
+    }
+
     pub fn unshift(&self, val: VVal) -> &VVal {
         if let VVal::Lst(b) = &self {
             b.borrow_mut().insert(0, val);
