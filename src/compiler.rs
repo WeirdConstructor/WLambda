@@ -55,6 +55,7 @@ use crate::vval::StackAction;
 use crate::vval::SynPos;
 use crate::vval::Syntax;
 use crate::vval::VVal;
+use crate::vval::Type;
 use crate::vval::VValFun;
 use crate::vval::VarPos;
 
@@ -71,6 +72,8 @@ use crate::io::debug_print_value;
 use crate::formatter;
 use crate::selector;
 use crate::struct_pattern;
+
+use crate::types::type_pass;
 
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
@@ -3092,7 +3095,8 @@ pub(crate) fn compile(
 /// Compiles a WLambda AST into an [EvalNode] in the given CompileEnv.
 /// This is an internal function.
 fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
-    let prog = compile_stmts(ast, 1, ce)?;
+    let typed_ast = type_pass(ast, Type::any(), ce)?;
+    let prog = compile_stmts(&typed_ast, 1, ce)?;
 
     let mut p = Prog::new();
     prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));
@@ -3113,7 +3117,11 @@ pub fn test_eval_to_string(s: &str) -> String {
     match parser::parse(s, "<compiler:s_eval>") {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
-            match compile(&ast, &mut ce) {
+            let typed_ast = match type_pass(&ast, Type::any(), &mut ce) {
+                Ok(typed_ast) => typed_ast,
+                Err(e) => return format!("TYPE ERR: {}", e),
+            };
+            match compile(&typed_ast, &mut ce) {
                 Ok(prog) => {
                     let local_space = ce.borrow().get_local_space();
 

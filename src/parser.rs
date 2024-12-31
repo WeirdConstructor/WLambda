@@ -19,6 +19,7 @@ to parse in this hand written parser.
 */
 
 use crate::vval::Syntax;
+use crate::vval::Type;
 use crate::vval::VVal;
 use std::cell::RefCell;
 use std::str::FromStr;
@@ -945,6 +946,13 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
     }
 }
 
+fn is_ident_char(c: char) -> bool {
+    match c {
+        '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
+        _ => !c.is_whitespace(),
+    }
+}
+
 fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
     if ps.peek().is_none() {
         return Err(ps.err(ParseErrorKind::EOF("identifier")));
@@ -978,12 +986,78 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
 
         Ok(identifier)
     } else {
-        let identifier = ps.take_while(|c| match c {
-            '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
-            _ => !c.is_whitespace(),
-        });
+        let mut identifier = String::from("");
+        while ps.peek().unwrap_or(' ') != ' ' {
+            let c = ps.expect_some(ps.peek())?;
+            if !is_ident_char(c) {
+                break;
+            }
+
+            if c == ':' {
+                if !is_ident_char(ps.peek_offs(1).unwrap_or(' ')) {
+                    break;
+                } else {
+                    ps.consume();
+                    identifier.push(c);
+                }
+            } else {
+                ps.consume();
+                identifier.push(c);
+            }
+        }
         Ok(identifier.to_string())
     }
+}
+
+//    struct_type   = "record", "{", recordbody, "}"
+//                  | "enum", "{", enumbody, "}"
+//                  ;
+//    basetype      = "any" | "bool" | "none" | "str" | "num" | "int" | "float"
+//                  | "bytes" | "sym" | "char" | "byte" | "syntax" | "type" | "userdata"
+//                  | "ref", type
+//                  | "ref_weak", type
+//                  | "ref_hidden", type
+//                  | "pair", type, ",", type
+//                  | "optional", type
+//                  | "ivec2" | "ivec3" | "ivec4"
+//                  | "fvec2" | "fvec3" | "fvec4"
+//                  | "iter", type
+//                  | fun_type
+//                  | "{", [ type ], "}" (* map type *)
+//                  | "[", [ type ], "]" (* list type *)
+//                  | struct_type
+//                  | nominal_type
+//                  ;
+fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
+    let typename = parse_identifier(ps)?;
+    println!("PARSE TYPE {}", typename);
+    ps.skip_ws_and_comments();
+
+    let typ = match &typename[..] {
+        "any" => VVal::typ_box(Type::Any),
+        "bool" => VVal::typ_box(Type::Bool),
+        "none" => VVal::typ_box(Type::None),
+        "char" => VVal::typ_box(Type::Char),
+        "int" => VVal::typ_box(Type::Int),
+        "float" => VVal::typ_box(Type::Float),
+        "string" => VVal::typ_box(Type::Str),
+        "num" => VVal::typ_box(Type::Num),
+        "bytes" => VVal::typ_box(Type::Bytes),
+        "syntax" => VVal::typ_box(Type::Syntax),
+        "type" => VVal::typ_box(Type::Type),
+        "userdata" => VVal::typ_box(Type::Userdata),
+        "ivec2" => VVal::typ_box(Type::IVec2),
+        "ivec3" => VVal::typ_box(Type::IVec3),
+        "ivec4" => VVal::typ_box(Type::IVec4),
+        "fvec2" => VVal::typ_box(Type::FVec2),
+        "fvec3" => VVal::typ_box(Type::FVec3),
+        "fvec4" => VVal::typ_box(Type::FVec4),
+        _ => {
+            return Err(ps.err(ParseErrorKind::BadType("unknown type definition".to_string())));
+        }
+    };
+
+    Ok(typ)
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -1691,6 +1765,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
         let mut destructuring = false;
         let ids = VVal::vec();
+        let types = VVal::vec();
 
         match ps.expect_some(ps.peek())? {
             '(' => {
@@ -1703,6 +1778,14 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     }
                     ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
                     ps.skip_ws_and_comments();
+                    if is_def {
+                        if ps.consume_token_wsc(':', Syntax::T) {
+                            types.push(parse_type(ps)?);
+                        } else {
+                            types.push(VVal::type_any());
+                        }
+                    }
+
                     if !ps.consume_token_wsc(',', Syntax::TDelim) {
                         break;
                     }
@@ -1721,6 +1804,14 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
             _ => {
                 ids.push(VVal::new_sym_mv(parse_identifier(ps)?));
                 ps.skip_ws_and_comments();
+
+                if is_def {
+                    if ps.consume_token_wsc(':', Syntax::T) {
+                        types.push(parse_type(ps)?);
+                    } else {
+                        types.push(VVal::type_any());
+                    }
+                }
             }
         }
 
@@ -1754,6 +1845,14 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
         if destructuring {
             assign.push(VVal::Bol(destructuring));
+        } else if is_def {
+            assign.push(VVal::None);
+        }
+
+        if is_def {
+            if types.len() > 0 {
+                assign.push(types);
+            }
         }
 
         Ok(assign)
@@ -2574,7 +2673,7 @@ mod tests {
 
     fn refmt(s: &str) -> String {
         use crate::code_fmt::SourceFormatter;
-        let r = parse(s);
+        parse(s);
         let ps = Box::new(get_last_parse_state().unwrap());
         let mut sf = Box::new(SourceFormatter::new());
         let res = sf.format_source(&ps);

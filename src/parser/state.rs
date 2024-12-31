@@ -210,6 +210,7 @@ pub enum ParseErrorKind {
     BadFormat(String),
     BadKeyword(String, &'static str),
     BadNumber(ParseNumberError),
+    BadType(String),
     //BadCall(&'static str),
     EOF(&'static str),
 }
@@ -228,6 +229,7 @@ impl fmt::Display for ParseErrorKind {
             BadFormat(s) => write!(f, "{}", s),
             BadKeyword(kw, s) => write!(f, "Got '{}', expected {}", kw, s),
             BadNumber(s) => write!(f, "{}", s),
+            BadType(s) => write!(f, "{}", s),
             //BadCall(s)            => write!(f, "{}", s),
             EOF(s) => write!(f, "EOF while parsing: {}", s),
         }
@@ -463,6 +465,20 @@ impl State {
             None
         } else {
             Some(self.input[self.ch_ptr])
+        }
+    }
+
+    /// Returns the character under the parse head, applied with the offset `offs`.
+    /// Returns `None` when the parse head is at EOF.
+    pub fn peek_offs(&self, offs: usize) -> Option<char> {
+        if self.at_end() {
+            None
+        } else {
+            if (self.ch_ptr + offs) >= self.input.len() {
+                None
+            } else {
+                Some(self.input[self.ch_ptr + offs])
+            }
         }
     }
 

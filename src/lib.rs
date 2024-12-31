@@ -651,6 +651,7 @@ pub mod util;
 pub mod vm;
 pub mod vval;
 pub mod vval_user_obj;
+pub mod types;
 
 pub use compiler::EvalContext;
 pub use compiler::GlobalEnv;

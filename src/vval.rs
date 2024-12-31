@@ -1879,6 +1879,7 @@ pub enum Type {
     Bytes,
     Sym,
     Char,
+    Byte,
     Syntax,
     Type,
     Userdata,
@@ -1904,7 +1905,9 @@ pub enum Type {
 }
 
 impl Type {
-    fn s(&self) -> String {
+    pub fn any() -> Rc<Type> { Rc::new(Type::Any) }
+
+    pub fn s(&self) -> String {
         match self {
             Type::Any => "any".to_string(),
             Type::Bool => "bool".to_string(),
@@ -1912,6 +1915,7 @@ impl Type {
             Type::Str => "str".to_string(),
             Type::Bytes => "bytes".to_string(),
             Type::Sym => "sym".to_string(),
+            Type::Byte => "byte".to_string(),
             Type::Char => "char".to_string(),
             Type::Syntax => "syntax".to_string(),
             Type::Type => "type".to_string(),
@@ -1949,7 +1953,7 @@ impl Type {
         }
     }
 
-    fn resolve_check(&self) -> TypeResolve {
+    pub fn resolve_check(&self) -> TypeResolve {
         match self {
             Type::Any => return TypeResolve::Resolved,
             Type::Bool => return TypeResolve::Resolved,
@@ -1958,6 +1962,7 @@ impl Type {
             Type::Bytes => return TypeResolve::Resolved,
             Type::Sym => return TypeResolve::Resolved,
             Type::Char => return TypeResolve::Resolved,
+            Type::Byte => return TypeResolve::Resolved,
             Type::Syntax => return TypeResolve::Resolved,
             Type::Type => return TypeResolve::Resolved,
             Type::Userdata => return TypeResolve::Resolved,
@@ -2984,6 +2989,18 @@ impl VVal {
 
     pub fn new_usr<T: VValUserData + 'static>(o: T) -> VVal {
         VVal::Usr(Box::new(o))
+    }
+
+    pub fn type_any() -> VVal {
+        VVal::typ_box(Type::Any)
+    }
+
+    pub fn typ_box(t: Type) -> VVal {
+        VVal::Type(Rc::new(t))
+    }
+
+    pub fn typ(t: Rc<Type>) -> VVal {
+        VVal::Type(t)
     }
 
     #[inline]
