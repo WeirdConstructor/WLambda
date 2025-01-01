@@ -1472,6 +1472,7 @@ impl VValFun {
         min_args: Option<usize>,
         max_args: Option<usize>,
         err_arg_ok: bool,
+        typ: Rc<Type>,
     ) -> VVal
     where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
@@ -1483,6 +1484,7 @@ impl VValFun {
             min_args,
             max_args,
             err_arg_ok,
+            typ,
             None,
             Rc::new(vec![]),
         )
@@ -1494,6 +1496,7 @@ impl VValFun {
         max_args: Option<usize>,
         err_arg_ok: bool,
         spos: SynPos,
+        typ: Rc<Type>,
     ) -> VVal
     where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
@@ -1505,6 +1508,7 @@ impl VValFun {
             min_args,
             max_args,
             err_arg_ok,
+            typ,
             Some(spos),
             Rc::new(vec![]),
         )
@@ -1519,6 +1523,7 @@ impl VValFun {
         min_args: Option<usize>,
         max_args: Option<usize>,
         err_arg_ok: bool,
+        typ: Rc<Type>,
         syn_pos: Option<SynPos>,
         upvalue_pos: Rc<std::vec::Vec<VarPos>>,
     ) -> VVal {
@@ -1527,7 +1532,7 @@ impl VValFun {
             upvalues,
             fun: FunType::ClosureNode(fun),
             local_size: env_size,
-            typ: None,
+            typ,
             min_args,
             max_args,
             err_arg_ok,
@@ -1918,8 +1923,37 @@ impl Type {
         Rc::new(Type::Any)
     }
 
+    pub fn union(&self, t: Rc<Type>) -> Rc<Self> {
+        if let Type::Union(u) = self {
+            let v = vec![];
+            for te in u.iter() {
+                v.push(te);
+            }
+            v.push(t);
+            Rc::new(Type::Union(Rc::new(v)))
+        } else {
+            Rc::new(Type::Union(Rc::new(vec![Rc::new(self.clone()), t])))
+        }
+    }
+
     pub fn rc_new_var(n: &str) -> Rc<Self> {
         Rc::new(Type::Var(Rc::new(format!("{}{}", n, TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst)))))
+    }
+
+    pub fn generic(n: &str) -> Rc<Self> {
+        Rc::new(Type::Var(Rc::new(n.to_string())))
+    }
+
+    pub fn fun_ret(t: Self) -> Rc<Type> {
+        Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t)))
+    }
+
+    pub fn fun_1_ret(a1: Self, t: Self) -> Rc<Type> {
+        Rc::new(Type::Function(Rc::new(vec![Rc::new(a1)]), Rc::new(t)))
+    }
+
+    pub fn fun_2_ret(a1: Self, a2: Self, t: Self) -> Rc<Type> {
+        Rc::new(Type::Function(Rc::new(vec![Rc::new(a1), Rc::new(a2)]), Rc::new(t)))
     }
 
     pub fn s(&self) -> String {
@@ -3185,13 +3219,15 @@ impl VVal {
         VVal::Lst(Rc::new(RefCell::new(v)))
     }
 
-    /// Creates a new WLambda function that wraps the given Rust
+    /// Deprecated: Creates a new WLambda function that wraps the given Rust
     /// closure. See also `VValFun::new_fun`. For a more detailed
     /// discussion of the parameters.
     ///
+    /// Deprecation notice: Please use `VVal::new_fun_t` to pass a proper type with your function.
+    ///
     ///```rust
     /// use wlambda::compiler::EvalContext;
-    /// use wlambda::vval::{VVal, VValFun, Env};
+    /// use wlambda::vval::{VVal, VValFun, Env, Type};
     ///
     /// let mut ctx = wlambda::compiler::EvalContext::new_empty_global_env();
     ///
@@ -3223,6 +3259,45 @@ impl VVal {
             Rc::new(vec![]),
         )
     }
+
+    /// Creates a new typed WLambda function that wraps the given Rust
+    /// closure. See also `VValFun::new_fun_t`. For a more detailed
+    /// discussion of the parameters.
+    ///
+    ///```rust
+    /// use wlambda::compiler::EvalContext;
+    /// use wlambda::vval::{VVal, VValFun, Env, Type};
+    ///
+    /// let mut ctx = wlambda::compiler::EvalContext::new_empty_global_env();
+    ///
+    /// ctx.set_global_var("xyz",
+    ///     &VVal::new_fun_t(
+    ///         move |env: &mut Env, argc: usize| {
+    ///             Ok(VVal::new_str("xyz"))
+    ///         }, Type::fun_ret(Type::Str)));
+    ///
+    /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
+    ///```
+    pub fn new_fun_t<T>(
+        fun: T,
+        typ: Rc<Type>,
+    ) -> VVal
+    where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        VValFun::new_val(
+            Rc::new(RefCell::new(fun)),
+            Vec::new(),
+            0,
+            None,
+            None,
+            true,
+            typ,
+            None,
+            Rc::new(vec![]),
+        )
+    }
+
 
     pub fn call(&self, env: &mut Env, args: &[VVal]) -> Result<VVal, StackAction> {
         let argc = args.len();
@@ -5214,6 +5289,18 @@ impl VVal {
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
     {
         self.set_key_sym(s2sym(key), VValFun::new_fun(fun, min_args, max_args, err_arg_ok))
+            .expect("Map not borrowed when using set_map_key_fun");
+    }
+
+    pub fn set_map_key_fun_t<T>(
+        &self,
+        key: &str,
+        fun: T,
+        typ: Rc<Type>
+    ) where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        self.set_key_sym(s2sym(key), VValFun::new_fun(fun, None, None, true))
             .expect("Map not borrowed when using set_map_key_fun");
     }
 
