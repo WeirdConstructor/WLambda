@@ -30,14 +30,14 @@ fn check_function_string_rep() {
     assert_eq!(ve("!upv1 = \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
                "\"&F{@<compiler:s_eval>:1:21 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&\\\"lol!\\\"]}\"");
     assert_eq!(ve("!upv1 = $&& \"lol!\"; str {|1<3| !x = 1; !g = 2; upv1 }"),
-               "\"&F{@<compiler:s_eval>:1:23 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&$&&\\\"lol!\\\"]}\"");
+               "\"&F{@<compiler:s_eval>:1:25 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&$&&\\\"lol!\\\"]}\"");
     assert_eq!(
         ve("!upv1 = \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
         "&F{@<compiler:s_eval>:1:17 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&\"lol!\"]}"
     );
     assert_eq!(
         ve("!upv1 = $&& \"lol!\"; {|1<3| !x = 1; !g = 2; upv1 }"),
-        "&F{@<compiler:s_eval>:1:19 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&$&&\"lol!\"]}"
+        "&F{@<compiler:s_eval>:1:21 Func[upv1],amin=1,amax=3,locals=2,upvalues=$[$&$&&\"lol!\"]}"
     );
 }
 
@@ -3181,7 +3181,7 @@ fn check_error_reporting_func() {
         "EXEC ERR: Caught Panic: function expects at most 0 arguments, got 1\n    <compiler:s_eval>:1:19 Func[foo] [10]\n    <compiler:s_eval>:1:29 Call [10]\n");
     assert_eq!(
         ve("!x = ${(foo) = {}}; x.foo 10;"),
-        "COMPILE ERROR: <compiler:s_eval>:1:12 Compilation Error: Variable 'foo' undefined"
+        "COMPILE ERROR: <compiler:s_eval>:1:9 Compilation Error: Variable 'foo' undefined"
     );
     assert_eq!(ve("!x = ${foo = {}}; x.foo 10;"),
         "EXEC ERR: Caught Panic: function expects at most 0 arguments, got 1\n    <compiler:s_eval>:1:14 Func[foo] [10]\n    <compiler:s_eval>:1:25 Call [10]\n");
@@ -3744,6 +3744,13 @@ fn check_if() {
     );
     assert_eq!(
         ve(r"
+        !(y,o) = ? 2 < 3 { !(x,o2) = 11; 1 } { 2 };
+        y
+    "),
+        "1"
+    );
+    assert_eq!(
+        ve(r"
         !x = 11;
         !k = $n;
         !y = ? 2 < 3 {
@@ -4145,7 +4152,7 @@ fn check_iter() {
     assert_eq!(v(r"
         !it = $iter $i(0,5);
         $@v it \$+ $p(_, unwrap it[]);
-    "), "Runtime error: Panic: unwrap empty option!\n        $n\n    <wlambda::eval>:3:31 Call [$o()]\n    <wlambda::eval>:3:15 Func[it] [4]\n    <wlambda::eval>:3:14 Call [&F{@<wlambda::eval>:3:15 Func[it],a...]\n");
+    "), "Runtime error: Panic: unwrap empty option!\n        $n\n    <wlambda::eval>:3:33 Call [$o()]\n    <wlambda::eval>:3:17 Func[it] [4]\n    <wlambda::eval>:3:16 Call [&F{@<wlambda::eval>:3:17 Func[it],a...]\n");
 }
 
 #[test]
@@ -4599,7 +4606,7 @@ fn check_tree_match() {
 
     assert_eq!(ve("$S(a/b)  ${a = ${b = 20}}"), "$[20]");
     assert_eq!(ve("$S(a/b]) ${a = ${b = 20}}"),
-        "COMPILE ERROR: <compiler:s_eval>:1:10 Compilation Error: bad selector: <selector>:1:4 Unexpected token ']'. At end of selector\nat code:\n1   | ]\n");
+        "COMPILE ERROR: <compiler:s_eval>:1:2 Compilation Error: bad selector: <selector>:1:4 Unexpected token ']'. At end of selector\nat code:\n1   | ]\n");
     assert_eq!(ve("unwrap_err ~ std:selector $q a/b] "),
         "\"bad selector: <selector>:1:4 Unexpected token \\']\\'. At end of selector\\nat code:\\n1   | ]\\n, selector was: /a/b]/\"");
     assert_eq!(ve("(std:selector $q a/b ) ${a = ${b = 20}}"), "$[20]");
@@ -4715,10 +4722,10 @@ fn check_struct_patterns() {
     assert_eq!(ve("($M $error 20)        $error 20"), "${}");
     assert_eq!(ve("($M $error 20)        $error 21"), "$n");
     assert_eq!(ve("($M $error ?)         $error 22"), "${}");
-    assert_eq!(ve("($M x $error ?)       $error 23"), "${x=$e 23 [@ <compiler:s_eval>:1:20 Err]}");
+    assert_eq!(ve("($M x $error ?)       $error 23"), "${x=$e 23 [@ <compiler:s_eval>:1:30 Err]}");
     assert_eq!(
         ve("($M x $error (y ?))   $error 24"),
-        "${x=$e 24 [@ <compiler:s_eval>:1:20 Err],y=24}"
+        "${x=$e 24 [@ <compiler:s_eval>:1:30 Err],y=24}"
     );
 
     assert_eq!(ve("($M x 10)        $o(10)"), "${x=$o(10)}");
@@ -5629,13 +5636,13 @@ fn check_regex_pattern_global() {
     );
     assert_eq!(
         ve("$@v $rg $+f  $q fffooffffofof { $e 11 }"),
-        "EXEC ERR: Caught Panic: Dropped error value: 11\n    <compiler:s_eval>:1:34 Err 11\n"
+        "EXEC ERR: Caught Panic: Dropped error value: 11\n    <compiler:s_eval>:1:36 Err 11\n"
     );
 
     assert_eq!(ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { ? len[_.0] > 3 { next[]; } { $+ _.0 } }"), "$[\"fff\",\"f\",\"f\"]");
     assert_eq!(
         ve("$@v (std:pattern $q $+f :g) $q fffooffffofof { $e 11 }"),
-        "EXEC ERR: Caught Panic: Dropped error value: 11\n    <compiler:s_eval>:1:49 Err 11\n"
+        "EXEC ERR: Caught Panic: Dropped error value: 11\n    <compiler:s_eval>:1:51 Err 11\n"
     );
 
     assert_eq!(ve("$@v $rg\"$^$+f\" \"ffooofffofo\" \\$+ _.0"), "$[\"ff\"]");
@@ -7303,6 +7310,7 @@ fn check_prelude_lzw() {
 }
 
 #[test]
+#[cfg(feature = "serde_json")]
 fn check_chem() {
     assert_eq!(ve("!c = std:chem:parse :FeH2O; c.first_elem_info[].atomic_number"), "26");
     assert_eq!(
@@ -7838,6 +7846,10 @@ fn check_test_min_max() {
 fn check_multi_def() {
     assert_eq!(
         ve("!r = 14; if $t { !o = 12; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o }; r"),
+        "14"
+    );
+    assert_eq!(
+        ve("!(r,T) = 14; if $t { !(o,T2) = 12; if $t { !(y,T3) = 12; if $t { !(x,T4) = 1; !(x,T5) = 2; }; }; o }; r"),
         "14"
     );
     assert_eq!(ve("!o = 15; if $t { !y = 12; if $t { !x = 1; !x = 2; }; }; o"), "15");

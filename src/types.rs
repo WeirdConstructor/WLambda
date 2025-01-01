@@ -40,11 +40,16 @@ fn type_def(
     ce: &mut Rc<RefCell<CompileEnv>>,
     is_global: bool,
 ) -> Result<VVal, CompileError> {
+    let (vars, value, destr, types) = (ast.v_(1), ast.v_(2), ast.v_(3), ast.v_(4));
 
-    let vars = ast.at(1).unwrap();
-    let value = ast.at(2).unwrap();
-    let destr = ast.at(3).unwrap_or(VVal::None);
-    let types = ast.at(4).unwrap_or(VVal::None);
+    if destr.b() {
+        panic!("CANT DO THIS!");
+    } else {
+        let varname = vars.v_s_raw(0);
+        ce.borrow_mut().recent_var = varname.clone();
+
+//        let val_pw = compile(&value, ce)?;
+    }
 
     println!("Vars: {}, Types: {}", vars.s(), types.s());
 
@@ -59,6 +64,7 @@ pub(crate) fn type_pass(
     type_hint: Rc<Type>,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<VVal, CompileError> {
+    return Ok(ast.clone());
     match ast {
         VVal::Lst(_) => {
             let syn = ast.at(0).unwrap_or(VVal::None).get_syn();
@@ -67,9 +73,9 @@ pub(crate) fn type_pass(
                     let node = type_block(ast, 1, type_hint, ce)?;
                     node.unshift(ast.v_(0));
                     node
-                },
+                }
                 Syntax::Def => type_def(ast, ce, false)?,
-//                Syntax::DefGlobRef => compile_def(ast, ce, true),
+                //                Syntax::DefGlobRef => compile_def(ast, ce, true),
                 _ => return Err(ast.compile_err(format!("bad input: {}", ast.s()))),
             };
             Ok(v)

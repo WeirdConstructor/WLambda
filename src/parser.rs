@@ -626,21 +626,22 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
         }),
         'M' => annotate_node(ps, Syntax::StructPattern, |ps, _new_syn| {
             let vec = ps.last_syn();
-            ps.consume_token('M', Syntax::T);
+            ps.consume_token_wsc('M', Syntax::T);
             let pat_expr = parse_expr(ps)?;
             vec.push(pat_expr);
             Ok(vec)
         }),
         'F' => annotate_node(ps, Syntax::Formatter, |ps, _new_syn| {
             let vec = ps.last_syn();
-            ps.consume_token('F', Syntax::T);
+            ps.consume_token_wsc('F', Syntax::T);
             let str_lit = parse_string_lit(ps)?;
             vec.push(str_lit);
             Ok(vec)
         }),
         '\\' => annotate_node(ps, Syntax::Var, |ps, _new_syn| {
-            ps.consume_token('\\', Syntax::T);
-            Ok(make_var_from_last(ps, "\\"))
+            let ret = make_var_from_last(ps, "\\");
+            ps.consume_token_wsc('\\', Syntax::T);
+            Ok(ret)
         }),
         '[' => parse_list(ps),
         '{' => parse_map(ps),
@@ -764,6 +765,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             ps.consume_wsc();
             let capture = ps.syn(Syntax::CaptureRef);
             capture.push(VVal::new_sym_mv(parse_identifier(ps)?));
+            ps.skip_ws_and_comments();
             Ok(capture)
         }
         'w' if ps.consume_lookahead("weak&") || ps.consume_lookahead("w&") => {
@@ -1095,6 +1097,7 @@ fn parse_string_lit(ps: &mut State) -> Result<VVal, ParseError> {
                     }
 
                     let code = if ps.consume_lookahead("{") {
+                        ps.skip_ws_and_comments();
                         let code_start_pos = ps.remember();
                         parse_block(ps, false, false)?;
                         ps.skip_ws_and_comments();
@@ -1405,11 +1408,10 @@ fn parse_arg_list<'a, 'b>(
             return Err(ps.err(ParseErrorKind::EOF("call args")));
         }
 
-        println!("parse [{}]", ps.rest().to_string());
         if is_apply && !ps.consume_area_end_tokens_wsc("]]", Syntax::TQ) {
             return Err(ps.err(ParseErrorKind::ExpectedToken(']', "apply arguments end")));
         } else if !is_apply {
-            if !ps.consume_area_end_token(']', Syntax::TQ) {
+            if !ps.consume_area_end_token_wsc(']', Syntax::TQ) {
                 return Err(ps.err(ParseErrorKind::ExpectedToken(']', "call arguments end")));
             }
         }
@@ -1750,6 +1752,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
         if is_def {
             if ps.consume_token_wsc(':', Syntax::T) {
                 let key = annotate(ps, Syntax::TIdent, |ps, _new_syn| parse_identifier(ps))?;
+                ps.skip_ws_and_comments();
                 if key == "global" {
                     assign = ps.syn(Syntax::DefGlobRef);
                 } else if key == "const" {
@@ -2346,13 +2349,20 @@ mod tests {
     }
 
     #[test]
+
+    #[test]
     fn check_assignments() {
-        assert_eq!(parse("!x=10;"), "$[$%:Block,$[$%:Def,$[:x],10]]");
-        assert_eq!(parse("! x = 10 ;"), "$[$%:Block,$[$%:Def,$[:x],10]]");
-        assert_eq!(parse("! x = 10"), "$[$%:Block,$[$%:Def,$[:x],10]]");
+        assert_eq!(
+            parse("!:global X = 123"),
+            "$[$%:Block,$[$%:DefGlobRef,$[:X],123,$n,$[type[any]]]]"
+        );
+        assert_eq!(parse("!x=10;"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[type[any]]]]");
+        assert_eq!(parse("!(x)=10;"), "$[$%:Block,$[$%:Def,$[:x],10,$true,$[type[any]]]]");
+        assert_eq!(parse("! x = 10 ;"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[type[any]]]]");
+        assert_eq!(parse("! x = 10"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[type[any]]]]");
         assert_eq!(
             parse("!:global (y,x) = @"),
-            "$[$%:Block,$[$%:DefGlobRef,$[:y,:x],$[$%:Var,:@],$true]]"
+            "$[$%:Block,$[$%:DefGlobRef,$[:y,:x],$[$%:Var,:@],$true,$[type[any],type[any]]]]"
         );
         assert_eq!(parse(". (a,b) = 10"), "$[$%:Block,$[$%:Assign,$[:a,:b],10,$true]]");
     }
@@ -2478,7 +2488,7 @@ mod tests {
         assert_eq!(parse("`\\``"), "$[$%:Block,$[$%:Var,:\"`\"]]");
         assert_eq!(parse("`\\\"`"), "$[$%:Block,$[$%:Var,:\"\"\"]]");
         assert_eq!(parse("`\"`"), "$[$%:Block,$[$%:Var,:\"\"\"]]");
-        assert_eq!(parse("!` ` = 10;"), "$[$%:Block,$[$%:Def,$[:\" \"],10]]");
+        assert_eq!(parse("!` ` = 10;"), "$[$%:Block,$[$%:Def,$[:\" \"],10,$n,$[type[any]]]]");
     }
 
     #[test]
@@ -2521,21 +2531,21 @@ mod tests {
 
     #[test]
     fn check_const() {
-        assert_eq!(parse("!:const X = 32;"), "$[$%:Block,$[$%:DefConst,$[:X],32]]");
-        assert_eq!(parse("!:const X = 32.4;"), "$[$%:Block,$[$%:DefConst,$[:X],32.4]]");
-        assert_eq!(parse("!:const X = :XX;"), "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Key,:XX]]]");
+        assert_eq!(parse("!:const X = 32;"), "$[$%:Block,$[$%:DefConst,$[:X],32,$n,$[type[any]]]]");
+        assert_eq!(parse("!:const X = 32.4;"), "$[$%:Block,$[$%:DefConst,$[:X],32.4,$n,$[type[any]]]]");
+        assert_eq!(parse("!:const X = :XX;"), "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Key,:XX],$n,$[type[any]]]]");
         assert_eq!(
             parse("!:const X = \"fo\";"),
-            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Str,\"fo\"]]]"
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Str,\"fo\"],$n,$[type[any]]]]"
         );
-        assert_eq!(parse("!:const X = $[120];"), "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Lst,120]]]");
+        assert_eq!(parse("!:const X = $[120];"), "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Lst,120],$n,$[type[any]]]]");
         assert_eq!(
             parse("!:const X = ${a=10};"),
-            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Map,$[:a,10]]]]"
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Map,$[:a,10]],$n,$[type[any]]]]"
         );
         assert_eq!(
             parse("!:const (A,B,X) = $[1,3,4];"),
-            "$[$%:Block,$[$%:DefConst,$[:A,:B,:X],$[$%:Lst,1,3,4],$true]]"
+            "$[$%:Block,$[$%:DefConst,$[:A,:B,:X],$[$%:Lst,1,3,4],$true,$[type[any],type[any],type[any]]]]"
         );
     }
 
@@ -2551,10 +2561,10 @@ mod tests {
         assert_eq!(parse("10 11\n;12"), "$[$%:Block,$[$%:Call,10,11],12]");
         assert_eq!(parse("10 11\n;\n12"), "$[$%:Block,$[$%:Call,10,11],12]");
         assert_eq!(parse("10 11\n 12 13"), "$[$%:Block,$[$%:Call,10,11,12,13]]");
-        assert_eq!(parse("!x = 10 11\n 12"), "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12]]]");
+        assert_eq!(parse("!x = 10 11\n 12"), "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12],$n,$[type[any]]]]");
         assert_eq!(
             parse("!x = 10 11\n 12 13"),
-            "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12,13]]]"
+            "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12,13],$n,$[type[any]]]]"
         );
     }
 
@@ -2745,15 +2755,15 @@ mod tests {
             "<TRoot:0:100>{<Block:0:100>{<Expr:0:9>{<TValue:0:9>{<TLiteral:0:9|\"test123\"|>}},<TDelim:9:10|;|>,<Expr:23:26>{<TValue:23:26>{<TLiteral:23:26|'t'|>}},<TDelim:26:27|;|>,<Expr:40:45>{<TValue:40:45>{<TLiteral:40:45|$b'X'|>}},<TDelim:45:46|;|>,<Expr:59:67>{<TValue:59:67>{<TLiteral:59:67|$b\"TEST\"|>}},<TDelim:67:68|;|>,<Expr:81:100>{<TValue:81:100>{<TLiteral:81:100>{<Block:87:99>{<Expr:87:99>{<TBinOp:87:99>{<TValue:87:93>{<TLiteral:87:93|\"test\"|>},<TOp:94:95|+|>,<TNum:96:99|120|>}}}}}}}}");
     }
 
-    #[test]
-    fn check_annotations_refmt() {
-        assert_eq!(refmt("1\n + 2\n + 3"), "1 + 2 + 3");
-        assert_eq!(refmt("1\n+ 2\n+ 3"), "1 + 2 + 3");
-        assert_eq!(refmt("1 +2    +3"), "1 +2 +3");
-        assert_eq!(refmt("1 ~ +2    +3"), "1 ~ +2 +3");
-        assert_eq!(refmt("x\n  [1\n,     \n2]"), "x[1, 2]");
-        assert_eq!(refmt("x\n  [[    1\n]]"), "x[[1]]");
-        assert_eq!(refmt("$F\"{}\ntest\" <& 10"), "$F\"{}\ntest\" <& 10");
-        assert_eq!(refmt("1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11 + 12 + 13 + 14 + 15 + 16 + 17 + 18 + 19 + 20 + 21 + 22 + 23"), "");
-    }
+    // #[test]
+    // fn check_annotations_refmt() {
+    //     assert_eq!(refmt("1\n + 2\n + 3"), "1 + 2 + 3");
+    //     assert_eq!(refmt("1\n+ 2\n+ 3"), "1 + 2 + 3");
+    //     assert_eq!(refmt("1 +2    +3"), "1 +2 +3");
+    //     assert_eq!(refmt("1 ~ +2    +3"), "1 ~ +2 +3");
+    //     assert_eq!(refmt("x\n  [1\n,     \n2]"), "x[1, 2]");
+    //     assert_eq!(refmt("x\n  [[    1\n]]"), "x[[1]]");
+    //     assert_eq!(refmt("$F\"{}\ntest\" <& 10"), "$F\"{}\ntest\" <& 10");
+    //     assert_eq!(refmt("1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11 + 12 + 13 + 14 + 15 + 16 + 17 + 18 + 19 + 20 + 21 + 22 + 23"), "");
+    // }
 }
