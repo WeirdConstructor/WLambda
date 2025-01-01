@@ -1260,6 +1260,44 @@ impl CompileEnv {
         r
     }
 
+    pub fn get_type(&self, s: &str) -> Option<Rc<Type>> {
+        let pos = self.block_env.get(s);
+        match pos {
+            VarPos::NoPos => {
+                let opt_p = self.parent.as_ref();
+                if opt_p.is_none() {
+                    if let Some(v) = self.global.borrow().env.get(s) {
+                        if v.is_ref() {
+                            return Some(v.t());
+                        } else {
+                            return Some(v.t());
+                        }
+                    } else {
+                        return None
+                    }
+                }
+                let parent = opt_p.unwrap().clone();
+                let mut par_mut = parent.borrow_mut();
+
+                let par_var_pos = par_mut.block_env.get(s);
+                let par_var_pos = match par_var_pos {
+                    VarPos::NoPos => par_mut.get(s),
+                    _ => par_var_pos,
+                };
+                match par_var_pos {
+                    VarPos::Local(_) => None,
+                    VarPos::UpValue(_) => None,
+                    VarPos::Global(g) => Some(g.t()),
+                    VarPos::Const(c) => Some(c.t()),
+                    VarPos::NoPos => None
+                }
+            }
+            VarPos::Global(g) => Some(g.t()),
+            VarPos::Const(c) => Some(c.t()),
+            _ => None,
+        }
+    }
+
     pub fn get(&mut self, s: &str) -> VarPos {
         let pos = self.block_env.get(s);
         match pos {

@@ -1423,6 +1423,8 @@ pub struct VValFun {
     ///
     /// This value is used to reserve stack space for storing them.
     pub local_size: usize,
+    /// The function type
+    pub typ: Option<Rc<Type>>,
     /// Min number of arguments this functions requires.
     pub min_args: Option<usize>,
     /// Max number of arguments this functions requires.
@@ -1525,6 +1527,7 @@ impl VValFun {
             upvalues,
             fun: FunType::ClosureNode(fun),
             local_size: env_size,
+            typ: None,
             min_args,
             max_args,
             err_arg_ok,
@@ -1551,6 +1554,7 @@ impl VValFun {
             upvalues,
             fun: FunType::VMProg(prog),
             local_size: env_size,
+            typ: None,
             min_args,
             max_args,
             err_arg_ok,
@@ -1568,6 +1572,7 @@ impl VValFun {
             upvalue_pos: Rc::new(vec![]),
             upvalues: Vec::new(),
             local_size: 0,
+            typ: None,
             min_args: None,
             max_args: None,
             err_arg_ok: false,
@@ -1903,7 +1908,7 @@ pub enum Type {
     Ref(Rc<Type>),
     Record(Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
-    Function(Rc<Type>, Rc<Vec<(Rc<Type>, bool)>>),
+    Function(Rc<Vec<(Rc<Type>, bool)>>, Rc<Type>),
     Name(Rc<String>),
     Var(Rc<String>),
 }
@@ -1957,7 +1962,7 @@ impl Type {
                 }
                 res
             }
-            Type::Function(ret, types) => format!("({:?}) -> {}", *types, ret.s()),
+            Type::Function(types, ret) => format!("({:?}) -> {}", *types, ret.s()),
             Type::Name(name) => format!("{}", *name),
             Type::Var(name) => format!("<{}>", *name),
         }
@@ -2010,7 +2015,7 @@ impl Type {
                 }
                 res
             }
-            Type::Function(ret, types) => {
+            Type::Function(types, ret) => {
                 let mut res = ret.resolve_check();
                 for t in types.iter() {
                     match t.0.resolve_check() {
@@ -6133,8 +6138,11 @@ impl VVal {
             VVal::Lst(_) => Type::Lst(Type::any()),
             VVal::Map(_) => Type::Map(Type::any()),
             // TODO: Function type should be stored in VValFun!!!!
-            VVal::Fun(fun) => Type::Function(Type::any(), Rc::new(vec![])),
-            VVal::DropFun(_) => Type::Function(Rc::new(Type::None), Rc::new(vec![])),
+            VVal::Fun(fun) => match &fun.typ {
+                Some(t) => return t.clone(),
+                None => return Type::rc_new_var("_FUN"),
+            },
+            VVal::DropFun(_) => Type::Function(Rc::new(vec![]), Rc::new(Type::None)),
             VVal::FVec(nv) => match nv.dims() {
                 NVecDim::Two => Type::FVec2,
                 NVecDim::Three => Type::FVec3,

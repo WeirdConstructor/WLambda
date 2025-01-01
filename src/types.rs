@@ -14,7 +14,7 @@ use std::rc::Rc;
 use crate::compiler::CompileEnv;
 use crate::ops::BinOp;
 use crate::vval::Syntax;
-use crate::vval::Type;
+use crate::vval::{Type, TypeResolve};
 use crate::vval::VVal;
 //
 //pub(crate) fn type_pass(
@@ -98,6 +98,18 @@ fn type_binop(
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
     let (syn, a, b) = (ast.v_(0), ast.v_(1), ast.v_(2));
+    println!("SYN: {} | {:?}", syn.s(), ast);
+    println!("SYN: {:?}", ce.borrow_mut().get("+"));
+    // TODO: Get Type of BinOp from Environment by `syn`.
+    let op_type = match ce.borrow().get_type("+") {
+        Some(t) => t,
+        None => return Err(ast.compile_err(format!("Unknown type of operator: {}", ast.s()))),
+    };
+    match op_type.resolve_check() {
+        TypeResolve::Resolved => (),
+        e => return Err(ast.compile_err(format!("Operator has unknown type: {}, {:?}", op_type.s(), e))),
+    }
+    println!("TYPE: {:?}", op_type);
 
     Ok(TypedVVal::new(Type::rc_new_var("BinOp"), ast.clone()))
 }
@@ -183,11 +195,10 @@ pub(crate) fn type_pass(
         }
         _ => {
             println!("AST IN {:?}", ast.s());
-            Ok(TypedVVal::new(Type::rc_new_var("AST"), ast.clone()))
+            Ok(TypedVVal::new(ast.t(), ast.clone()))
         }
     }
 }
-
 
 #[allow(clippy::cognitive_complexity)]
 pub(crate) fn type_check(
