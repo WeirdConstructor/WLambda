@@ -11,8 +11,8 @@ use crate::vval::CompileError;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::ops::BinOp;
 use crate::compiler::CompileEnv;
+use crate::ops::BinOp;
 use crate::vval::Syntax;
 use crate::vval::Type;
 use crate::vval::VVal;
@@ -23,16 +23,28 @@ use crate::vval::VVal;
 //    ce: &mut Rc<RefCell<CompileEnv>>,
 //) -> Result<VVal, CompileError>;
 
+#[derive(Debug, Clone)]
+pub struct TypedVVal {
+    pub vval: VVal,
+    pub typ: Rc<Type>,
+}
+
+impl TypedVVal {
+    pub fn new(typ: Rc<Type>, vval: VVal) -> Self {
+        Self { vval, typ }
+    }
+}
+
 fn type_var(
     ast: &VVal,
     ce: &mut Rc<RefCell<CompileEnv>>,
     capt_ref: bool,
-) -> Result<VVal, CompileError> {
+) -> Result<TypedVVal, CompileError> {
     let syn = ast.at(0).unwrap_or(VVal::None);
     let spos = syn.get_syn_pos();
 
     let var = ast.at(1).unwrap();
-    var.with_s_ref(|var_s: &str| -> Result<VVal, CompileError> {
+    var.with_s_ref(|var_s: &str| -> Result<TypedVVal, CompileError> {
         match var_s {
             "_" => {
                 ce.borrow_mut().set_impl_arity(1);
@@ -76,21 +88,18 @@ fn type_var(
                 let pos = ce.borrow_mut().get(var_s);
             }
         }
-        Ok(VVal::None)
-    })?;
-
-    Ok(ast.clone())
+        Ok(TypedVVal::new(Type::rc_new_var(&format!("V{}_", var_s)), ast.clone()))
+    })
 }
-
 
 fn type_binop(
     ast: &VVal,
     op: BinOp,
     ce: &mut Rc<RefCell<CompileEnv>>,
-) -> Result<VVal, CompileError> {
+) -> Result<TypedVVal, CompileError> {
     let (syn, a, b) = (ast.v_(0), ast.v_(1), ast.v_(2));
 
-    Ok(ast.clone())
+    Ok(TypedVVal::new(Type::rc_new_var("BinOp"), ast.clone()))
 }
 
 fn type_block(
@@ -98,19 +107,24 @@ fn type_block(
     skip_cnt: usize,
     type_hint: Rc<Type>,
     ce: &mut Rc<RefCell<CompileEnv>>,
-) -> Result<VVal, CompileError> {
+) -> Result<TypedVVal, CompileError> {
+    let mut last_type = type_hint.clone();
     let stmts = ast.map_skip_vval(
-        |e, is_last| type_pass(e, if is_last { type_hint.clone() } else { Type::any() }, ce),
+        |e, is_last| {
+            let tv = type_pass(e, if is_last { type_hint.clone() } else { Type::any() }, ce)?;
+            last_type = tv.typ;
+            Ok(tv.vval)
+        },
         skip_cnt,
     )?;
-    Ok(stmts)
+    Ok(TypedVVal::new(last_type, stmts))
 }
 
 fn type_def(
     ast: &VVal,
     ce: &mut Rc<RefCell<CompileEnv>>,
     is_global: bool,
-) -> Result<VVal, CompileError> {
+) -> Result<TypedVVal, CompileError> {
     let (vars, value, destr, types) = (ast.v_(1), ast.v_(2), ast.v_(3), ast.v_(4));
 
     if destr.b() {
@@ -121,12 +135,12 @@ fn type_def(
 
         type_pass(&value, types.v_(0).t(), ce)?;
 
-//        let val_pw = compile(&value, ce)?;
+        //        let val_pw = compile(&value, ce)?;
     }
 
     println!("Vars: {}, Types: {}", vars.s(), types.s());
 
-    Ok(ast.clone())
+    Ok(TypedVVal::new(Type::any(), ast.clone()))
 }
 
 /// Runs the type checker pass over the AST.
@@ -136,15 +150,15 @@ pub(crate) fn type_pass(
     ast: &VVal,
     type_hint: Rc<Type>,
     ce: &mut Rc<RefCell<CompileEnv>>,
-) -> Result<VVal, CompileError> {
+) -> Result<TypedVVal, CompileError> {
     match ast {
         VVal::Lst(_) => {
             let syn = ast.at(0).unwrap_or(VVal::None).get_syn();
             let v = match syn {
                 Syntax::Block => {
-                    let node = type_block(ast, 1, type_hint, ce)?;
-                    node.unshift(ast.v_(0));
-                    node
+                    let tv = type_block(ast, 1, type_hint, ce)?;
+                    tv.vval.unshift(ast.v_(0));
+                    tv
                 }
                 Syntax::BinOpAdd => type_binop(ast, BinOp::Add, ce)?,
                 Syntax::BinOpSub => type_binop(ast, BinOp::Sub, ce)?,
@@ -159,13 +173,28 @@ pub(crate) fn type_pass(
                 Syntax::Var => type_var(ast, ce, false)?,
                 Syntax::Def => type_def(ast, ce, false)?,
                 //                Syntax::DefGlobRef => compile_def(ast, ce, true),
-                _ => return Err(ast.compile_err(format!("type checker got unknown input: {}", ast.s()))),
+                _ => {
+                    return Err(
+                        ast.compile_err(format!("type checker got unknown input: {}", ast.s()))
+                    )
+                }
             };
             Ok(v)
         }
         _ => {
             println!("AST IN {:?}", ast.s());
-            Ok(ast.clone())
+            Ok(TypedVVal::new(Type::rc_new_var("AST"), ast.clone()))
         }
     }
+}
+
+
+#[allow(clippy::cognitive_complexity)]
+pub(crate) fn type_check(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<VVal, CompileError> {
+    let tv = type_pass(ast, Type::any(), ce)?;
+    println!("TYPE RESULT: {:?}", tv.typ);
+    Ok(tv.vval)
 }

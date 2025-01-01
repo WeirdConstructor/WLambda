@@ -18,6 +18,8 @@ use crate::nvec::{NVec, NVecDim};
 use crate::ops::Prog;
 use crate::str_int::*;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use fnv::FnvHashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1868,6 +1870,8 @@ impl TypeRecord {
     }
 }
 
+static TYPE_VAR_ID: AtomicUsize = AtomicUsize::new(1);
+
 /// The definition of a type, that can be attached to functions, variables
 /// and values.
 #[derive(Debug, Clone, PartialEq)]
@@ -1905,8 +1909,12 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn any() -> Rc<Type> {
+    pub fn any() -> Rc<Self> {
         Rc::new(Type::Any)
+    }
+
+    pub fn rc_new_var(n: &str) -> Rc<Self> {
+        Rc::new(Type::Var(Rc::new(format!("{}{}", n, TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst)))))
     }
 
     pub fn s(&self) -> String {
@@ -6141,7 +6149,7 @@ impl VVal {
             VVal::HRef(v) => Type::Ref(v.borrow().t()),
             VVal::WWRef(l) => match l.upgrade() {
                 Some(v) => Type::Ref(v.borrow().t()),
-                None => Type::Ref(Type::any()),
+                None => Type::Ref(Type::rc_new_var("_T")),
             },
             VVal::Usr(_) => Type::Userdata,
         };

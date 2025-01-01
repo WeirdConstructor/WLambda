@@ -54,8 +54,8 @@ use crate::vval::EvalNode;
 use crate::vval::StackAction;
 use crate::vval::SynPos;
 use crate::vval::Syntax;
-use crate::vval::VVal;
 use crate::vval::Type;
+use crate::vval::VVal;
 use crate::vval::VValFun;
 use crate::vval::VarPos;
 
@@ -73,7 +73,7 @@ use crate::formatter;
 use crate::selector;
 use crate::struct_pattern;
 
-use crate::types::type_pass;
+use crate::types::type_check;
 
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
@@ -880,16 +880,9 @@ impl EvalContext {
         let path = std::path::Path::new(filename);
         let dir_path = path.parent();
 
-        self.set_global_var(
-            "@path",
-            &VVal::new_str(
-                path.to_str().unwrap_or_else(|| filename)));
+        self.set_global_var("@path", &VVal::new_str(path.to_str().unwrap_or_else(|| filename)));
         if let Some(s) = dir_path.map(|dp| dp.to_str()).flatten() {
-            let s = if s.is_empty() {
-                "."
-            } else {
-                s
-            };
+            let s = if s.is_empty() { "." } else { s };
             self.set_global_var("@dir", &VVal::new_str(s));
         } else {
             self.set_global_var("@dir", &VVal::new_str("."));
@@ -1334,7 +1327,6 @@ impl CompileEnv {
             _ => (),
         }
     }
-
 }
 
 fn check_for_at_arity(
@@ -3101,8 +3093,8 @@ pub(crate) fn compile(
 /// This is an internal function.
 fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     let mut cet = Rc::new(RefCell::new(ce.borrow().clone()));
-    let typed_ast = type_pass(ast, Type::any(), &mut cet)?;
-    let prog = compile_stmts(&typed_ast, 1, ce)?;
+    let ast = type_check(ast, &mut cet)?;
+    let prog = compile_stmts(&ast, 1, ce)?;
 
     let mut p = Prog::new();
     prog.eval_to(&mut p, ResPos::Value(ResValue::Ret));
@@ -3124,8 +3116,8 @@ pub fn test_eval_to_string(s: &str) -> String {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
             let mut cet = Rc::new(RefCell::new(ce.borrow().clone()));
-            let typed_ast = match type_pass(&ast, Type::any(), &mut cet) {
-                Ok(typed_ast) => typed_ast,
+            let typed_ast = match type_check(&ast, &mut cet) {
+                Ok(ast) => ast,
                 Err(e) => return format!("TYPE ERR: {}", e),
             };
             match compile(&typed_ast, &mut ce) {
