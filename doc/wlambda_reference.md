@@ -10207,8 +10207,10 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
     struct_type   = "record", "{", recordbody, "}"
                   | "enum", "{", enumbody, "}"
                   ;
+    userdata      = "userdata", "{", { ident, ":", type } "}"
+                  ;
     basetype      = "any" | "bool" | "none" | "str" | "num" | "int" | "float"
-                  | "bytes" | "sym" | "char" | "syntax" | "type" | "userdata"
+                  | "bytes" | "sym" | "char" | "syntax" | "type"
                   | "ref", type
                   | "ref_weak", type
                   | "ref_hidden", type
@@ -10222,6 +10224,7 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | "[", [ type ], "]" (* list type *)
                   | "[", type, ",", type, { ",", type }, "]" (* tuple type *)
                   | struct_type
+                  | userdata
                   | nominal_type
                   ;
     type          = "(", type, ")"

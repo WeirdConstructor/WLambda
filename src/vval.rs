@@ -1472,6 +1472,48 @@ impl VValFun {
         min_args: Option<usize>,
         max_args: Option<usize>,
         err_arg_ok: bool,
+    ) -> VVal
+    where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        VValFun::new_val(
+            Rc::new(RefCell::new(fun)),
+            Vec::new(),
+            0,
+            min_args,
+            max_args,
+            err_arg_ok,
+            Rc::new(Type::None),
+            None,
+            Rc::new(vec![]),
+        )
+    }
+
+    /// Creates a new VVal containing the given typed closure with the given minimum
+    /// and maximum parameters (see also [`add_func` of GlobalEnv](compiler/struct.GlobalEnv.html#method.add_func)).
+    ///
+    /// There is also a new more convenient (because provided by VVal itself)
+    /// function: `VVal::new_fun_t` which has the same parameters.
+    ///
+    /// This is usually useful if you want to add functions to the [EvalContext](compiler/struct.EvalContext.html).
+    /// at runtime.
+    ///
+    ///```rust
+    /// use wlambda::compiler::EvalContext;
+    /// use wlambda::vval::{VVal, VValFun, Env};
+    ///
+    /// let mut ctx = wlambda::compiler::EvalContext::new_empty_global_env();
+    ///
+    /// ctx.set_global_var("xyz",
+    ///     &VValFun::new_fun_t(
+    ///         move |env: &mut Env, argc: usize| {
+    ///             Ok(VVal::new_str("xyz"))
+    ///         }, Type::fun_ret(Type::Str)));
+    ///
+    /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
+    ///```
+    pub fn new_fun<T>(
+        fun: T,
         typ: Rc<Type>,
     ) -> VVal
     where
@@ -1896,7 +1938,6 @@ pub enum Type {
     Byte,
     Syntax,
     Type,
-    Userdata,
     Int,
     Float,
     IVec2,
@@ -1912,6 +1953,7 @@ pub enum Type {
     Tuple(Rc<Vec<Rc<Type>>>),
     Map(Rc<Type>),
     Ref(Rc<Type>),
+    Userdata(Rc<Vec<(String, Rc<Type>)>>),
     Record(Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
     Function(Rc<Vec<(Rc<Type>, bool)>>, Rc<Type>),
@@ -1969,7 +2011,6 @@ impl Type {
             Type::Char => "char".to_string(),
             Type::Syntax => "syntax".to_string(),
             Type::Type => "type".to_string(),
-            Type::Userdata => "userdata".to_string(),
             Type::Int => "int".to_string(),
             Type::Float => "float".to_string(),
             Type::IVec2 => "ivec2".to_string(),
@@ -1984,6 +2025,20 @@ impl Type {
             Type::Lst(t) => format!("[{}]", t.s()),
             Type::Ref(t) => format!("ref {}", t.s()),
             Type::Map(t) => format!("{{{}}}", t.s()),
+            Type::Userdata(fields) => {
+                "userdata".to_string(),
+                let mut res = String::from("userdata {");
+                let mut first = true;
+                for t in types.iter() {
+                    if !first {
+                        res += ", ";
+                    }
+                    res += &t.s();
+                    first = false;
+                }
+                res += "]";
+                res
+            }
             Type::Record(record) => format!("record {}", record.s()),
             Type::Tuple(types) => {
                 let mut res = String::from("[");
@@ -2028,7 +2083,6 @@ impl Type {
             Type::Byte => return TypeResolve::Resolved,
             Type::Syntax => return TypeResolve::Resolved,
             Type::Type => return TypeResolve::Resolved,
-            Type::Userdata => return TypeResolve::Resolved,
             Type::Int => return TypeResolve::Resolved,
             Type::Float => return TypeResolve::Resolved,
             Type::IVec2 => return TypeResolve::Resolved,
@@ -2052,6 +2106,17 @@ impl Type {
             Type::Ref(t) => t.resolve_check(),
             Type::Map(t) => t.resolve_check(),
             Type::Record(record) => record.resolve_check(),
+            Type::Userdata(fields) => {
+                let mut res = TypeResolve::Resolved;
+                for t in fields.iter() {
+                    match t.1.resolve_check() {
+                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+                        TypeResolve::Named => res = TypeResolve::Named,
+                        TypeResolve::Resolved => (),
+                    }
+                }
+                res
+            }
             Type::Tuple(types) | Type::Union(types) => {
                 let mut res = TypeResolve::Resolved;
                 for t in types.iter() {
@@ -6236,9 +6301,10 @@ impl VVal {
             VVal::Opt(None) => Type::Opt(Type::any()),
             VVal::Opt(Some(v)) => Type::Opt(v.t()),
             VVal::Iter(_) => Type::Any, // TODO: Iterator type encoded in VValIter???
+            // TODO: Lst and Map need to carry a type with them, so we can differenciate
+            //       Record from Map, and List from Tuple
             VVal::Lst(_) => Type::Lst(Type::any()),
             VVal::Map(_) => Type::Map(Type::any()),
-            // TODO: Function type should be stored in VValFun!!!!
             VVal::Fun(fun) => match &fun.typ {
                 Some(t) => return t.clone(),
                 None => return Type::rc_new_var("_FUN"),
@@ -6260,7 +6326,9 @@ impl VVal {
                 Some(v) => Type::Ref(v.borrow().t()),
                 None => Type::Ref(Type::rc_new_var("_T")),
             },
-            VVal::Usr(_) => Type::Userdata,
+            // TODO: Userdata needs to carry a type with it!
+            //       At least let it return it via some method!
+            VVal::Usr(_) => Type::Userdata(Rc::new(vec![])),
         };
         Rc::new(typ)
     }
