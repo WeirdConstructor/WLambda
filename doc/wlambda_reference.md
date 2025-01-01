@@ -10220,6 +10220,7 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | fun_type
                   | "{", [ type ], "}" (* map type *)
                   | "[", [ type ], "]" (* list type *)
+                  | "[", type, ",", type, { ",", type }, "]" (* tuple type *)
                   | struct_type
                   | nominal_type
                   ;

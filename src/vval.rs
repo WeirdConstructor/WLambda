@@ -1909,6 +1909,7 @@ pub enum Type {
     Err(Rc<Type>),
     Pair(Rc<Type>, Rc<Type>),
     Lst(Rc<Type>),
+    Tuple(Rc<Vec<Rc<Type>>>),
     Map(Rc<Type>),
     Ref(Rc<Type>),
     Record(Rc<TypeRecord>),
@@ -1984,6 +1985,19 @@ impl Type {
             Type::Ref(t) => format!("ref {}", t.s()),
             Type::Map(t) => format!("{{{}}}", t.s()),
             Type::Record(record) => format!("record {}", record.s()),
+            Type::Tuple(types) => {
+                let mut res = String::from("[");
+                let mut first = true;
+                for t in types.iter() {
+                    if !first {
+                        res += ", ";
+                    }
+                    res += &t.s();
+                    first = false;
+                }
+                res += "]";
+                res
+            }
             Type::Union(types) => {
                 let mut res = String::from("");
                 let mut first = true;
@@ -2038,7 +2052,7 @@ impl Type {
             Type::Ref(t) => t.resolve_check(),
             Type::Map(t) => t.resolve_check(),
             Type::Record(record) => record.resolve_check(),
-            Type::Union(types) => {
+            Type::Tuple(types) | Type::Union(types) => {
                 let mut res = TypeResolve::Resolved;
                 for t in types.iter() {
                     match t.resolve_check() {
