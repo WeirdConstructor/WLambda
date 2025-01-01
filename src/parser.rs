@@ -1043,7 +1043,6 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
         "int" => VVal::typ_box(Type::Int),
         "float" => VVal::typ_box(Type::Float),
         "string" => VVal::typ_box(Type::Str),
-        "num" => VVal::typ_box(Type::Num),
         "bytes" => VVal::typ_box(Type::Bytes),
         "syntax" => VVal::typ_box(Type::Syntax),
         "type" => VVal::typ_box(Type::Type),
@@ -1054,6 +1053,7 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
         "fvec2" => VVal::typ_box(Type::FVec2),
         "fvec3" => VVal::typ_box(Type::FVec3),
         "fvec4" => VVal::typ_box(Type::FVec4),
+        // TODO: ref, list, record, ...
         _ => {
             return Err(ps.err(ParseErrorKind::BadType("unknown type definition".to_string())));
         }
@@ -2347,8 +2347,6 @@ mod tests {
 
         assert_eq!(parse("20 & 10"), "$[$%:Block,$[$%:Call,$[$%:Var,:&],20,10]]");
     }
-
-    #[test]
 
     #[test]
     fn check_assignments() {

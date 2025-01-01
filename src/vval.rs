@@ -14,7 +14,7 @@ use std::rc::Rc;
 use std::rc::Weak;
 
 use crate::compiler::{GlobalEnv, GlobalEnvRef};
-use crate::nvec::NVec;
+use crate::nvec::{NVec, NVecDim};
 use crate::ops::Prog;
 use crate::str_int::*;
 
@@ -1883,7 +1883,6 @@ pub enum Type {
     Syntax,
     Type,
     Userdata,
-    Num,
     Int,
     Float,
     IVec2,
@@ -1897,6 +1896,7 @@ pub enum Type {
     Pair(Rc<Type>, Rc<Type>),
     Lst(Rc<Type>),
     Map(Rc<Type>),
+    Ref(Rc<Type>),
     Record(Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
     Function(Rc<Type>, Rc<Vec<(Rc<Type>, bool)>>),
@@ -1905,7 +1905,9 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn any() -> Rc<Type> { Rc::new(Type::Any) }
+    pub fn any() -> Rc<Type> {
+        Rc::new(Type::Any)
+    }
 
     pub fn s(&self) -> String {
         match self {
@@ -1920,7 +1922,6 @@ impl Type {
             Type::Syntax => "syntax".to_string(),
             Type::Type => "type".to_string(),
             Type::Userdata => "userdata".to_string(),
-            Type::Num => "num".to_string(),
             Type::Int => "int".to_string(),
             Type::Float => "float".to_string(),
             Type::IVec2 => "ivec2".to_string(),
@@ -1933,6 +1934,7 @@ impl Type {
             Type::Err(t) => format!("error {}", t.s()),
             Type::Pair(t, t2) => format!("pair {}, {}", t.s(), t2.s()),
             Type::Lst(t) => format!("[{}]", t.s()),
+            Type::Ref(t) => format!("ref {}", t.s()),
             Type::Map(t) => format!("{{{}}}", t.s()),
             Type::Record(record) => format!("record {}", record.s()),
             Type::Union(types) => {
@@ -1966,7 +1968,6 @@ impl Type {
             Type::Syntax => return TypeResolve::Resolved,
             Type::Type => return TypeResolve::Resolved,
             Type::Userdata => return TypeResolve::Resolved,
-            Type::Num => return TypeResolve::Resolved,
             Type::Int => return TypeResolve::Resolved,
             Type::Float => return TypeResolve::Resolved,
             Type::IVec2 => return TypeResolve::Resolved,
@@ -1987,6 +1988,7 @@ impl Type {
                 res
             }
             Type::Lst(t) => t.resolve_check(),
+            Type::Ref(t) => t.resolve_check(),
             Type::Map(t) => t.resolve_check(),
             Type::Record(record) => record.resolve_check(),
             Type::Union(types) => {
@@ -6103,12 +6105,48 @@ impl VVal {
     }
 
     pub fn t(&self) -> Rc<Type> {
-        match self {
-            VVal::Type(t) => t.clone(),
-            _ => Type::any(),
-        }
+        let typ = match self {
+            VVal::Type(t) => return t.clone(),
+            VVal::None => Type::None,
+            VVal::Err(e) => Type::Err(e.borrow().0.t()),
+            VVal::Bol(_) => Type::Bool,
+            VVal::Sym(_) => Type::Sym,
+            VVal::Chr(VValChr::Char(_)) => Type::Char,
+            VVal::Chr(VValChr::Byte(_)) => Type::Byte,
+            VVal::Str(_) => Type::Str,
+            VVal::Byt(_) => Type::Bytes,
+            VVal::Int(_) => Type::Int,
+            VVal::Flt(_) => Type::Float,
+            VVal::Syn(_) => Type::Syntax,
+            VVal::Pair(p) => Type::Pair(p.0.t(), p.1.t()),
+            VVal::Opt(None) => Type::Opt(Type::any()),
+            VVal::Opt(Some(v)) => Type::Opt(v.t()),
+            VVal::Iter(_) => Type::Any, // TODO: Iterator type encoded in VValIter???
+            VVal::Lst(_) => Type::Lst(Type::any()),
+            VVal::Map(_) => Type::Map(Type::any()),
+            // TODO: Function type should be stored in VValFun!!!!
+            VVal::Fun(fun) => Type::Function(Type::any(), Rc::new(vec![])),
+            VVal::DropFun(_) => Type::Function(Rc::new(Type::None), Rc::new(vec![])),
+            VVal::FVec(nv) => match nv.dims() {
+                NVecDim::Two => Type::FVec2,
+                NVecDim::Three => Type::FVec3,
+                NVecDim::Four => Type::FVec4,
+            },
+            VVal::IVec(nv) => match nv.dims() {
+                NVecDim::Two => Type::IVec2,
+                NVecDim::Three => Type::IVec3,
+                NVecDim::Four => Type::IVec4,
+            },
+            VVal::Ref(v) => Type::Ref(v.borrow().t()),
+            VVal::HRef(v) => Type::Ref(v.borrow().t()),
+            VVal::WWRef(l) => match l.upgrade() {
+                Some(v) => Type::Ref(v.borrow().t()),
+                None => Type::Ref(Type::any()),
+            },
+            VVal::Usr(_) => Type::Userdata,
+        };
+        Rc::new(typ)
     }
-
 
     #[allow(clippy::cast_lossless)]
     pub fn f(&self) -> f64 {
