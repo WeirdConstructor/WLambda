@@ -28,5 +28,5 @@ fn ve(s: &str) -> String {
 
 #[test]
 fn chk_types_add() {
-    assert_eq!(ve("!x: float = 1 + \"2\""), "10"); // Expecting a type error!
+    assert_eq!(ve("!x: float = 1 + \"2\"; x"), "10"); // Expecting a type error!
 }

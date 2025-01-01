@@ -1302,34 +1302,39 @@ impl CompileEnv {
             _ => pos,
         }
     }
-}
 
-fn set_impl_arity(i: usize, ce: &mut Rc<RefCell<CompileEnv>>) {
-    let min = ce.borrow().implicit_arity.0.clone();
-    match min {
-        ArityParam::Undefined => {
-            ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i);
-        }
-        ArityParam::Limit(j) => {
-            if j < i {
-                ce.borrow_mut().implicit_arity.0 = ArityParam::Limit(i);
-            };
-        }
-        _ => (),
+    pub fn set_impl_arity_infinite(&mut self) {
+        self.implicit_arity.1 = ArityParam::Infinite;
     }
 
-    let max = ce.borrow_mut().implicit_arity.1.clone();
-    match max {
-        ArityParam::Undefined => {
-            ce.borrow_mut().implicit_arity.1 = ArityParam::Limit(i);
-        }
-        ArityParam::Limit(j) => {
-            if j < i {
-                ce.borrow_mut().implicit_arity.1 = ArityParam::Limit(i);
+    pub fn set_impl_arity(&mut self, i: usize) {
+        let min = self.implicit_arity.0.clone();
+        match min {
+            ArityParam::Undefined => {
+                self.implicit_arity.0 = ArityParam::Limit(i);
             }
+            ArityParam::Limit(j) => {
+                if j < i {
+                    self.implicit_arity.0 = ArityParam::Limit(i);
+                };
+            }
+            _ => (),
         }
-        _ => (),
+
+        let max = self.implicit_arity.1.clone();
+        match max {
+            ArityParam::Undefined => {
+                self.implicit_arity.1 = ArityParam::Limit(i);
+            }
+            ArityParam::Limit(j) => {
+                if j < i {
+                    self.implicit_arity.1 = ArityParam::Limit(i);
+                }
+            }
+            _ => (),
+        }
     }
+
 }
 
 fn check_for_at_arity(
@@ -1347,7 +1352,7 @@ fn check_for_at_arity(
             let var = ast.at(2).unwrap().at(1).unwrap();
             if var.with_s_ref(|var: &str| var == "@") {
                 ce.borrow_mut().implicit_arity = prev_arity;
-                set_impl_arity(llen, ce);
+                ce.borrow_mut().set_impl_arity(llen);
             }
         }
     }
@@ -1483,47 +1488,47 @@ fn compile_var(
     var.with_s_ref(|var_s: &str| -> Result<ProgWriter, CompileError> {
         match var_s {
             "_" => {
-                set_impl_arity(1, ce);
+                ce.borrow_mut().set_impl_arity(1);
                 pw_arg(0, capt_ref)
             }
             "_1" => {
-                set_impl_arity(2, ce);
+                ce.borrow_mut().set_impl_arity(2);
                 pw_arg(1, capt_ref)
             }
             "_2" => {
-                set_impl_arity(3, ce);
+                ce.borrow_mut().set_impl_arity(3);
                 pw_arg(2, capt_ref)
             }
             "_3" => {
-                set_impl_arity(4, ce);
+                ce.borrow_mut().set_impl_arity(4);
                 pw_arg(3, capt_ref)
             }
             "_4" => {
-                set_impl_arity(5, ce);
+                ce.borrow_mut().set_impl_arity(5);
                 pw_arg(4, capt_ref)
             }
             "_5" => {
-                set_impl_arity(6, ce);
+                ce.borrow_mut().set_impl_arity(6);
                 pw_arg(5, capt_ref)
             }
             "_6" => {
-                set_impl_arity(7, ce);
+                ce.borrow_mut().set_impl_arity(7);
                 pw_arg(6, capt_ref)
             }
             "_7" => {
-                set_impl_arity(8, ce);
+                ce.borrow_mut().set_impl_arity(8);
                 pw_arg(7, capt_ref)
             }
             "_8" => {
-                set_impl_arity(9, ce);
+                ce.borrow_mut().set_impl_arity(9);
                 pw_arg(8, capt_ref)
             }
             "_9" => {
-                set_impl_arity(10, ce);
+                ce.borrow_mut().set_impl_arity(10);
                 pw_arg(9, capt_ref)
             }
             "@" => {
-                ce.borrow_mut().implicit_arity.1 = ArityParam::Infinite;
+                ce.borrow_mut().set_impl_arity_infinite();
                 pw!(prog, store, {
                     store.if_must_store(|store_pos| {
                         prog.op_argv(&spos, store_pos);
@@ -3095,7 +3100,8 @@ pub(crate) fn compile(
 /// Compiles a WLambda AST into an [EvalNode] in the given CompileEnv.
 /// This is an internal function.
 fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
-    let typed_ast = type_pass(ast, Type::any(), ce)?;
+    let mut cet = Rc::new(RefCell::new(ce.borrow().clone()));
+    let typed_ast = type_pass(ast, Type::any(), &mut cet)?;
     let prog = compile_stmts(&typed_ast, 1, ce)?;
 
     let mut p = Prog::new();
@@ -3117,7 +3123,8 @@ pub fn test_eval_to_string(s: &str) -> String {
     match parser::parse(s, "<compiler:s_eval>") {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
-            let typed_ast = match type_pass(&ast, Type::any(), &mut ce) {
+            let mut cet = Rc::new(RefCell::new(ce.borrow().clone()));
+            let typed_ast = match type_pass(&ast, Type::any(), &mut cet) {
                 Ok(typed_ast) => typed_ast,
                 Err(e) => return format!("TYPE ERR: {}", e),
             };

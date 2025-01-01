@@ -6102,6 +6102,14 @@ impl VVal {
         });
     }
 
+    pub fn t(&self) -> Rc<Type> {
+        match self {
+            VVal::Type(t) => t.clone(),
+            _ => Type::any(),
+        }
+    }
+
+
     #[allow(clippy::cast_lossless)]
     pub fn f(&self) -> f64 {
         match self {
