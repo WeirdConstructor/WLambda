@@ -2356,12 +2356,41 @@ impl Type {
             Type::Var(_name) => TypeResolve::UnboundVars,
         }
     }
+
+    pub fn wrap_simple(&self, other: Rc<Type>) -> Option<Rc<Type>> {
+        match self {
+            Type::Opt(t) => Some(Rc::new(Type::Opt(other))),
+            Type::Err(t) => Some(Rc::new(Type::Err(other))),
+            Type::Lst(t) => Some(Rc::new(Type::Lst(other))),
+            Type::Map(t) => Some(Rc::new(Type::Map(other))),
+            Type::Ref(t) => Some(Rc::new(Type::Ref(other))),
+            _ => None,
+        }
+    }
 }
 
 macro_rules! resolve_type_trivial {
     ($typ: ident, $chk_t: ident, $type: pat) => {
         if matches!(**$chk_t, $type) {
             TypeResolveResult::Match { typ: $typ.clone() }
+        } else {
+            TypeResolveResult::Conflict { expected: $typ.clone(), got: $chk_t.clone() }
+        }
+    };
+}
+
+macro_rules! resolve_type_wrap1 {
+    ($typ: ident, $t: ident, $chk_t: ident, $pat: ident :: $pat2: ident, $bv: ident, $nr: ident) => {
+        if let $pat::$pat2(ot) = $chk_t.as_ref() {
+            match resolve_type($t, ot, $bv, $nr) {
+                TypeResolveResult::Match { typ } => TypeResolveResult::Match {
+                    typ: $typ.wrap_simple(typ).unwrap_or_else(|| Rc::new(Type::None)),
+                },
+                TypeResolveResult::Conflict { expected, got } => TypeResolveResult::Conflict {
+                    expected: $typ.wrap_simple(expected).unwrap_or_else(|| Rc::new(Type::None)),
+                    got: $chk_t.clone(),
+                },
+            }
         } else {
             TypeResolveResult::Conflict { expected: $typ.clone(), got: $chk_t.clone() }
         }
@@ -2396,36 +2425,11 @@ where
         Type::FVec2 => resolve_type_trivial!(typ, chk_t, Type::FVec2),
         Type::FVec3 => resolve_type_trivial!(typ, chk_t, Type::FVec3),
         Type::FVec4 => resolve_type_trivial!(typ, chk_t, Type::FVec4),
-        Type::Opt(t) => {
-            if let Type::Opt(ot) = chk_t.as_ref() {
-                match resolve_type(t, ot, bound_vars, name_resolver) {
-                    TypeResolveResult::Match { typ } => {
-                        TypeResolveResult::Match { typ: Rc::new(Type::Opt(typ)) }
-                    }
-                    TypeResolveResult::Conflict { expected, got } => TypeResolveResult::Conflict {
-                        expected: Rc::new(Type::Opt(expected)),
-                        got: chk_t.clone(),
-                    },
-                }
-            } else {
-                TypeResolveResult::Conflict { expected: typ.clone(), got: chk_t.clone() }
-            }
-        }
-        Type::Err(t) => {
-            if let Type::Err(ot) = chk_t.as_ref() {
-                match resolve_type(t, ot, bound_vars, name_resolver) {
-                    TypeResolveResult::Match { typ } => {
-                        TypeResolveResult::Match { typ: Rc::new(Type::Opt(typ)) }
-                    }
-                    TypeResolveResult::Conflict { expected, got } => TypeResolveResult::Conflict {
-                        expected: Rc::new(Type::Err(expected)),
-                        got: chk_t.clone(),
-                    },
-                }
-            } else {
-                TypeResolveResult::Conflict { expected: typ.clone(), got: chk_t.clone() }
-            }
-        }
+        Type::Opt(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Opt, bound_vars, name_resolver),
+        Type::Err(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Err, bound_vars, name_resolver),
+        Type::Lst(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Lst, bound_vars, name_resolver),
+        Type::Ref(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Ref, bound_vars, name_resolver),
+        Type::Map(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Map, bound_vars, name_resolver),
         Type::Pair(t, t2) => {
             if let Type::Pair(ct, ct2) = chk_t.as_ref() {
                 let ct = match resolve_type(t, ct, bound_vars, name_resolver) {
@@ -2453,27 +2457,6 @@ where
                 TypeResolveResult::Conflict { expected: typ.clone(), got: chk_t.clone() }
             }
         }
-        //        Type::Lst(t) => {
-        //            if let Type::Lst(ot) = chk_t.as_ref() {
-        //                t.match_resolved(ot, bound_vars)
-        //            } else {
-        //                false
-        //            }
-        //        }
-        //        Type::Ref(t) => {
-        //            if let Type::Ref(ot) = chk_t.as_ref() {
-        //                t.match_resolved(ot, bound_vars)
-        //            } else {
-        //                false
-        //            }
-        //        }
-        //        Type::Map(t) => {
-        //            if let Type::Map(ot) = chk_t.as_ref() {
-        //                t.match_resolved(ot, bound_vars)
-        //            } else {
-        //                false
-        //            }
-        //        }
         //        Type::Userdata(fields) => {
         //            // TODO
         //            false
