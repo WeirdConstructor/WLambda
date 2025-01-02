@@ -7,15 +7,12 @@ The AST as it comes directly from the Parser. The type checker will also augment
 type information of course.
 */
 
-use crate::vval::CompileError;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::compiler::CompileEnv;
 use crate::ops::BinOp;
-use crate::vval::Syntax;
-use crate::vval::VVal;
-use crate::vval::{Type, TypeResolve};
+use crate::vval::{CompileError, Syntax, Type, TypeResolve, VVal, VarPos};
 //
 //pub(crate) fn type_pass(
 //    ast: &VVal,
@@ -84,9 +81,15 @@ fn type_var(
                 //      an explicit function type to everything.
             }
             _ => {
-                let pos = ce.borrow_mut().get(var_s);
-                // TODO: Get Type of variable!
-                // TODO: If capt_ref is true, we need to make it a reference type!
+                let (pos, typ) = ce.borrow_mut().get(var_s);
+                if let VarPos::NoPos = pos {
+                    return Err(ast.compile_err(format!("Variable '{}' undefined", var_s)));
+                }
+                if capt_ref {
+                    return Ok(TypedVVal::new(Type::ref_type(typ), ast.clone()));
+                } else {
+                    return Ok(TypedVVal::new(typ, ast.clone()));
+                }
             }
         }
         Ok(TypedVVal::new(Type::rc_new_var(&format!("V{}_", var_s)), ast.clone()))
@@ -100,25 +103,19 @@ fn type_var(
 fn type_binop(
     ast: &VVal,
     op: BinOp,
+    type_hint: Rc<Type>,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
     let (syn, a, b) = (ast.v_(0), ast.v_(1), ast.v_(2));
     println!("SYN: {} | {:?}", syn.s(), ast);
     println!("SYN: {:?}", ce.borrow_mut().get("+"));
     // TODO: Get Type of BinOp from Environment by `syn`.
-    let op_type = match ce.borrow().get_type("+") {
+    let op_type = match ce.borrow_mut().get_type("+") {
         Some(t) => t,
         None => return Err(ast.compile_err(format!("Unknown type of operator: {}", ast.s()))),
     };
-    match op_type.resolve_check() {
-        TypeResolve::Resolved => (),
-        e => {
-            return Err(ast.compile_err(format!(
-                "Operator has unknown type: {}, {:?}",
-                op_type.s(),
-                e
-            )))
-        }
+    if !op_type.is_resolved() {
+        return Err(ast.compile_err(format!("Operator has unknown type: {}", op_type.s(),)));
     }
     println!("TYPE: {:?}", op_type);
 
@@ -151,14 +148,75 @@ fn type_def(
     let (vars, value, destr, types) = (ast.v_(1), ast.v_(2), ast.v_(3), ast.v_(4));
 
     if destr.b() {
-        panic!("CANT DO THIS!");
+        if let VVal::Lst(b, _) = vars.clone() {
+            for (i, v) in b.borrow().iter().enumerate() {
+                ce.borrow_mut().def(&v.s_raw(), is_global, types.v_(i).t());
+            }
+        }
     } else {
         let varname = vars.v_s_raw(0);
         ce.borrow_mut().recent_var = varname.clone();
 
-        type_pass(&value, types.v_(0).t(), ce)?;
+        let var_typ = types.v_(0).t();
 
-        //        let val_pw = compile(&value, ce)?;
+        if !var_typ.is_resolved() {
+            return Err(ast.compile_err(format!(
+                "Can't define variable with unresolved type, variable '{}', unresolved type: {}",
+                varname,
+                var_typ.s(),
+            )));
+        }
+
+        if is_global {
+            let tv = type_pass(&value, var_typ.clone(), ce)?;
+            let typ = tv.typ;
+
+            if !typ.is_resolved() {
+                return Err(ast.compile_err(format!(
+                    "Can't assign value with unresolved type to variable '{}', unresolved value type: {}",
+                    varname,
+                    typ.s(),
+                )));
+            }
+
+            if !typ.isa_resolved(&var_typ) {
+                return Err(ast.compile_err(format!(
+                    "Can't assign type {} to variable {} of type {}",
+                    typ.s(),
+                    varname,
+                    var_typ.s(),
+                )));
+            }
+
+            if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true, var_typ) {
+                // everything is fine!
+            } else {
+                panic!("Defining global did not return a global!");
+            }
+        } else {
+            let next_local = ce.borrow_mut().next_local();
+            let tv = type_pass(&value, var_typ.clone(), ce)?;
+            let typ = tv.typ;
+
+            if !typ.is_resolved() {
+                return Err(ast.compile_err(format!(
+                    "Can't assign value with unresolved type to variable '{}', unresolved value type: {}",
+                    varname,
+                    typ.s(),
+                )));
+            }
+
+            if !typ.isa_resolved(&var_typ) {
+                return Err(ast.compile_err(format!(
+                    "Can't assign type {} to variable {} of type {}",
+                    typ.s(),
+                    varname,
+                    var_typ.s(),
+                )));
+            }
+
+            ce.borrow_mut().def_local(&varname, next_local, typ);
+        }
     }
 
     println!("Vars: {}, Types: {}", vars.s(), types.s());
@@ -183,16 +241,16 @@ pub(crate) fn type_pass(
                     tv.vval.unshift(ast.v_(0));
                     tv
                 }
-                Syntax::BinOpAdd => type_binop(ast, BinOp::Add, ce)?,
-                Syntax::BinOpSub => type_binop(ast, BinOp::Sub, ce)?,
-                Syntax::BinOpDiv => type_binop(ast, BinOp::Div, ce)?,
-                Syntax::BinOpMod => type_binop(ast, BinOp::Mod, ce)?,
-                Syntax::BinOpMul => type_binop(ast, BinOp::Mul, ce)?,
-                Syntax::BinOpGe => type_binop(ast, BinOp::Ge, ce)?,
-                Syntax::BinOpGt => type_binop(ast, BinOp::Gt, ce)?,
-                Syntax::BinOpLe => type_binop(ast, BinOp::Le, ce)?,
-                Syntax::BinOpLt => type_binop(ast, BinOp::Lt, ce)?,
-                Syntax::BinOpEq => type_binop(ast, BinOp::Eq, ce)?,
+                Syntax::BinOpAdd => type_binop(ast, BinOp::Add, type_hint, ce)?,
+                Syntax::BinOpSub => type_binop(ast, BinOp::Sub, type_hint, ce)?,
+                Syntax::BinOpDiv => type_binop(ast, BinOp::Div, type_hint, ce)?,
+                Syntax::BinOpMod => type_binop(ast, BinOp::Mod, type_hint, ce)?,
+                Syntax::BinOpMul => type_binop(ast, BinOp::Mul, type_hint, ce)?,
+                Syntax::BinOpGe => type_binop(ast, BinOp::Ge, type_hint, ce)?,
+                Syntax::BinOpGt => type_binop(ast, BinOp::Gt, type_hint, ce)?,
+                Syntax::BinOpLe => type_binop(ast, BinOp::Le, type_hint, ce)?,
+                Syntax::BinOpLt => type_binop(ast, BinOp::Lt, type_hint, ce)?,
+                Syntax::BinOpEq => type_binop(ast, BinOp::Eq, type_hint, ce)?,
                 Syntax::Var => type_var(ast, ce, false)?,
                 Syntax::Def => type_def(ast, ce, false)?,
                 //                Syntax::DefGlobRef => compile_def(ast, ce, true),
@@ -204,10 +262,7 @@ pub(crate) fn type_pass(
             };
             Ok(v)
         }
-        _ => {
-            println!("AST IN {:?}", ast.s());
-            Ok(TypedVVal::new(ast.t(), ast.clone()))
-        }
+        _ => Ok(TypedVVal::new(ast.t(), ast.clone())),
     }
 }
 
@@ -217,9 +272,12 @@ pub(crate) fn type_check(
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<VVal, CompileError> {
     match type_pass(ast, Type::any(), ce) {
-        Ok(tv) => Ok(ast.clone()),
+        Ok(tv) => {
+            eprintln!("TYPE: {}", tv.typ.s());
+            Ok(ast.clone())
+        }
         Err(e) => {
-            eprintln!("TYPE ERROR: {:?}", e);
+            eprintln!("TYPE ERROR: {}", e);
             Ok(ast.clone())
         }
     }

@@ -457,7 +457,7 @@ pub struct Env {
     /// See also the [with_user_do](struct.Env.html#method.with_user_do) function.
     pub user: Rc<RefCell<dyn std::any::Any>>,
     /// The exported names of this module.
-    pub exports: FnvHashMap<Symbol, VVal>,
+    pub exports: FnvHashMap<Symbol, (VVal, Rc<Type>)>,
     /// This is the standard output used for any functions in
     /// WLambda that print something. Such as `std:displayln`
     /// or `std:writeln`.
@@ -620,7 +620,12 @@ impl Env {
     }
 
     pub fn export_name(&mut self, name: &str, value: &VVal) {
-        self.exports.insert(s2sym(name), value.clone());
+        let typ = value.t();
+        self.exports.insert(s2sym(name), (value.clone(), typ));
+    }
+
+    pub fn export_name_t(&mut self, name: &str, value: &VVal, typ: Rc<Type>) {
+        self.exports.insert(s2sym(name), (value.clone(), typ));
     }
 
     #[inline]
@@ -1816,8 +1821,10 @@ pub trait VValUserData {
 
     /// Use this method to provide a type for this userdata. You may use it to
     /// return the methods or calling semantics of this userdata.
-    fn typ(&self) -> Rc<Type> {
-        Type::any()
+    ///
+    /// You should return the name of the userdata type and the `Type` definition of it.
+    fn type_info(&self) -> (String, Rc<Type>) {
+        ("UserdataUnknown".to_string(), Type::none())
     }
 
     /// This should be implemented simply by returning
@@ -1927,6 +1934,15 @@ impl TypeRecord {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeMatch {
+    NoMatch { expected: Rc<Type>, got: Rc<Type> },
+    NoMatchReturnType { expected: Rc<Type>, got: Rc<Type> },
+    NoMatchArgumentType { arg_idx: usize, expected: Rc<Type>, got: Rc<Type> },
+    Ambigious { expected: Rc<Type>, candidates: Vec<Rc<Type>> },
+    Match { got: Rc<Type> },
+}
+
 static TYPE_VAR_ID: AtomicUsize = AtomicUsize::new(1);
 
 /// The definition of a type, that can be attached to functions, variables
@@ -1962,11 +1978,12 @@ pub enum Type {
     Record(Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
     Function(Rc<Vec<(Rc<Type>, bool)>>, Rc<Type>),
-    Name(Rc<String>),
+    Name(Rc<String>, Option<Rc<Type>>),
     Var(Rc<String>),
 }
 
 thread_local! {
+    pub static TYPE_RC_NONE: Rc<Type> = Rc::new(Type::None);
     pub static TYPE_RC_ANY: Rc<Type> = Rc::new(Type::Any);
     pub static TYPE_RC_OPT_ANY: Rc<Type> = Rc::new(Type::Opt(Rc::new(Type::Any)));
     pub static TYPE_RC_LST_ANY: Rc<Type> = Rc::new(Type::Lst(Rc::new(Type::Any)));
@@ -1974,6 +1991,10 @@ thread_local! {
 }
 
 impl Type {
+    pub fn none() -> Rc<Self> {
+        TYPE_RC_NONE.with(|typ| typ.clone())
+    }
+
     pub fn any() -> Rc<Self> {
         TYPE_RC_ANY.with(|typ| typ.clone())
     }
@@ -2021,6 +2042,171 @@ impl Type {
 
     pub fn fun_2_ret(a1: Self, a2: Self, t: Self) -> Rc<Type> {
         Rc::new(Type::Function(Rc::new(vec![(Rc::new(a1), true), (Rc::new(a2), true)]), Rc::new(t)))
+    }
+
+    pub fn ref_type(t: Rc<Self>) -> Rc<Type> {
+        Rc::new(Type::Ref(t))
+    }
+
+    pub fn match_call_type(&self, ret_type: Rc<Type>, args: &[Rc<Type>]) -> TypeMatch {
+        let expected = Rc::new(Type::Function(
+            Rc::new(args.iter().map(|a| (a.clone(), true)).collect()),
+            ret_type.clone(),
+        ));
+
+        match self {
+            Type::Union(types) => {
+                let mut last_no_match = None;
+                let mut matches = vec![];
+                for t in types.iter() {
+                    let match_res = t.match_call_type(ret_type.clone(), args);
+                    match match_res {
+                        TypeMatch::Match { got } => matches.push(got),
+                        _ => {
+                            last_no_match = Some(match_res);
+                        }
+                    }
+                }
+
+                if matches.is_empty() {
+                    // TODO: Might be a good idea to store the full matching path?
+                    if let Some(no_match) = last_no_match {
+                        no_match
+                    } else {
+                        TypeMatch::NoMatch { expected, got: Rc::new(self.clone()) }
+                    }
+                } else if matches.len() > 1 {
+                    TypeMatch::Ambigious { expected, candidates: matches }
+                } else {
+                    TypeMatch::Match { got: matches[0].clone() }
+                }
+            }
+            Type::Function(types, ret) => {
+                if !ret.isa_resolved(&ret_type) {
+                    return TypeMatch::NoMatchReturnType { expected: ret.clone(), got: ret_type };
+                }
+
+                for (i, (t, is_required)) in types.iter().enumerate() {
+                    if !is_required {
+                        // TODO: The functions should have a required arguments part,
+                        // and an optional part. The Optional part being none means: no optional part
+                        // and an Some(vec![]) there means, we got any amount of extra options???
+                        panic!("Unrequired Function arguments are not implemented yet!");
+                    }
+                    if let Some(arg_type) = args.get(i) {
+                        if !t.isa_resolved(arg_type) {
+                            return TypeMatch::NoMatchArgumentType {
+                                arg_idx: i,
+                                expected: t.clone(),
+                                got: arg_type.clone(),
+                            };
+                        }
+                    } else {
+                        return TypeMatch::NoMatchArgumentType {
+                            arg_idx: i,
+                            expected: t.clone(),
+                            got: Type::none(),
+                        };
+                    }
+                }
+
+                TypeMatch::Match { got: Rc::new(self.clone()) }
+            }
+            Type::Name(name, Some(t)) => t.match_call_type(ret_type, args),
+            _ => TypeMatch::NoMatch { expected, got: Rc::new(self.clone()) },
+        }
+    }
+
+    pub fn isa_resolved(&self, chk_t: &Type) -> bool {
+        match self {
+            Type::Any => true,
+            Type::Bool => matches!(chk_t, Type::Bool),
+            Type::None => matches!(chk_t, Type::None),
+            Type::Str => matches!(chk_t, Type::Str),
+            Type::Bytes => matches!(chk_t, Type::Bytes),
+            Type::Sym => matches!(chk_t, Type::Sym),
+            Type::Byte => matches!(chk_t, Type::Byte),
+            Type::Char => matches!(chk_t, Type::Char),
+            Type::Syntax => matches!(chk_t, Type::Syntax),
+            Type::Type => matches!(chk_t, Type::Type),
+            Type::Int => matches!(chk_t, Type::Int),
+            Type::Float => matches!(chk_t, Type::Float),
+            Type::IVec2 => matches!(chk_t, Type::IVec2),
+            Type::IVec3 => matches!(chk_t, Type::IVec3),
+            Type::IVec4 => matches!(chk_t, Type::IVec4),
+            Type::FVec2 => matches!(chk_t, Type::FVec2),
+            Type::FVec3 => matches!(chk_t, Type::FVec3),
+            Type::FVec4 => matches!(chk_t, Type::FVec4),
+            Type::Opt(t) => {
+                if let Type::Opt(ot) = chk_t {
+                    t.isa_resolved(&ot)
+                } else {
+                    false
+                }
+            }
+            Type::Err(t) => {
+                if let Type::Err(ot) = chk_t {
+                    t.isa_resolved(&ot)
+                } else {
+                    false
+                }
+            }
+            Type::Pair(t, t2) => {
+                if let Type::Pair(ct, ct2) = chk_t {
+                    t.isa_resolved(&ct) && t2.isa_resolved(&ct2)
+                } else {
+                    false
+                }
+            }
+            Type::Lst(t) => {
+                if let Type::Lst(ot) = chk_t {
+                    t.isa_resolved(&ot)
+                } else {
+                    false
+                }
+            }
+            Type::Ref(t) => {
+                if let Type::Ref(ot) = chk_t {
+                    t.isa_resolved(&ot)
+                } else {
+                    false
+                }
+            }
+            Type::Map(t) => {
+                if let Type::Map(ot) = chk_t {
+                    t.isa_resolved(&ot)
+                } else {
+                    false
+                }
+            }
+            Type::Userdata(fields) => {
+                // TODO
+                false
+            }
+            Type::Record(record) => {
+                // TODO
+                false
+            }
+            Type::Tuple(types) => {
+                // TODO
+                false
+            }
+            Type::Union(types) => {
+                for t in types.iter() {
+                    if t.isa_resolved(chk_t) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Type::Function(types, ret) => {
+                // TODO
+                false
+            }
+            Type::Name(name, None) => false,
+            Type::Name(name, Some(t)) => t.isa_resolved(chk_t),
+            Type::Var(name) => false,
+        }
     }
 
     pub fn s(&self) -> String {
@@ -2090,8 +2276,16 @@ impl Type {
                 res
             }
             Type::Function(types, ret) => format!("({:?}) -> {}", *types, ret.s()),
-            Type::Name(name) => format!("{}", *name),
+            Type::Name(name, None) => format!("{}", *name),
+            Type::Name(name, Some(t)) => format!("{} = {}", *name, t.s()),
             Type::Var(name) => format!("<{}>", *name),
+        }
+    }
+
+    pub fn is_resolved(&self) -> bool {
+        match self.resolve_check() {
+            TypeResolve::Resolved => true,
+            e => false,
         }
     }
 
@@ -2163,7 +2357,8 @@ impl Type {
                 }
                 res
             }
-            Type::Name(_name) => TypeResolve::Named,
+            Type::Name(_name, None) => TypeResolve::Named,
+            Type::Name(_name, Some(t)) => t.resolve_check(),
             Type::Var(_name) => TypeResolve::UnboundVars,
         }
     }
@@ -4620,7 +4815,7 @@ impl VVal {
     pub fn map_typed(typ: Rc<Type>) -> VVal {
         VVal::Map(
             Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(2, Default::default()))),
-            typ
+            typ,
         )
     }
 

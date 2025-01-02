@@ -208,7 +208,7 @@ impl LocalFileModuleResolver {
 ///```
 #[derive(Default, Debug, Clone)]
 pub struct SymbolTable {
-    symbols: FnvHashMap<Symbol, VVal>,
+    symbols: FnvHashMap<Symbol, (VVal, Rc<Type>)>,
 }
 
 impl SymbolTable {
@@ -231,7 +231,14 @@ impl SymbolTable {
     /// value can be imported.
     #[allow(dead_code)]
     pub fn set(&mut self, name: &str, value: VVal) {
-        self.symbols.insert(s2sym(name), value);
+        self.symbols.insert(s2sym(name), (value, Type::any()));
+    }
+
+    /// Sets the entry `name` to the value `value` and it's type to `typ`.
+    /// So that the value can be imported with type information.
+    #[allow(dead_code)]
+    pub fn set_t(&mut self, name: &str, value: VVal, typ: Rc<Type>) {
+        self.symbols.insert(s2sym(name), (value, typ));
     }
 
     /// Retrieves a value from the SymbolTable, if present.
@@ -244,7 +251,7 @@ impl SymbolTable {
     /// ```
     #[allow(dead_code)]
     pub fn get(&self, name: &str) -> Option<&VVal> {
-        self.symbols.get(&s2sym(name))
+        self.symbols.get(&s2sym(name)).map(|r| &r.0)
     }
 
     /// Helper function for building symbol tables with functions in them.
@@ -268,7 +275,10 @@ impl SymbolTable {
     ) where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
     {
-        self.symbols.insert(s2sym(fnname), VValFun::new_fun(fun, min_args, max_args, err_arg_ok));
+        self.symbols.insert(
+            s2sym(fnname),
+            (VValFun::new_fun(fun, min_args, max_args, err_arg_ok), Type::any()),
+        );
     }
 
     /// Helper function for building symbol tables with typed functions in them.
@@ -282,15 +292,11 @@ impl SymbolTable {
     ///          |e: &mut wlambda::vval::Env, _argc: usize| Ok(VVal::None),
     ///          Type::fun_ret(Type::None));
     ///```
-    pub fn fun_t<T>(
-        &mut self,
-        fnname: &str,
-        fun: T,
-        typ: Rc<Type>,
-    ) where
+    pub fn fun_t<T>(&mut self, fnname: &str, fun: T, typ: Rc<Type>)
+    where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
     {
-        self.symbols.insert(s2sym(fnname), VValFun::new_fun_t(fun, typ));
+        self.symbols.insert(s2sym(fnname), (VValFun::new_fun_t(fun, typ.clone()), typ));
     }
 }
 
@@ -387,7 +393,7 @@ impl ModuleResolver for LocalFileModuleResolver {
 /// - And [GlobalEnv::get_var()](#method.get_var).
 #[derive(Clone)]
 pub struct GlobalEnv {
-    env: std::collections::HashMap<String, VVal>,
+    env: std::collections::HashMap<String, (VVal, Rc<Type>)>,
     mem_modules: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, SymbolTable>>>,
 
     /// Holds the default module resolver for this global environment.
@@ -438,7 +444,17 @@ impl GlobalEnv {
     ) where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
     {
-        self.env.insert(String::from(fnname), VValFun::new_fun(fun, min_args, max_args, false));
+        self.env.insert(
+            String::from(fnname),
+            (VValFun::new_fun(fun, min_args, max_args, false), Type::any()),
+        );
+    }
+
+    pub fn add_func_t<T>(&mut self, fnname: &str, fun: T, typ: Rc<Type>)
+    where
+        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    {
+        self.env.insert(String::from(fnname), (VValFun::new_fun_t(fun, typ.clone()), typ));
     }
 
     /// Sets a global variable to a value.
@@ -448,10 +464,37 @@ impl GlobalEnv {
     pub fn set_var(&mut self, var: &str, val: &VVal) {
         match self.env.get(var) {
             Some(v) => {
-                v.set_ref(val.clone());
+                v.0.set_ref(val.clone());
             }
             None => {
-                self.env.insert(String::from(var), val.to_ref());
+                self.env.insert(String::from(var), (val.to_ref(), val.t()));
+            }
+        }
+    }
+
+    /// Sets the type of a global variable. Implicitly will create it, if it does not exist.
+    #[allow(dead_code)]
+    pub fn set_type(&mut self, var: &str, typ: Rc<Type>) {
+        match self.env.get_mut(var) {
+            Some(v) => {
+                v.1 = typ;
+            }
+            None => {
+                self.env.insert(String::from(var), (VVal::None.to_ref(), typ));
+            }
+        }
+    }
+
+    /// Sets a global variable to a value and also specifies it's type.
+    #[allow(dead_code)]
+    pub fn set_var_t(&mut self, var: &str, val: &VVal, typ: Rc<Type>) {
+        match self.env.get_mut(var) {
+            Some(v) => {
+                v.0.set_ref(val.clone());
+                v.1 = typ;
+            }
+            None => {
+                self.env.insert(String::from(var), (val.to_ref(), typ));
             }
         }
     }
@@ -461,7 +504,13 @@ impl GlobalEnv {
     /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
     #[allow(dead_code)]
     pub fn get_var(&self, var: &str) -> Option<VVal> {
-        self.env.get(var).map(|v| v.deref())
+        self.env.get(var).map(|v| v.0.deref())
+    }
+
+    /// Returns the type of a global variable.
+    #[allow(dead_code)]
+    pub fn get_type(&self, var: &str) -> Option<Rc<Type>> {
+        self.env.get(var).map(|v| v.1.clone())
     }
 
     /// Returns the reference to the value of a global variable.
@@ -471,7 +520,7 @@ impl GlobalEnv {
     /// See also [EvalContext::get_global_var()](struct.EvalContext.html#method.get_global_var)
     #[allow(dead_code)]
     pub fn get_var_ref(&self, var: &str) -> Option<VVal> {
-        self.env.get(var).cloned()
+        self.env.get(var).map(|v| v.0.clone())
     }
 
     /// Sets a symbol table for a module before a module asks for it.
@@ -1056,7 +1105,8 @@ pub(crate) enum ArityParam {
 #[derive(Debug, Clone)]
 #[allow(clippy::box_collection)]
 struct BlockEnv {
-    local_map_stack: std::vec::Vec<(usize, Box<std::collections::HashMap<String, VarPos>>)>,
+    local_map_stack:
+        std::vec::Vec<(usize, Box<std::collections::HashMap<String, (VarPos, Rc<Type>)>>)>,
     locals: std::vec::Vec<(String, CompileLocal)>,
 }
 
@@ -1112,9 +1162,9 @@ impl BlockEnv {
         (self.locals.len(), self.locals.len() + local_count)
     }
 
-    fn set_upvalue(&mut self, var: &str, idx: usize) -> VarPos {
+    fn set_upvalue(&mut self, var: &str, idx: usize, typ: Rc<Type>) -> VarPos {
         let last_idx = self.local_map_stack.len() - 1;
-        self.local_map_stack[last_idx].1.insert(String::from(var), VarPos::UpValue(idx));
+        self.local_map_stack[last_idx].1.insert(String::from(var), (VarPos::UpValue(idx), typ));
         VarPos::UpValue(idx)
     }
 
@@ -1124,21 +1174,21 @@ impl BlockEnv {
         next_index
     }
 
-    fn def_local(&mut self, var: &str, idx: usize) {
+    fn def_local(&mut self, var: &str, idx: usize, typ: Rc<Type>) {
         self.locals[idx].0 = String::from(var);
         let last_idx = self.local_map_stack.len() - 1;
-        self.local_map_stack[last_idx].1.insert(String::from(var), VarPos::Local(idx));
+        self.local_map_stack[last_idx].1.insert(String::from(var), (VarPos::Local(idx), typ));
         self.local_map_stack[last_idx].0 += 1;
     }
 
-    fn get(&self, var: &str) -> VarPos {
+    fn get(&self, var: &str) -> (VarPos, Rc<Type>) {
         for (_locals, map) in self.local_map_stack.iter().rev() {
             if let Some(pos) = map.get(var) {
                 return pos.clone();
             }
         }
 
-        VarPos::NoPos
+        (VarPos::NoPos, Type::none())
     }
 }
 
@@ -1210,18 +1260,19 @@ impl CompileEnv {
         }))
     }
 
-    fn def_up(&mut self, s: &str, parent_local_var: VarPos) -> VarPos {
+    fn def_up(&mut self, s: &str, parent_local_var: VarPos, typ: Rc<Type>) -> VarPos {
         let next_index = self.upvals.len();
         self.upvals.push(parent_local_var);
-        self.block_env.set_upvalue(s, next_index)
+        self.block_env.set_upvalue(s, next_index, typ)
     }
 
     pub fn def_const(&mut self, s: &str, val: VVal) {
-        self.global.borrow_mut().env.insert(String::from(s), val);
+        let typ = val.t();
+        self.global.borrow_mut().env.insert(String::from(s), (val, typ));
     }
 
-    pub fn def_local(&mut self, s: &str, idx: usize) {
-        self.block_env.def_local(s, idx);
+    pub fn def_local(&mut self, s: &str, idx: usize, typ: Rc<Type>) {
+        self.block_env.def_local(s, idx, typ);
     }
 
     pub fn next_local(&mut self) -> usize {
@@ -1236,15 +1287,15 @@ impl CompileEnv {
         self.locals_space
     }
 
-    pub fn def(&mut self, s: &str, is_global: bool) -> VarPos {
+    pub fn def(&mut self, s: &str, is_global: bool, typ: Rc<Type>) -> VarPos {
         if is_global {
             let v = VVal::None;
             let r = v.to_ref();
-            self.global.borrow_mut().env.insert(String::from(s), r.clone());
+            self.global.borrow_mut().env.insert(String::from(s), (r.clone(), typ));
             VarPos::Global(r)
         } else {
             let idx = self.next_local();
-            self.block_env.def_local(s, idx);
+            self.block_env.def_local(s, idx, typ);
             VarPos::Local(idx)
         }
     }
@@ -1281,77 +1332,51 @@ impl CompileEnv {
         r
     }
 
-    pub fn get_type(&self, s: &str) -> Option<Rc<Type>> {
-        let pos = self.block_env.get(s);
-        match pos {
-            VarPos::NoPos => {
-                let opt_p = self.parent.as_ref();
-                if opt_p.is_none() {
-                    if let Some(v) = self.global.borrow().env.get(s) {
-                        if v.is_ref() {
-                            return Some(v.t());
-                        } else {
-                            return Some(v.t());
-                        }
-                    } else {
-                        return None;
-                    }
-                }
-                let parent = opt_p.unwrap().clone();
-                let mut par_mut = parent.borrow_mut();
-
-                let par_var_pos = par_mut.block_env.get(s);
-                let par_var_pos = match par_var_pos {
-                    VarPos::NoPos => par_mut.get(s),
-                    _ => par_var_pos,
-                };
-                match par_var_pos {
-                    VarPos::Local(_) => None,
-                    VarPos::UpValue(_) => None,
-                    VarPos::Global(g) => Some(g.t()),
-                    VarPos::Const(c) => Some(c.t()),
-                    VarPos::NoPos => None,
-                }
-            }
-            VarPos::Global(g) => Some(g.t()),
-            VarPos::Const(c) => Some(c.t()),
-            _ => None,
-        }
-    }
-
-    pub fn get(&mut self, s: &str) -> VarPos {
-        let pos = self.block_env.get(s);
+    pub fn get(&mut self, s: &str) -> (VarPos, Rc<Type>) {
+        let (pos, typ) = self.block_env.get(s);
         match pos {
             VarPos::NoPos => {
                 let opt_p = self.parent.as_mut();
                 if opt_p.is_none() {
-                    if let Some(v) = self.global.borrow().env.get(s) {
+                    if let Some((v, typ)) = self.global.borrow().env.get(s) {
                         if v.is_ref() {
-                            return VarPos::Global(v.clone());
+                            return (VarPos::Global(v.clone()), typ.clone());
                         } else {
-                            return VarPos::Const(v.clone());
+                            return (VarPos::Const(v.clone()), typ.clone());
                         }
                     } else {
-                        return VarPos::NoPos;
+                        return (VarPos::NoPos, Type::none());
                     }
                 }
                 let parent = opt_p.unwrap().clone();
                 let mut par_mut = parent.borrow_mut();
 
-                let par_var_pos = par_mut.block_env.get(s);
-                let par_var_pos = match par_var_pos {
+                let (par_var_pos, local_type) = par_mut.block_env.get(s);
+                let (par_var_pos, local_type) = match par_var_pos {
                     VarPos::NoPos => par_mut.get(s),
-                    _ => par_var_pos,
+                    _ => (par_var_pos, local_type),
                 };
                 match par_var_pos {
-                    VarPos::Local(_) => self.def_up(s, par_var_pos),
-                    VarPos::UpValue(_) => self.def_up(s, par_var_pos),
-                    VarPos::Global(g) => VarPos::Global(g),
-                    VarPos::Const(c) => VarPos::Const(c),
-                    VarPos::NoPos => VarPos::NoPos,
+                    VarPos::Local(_) => {
+                        (self.def_up(s, par_var_pos, local_type.clone()), local_type)
+                    }
+                    VarPos::UpValue(_) => {
+                        (self.def_up(s, par_var_pos, local_type.clone()), local_type)
+                    }
+                    VarPos::Global(g) => (VarPos::Global(g), local_type),
+                    VarPos::Const(c) => (VarPos::Const(c), local_type),
+                    VarPos::NoPos => (VarPos::NoPos, Type::none()),
                 }
             }
-            _ => pos,
+            _ => (pos, typ),
+        }
+    }
+
+    pub fn get_type(&mut self, s: &str) -> Option<Rc<Type>> {
+        let (pos, typ) = self.get(s);
+        match pos {
+            VarPos::NoPos => None,
+            _ => Some(typ),
         }
     }
 
@@ -1464,9 +1489,7 @@ fn compile_def(
 
     let prev_max_arity = ce.borrow().implicit_arity.clone();
 
-    let vars = ast.at(1).unwrap();
-    let value = ast.at(2).unwrap();
-    let destr = ast.at(3).unwrap_or(VVal::None);
+    let (vars, value, destr, types) = (ast.v_(1), ast.v_(2), ast.v_(3), ast.v_(4));
 
     //d// println!("COMP DEF: {:?} global={}, destr={}", vars, is_global, destr.b());
 
@@ -1475,7 +1498,12 @@ fn compile_def(
 
         check_for_at_arity(prev_max_arity, ast, ce, &vars);
 
-        let poses = vars.map_ok_skip(|v| ce.borrow_mut().def(&v.s_raw(), is_global), 0);
+        let mut poses = vec![];
+        if let VVal::Lst(b, _) = vars.clone() {
+            for (i, v) in b.borrow().iter().enumerate() {
+                poses.push(ce.borrow_mut().def(&v.s_raw(), is_global, types.v_(i).t()));
+            }
+        }
 
         pw_null!(prog, {
             let vp = val_pw.eval(prog);
@@ -1488,11 +1516,12 @@ fn compile_def(
     } else {
         let varname = vars.at(0).unwrap().s_raw();
         ce.borrow_mut().recent_var = varname.clone();
+        let typ = types.v_(0).t();
 
         if is_global {
             let val_pw = compile(&value, ce)?;
 
-            if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true) {
+            if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true, typ) {
                 pw_null!(prog, {
                     let gp = prog.global_pos(r.clone());
                     val_pw.eval_to(prog, gp);
@@ -1503,7 +1532,7 @@ fn compile_def(
         } else {
             let next_local = ce.borrow_mut().next_local();
             let val_pw = compile(&value, ce)?;
-            ce.borrow_mut().def_local(&varname, next_local);
+            ce.borrow_mut().def_local(&varname, next_local, typ);
 
             pw_null!(prog, {
                 val_pw.eval_to(prog, ResPos::Local(next_local as u16));
@@ -1590,7 +1619,7 @@ fn compile_var(
                 })
             }
             _ => {
-                let pos = ce.borrow_mut().get(var_s);
+                let (pos, _typ) = ce.borrow_mut().get(var_s);
                 let mk_respos: Result<Box<dyn Fn(&mut Prog) -> ResPos>, CompileError> = match pos {
                     VarPos::UpValue(i) => {
                         Ok(Box::new(move |_prog: &mut Prog| ResPos::Up(i as u16)))
@@ -1643,7 +1672,7 @@ fn compile_assign(
 
         check_for_at_arity(prev_max_arity, ast, ce, &vars);
 
-        let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()), 0);
+        let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()).0, 0);
 
         pw_null!(prog, {
             let vp = val_pw.eval(prog);
@@ -1655,7 +1684,7 @@ fn compile_assign(
         })
     } else {
         let varname = &vars.at(0).unwrap().s_raw();
-        let pos = ce.borrow_mut().get(varname);
+        let (pos, _typ) = ce.borrow_mut().get(varname);
 
         let val_pw = compile(&value, ce)?;
 
@@ -2111,7 +2140,10 @@ pub(crate) fn compile_iter(
 
     let iterable = compile_direct_block(&ast.at(3).unwrap_or(VVal::None), ce)?;
 
-    ce.borrow_mut().def_local(&varname, iter_var);
+    // TODO: Fill variable type in type_check()!
+    let typ = ast.v_(5).t();
+
+    ce.borrow_mut().def_local(&varname, iter_var, typ);
 
     let expr = compile_direct_block(&ast.at(4).unwrap_or(VVal::None), ce)?;
 
@@ -2468,7 +2500,8 @@ pub(crate) fn compile(
                         prog.op_new_iter(&spos, vp, store);
                     })
                 }
-                Syntax::Opt => { // $[value, type]
+                Syntax::Opt => {
+                    // $[value, type]
                     let typ = ast.v_(2).t();
                     if let Some(v) = ast.at(1) {
                         let val_pw = compile(&v, ce)?;
@@ -2479,7 +2512,12 @@ pub(crate) fn compile(
                         })
                     } else {
                         pw_store_if_needed!(prog, store, {
-                            prog.op_new_opt(&spos, ResPos::Value(ResValue::None), store, typ.clone());
+                            prog.op_new_opt(
+                                &spos,
+                                ResPos::Value(ResValue::None),
+                                store,
+                                typ.clone(),
+                            );
                         })
                     }
                 }
