@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 use crate::compiler::CompileEnv;
 use crate::ops::BinOp;
-use crate::vval::{CompileError, Syntax, Type, TypeResolve, VVal, VarPos};
+use crate::vval::{CompileError, Syntax, Type, TypeResolve, VVal, VarPos, resolve_type};
 //
 //pub(crate) fn type_pass(
 //    ast: &VVal,
