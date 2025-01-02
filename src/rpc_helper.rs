@@ -122,7 +122,7 @@ impl RPCHandle {
 
     fn get_request(&self) -> Option<AtomicAValSlot> {
         match self.free_queue.try_recv() {
-            VVal::Opt(Some(o)) => {
+            VVal::Opt(Some(o), _) => {
                 if let VVal::Usr(mut ud) = (*o).clone() {
                     if let Some(ud) = ud.as_any().downcast_ref::<AtomicAValSlot>() {
                         Some(ud.clone())
@@ -133,7 +133,7 @@ impl RPCHandle {
                     None
                 }
             }
-            VVal::Opt(None) | VVal::None => Some(AtomicAValSlot::new()),
+            VVal::Opt(None, _) | VVal::None => Some(AtomicAValSlot::new()),
             _ => None,
         }
     }
@@ -245,7 +245,7 @@ pub fn rpc_handler_step(
     let res = handle.request_queue.recv_timeout(Some(timeout));
     if res.is_err() {
         Err(RPCHandlerError::Disconnected)
-    } else if let VVal::Opt(Some(m)) = res {
+    } else if let VVal::Opt(Some(m), _) = res {
         let cmd = m.at(0).unwrap_or(VVal::None).i();
         let resp = m.at(1).unwrap_or(VVal::None);
         let name = m.at(2).unwrap_or(VVal::None);

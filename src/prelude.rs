@@ -10949,8 +10949,8 @@ pub fn core_symbol_table() -> SymbolTable {
             let b = env.arg(1);
 
             Ok(match a {
-                VVal::Opt(Some(a)) => a.as_ref().clone(),
-                VVal::Opt(None) => b,
+                VVal::Opt(Some(a), _) => a.as_ref().clone(),
+                VVal::Opt(None, _) => b,
                 VVal::None => b,
                 _ => a,
             })
@@ -10968,8 +10968,8 @@ pub fn core_symbol_table() -> SymbolTable {
             let b = env.arg(1);
 
             Ok(match a {
-                VVal::Opt(Some(a)) => a.as_ref().clone(),
-                VVal::Opt(None) => b,
+                VVal::Opt(Some(a), _) => a.as_ref().clone(),
+                VVal::Opt(None, _) => b,
                 VVal::Err(_) => b,
                 VVal::None => b,
                 _ => a,
@@ -11005,8 +11005,8 @@ pub fn core_symbol_table() -> SymbolTable {
             let b = env.arg(1);
 
             Ok(match a {
-                VVal::Opt(Some(a)) => a.as_ref().clone(),
-                VVal::Opt(None) => b,
+                VVal::Opt(Some(a), _) => a.as_ref().clone(),
+                VVal::Opt(None, _) => b,
                 _ => a,
             })
         },
@@ -11150,12 +11150,12 @@ pub fn core_symbol_table() -> SymbolTable {
                     Some(err_v.borrow().1.clone()),
                     err_v.borrow().0.clone(),
                 )),
-                VVal::Opt(None) => Err(StackAction::panic_str(
+                VVal::Opt(None, _) => Err(StackAction::panic_str(
                     "unwrap empty option!".to_string(),
                     None,
                     VVal::None,
                 )),
-                VVal::Opt(Some(v)) => Ok((*v).clone()),
+                VVal::Opt(Some(v), _) => Ok((*v).clone()),
                 v => Ok(v),
             }
         },
@@ -12137,7 +12137,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
             for i in 1..argc {
                 match env.arg(i) {
-                    VVal::Lst(b) => {
+                    VVal::Lst(b, _) => {
                         for item in b.borrow().iter() {
                             v.list_operation(|r: &mut std::cell::RefMut<Vec<VVal>>| {
                                 r.insert(0, item.clone());
@@ -12174,7 +12174,7 @@ pub fn std_symbol_table() -> SymbolTable {
 
             for i in 1..argc {
                 match env.arg(i) {
-                    VVal::Lst(b) => {
+                    VVal::Lst(b, _) => {
                         for item in b.borrow().iter() {
                             v.list_operation(|r: &mut std::cell::RefMut<Vec<VVal>>| {
                                 r.push(item.clone());
@@ -12479,7 +12479,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let mut s = String::from("");
             for i in 0..argc {
                 let aref = env.arg_ref(i).unwrap();
-                if let VVal::Lst(l) = aref {
+                if let VVal::Lst(l, _) = aref {
                     for v in l.borrow().iter() {
                         v.with_s_ref(|vs: &str| s.push_str(vs));
                     }
@@ -12532,7 +12532,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let sep = env.arg(0);
             let lst = env.arg(1);
-            if let VVal::Lst(l) = lst {
+            if let VVal::Lst(l, _) = lst {
                 let mut s = VVal::new_str("");
                 let mut first = true;
                 for item in l.borrow().iter() {
@@ -12869,7 +12869,7 @@ pub fn std_symbol_table() -> SymbolTable {
         st,
         "bytes:from_vec",
         |env: &mut Env, _argc: usize| {
-            if let VVal::Lst(u) = env.arg(0) {
+            if let VVal::Lst(u, _) = env.arg(0) {
                 Ok(VVal::new_byt(u.borrow().iter().map(|v| v.i() as u8).collect()))
             } else {
                 Ok(VVal::None)

@@ -14,8 +14,8 @@ use std::rc::Rc;
 use crate::compiler::CompileEnv;
 use crate::ops::BinOp;
 use crate::vval::Syntax;
-use crate::vval::{Type, TypeResolve};
 use crate::vval::VVal;
+use crate::vval::{Type, TypeResolve};
 //
 //pub(crate) fn type_pass(
 //    ast: &VVal,
@@ -112,7 +112,13 @@ fn type_binop(
     };
     match op_type.resolve_check() {
         TypeResolve::Resolved => (),
-        e => return Err(ast.compile_err(format!("Operator has unknown type: {}, {:?}", op_type.s(), e))),
+        e => {
+            return Err(ast.compile_err(format!(
+                "Operator has unknown type: {}, {:?}",
+                op_type.s(),
+                e
+            )))
+        }
     }
     println!("TYPE: {:?}", op_type);
 
@@ -169,7 +175,7 @@ pub(crate) fn type_pass(
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
     match ast {
-        VVal::Lst(_) => {
+        VVal::Lst(_, _) => {
             let syn = ast.at(0).unwrap_or(VVal::None).get_syn();
             let v = match syn {
                 Syntax::Block => {
@@ -210,7 +216,11 @@ pub(crate) fn type_check(
     ast: &VVal,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<VVal, CompileError> {
-    let tv = type_pass(ast, Type::any(), ce)?;
-    println!("TYPE RESULT: {:?}", tv.typ);
-    Ok(tv.vval)
+    match type_pass(ast, Type::any(), ce) {
+        Ok(tv) => Ok(ast.clone()),
+        Err(e) => {
+            eprintln!("TYPE ERROR: {:?}", e);
+            Ok(ast.clone())
+        }
+    }
 }

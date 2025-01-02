@@ -22,7 +22,6 @@ macro_rules! in_reg {
             ResPos::Stack(_o) => $env.pop(),
             ResPos::Value(ResValue::Ret) => std::mem::replace(&mut $ret, VVal::None),
             ResPos::Value(ResValue::None) => VVal::None,
-            ResPos::Value(ResValue::OptNone) => VVal::Opt(None),
             ResPos::Value(ResValue::SelfObj) => $env.self_object(),
             ResPos::Value(ResValue::SelfData) => $env.self_object().proto_data(),
             ResPos::Value(ResValue::AccumVal) => $env.get_accum_value(),
@@ -282,12 +281,12 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     handle_err!(a, "second pair element", retv),
                 )
             }),
-            Op::NewOpt(a, r) => op_r!(env, ret, retv, data, r, {
-                if let ResPos::Value(ResValue::OptNone) = a {
-                    VVal::Opt(None)
+            Op::NewOpt(a, r, typ) => op_r!(env, ret, retv, data, r, {
+                if let ResPos::Value(ResValue::None) = a {
+                    VVal::Opt(None, typ.clone())
                 } else {
                     in_reg!(env, ret, data, a);
-                    VVal::Opt(Some(Rc::new(a)))
+                    VVal::Opt(Some(Rc::new(a)), typ.clone())
                 }
             }),
             Op::NewIter(a, r) => op_a_r!(env, ret, retv, data, a, r, {
@@ -584,7 +583,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
             }),
             Op::Eq(b, a, r) => op_a_b_r!(env, ret, retv, data, b, a, r, { VVal::Bol(a.eqv(&b)) }),
-            Op::NewList(r) => op_r!(env, ret, retv, data, r, { VVal::vec() }),
+            Op::NewList(r, typ) => op_r!(env, ret, retv, data, r, { VVal::vec_typed(typ.clone()) }),
             Op::ListPush(a, b, r) => op_a_b_r!(env, ret, retv, data, a, b, r, {
                 b.push(handle_err!(a, "list element", retv));
                 b
@@ -603,7 +602,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                 }
                 b
             }),
-            Op::NewMap(r) => op_r!(env, ret, retv, data, r, { VVal::map() }),
+            Op::NewMap(r, typ) => op_r!(env, ret, retv, data, r, { VVal::map_typed(typ.clone()) }),
             Op::MapSetKey(v, k, m, r) => op_a_b_c_r!(env, ret, retv, data, v, k, m, r, {
                 let v = handle_err!(v, "map value", retv);
                 let k = handle_err!(k, "map key", retv);
@@ -769,7 +768,7 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
 
                 let mut argv = argv;
 
-                let argc = if let VVal::Lst(l) = &argv {
+                let argc = if let VVal::Lst(l, _) = &argv {
                     l.borrow().len()
                 } else {
                     let a = VVal::vec();
@@ -813,45 +812,6 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                     pc = (pc as i32 + *jmp_offs) as usize;
                 }
             }
-
-            //            Op::SNOr(b, a, r, mode) => op_a_b_r!(env, ret, retv, data, b, a, r, {
-            //                match *mode {
-            //                    1 => { // SomeOr
-            //                        match a {
-            //                            VVal::Opt(Some(a)) => a.as_ref().clone(),
-            //                            VVal::Opt(None)    => b,
-            //                            VVal::None         => b,
-            //                            _                  => a,
-            //                        }
-            //                    },
-            //                    4 => { // ExtSomeOr
-            //                        match a {
-            //                            VVal::Opt(Some(a)) => a.as_ref().clone(),
-            //                            VVal::Opt(None)    => b,
-            //                            VVal::None         => b,
-            //                            VVal::Err(_)       => b,
-            //                            _                  => a,
-            //                        }
-            //                    },
-            //                    2 => { // ErrOr
-            //                        match a {
-            //                            VVal::Err(_) => b,
-            //                            _            => a,
-            //                        }
-            //                    },
-            //                    3 => { // OptOr
-            //                        match a {
-            //                            VVal::Opt(Some(a)) => a.as_ref().clone(),
-            //                            VVal::Opt(None)    => b,
-            //                            _                  => a,
-            //                        }
-            //                    },
-            //                    0 | _ => {
-            //                        if let VVal::None = a { b }
-            //                        else                  { a }
-            //                    }
-            //                }
-            //            }),
             Op::OrJmp(a, jmp_offs, r, mode) => {
                 in_reg!(env, ret, data, a);
                 match mode {
@@ -862,9 +822,9 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         }
                     }
                     OrMode::SomeOp => match a {
-                        VVal::Opt(None) => {}
+                        VVal::Opt(None, _) => {}
                         VVal::None => {}
-                        VVal::Opt(Some(a)) => {
+                        VVal::Opt(Some(a), _) => {
                             pc = (pc as i32 + *jmp_offs) as usize;
                             out_reg!(env, ret, retv, data, r, a.as_ref().clone());
                         }
@@ -874,10 +834,10 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         }
                     },
                     OrMode::ExtSomeOp => match a {
-                        VVal::Opt(None) => {}
+                        VVal::Opt(None, _) => {}
                         VVal::None => {}
                         VVal::Err(_) => {}
-                        VVal::Opt(Some(a)) => {
+                        VVal::Opt(Some(a), _) => {
                             pc = (pc as i32 + *jmp_offs) as usize;
                             out_reg!(env, ret, retv, data, r, a.as_ref().clone());
                         }
@@ -901,8 +861,8 @@ pub fn vm(prog: &Prog, env: &mut Env) -> Result<VVal, StackAction> {
                         }
                     },
                     OrMode::OptOp => match a {
-                        VVal::Opt(None) => {}
-                        VVal::Opt(Some(a)) => {
+                        VVal::Opt(None, _) => {}
+                        VVal::Opt(Some(a), _) => {
                             pc = (pc as i32 + *jmp_offs) as usize;
                             out_reg!(env, ret, retv, data, r, a.as_ref().clone());
                         }

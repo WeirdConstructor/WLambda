@@ -1063,7 +1063,6 @@ struct BlockEnv {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum ResValue {
     None,
-    OptNone,
     Ret,
     AccumVal,
     AccumFun,
@@ -1398,7 +1397,7 @@ fn check_for_at_arity(
     // If we have an destructuring assignment directly from "@", then we conclude
     // the implicit max arity to be minimum of number of vars:
     if ast.at(2).unwrap_or(VVal::None).at(0).unwrap_or(VVal::None).get_syn() == Syntax::Var {
-        if let VVal::Lst(l) = vars {
+        if let VVal::Lst(l, _) = vars {
             let llen = l.borrow().len();
 
             let var = ast.at(2).unwrap().at(1).unwrap();
@@ -1776,7 +1775,7 @@ fn compile_direct_block(
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<ProgWriter, CompileError> {
     match ast {
-        VVal::Lst(_) => {
+        VVal::Lst(_, _) => {
             let syn = ast.at(0).unwrap_or(VVal::None);
             let syn = syn.get_syn();
 
@@ -1829,7 +1828,7 @@ fn compile_binop(
 #[allow(clippy::many_single_char_names)]
 fn compile_const_value(val: &VVal) -> Result<VVal, CompileError> {
     match val {
-        VVal::Lst(l) => {
+        VVal::Lst(l, _) => {
             let l = l.borrow();
             match l[0].get_syn() {
                 Syntax::Key => Ok(l[1].clone()),
@@ -1906,8 +1905,8 @@ fn compile_const(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<ProgWri
             let varname = v.s_raw();
             let val = compile_const_value(&value)?;
             let val = match val {
-                VVal::Lst(_) => val.at(i).unwrap_or(VVal::None),
-                VVal::Map(_) => val.get_key(&varname).unwrap_or(VVal::None),
+                VVal::Lst(_, _) => val.at(i).unwrap_or(VVal::None),
+                VVal::Map(_, _) => val.get_key(&varname).unwrap_or(VVal::None),
                 _ => val,
             };
 
@@ -2290,7 +2289,7 @@ pub(crate) fn compile_match(
         (dfun_constr)(
             Box::new(move |sym, val| set_res_ref.set_key_sym(sym.clone(), val.clone()).unwrap()),
             Box::new(move || {
-                if let VVal::Map(m) = res_ref.deref() {
+                if let VVal::Map(m, _) = res_ref.deref() {
                     m.borrow_mut().clear();
                 } else {
                     res_ref.set_ref(VVal::map());
@@ -2365,7 +2364,7 @@ pub(crate) fn compile(
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<ProgWriter, CompileError> {
     match ast {
-        VVal::Lst(_) => {
+        VVal::Lst(_, _) => {
             let syn = ast.at(0).unwrap_or(VVal::None);
             let spos = syn.get_syn_pos();
             let syn = syn.get_syn();
@@ -2419,6 +2418,10 @@ pub(crate) fn compile(
                 }
                 Syntax::Lst => {
                     let mut pws: std::vec::Vec<(bool, ProgWriter)> = vec![];
+
+                    // TODO: Types! Pass them in from the AST?!
+                    let typ = Type::vec_any();
+
                     for (a, _) in ast.iter().skip(1) {
                         if a.is_vec()
                             && a.at(0).unwrap_or(VVal::None).syn().unwrap() == Syntax::VecSplice
@@ -2433,7 +2436,7 @@ pub(crate) fn compile(
                     }
 
                     pw_provides_result_pos!(prog, {
-                        prog.op_new_list(&spos, ResPos::Stack(0));
+                        prog.op_new_list(&spos, ResPos::Stack(0), typ.clone());
 
                         for (is_splice, pw) in pws.iter() {
                             pw.eval_to(prog, ResPos::Stack(0));
@@ -2465,22 +2468,26 @@ pub(crate) fn compile(
                         prog.op_new_iter(&spos, vp, store);
                     })
                 }
-                Syntax::Opt => {
+                Syntax::Opt => { // $[value, type]
+                    let typ = ast.v_(2).t();
                     if let Some(v) = ast.at(1) {
                         let val_pw = compile(&v, ce)?;
 
                         pw_store_if_needed!(prog, store, {
                             let vp = val_pw.eval(prog);
-                            prog.op_new_opt(&spos, vp, store);
+                            prog.op_new_opt(&spos, vp, store, typ.clone());
                         })
                     } else {
                         pw_store_if_needed!(prog, store, {
-                            prog.op_new_opt(&spos, ResPos::Value(ResValue::OptNone), store);
+                            prog.op_new_opt(&spos, ResPos::Value(ResValue::None), store, typ.clone());
                         })
                     }
                 }
                 Syntax::Map => {
                     let mut pws: std::vec::Vec<(ProgWriter, Option<ProgWriter>)> = vec![];
+
+                    // TODO: Types!
+                    let typ = Type::map_any();
 
                     for (e, _) in ast.iter().skip(1) {
                         let k = e.at(0).unwrap();
@@ -2505,7 +2512,7 @@ pub(crate) fn compile(
                     }
 
                     pw_provides_result_pos!(prog, {
-                        prog.op_new_map(&spos, ResPos::Stack(0));
+                        prog.op_new_map(&spos, ResPos::Stack(0), typ.clone());
 
                         for (kc_pw, vc_pw) in pws.iter() {
                             if let Some(vc_pw) = vc_pw {
@@ -2596,6 +2603,9 @@ pub(crate) fn compile(
                     let upvs = ce_sub.borrow_mut().get_upval_pos();
                     let upvalues = vec![];
 
+                    // TODO: Types! Pass them in via AST from type checker.
+                    let typ = Type::any();
+
                     let fun_template = VValFun::new_prog(
                         func_prog,
                         upvalues,
@@ -2603,6 +2613,7 @@ pub(crate) fn compile(
                         min_args,
                         max_args,
                         false,
+                        typ,
                         Some(fun_spos),
                         Rc::new(upvs),
                         label,

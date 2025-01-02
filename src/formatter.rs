@@ -500,7 +500,7 @@ where
             f(fs, b)?;
             write!(fs, ")")?;
         }
-        VVal::Lst(_) => {
+        VVal::Lst(_, _) => {
             write!(fs, "[")?;
             let mut first = true;
             for (a, _) in arg.iter() {
@@ -514,7 +514,7 @@ where
             }
             write!(fs, "]")?;
         }
-        VVal::Map(m) => {
+        VVal::Map(m, _) => {
             use crate::str_int::*;
             write!(fs, "{{")?;
             let hm = m.borrow();

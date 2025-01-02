@@ -103,7 +103,7 @@ impl Prog {
                     patch_respos_data(p2, self_data_next_idx);
                     patch_respos_data(p3, self_data_next_idx);
                 }
-                Op::NewOpt(p1, p2) => {
+                Op::NewOpt(p1, p2, _typ) => {
                     patch_respos_data(p1, self_data_next_idx);
                     patch_respos_data(p2, self_data_next_idx);
                 }
@@ -266,10 +266,10 @@ impl Prog {
                 //                    patch_respos_data(p1, self_data_next_idx);
                 //                    patch_respos_data(p2, self_data_next_idx);
                 //                },
-                Op::NewMap(p1) => {
+                Op::NewMap(p1, _typ) => {
                     patch_respos_data(p1, self_data_next_idx);
                 }
-                Op::NewList(p1) => {
+                Op::NewList(p1, _typ) => {
                     patch_respos_data(p1, self_data_next_idx);
                 }
                 Op::Argv(p1) => {
@@ -374,9 +374,9 @@ impl Prog {
         self.push_op(Op::ToRef(a, r, typ));
     }
 
-    pub(crate) fn op_new_list(&mut self, sp: &SynPos, r: ResPos) {
+    pub(crate) fn op_new_list(&mut self, sp: &SynPos, r: ResPos, typ: Rc<Type>) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::NewList(r));
+        self.push_op(Op::NewList(r, typ));
     }
 
     pub(crate) fn op_list_splice(&mut self, sp: &SynPos, a: ResPos, b: ResPos, r: ResPos) {
@@ -389,9 +389,9 @@ impl Prog {
         self.push_op(Op::ListPush(a, b, r));
     }
 
-    pub(crate) fn op_new_map(&mut self, sp: &SynPos, r: ResPos) {
+    pub(crate) fn op_new_map(&mut self, sp: &SynPos, r: ResPos, typ: Rc<Type>) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::NewMap(r));
+        self.push_op(Op::NewMap(r, typ));
     }
 
     pub(crate) fn op_map_set_key(
@@ -482,9 +482,9 @@ impl Prog {
         self.push_op(op.to_op(a, b, r));
     }
 
-    pub(crate) fn op_new_opt(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
+    pub(crate) fn op_new_opt(&mut self, sp: &SynPos, a: ResPos, r: ResPos, typ: Rc<Type>) {
         self.set_dbg(sp.clone());
-        self.push_op(Op::NewOpt(a, r));
+        self.push_op(Op::NewOpt(a, r, typ));
     }
 
     pub(crate) fn op_new_iter(&mut self, sp: &SynPos, a: ResPos, r: ResPos) {
@@ -725,13 +725,13 @@ impl DestructureInfo {
     #[allow(clippy::cognitive_complexity)]
     pub fn destructure(&self, env: &mut Env, val: VVal) {
         match val {
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let nul = VVal::None;
                 for (i, pos) in self.poses.iter().enumerate() {
                     set_at_varpos!(self, env, pos, l.borrow().get(i).unwrap_or(&nul));
                 }
             }
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 for (i, pos) in self.poses.iter().enumerate() {
                     let sym = self.vars.at(i).unwrap().to_sym();
                     let val = m.borrow().get(&sym).cloned().unwrap_or(VVal::None);
@@ -949,7 +949,7 @@ pub(crate) enum OrMode {
 #[derive(Debug, Clone)]
 pub(crate) enum Op {
     Mov(ResPos, ResPos),
-    NewOpt(ResPos, ResPos),
+    NewOpt(ResPos, ResPos, Rc<Type>),
     NewIter(ResPos, ResPos),
     NewPair(ResPos, ResPos, ResPos),
     NewNVec(Box<NVecPos>, ResPos),
@@ -969,10 +969,10 @@ pub(crate) enum Op {
     Gt(ResPos, ResPos, ResPos),
     Eq(ResPos, ResPos, ResPos),
     NewErr(ResPos, ResPos),
-    NewList(ResPos),
+    NewList(ResPos, Rc<Type>),
     ListPush(ResPos, ResPos, ResPos),
     ListSplice(ResPos, ResPos, ResPos),
-    NewMap(ResPos),
+    NewMap(ResPos, Rc<Type>),
     MapSetKey(ResPos, ResPos, ResPos, ResPos),
     MapSplice(ResPos, ResPos, ResPos),
     NewClos(ResPos, ResPos),
@@ -998,6 +998,7 @@ pub(crate) enum Op {
     Builtin(Builtin),
     IterInit(ResPos, i32),
     IterNext(ResPos),
+    // TODO: AsType(Rc<Type>)
     //    UnwindMov(ResPos, ResPos),
     Unwind,
     End,

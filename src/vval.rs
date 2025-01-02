@@ -1083,7 +1083,7 @@ impl Env {
 
     pub fn setup_accumulator(&mut self, v: VVal) {
         let f = match v {
-            VVal::Map(_) => VValFun::new_fun(
+            VVal::Map(_, _) => VValFun::new_fun(
                 move |env: &mut Env, _argc: usize| {
                     let k = env.arg(0);
                     let v = env.arg(1);
@@ -1589,6 +1589,7 @@ impl VValFun {
         min_args: Option<usize>,
         max_args: Option<usize>,
         err_arg_ok: bool,
+        typ: Rc<Type>,
         syn_pos: Option<SynPos>,
         upvalue_pos: Rc<std::vec::Vec<VarPos>>,
         label: VVal,
@@ -1598,7 +1599,7 @@ impl VValFun {
             upvalues,
             fun: FunType::VMProg(prog),
             local_size: env_size,
-            typ: None,
+            typ: Some(typ),
             min_args,
             max_args,
             err_arg_ok,
@@ -1812,6 +1813,13 @@ pub trait VValUserData {
     fn call(&self, _env: &mut Env) -> Result<VVal, StackAction> {
         Ok(VVal::None)
     }
+
+    /// Use this method to provide a type for this userdata. You may use it to
+    /// return the methods or calling semantics of this userdata.
+    fn typ(&self) -> Rc<Type> {
+        Type::any()
+    }
+
     /// This should be implemented simply by returning
     /// a mutable reference to the concrete type self.
     /// It allows you to access your data structure from inside
@@ -1958,9 +1966,28 @@ pub enum Type {
     Var(Rc<String>),
 }
 
+thread_local! {
+    pub static TYPE_RC_ANY: Rc<Type> = Rc::new(Type::Any);
+    pub static TYPE_RC_OPT_ANY: Rc<Type> = Rc::new(Type::Opt(Rc::new(Type::Any)));
+    pub static TYPE_RC_LST_ANY: Rc<Type> = Rc::new(Type::Lst(Rc::new(Type::Any)));
+    pub static TYPE_RC_MAP_ANY: Rc<Type> = Rc::new(Type::Map(Rc::new(Type::Any)));
+}
+
 impl Type {
     pub fn any() -> Rc<Self> {
-        Rc::new(Type::Any)
+        TYPE_RC_ANY.with(|typ| typ.clone())
+    }
+
+    pub fn opt_any() -> Rc<Self> {
+        TYPE_RC_OPT_ANY.with(|typ| typ.clone())
+    }
+
+    pub fn vec_any() -> Rc<Self> {
+        TYPE_RC_LST_ANY.with(|typ| typ.clone())
+    }
+
+    pub fn map_any() -> Rc<Self> {
+        TYPE_RC_MAP_ANY.with(|typ| typ.clone())
     }
 
     pub fn union(&self, t: Rc<Type>) -> Rc<Self> {
@@ -2225,13 +2252,13 @@ pub enum VVal {
     /// weird, and it is weird. But in case of iterator functions that
     /// iterate over an array you can find out whether the iterator is at
     /// the end or will provide more values.
-    Opt(Option<Rc<VVal>>),
+    Opt(Option<Rc<VVal>>, Rc<Type>),
     /// A special internal iterator type for built in VVal data structures.
     Iter(Rc<RefCell<VValIter>>),
     /// A list (or vector) of VVals.
-    Lst(Rc<RefCell<std::vec::Vec<VVal>>>),
+    Lst(Rc<RefCell<std::vec::Vec<VVal>>>, Rc<Type>),
     /// A mapping of strings to VVals.
-    Map(Rc<RefCell<FnvHashMap<Symbol, VVal>>>),
+    Map(Rc<RefCell<FnvHashMap<Symbol, VVal>>>, Rc<Type>),
     /// A function, see also [VValFun](struct.VValFun.html)
     Fun(Rc<VValFun>),
     /// A guarded VVal, that executes a given function when it is
@@ -2339,17 +2366,17 @@ impl CycleCheck {
                 self.touch_walk(&b.0);
                 self.touch_walk(&b.1);
             }
-            VVal::Opt(b) => {
+            VVal::Opt(b, _) => {
                 if let Some(x) = b {
                     self.touch_walk(x);
                 }
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 for v in l.borrow().iter() {
                     self.touch_walk(v);
                 }
             }
-            VVal::Map(l) => {
+            VVal::Map(l, _) => {
                 for (_k, v) in l.borrow().iter() {
                     self.touch_walk(v);
                 }
@@ -2598,7 +2625,7 @@ macro_rules! pair_key_to_iter {
                     "enumerate" => $p.1.enumerate(),
                     _ => return std::iter::from_fn(Box::new(move || None)),
                 };
-                if let VVal::Lst(l) = l {
+                if let VVal::Lst(l, _) = l {
                     let l = l.clone();
                     let mut idx = 0;
                     std::iter::from_fn(Box::new(move || {
@@ -2910,7 +2937,7 @@ fn range_extract(from: i64, cnt: i64, val: &VVal) -> VVal {
 
             VVal::vec_mv(out)
         }
-        VVal::Lst(l) => {
+        VVal::Lst(l, _) => {
             let v: Vec<VVal> =
                 l.borrow().iter().skip(from as usize).take(cnt as usize).cloned().collect();
             VVal::vec_mv(v)
@@ -2987,7 +3014,7 @@ fn pair_extract(a: &VVal, b: &VVal, val: &VVal) -> VVal {
             }
             _ => VVal::None,
         },
-        VVal::Lst(_) => match (a, b) {
+        VVal::Lst(_, _) => match (a, b) {
             (VVal::Int(from), VVal::Int(cnt)) => range_extract(*from, *cnt, val),
             _ => VVal::None,
         },
@@ -3208,7 +3235,12 @@ impl VVal {
 
     #[inline]
     pub fn vec() -> VVal {
-        VVal::Lst(Rc::new(RefCell::new(Vec::new())))
+        VVal::Lst(Rc::new(RefCell::new(Vec::new())), Type::any())
+    }
+
+    #[inline]
+    pub fn vec_typed(typ: Rc<Type>) -> VVal {
+        VVal::Lst(Rc::new(RefCell::new(Vec::new())), typ)
     }
 
     #[inline]
@@ -3248,17 +3280,17 @@ impl VVal {
 
     #[inline]
     pub fn opt(v: VVal) -> VVal {
-        VVal::Opt(Some(Rc::new(v)))
+        VVal::Opt(Some(Rc::new(v)), Type::opt_any())
     }
 
     #[inline]
     pub fn opt_none() -> VVal {
-        VVal::Opt(None)
+        VVal::Opt(None, Type::opt_any())
     }
 
     #[inline]
     pub fn unwrap_opt(&self) -> VVal {
-        if let VVal::Opt(Some(o)) = self {
+        if let VVal::Opt(Some(o), _) = self {
             o.as_ref().clone()
         } else {
             VVal::None
@@ -3277,7 +3309,7 @@ impl VVal {
     }
 
     pub fn to_vec(&self) -> Vec<VVal> {
-        if let VVal::Lst(l) = self {
+        if let VVal::Lst(l, _) = self {
             let r: Vec<VVal> = l.borrow_mut().iter().cloned().collect();
             r
         } else {
@@ -3288,11 +3320,11 @@ impl VVal {
     pub fn vec_from(vl: &[VVal]) -> VVal {
         let mut v = Vec::new();
         v.extend_from_slice(vl);
-        VVal::Lst(Rc::new(RefCell::new(v)))
+        VVal::Lst(Rc::new(RefCell::new(v)), Type::vec_any())
     }
 
     pub fn vec_mv(v: Vec<VVal>) -> VVal {
-        VVal::Lst(Rc::new(RefCell::new(v)))
+        VVal::Lst(Rc::new(RefCell::new(v)), Type::vec_any())
     }
 
     /// Deprecated: Creates a new WLambda function that wraps the given Rust
@@ -3388,14 +3420,14 @@ impl VVal {
 
     pub fn shallow_clone(&self) -> VVal {
         match self {
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let out = VVal::vec();
                 for v in l.borrow().iter() {
                     out.push(v.clone());
                 }
                 out
             }
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 let out = VVal::map();
                 for (k, v) in m.borrow_mut().iter() {
                     if out.set_key_sym(k.clone(), v.clone()).is_err() {
@@ -3424,7 +3456,7 @@ impl VVal {
     where
         F: FnMut(&VVal, &VVal) -> std::cmp::Ordering,
     {
-        if let VVal::Lst(v) = self {
+        if let VVal::Lst(v, _) = self {
             v.borrow_mut().sort_by(compare);
         }
     }
@@ -3433,7 +3465,7 @@ impl VVal {
     where
         I: FnMut() -> i64,
     {
-        if let VVal::Lst(list) = self {
+        if let VVal::Lst(list, _) = self {
             let len = list.borrow().len();
             if len <= 1 {
                 return;
@@ -3600,7 +3632,9 @@ impl VVal {
         match self.deref() {
             VVal::Str(s) => VVal::new_str_mv(s.chars().rev().collect::<String>()),
             VVal::Byt(b) => VVal::new_byt(b.iter().rev().copied().collect::<Vec<u8>>()),
-            VVal::Lst(l) => VVal::vec_mv(l.borrow().iter().rev().cloned().collect::<Vec<VVal>>()),
+            VVal::Lst(l, _) => {
+                VVal::vec_mv(l.borrow().iter().rev().cloned().collect::<Vec<VVal>>())
+            }
             VVal::IVec(b) => match b.as_ref() {
                 NVec::Vec2(a, b) => VVal::IVec(Box::new(NVec::Vec2(*b, *a))),
                 NVec::Vec3(a, b, c) => VVal::IVec(Box::new(NVec::Vec3(*c, *b, *a))),
@@ -3627,7 +3661,7 @@ impl VVal {
     #[allow(clippy::while_let_on_iterator)]
     pub fn keys(&self) -> VVal {
         match self {
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 let out = VVal::vec();
                 for (k, _) in m.borrow_mut().iter() {
                     out.push(VVal::new_str_mv(k.to_string()));
@@ -3644,7 +3678,7 @@ impl VVal {
                 }
                 out
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let out = VVal::vec();
                 for (i, _) in l.borrow_mut().iter().enumerate() {
                     out.push(VVal::Int(i as i64));
@@ -3672,14 +3706,14 @@ impl VVal {
     #[allow(clippy::while_let_on_iterator)]
     pub fn values(&self) -> VVal {
         match self {
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 let out = VVal::vec();
                 for (_, v) in m.borrow_mut().iter() {
                     out.push(v.clone());
                 }
                 out
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let out = VVal::vec();
                 for v in l.borrow_mut().iter() {
                     out.push(v.clone());
@@ -3743,14 +3777,14 @@ impl VVal {
     #[allow(clippy::while_let_on_iterator)]
     pub fn enumerate(&self) -> VVal {
         match self {
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 let out = VVal::vec();
                 for (i, _) in m.borrow_mut().iter().enumerate() {
                     out.push(VVal::Int(i as i64));
                 }
                 out
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let out = VVal::vec();
                 for (i, _) in l.borrow_mut().iter().enumerate() {
                     out.push(VVal::Int(i as i64));
@@ -3779,8 +3813,8 @@ impl VVal {
     /// string characters.
     pub fn iter_over_vvals(&self) -> bool {
         self.with_deref(
-            |v| matches!(v, VVal::Lst(_) | VVal::Map(_) | VVal::Opt(_)),
-            |v| matches!(v, Some(VVal::Lst(_)) | Some(VVal::Map(_)) | Some(VVal::Opt(_))),
+            |v| matches!(v, VVal::Lst(_, _) | VVal::Map(_, _) | VVal::Opt(_, _)),
+            |v| matches!(v, Some(VVal::Lst(_, _)) | Some(VVal::Map(_, _)) | Some(VVal::Opt(_, _))),
         )
     }
 
@@ -3817,7 +3851,7 @@ impl VVal {
     /// ```
     pub fn iter(&self) -> VValIter {
         match self {
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let l = l.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
@@ -3829,7 +3863,7 @@ impl VVal {
                     r
                 }))
             }
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 let m = m.clone();
                 let mut idx = 0;
                 std::iter::from_fn(Box::new(move || {
@@ -3925,7 +3959,7 @@ impl VVal {
                 }
                 _ => std::iter::from_fn(Box::new(move || None)),
             },
-            VVal::Opt(Some(v)) => {
+            VVal::Opt(Some(v), _) => {
                 let x = v.as_ref().clone();
                 let mut used = false;
                 std::iter::from_fn(Box::new(move || {
@@ -3936,7 +3970,7 @@ impl VVal {
                     Some((x.clone(), None))
                 }))
             }
-            VVal::Opt(None) => std::iter::from_fn(Box::new(move || None)),
+            VVal::Opt(None, _) => std::iter::from_fn(Box::new(move || None)),
             _ => self.with_deref(
                 |v| v.iter(),
                 |v| {
@@ -3976,8 +4010,8 @@ impl VVal {
                         None
                     }
                     Ok(v) => match v {
-                        VVal::Opt(None) => None,
-                        VVal::Opt(Some(v)) => Some((v.as_ref().clone(), None)),
+                        VVal::Opt(None, _) => None,
+                        VVal::Opt(Some(v), _) => Some((v.as_ref().clone(), None)),
                         _ => Some((v, None)),
                     },
                 }))
@@ -4137,7 +4171,7 @@ impl VVal {
                     match first {
                         // Calling a boolean on a list converts the boolean into an integer
                         // and fetches the value at that index.
-                        VVal::Lst(_) => Ok(first.at(*b as usize).unwrap_or(VVal::None)),
+                        VVal::Lst(_, _) => Ok(first.at(*b as usize).unwrap_or(VVal::None)),
                         // Calling a boolean on a pair converts the boolean into an integer
                         // and fetches the value at that index.
                         VVal::Pair(_) => Ok(first.at(*b as usize).unwrap_or(VVal::None)),
@@ -4171,7 +4205,7 @@ impl VVal {
                     Ok(self.clone())
                 }
             }),
-            VVal::Map(m) => env.with_local_call_info(argc, |e: &mut Env| {
+            VVal::Map(m, _) => env.with_local_call_info(argc, |e: &mut Env| {
                 let f = e.arg(0);
 
                 let mut ret = VVal::None;
@@ -4197,7 +4231,7 @@ impl VVal {
                 }
                 Ok(ret)
             }),
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 env.with_local_call_info(argc, |e: &mut Env| {
                     // calling a list with any other value is an implicit map, meaning that for
                     // each value in the list the argument is called and the respective element
@@ -4291,7 +4325,7 @@ impl VVal {
                             }
                             Ok(ret)
                         }
-                        VVal::Lst(_) => {
+                        VVal::Lst(_, _) => {
                             let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
                             let cnt = first_arg
                                 .at(1)
@@ -4303,7 +4337,7 @@ impl VVal {
                         }
                         VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
                         VVal::IVec(iv) => Ok(range_extract(iv.x_raw(), iv.y_raw(), self)),
-                        VVal::Map(_) => Ok(self
+                        VVal::Map(_, _) => Ok(self
                             .with_s_ref(|key: &str| first_arg.get_key(key).unwrap_or(VVal::None))),
                         _ => Ok(VVal::None),
                     }
@@ -4352,7 +4386,7 @@ impl VVal {
                             }
                             Ok(ret)
                         }
-                        VVal::Lst(_) => {
+                        VVal::Lst(_, _) => {
                             let from = first_arg.at(0).unwrap_or(VVal::Int(0)).i() as usize;
                             let cnt = first_arg
                                 .at(1)
@@ -4364,7 +4398,7 @@ impl VVal {
                         VVal::Chr(_) | VVal::Byt(_) | VVal::Str(_) => {
                             concat_operation(false, self, argc, e)
                         }
-                        VVal::Map(_) => {
+                        VVal::Map(_, _) => {
                             Ok(first_arg.get_key(vval_str.as_ref()).unwrap_or(VVal::None))
                         }
                         VVal::Pair(p) => Ok(pair_extract(&p.0, &p.1, self)),
@@ -4461,7 +4495,7 @@ impl VVal {
                     Ok(iter_next!(i.borrow_mut()))
                 }
             }
-            VVal::Opt(v) => {
+            VVal::Opt(v, _) => {
                 if argc == 0 {
                     if let Some(v) = v {
                         Ok(v.as_ref().clone())
@@ -4577,10 +4611,17 @@ impl VVal {
     }
 
     pub fn map() -> VVal {
-        VVal::Map(Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(
-            2,
-            Default::default(),
-        ))))
+        VVal::Map(
+            Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(2, Default::default()))),
+            Type::map_any(),
+        )
+    }
+
+    pub fn map_typed(typ: Rc<Type>) -> VVal {
+        VVal::Map(
+            Rc::new(RefCell::new(FnvHashMap::with_capacity_and_hasher(2, Default::default()))),
+            typ
+        )
     }
 
     pub fn map1(k: &str, v: VVal) -> VVal {
@@ -4662,10 +4703,10 @@ impl VVal {
             VVal::Str(s) => &*s.as_ref() as *const String as i64,
             VVal::Byt(s) => &*s.as_ref() as *const Vec<u8> as i64,
             VVal::Sym(s) => s.ref_id(),
-            VVal::Lst(v) => &*v.borrow() as *const Vec<VVal> as i64,
-            VVal::Map(v) => &*v.borrow() as *const FnvHashMap<Symbol, VVal> as i64,
+            VVal::Lst(v, _) => &*v.borrow() as *const Vec<VVal> as i64,
+            VVal::Map(v, _) => &*v.borrow() as *const FnvHashMap<Symbol, VVal> as i64,
             VVal::Iter(v) => &*v.borrow() as *const VValIter as i64,
-            VVal::Opt(p) => {
+            VVal::Opt(p, _) => {
                 if let Some(p) = p {
                     &*p.as_ref() as *const VVal as i64
                 } else {
@@ -4758,8 +4799,8 @@ impl VVal {
                     false
                 }
             }
-            VVal::Opt(a) => {
-                if let VVal::Opt(b) = v {
+            VVal::Opt(a, _) => {
+                if let VVal::Opt(b, _) = v {
                     if let Some(a) = a {
                         if let Some(b) = b {
                             a.eqv(b)
@@ -4773,15 +4814,15 @@ impl VVal {
                     false
                 }
             }
-            VVal::Lst(l) => {
-                if let VVal::Lst(l2) = v {
+            VVal::Lst(l, _) => {
+                if let VVal::Lst(l2, _) = v {
                     Rc::ptr_eq(l, l2)
                 } else {
                     false
                 }
             }
-            VVal::Map(l) => {
-                if let VVal::Map(l2) = v {
+            VVal::Map(l, _) => {
+                if let VVal::Map(l2, _) = v {
                     Rc::ptr_eq(l, l2)
                 } else {
                     false
@@ -4907,7 +4948,7 @@ impl VVal {
         T: FnMut(&VVal) -> R,
     {
         let mut res: Vec<R> = Vec::new();
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             for i in b.borrow().iter().skip(skip) {
                 res.push(op(i));
             }
@@ -4920,7 +4961,7 @@ impl VVal {
         T: FnMut(&VVal) -> Result<R, E>,
     {
         let mut res: Vec<R> = Vec::new();
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             for i in b.borrow().iter().skip(skip) {
                 res.push(op(i)?);
             }
@@ -4933,7 +4974,7 @@ impl VVal {
         T: FnMut(&VVal, bool) -> Result<VVal, E>,
     {
         let res = VVal::vec();
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             let len = b.borrow().len();
             let len = if len > skip { len - skip } else { 0 };
 
@@ -4946,7 +4987,7 @@ impl VVal {
     }
 
     pub fn unshift(&self, val: VVal) -> &VVal {
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             b.borrow_mut().insert(0, val);
             self
         } else {
@@ -4987,7 +5028,7 @@ impl VVal {
         //d// println!("ADD: {:?}", vals);
 
         match &collection {
-            VVal::Lst(lst) => {
+            VVal::Lst(lst, _) => {
                 for v in vals.iter() {
                     v.clone().with_value_or_iter_values(|v, _k| {
                         match list_add {
@@ -5007,7 +5048,7 @@ impl VVal {
                     });
                 }
             }
-            VVal::Map(map) => {
+            VVal::Map(map, _) => {
                 for v in vals.iter() {
                     v.clone().with_value_or_iter_values(|v, k| {
                         match list_add {
@@ -5024,12 +5065,12 @@ impl VVal {
                                         map.borrow_mut().insert(s2sym(k), v.at(1).unwrap())
                                     });
                                 }
-                                VVal::Lst(_) => {
+                                VVal::Lst(_, _) => {
                                     v.v_(0).with_s_ref(|k| {
                                         map.borrow_mut().insert(s2sym(k), v.clone())
                                     });
                                 }
-                                VVal::Map(_) => {
+                                VVal::Map(_, _) => {
                                     for (vm, km) in v.iter() {
                                         if let Some(k) = km {
                                             k.with_s_ref(|ks| {
@@ -5152,7 +5193,7 @@ impl VVal {
     }
 
     pub fn insert_at(&self, index: usize, val: VVal) {
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             if index > b.borrow().len() {
                 b.borrow_mut().resize_with(index, || VVal::None);
             }
@@ -5164,7 +5205,7 @@ impl VVal {
     }
 
     pub fn remove_at(&self, index: usize) -> VVal {
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             b.borrow_mut().remove(index)
         } else {
             self.with_deref(|v| v.remove_at(index), |_| VVal::None)
@@ -5172,7 +5213,7 @@ impl VVal {
     }
 
     pub fn set(&self, index: usize, val: VVal) {
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             if index >= b.borrow().len() {
                 b.borrow_mut().resize(index + 1, VVal::None);
             }
@@ -5181,7 +5222,7 @@ impl VVal {
     }
 
     pub fn set_at(&self, index: usize, val: VVal) {
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             b.borrow_mut()[index] = val;
         }
     }
@@ -5204,7 +5245,7 @@ impl VVal {
                 }
                 iter_next_value!(i, v, { Some(v) }, None)
             }
-            VVal::Opt(ref b) => {
+            VVal::Opt(ref b, _) => {
                 if let Some(b) = b {
                     b.as_ref().at(index)
                 } else {
@@ -5225,7 +5266,7 @@ impl VVal {
                 3 => b.w().unwrap_or(VVal::None),
                 _ => VVal::None,
             }),
-            VVal::Lst(b) => {
+            VVal::Lst(b, _) => {
                 if b.borrow().len() > index {
                     Some(b.borrow()[index].clone())
                 } else {
@@ -5241,8 +5282,8 @@ impl VVal {
 
     pub fn proto_data(&self) -> VVal {
         match self {
-            VVal::Map(m) => m.borrow().get(&s2sym("_data")).cloned().unwrap_or(VVal::None),
-            VVal::Lst(l) => {
+            VVal::Map(m, _) => m.borrow().get(&s2sym("_data")).cloned().unwrap_or(VVal::None),
+            VVal::Lst(l, _) => {
                 if l.borrow().len() > 1 {
                     l.borrow()[1].clone()
                 } else {
@@ -5255,7 +5296,7 @@ impl VVal {
 
     pub fn proto_lookup(&self, key: &str) -> Option<VVal> {
         match self {
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 if let Some(func) = m.borrow().get(&s2sym(key)) {
                     Some(func.clone())
                 } else if let Some(proto) = m.borrow().get(&s2sym("_proto")) {
@@ -5264,7 +5305,7 @@ impl VVal {
                     None
                 }
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let l = l.borrow();
                 if l.is_empty() {
                     None
@@ -5278,14 +5319,14 @@ impl VVal {
 
     pub fn get_key_sym(&self, key: &Symbol) -> Option<VVal> {
         match self {
-            VVal::Map(m) => m.borrow().get(key).cloned(),
+            VVal::Map(m, _) => m.borrow().get(key).cloned(),
             _ => self.get_key(key.as_ref()),
         }
     }
 
     pub fn get_key(&self, key: &str) -> Option<VVal> {
         match self {
-            VVal::Map(m) => m.borrow().get(&s2sym(key)).cloned(),
+            VVal::Map(m, _) => m.borrow().get(&s2sym(key)).cloned(),
             VVal::IVec(b) => Some(match key {
                 "0" | "first" | "x" | "r" | "h" => b.x(),
                 "1" | "second" | "y" | "g" | "s" => b.y(),
@@ -5334,7 +5375,7 @@ impl VVal {
                 }
                 iter_next_value!(i, v, { Some(v) }, None)
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 if !key.chars().all(|c| c.is_digit(10)) {
                     return None;
                 }
@@ -5384,8 +5425,8 @@ impl VVal {
         D: FnOnce(Option<&VVal>) -> R,
     {
         match self {
-            VVal::Opt(Some(v)) => op(v.as_ref()),
-            VVal::Opt(None) => op(&VVal::None),
+            VVal::Opt(Some(v), _) => op(v.as_ref()),
+            VVal::Opt(None, _) => op(&VVal::None),
             VVal::Ref(l) => op(&(*l).borrow()),
             VVal::HRef(l) => op(&(*l).borrow()),
             VVal::WWRef(l) => match l.upgrade() {
@@ -5401,7 +5442,7 @@ impl VVal {
         O: FnMut(&mut std::cell::RefMut<std::vec::Vec<VVal>>) -> R,
     {
         match self {
-            VVal::Lst(l) => match l.try_borrow_mut() {
+            VVal::Lst(l, _) => match l.try_borrow_mut() {
                 Ok(mut v) => Ok(op(&mut v)),
                 Err(_) => Err(StackAction::panic_borrow(self)),
             },
@@ -5419,14 +5460,14 @@ impl VVal {
 
     pub fn delete_key(&self, key: &VVal) -> Result<VVal, StackAction> {
         match self {
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 let ks = key.to_sym();
                 match m.try_borrow_mut() {
                     Ok(mut r) => Ok(r.remove(&ks).unwrap_or(VVal::None)),
                     Err(_) => Err(StackAction::panic_borrow(self)),
                 }
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 if key.i() < 0 {
                     return Ok(VVal::None);
                 }
@@ -5454,7 +5495,7 @@ impl VVal {
 
     pub fn set_key_sym(&self, key: Symbol, val: VVal) -> Result<(), StackAction> {
         match self {
-            VVal::Map(m) => match m.try_borrow_mut() {
+            VVal::Map(m, _) => match m.try_borrow_mut() {
                 Ok(mut r) => {
                     r.insert(key, val);
                     Ok(())
@@ -5467,7 +5508,7 @@ impl VVal {
 
     pub fn set_key(&self, key: &VVal, val: VVal) -> Result<(), StackAction> {
         match self {
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 let ks = key.to_sym();
                 match m.try_borrow_mut() {
                     Ok(mut r) => {
@@ -5477,7 +5518,7 @@ impl VVal {
                     Err(_) => Err(StackAction::panic_borrow(self)),
                 }
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 if key.i() < 0 {
                     return Ok(());
                 }
@@ -5503,7 +5544,7 @@ impl VVal {
     }
 
     pub fn pop(&self) -> VVal {
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             b.borrow_mut().pop().unwrap_or(VVal::None)
         } else {
             self.with_deref(|v| v.pop(), |_| VVal::None)
@@ -5558,7 +5599,7 @@ impl VVal {
             VVal::Flt(f) => {
                 *f += val.f();
             }
-            VVal::Lst(v) => {
+            VVal::Lst(v, _) => {
                 v.borrow_mut().push(val.clone());
             }
             _ => (),
@@ -5567,7 +5608,7 @@ impl VVal {
 
     pub fn push(&self, val: VVal) -> &VVal {
         //d// println!("FN PUSH {} v {}", self.s(), val.s());
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             //d// println!("FN ! PUSH {} v {}", self.s(), val.s());
             b.borrow_mut().push(val);
         } else {
@@ -5588,8 +5629,8 @@ impl VVal {
     pub fn len(&self) -> usize {
         match self {
             VVal::Chr(_) => 1,
-            VVal::Lst(l) => l.borrow().len(),
-            VVal::Map(l) => l.borrow().len(),
+            VVal::Lst(l, _) => l.borrow().len(),
+            VVal::Map(l, _) => l.borrow().len(),
             VVal::Byt(l) => l.len(),
             VVal::Str(l) => l.len(),
             VVal::Sym(l) => l.len(),
@@ -5788,7 +5829,7 @@ impl VVal {
     }
 
     pub fn is_optional(&self) -> bool {
-        matches!(self, VVal::Opt(_))
+        matches!(self, VVal::Opt(_, _))
     }
 
     pub fn is_ref(&self) -> bool {
@@ -5821,7 +5862,7 @@ impl VVal {
     }
 
     pub fn is_vec(&self) -> bool {
-        matches!(self, VVal::Lst(_))
+        matches!(self, VVal::Lst(_, _))
     }
 
     pub fn is_nvec(&self) -> bool {
@@ -5845,11 +5886,11 @@ impl VVal {
     }
 
     pub fn is_map(&self) -> bool {
-        matches!(self, VVal::Map(_))
+        matches!(self, VVal::Map(_, _))
     }
 
     pub fn is_some(&self) -> bool {
-        !matches!(self, VVal::Opt(None) | VVal::None)
+        !matches!(self, VVal::Opt(None, _) | VVal::None)
     }
 
     pub fn map_some<T, R>(&self, r: R, f: T) -> R
@@ -5858,13 +5899,13 @@ impl VVal {
     {
         match self {
             VVal::None => r,
-            VVal::Opt(Some(v)) => f(r, &*v),
+            VVal::Opt(Some(v), _) => f(r, &*v),
             _ => f(r, self),
         }
     }
 
     pub fn is_none(&self) -> bool {
-        matches!(self, VVal::Opt(None) | VVal::None)
+        matches!(self, VVal::Opt(None, _) | VVal::None)
     }
 
     pub fn is_err(&self) -> bool {
@@ -5984,9 +6025,9 @@ impl VVal {
             VVal::Flt(_) => "float",
             VVal::Pair(_) => "pair",
             VVal::Iter(_) => "iter",
-            VVal::Opt(_) => "optional",
-            VVal::Lst(_) => "vector",
-            VVal::Map(_) => "map",
+            VVal::Opt(_, _) => "optional",
+            VVal::Lst(_, _) => "vector",
+            VVal::Map(_, _) => "map",
             VVal::Usr(_) => "userdata",
             VVal::Fun(_) => "function",
             VVal::IVec(_) => "integer_vector",
@@ -6243,7 +6284,7 @@ impl VVal {
     where
         T: FnMut(&VVal),
     {
-        if let VVal::Lst(b) = &self {
+        if let VVal::Lst(b, _) = &self {
             for i in b.borrow().iter() {
                 op(i);
             }
@@ -6254,7 +6295,7 @@ impl VVal {
     where
         T: FnMut(&str, &VVal),
     {
-        if let VVal::Map(b) = &self {
+        if let VVal::Map(b, _) = &self {
             for (k, v) in b.borrow().iter() {
                 op(k, v);
             }
@@ -6288,13 +6329,10 @@ impl VVal {
             VVal::Flt(_) => Type::Float,
             VVal::Syn(_) => Type::Syntax,
             VVal::Pair(p) => Type::Pair(p.0.t(), p.1.t()),
-            VVal::Opt(None) => Type::Opt(Type::any()),
-            VVal::Opt(Some(v)) => Type::Opt(v.t()),
+            VVal::Opt(_, t) => return t.clone(),
             VVal::Iter(_) => Type::Any, // TODO: Iterator type encoded in VValIter???
-            // TODO: Lst and Map need to carry a type with them, so we can differenciate
-            //       Record from Map, and List from Tuple
-            VVal::Lst(_) => Type::Lst(Type::any()),
-            VVal::Map(_) => Type::Map(Type::any()),
+            VVal::Lst(_, t) => return t.clone(),
+            VVal::Map(_, t) => return t.clone(),
             VVal::Fun(fun) => match &fun.typ {
                 Some(t) => return t.clone(),
                 None => return Type::rc_new_var("_FUN"),
@@ -6349,8 +6387,8 @@ impl VVal {
             VVal::Int(i) => *i as f64,
             VVal::Flt(f) => *f,
             VVal::Pair(b) => b.0.f(),
-            VVal::Lst(l) => l.borrow().len() as f64,
-            VVal::Map(l) => l.borrow().len() as f64,
+            VVal::Lst(l, _) => l.borrow().len() as f64,
+            VVal::Map(l, _) => l.borrow().len() as f64,
             VVal::Usr(u) => u.f(),
             VVal::Fun(_) => 1.0,
             VVal::IVec(iv) => iv.x_raw() as f64,
@@ -6386,8 +6424,8 @@ impl VVal {
             VVal::Int(i) => *i,
             VVal::Flt(f) => *f as i64,
             VVal::Pair(b) => b.0.i(),
-            VVal::Lst(l) => l.borrow().len() as i64,
-            VVal::Map(l) => l.borrow().len() as i64,
+            VVal::Lst(l, _) => l.borrow().len() as i64,
+            VVal::Map(l, _) => l.borrow().len() as i64,
             VVal::Usr(u) => u.i(),
             VVal::Fun(_) => 1,
             VVal::IVec(iv) => iv.x_raw(),
@@ -6447,8 +6485,8 @@ impl VVal {
                 }
             }
             VVal::Pair(b) => b.0.byte(),
-            VVal::Lst(l) => l.borrow().len() as u8,
-            VVal::Map(l) => l.borrow().len() as u8,
+            VVal::Lst(l, _) => l.borrow().len() as u8,
+            VVal::Map(l, _) => l.borrow().len() as u8,
             VVal::Usr(u) => u.byte(),
             VVal::Fun(_) => b'\x01',
             VVal::IVec(iv) => iv.x_raw() as u8,
@@ -6484,8 +6522,8 @@ impl VVal {
             VVal::Int(i) => std::char::from_u32(*i as u32).unwrap_or('\0'),
             VVal::Flt(f) => std::char::from_u32(*f as u32).unwrap_or('\0'),
             VVal::Pair(b) => b.0.c(),
-            VVal::Lst(l) => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
-            VVal::Map(l) => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
+            VVal::Lst(l, _) => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
+            VVal::Map(l, _) => std::char::from_u32(l.borrow().len() as u32).unwrap_or('\0'),
             VVal::Usr(u) => u.c(),
             VVal::Fun(_) => '\u{01}',
             VVal::IVec(iv) => std::char::from_u32(iv.x_raw() as u32).unwrap_or('\0'),
@@ -6509,12 +6547,12 @@ impl VVal {
             VVal::Pair(b) => b.0.b() || b.1.b(),
             VVal::Int(i) => (*i) != 0,
             VVal::Flt(f) => (*f as i64) != 0,
-            VVal::Lst(l) => (l.borrow().len() as i64) != 0,
-            VVal::Map(l) => (l.borrow().len() as i64) != 0,
+            VVal::Lst(l, _) => (l.borrow().len() as i64) != 0,
+            VVal::Map(l, _) => (l.borrow().len() as i64) != 0,
             VVal::Usr(u) => u.b(),
             VVal::Fun(_) => true,
-            VVal::Opt(None) => false,
-            VVal::Opt(Some(_)) => true,
+            VVal::Opt(None, _) => false,
+            VVal::Opt(Some(_), _) => true,
             VVal::IVec(iv) => iv.x().b(),
             VVal::FVec(fv) => fv.x().b(),
             VVal::Iter(i) => iter_next_value!(i.borrow_mut(), v, { v.b() }, false),
@@ -6527,7 +6565,7 @@ impl VVal {
         match self {
             VVal::IVec(i) => N::from_ivec(**i),
             VVal::FVec(f) => N::from_fvec(**f),
-            VVal::Map(map) => {
+            VVal::Map(map, _) => {
                 let m = map.borrow();
                 let o = N::zero().into_vval();
                 NVec::from_vval_tpl((
@@ -6550,7 +6588,7 @@ impl VVal {
                     .unwrap()
                 })
             }
-            VVal::Lst(lst) => {
+            VVal::Lst(lst, _) => {
                 let list = lst.borrow();
                 let mut lst = list.iter();
                 let zero = N::zero().into_vval();
@@ -6608,15 +6646,15 @@ impl VVal {
             VVal::Flt(f) => f.to_string(),
             VVal::Pair(b) => format!("$p({},{})", b.0.s_cy(c), b.1.s_cy(c)),
             VVal::Iter(_) => "$iter(&)".to_string(),
-            VVal::Opt(b) => {
+            VVal::Opt(b, _) => {
                 if let Some(b) = b {
                     format!("$o({})", b.s_cy(c))
                 } else {
                     "$o()".to_string()
                 }
             }
-            VVal::Lst(l) => VVal::dump_vec_as_str(l, c),
-            VVal::Map(l) => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
+            VVal::Lst(l, _) => VVal::dump_vec_as_str(l, c),
+            VVal::Map(l, _) => VVal::dump_map_as_str(l, c), // VVal::dump_map_as_str(l),
             VVal::Usr(u) => u.s(),
             VVal::Fun(f) => {
                 let min = if f.min_args.is_none() {
@@ -6815,7 +6853,7 @@ impl serde::ser::Serialize for VVal {
                 seq.serialize_element(&b.1)?;
                 seq.end()
             }
-            VVal::Opt(b) => {
+            VVal::Opt(b, _) => {
                 if let Some(b) = b {
                     let mut seq = serializer.serialize_seq(Some(1))?;
                     seq.serialize_element(b.as_ref())?;
@@ -6825,14 +6863,14 @@ impl serde::ser::Serialize for VVal {
                     seq.end()
                 }
             }
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let mut seq = serializer.serialize_seq(Some(l.borrow().len()))?;
                 for v in l.borrow().iter() {
                     seq.serialize_element(v)?;
                 }
                 seq.end()
             }
-            VVal::Map(l) => {
+            VVal::Map(l, _) => {
                 let hm = l.borrow();
 
                 let mut map = serializer.serialize_map(Some(l.borrow().len()))?;

@@ -1397,7 +1397,7 @@ fn compile_node(n: &VVal, sn: SelNode) -> SelNode {
 
 fn compile_selector(sel: &VVal, no_capture: bool) -> SelNode {
     //d// println!("***** COM SELECTOR: {}", sel.s());
-    if let VVal::Lst(_) = sel {
+    if let VVal::Lst(_, _) = sel {
         let first = sel.at(0).unwrap_or(VVal::None);
         if first.to_sym() == s2sym("Path") {
             let mut next: Option<SelNode> =

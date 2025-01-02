@@ -550,7 +550,7 @@ pub fn compile_struct_pattern(
 
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
                     let v = v.deref();
-                    if let VVal::Map(m) = &v {
+                    if let VVal::Map(m, _) = &v {
                         for kv_match in key_matches.iter() {
                             let mut matched_kv = false;
                             for (k, v) in m.borrow().iter() {
@@ -577,7 +577,7 @@ pub fn compile_struct_pattern(
         Syntax::Opt => {
             if ast.len() == 1 {
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
-                    if let VVal::Opt(None) = v {
+                    if let VVal::Opt(None, _) = v {
                         store_var(v, &var, f);
                         true
                     } else {
@@ -587,7 +587,7 @@ pub fn compile_struct_pattern(
             } else {
                 let cond = compile_struct_pattern(&ast.v_(1), var_map, None)?;
                 Ok(Box::new(move |v: &VVal, f: &FnVarAssign| {
-                    let matched = if let VVal::Opt(Some(ov)) = &v { cond(&*ov, f) } else { false };
+                    let matched = if let VVal::Opt(Some(ov), _) = &v { cond(&*ov, f) } else { false };
                     store_var_if(matched, v, &var, f)
                 }))
             }

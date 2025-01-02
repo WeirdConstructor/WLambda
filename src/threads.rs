@@ -183,19 +183,19 @@ impl AVal {
             VVal::Byt(b) => AVal::Byt(b.as_ref().clone()),
             VVal::Int(i) => AVal::Int(*i),
             VVal::Flt(f) => AVal::Flt(*f),
-            VVal::Opt(None) => AVal::Opt(None),
-            VVal::Opt(Some(v)) => AVal::Opt(Some(Box::new(AVal::from_vval(v)))),
+            VVal::Opt(None, _) => AVal::Opt(None),
+            VVal::Opt(Some(v), _) => AVal::Opt(Some(Box::new(AVal::from_vval(v)))),
             VVal::FVec(v) => AVal::FVec(**v),
             VVal::IVec(v) => AVal::IVec(**v),
             VVal::Pair(p) => AVal::Pair(Box::new((AVal::from_vval(&p.0), AVal::from_vval(&p.1)))),
-            VVal::Lst(l) => {
+            VVal::Lst(l, _) => {
                 let mut avec = vec![];
                 for vv in l.borrow().iter() {
                     avec.push(AVal::from_vval(vv));
                 }
                 AVal::Lst(avec)
             }
-            VVal::Map(m) => {
+            VVal::Map(m, _) => {
                 let mut amap = FnvHashMap::with_capacity_and_hasher(2, Default::default());
                 for (k, v) in m.borrow().iter() {
                     amap.insert(String::from(k.as_ref()), AVal::from_vval(v));
@@ -589,8 +589,8 @@ impl AValChannel {
                     Err(_) => VVal::err_msg("recv disconnected"),
                 },
                 Some(dur) => match guard.recv_timeout(dur) {
-                    Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
-                    Err(RecvTimeoutError::Timeout) => VVal::Opt(None),
+                    Ok(av) => VVal::opt(av.to_vval()),
+                    Err(RecvTimeoutError::Timeout) => VVal::opt_none(),
                     Err(RecvTimeoutError::Disconnected) => {
                         VVal::err_msg("recv_timeout disconnected")
                     }
@@ -603,8 +603,8 @@ impl AValChannel {
     pub fn try_recv(&self) -> VVal {
         match self.receiver.lock() {
             Ok(guard) => match guard.try_recv() {
-                Ok(av) => VVal::Opt(Some(Rc::new(av.to_vval()))),
-                Err(TryRecvError::Empty) => VVal::Opt(None),
+                Ok(av) => VVal::opt(av.to_vval()),
+                Err(TryRecvError::Empty) => VVal::opt_none(),
                 Err(e) => VVal::err_msg(&format!("try_recv error: {}", e)),
             },
             Err(e) => VVal::err_msg(&format!("Failed to receive, can't get lock: {}", e)),
