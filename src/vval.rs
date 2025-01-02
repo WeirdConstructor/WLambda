@@ -1512,10 +1512,7 @@ impl VValFun {
     ///
     /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
     ///```
-    pub fn new_fun<T>(
-        fun: T,
-        typ: Rc<Type>,
-    ) -> VVal
+    pub fn new_fun_t<T>(fun: T, typ: Rc<Type>) -> VVal
     where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
     {
@@ -1523,38 +1520,38 @@ impl VValFun {
             Rc::new(RefCell::new(fun)),
             Vec::new(),
             0,
-            min_args,
-            max_args,
-            err_arg_ok,
+            None,
+            None,
+            true,
             typ,
             None,
             Rc::new(vec![]),
         )
     }
 
-    pub fn new_fun_with_pos<T>(
-        fun: T,
-        min_args: Option<usize>,
-        max_args: Option<usize>,
-        err_arg_ok: bool,
-        spos: SynPos,
-        typ: Rc<Type>,
-    ) -> VVal
-    where
-        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
-    {
-        VValFun::new_val(
-            Rc::new(RefCell::new(fun)),
-            Vec::new(),
-            0,
-            min_args,
-            max_args,
-            err_arg_ok,
-            typ,
-            Some(spos),
-            Rc::new(vec![]),
-        )
-    }
+    //    pub fn new_fun_with_pos<T>(
+    //        fun: T,
+    //        min_args: Option<usize>,
+    //        max_args: Option<usize>,
+    //        err_arg_ok: bool,
+    //        spos: SynPos,
+    //        typ: Rc<Type>,
+    //    ) -> VVal
+    //    where
+    //        T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
+    //    {
+    //        VValFun::new_val(
+    //            Rc::new(RefCell::new(fun)),
+    //            Vec::new(),
+    //            0,
+    //            min_args,
+    //            max_args,
+    //            err_arg_ok,
+    //            typ,
+    //            Some(spos),
+    //            Rc::new(vec![]),
+    //        )
+    //    }
 
     /// Internal utility function. Use at your own risk, API might change.
     #[allow(clippy::too_many_arguments)]
@@ -1574,7 +1571,7 @@ impl VValFun {
             upvalues,
             fun: FunType::ClosureNode(fun),
             local_size: env_size,
-            typ,
+            typ: Some(typ),
             min_args,
             max_args,
             err_arg_ok,
@@ -1968,11 +1965,11 @@ impl Type {
 
     pub fn union(&self, t: Rc<Type>) -> Rc<Self> {
         if let Type::Union(u) = self {
-            let v = vec![];
+            let mut v = vec![];
             for te in u.iter() {
-                v.push(te);
+                v.push(te.clone());
             }
-            v.push(t);
+            v.push(t.clone());
             Rc::new(Type::Union(Rc::new(v)))
         } else {
             Rc::new(Type::Union(Rc::new(vec![Rc::new(self.clone()), t])))
@@ -1992,11 +1989,11 @@ impl Type {
     }
 
     pub fn fun_1_ret(a1: Self, t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(Rc::new(vec![Rc::new(a1)]), Rc::new(t)))
+        Rc::new(Type::Function(Rc::new(vec![(Rc::new(a1), true)]), Rc::new(t)))
     }
 
     pub fn fun_2_ret(a1: Self, a2: Self, t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(Rc::new(vec![Rc::new(a1), Rc::new(a2)]), Rc::new(t)))
+        Rc::new(Type::Function(Rc::new(vec![(Rc::new(a1), true), (Rc::new(a2), true)]), Rc::new(t)))
     }
 
     pub fn s(&self) -> String {
@@ -2026,17 +2023,17 @@ impl Type {
             Type::Ref(t) => format!("ref {}", t.s()),
             Type::Map(t) => format!("{{{}}}", t.s()),
             Type::Userdata(fields) => {
-                "userdata".to_string(),
                 let mut res = String::from("userdata {");
                 let mut first = true;
-                for t in types.iter() {
+                for t in fields.iter() {
                     if !first {
                         res += ", ";
                     }
-                    res += &t.s();
+                    res += &t.0;
+                    res += &t.1.s();
                     first = false;
                 }
-                res += "]";
+                res += "}";
                 res
             }
             Type::Record(record) => format!("record {}", record.s()),
@@ -3334,6 +3331,7 @@ impl VVal {
             min_args,
             max_args,
             err_arg_ok,
+            Type::rc_new_var("_F"),
             None,
             Rc::new(vec![]),
         )
@@ -3357,10 +3355,7 @@ impl VVal {
     ///
     /// assert_eq!(ctx.eval("xyz[]").unwrap().s_raw(), "xyz")
     ///```
-    pub fn new_fun_t<T>(
-        fun: T,
-        typ: Rc<Type>,
-    ) -> VVal
+    pub fn new_fun_t<T>(fun: T, typ: Rc<Type>) -> VVal
     where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
     {
@@ -3376,7 +3371,6 @@ impl VVal {
             Rc::new(vec![]),
         )
     }
-
 
     pub fn call(&self, env: &mut Env, args: &[VVal]) -> Result<VVal, StackAction> {
         let argc = args.len();
@@ -5371,15 +5365,11 @@ impl VVal {
             .expect("Map not borrowed when using set_map_key_fun");
     }
 
-    pub fn set_map_key_fun_t<T>(
-        &self,
-        key: &str,
-        fun: T,
-        typ: Rc<Type>
-    ) where
+    pub fn set_map_key_fun_t<T>(&self, key: &str, fun: T, typ: Rc<Type>)
+    where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
     {
-        self.set_key_sym(s2sym(key), VValFun::new_fun(fun, None, None, true))
+        self.set_key_sym(s2sym(key), VValFun::new_fun_t(fun, typ))
             .expect("Map not borrowed when using set_map_key_fun");
     }
 

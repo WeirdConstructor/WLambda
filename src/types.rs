@@ -41,10 +41,9 @@ fn type_var(
     capt_ref: bool,
 ) -> Result<TypedVVal, CompileError> {
     let syn = ast.at(0).unwrap_or(VVal::None);
-    let spos = syn.get_syn_pos();
 
     let var = ast.at(1).unwrap();
-    var.with_s_ref(|var_s: &str| -> Result<TypedVVal, CompileError> {
+    let mut typ_val = var.with_s_ref(|var_s: &str| -> Result<TypedVVal, CompileError> {
         match var_s {
             "_" => {
                 ce.borrow_mut().set_impl_arity(1);
@@ -86,10 +85,16 @@ fn type_var(
             }
             _ => {
                 let pos = ce.borrow_mut().get(var_s);
+                // TODO: Get Type of variable!
+                // TODO: If capt_ref is true, we need to make it a reference type!
             }
         }
         Ok(TypedVVal::new(Type::rc_new_var(&format!("V{}_", var_s)), ast.clone()))
-    })
+    })?;
+    if capt_ref {
+        typ_val.typ = Rc::new(Type::Ref(typ_val.typ));
+    }
+    Ok(typ_val)
 }
 
 fn type_binop(

@@ -1046,14 +1046,13 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
         "bytes" => VVal::typ_box(Type::Bytes),
         "syntax" => VVal::typ_box(Type::Syntax),
         "type" => VVal::typ_box(Type::Type),
-        "userdata" => VVal::typ_box(Type::Userdata),
         "ivec2" => VVal::typ_box(Type::IVec2),
         "ivec3" => VVal::typ_box(Type::IVec3),
         "ivec4" => VVal::typ_box(Type::IVec4),
         "fvec2" => VVal::typ_box(Type::FVec2),
         "fvec3" => VVal::typ_box(Type::FVec3),
         "fvec4" => VVal::typ_box(Type::FVec4),
-        // TODO: ref, list, record, ...
+        // TODO: ref, list, record, userdata, ...
         _ => {
             return Err(ps.err(ParseErrorKind::BadType("unknown type definition".to_string())));
         }

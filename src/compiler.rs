@@ -280,21 +280,17 @@ impl SymbolTable {
     /// let mut st = wlambda::compiler::SymbolTable::new();
     /// st.fun_t("nothing",
     ///          |e: &mut wlambda::vval::Env, _argc: usize| Ok(VVal::None),
-    ///          None, None, false, Type::fun_ret(Type::None));
+    ///          Type::fun_ret(Type::None));
     ///```
     pub fn fun_t<T>(
         &mut self,
         fnname: &str,
         fun: T,
-        min_args: Option<usize>,
-        max_args: Option<usize>,
-        err_arg_ok: bool,
         typ: Rc<Type>,
     ) where
         T: 'static + Fn(&mut Env, usize) -> Result<VVal, StackAction>,
     {
-        self.symbols
-            .insert(s2sym(fnname), VValFun::new_fun_t(fun, min_args, max_args, err_arg_ok, typ));
+        self.symbols.insert(s2sym(fnname), VValFun::new_fun_t(fun, typ));
     }
 }
 
