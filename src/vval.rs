@@ -1979,7 +1979,7 @@ pub enum Type {
     Union(Rc<Vec<Rc<Type>>>),
     Function(Rc<Vec<(Rc<Type>, bool)>>, Rc<Type>),
     Name(Rc<String>, Option<Rc<Type>>),
-    Var(Rc<String>),
+    Var(Rc<String>, Option<Rc<Type>>),
 }
 
 thread_local! {
@@ -2025,11 +2025,14 @@ impl Type {
     }
 
     pub fn rc_new_var(n: &str) -> Rc<Self> {
-        Rc::new(Type::Var(Rc::new(format!("{}{}", n, TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst)))))
+        Rc::new(Type::Var(
+            Rc::new(format!("{}{}", n, TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst))),
+            None,
+        ))
     }
 
     pub fn generic(n: &str) -> Rc<Self> {
-        Rc::new(Type::Var(Rc::new(n.to_string())))
+        Rc::new(Type::Var(Rc::new(n.to_string()), None))
     }
 
     pub fn fun_ret(t: Self) -> Rc<Type> {
@@ -2114,6 +2117,145 @@ impl Type {
             }
             Type::Name(name, Some(t)) => t.match_call_type(ret_type, args),
             _ => TypeMatch::NoMatch { expected, got: Rc::new(self.clone()) },
+        }
+    }
+
+    pub fn match_resolved(
+        &self,
+        chk_t: Rc<Type>,
+        bound_vars: &mut Vec<(String, Rc<Type>)>,
+    ) -> bool {
+        match self {
+            Type::Any => true,
+            Type::Bool => matches!(*chk_t, Type::Bool),
+            Type::None => matches!(*chk_t, Type::None),
+            Type::Str => matches!(*chk_t, Type::Str),
+            Type::Bytes => matches!(*chk_t, Type::Bytes),
+            Type::Sym => matches!(*chk_t, Type::Sym),
+            Type::Byte => matches!(*chk_t, Type::Byte),
+            Type::Char => matches!(*chk_t, Type::Char),
+            Type::Syntax => matches!(*chk_t, Type::Syntax),
+            Type::Type => matches!(*chk_t, Type::Type),
+            Type::Int => matches!(*chk_t, Type::Int),
+            Type::Float => matches!(*chk_t, Type::Float),
+            Type::IVec2 => matches!(*chk_t, Type::IVec2),
+            Type::IVec3 => matches!(*chk_t, Type::IVec3),
+            Type::IVec4 => matches!(*chk_t, Type::IVec4),
+            Type::FVec2 => matches!(*chk_t, Type::FVec2),
+            Type::FVec3 => matches!(*chk_t, Type::FVec3),
+            Type::FVec4 => matches!(*chk_t, Type::FVec4),
+            Type::Opt(t) => {
+                if let Type::Opt(ot) = *chk_t {
+                    t.match_resolved(ot, bound_vars)
+                } else {
+                    false
+                }
+            }
+            Type::Err(t) => {
+                if let Type::Err(ot) = *chk_t {
+                    t.match_resolved(ot, bound_vars)
+                } else {
+                    false
+                }
+            }
+            Type::Pair(t, t2) => {
+                if let Type::Pair(ct, ct2) = *chk_t {
+                    t.match_resolved(ct, bound_vars) && t2.match_resolved(ct2, bound_vars)
+                } else {
+                    false
+                }
+            }
+            Type::Lst(t) => {
+                if let Type::Lst(ot) = *chk_t {
+                    t.match_resolved(ot, bound_vars)
+                } else {
+                    false
+                }
+            }
+            Type::Ref(t) => {
+                if let Type::Ref(ot) = *chk_t {
+                    t.match_resolved(ot, bound_vars)
+                } else {
+                    false
+                }
+            }
+            Type::Map(t) => {
+                if let Type::Map(ot) = *chk_t {
+                    t.match_resolved(ot, bound_vars)
+                } else {
+                    false
+                }
+            }
+            Type::Userdata(fields) => {
+                // TODO
+                false
+            }
+            Type::Record(record) => {
+                // TODO
+                false
+            }
+            Type::Tuple(types) => {
+                // TODO
+                false
+            }
+            Type::Union(types) => {
+                for t in types.iter() {
+                    let bv = bound_vars.clone();
+                    if t.match_resolved(chk_t, &mut bv) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Type::Function(types, ret) => {
+                // TODO
+                false
+            }
+            Type::Name(name, None) => false,
+            Type::Name(name, Some(t)) => {
+                if let Type::Name(chk_name, ot) = *chk_t {
+                    if name.as_str() != chk_name.as_str() {
+                        false
+                    } else if let Some(ot) = ot {
+                        t.match_resolved(ot, bound_vars)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            Type::Var(name, None) => {
+                if let Some((_, typ)) =
+                    bound_vars.iter().find(|var| var.0.as_str() == name.as_str())
+                {
+                    // TODO: We should maybe save the resolve path/info?
+                    if typ.match_resolved(chk_t, bound_vars) {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    bound_vars.push((name.to_string(), chk_t.clone()));
+                    true
+                }
+            }
+            Type::Var(name, Some(t)) => {
+                // TODO: Do a structure match on `t`! XXX
+                if let Some((_, typ)) =
+                    bound_vars.iter().find(|var| var.0.as_str() == name.as_str())
+                {
+                    // TODO: We should maybe save the resolve path/info?
+                    if typ.match_resolved(chk_t, bound_vars) {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    bound_vars.push((name.to_string(), chk_t.clone()));
+                    true
+                }
+            }
         }
     }
 
@@ -2204,8 +2346,21 @@ impl Type {
                 false
             }
             Type::Name(name, None) => false,
-            Type::Name(name, Some(t)) => t.isa_resolved(chk_t),
-            Type::Var(name) => false,
+            Type::Name(name, Some(t)) => {
+                if let Type::Name(chk_name, ot) = chk_t {
+                    if name != chk_name {
+                        false
+                    } else if let Some(ot) = ot {
+                        t.isa_resolved(&ot)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            Type::Var(name, None) => false,
+            Type::Var(name, Some(t)) => t.isa_resolved(chk_t),
         }
     }
 
@@ -2278,7 +2433,8 @@ impl Type {
             Type::Function(types, ret) => format!("({:?}) -> {}", *types, ret.s()),
             Type::Name(name, None) => format!("{}", *name),
             Type::Name(name, Some(t)) => format!("{} = {}", *name, t.s()),
-            Type::Var(name) => format!("<{}>", *name),
+            Type::Var(name, None) => format!("<{}>", *name),
+            Type::Var(name, Some(t)) => format!("<{}={}>", *name, t.s()),
         }
     }
 
@@ -2359,7 +2515,8 @@ impl Type {
             }
             Type::Name(_name, None) => TypeResolve::Named,
             Type::Name(_name, Some(t)) => t.resolve_check(),
-            Type::Var(_name) => TypeResolve::UnboundVars,
+            Type::Var(_name, None) => TypeResolve::UnboundVars,
+            Type::Var(_name, Some(t)) => t.resolve_check(),
         }
     }
 }
