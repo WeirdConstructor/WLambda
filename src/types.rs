@@ -109,17 +109,16 @@ fn type_binop(
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
     let (syn, a, b) = (ast.v_(0), ast.v_(1), ast.v_(2));
-    println!("SYN: {} | {:?}", syn.s(), ast);
-    println!("SYN: {:?}", ce.borrow_mut().get("+"));
+    //    println!("SYN: {:?}", ce.borrow_mut().get("+"));
     // TODO: Get Type of BinOp from Environment by `syn`.
     let op_type = match ce.borrow_mut().get_type("+") {
         Some(t) => t,
         None => return Err(ast.compile_err(format!("Unknown type of operator: {}", ast.s()))),
     };
-    if !op_type.is_resolved() {
-        return Err(ast.compile_err(format!("Operator has unknown type: {}", op_type.s(),)));
-    }
-    println!("TYPE: {:?}", op_type);
+    //    if !op_type.is_resolved() {
+    //        return Err(ast.compile_err(format!("Operator has unknown type: {}", op_type.s(),)));
+    //    }
+    //d// println!("TYPE: {:?}", op_type);
 
     // TODO: Get union type from first argument!
     let a_type = type_pass(&a, Type::any(), ce)?;
@@ -132,13 +131,14 @@ fn type_binop(
     let chk_typ = Type::fun_2_ret((*a_type.typ).clone(), (*b_type.typ).clone(), Type::Any);
 
     let mut bound_vars = vec![];
-    let res =
-        resolve_type(&op_type, &chk_typ, &mut bound_vars, &mut |name| ce.borrow_mut().get_type(name));
+    let res = resolve_type(&op_type, &chk_typ, &mut bound_vars, &mut |name| {
+        ce.borrow_mut().get_type(name)
+    });
     let operation_typ = match res {
         TypeResolveResult::Match { typ } => typ,
         TypeResolveResult::Conflict { expected, got, reason } => {
             return Err(ast.compile_err(format!(
-                "Type error, expected:\n {}\ngot:        {}\n    reason: {}",
+                "Type error, expected:\n {}\ngot: {}\n=> reason: {}",
                 expected.s(),
                 got.s(),
                 reason
@@ -146,7 +146,16 @@ fn type_binop(
         }
     };
 
-    Ok(TypedVVal::new(operation_typ, ast.clone()))
+    if let Type::Function(_args, ret_type, _bound_vars) = operation_typ.as_ref() {
+        eprintln!("RetType: {}", ret_type.s());
+        Ok(TypedVVal::new(ret_type.clone(), ast.clone()))
+    } else {
+        Err(ast.compile_err(format!(
+            "Expected function type from operator {}, got: {}",
+            syn.s(),
+            operation_typ.s()
+        )))
+    }
 }
 
 fn type_block(
@@ -295,19 +304,20 @@ pub(crate) fn type_pass(
     }
 }
 
-#[allow(clippy::cognitive_complexity)]
 pub(crate) fn type_check(
     ast: &VVal,
     ce: &mut Rc<RefCell<CompileEnv>>,
+    types_enabled: bool,
 ) -> Result<VVal, CompileError> {
     match type_pass(ast, Type::any(), ce) {
-        Ok(tv) => {
-            eprintln!("TYPE: {}", tv.typ.s());
-            Ok(ast.clone())
-        }
+        Ok(tv) => Ok(ast.clone()),
         Err(e) => {
-            eprintln!("TYPE ERROR: {}", e);
-            Ok(ast.clone())
+            if types_enabled {
+                Err(e)
+            } else {
+                eprintln!("TYPE ERROR: {}", e);
+                Ok(ast.clone())
+            }
         }
     }
 }

@@ -759,6 +759,7 @@ pub struct EvalContext {
     /// Holds the top level environment data accross multiple eval()
     /// invocations.
     pub local: Rc<RefCell<Env>>,
+    pub types_enabled: bool,
 }
 
 impl EvalContext {
@@ -874,6 +875,7 @@ impl EvalContext {
                 quote_func: false,
             })),
             local: Rc::new(RefCell::new(Env::new_with_user(global, user))),
+            types_enabled: false,
         }
     }
 
@@ -898,7 +900,7 @@ impl EvalContext {
     /// println!("Res: {}", r.s());
     /// ```
     pub fn eval_ast(&mut self, ast: &VVal) -> Result<VVal, EvalError> {
-        let prog = compile_vm_fun(ast, &mut self.local_compile);
+        let prog = compile_vm_fun(ast, &mut self.local_compile, self.types_enabled);
         let locals_size = self.local_compile.borrow().get_local_space();
 
         let mut temporary_env = None;
@@ -3200,9 +3202,13 @@ pub(crate) fn compile(
 
 /// Compiles a WLambda AST into an [EvalNode] in the given CompileEnv.
 /// This is an internal function.
-fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
+fn compile_vm_fun(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    types_enabled: bool,
+) -> Result<EvalNode, CompileError> {
     let mut cet = Rc::new(RefCell::new(ce.borrow().clone()));
-    let ast = type_check(ast, &mut cet)?;
+    let ast = type_check(ast, &mut cet, types_enabled)?;
     let prog = compile_stmts(&ast, 1, ce)?;
 
     let mut p = Prog::new();
@@ -3225,7 +3231,7 @@ pub fn test_eval_to_string(s: &str) -> String {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
             let mut cet = Rc::new(RefCell::new(ce.borrow().clone()));
-            let typed_ast = match type_check(&ast, &mut cet) {
+            let typed_ast = match type_check(&ast, &mut cet, false) {
                 Ok(ast) => ast,
                 Err(e) => return format!("TYPE ERR: {}", e),
             };

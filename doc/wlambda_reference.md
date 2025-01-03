@@ -10189,22 +10189,23 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
 ### - WLambda Type Syntax
 
 ```ebnf
-    typeargs      = "<", ident, { ",", ident }, ">"
+    type_var      = ident, ["is", type]
                   ;
-    nominal_type  = ident, { ".", ident }, [ typeargs ]
+    type_vars      = "<", type_var, { ",", type_var }, ">"
+                  ;
+    nominal_type  = ident, { ".", ident }, [ type_vars ]
                   ;
     interface_list = nominal_type, { ",", nominal_type }
-                   | "{", type "}", { ",", nominal_type }
                    ;
     record_entry  = "type", ident, "=", type
                   | ident, ":", type
                   | "\"", (? any char, quoted \\ and \" ?), "\"", ":", type
                   ;
-    enum_body      = ident, { "," ident }
+    enum_body     = ident, { "," ident }
                   ;
-    record_body    = [ "is", interface_list ], { record_entry }
+    record_body   = [ "is", interface_list ], { record_entry }
                   ;
-    abstract_type = "record", ident, [ typeargs ], "{", record_body, "}"
+    abstract_type = "record", ident, [ type_vars ], "{", record_body, "}"
                   | "enum", ident, "{", enum_body, "}"
                   ;
     userdata      = "userdata", ident, "{", { ident, ":", type } "}"
@@ -10228,10 +10229,11 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | nominal_type
                   ;
     type          = "(", type, ")"
-                  | basetype { "|", basetype }     (* "|" is for type options *)
+                  | basetype, { "|", basetype }  (* "|" is for type options *)
                   ;
-    fun_type      = "(", [ [ ident, ":" ], type, { ",", [ ident, ":" ], type }, ], ")",
-                         [ "->", type ]
+    fun_type      = [ type_vars ],
+                    "(", [ [ ident, ":" ], type, { ",", [ ident, ":" ], type }, ], ")",
+                    [ "->", type ]
                   ;
 ```
 

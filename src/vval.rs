@@ -1944,13 +1944,17 @@ impl TypeRecord {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeConflictReason {
     WrongType(Rc<Type>, Rc<Type>),
-    WrongArgumentType(usize, Rc<Type>, Rc<Type>),
+    WrongArgumentType(usize, Box<TypeConflictReason>),
     ArgumentMissing(usize, Rc<Type>),
     ArgumentCountMismatch(usize, usize),
     WrongReturnType(Rc<Type>, Rc<Type>),
     PairType(u8, Rc<Type>, Rc<Type>),
-    UnionDidNotMatch(Rc<Vec<TypeResolveResult>>),
+    VarLimit(String, Rc<Type>, Rc<Type>),
+    BoundVarTypeMismatch(String, Rc<Type>, Rc<Type>),
+    UnionDidNotMatch(Rc<Vec<(Rc<Type>, TypeConflictReason)>>),
     UnionMatchesAmbigious(Rc<Vec<Rc<Type>>>, Rc<Type>),
+    UnknownTypeVar(String),
+    UnknownType(String),
 }
 
 impl std::fmt::Display for TypeConflictReason {
@@ -1959,8 +1963,8 @@ impl std::fmt::Display for TypeConflictReason {
             TypeConflictReason::WrongType(exp, got) => {
                 write!(f, "Mismatch {} <=> {}", exp.s(), got.s())
             }
-            TypeConflictReason::WrongArgumentType(idx, exp, got) => {
-                write!(f, "Wrong argument {}, expected: {}, got: {}", idx + 1, exp.s(), got.s())
+            TypeConflictReason::WrongArgumentType(idx, reason) => {
+                writeln!(f, "Wrong argument {}, reason: {}", idx + 1, reason)
             }
             TypeConflictReason::ArgumentCountMismatch(req, got) => {
                 write!(f, "Wrong number of arguments, required {}, got: {}", req, got)
@@ -1972,10 +1976,23 @@ impl std::fmt::Display for TypeConflictReason {
                 write!(f, "Wrong return type expected: {}, got: {}", exp.s(), got.s())
             }
             TypeConflictReason::PairType(idx, exp, got) => {
-                write!(f, "Wrong pair type at pos {} expected: {}, got: {}", idx + 1, exp.s(), got.s())
+                write!(
+                    f,
+                    "Wrong pair type at pos {} expected: {}, got: {}",
+                    idx + 1,
+                    exp.s(),
+                    got.s()
+                )
             }
-            TypeConflictReason::UnionDidNotMatch(resolve_results) => {
-                write!(f, "No matching types in union!")
+            TypeConflictReason::UnionDidNotMatch(reasons) => {
+                writeln!(f, "No matching types in union:")?;
+                fmt.debug_list();
+                for (typ, reason) in reasons.iter() {
+                    fmt.
+                    writeln!(f, "    | {}", typ.s())?;
+                    writeln!(f, "        => reason: {}", reason)?;
+                }
+                Ok(())
             }
             TypeConflictReason::UnionMatchesAmbigious(matched, got) => {
                 writeln!(f, "Union matches ambigious: ")?;
@@ -1983,6 +2000,31 @@ impl std::fmt::Display for TypeConflictReason {
                     writeln!(f, "    | {} <=> {}", t.s(), got.s())?;
                 }
                 Ok(())
+            }
+            TypeConflictReason::BoundVarTypeMismatch(varname, expected, got) => {
+                writeln!(
+                    f,
+                    "Type variable {} conflict, <{} is {}> but got: {}",
+                    varname,
+                    varname,
+                    expected.s(),
+                    got.s()
+                )
+            }
+            TypeConflictReason::VarLimit(varname, expected, got) => {
+                writeln!(
+                    f,
+                    "Type variable {} can't be bound, expected: {}, got {}",
+                    varname,
+                    expected.s(),
+                    got.s()
+                )
+            }
+            TypeConflictReason::UnknownType(name) => {
+                write!(f, "Unknown type name '{}'", name)
+            }
+            TypeConflictReason::UnknownTypeVar(name) => {
+                write!(f, "Unknown type variable '{}'", name)
             }
         }
     }
@@ -2028,7 +2070,7 @@ pub enum Type {
     Userdata(Rc<String>, Rc<Vec<(String, Rc<Type>)>>),
     Record(Rc<String>, Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
-    Function(Rc<Vec<(Rc<Type>, bool)>>, Rc<Type>),
+    Function(Rc<Vec<(Rc<Type>, bool)>>, Rc<Type>, Option<Rc<Vec<(String, Rc<Type>)>>>),
     Name(Rc<String>),
     Var(Rc<String>, Option<Rc<Vec<String>>>),
 }
@@ -2102,18 +2144,43 @@ impl Type {
         Rc::new(Type::Var(Rc::new(n.to_string()), None))
     }
 
+    pub fn generic_is(n: &str, limits: Vec<String>) -> Rc<Self> {
+        Rc::new(Type::Var(Rc::new(n.to_string()), Some(Rc::new(limits))))
+    }
+
+    pub fn named(n: &str) -> Rc<Self> {
+        Rc::new(Type::Name(Rc::new(n.to_string())))
+    }
+
     pub fn fun_ret(t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t)))
+        Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t), None))
     }
 
     pub fn fun_1_ret(a1: Self, t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(Rc::new(vec![(Rc::new(a1), false)]), Rc::new(t)))
+        Rc::new(Type::Function(Rc::new(vec![(Rc::new(a1), false)]), Rc::new(t), None))
+    }
+
+    pub fn fun_1_ret_is(a1: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
+        Rc::new(Type::Function(
+            Rc::new(vec![(Rc::new(a1), false)]),
+            Rc::new(t),
+            Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), t.clone())).collect())),
+        ))
     }
 
     pub fn fun_2_ret(a1: Self, a2: Self, t: Self) -> Rc<Type> {
         Rc::new(Type::Function(
             Rc::new(vec![(Rc::new(a1), false), (Rc::new(a2), false)]),
             Rc::new(t),
+            None,
+        ))
+    }
+
+    pub fn fun_2_ret_is(a1: Self, a2: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
+        Rc::new(Type::Function(
+            Rc::new(vec![(Rc::new(a1), false), (Rc::new(a2), false)]),
+            Rc::new(t),
+            Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), t.clone())).collect())),
         ))
     }
 
@@ -2272,7 +2339,7 @@ impl Type {
                 }
                 false
             }
-            Type::Function(types, ret) => {
+            Type::Function(types, ret, type_vars) => {
                 // TODO
                 false
             }
@@ -2339,16 +2406,38 @@ impl Type {
                 let mut res = String::from("");
                 let mut first = true;
                 for t in types.iter() {
+                    let ts = t.s();
                     if !first {
-                        res += " | ";
+                        if ts.len() > 10 {
+                            res += "\n| ";
+                        } else {
+                            res += " | ";
+                        }
+                    } else {
+                        if ts.len() > 10 {
+                            res += " "; // little hack, we assume the next type is long too...
+                        }
                     }
-                    res += &t.s();
+                    res += ts.as_str();
                     first = false;
                 }
                 res
             }
-            Type::Function(types, ret) => {
-                let mut fun = String::from("(");
+            Type::Function(types, ret, type_vars) => {
+                let limit_str = if let Some(type_vars) = type_vars {
+                    let mut ls = String::from("<");
+                    for (varname, limit_type) in type_vars.iter() {
+                        ls += varname.as_str();
+                        ls += " is (";
+                        ls += &limit_type.s();
+                        ls += ")";
+                    }
+                    ls += "> ";
+                    ls
+                } else {
+                    String::from("")
+                };
+                let mut fun = limit_str + "(";
                 for (i, (t, opt)) in types.iter().enumerate() {
                     if i != 0 {
                         fun += ", ";
@@ -2445,7 +2534,7 @@ impl Type {
                 }
                 res
             }
-            Type::Function(types, ret) => {
+            Type::Function(types, ret, _limits) => {
                 let mut res = ret.resolve_check();
                 for t in types.iter() {
                     match t.0.resolve_check() {
@@ -2522,7 +2611,33 @@ where
     F: FnMut(&str) -> Option<Rc<Type>>,
 {
     match typ.as_ref() {
-        Type::Any => TypeResolveResult::Match { typ: typ.clone() },
+        Type::Any => match chk_t.as_ref() {
+            Type::Var(name, _l) => {
+                if let Some((_, typ)) =
+                    bound_vars.iter().find(|var| var.0.as_str() == name.as_str())
+                {
+                    TypeResolveResult::Match { typ: typ.clone() }
+                } else {
+                    TypeResolveResult::Conflict {
+                        expected: typ.clone(),
+                        got: chk_t.clone(),
+                        reason: TypeConflictReason::UnknownTypeVar(name.to_string()),
+                    }
+                }
+            }
+            Type::Name(name) => {
+                if let Some(t) = name_resolver(name) {
+                    TypeResolveResult::Match { typ: t.clone() }
+                } else {
+                    TypeResolveResult::Conflict {
+                        expected: typ.clone(),
+                        got: chk_t.clone(),
+                        reason: TypeConflictReason::UnknownType(name.to_string()),
+                    }
+                }
+            }
+            t => TypeResolveResult::Match { typ: Rc::new(t.clone()) },
+        },
         Type::Bool => resolve_type_trivial!(typ, chk_t, Type::Bool),
         Type::None => resolve_type_trivial!(typ, chk_t, Type::None),
         Type::Str => resolve_type_trivial!(typ, chk_t, Type::Str),
@@ -2588,7 +2703,9 @@ where
                     TypeResolveResult::Match { typ } => {
                         matched_types.push(typ);
                     }
-                    conflict => conflicts.push(conflict),
+                    TypeResolveResult::Conflict { got, reason, expected, .. } => {
+                        conflicts.push((expected.clone(), reason))
+                    }
                 }
             }
 
@@ -2611,9 +2728,17 @@ where
                 }
             }
         }
-        Type::Function(arg_types, ret) => {
+        Type::Function(arg_types, ret, type_vars) => {
             // Only matches, if the other type is also a function type.
-            if let Type::Function(chk_arg_types, chk_ret) = chk_t.as_ref() {
+            if let Type::Function(chk_arg_types, chk_ret, limits) = chk_t.as_ref() {
+                // TODO: Do not allocate if we don't have limits!
+                let mut bv = bound_vars.clone();
+                if let Some(limits) = limits {
+                    for (var, typ) in limits.iter() {
+                        bv.push((var.to_string(), typ.clone()));
+                    }
+                }
+
                 let mut matched_args = vec![];
                 let mut required = 0;
                 for (i, (t, optional)) in arg_types.iter().enumerate() {
@@ -2626,12 +2751,11 @@ where
                                 TypeResolveResult::Match { typ } => typ,
                                 TypeResolveResult::Conflict { expected, got, reason } => {
                                     return TypeResolveResult::Conflict {
-                                        expected,
-                                        got,
+                                        expected: typ.clone(),
+                                        got: chk_t.clone(),
                                         reason: TypeConflictReason::WrongArgumentType(
                                             i,
-                                            t.clone(),
-                                            chk_arg_typ.clone(),
+                                            Box::new(reason)
                                         ),
                                     }
                                 }
@@ -2654,14 +2778,20 @@ where
                     return TypeResolveResult::Conflict {
                         expected: typ.clone(),
                         got: chk_t.clone(),
-                        reason: TypeConflictReason::ArgumentCountMismatch(required, chk_arg_types.len()),
-                    }
+                        reason: TypeConflictReason::ArgumentCountMismatch(
+                            required,
+                            chk_arg_types.len(),
+                        ),
+                    };
                 } else if arg_types.len() < chk_arg_types.len() {
                     return TypeResolveResult::Conflict {
                         expected: typ.clone(),
                         got: chk_t.clone(),
-                        reason: TypeConflictReason::ArgumentCountMismatch(required, chk_arg_types.len()),
-                    }
+                        reason: TypeConflictReason::ArgumentCountMismatch(
+                            required,
+                            chk_arg_types.len(),
+                        ),
+                    };
                 }
 
                 // Return types are matched reverse. That means, the calling function
@@ -2681,8 +2811,10 @@ where
                     }
                 };
 
+                println!("MATCHED RET: {} <=> {} => {}", chk_ret.s(), ret.s(), matched_ret.s());
+
                 TypeResolveResult::Match {
-                    typ: Rc::new(Type::Function(Rc::new(matched_args), matched_ret)),
+                    typ: Rc::new(Type::Function(Rc::new(matched_args), matched_ret, None)),
                 }
             } else {
                 TypeResolveResult::Conflict {
@@ -2702,6 +2834,56 @@ where
                 got: chk_t.clone(),
 
                 reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+            }
+        }
+        Type::Var(name, _limits_might_be_not_needed_if_not_then_remove_from_type_thanks) => {
+            let bound_type = if let Some((_, typ)) =
+                bound_vars.iter().find(|var| var.0.as_str() == name.as_str())
+            {
+                Some(typ.clone())
+            } else {
+                None
+            };
+
+            if let Some(bound_type) = bound_type {
+                let bound_type = if let Type::Union(_) = typ.as_ref() {
+                    let bound_type = match resolve_type(typ, chk_t, bound_vars, name_resolver) {
+                        TypeResolveResult::Match { typ } => typ,
+                        TypeResolveResult::Conflict { expected, got, reason } => {
+                            return TypeResolveResult::Conflict {
+                                expected: typ.clone(),
+                                got: chk_t.clone(),
+                                reason: TypeConflictReason::VarLimit(
+                                    name.to_string(),
+                                    typ.clone(),
+                                    chk_t.clone(),
+                                ),
+                            }
+                        }
+                    };
+                    bound_vars.insert(0, (name.to_string(), bound_type.clone()));
+                    bound_type
+                } else {
+                    bound_type
+                };
+
+                match resolve_type(&bound_type, chk_t, bound_vars, name_resolver) {
+                    TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+                    TypeResolveResult::Conflict { expected, got, reason } => {
+                        TypeResolveResult::Conflict {
+                            expected,
+                            got,
+                            reason: TypeConflictReason::BoundVarTypeMismatch(
+                                name.to_string(),
+                                bound_type.clone(),
+                                chk_t.clone(),
+                            ),
+                        }
+                    }
+                }
+            } else {
+                bound_vars.push((name.to_string(), chk_t.clone()));
+                TypeResolveResult::Match { typ: chk_t.clone() }
             }
         }
         //        Type::Userdata(fields) => {
@@ -6938,7 +7120,7 @@ impl VVal {
                 Some(t) => return t.clone(),
                 None => return Type::rc_new_var("_FUN"),
             },
-            VVal::DropFun(_) => Type::Function(Rc::new(vec![]), Rc::new(Type::None)),
+            VVal::DropFun(_) => Type::Function(Rc::new(vec![]), Rc::new(Type::None), None),
             VVal::FVec(nv) => match nv.dims() {
                 NVecDim::Two => Type::FVec2,
                 NVecDim::Three => Type::FVec3,
