@@ -10891,14 +10891,14 @@ pub fn core_symbol_table() -> SymbolTable {
        .union(Type::fun_1_ret(Type::FVec2, Type::FVec2))
        .union(Type::fun_1_ret(Type::FVec3, Type::FVec3))
        .union(Type::fun_1_ret(Type::FVec4, Type::FVec4))
-       .union(Type::fun_2_ret(Type::Float, Type::Any, Type::Float))
-       .union(Type::fun_2_ret(Type::Int, Type::Any, Type::Int))
-       .union(Type::fun_2_ret(Type::IVec2, Type::Any, Type::IVec2))
-       .union(Type::fun_2_ret(Type::IVec3, Type::Any, Type::IVec3))
-       .union(Type::fun_2_ret(Type::IVec4, Type::Any, Type::IVec4))
-       .union(Type::fun_2_ret(Type::FVec2, Type::Any, Type::FVec2))
-       .union(Type::fun_2_ret(Type::FVec3, Type::Any, Type::FVec3))
-       .union(Type::fun_2_ret(Type::FVec4, Type::Any, Type::FVec4)));
+       .union(Type::fun_2_ret(Type::Float, Type::Float, Type::Float))
+       .union(Type::fun_2_ret(Type::Int,   Type::Int,   Type::Int))
+       .union(Type::fun_2_ret(Type::IVec2, Type::IVec2, Type::IVec2))
+       .union(Type::fun_2_ret(Type::IVec3, Type::IVec3, Type::IVec3))
+       .union(Type::fun_2_ret(Type::IVec4, Type::IVec4, Type::IVec4))
+       .union(Type::fun_2_ret(Type::FVec2, Type::FVec2, Type::FVec2))
+       .union(Type::fun_2_ret(Type::FVec3, Type::FVec3, Type::FVec3))
+       .union(Type::fun_2_ret(Type::FVec4, Type::FVec4, Type::FVec4)));
     add_func!(st, -, env, argc, {
         Ok(match (argc, env.arg(0)) {
             (0, _) => VVal::None,

@@ -12,7 +12,9 @@ use std::rc::Rc;
 
 use crate::compiler::CompileEnv;
 use crate::ops::BinOp;
-use crate::vval::{CompileError, Syntax, Type, TypeResolve, VVal, VarPos, resolve_type};
+use crate::vval::{
+    resolve_type, CompileError, Syntax, Type, TypeConflictReason, TypeResolveResult, VVal, VarPos,
+};
 //
 //pub(crate) fn type_pass(
 //    ast: &VVal,
@@ -119,7 +121,32 @@ fn type_binop(
     }
     println!("TYPE: {:?}", op_type);
 
-    Ok(TypedVVal::new(Type::rc_new_var("BinOp"), ast.clone()))
+    // TODO: Get union type from first argument!
+    let a_type = type_pass(&a, Type::any(), ce)?;
+
+    // TODO: Get union type from second argument!
+    let b_type = type_pass(&b, Type::any(), ce)?;
+
+    // TODO: Maybe we should also pass a second type hint down, one which limits the
+    //       possible return types?
+    let chk_typ = Type::fun_2_ret((*a_type.typ).clone(), (*b_type.typ).clone(), Type::Any);
+
+    let mut bound_vars = vec![];
+    let res =
+        resolve_type(&op_type, &chk_typ, &mut bound_vars, &mut |name| ce.borrow_mut().get_type(name));
+    let operation_typ = match res {
+        TypeResolveResult::Match { typ } => typ,
+        TypeResolveResult::Conflict { expected, got, reason } => {
+            return Err(ast.compile_err(format!(
+                "Type error, expected:\n {}\ngot:        {}\n    reason: {}",
+                expected.s(),
+                got.s(),
+                reason
+            )));
+        }
+    };
+
+    Ok(TypedVVal::new(operation_typ, ast.clone()))
 }
 
 fn type_block(
@@ -236,6 +263,8 @@ pub(crate) fn type_pass(
         VVal::Lst(_, _) => {
             let syn = ast.at(0).unwrap_or(VVal::None).get_syn();
             let v = match syn {
+                Syntax::Key => TypedVVal::new(Type::sym(), ast.clone()),
+                Syntax::Str => TypedVVal::new(Type::str(), ast.clone()),
                 Syntax::Block => {
                     let tv = type_block(ast, 1, type_hint, ce)?;
                     tv.vval.unshift(ast.v_(0));

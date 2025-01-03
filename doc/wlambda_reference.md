@@ -10193,21 +10193,21 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   ;
     nominal_type  = ident, { ".", ident }, [ typeargs ]
                   ;
-    interfacelist = nominal_type, { ",", nominal_type }
-                  | "{", type "}", { ",", nominal_type }
-                  ;
+    interface_list = nominal_type, { ",", nominal_type }
+                   | "{", type "}", { ",", nominal_type }
+                   ;
     record_entry  = "type", ident, "=", type
                   | ident, ":", type
                   | "\"", (? any char, quoted \\ and \" ?), "\"", ":", type
                   ;
-    enumbody      = ident, { "," ident }
+    enum_body      = ident, { "," ident }
                   ;
-    recordbody    = [ typeargs ], [ "is", interfacelist ], { record_entry }
+    record_body    = [ "is", interface_list ], { record_entry }
                   ;
-    struct_type   = "record", "{", recordbody, "}"
-                  | "enum", "{", enumbody, "}"
+    abstract_type = "record", ident, [ typeargs ], "{", record_body, "}"
+                  | "enum", ident, "{", enum_body, "}"
                   ;
-    userdata      = "userdata", "{", { ident, ":", type } "}"
+    userdata      = "userdata", ident, "{", { ident, ":", type } "}"
                   ;
     basetype      = "any" | "bool" | "none" | "str" | "num" | "int" | "float"
                   | "bytes" | "sym" | "char" | "syntax" | "type"
@@ -10223,7 +10223,7 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | "{", [ type ], "}" (* map type *)
                   | "[", [ type ], "]" (* list type *)
                   | "[", type, ",", type, { ",", type }, "]" (* tuple type *)
-                  | struct_type
+                  | abstract_type
                   | userdata
                   | nominal_type
                   ;
