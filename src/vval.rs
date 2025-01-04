@@ -237,6 +237,8 @@ pub enum Syntax {
     AssignRef,
     DefGlobRef,
     DefConst,
+    DefType,
+    DefGlobType,
     SelfObj,
     SelfData,
     Import,
@@ -333,6 +335,8 @@ impl std::str::FromStr for Syntax {
             "AssignRef" => Ok(Syntax::AssignRef),
             "DefGlobRef" => Ok(Syntax::DefGlobRef),
             "DefConst" => Ok(Syntax::DefConst),
+            "DefType" => Ok(Syntax::DefType),
+            "DefGlobType" => Ok(Syntax::DefGlobType),
             "SelfObj" => Ok(Syntax::SelfObj),
             "SelfData" => Ok(Syntax::SelfData),
             "Import" => Ok(Syntax::Import),
@@ -2069,7 +2073,7 @@ pub enum Type {
     Record(Rc<String>, Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
     Function(Rc<Vec<(Rc<Type>, bool)>>, Rc<Type>, Option<Rc<Vec<(String, Rc<Type>)>>>),
-    Name(Rc<String>),
+    Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
     Var(Rc<String>, Option<Rc<Vec<String>>>),
 }
 
@@ -2080,6 +2084,7 @@ thread_local! {
     pub static TYPE_RC_STR: Rc<Type> = Rc::new(Type::Str);
     pub static TYPE_RC_INT: Rc<Type> = Rc::new(Type::Int);
     pub static TYPE_RC_FLOAT: Rc<Type> = Rc::new(Type::Float);
+    pub static TYPE_RC_TYPE: Rc<Type> = Rc::new(Type::Type);
     pub static TYPE_RC_OPT_ANY: Rc<Type> = Rc::new(Type::Opt(Rc::new(Type::Any)));
     pub static TYPE_RC_LST_ANY: Rc<Type> = Rc::new(Type::Lst(Rc::new(Type::Any)));
     pub static TYPE_RC_MAP_ANY: Rc<Type> = Rc::new(Type::Map(Rc::new(Type::Any)));
@@ -2104,6 +2109,9 @@ impl Type {
     }
     pub fn float() -> Rc<Self> {
         TYPE_RC_FLOAT.with(|typ| typ.clone())
+    }
+    pub fn typ() -> Rc<Self> {
+        TYPE_RC_TYPE.with(|typ| typ.clone())
     }
 
     pub fn opt_any() -> Rc<Self> {
@@ -2147,7 +2155,7 @@ impl Type {
     }
 
     pub fn named(n: &str) -> Rc<Self> {
-        Rc::new(Type::Name(Rc::new(n.to_string())))
+        Rc::new(Type::Name(Rc::new(n.to_string()), None))
     }
 
     pub fn fun_ret(t: Self) -> Rc<Type> {
@@ -2341,7 +2349,7 @@ impl Type {
                 // TODO
                 false
             }
-            Type::Name(name) => false,
+            Type::Name(name, _binds) => false,
             Type::Var(name, _limits) => false,
         }
     }
@@ -2452,7 +2460,19 @@ impl Type {
                 fun += &ret.s();
                 fun
             }
-            Type::Name(name) => format!("{}", *name),
+            Type::Name(name, None) => format!("{}", *name),
+            Type::Name(name, Some(binds)) => {
+                let mut s = format!("{}", *name);
+                s += "<";
+                for (i, b) in binds.iter().enumerate() {
+                    if i != 0 {
+                        s += ", ";
+                    }
+                    s += &b.s();
+                }
+                s += ">";
+                s
+            }
             Type::Var(name, None) => format!("<{}>", *name),
             Type::Var(name, Some(limits)) => {
                 let mut limit_list = String::from("");
@@ -2543,7 +2563,7 @@ impl Type {
                 }
                 res
             }
-            Type::Name(_name) => TypeResolve::Named,
+            Type::Name(_name, _bindings) => TypeResolve::Named,
             Type::Var(_name, _limits) => TypeResolve::UnboundVars,
         }
     }
@@ -2623,9 +2643,10 @@ where
                     }
                 }
             }
-            Type::Name(name) => {
-                if let Some(t) = name_resolver(name) {
-                    TypeResolveResult::Match { typ: t.clone() }
+            Type::Name(name, _bindings) => {
+                // If the type exists, then we can allow it in place of an `Any`.
+                if let Some(_) = name_resolver(name) {
+                    TypeResolveResult::Match { typ: typ.clone() }
                 } else {
                     TypeResolveResult::Conflict {
                         expected: typ.clone(),
@@ -2753,7 +2774,7 @@ where
                                         got: chk_t.clone(),
                                         reason: TypeConflictReason::WrongArgumentType(
                                             i,
-                                            Box::new(reason)
+                                            Box::new(reason),
                                         ),
                                     }
                                 }
@@ -2822,11 +2843,33 @@ where
                 }
             }
         }
-        Type::Name(name) => {
+        Type::Name(name, binds) => {
+            // case: Name == Name
+            // case: Alias == Name
+            // case: Alias == Alias
+            // case: Name == Alias
+            // case: Name<Num> == Name<int>
+            // case: Name<Num> == Name<int>
+            // case: Point<Num> = Pos<int>
+            //       with:
+            //              !:type Point record<N is Num> { x: N, y: N }
+            //              !:type Pos record<S> { is Point<S> }
+            //              !p : Point<Num> = as Pos<int>: ${ x: 10, y: 20 };
+            if let Type::Name(chk_name, chk_binds) = chk_t.as_ref() {
+            } else {
+                // we need to check if the `name` is an alias for the other type.
+                // !Num : type = $type int | float;
+                // !x : Num = 120;
+                // !x : Num = 120.21;
+            }
+
             // TODO: check if the chk_t either is exactly that name, or if the type
             //       behind the chk_t implementing the interface of this type.
             //       That means, resolving the Name of chk_t, if chk_t is a name.
             //       If chk_t is not a name:
+
+            //                if let Some(t) = name_resolver(name) {
+            //                }
             TypeResolveResult::Conflict {
                 expected: typ.clone(),
                 got: chk_t.clone(),
@@ -6763,6 +6806,8 @@ impl VVal {
                 Syntax::AssignRef => "AssignRef",
                 Syntax::DefGlobRef => "DefGlobRef",
                 Syntax::DefConst => "DefConst",
+                Syntax::DefType => "DefType",
+                Syntax::DefGlobType => "DefGlobType",
                 Syntax::SelfObj => "SelfObj",
                 Syntax::SelfData => "SelfData",
                 Syntax::Import => "Import",

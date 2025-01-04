@@ -1543,6 +1543,34 @@ fn compile_def(
     }
 }
 
+fn compile_deftype(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    is_global: bool,
+) -> Result<ProgWriter, CompileError> {
+    let syn = ast.at(0).unwrap_or(VVal::None);
+    let spos = syn.get_syn_pos();
+
+    let (typename, typ) = (ast.v_s_raw(1), ast.v_(2));
+
+    if is_global {
+        if let VarPos::Global(r) = ce.borrow_mut().def(&typename, true, Type::typ()) {
+            r.set_ref(typ);
+            pw_null!(prog, {})
+        } else {
+            panic!("Defining global did not return a global!");
+        }
+    } else {
+        let next_local = ce.borrow_mut().next_local();
+        ce.borrow_mut().def_local(&typename, next_local, Type::typ());
+
+        pw_null!(prog, {
+            let typpos = prog.data_pos(typ.clone());
+            prog.op_mov(&spos, typpos, ResPos::Local(next_local as u16));
+        })
+    }
+}
+
 pub(crate) fn pw_arg(arg_idx: usize, to_ref: bool) -> Result<ProgWriter, CompileError> {
     let arg_pos = ResPos::Arg(arg_idx as u16);
 
@@ -2412,6 +2440,8 @@ pub(crate) fn compile(
                 Syntax::Def => compile_def(ast, ce, false),
                 Syntax::DefGlobRef => compile_def(ast, ce, true),
                 Syntax::DefConst => compile_const(ast, ce),
+                Syntax::DefType => compile_deftype(ast, ce, false),
+                Syntax::DefGlobType => compile_deftype(ast, ce, true),
                 Syntax::BinOpAdd => compile_binop(ast, BinOp::Add, ce),
                 Syntax::BinOpSub => compile_binop(ast, BinOp::Sub, ce),
                 Syntax::BinOpDiv => compile_binop(ast, BinOp::Div, ce),

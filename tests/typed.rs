@@ -58,7 +58,7 @@ fn chk_types_parse_type_values() {
         "$type(pair(ref pair(int, pair(str, float)), ivec2))"
     );
     assert_eq!(v("$type Animals.Mammal"), "$type(Animals.Mammal)");
-    assert_eq!(v("$type Main.Animal<Mammal,XXX>"), "");
+    assert_eq!(v("$type Main . Animal<Mammal,   XXX>"), "$type(Main.Animal<Mammal, XXX>)");
 }
 
 #[test]
@@ -66,4 +66,15 @@ fn chk_types_add() {
     assert_eq!(v("!x: int = 5 + 2; x"), "7"); // Expecting all ok
     assert!(v("!x: float = 5 + 3; x").find("int to variable x of type float").is_some());
     assert_eq!(v("!x: float = 1 + \"2\"; x"), "10"); // Expecting a type error!
+}
+
+#[test]
+fn chk_types_named() {
+    assert_eq!(v("!o: Num = 10; o"), "");
+    assert_eq!(v("!o: Num = 10.12; o"), "");
+}
+
+#[test]
+fn chk_types_def() {
+    assert_eq!(v("!:type OneDimPoint int; !x: OneDimPoint = 120; OneDimPoint => x"), "120");
 }

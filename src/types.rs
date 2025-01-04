@@ -260,6 +260,27 @@ fn type_def(
     Ok(TypedVVal::new(Type::any(), ast.clone()))
 }
 
+fn type_deftype(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    is_global: bool,
+) -> Result<TypedVVal, CompileError> {
+    let (typename, typ) = (ast.v_s_raw(1), ast.v_(2));
+
+    if is_global {
+        if let VarPos::Global(r) = ce.borrow_mut().def(&typename, true, typ.t()) {
+            r.set_ref(typ);
+        } else {
+            panic!("Defining global did not return a global!");
+        }
+    } else {
+        let next_local = ce.borrow_mut().next_local();
+        ce.borrow_mut().def_local(&typename, next_local, typ.t());
+    }
+
+    Ok(TypedVVal::new(Type::typ(), ast.clone()))
+}
+
 /// Runs the type checker pass over the AST.
 /// TODO: Do we do preparative steps for the compiler/code generator?
 #[allow(clippy::cognitive_complexity)]
@@ -291,6 +312,8 @@ pub(crate) fn type_pass(
                 Syntax::BinOpEq => type_binop(ast, BinOp::Eq, type_hint, ce)?,
                 Syntax::Var => type_var(ast, ce, false)?,
                 Syntax::Def => type_def(ast, ce, false)?,
+                Syntax::DefType => type_deftype(ast, ce, false)?,
+                Syntax::DefGlobType => type_deftype(ast, ce, true)?,
                 //                Syntax::DefGlobRef => compile_def(ast, ce, true),
                 _ => {
                     return Err(

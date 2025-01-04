@@ -1115,17 +1115,23 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
                 }
 
                 if ps.consume_area_start_token_wsc('<', Syntax::TQ) {
+                    let mut bindings = vec![];
+                    let typebind = parse_type(ps)?;
+                    bindings.push(typebind.t());
+
                     while ps.consume_token_wsc(',', Syntax::TDelim) {
                         let typebind = parse_type(ps)?;
+                        bindings.push(typebind.t());
                     }
 
                     if !ps.consume_area_end_token_wsc('>', Syntax::TQ) {
                         return Err(ps.err(ParseErrorKind::ExpectedToken('>', "type generic binding end")));
                     }
+
+                    VVal::typ_box(Type::Name(Rc::new(typename), Some(Rc::new(bindings))))
+                } else {
+                    VVal::typ_box(Type::Name(Rc::new(typename), None))
                 }
-
-
-                VVal::typ_box(Type::Name(Rc::new(typename)))
             }
         };
 
@@ -1825,15 +1831,24 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
         let mut assign = ps.last_syn();
 
         let mut is_ref = false;
+        let mut is_type_definition = false;
 
         if is_def {
             if ps.consume_token_wsc(':', Syntax::T) {
                 let key = annotate(ps, Syntax::TIdent, |ps, _new_syn| parse_identifier(ps))?;
                 ps.skip_ws_and_comments();
                 if key == "global" {
-                    assign = ps.syn(Syntax::DefGlobRef);
+                    if ps.consume_tokens_wsc("type", Syntax::TIdent) {
+                        is_type_definition = true;
+                        assign = ps.syn(Syntax::DefType);
+                    } else {
+                        assign = ps.syn(Syntax::DefGlobType);
+                    }
                 } else if key == "const" {
                     assign = ps.syn(Syntax::DefConst);
+                } else if key == "type" {
+                    is_type_definition = true;
+                    assign = ps.syn(Syntax::DefType);
                 }
             }
         } else {
@@ -1841,6 +1856,14 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                 assign = ps.syn(Syntax::AssignRef);
                 is_ref = true;
             }
+        }
+
+        if is_type_definition {
+            let typename = parse_typename(ps)?;
+            ps.skip_ws_and_comments();
+            assign.push(VVal::new_str_mv(typename));
+            assign.push(parse_type(ps)?);
+            return Ok(assign);
         }
 
         let mut destructuring = false;

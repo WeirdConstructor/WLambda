@@ -10080,6 +10080,7 @@ In the following grammar, white space and comments are omitted:
     destr_assign  = "(", [ qident, [ ":", type ], { ",", qident, [ ":", type ] } ], ")", "=" expr
                   ;
     definition    = [ ref_specifier ], ( simple_assign | destr_assign )
+                  | ":", [ "global" ], "type", type_ident, type
                   ;
     import        = "!", "@import", symbol, [ [ "=" ], symbol ]
                   | "!", "@wlambda"
@@ -10213,8 +10214,8 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   ;
     record_body   = [ "is", interface_list ], { record_entry }
                   ;
-    abstract_type = "record", type_ident, [ type_vars ], "{", record_body, "}"
-                  | "enum", type_ident, "{", enum_body, "}"
+    abstract_type = "record", [ type_vars ], "{", record_body, "}"
+                  | "enum", "{", enum_body, "}"
                   ;
     userdata      = "userdata", type_ident, "{", { ident, ":", type } "}"
                   ;
