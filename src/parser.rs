@@ -22,6 +22,7 @@ use crate::vval::Syntax;
 use crate::vval::Type;
 use crate::vval::VVal;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::str::FromStr;
 
 pub mod state;
@@ -686,12 +687,17 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             Ok(ps.syn(Syntax::SelfObj))
         }
         't' => {
-            if ps.consume_lookahead("true") {
+            if ps.consume_lookahead("type") {
                 ps.skip_ws_and_comments();
+                Ok(parse_type(ps)?)
             } else {
-                ps.consume_wsc();
+                if ps.consume_lookahead("true") {
+                    ps.skip_ws_and_comments();
+                } else {
+                    ps.consume_wsc();
+                }
+                Ok(VVal::Bol(true))
             }
-            Ok(VVal::Bol(true))
         }
         'f' => {
             if ps.consume_lookahead("false") {
@@ -948,14 +954,22 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
     }
 }
 
-fn is_ident_char(c: char) -> bool {
-    match c {
-        '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
-        _ => !c.is_whitespace(),
+fn is_ident_char(c: char, is_type: bool) -> bool {
+    if is_type {
+        match c {
+            '<' | '>' if is_type => false,
+            '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
+            _ => !c.is_whitespace(),
+        }
+    } else {
+        match c {
+            '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
+            _ => !c.is_whitespace(),
+        }
     }
 }
 
-fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
+fn parse_ident(ps: &mut State, is_type: bool) -> Result<String, ParseError> {
     if ps.peek().is_none() {
         return Err(ps.err(ParseErrorKind::EOF("identifier")));
     }
@@ -991,12 +1005,12 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
         let mut identifier = String::from("");
         while ps.peek().unwrap_or(' ') != ' ' {
             let c = ps.expect_some(ps.peek())?;
-            if !is_ident_char(c) {
+            if !is_ident_char(c, is_type) {
                 break;
             }
 
             if c == ':' {
-                if !is_ident_char(ps.peek_offs(1).unwrap_or(' ')) {
+                if !is_ident_char(ps.peek_offs(1).unwrap_or(' '), is_type) {
                     break;
                 } else {
                     ps.consume();
@@ -1009,6 +1023,14 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
         }
         Ok(identifier.to_string())
     }
+}
+
+fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
+    parse_ident(ps, false)
+}
+
+fn parse_typename(ps: &mut State) -> Result<String, ParseError> {
+    parse_ident(ps, true)
 }
 
 //    struct_type   = "record", "{", recordbody, "}"
@@ -1031,34 +1053,90 @@ fn parse_identifier(ps: &mut State) -> Result<String, ParseError> {
 //                  | nominal_type
 //                  ;
 fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
-    let typename = parse_identifier(ps)?;
-    println!("PARSE TYPE {}", typename);
-    ps.skip_ws_and_comments();
+    annotate_node(ps, Syntax::Type, |ps, _| {
+        let is_quoted = ps.consume_area_start_token_wsc('(', Syntax::TQ);
 
-    let typ = match &typename[..] {
-        "any" => VVal::typ_box(Type::Any),
-        "bool" => VVal::typ_box(Type::Bool),
-        "none" => VVal::typ_box(Type::None),
-        "char" => VVal::typ_box(Type::Char),
-        "int" => VVal::typ_box(Type::Int),
-        "float" => VVal::typ_box(Type::Float),
-        "string" => VVal::typ_box(Type::Str),
-        "bytes" => VVal::typ_box(Type::Bytes),
-        "syntax" => VVal::typ_box(Type::Syntax),
-        "type" => VVal::typ_box(Type::Type),
-        "ivec2" => VVal::typ_box(Type::IVec2),
-        "ivec3" => VVal::typ_box(Type::IVec3),
-        "ivec4" => VVal::typ_box(Type::IVec4),
-        "fvec2" => VVal::typ_box(Type::FVec2),
-        "fvec3" => VVal::typ_box(Type::FVec3),
-        "fvec4" => VVal::typ_box(Type::FVec4),
-        // TODO: ref, list, record, userdata, ...
-        _ => {
-            return Err(ps.err(ParseErrorKind::BadType("unknown type definition".to_string())));
+        let typename = if ps.lookahead_one_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+            parse_typename(ps)?
+        } else {
+            parse_identifier(ps)?
+        };
+        ps.skip_ws_and_comments();
+
+        let typ = match &typename[..] {
+            "any" => VVal::typ_box(Type::Any),
+            "bool" => VVal::typ_box(Type::Bool),
+            "none" => VVal::typ_box(Type::None),
+            "char" => VVal::typ_box(Type::Char),
+            "byte" => VVal::typ_box(Type::Byte),
+            "int" => VVal::typ_box(Type::Int),
+            "float" => VVal::typ_box(Type::Float),
+            "str" => VVal::typ_box(Type::Str),
+            "bytes" => VVal::typ_box(Type::Bytes),
+            "sym" => VVal::typ_box(Type::Sym),
+            "syntax" => VVal::typ_box(Type::Syntax),
+            "type" => VVal::typ_box(Type::Type),
+            "ivec2" => VVal::typ_box(Type::IVec2),
+            "ivec3" => VVal::typ_box(Type::IVec3),
+            "ivec4" => VVal::typ_box(Type::IVec4),
+            "fvec2" => VVal::typ_box(Type::FVec2),
+            "fvec3" => VVal::typ_box(Type::FVec3),
+            "fvec4" => VVal::typ_box(Type::FVec4),
+            "ref" => {
+                let typ = parse_type(ps)?;
+                VVal::typ_box(Type::Ref(typ.t()))
+            }
+            "optional" => {
+                let typ = parse_type(ps)?;
+                VVal::typ_box(Type::Opt(typ.t()))
+            }
+            "pair" => {
+                if !ps.consume_area_start_token_wsc('(', Syntax::TQ) {
+                    return Err(ps.err(ParseErrorKind::ExpectedToken('(', "pair type start")));
+                }
+                let typ_1 = parse_type(ps)?;
+                if !ps.consume_token_wsc(',', Syntax::TDelim) {
+                    return Err(ps.err(ParseErrorKind::ExpectedToken(',', "pair type")));
+                }
+                let typ_2 = parse_type(ps)?;
+                if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
+                    return Err(ps.err(ParseErrorKind::ExpectedToken('(', "pair type end")));
+                }
+                VVal::typ_box(Type::Pair(typ_1.t(), typ_2.t()))
+            }
+            // TODO: ref, list, record, userdata, ...
+            _ => {
+                let mut typename = typename;
+                // type name!
+                while ps.consume_token_wsc('.', Syntax::T) {
+                    typename += ".";
+                    let type_path_elem = parse_typename(ps)?;
+                    typename += &type_path_elem;
+                }
+
+                if ps.consume_area_start_token_wsc('<', Syntax::TQ) {
+                    while ps.consume_token_wsc(',', Syntax::TDelim) {
+                        let typebind = parse_type(ps)?;
+                    }
+
+                    if !ps.consume_area_end_token_wsc('>', Syntax::TQ) {
+                        return Err(ps.err(ParseErrorKind::ExpectedToken('>', "type generic binding end")));
+                    }
+                }
+
+
+                VVal::typ_box(Type::Name(Rc::new(typename)))
+            }
+        };
+
+        if is_quoted {
+            if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken(')', "type end")));
+            }
         }
-    };
 
-    Ok(typ)
+        Ok(typ)
+    })
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -2529,13 +2607,22 @@ mod tests {
     #[test]
     fn check_const() {
         assert_eq!(parse("!:const X = 32;"), "$[$%:Block,$[$%:DefConst,$[:X],32,$n,$[type[any]]]]");
-        assert_eq!(parse("!:const X = 32.4;"), "$[$%:Block,$[$%:DefConst,$[:X],32.4,$n,$[type[any]]]]");
-        assert_eq!(parse("!:const X = :XX;"), "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Key,:XX],$n,$[type[any]]]]");
+        assert_eq!(
+            parse("!:const X = 32.4;"),
+            "$[$%:Block,$[$%:DefConst,$[:X],32.4,$n,$[type[any]]]]"
+        );
+        assert_eq!(
+            parse("!:const X = :XX;"),
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Key,:XX],$n,$[type[any]]]]"
+        );
         assert_eq!(
             parse("!:const X = \"fo\";"),
             "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Str,\"fo\"],$n,$[type[any]]]]"
         );
-        assert_eq!(parse("!:const X = $[120];"), "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Lst,120],$n,$[type[any]]]]");
+        assert_eq!(
+            parse("!:const X = $[120];"),
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Lst,120],$n,$[type[any]]]]"
+        );
         assert_eq!(
             parse("!:const X = ${a=10};"),
             "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Map,$[:a,10]],$n,$[type[any]]]]"
@@ -2558,7 +2645,10 @@ mod tests {
         assert_eq!(parse("10 11\n;12"), "$[$%:Block,$[$%:Call,10,11],12]");
         assert_eq!(parse("10 11\n;\n12"), "$[$%:Block,$[$%:Call,10,11],12]");
         assert_eq!(parse("10 11\n 12 13"), "$[$%:Block,$[$%:Call,10,11,12,13]]");
-        assert_eq!(parse("!x = 10 11\n 12"), "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12],$n,$[type[any]]]]");
+        assert_eq!(
+            parse("!x = 10 11\n 12"),
+            "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12],$n,$[type[any]]]]"
+        );
         assert_eq!(
             parse("!x = 10 11\n 12 13"),
             "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12,13],$n,$[type[any]]]]"

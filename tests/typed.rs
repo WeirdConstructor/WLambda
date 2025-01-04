@@ -31,6 +31,37 @@ fn ve(s: &str) -> String {
 }
 
 #[test]
+fn chk_types_parse_type_values() {
+    assert_eq!(v("$type any"), "$type(any)");
+    assert_eq!(v("$type bool"), "$type(bool)");
+    assert_eq!(v("$type none"), "$type(none)");
+    assert_eq!(v("$type str"), "$type(str)");
+    assert_eq!(v("$type int"), "$type(int)");
+    assert_eq!(v("$type float"), "$type(float)");
+    assert_eq!(v("$type bytes"), "$type(bytes)");
+    assert_eq!(v("$type sym"), "$type(sym)");
+    assert_eq!(v("$type char"), "$type(char)");
+    assert_eq!(v("$type byte"), "$type(byte)");
+    assert_eq!(v("$type syntax"), "$type(syntax)");
+    assert_eq!(v("$type type"), "$type(type)");
+
+    assert_eq!(v("$type ref int"), "$type(ref int)");
+    assert_eq!(v("$type ref ref int"), "$type(ref ref int)");
+    assert_eq!(v("$type optional int"), "$type(optional int)");
+    assert_eq!(v("$type pair(int, int)"), "$type(pair(int, int))");
+    assert_eq!(
+        v("$type pair(ref pair(int, str), float)"),
+        "$type(pair(ref pair(int, str), float))"
+    );
+    assert_eq!(
+        v("$type (pair(ref pair(int, (pair(str, float))), ivec2))"),
+        "$type(pair(ref pair(int, pair(str, float)), ivec2))"
+    );
+    assert_eq!(v("$type Animals.Mammal"), "$type(Animals.Mammal)");
+    assert_eq!(v("$type Main.Animal<Mammal,XXX>"), "");
+}
+
+#[test]
 fn chk_types_add() {
     assert_eq!(v("!x: int = 5 + 2; x"), "7"); // Expecting all ok
     assert!(v("!x: float = 5 + 3; x").find("int to variable x of type float").is_some());

@@ -1986,9 +1986,7 @@ impl std::fmt::Display for TypeConflictReason {
             }
             TypeConflictReason::UnionDidNotMatch(reasons) => {
                 writeln!(f, "No matching types in union:")?;
-                fmt.debug_list();
                 for (typ, reason) in reasons.iter() {
-                    fmt.
                     writeln!(f, "    | {}", typ.s())?;
                     writeln!(f, "        => reason: {}", reason)?;
                 }
@@ -2370,7 +2368,7 @@ impl Type {
             Type::FVec4 => "fvec4".to_string(),
             Type::Opt(t) => format!("optional {}", t.s()),
             Type::Err(t) => format!("error {}", t.s()),
-            Type::Pair(t, t2) => format!("pair {}, {}", t.s(), t2.s()),
+            Type::Pair(t, t2) => format!("pair({}, {})", t.s(), t2.s()),
             Type::Lst(t) => format!("[{}]", t.s()),
             Type::Ref(t) => format!("ref {}", t.s()),
             Type::Map(t) => format!("{{{}}}", t.s()),
@@ -7465,7 +7463,7 @@ impl VVal {
             VVal::DropFun(f) => format!("std:to_drop[{}]", f.fun.s_cy(c)),
             VVal::Ref(l) => format!("$&&{}", (*l).borrow().s_cy(c)),
             VVal::HRef(l) => format!("$&{}", (*l).borrow().s_cy(c)),
-            VVal::Type(t) => format!("type[{}]", (*t).s()),
+            VVal::Type(t) => format!("$type({})", (*t).s()),
             VVal::FVec(nvec) => nvec.s(),
             VVal::IVec(nvec) => nvec.s(),
             VVal::WWRef(l) => match l.upgrade() {

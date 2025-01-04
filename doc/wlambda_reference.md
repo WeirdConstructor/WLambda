@@ -9792,12 +9792,17 @@ In the following grammar, white space and comments are omitted:
 ```ebnf
 
     ident_start   = ( ?alphabetic? | "_" | "@" | "?" )
+                  ;
+    type_ident_start = ( ?upper case alphabetic? | "_" )
+                     ;
     ident_end     = { ?any character?
                      - ( ?white space?
                          | "." | "," | ";"
                          | "{" | "}" | "[" | "]" | "(" | ")"
                          | "~" | "|" | "=" ) }
                   ;
+    type_ident_end = ident_end - ( "<" | ">" )
+                   ;
     qident        = ident_end
                   (* a quoted identifier can not appear anywhere,
                      it's usually delimited or follows something that
@@ -9805,6 +9810,9 @@ In the following grammar, white space and comments are omitted:
                   | "`", { ?any character except '`'? }, "`" (* quoted identifier *)
                   ;
     ident         = ident_start, [ ident_end ]
+                  | "`", { ?any character except '`'? }, "`" (* quoted identifier *)
+                  ;
+    type_ident    = type_ident_start, [ type_ident_end ]
                   | "`", { ?any character except '`'? }, "`" (* quoted identifier *)
                   ;
     ref_specifier = ":", qident
@@ -9957,7 +9965,7 @@ In the following grammar, white space and comments are omitted:
                   ;
     deref         = "*", value
                   ;
-    typevalue     = "type", type
+    typevalue     = "type", ( "(", type, ")" | type )
                   ;
     special_value = list
                   | map
@@ -9998,8 +10006,8 @@ In the following grammar, white space and comments are omitted:
                      and lots of other places as stringy sentinel values
                   *)
                   ;
-    cast          = "as", type, (":", value | "(" expr ")")
-                  | "is", type, (":", value | "(" expr ")")
+    cast          = "as", type, ( ":", value | "(", expr, ")" )
+                  | "is", type, ( ":", value | "(", expr, ")" )
                   ;
     value         = number
                   | string_lit
@@ -10189,15 +10197,15 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
 ### - WLambda Type Syntax
 
 ```ebnf
-    type_var      = ident, ["is", type]
+    type_var      = type_ident, ["is", type]
                   ;
     type_vars      = "<", type_var, { ",", type_var }, ">"
                   ;
-    nominal_type  = ident, { ".", ident }, [ type_vars ]
+    nominal_type  = type_ident, { ".", type_ident }, [ type_vars ]
                   ;
     interface_list = nominal_type, { ",", nominal_type }
                    ;
-    record_entry  = "type", ident, "=", type
+    record_entry  = "type", type_ident, "=", type
                   | ident, ":", type
                   | "\"", (? any char, quoted \\ and \" ?), "\"", ":", type
                   ;
@@ -10205,17 +10213,15 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   ;
     record_body   = [ "is", interface_list ], { record_entry }
                   ;
-    abstract_type = "record", ident, [ type_vars ], "{", record_body, "}"
-                  | "enum", ident, "{", enum_body, "}"
+    abstract_type = "record", type_ident, [ type_vars ], "{", record_body, "}"
+                  | "enum", type_ident, "{", enum_body, "}"
                   ;
-    userdata      = "userdata", ident, "{", { ident, ":", type } "}"
+    userdata      = "userdata", type_ident, "{", { ident, ":", type } "}"
                   ;
-    basetype      = "any" | "bool" | "none" | "str" | "num" | "int" | "float"
-                  | "bytes" | "sym" | "char" | "syntax" | "type"
+    basetype      = "any" | "bool" | "none" | "str" | "int" | "float"
+                  | "bytes" | "sym" | "char" | "byte" | "syntax" | "type"
                   | "ref", type
-                  | "ref_weak", type
-                  | "ref_hidden", type
-                  | "pair", type, ",", type
+                  | "pair", "(", type, ",", type, ")"
                   | "optional", type
                   | "ivec2" | "ivec3" | "ivec4"
                   | "fvec2" | "fvec3" | "fvec4"
