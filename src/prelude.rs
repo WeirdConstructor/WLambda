@@ -10894,10 +10894,10 @@ pub fn core_symbol_table() -> SymbolTable {
             }
         })
     }, Type::fun_1_ret_is(
-           (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
+           "a", (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
            &[(&"N", Type::named("Num").union(Type::named("NVec")))])
        .union(Type::fun_2_ret_is(
-           (*Type::generic("N")).clone(), (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
+           "a", (*Type::generic("N")).clone(), "b", (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
            &[(&"N", Type::named("Num").union(Type::named("NVec")))])));
     add_func!(st, -, env, argc, {
         Ok(match (argc, env.arg(0)) {

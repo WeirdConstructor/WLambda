@@ -1033,25 +1033,84 @@ fn parse_typename(ps: &mut State) -> Result<String, ParseError> {
     parse_ident(ps, true)
 }
 
-//    struct_type   = "record", "{", recordbody, "}"
-//                  | "enum", "{", enumbody, "}"
-//                  ;
-//    basetype      = "any" | "bool" | "none" | "str" | "num" | "int" | "float"
-//                  | "bytes" | "sym" | "char" | "byte" | "syntax" | "type" | "userdata"
-//                  | "ref", type
-//                  | "ref_weak", type
-//                  | "ref_hidden", type
-//                  | "pair", type, ",", type
-//                  | "optional", type
-//                  | "ivec2" | "ivec3" | "ivec4"
-//                  | "fvec2" | "fvec3" | "fvec4"
-//                  | "iter", type
-//                  | fun_type
-//                  | "{", [ type ], "}" (* map type *)
-//                  | "[", [ type ], "]" (* list type *)
-//                  | struct_type
-//                  | nominal_type
-//                  ;
+fn parse_type_vars(ps: &mut State) -> Result<Option<Rc<Vec<(String, Rc<Type>)>>>, ParseError> {
+    if !ps.consume_area_start_token_wsc('<', Syntax::TQ) {
+        return Ok(None);
+    }
+
+    if ps.lookahead(">") {
+        if !ps.consume_area_end_token_wsc('>', Syntax::TQ) {
+            return Err(ps.err(ParseErrorKind::ExpectedToken('>', "type vars end")));
+        }
+
+        return Ok(None);
+    }
+
+    let mut bindings = vec![];
+
+    let tvar = parse_typename(ps)?;
+    ps.skip_ws_and_comments();
+    let constraint_type =
+        if ps.consume_tokens_wsc("is", Syntax::T) { parse_type(ps)?.t() } else { Type::any() };
+    bindings.push((tvar, constraint_type));
+
+    while ps.consume_token_wsc(',', Syntax::TDelim) {
+        let tvar = parse_typename(ps)?;
+        ps.skip_ws_and_comments();
+        let constraint_type =
+            if ps.consume_tokens_wsc("is", Syntax::T) { parse_type(ps)?.t() } else { Type::any() };
+        bindings.push((tvar, constraint_type));
+    }
+
+    if !ps.consume_area_end_token_wsc('>', Syntax::TQ) {
+        return Err(ps.err(ParseErrorKind::ExpectedToken('>', "type vars end")));
+    }
+
+    Ok(Some(Rc::new(bindings)))
+}
+
+fn parse_fun_type(ps: &mut State) -> Result<VVal, ParseError> {
+    let type_vars = parse_type_vars(ps)?;
+
+    if !ps.consume_area_start_token_wsc('(', Syntax::TQ) {
+        return Err(ps.err(ParseErrorKind::ExpectedToken('(', "function type start")));
+    }
+
+    let mut args = vec![];
+
+    while ps.peek().unwrap_or(')') != ')' {
+        let ident = if is_ident_start(ps.expect_some(ps.peek())?) {
+            let ident = parse_identifier(ps)?;
+            if !ps.consume_token_wsc(':', Syntax::TDelim) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken(':', "function argument type")));
+            }
+
+            Some(ident)
+        } else {
+            None
+        };
+
+        let typ = parse_type(ps)?.t();
+        args.push((typ, false, ident));
+
+        if !ps.consume_token_wsc(',', Syntax::TDelim) {
+            break;
+        }
+    }
+
+    if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
+        return Err(ps.err(ParseErrorKind::ExpectedToken(')', "function type end")));
+    }
+
+    let mut ret_type = Type::none();
+
+    if ps.consume_tokens_wsc("->", Syntax::TDelim) {
+        ret_type = parse_type(ps)?.t();
+    }
+
+    Ok(VVal::typ_box(Type::Function(Rc::new(args), ret_type, type_vars)))
+}
+
 fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
     annotate_node(ps, Syntax::Type, |ps, _| {
         let is_quoted = ps.consume_area_start_token_wsc('(', Syntax::TQ);
@@ -1104,6 +1163,7 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
                 }
                 VVal::typ_box(Type::Pair(typ_1.t(), typ_2.t()))
             }
+            "fn" => parse_fun_type(ps)?,
             // TODO: ref, list, record, userdata, ...
             _ => {
                 let mut typename = typename;
@@ -1111,6 +1171,7 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
                 while ps.consume_token_wsc('.', Syntax::T) {
                     typename += ".";
                     let type_path_elem = parse_typename(ps)?;
+                    ps.skip_ws_and_comments();
                     typename += &type_path_elem;
                 }
 
@@ -1125,7 +1186,9 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
                     }
 
                     if !ps.consume_area_end_token_wsc('>', Syntax::TQ) {
-                        return Err(ps.err(ParseErrorKind::ExpectedToken('>', "type generic binding end")));
+                        return Err(
+                            ps.err(ParseErrorKind::ExpectedToken('>', "type generic binding end"))
+                        );
                     }
 
                     VVal::typ_box(Type::Name(Rc::new(typename), Some(Rc::new(bindings))))

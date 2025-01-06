@@ -2072,7 +2072,7 @@ pub enum Type {
     Userdata(Rc<String>, Rc<Vec<(String, Rc<Type>)>>),
     Record(Rc<String>, Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
-    Function(Rc<Vec<(Rc<Type>, bool)>>, Rc<Type>, Option<Rc<Vec<(String, Rc<Type>)>>>),
+    Function(Rc<Vec<(Rc<Type>, bool, Option<String>)>>, Rc<Type>, Option<Rc<Vec<(String, Rc<Type>)>>>),
     Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
     Var(Rc<String>, Option<Rc<Vec<String>>>),
 }
@@ -2162,29 +2162,46 @@ impl Type {
         Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t), None))
     }
 
-    pub fn fun_1_ret(a1: Self, t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(Rc::new(vec![(Rc::new(a1), false)]), Rc::new(t), None))
-    }
-
-    pub fn fun_1_ret_is(a1: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
+    pub fn fun_1_ret(a1n: &str, a1: Self, t: Self) -> Rc<Type> {
         Rc::new(Type::Function(
-            Rc::new(vec![(Rc::new(a1), false)]),
-            Rc::new(t),
-            Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), t.clone())).collect())),
-        ))
-    }
-
-    pub fn fun_2_ret(a1: Self, a2: Self, t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(
-            Rc::new(vec![(Rc::new(a1), false), (Rc::new(a2), false)]),
+            Rc::new(vec![(Rc::new(a1), false, Some(a1n.to_string()))]),
             Rc::new(t),
             None,
         ))
     }
 
-    pub fn fun_2_ret_is(a1: Self, a2: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
+    pub fn fun_1_ret_is(a1n: &str, a1: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
         Rc::new(Type::Function(
-            Rc::new(vec![(Rc::new(a1), false), (Rc::new(a2), false)]),
+            Rc::new(vec![(Rc::new(a1), false, Some(a1n.to_string()))]),
+            Rc::new(t),
+            Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), t.clone())).collect())),
+        ))
+    }
+
+    pub fn fun_2_ret(a1n: &str, a1: Self, a2n: &str, a2: Self, t: Self) -> Rc<Type> {
+        Rc::new(Type::Function(
+            Rc::new(vec![
+                (Rc::new(a1), false, Some(a1n.to_string())),
+                (Rc::new(a2), false, Some(a2n.to_string())),
+            ]),
+            Rc::new(t),
+            None,
+        ))
+    }
+
+    pub fn fun_2_ret_is(
+        a1n: &str,
+        a1: Self,
+        a2n: &str,
+        a2: Self,
+        t: Self,
+        is: &[(&str, Rc<Type>)],
+    ) -> Rc<Type> {
+        Rc::new(Type::Function(
+            Rc::new(vec![
+                (Rc::new(a1), false, Some(a1n.to_string())),
+                (Rc::new(a2), false, Some(a2n.to_string())),
+            ]),
             Rc::new(t),
             Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), t.clone())).collect())),
         ))
@@ -2432,7 +2449,10 @@ impl Type {
             Type::Function(types, ret, type_vars) => {
                 let limit_str = if let Some(type_vars) = type_vars {
                     let mut ls = String::from("<");
-                    for (varname, limit_type) in type_vars.iter() {
+                    for (i, (varname, limit_type)) in type_vars.iter().enumerate() {
+                        if i != 0 {
+                            ls += ", ";
+                        }
                         ls += varname.as_str();
                         ls += " is (";
                         ls += &limit_type.s();
@@ -2444,7 +2464,7 @@ impl Type {
                     String::from("")
                 };
                 let mut fun = limit_str + "(";
-                for (i, (t, opt)) in types.iter().enumerate() {
+                for (i, (t, opt, param_name)) in types.iter().enumerate() {
                     if i != 0 {
                         fun += ", ";
                     }
@@ -2453,6 +2473,10 @@ impl Type {
                         fun += &t.s();
                         fun += "]";
                     } else {
+                        if let Some(param_name) = param_name {
+                            fun += param_name.as_ref();
+                            fun += ": ";
+                        }
                         fun += &t.s();
                     }
                 }
@@ -2760,11 +2784,11 @@ where
 
                 let mut matched_args = vec![];
                 let mut required = 0;
-                for (i, (t, optional)) in arg_types.iter().enumerate() {
+                for (i, (t, optional, param_name)) in arg_types.iter().enumerate() {
                     if !optional {
                         required += 1;
                     }
-                    if let Some((chk_arg_typ, _optional)) = chk_arg_types.get(i) {
+                    if let Some((chk_arg_typ, _optional, _param_names)) = chk_arg_types.get(i) {
                         let matched_arg_typ =
                             match resolve_type(t, chk_arg_typ, bound_vars, name_resolver) {
                                 TypeResolveResult::Match { typ } => typ,
@@ -2779,7 +2803,7 @@ where
                                     }
                                 }
                             };
-                        matched_args.push((matched_arg_typ, *optional));
+                        matched_args.push((matched_arg_typ, *optional, param_name.clone()));
                     } else {
                         if !optional {
                             return TypeResolveResult::Conflict {

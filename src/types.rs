@@ -128,7 +128,8 @@ fn type_binop(
 
     // TODO: Maybe we should also pass a second type hint down, one which limits the
     //       possible return types?
-    let chk_typ = Type::fun_2_ret((*a_type.typ).clone(), (*b_type.typ).clone(), Type::Any);
+    let chk_typ =
+        Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), Type::Any);
 
     let mut bound_vars = vec![];
     let res = resolve_type(&op_type, &chk_typ, &mut bound_vars, &mut |name| {

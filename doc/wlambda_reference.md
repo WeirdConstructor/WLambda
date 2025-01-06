@@ -768,7 +768,8 @@ cycles and memory leaks.
     ## `self`, this would create a ref cycle. This is why we needed
     ## to make a weak reference to self.
 
-    ## Make an explicit hidden reference:
+    ## Make an explicit hidden reference. It will keep the object
+    ## referenced until we leave this constructor function:
     !self_ = $& ${
         name = name,
     };
@@ -10227,7 +10228,7 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | "ivec2" | "ivec3" | "ivec4"
                   | "fvec2" | "fvec3" | "fvec4"
                   | "iter", type
-                  | fun_type
+                  | "fn", fun_type
                   | "{", [ type ], "}" (* map type *)
                   | "[", [ type ], "]" (* list type *)
                   | "[", type, ",", type, { ",", type }, "]" (* tuple type *)

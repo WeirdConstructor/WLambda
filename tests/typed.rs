@@ -69,6 +69,11 @@ fn chk_types_add() {
 }
 
 #[test]
+fn chk_types_function() {
+    assert_eq!(v("!x: fn <O is (Num),X>(a: O, b: float) -> X = $n"), "");
+}
+
+#[test]
 fn chk_types_named() {
     assert_eq!(v("!o: Num = 10; o"), "");
     assert_eq!(v("!o: Num = 10.12; o"), "");
