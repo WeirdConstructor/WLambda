@@ -9994,7 +9994,7 @@ In the following grammar, white space and comments are omitted:
                   | "|", number, "|"              (* set min and max *)
                   | "|", "|"                      (* no enforcement *)
                   ;
-    function      = [ "\:", ident ], [ ":", fun_type ], "{", [ arity_def ], block, "}"
+    function      = [ "\:", ident ], [ ("fn", fun_type ], "{", [ arity_def ], block, "}"
                   | "\", [ arity_def ], statement
                   ;
     var           = ident

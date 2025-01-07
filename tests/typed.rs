@@ -62,6 +62,11 @@ fn chk_types_parse_type_values() {
 }
 
 #[test]
+fn chk_types_infer_var_type() {
+    assert_eq!(v("!x = 5 + 2; .x = 10.3; x"), "Err"); // Expecting error on assigning 10.3!
+}
+
+#[test]
 fn chk_types_add() {
     assert_eq!(v("!x: int = 5 + 2; x"), "7"); // Expecting all ok
     assert!(v("!x: float = 5 + 3; x").find("int to variable x of type float").is_some());

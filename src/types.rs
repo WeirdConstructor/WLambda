@@ -15,12 +15,22 @@ use crate::ops::BinOp;
 use crate::vval::{
     resolve_type, CompileError, Syntax, Type, TypeConflictReason, TypeResolveResult, VVal, VarPos,
 };
-//
-//pub(crate) fn type_pass(
-//    ast: &VVal,
-//    type_hint: Rc<Type>,
-//    ce: &mut Rc<RefCell<CompileEnv>>,
-//) -> Result<VVal, CompileError>;
+
+#[derive(Debug, Clone)]
+enum TypeHint {
+    Infer,
+    Expect(Rc<Type>),
+}
+
+impl TypeHint {
+    fn from_type(ty: &Rc<Type>) -> Self {
+        if ty.is_none() {
+            TypeHint::Infer
+        } else {
+            TypeHint::Expect(ty.clone())
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct TypedVVal {
@@ -105,7 +115,7 @@ fn type_var(
 fn type_binop(
     ast: &VVal,
     op: BinOp,
-    type_hint: Rc<Type>,
+    type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
     let (syn, a, b) = (ast.v_(0), ast.v_(1), ast.v_(2));
@@ -121,15 +131,18 @@ fn type_binop(
     //d// println!("TYPE: {:?}", op_type);
 
     // TODO: Get union type from first argument!
-    let a_type = type_pass(&a, Type::any(), ce)?;
+    let a_type = type_pass(&a, TypeHint::Infer, ce)?;
 
     // TODO: Get union type from second argument!
-    let b_type = type_pass(&b, Type::any(), ce)?;
+    let b_type = type_pass(&b, TypeHint::Infer, ce)?;
 
-    // TODO: Maybe we should also pass a second type hint down, one which limits the
-    //       possible return types?
+    let ret_type = if let TypeHint::Expect(t) = type_hint {
+        t.as_type()
+    } else {
+        Type::Any
+    };
     let chk_typ =
-        Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), Type::Any);
+        Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
 
     let mut bound_vars = vec![];
     let res = resolve_type(&op_type, &chk_typ, &mut bound_vars, &mut |name| {
@@ -162,13 +175,17 @@ fn type_binop(
 fn type_block(
     ast: &VVal,
     skip_cnt: usize,
-    type_hint: Rc<Type>,
+    type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
-    let mut last_type = type_hint.clone();
+    let mut last_type = Type::none();
     let stmts = ast.map_skip_vval(
         |e, is_last| {
-            let tv = type_pass(e, if is_last { type_hint.clone() } else { Type::any() }, ce)?;
+            let tv = type_pass(
+                e,
+                if is_last { type_hint.clone() } else { TypeHint::Expect(Type::any()) },
+                ce,
+            )?;
             last_type = tv.typ;
             Ok(tv.vval)
         },
@@ -196,34 +213,14 @@ fn type_def(
 
         let var_typ = types.v_(0).t();
 
-        if !var_typ.is_resolved() {
-            return Err(ast.compile_err(format!(
-                "Can't define variable with unresolved type, variable '{}', unresolved type: {}",
-                varname,
-                var_typ.s(),
-            )));
-        }
-
         if is_global {
-            let tv = type_pass(&value, var_typ.clone(), ce)?;
+            let tv = type_pass(&value, TypeHint::from_type(&var_typ), ce)?;
             let typ = tv.typ;
 
-            if !typ.is_resolved() {
-                return Err(ast.compile_err(format!(
-                    "Can't assign value with unresolved type to variable '{}', unresolved value type: {}",
-                    varname,
-                    typ.s(),
-                )));
-            }
-
-            if !typ.isa_resolved(&var_typ) {
-                return Err(ast.compile_err(format!(
-                    "Can't assign type {} to variable {} of type {}",
-                    typ.s(),
-                    varname,
-                    var_typ.s(),
-                )));
-            }
+            // If typ == None, but var_typ != None         => Error
+            // If var_typ != None and not(var_typ ISA typ) => Error
+            // If var_typ == None and typ == None          => Error
+            // If var_typ != None and var_typ ISA typ      => Ok
 
             if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true, var_typ) {
                 // everything is fine!
@@ -232,25 +229,8 @@ fn type_def(
             }
         } else {
             let next_local = ce.borrow_mut().next_local();
-            let tv = type_pass(&value, var_typ.clone(), ce)?;
+            let tv = type_pass(&value, TypeHint::from_type(&var_typ), ce)?;
             let typ = tv.typ;
-
-            if !typ.is_resolved() {
-                return Err(ast.compile_err(format!(
-                    "Can't assign value with unresolved type to variable '{}', unresolved value type: {}",
-                    varname,
-                    typ.s(),
-                )));
-            }
-
-            if !typ.isa_resolved(&var_typ) {
-                return Err(ast.compile_err(format!(
-                    "Can't assign type {} to variable {} of type {}",
-                    typ.s(),
-                    varname,
-                    var_typ.s(),
-                )));
-            }
 
             ce.borrow_mut().def_local(&varname, next_local, typ);
         }
@@ -287,7 +267,7 @@ fn type_deftype(
 #[allow(clippy::cognitive_complexity)]
 pub(crate) fn type_pass(
     ast: &VVal,
-    type_hint: Rc<Type>,
+    type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
     match ast {
@@ -333,7 +313,7 @@ pub(crate) fn type_check(
     ce: &mut Rc<RefCell<CompileEnv>>,
     types_enabled: bool,
 ) -> Result<VVal, CompileError> {
-    match type_pass(ast, Type::any(), ce) {
+    match type_pass(ast, TypeHint::Expect(Type::any()), ce) {
         Ok(tv) => Ok(ast.clone()),
         Err(e) => {
             if types_enabled {

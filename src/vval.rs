@@ -1947,6 +1947,7 @@ impl TypeRecord {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeConflictReason {
+    Unresolved,
     WrongType(Rc<Type>, Rc<Type>),
     WrongArgumentType(usize, Box<TypeConflictReason>),
     ArgumentMissing(usize, Rc<Type>),
@@ -1964,6 +1965,9 @@ pub enum TypeConflictReason {
 impl std::fmt::Display for TypeConflictReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            TypeConflictReason::Unresolved => {
+                write!(f, "Encountered unresolved type. Type annotation needed.")
+            }
             TypeConflictReason::WrongType(exp, got) => {
                 write!(f, "Mismatch {} <=> {}", exp.s(), got.s())
             }
@@ -2044,9 +2048,9 @@ static TYPE_VAR_ID: AtomicUsize = AtomicUsize::new(1);
 /// and values.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    None,
     Any,
     Bool,
-    None,
     Str,
     Bytes,
     Sym,
@@ -2112,6 +2116,10 @@ impl Type {
     }
     pub fn typ() -> Rc<Self> {
         TYPE_RC_TYPE.with(|typ| typ.clone())
+    }
+
+    pub fn as_type(&self) -> Self {
+        self.clone()
     }
 
     pub fn opt_any() -> Rc<Self> {
@@ -2279,6 +2287,14 @@ impl Type {
     //            _ => TypeMatch::NoMatch { expected, got: Rc::new(self.clone()) },
     //        }
     //    }
+
+    pub fn is_any(&self) -> bool {
+        matches!(self, Type::Any)
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(self, Type::None)
+    }
 
     pub fn isa_resolved(&self, chk_t: &Type) -> bool {
         match self {
@@ -2653,6 +2669,13 @@ where
     F: FnMut(&str) -> Option<Rc<Type>>,
 {
     match typ.as_ref() {
+        Type::None => {
+            TypeResolveResult::Conflict {
+                expected: typ.clone(),
+                got: chk_t.clone(),
+                reason: TypeConflictReason::Unresolved
+            }
+        }
         Type::Any => match chk_t.as_ref() {
             Type::Var(name, _l) => {
                 if let Some((_, typ)) =
@@ -2682,7 +2705,6 @@ where
             t => TypeResolveResult::Match { typ: Rc::new(t.clone()) },
         },
         Type::Bool => resolve_type_trivial!(typ, chk_t, Type::Bool),
-        Type::None => resolve_type_trivial!(typ, chk_t, Type::None),
         Type::Str => resolve_type_trivial!(typ, chk_t, Type::Str),
         Type::Bytes => resolve_type_trivial!(typ, chk_t, Type::Bytes),
         Type::Sym => resolve_type_trivial!(typ, chk_t, Type::Sym),
@@ -3986,6 +4008,10 @@ impl VVal {
 
     pub fn type_any() -> VVal {
         VVal::typ_box(Type::Any)
+    }
+
+    pub fn type_none() -> VVal {
+        VVal::typ_box(Type::None)
     }
 
     pub fn typ_box(t: Type) -> VVal {

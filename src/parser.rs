@@ -1948,7 +1948,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                         if ps.consume_token_wsc(':', Syntax::T) {
                             types.push(parse_type(ps)?);
                         } else {
-                            types.push(VVal::type_any());
+                            types.push(VVal::type_none());
                         }
                     }
 
@@ -1975,7 +1975,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     if ps.consume_token_wsc(':', Syntax::T) {
                         types.push(parse_type(ps)?);
                     } else {
-                        types.push(VVal::type_any());
+                        types.push(VVal::type_none());
                     }
                 }
             }
