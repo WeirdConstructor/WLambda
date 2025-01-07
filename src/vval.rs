@@ -246,6 +246,7 @@ pub enum Syntax {
     DumpStack,
     DumpVM,
     DebugPrint,
+    CompileType,
     MapSplice,
     VecSplice,
     Accum,
@@ -344,6 +345,7 @@ impl std::str::FromStr for Syntax {
             "DumpStack" => Ok(Syntax::DumpStack),
             "DumpVM" => Ok(Syntax::DumpVM),
             "DebugPrint" => Ok(Syntax::DebugPrint),
+            "CompileType" => Ok(Syntax::CompileType),
             "MapSplice" => Ok(Syntax::MapSplice),
             "VecSplice" => Ok(Syntax::VecSplice),
             "Accum" => Ok(Syntax::Accum),
@@ -2122,6 +2124,10 @@ impl Type {
         TYPE_RC_TYPE.with(|typ| typ.clone())
     }
 
+    pub fn pair(a: Rc<Self>, b: Rc<Self>) -> Rc<Self> {
+        Rc::new(Type::Pair(a.clone(), b.clone()))
+    }
+
     pub fn as_type(&self) -> Self {
         self.clone()
     }
@@ -2298,6 +2304,10 @@ impl Type {
 
     pub fn is_none(&self) -> bool {
         matches!(self, Type::None)
+    }
+
+    pub fn is_type(&self) -> bool {
+        matches!(self, Type::Type)
     }
 
     //    pub fn isa_resolved(&self, chk_t: &Type) -> bool {
@@ -2730,7 +2740,7 @@ where
         Type::Pair(t, t2) => {
             if let Type::Pair(ct, ct2) = chk_t.as_ref() {
                 let ct = match resolve_type(t, ct, bound_vars, name_resolver) {
-                    TypeResolveResult::Conflict { expected, got, reason } => {
+                    TypeResolveResult::Conflict { expected, reason, .. } => {
                         return TypeResolveResult::Conflict {
                             expected: Rc::new(Type::Pair(expected, ct2.clone())),
                             got: chk_t.clone(),
@@ -2741,7 +2751,7 @@ where
                 };
 
                 let ct2 = match resolve_type(t2, ct2, bound_vars, name_resolver) {
-                    TypeResolveResult::Conflict { expected, got, reason } => {
+                    TypeResolveResult::Conflict { reason, .. } => {
                         return TypeResolveResult::Conflict {
                             expected: Rc::new(Type::Pair(ct, ct2.clone())),
                             got: chk_t.clone(),
@@ -2770,7 +2780,7 @@ where
                     TypeResolveResult::Match { typ } => {
                         matched_types.push(typ);
                     }
-                    TypeResolveResult::Conflict { got, reason, expected, .. } => {
+                    TypeResolveResult::Conflict { reason, expected, .. } => {
                         conflicts.push((expected.clone(), reason))
                     }
                 }
@@ -2795,7 +2805,9 @@ where
                 }
             }
         }
-        Type::Function(arg_types, ret, type_vars) => {
+        Type::Function(arg_types, ret, _type_vars) => {
+            // TODO: do something with type_vars!
+
             // Only matches, if the other type is also a function type.
             if let Type::Function(chk_arg_types, chk_ret, limits) = chk_t.as_ref() {
                 // TODO: Do not allocate if we don't have limits!
@@ -2805,6 +2817,7 @@ where
                         bv.push((var.to_string(), typ.clone()));
                     }
                 }
+
 
                 let mut matched_args = vec![];
                 let mut required = 0;
@@ -2816,7 +2829,7 @@ where
                         let matched_arg_typ =
                             match resolve_type(t, chk_arg_typ, bound_vars, name_resolver) {
                                 TypeResolveResult::Match { typ } => typ,
-                                TypeResolveResult::Conflict { expected, got, reason } => {
+                                TypeResolveResult::Conflict { reason, .. } => {
                                     return TypeResolveResult::Conflict {
                                         expected: typ.clone(),
                                         got: chk_t.clone(),
@@ -2865,7 +2878,7 @@ where
                 // needs to tell us, which return types are acceptable!
                 let matched_ret = match resolve_type(chk_ret, ret, bound_vars, name_resolver) {
                     TypeResolveResult::Match { typ } => typ,
-                    TypeResolveResult::Conflict { expected, got, reason } => {
+                    TypeResolveResult::Conflict { expected, got, .. } => {
                         return TypeResolveResult::Conflict {
                             // Should be correct, because we reversed chk_ret and ret.
                             expected: got,
@@ -2891,7 +2904,7 @@ where
                 }
             }
         }
-        Type::Name(name, binds) => {
+        Type::Name(_name, _binds) => {
             // case: Name == Name
             // case: Alias == Name
             // case: Alias == Alias
@@ -2903,7 +2916,7 @@ where
             //              !:type Point record<N is Num> { x: N, y: N }
             //              !:type Pos record<S> { is Point<S> }
             //              !p : Point<Num> = as Pos<int>: ${ x: 10, y: 20 };
-            if let Type::Name(chk_name, chk_binds) = chk_t.as_ref() {
+            if let Type::Name(_chk_name, _chk_binds) = chk_t.as_ref() {
             } else {
                 // we need to check if the `name` is an alias for the other type.
                 // !Num : type = $type int | float;
@@ -2938,7 +2951,7 @@ where
                 let bound_type = if let Type::Union(_) = typ.as_ref() {
                     let bound_type = match resolve_type(typ, chk_t, bound_vars, name_resolver) {
                         TypeResolveResult::Match { typ } => typ,
-                        TypeResolveResult::Conflict { expected, got, reason } => {
+                        TypeResolveResult::Conflict { expected: _, got: _, reason: _ } => {
                             return TypeResolveResult::Conflict {
                                 expected: typ.clone(),
                                 got: chk_t.clone(),
@@ -2958,7 +2971,7 @@ where
 
                 match resolve_type(&bound_type, chk_t, bound_vars, name_resolver) {
                     TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
-                    TypeResolveResult::Conflict { expected, got, reason } => {
+                    TypeResolveResult::Conflict { expected, got, .. } => {
                         TypeResolveResult::Conflict {
                             expected,
                             got,
@@ -6867,6 +6880,7 @@ impl VVal {
                 Syntax::DumpStack => "DumpStack",
                 Syntax::DumpVM => "DumpVM",
                 Syntax::DebugPrint => "DebugPrint",
+                Syntax::CompileType => "CompileType",
                 Syntax::MapSplice => "MapSplice",
                 Syntax::VecSplice => "VecSplice",
                 Syntax::Accum => "Accum",

@@ -1108,7 +1108,7 @@ pub(crate) enum ArityParam {
 #[allow(clippy::box_collection)]
 struct BlockEnv {
     local_map_stack:
-        std::vec::Vec<(usize, Box<std::collections::HashMap<String, (VarPos, Rc<Type>)>>)>,
+        std::vec::Vec<(usize, Box<std::collections::HashMap<String, (VarPos, VVal, Rc<Type>)>>)>,
     locals: std::vec::Vec<(String, CompileLocal)>,
 }
 
@@ -1166,7 +1166,9 @@ impl BlockEnv {
 
     fn set_upvalue(&mut self, var: &str, idx: usize, typ: Rc<Type>) -> VarPos {
         let last_idx = self.local_map_stack.len() - 1;
-        self.local_map_stack[last_idx].1.insert(String::from(var), (VarPos::UpValue(idx), typ));
+        self.local_map_stack[last_idx]
+            .1
+            .insert(String::from(var), (VarPos::UpValue(idx), VVal::None, typ));
         VarPos::UpValue(idx)
     }
 
@@ -1179,14 +1181,34 @@ impl BlockEnv {
     fn def_local(&mut self, var: &str, idx: usize, typ: Rc<Type>) {
         self.locals[idx].0 = String::from(var);
         let last_idx = self.local_map_stack.len() - 1;
-        self.local_map_stack[last_idx].1.insert(String::from(var), (VarPos::Local(idx), typ));
+        self.local_map_stack[last_idx]
+            .1
+            .insert(String::from(var), (VarPos::Local(idx), VVal::None, typ));
         self.local_map_stack[last_idx].0 += 1;
+    }
+
+    fn set_compiletime_value(&mut self, var: &str, value: &VVal) {
+        for (_locals, map) in self.local_map_stack.iter_mut().rev() {
+            if let Some((_pos, env_val, _typ)) = map.get_mut(var) {
+                *env_val = value.clone();
+            }
+        }
+    }
+
+    fn get_compiletime_value(&self, var: &str) -> Option<VVal> {
+        for (_locals, map) in self.local_map_stack.iter().rev() {
+            if let Some((_pos, env_val, _typ)) = map.get(var) {
+                return Some(env_val.clone());
+            }
+        }
+
+        None
     }
 
     fn get(&self, var: &str) -> (VarPos, Rc<Type>) {
         for (_locals, map) in self.local_map_stack.iter().rev() {
-            if let Some(pos) = map.get(var) {
-                return pos.clone();
+            if let Some((pos, _env_val, typ)) = map.get(var) {
+                return (pos.clone(), typ.clone());
             }
         }
 
@@ -1275,6 +1297,23 @@ impl CompileEnv {
 
     pub fn def_local(&mut self, s: &str, idx: usize, typ: Rc<Type>) {
         self.block_env.def_local(s, idx, typ);
+    }
+
+    pub fn set_compiletime_value(&mut self, var: &str, value: &VVal) {
+        self.block_env.set_compiletime_value(var, value);
+    }
+
+    #[allow(dead_code)]
+    pub fn get_compiletime_value(&mut self, var: &str) -> Option<(VVal, Rc<Type>)> {
+        let (varpos, typ) = self.get(var);
+        let value = match varpos {
+            VarPos::UpValue(_) => self.block_env.get_compiletime_value(var),
+            VarPos::Local(_) => self.block_env.get_compiletime_value(var),
+            VarPos::Global(g) => Some(g.deref()),
+            VarPos::Const(c) => Some(c.clone()),
+            VarPos::NoPos => None,
+        };
+        value.map(|v| (v, typ))
     }
 
     pub fn next_local(&mut self) -> usize {
@@ -2886,6 +2925,16 @@ pub(crate) fn compile(
                 }
                 Syntax::SelfData => {
                     pw_provides_result_pos!(prog, { ResPos::Value(ResValue::SelfData) })
+                }
+                Syntax::CompileType => {
+                    let expr = compile(&ast.at(1).unwrap(), ce)?;
+                    let typ = ast.at(2).unwrap_or(VVal::None);
+
+                    pw_store_if_needed!(prog, store, {
+                        let expr_res_pos = expr.eval(prog);
+                        let typ_pos = prog.data_pos(typ.clone());
+                        prog.op_new_pair(&SynPos::empty(), typ_pos, expr_res_pos, store);
+                    })
                 }
                 Syntax::DebugPrint => {
                     pw_provides_result_pos!(prog, {

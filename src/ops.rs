@@ -870,6 +870,21 @@ impl BinOp {
             BinOp::Eq => Op::Eq(a, b, out),
         }
     }
+
+    pub(crate) fn token(&self) -> &str {
+        match self {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Mod => "%",
+            BinOp::Le => "<=",
+            BinOp::Lt => "<",
+            BinOp::Ge => ">=",
+            BinOp::Gt => ">",
+            BinOp::Eq => "==",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

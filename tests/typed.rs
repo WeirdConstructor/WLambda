@@ -80,5 +80,8 @@ fn chk_types_named() {
 
 #[test]
 fn chk_types_def() {
-    assert_eq!(v("!:type OneDimPoint int; !x: OneDimPoint = 120; OneDimPoint => x"), "120");
+    assert_eq!(
+        v("!:type OneDimPoint int; !x: OneDimPoint = 120; ($COMPILE_TYPE x) => OneDimPoint"),
+        "$p($p(120,$type(OneDimPoint)),$type(int))"
+    );
 }

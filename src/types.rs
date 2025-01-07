@@ -12,9 +12,7 @@ use std::rc::Rc;
 
 use crate::compiler::CompileEnv;
 use crate::ops::BinOp;
-use crate::vval::{
-    resolve_type, CompileError, Syntax, Type, TypeResolveResult, VVal, VarPos,
-};
+use crate::vval::{resolve_type, CompileError, Syntax, Type, TypeResolveResult, VVal, VarPos};
 
 #[derive(Debug, Clone)]
 pub(crate) enum TypeHint {
@@ -28,6 +26,14 @@ impl TypeHint {
             TypeHint::Infer
         } else {
             TypeHint::Expect(ty.clone())
+        }
+    }
+
+    fn expect(&self) -> Option<&Type> {
+        if let TypeHint::Expect(ty) = self {
+            Some(ty.as_ref())
+        } else {
+            None
         }
     }
 }
@@ -49,8 +55,6 @@ fn type_var(
     ce: &mut Rc<RefCell<CompileEnv>>,
     capt_ref: bool,
 ) -> Result<TypedVVal, CompileError> {
-    let syn = ast.at(0).unwrap_or(VVal::None);
-
     let var = ast.at(1).unwrap();
     let mut typ_val = var.with_s_ref(|var_s: &str| -> Result<TypedVVal, CompileError> {
         match var_s {
@@ -97,6 +101,7 @@ fn type_var(
                 if let VarPos::NoPos = pos {
                     return Err(ast.compile_err(format!("Variable '{}' undefined", var_s)));
                 }
+                println!("GET VAR TYPE {} => {}", var_s, typ.s());
                 if capt_ref {
                     return Ok(TypedVVal::new(Type::ref_type(typ), ast.clone()));
                 } else {
@@ -121,7 +126,7 @@ fn type_binop(
     let (syn, a, b) = (ast.v_(0), ast.v_(1), ast.v_(2));
     //    println!("SYN: {:?}", ce.borrow_mut().get("+"));
     // TODO: Get Type of BinOp from Environment by `syn`.
-    let op_type = match ce.borrow_mut().get_type("+") {
+    let op_type = match ce.borrow_mut().get_type(op.token()) {
         Some(t) => t,
         None => return Err(ast.compile_err(format!("Unknown type of operator: {}", ast.s()))),
     };
@@ -136,17 +141,17 @@ fn type_binop(
     // TODO: Get union type from second argument!
     let b_type = type_pass(&b, TypeHint::Infer, ce)?;
 
-    let ret_type = if let TypeHint::Expect(t) = type_hint {
-        t.as_type()
-    } else {
-        Type::Any
-    };
-    let chk_typ =
-        Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
+    let ret_type = if let TypeHint::Expect(t) = type_hint { t.as_type() } else { Type::Any };
+    let chk_typ = Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
 
     let mut bound_vars = vec![];
     let res = resolve_type(&op_type, &chk_typ, &mut bound_vars, &mut |name| {
-        ce.borrow_mut().get_type(name)
+        let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
+        if vartype.is_type() {
+            Some(value.t())
+        } else {
+            None
+        }
     });
     let operation_typ = match res {
         TypeResolveResult::Match { typ } => typ,
@@ -212,17 +217,18 @@ fn type_def(
         ce.borrow_mut().recent_var = varname.clone();
 
         let var_typ = types.v_(0).t();
+        println!("VAR TYPE DEF: {} = {}", varname, var_typ.s());
 
         if is_global {
             let tv = type_pass(&value, TypeHint::from_type(&var_typ), ce)?;
-            let typ = tv.typ;
+            let _typ = tv.typ;
 
             // If typ == None, but var_typ != None         => Error
             // If var_typ != None and not(var_typ ISA typ) => Error
             // If var_typ == None and typ == None          => Error
             // If var_typ != None and var_typ ISA typ      => Ok
 
-            if let VarPos::Global(r) = ce.borrow_mut().def(&varname, true, var_typ) {
+            if let VarPos::Global(_r) = ce.borrow_mut().def(&varname, true, var_typ) {
                 // everything is fine!
             } else {
                 panic!("Defining global did not return a global!");
@@ -230,9 +236,9 @@ fn type_def(
         } else {
             let next_local = ce.borrow_mut().next_local();
             let tv = type_pass(&value, TypeHint::from_type(&var_typ), ce)?;
-            let typ = tv.typ;
+            let _typ = tv.typ;
 
-            ce.borrow_mut().def_local(&varname, next_local, typ);
+            ce.borrow_mut().def_local(&varname, next_local, var_typ);
         }
     }
 
@@ -248,15 +254,18 @@ fn type_deftype(
 ) -> Result<TypedVVal, CompileError> {
     let (typename, typ) = (ast.v_s_raw(1), ast.v_(2));
 
+    let new_named = Type::named(&typename);
+
     if is_global {
-        if let VarPos::Global(r) = ce.borrow_mut().def(&typename, true, typ.t()) {
+        if let VarPos::Global(r) = ce.borrow_mut().def(&typename, true, new_named) {
             r.set_ref(typ);
         } else {
             panic!("Defining global did not return a global!");
         }
     } else {
         let next_local = ce.borrow_mut().next_local();
-        ce.borrow_mut().def_local(&typename, next_local, typ.t());
+        ce.borrow_mut().def_local(&typename, next_local, new_named);
+        ce.borrow_mut().set_compiletime_value(&typename, &typ);
     }
 
     Ok(TypedVVal::new(Type::typ(), ast.clone()))
@@ -295,6 +304,12 @@ pub(crate) fn type_pass(
                 Syntax::Def => type_def(ast, ce, false)?,
                 Syntax::DefType => type_deftype(ast, ce, false)?,
                 Syntax::DefGlobType => type_deftype(ast, ce, true)?,
+                Syntax::CompileType => {
+                    let expr = ast.v_(1);
+                    let res_type = type_pass(&expr, type_hint, ce)?;
+                    let new_ast = VVal::vec3(ast.v_(0), ast.v_(1), VVal::typ(res_type.typ.clone()));
+                    TypedVVal::new(res_type.typ, new_ast)
+                }
                 //                Syntax::DefGlobRef => compile_def(ast, ce, true),
                 _ => {
                     return Err(
@@ -303,6 +318,19 @@ pub(crate) fn type_pass(
                 }
             };
             Ok(v)
+        }
+        VVal::Pair(pair) => {
+            // TODO: If type_hint is hinting a Pair, then deconstruct that!
+            let (th_a, th_b) = if let Some(&Type::Pair(ref atype, ref btype)) = type_hint.expect() {
+                (TypeHint::from_type(&atype), TypeHint::from_type(&btype))
+            } else {
+                (TypeHint::Infer, TypeHint::Infer)
+            };
+
+            let a = type_pass(&pair.0, th_a, ce)?;
+            let b = type_pass(&pair.1, th_b, ce)?;
+
+            Ok(TypedVVal::new(Type::pair(a.typ, b.typ), VVal::pair(a.vval, b.vval)))
         }
         _ => Ok(TypedVVal::new(ast.t(), ast.clone())),
     }
@@ -314,7 +342,7 @@ pub(crate) fn type_check(
     types_enabled: bool,
 ) -> Result<VVal, CompileError> {
     match type_pass(ast, TypeHint::Expect(Type::any()), ce) {
-        Ok(tv) => Ok(ast.clone()),
+        Ok(tv) => Ok(tv.vval.clone()),
         Err(e) => {
             if types_enabled {
                 Err(e)
