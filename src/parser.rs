@@ -2928,15 +2928,15 @@ mod tests {
             "<TRoot:0:100>{<Block:0:100>{<Expr:0:9>{<TValue:0:9>{<TLiteral:0:9|\"test123\"|>}},<TDelim:9:10|;|>,<Expr:23:26>{<TValue:23:26>{<TLiteral:23:26|'t'|>}},<TDelim:26:27|;|>,<Expr:40:45>{<TValue:40:45>{<TLiteral:40:45|$b'X'|>}},<TDelim:45:46|;|>,<Expr:59:67>{<TValue:59:67>{<TLiteral:59:67|$b\"TEST\"|>}},<TDelim:67:68|;|>,<Expr:81:100>{<TValue:81:100>{<TLiteral:81:100>{<Block:87:99>{<Expr:87:99>{<TBinOp:87:99>{<TValue:87:93>{<TLiteral:87:93|\"test\"|>},<TOp:94:95|+|>,<TNum:96:99|120|>}}}}}}}}");
     }
 
-    // #[test]
-    // fn check_annotations_refmt() {
-    //     assert_eq!(refmt("1\n + 2\n + 3"), "1 + 2 + 3");
-    //     assert_eq!(refmt("1\n+ 2\n+ 3"), "1 + 2 + 3");
-    //     assert_eq!(refmt("1 +2    +3"), "1 +2 +3");
-    //     assert_eq!(refmt("1 ~ +2    +3"), "1 ~ +2 +3");
-    //     assert_eq!(refmt("x\n  [1\n,     \n2]"), "x[1, 2]");
-    //     assert_eq!(refmt("x\n  [[    1\n]]"), "x[[1]]");
-    //     assert_eq!(refmt("$F\"{}\ntest\" <& 10"), "$F\"{}\ntest\" <& 10");
-    //     assert_eq!(refmt("1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11 + 12 + 13 + 14 + 15 + 16 + 17 + 18 + 19 + 20 + 21 + 22 + 23"), "");
-    // }
+    #[test]
+    fn check_annotations_refmt() {
+        assert_eq!(refmt("1\n + 2\n + 3"), "1 + 2 + 3");
+        assert_eq!(refmt("1\n+ 2\n+ 3"), "1 + 2 + 3");
+        assert_eq!(refmt("1 +2    +3"), "1 +2 +3");
+        assert_eq!(refmt("1 ~ +2    +3"), "1 ~ +2 +3");
+        assert_eq!(refmt("x\n  [1\n,     \n2]"), "x[1, 2]");
+        assert_eq!(refmt("x\n  [[    1\n]]"), "x[[1]]");
+        assert_eq!(refmt("$F\"{}\ntest\" <& 10"), "$F\"{}\ntest\" <& 10");
+        assert_eq!(refmt("1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 10 + 11 + 12 + 13 + 14 + 15 + 16 + 17 + 18 + 19 + 20 + 21 + 22 + 23"), "");
+    }
 }

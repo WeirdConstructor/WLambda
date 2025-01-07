@@ -2076,7 +2076,11 @@ pub enum Type {
     Userdata(Rc<String>, Rc<Vec<(String, Rc<Type>)>>),
     Record(Rc<String>, Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
-    Function(Rc<Vec<(Rc<Type>, bool, Option<String>)>>, Rc<Type>, Option<Rc<Vec<(String, Rc<Type>)>>>),
+    Function(
+        Rc<Vec<(Rc<Type>, bool, Option<String>)>>,
+        Rc<Type>,
+        Option<Rc<Vec<(String, Rc<Type>)>>>,
+    ),
     Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
     Var(Rc<String>, Option<Rc<Vec<String>>>),
 }
@@ -2296,96 +2300,96 @@ impl Type {
         matches!(self, Type::None)
     }
 
-    pub fn isa_resolved(&self, chk_t: &Type) -> bool {
-        match self {
-            Type::Any => true,
-            Type::Bool => matches!(chk_t, Type::Bool),
-            Type::None => matches!(chk_t, Type::None),
-            Type::Str => matches!(chk_t, Type::Str),
-            Type::Bytes => matches!(chk_t, Type::Bytes),
-            Type::Sym => matches!(chk_t, Type::Sym),
-            Type::Byte => matches!(chk_t, Type::Byte),
-            Type::Char => matches!(chk_t, Type::Char),
-            Type::Syntax => matches!(chk_t, Type::Syntax),
-            Type::Type => matches!(chk_t, Type::Type),
-            Type::Int => matches!(chk_t, Type::Int),
-            Type::Float => matches!(chk_t, Type::Float),
-            Type::IVec2 => matches!(chk_t, Type::IVec2),
-            Type::IVec3 => matches!(chk_t, Type::IVec3),
-            Type::IVec4 => matches!(chk_t, Type::IVec4),
-            Type::FVec2 => matches!(chk_t, Type::FVec2),
-            Type::FVec3 => matches!(chk_t, Type::FVec3),
-            Type::FVec4 => matches!(chk_t, Type::FVec4),
-            Type::Opt(t) => {
-                if let Type::Opt(ot) = chk_t {
-                    t.isa_resolved(&ot)
-                } else {
-                    false
-                }
-            }
-            Type::Err(t) => {
-                if let Type::Err(ot) = chk_t {
-                    t.isa_resolved(&ot)
-                } else {
-                    false
-                }
-            }
-            Type::Pair(t, t2) => {
-                if let Type::Pair(ct, ct2) = chk_t {
-                    t.isa_resolved(&ct) && t2.isa_resolved(&ct2)
-                } else {
-                    false
-                }
-            }
-            Type::Lst(t) => {
-                if let Type::Lst(ot) = chk_t {
-                    t.isa_resolved(&ot)
-                } else {
-                    false
-                }
-            }
-            Type::Ref(t) => {
-                if let Type::Ref(ot) = chk_t {
-                    t.isa_resolved(&ot)
-                } else {
-                    false
-                }
-            }
-            Type::Map(t) => {
-                if let Type::Map(ot) = chk_t {
-                    t.isa_resolved(&ot)
-                } else {
-                    false
-                }
-            }
-            Type::Userdata(name, fields) => {
-                // TODO
-                false
-            }
-            Type::Record(name, record) => {
-                // TODO
-                false
-            }
-            Type::Tuple(types) => {
-                // TODO
-                false
-            }
-            Type::Union(types) => {
-                for t in types.iter() {
-                    if t.isa_resolved(chk_t) {
-                        return true;
-                    }
-                }
-                false
-            }
-            Type::Function(types, ret, type_vars) => {
-                // TODO
-                false
-            }
-            Type::Name(name, _binds) => false,
-            Type::Var(name, _limits) => false,
-        }
-    }
+    //    pub fn isa_resolved(&self, chk_t: &Type) -> bool {
+    //        match self {
+    //            Type::Any => true,
+    //            Type::Bool => matches!(chk_t, Type::Bool),
+    //            Type::None => matches!(chk_t, Type::None),
+    //            Type::Str => matches!(chk_t, Type::Str),
+    //            Type::Bytes => matches!(chk_t, Type::Bytes),
+    //            Type::Sym => matches!(chk_t, Type::Sym),
+    //            Type::Byte => matches!(chk_t, Type::Byte),
+    //            Type::Char => matches!(chk_t, Type::Char),
+    //            Type::Syntax => matches!(chk_t, Type::Syntax),
+    //            Type::Type => matches!(chk_t, Type::Type),
+    //            Type::Int => matches!(chk_t, Type::Int),
+    //            Type::Float => matches!(chk_t, Type::Float),
+    //            Type::IVec2 => matches!(chk_t, Type::IVec2),
+    //            Type::IVec3 => matches!(chk_t, Type::IVec3),
+    //            Type::IVec4 => matches!(chk_t, Type::IVec4),
+    //            Type::FVec2 => matches!(chk_t, Type::FVec2),
+    //            Type::FVec3 => matches!(chk_t, Type::FVec3),
+    //            Type::FVec4 => matches!(chk_t, Type::FVec4),
+    //            Type::Opt(t) => {
+    //                if let Type::Opt(ot) = chk_t {
+    //                    t.isa_resolved(&ot)
+    //                } else {
+    //                    false
+    //                }
+    //            }
+    //            Type::Err(t) => {
+    //                if let Type::Err(ot) = chk_t {
+    //                    t.isa_resolved(&ot)
+    //                } else {
+    //                    false
+    //                }
+    //            }
+    //            Type::Pair(t, t2) => {
+    //                if let Type::Pair(ct, ct2) = chk_t {
+    //                    t.isa_resolved(&ct) && t2.isa_resolved(&ct2)
+    //                } else {
+    //                    false
+    //                }
+    //            }
+    //            Type::Lst(t) => {
+    //                if let Type::Lst(ot) = chk_t {
+    //                    t.isa_resolved(&ot)
+    //                } else {
+    //                    false
+    //                }
+    //            }
+    //            Type::Ref(t) => {
+    //                if let Type::Ref(ot) = chk_t {
+    //                    t.isa_resolved(&ot)
+    //                } else {
+    //                    false
+    //                }
+    //            }
+    //            Type::Map(t) => {
+    //                if let Type::Map(ot) = chk_t {
+    //                    t.isa_resolved(&ot)
+    //                } else {
+    //                    false
+    //                }
+    //            }
+    //            Type::Userdata(name, fields) => {
+    //                // TODO
+    //                false
+    //            }
+    //            Type::Record(name, record) => {
+    //                // TODO
+    //                false
+    //            }
+    //            Type::Tuple(types) => {
+    //                // TODO
+    //                false
+    //            }
+    //            Type::Union(types) => {
+    //                for t in types.iter() {
+    //                    if t.isa_resolved(chk_t) {
+    //                        return true;
+    //                    }
+    //                }
+    //                false
+    //            }
+    //            Type::Function(types, ret, type_vars) => {
+    //                // TODO
+    //                false
+    //            }
+    //            Type::Name(name, _binds) => false,
+    //            Type::Var(name, _limits) => false,
+    //        }
+    //    }
 
     pub fn s(&self) -> String {
         match self {
@@ -2531,7 +2535,7 @@ impl Type {
     pub fn is_resolved(&self) -> bool {
         match self.resolve_check() {
             TypeResolve::Resolved => true,
-            e => false,
+            _ => false,
         }
     }
 
@@ -2610,11 +2614,11 @@ impl Type {
 
     pub fn wrap_simple(&self, other: Rc<Type>) -> Option<Rc<Type>> {
         match self {
-            Type::Opt(t) => Some(Rc::new(Type::Opt(other))),
-            Type::Err(t) => Some(Rc::new(Type::Err(other))),
-            Type::Lst(t) => Some(Rc::new(Type::Lst(other))),
-            Type::Map(t) => Some(Rc::new(Type::Map(other))),
-            Type::Ref(t) => Some(Rc::new(Type::Ref(other))),
+            Type::Opt(_) => Some(Rc::new(Type::Opt(other))),
+            Type::Err(_) => Some(Rc::new(Type::Err(other))),
+            Type::Lst(_) => Some(Rc::new(Type::Lst(other))),
+            Type::Map(_) => Some(Rc::new(Type::Map(other))),
+            Type::Ref(_) => Some(Rc::new(Type::Ref(other))),
             _ => None,
         }
     }
@@ -2641,7 +2645,7 @@ macro_rules! resolve_type_wrap1 {
                 TypeResolveResult::Match { typ } => TypeResolveResult::Match {
                     typ: $typ.wrap_simple(typ).unwrap_or_else(|| Rc::new(Type::None)),
                 },
-                TypeResolveResult::Conflict { expected, got, reason } => {
+                TypeResolveResult::Conflict { expected, reason, .. } => {
                     TypeResolveResult::Conflict {
                         expected: $typ.wrap_simple(expected).unwrap_or_else(|| Rc::new(Type::None)),
                         got: $chk_t.clone(),
@@ -2669,13 +2673,11 @@ where
     F: FnMut(&str) -> Option<Rc<Type>>,
 {
     match typ.as_ref() {
-        Type::None => {
-            TypeResolveResult::Conflict {
-                expected: typ.clone(),
-                got: chk_t.clone(),
-                reason: TypeConflictReason::Unresolved
-            }
-        }
+        Type::None => TypeResolveResult::Conflict {
+            expected: typ.clone(),
+            got: chk_t.clone(),
+            reason: TypeConflictReason::Unresolved,
+        },
         Type::Any => match chk_t.as_ref() {
             Type::Var(name, _l) => {
                 if let Some((_, typ)) =
@@ -2738,7 +2740,7 @@ where
                     TypeResolveResult::Match { typ } => typ,
                 };
 
-                let ct2 = match resolve_type(t, ct2, bound_vars, name_resolver) {
+                let ct2 = match resolve_type(t2, ct2, bound_vars, name_resolver) {
                     TypeResolveResult::Conflict { expected, got, reason } => {
                         return TypeResolveResult::Conflict {
                             expected: Rc::new(Type::Pair(ct, ct2.clone())),
@@ -7705,6 +7707,7 @@ impl serde::ser::Serialize for VVal {
 
         match self {
             VVal::Str(_) => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
+            VVal::Type(_) => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Sym(_) => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Byt(b) => serializer.serialize_bytes(&b[..]),
             VVal::Chr(b) => match b {

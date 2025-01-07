@@ -13,11 +13,11 @@ use std::rc::Rc;
 use crate::compiler::CompileEnv;
 use crate::ops::BinOp;
 use crate::vval::{
-    resolve_type, CompileError, Syntax, Type, TypeConflictReason, TypeResolveResult, VVal, VarPos,
+    resolve_type, CompileError, Syntax, Type, TypeResolveResult, VVal, VarPos,
 };
 
 #[derive(Debug, Clone)]
-enum TypeHint {
+pub(crate) enum TypeHint {
     Infer,
     Expect(Rc<Type>),
 }
@@ -33,7 +33,7 @@ impl TypeHint {
 }
 
 #[derive(Debug, Clone)]
-pub struct TypedVVal {
+pub(crate) struct TypedVVal {
     pub vval: VVal,
     pub typ: Rc<Type>,
 }

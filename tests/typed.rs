@@ -1,8 +1,6 @@
 // Copyright (c) 2024 Weird Constructor <weirdconstructor@gmail.com>
 // This is a part of WLambda. See README.md and COPYING for details.
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use wlambda::*;
 
 pub fn v(s: &str) -> String {
@@ -24,10 +22,6 @@ pub fn v2s(s: &str) -> String {
         Ok(v) => v.with_s_ref(|s| String::from(s)),
         Err(e) => format!("{}", e),
     }
-}
-
-fn ve(s: &str) -> String {
-    wlambda::compiler::test_eval_to_string(s)
 }
 
 #[test]
