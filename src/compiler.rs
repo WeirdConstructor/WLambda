@@ -2926,7 +2926,7 @@ pub(crate) fn compile(
                 Syntax::SelfData => {
                     pw_provides_result_pos!(prog, { ResPos::Value(ResValue::SelfData) })
                 }
-                Syntax::CompileType => {
+                Syntax::TypeOf => {
                     let expr = compile(&ast.at(1).unwrap(), ce)?;
                     let typ = ast.at(2).unwrap_or(VVal::None);
 

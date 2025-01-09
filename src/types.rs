@@ -207,6 +207,8 @@ fn type_def(
     let (vars, value, destr, types) = (ast.v_(1), ast.v_(2), ast.v_(3), ast.v_(4));
 
     if destr.b() {
+        // TODO // check_for_at_arity(prev_max_arity, ast, ce, &vars);
+
         if let VVal::Lst(b, _) = vars.clone() {
             for (i, v) in b.borrow().iter().enumerate() {
                 ce.borrow_mut().def(&v.s_raw(), is_global, types.v_(i).t());
@@ -271,6 +273,71 @@ fn type_deftype(
     Ok(TypedVVal::new(Type::typ(), ast.clone()))
 }
 
+fn type_assign(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    is_ref: bool,
+) -> Result<TypedVVal, CompileError> {
+    let (vars, value, destr) = (ast.v_(1), ast.v_(2), ast.v_(3));
+
+    if destr.b() {
+        // let val_pw = compile(&value, ce)?;
+
+        // TODO // let prev_max_arity = ce.borrow().implicit_arity.clone();
+        // TODO // check_for_at_arity(prev_max_arity, ast, ce, &vars);
+
+        // 1. get types for vars
+        // 2. get types for values
+        // 3. check value types against var types.
+        // let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()).0, 0);
+        Ok(TypedVVal::new(Type::none(), ast.clone()))
+
+    } else {
+        let varname = &vars.v_s_raw(0);
+        let (pos, var_type) = ce.borrow_mut().get(varname);
+
+        match pos {
+            VarPos::Const(_) => {
+                return Err(ast.compile_err(format!("Can't assign to constant '{}'", varname)))
+            }
+            VarPos::NoPos => {
+                return Err(ast.compile_err(format!(
+                    "Can't assign to undefined local variable '{}'",
+                    varname
+                )))
+            }
+            _ => (),
+        }
+
+        let value_type = type_pass(&value, TypeHint::from_type(&var_type), ce)?;
+        let new_ast = VVal::vec3(vars, VVal::vec1(value_type.vval), destr);
+
+        let mut bound_vars = vec![];
+        let res = resolve_type(&var_type, &value_type.typ, &mut bound_vars, &mut |name| {
+            let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
+            if vartype.is_type() {
+                Some(value.t())
+            } else {
+                None
+            }
+        });
+
+        let operation_typ = match res {
+            TypeResolveResult::Match { typ } => typ,
+            TypeResolveResult::Conflict { expected, got, reason } => {
+                return Err(ast.compile_err(format!(
+                    "Type error, expected:\n {}\ngot: {}\n=> reason: {}",
+                    expected.s(),
+                    got.s(),
+                    reason
+                )));
+            }
+        };
+
+        Ok(TypedVVal::new(Type::none(), new_ast))
+    }
+}
+
 /// Runs the type checker pass over the AST.
 /// TODO: Do we do preparative steps for the compiler/code generator?
 #[allow(clippy::cognitive_complexity)]
@@ -304,7 +371,9 @@ pub(crate) fn type_pass(
                 Syntax::Def => type_def(ast, ce, false)?,
                 Syntax::DefType => type_deftype(ast, ce, false)?,
                 Syntax::DefGlobType => type_deftype(ast, ce, true)?,
-                Syntax::CompileType => {
+                Syntax::Assign => type_assign(ast, ce, false)?,
+                Syntax::AssignRef => type_assign(ast, ce, true)?,
+                Syntax::TypeOf => {
                     let expr = ast.v_(1);
                     let res_type = type_pass(&expr, type_hint, ce)?;
                     let new_ast = VVal::vec3(ast.v_(0), ast.v_(1), VVal::typ(res_type.typ.clone()));

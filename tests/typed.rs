@@ -74,14 +74,17 @@ fn chk_types_function() {
 
 #[test]
 fn chk_types_named() {
-    assert_eq!(v("!o: Num = 10; o"), "");
-    assert_eq!(v("!o: Num = 10.12; o"), "");
+    assert_eq!(v("!o: Num = 10; $typeof o"), "$p(10,$type(Num))");
+    assert!(v("!o: Num = 10.12; .o = 10; o").find("Mismatch Num <=> int").is_some(), "Nominally typed stuff can't be assigned.");
+    assert_eq!(v("!o: Num = 10.12; !o2: Num = 10; .o = o2; o"), "02");
+    assert_eq!(v("!o: int | float = 10.12; .o = 10; o"), "");
+//    assert!(r.find("Wrong argument 2").is_some(), "Catch bad argument.");
 }
 
 #[test]
 fn chk_types_def() {
     assert_eq!(
-        v("!:type OneDimPoint int; !x: OneDimPoint = 120; ($COMPILE_TYPE x) => OneDimPoint"),
+        v("!:type OneDimPoint int; !x: OneDimPoint = 120; ($typeof x) => OneDimPoint"),
         "$p($p(120,$type(OneDimPoint)),$type(int))"
     );
 }

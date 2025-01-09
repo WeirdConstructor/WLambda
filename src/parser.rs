@@ -670,12 +670,6 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             ps.skip_ws_and_comments();
             Ok(ps.syn(Syntax::DebugPrint))
         }
-        'C' if ps.consume_lookahead("COMPILE_TYPE") => {
-            ps.skip_ws_and_comments();
-            let s = ps.syn(Syntax::CompileType);
-            s.push(parse_expr(ps)?);
-            Ok(s)
-        }
         'd' => {
             if ps.consume_lookahead("data") {
                 ps.skip_ws_and_comments();
@@ -693,7 +687,12 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
             Ok(ps.syn(Syntax::SelfObj))
         }
         't' => {
-            if ps.consume_lookahead("type") {
+            if ps.consume_lookahead("typeof") {
+                ps.skip_ws_and_comments();
+                let s = ps.syn(Syntax::TypeOf);
+                s.push(parse_expr(ps)?);
+                Ok(s)
+            } else if ps.consume_lookahead("type") {
                 ps.skip_ws_and_comments();
                 Ok(parse_type(ps)?)
             } else {
