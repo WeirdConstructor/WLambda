@@ -1900,7 +1900,7 @@ pub enum TypeResolve {
 }
 
 /// A record type
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct TypeRecord {
     typedefs: Vec<(String, Rc<Type>)>,
     fields: Vec<(String, Rc<Type>)>,
@@ -1947,7 +1947,7 @@ impl TypeRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum TypeConflictReason {
     Unresolved,
     WrongType(Rc<Type>, Rc<Type>),
@@ -2038,17 +2038,46 @@ impl std::fmt::Display for TypeConflictReason {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+static TYPE_VAR_ID: AtomicUsize = AtomicUsize::new(1);
+
+#[derive(Debug, Clone)]
+pub struct TypeEnv {
+    parent: Option<Rc<TypeEnv>>,
+    typename_env: FnvHashMap<String, Rc<Type>>,
+    id: usize,
+}
+
+impl TypeEnv {
+    pub fn new() -> Self {
+        Self {
+            parent: None,
+            typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
+            id: TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst),
+        }
+    }
+
+    pub fn new_with_parent(parent: Rc<Self>) -> Self {
+        Self {
+            parent: Some(parent),
+            typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
+            id: TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst),
+        }
+    }
+
+    pub fn env_id(&self) -> usize {
+        self.id
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum TypeResolveResult {
     Conflict { expected: Rc<Type>, got: Rc<Type>, reason: TypeConflictReason },
     Match { typ: Rc<Type> },
 }
 
-static TYPE_VAR_ID: AtomicUsize = AtomicUsize::new(1);
-
 /// The definition of a type, that can be attached to functions, variables
 /// and values.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Type {
     None,
     Any,
@@ -2084,8 +2113,8 @@ pub enum Type {
         Rc<Type>,
         Option<Rc<Vec<(String, Rc<Type>)>>>,
     ),
-    Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
-    Alias(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
+    Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>, Option<Rc<TypeEnv>>),
+    Alias(Rc<String>, Option<Rc<Vec<Rc<Type>>>>, Option<Rc<TypeEnv>>),
     Var(Rc<String>, Option<Rc<Vec<String>>>),
 }
 
@@ -2175,7 +2204,7 @@ impl Type {
     }
 
     pub fn named(n: &str) -> Rc<Self> {
-        Rc::new(Type::Name(Rc::new(n.to_string()), None))
+        Rc::new(Type::Name(Rc::new(n.to_string()), None, None))
     }
 
     pub fn fun_ret(t: Self) -> Rc<Type> {
@@ -2403,6 +2432,12 @@ impl Type {
     //        }
     //    }
 
+    pub fn eq(&self, other: &Self) -> bool {
+        // TODO: Implement equality check!
+        //       Adhere to the TypeEnv the named/aliased types belong to!
+        false
+    }
+
     pub fn s(&self) -> String {
         match self {
             Type::Any => "any".to_string(),
@@ -2517,8 +2552,8 @@ impl Type {
                 fun += &ret.s();
                 fun
             }
-            Type::Alias(name, None) => format!("{}", *name),
-            Type::Alias(name, Some(binds)) => {
+            Type::Alias(name, None, _) => format!("{}", *name),
+            Type::Alias(name, Some(binds), _) => {
                 let mut s = format!("{}", *name);
                 s += "<";
                 for (i, b) in binds.iter().enumerate() {
@@ -2530,8 +2565,8 @@ impl Type {
                 s += ">";
                 s
             }
-            Type::Name(name, None) => format!("{}", *name),
-            Type::Name(name, Some(binds)) => {
+            Type::Name(name, None, _) => format!("{}", *name),
+            Type::Name(name, Some(binds), _) => {
                 let mut s = format!("{}", *name);
                 s += "<";
                 for (i, b) in binds.iter().enumerate() {
@@ -2634,8 +2669,8 @@ impl Type {
                 }
                 res
             }
-            Type::Name(_name, _bindings) => TypeResolve::Named,
-            Type::Alias(_name, _bindings) => TypeResolve::Named,
+            Type::Name(_name, _bindings, _typenv) => TypeResolve::Named,
+            Type::Alias(_name, _bindings, _typenv) => TypeResolve::Named,
             Type::Var(_name, _limits) => TypeResolve::UnboundVars,
         }
     }
@@ -2721,7 +2756,8 @@ where
                     }
                 }
             }
-            Type::Name(name, _bindings) => {
+            Type::Name(name, _bindings, _type_env) => {
+                // TODO: Use _type_env!
                 // If the type exists, then we can allow it in place of an `Any`.
                 if let Some(_) = name_resolver(name) {
                     TypeResolveResult::Match { typ: typ.clone() }
@@ -2925,9 +2961,13 @@ where
                 }
             }
         }
-        Type::Alias(_name, _binds) => {
-        }
-        Type::Name(_name, _binds) => {
+        Type::Alias(_name, _binds, _type_env) => TypeResolveResult::Conflict {
+            expected: typ.clone(),
+            got: chk_t.clone(),
+
+            reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+        },
+        Type::Name(_name, _binds, _type_env) => {
             // case: Name == Name
             // case: Alias == Name
             // case: Alias == Alias
@@ -2939,7 +2979,7 @@ where
             //              !:type Point record<N is Num> { x: N, y: N }
             //              !:type Pos record<S> { is Point<S> }
             //              !p : Point<Num> = as Pos<int>: ${ x: 10, y: 20 };
-            if let Type::Name(_chk_name, _chk_binds) = chk_t.as_ref() {
+            if let Type::Name(_chk_name, _chk_binds, _env) = chk_t.as_ref() {
             } else {
                 // we need to check if the `name` is an alias for the other type.
                 // !Num : type = $type int | float;
@@ -5787,7 +5827,7 @@ impl VVal {
             }
             VVal::Type(t) => {
                 if let VVal::Type(t2) = v {
-                    t == t2
+                    t.eq(t2)
                 } else {
                     false
                 }

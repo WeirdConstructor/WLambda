@@ -1192,38 +1192,39 @@ fn parse_basetype(ps: &mut State) -> Result<VVal, ParseError> {
                 None
             };
 
-            if let Some(c) = typename.get(0) {
-                if c == "@" {
-                    VVal::typ_box(Type::Alias(Rc::new(typename), bindings))
+            if let Some(c) = typename.chars().nth(0) {
+                if c == '@' {
+                    VVal::typ_box(Type::Alias(Rc::new(typename), bindings, None))
                 } else {
-                    VVal::typ_box(Type::Name(Rc::new(typename), bindings))
+                    VVal::typ_box(Type::Name(Rc::new(typename), bindings, None))
                 }
             } else {
-                VVal::typ_box(Type::Name(Rc::new(typename), bindings))
+                VVal::typ_box(Type::Name(Rc::new(typename), bindings, None))
             }
         }
     };
 
-    typ
+    Ok(typ)
 }
 
 fn parse_type_union(ps: &mut State) -> Result<VVal, ParseError> {
     let mut typ = parse_basetype(ps)?;
 
-    if ps.lookahead('|') {
-        let mut uniont = vec![typ];
+    if ps.lookahead("|") {
+        let mut uniont = vec![typ.t()];
         while ps.expect_some(ps.peek())? == '|' {
             ps.consume_token_wsc('|', Syntax::TOp);
-            uniont.push(parse_type(ps)?);
+            uniont.push(parse_type(ps)?.t());
         }
 
-        typ = Rc::new(Type::Union(uniont));
+        typ = VVal::typ_box(Type::Union(Rc::new(uniont)));
     }
 
     Ok(typ)
 }
 
 fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
+    // TODO: Handle type_q from the reference!
     annotate_node(ps, Syntax::Type, |ps, _| {
         let mut typ = if ps.consume_area_start_token_wsc('(', Syntax::TQ) {
             let typ = parse_type_union(ps)?;
@@ -1238,7 +1239,7 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
         };
 
         if ps.consume_token_wsc('?', Syntax::T) {
-            typ = Rc::new(Type::Maybe(typ.t()));
+            typ = VVal::typ_box(Type::Maybe(typ.t()));
         }
 
         Ok(typ)
@@ -1940,9 +1941,9 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                 if key == "global" {
                     if ps.consume_tokens_wsc("type", Syntax::TIdent) {
                         is_type_definition = true;
-                        assign = ps.syn(Syntax::DefType);
-                    } else {
                         assign = ps.syn(Syntax::DefGlobType);
+                    } else {
+                        assign = ps.syn(Syntax::DefGlobRef);
                     }
                 } else if key == "const" {
                     assign = ps.syn(Syntax::DefConst);
@@ -1985,7 +1986,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                         if ps.consume_token_wsc(':', Syntax::T) {
                             types.push(parse_type(ps)?);
                         } else {
-                            types.push(VVal::type_none());
+                            types.push(VVal::type_any());
                         }
                     }
 
@@ -2012,7 +2013,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     if ps.consume_token_wsc(':', Syntax::T) {
                         types.push(parse_type(ps)?);
                     } else {
-                        types.push(VVal::type_none());
+                        types.push(VVal::type_any());
                     }
                 }
             }
@@ -2552,15 +2553,15 @@ mod tests {
     fn check_assignments() {
         assert_eq!(
             parse("!:global X = 123"),
-            "$[$%:Block,$[$%:DefGlobRef,$[:X],123,$n,$[type[any]]]]"
+            "$[$%:Block,$[$%:DefGlobRef,$[:X],123,$n,$[$type(any)]]]"
         );
-        assert_eq!(parse("!x=10;"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[type[any]]]]");
-        assert_eq!(parse("!(x)=10;"), "$[$%:Block,$[$%:Def,$[:x],10,$true,$[type[any]]]]");
-        assert_eq!(parse("! x = 10 ;"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[type[any]]]]");
-        assert_eq!(parse("! x = 10"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[type[any]]]]");
+        assert_eq!(parse("!x=10;"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[$type(any)]]]");
+        assert_eq!(parse("!(x)=10;"), "$[$%:Block,$[$%:Def,$[:x],10,$true,$[$type(any)]]]");
+        assert_eq!(parse("! x = 10 ;"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[$type(any)]]]");
+        assert_eq!(parse("! x = 10"), "$[$%:Block,$[$%:Def,$[:x],10,$n,$[$type(any)]]]");
         assert_eq!(
             parse("!:global (y,x) = @"),
-            "$[$%:Block,$[$%:DefGlobRef,$[:y,:x],$[$%:Var,:@],$true,$[type[any],type[any]]]]"
+            "$[$%:Block,$[$%:DefGlobRef,$[:y,:x],$[$%:Var,:@],$true,$[$type(any),$type(any)]]]"
         );
         assert_eq!(parse(". (a,b) = 10"), "$[$%:Block,$[$%:Assign,$[:a,:b],10,$true]]");
     }
@@ -2686,7 +2687,7 @@ mod tests {
         assert_eq!(parse("`\\``"), "$[$%:Block,$[$%:Var,:\"`\"]]");
         assert_eq!(parse("`\\\"`"), "$[$%:Block,$[$%:Var,:\"\"\"]]");
         assert_eq!(parse("`\"`"), "$[$%:Block,$[$%:Var,:\"\"\"]]");
-        assert_eq!(parse("!` ` = 10;"), "$[$%:Block,$[$%:Def,$[:\" \"],10,$n,$[type[any]]]]");
+        assert_eq!(parse("!` ` = 10;"), "$[$%:Block,$[$%:Def,$[:\" \"],10,$n,$[$type(any)]]]");
     }
 
     #[test]
@@ -2729,30 +2730,30 @@ mod tests {
 
     #[test]
     fn check_const() {
-        assert_eq!(parse("!:const X = 32;"), "$[$%:Block,$[$%:DefConst,$[:X],32,$n,$[type[any]]]]");
+        assert_eq!(parse("!:const X = 32;"), "$[$%:Block,$[$%:DefConst,$[:X],32,$n,$[$type(any)]]]");
         assert_eq!(
             parse("!:const X = 32.4;"),
-            "$[$%:Block,$[$%:DefConst,$[:X],32.4,$n,$[type[any]]]]"
+            "$[$%:Block,$[$%:DefConst,$[:X],32.4,$n,$[$type(any)]]]"
         );
         assert_eq!(
             parse("!:const X = :XX;"),
-            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Key,:XX],$n,$[type[any]]]]"
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Key,:XX],$n,$[$type(any)]]]"
         );
         assert_eq!(
             parse("!:const X = \"fo\";"),
-            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Str,\"fo\"],$n,$[type[any]]]]"
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Str,\"fo\"],$n,$[$type(any)]]]"
         );
         assert_eq!(
             parse("!:const X = $[120];"),
-            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Lst,120],$n,$[type[any]]]]"
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Lst,120],$n,$[$type(any)]]]"
         );
         assert_eq!(
             parse("!:const X = ${a=10};"),
-            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Map,$[:a,10]],$n,$[type[any]]]]"
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Map,$[:a,10]],$n,$[$type(any)]]]"
         );
         assert_eq!(
             parse("!:const (A,B,X) = $[1,3,4];"),
-            "$[$%:Block,$[$%:DefConst,$[:A,:B,:X],$[$%:Lst,1,3,4],$true,$[type[any],type[any],type[any]]]]"
+            "$[$%:Block,$[$%:DefConst,$[:A,:B,:X],$[$%:Lst,1,3,4],$true,$[$type(any),$type(any),$type(any)]]]"
         );
     }
 
@@ -2770,11 +2771,11 @@ mod tests {
         assert_eq!(parse("10 11\n 12 13"), "$[$%:Block,$[$%:Call,10,11,12,13]]");
         assert_eq!(
             parse("!x = 10 11\n 12"),
-            "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12],$n,$[type[any]]]]"
+            "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12],$n,$[$type(any)]]]"
         );
         assert_eq!(
             parse("!x = 10 11\n 12 13"),
-            "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12,13],$n,$[type[any]]]]"
+            "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12,13],$n,$[$type(any)]]]"
         );
     }
 

@@ -10089,6 +10089,10 @@ In the following grammar, white space and comments are omitted:
     type_switch   = "types", ("on" | "off")
                   ;
     export        = "!", "@export", symbol, [ ":", type ], [ "=" ], expr
+                  | "!", "@export", "type", type_ident, type
+                  (* Note: when exporting types, we need to make sure to have the types capture
+                           their source environment somehow. or else named types and aliases
+                           are not properly resolved! *)
                   ;
     statement     = "!" definition
                   | "." simple_assign
@@ -10228,10 +10232,10 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | "fvec2" | "fvec3" | "fvec4"
                   ;
     basetype      = base_datatype
-                  | "ref", type
+                  | "ref", type_q
                   | "pair", "(", type, ",", type, ")"
-                  | "optional", type
-                  | "iter", type
+                  | "optional", type_q
+                  | "iter", type_q
                   | "fn", fun_type
                   | "{", [ type ], "}" (* map type *)
                   | "[", [ type ], "]" (* list type *)
@@ -10240,15 +10244,18 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | userdata
                   | nominal_type
                   | type_alias
-                  | basetype, "?"
+                  | "(", type, ")"
+                  ;
+    type_q        = basetype
+                  | "(", type, ")"
                   ;
     type          = basetype
-                  | "(", type, ")"
-                  | type, { "|", type }, [ "?" ]  (* "|" is for type options, "?" is for implicit "| none" *)
+                  | type, "?"                (* "?" is for implicit "| none" *)
+                  | type_q, { "|", type_q }  (* "|" is for type options *)
                   ;
     fun_type      = [ type_vars ],
                     "(", [ [ ident, ":" ], type, { ",", [ ident, ":" ], type }, ], ")",
-                    [ "->", type ]
+                    [ "->", type_q ]
                   ;
 ```
 
