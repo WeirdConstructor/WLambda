@@ -2069,6 +2069,7 @@ pub enum Type {
     FVec3,
     FVec4,
     Opt(Rc<Type>),
+    Maybe(Rc<Type>),
     Err(Rc<Type>),
     Pair(Rc<Type>, Rc<Type>),
     Lst(Rc<Type>),
@@ -2084,6 +2085,7 @@ pub enum Type {
         Option<Rc<Vec<(String, Rc<Type>)>>>,
     ),
     Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
+    Alias(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
     Var(Rc<String>, Option<Rc<Vec<String>>>),
 }
 
@@ -2422,6 +2424,7 @@ impl Type {
             Type::FVec3 => "fvec3".to_string(),
             Type::FVec4 => "fvec4".to_string(),
             Type::Opt(t) => format!("optional {}", t.s()),
+            Type::Maybe(t) => format!("{}?", t.s()),
             Type::Err(t) => format!("error {}", t.s()),
             Type::Pair(t, t2) => format!("pair({}, {})", t.s(), t2.s()),
             Type::Lst(t) => format!("[{}]", t.s()),
@@ -2514,6 +2517,19 @@ impl Type {
                 fun += &ret.s();
                 fun
             }
+            Type::Alias(name, None) => format!("{}", *name),
+            Type::Alias(name, Some(binds)) => {
+                let mut s = format!("{}", *name);
+                s += "<";
+                for (i, b) in binds.iter().enumerate() {
+                    if i != 0 {
+                        s += ", ";
+                    }
+                    s += &b.s();
+                }
+                s += ">";
+                s
+            }
             Type::Name(name, None) => format!("{}", *name),
             Type::Name(name, Some(binds)) => {
                 let mut s = format!("{}", *name);
@@ -2570,6 +2586,7 @@ impl Type {
             Type::FVec3 => return TypeResolve::Resolved,
             Type::FVec4 => return TypeResolve::Resolved,
             Type::Opt(t) => return t.resolve_check(),
+            Type::Maybe(t) => return t.resolve_check(),
             Type::Err(t) => return t.resolve_check(),
             Type::Pair(t, t2) => {
                 let mut res = t.resolve_check();
@@ -2618,6 +2635,7 @@ impl Type {
                 res
             }
             Type::Name(_name, _bindings) => TypeResolve::Named,
+            Type::Alias(_name, _bindings) => TypeResolve::Named,
             Type::Var(_name, _limits) => TypeResolve::UnboundVars,
         }
     }
@@ -2625,6 +2643,7 @@ impl Type {
     pub fn wrap_simple(&self, other: Rc<Type>) -> Option<Rc<Type>> {
         match self {
             Type::Opt(_) => Some(Rc::new(Type::Opt(other))),
+            Type::Maybe(_) => Some(Rc::new(Type::Maybe(other))),
             Type::Err(_) => Some(Rc::new(Type::Err(other))),
             Type::Lst(_) => Some(Rc::new(Type::Lst(other))),
             Type::Map(_) => Some(Rc::new(Type::Map(other))),
@@ -2733,6 +2752,9 @@ where
         Type::FVec3 => resolve_type_trivial!(typ, chk_t, Type::FVec3),
         Type::FVec4 => resolve_type_trivial!(typ, chk_t, Type::FVec4),
         Type::Opt(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Opt, bound_vars, name_resolver),
+        Type::Maybe(t) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Maybe, bound_vars, name_resolver)
+        }
         Type::Err(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Err, bound_vars, name_resolver),
         Type::Lst(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Lst, bound_vars, name_resolver),
         Type::Ref(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Ref, bound_vars, name_resolver),
@@ -2818,7 +2840,6 @@ where
                     }
                 }
 
-
                 let mut matched_args = vec![];
                 let mut required = 0;
                 for (i, (t, optional, param_name)) in arg_types.iter().enumerate() {
@@ -2903,6 +2924,8 @@ where
                     reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
                 }
             }
+        }
+        Type::Alias(_name, _binds) => {
         }
         Type::Name(_name, _binds) => {
             // case: Name == Name

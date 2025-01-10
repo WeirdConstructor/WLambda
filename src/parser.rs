@@ -960,23 +960,17 @@ fn make_binop(ps: &State, op: StrPart) -> VVal {
 }
 
 fn is_ident_char(c: char, is_type: bool) -> bool {
-    if is_type {
-        match c {
-            '<' | '>' if is_type => false,
-            '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
-            _ => !c.is_whitespace(),
-        }
-    } else {
-        match c {
-            '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
-            _ => !c.is_whitespace(),
-        }
+    match c {
+        '<' | '>' if is_type => false,
+        '?' if is_type => false,
+        '.' | ',' | ';' | '{' | '}' | '[' | ']' | '(' | ')' | '~' | '|' | '=' => false,
+        _ => !c.is_whitespace(),
     }
 }
 
 fn parse_ident(ps: &mut State, is_type: bool) -> Result<String, ParseError> {
     if ps.peek().is_none() {
-        return Err(ps.err(ParseErrorKind::EOF("identifier")));
+        return Err(ps.err(ParseErrorKind::EOF(if is_type { "typename" } else { "identifier" })));
     }
 
     if ps.peek().unwrap() == '`' {
@@ -1116,97 +1110,135 @@ fn parse_fun_type(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(VVal::typ_box(Type::Function(Rc::new(args), ret_type, type_vars)))
 }
 
-fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
-    annotate_node(ps, Syntax::Type, |ps, _| {
-        let is_quoted = ps.consume_area_start_token_wsc('(', Syntax::TQ);
+fn parse_basetype(ps: &mut State) -> Result<VVal, ParseError> {
+    let typename = if ps.lookahead_one_of("@ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+        parse_typename(ps)?
+    } else {
+        parse_identifier(ps)?
+    };
+    ps.skip_ws_and_comments();
 
-        let typename = if ps.lookahead_one_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
-            parse_typename(ps)?
-        } else {
-            parse_identifier(ps)?
-        };
-        ps.skip_ws_and_comments();
+    let typ = match &typename[..] {
+        "any" => VVal::typ_box(Type::Any),
+        "bool" => VVal::typ_box(Type::Bool),
+        "none" => VVal::typ_box(Type::None),
+        "char" => VVal::typ_box(Type::Char),
+        "byte" => VVal::typ_box(Type::Byte),
+        "int" => VVal::typ_box(Type::Int),
+        "float" => VVal::typ_box(Type::Float),
+        "str" => VVal::typ_box(Type::Str),
+        "bytes" => VVal::typ_box(Type::Bytes),
+        "sym" => VVal::typ_box(Type::Sym),
+        "syntax" => VVal::typ_box(Type::Syntax),
+        "type" => VVal::typ_box(Type::Type),
+        "ivec2" => VVal::typ_box(Type::IVec2),
+        "ivec3" => VVal::typ_box(Type::IVec3),
+        "ivec4" => VVal::typ_box(Type::IVec4),
+        "fvec2" => VVal::typ_box(Type::FVec2),
+        "fvec3" => VVal::typ_box(Type::FVec3),
+        "fvec4" => VVal::typ_box(Type::FVec4),
+        "ref" => {
+            let typ = parse_type(ps)?;
+            VVal::typ_box(Type::Ref(typ.t()))
+        }
+        "optional" => {
+            let typ = parse_type(ps)?;
+            VVal::typ_box(Type::Opt(typ.t()))
+        }
+        "pair" => {
+            if !ps.consume_area_start_token_wsc('(', Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('(', "pair type start")));
+            }
+            let typ_1 = parse_type(ps)?;
+            if !ps.consume_token_wsc(',', Syntax::TDelim) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken(',', "pair type")));
+            }
+            let typ_2 = parse_type(ps)?;
+            if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('(', "pair type end")));
+            }
+            VVal::typ_box(Type::Pair(typ_1.t(), typ_2.t()))
+        }
+        "fn" => parse_fun_type(ps)?,
+        // TODO: ref, list, record, userdata, ...
+        _ => {
+            let mut typename = typename;
+            // type name!
+            while ps.consume_token_wsc('.', Syntax::T) {
+                typename += ".";
+                let type_path_elem = parse_typename(ps)?;
+                ps.skip_ws_and_comments();
+                typename += &type_path_elem;
+            }
 
-        let typ = match &typename[..] {
-            "any" => VVal::typ_box(Type::Any),
-            "bool" => VVal::typ_box(Type::Bool),
-            "none" => VVal::typ_box(Type::None),
-            "char" => VVal::typ_box(Type::Char),
-            "byte" => VVal::typ_box(Type::Byte),
-            "int" => VVal::typ_box(Type::Int),
-            "float" => VVal::typ_box(Type::Float),
-            "str" => VVal::typ_box(Type::Str),
-            "bytes" => VVal::typ_box(Type::Bytes),
-            "sym" => VVal::typ_box(Type::Sym),
-            "syntax" => VVal::typ_box(Type::Syntax),
-            "type" => VVal::typ_box(Type::Type),
-            "ivec2" => VVal::typ_box(Type::IVec2),
-            "ivec3" => VVal::typ_box(Type::IVec3),
-            "ivec4" => VVal::typ_box(Type::IVec4),
-            "fvec2" => VVal::typ_box(Type::FVec2),
-            "fvec3" => VVal::typ_box(Type::FVec3),
-            "fvec4" => VVal::typ_box(Type::FVec4),
-            "ref" => {
-                let typ = parse_type(ps)?;
-                VVal::typ_box(Type::Ref(typ.t()))
-            }
-            "optional" => {
-                let typ = parse_type(ps)?;
-                VVal::typ_box(Type::Opt(typ.t()))
-            }
-            "pair" => {
-                if !ps.consume_area_start_token_wsc('(', Syntax::TQ) {
-                    return Err(ps.err(ParseErrorKind::ExpectedToken('(', "pair type start")));
-                }
-                let typ_1 = parse_type(ps)?;
-                if !ps.consume_token_wsc(',', Syntax::TDelim) {
-                    return Err(ps.err(ParseErrorKind::ExpectedToken(',', "pair type")));
-                }
-                let typ_2 = parse_type(ps)?;
-                if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
-                    return Err(ps.err(ParseErrorKind::ExpectedToken('(', "pair type end")));
-                }
-                VVal::typ_box(Type::Pair(typ_1.t(), typ_2.t()))
-            }
-            "fn" => parse_fun_type(ps)?,
-            // TODO: ref, list, record, userdata, ...
-            _ => {
-                let mut typename = typename;
-                // type name!
-                while ps.consume_token_wsc('.', Syntax::T) {
-                    typename += ".";
-                    let type_path_elem = parse_typename(ps)?;
-                    ps.skip_ws_and_comments();
-                    typename += &type_path_elem;
-                }
+            let bindings = if ps.consume_area_start_token_wsc('<', Syntax::TQ) {
+                let mut bindings = vec![];
+                let typebind = parse_type(ps)?;
+                bindings.push(typebind.t());
 
-                if ps.consume_area_start_token_wsc('<', Syntax::TQ) {
-                    let mut bindings = vec![];
+                while ps.consume_token_wsc(',', Syntax::TDelim) {
                     let typebind = parse_type(ps)?;
                     bindings.push(typebind.t());
-
-                    while ps.consume_token_wsc(',', Syntax::TDelim) {
-                        let typebind = parse_type(ps)?;
-                        bindings.push(typebind.t());
-                    }
-
-                    if !ps.consume_area_end_token_wsc('>', Syntax::TQ) {
-                        return Err(
-                            ps.err(ParseErrorKind::ExpectedToken('>', "type generic binding end"))
-                        );
-                    }
-
-                    VVal::typ_box(Type::Name(Rc::new(typename), Some(Rc::new(bindings))))
-                } else {
-                    VVal::typ_box(Type::Name(Rc::new(typename), None))
                 }
-            }
-        };
 
-        if is_quoted {
+                if !ps.consume_area_end_token_wsc('>', Syntax::TQ) {
+                    return Err(
+                        ps.err(ParseErrorKind::ExpectedToken('>', "type generic binding end"))
+                    );
+                }
+
+                Some(Rc::new(bindings))
+            } else {
+                None
+            };
+
+            if let Some(c) = typename.get(0) {
+                if c == "@" {
+                    VVal::typ_box(Type::Alias(Rc::new(typename), bindings))
+                } else {
+                    VVal::typ_box(Type::Name(Rc::new(typename), bindings))
+                }
+            } else {
+                VVal::typ_box(Type::Name(Rc::new(typename), bindings))
+            }
+        }
+    };
+
+    typ
+}
+
+fn parse_type_union(ps: &mut State) -> Result<VVal, ParseError> {
+    let mut typ = parse_basetype(ps)?;
+
+    if ps.lookahead('|') {
+        let mut uniont = vec![typ];
+        while ps.expect_some(ps.peek())? == '|' {
+            ps.consume_token_wsc('|', Syntax::TOp);
+            uniont.push(parse_type(ps)?);
+        }
+
+        typ = Rc::new(Type::Union(uniont));
+    }
+
+    Ok(typ)
+}
+
+fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
+    annotate_node(ps, Syntax::Type, |ps, _| {
+        let mut typ = if ps.consume_area_start_token_wsc('(', Syntax::TQ) {
+            let typ = parse_type_union(ps)?;
+
             if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
                 return Err(ps.err(ParseErrorKind::ExpectedToken(')', "type end")));
             }
+
+            typ
+        } else {
+            parse_type_union(ps)?
+        };
+
+        if ps.consume_token_wsc('?', Syntax::T) {
+            typ = Rc::new(Type::Maybe(typ.t()));
         }
 
         Ok(typ)

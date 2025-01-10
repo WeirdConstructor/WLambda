@@ -73,12 +73,27 @@ fn chk_types_function() {
 }
 
 #[test]
+fn chk_types_aliasing() {
+    assert_eq!(
+        v("!:type @Num (int | float); !f = fn(@Num, @Num) -> int { int[_ + _1] }; f 10 11.2"),
+        "21"
+    );
+    assert_eq!(
+        v("!:type Numi (int | float); !f = fn(Numi, Numi) -> int { int[_ + _1] }; f 10 11.2"),
+        "error 10 or 11.2 is not \"Numi\"."
+    );
+}
+
+#[test]
 fn chk_types_named() {
     assert_eq!(v("!o: Num = 10; $typeof o"), "$p(10,$type(Num))");
-    assert!(v("!o: Num = 10.12; .o = 10; o").find("Mismatch Num <=> int").is_some(), "Nominally typed stuff can't be assigned.");
+    assert!(
+        v("!o: Num = 10.12; .o = 10; o").find("Mismatch Num <=> int").is_some(),
+        "Nominally typed stuff can't be assigned."
+    );
     assert_eq!(v("!o: Num = 10.12; !o2: Num = 10; .o = o2; o"), "02");
     assert_eq!(v("!o: int | float = 10.12; .o = 10; o"), "");
-//    assert!(r.find("Wrong argument 2").is_some(), "Catch bad argument.");
+    //    assert!(r.find("Wrong argument 2").is_some(), "Catch bad argument.");
 }
 
 #[test]

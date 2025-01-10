@@ -10205,6 +10205,8 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   ;
     nominal_type  = type_ident, { ".", type_ident }, [ type_vars ]
                   ;
+    type_alias     = "@", nominal_type
+                   ;
     interface_list = nominal_type, { ",", nominal_type }
                    ;
     record_entry  = "type", type_ident, "=", type
@@ -10220,13 +10222,15 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   ;
     userdata      = "userdata", type_ident, "{", { ident, ":", type } "}"
                   ;
-    basetype      = "any" | "bool" | "none" | "str" | "int" | "float"
+    base_datatype = "any" | "bool" | "none" | "str" | "int" | "float"
                   | "bytes" | "sym" | "char" | "byte" | "syntax" | "type"
+                  | "ivec2" | "ivec3" | "ivec4"
+                  | "fvec2" | "fvec3" | "fvec4"
+                  ;
+    basetype      = base_datatype
                   | "ref", type
                   | "pair", "(", type, ",", type, ")"
                   | "optional", type
-                  | "ivec2" | "ivec3" | "ivec4"
-                  | "fvec2" | "fvec3" | "fvec4"
                   | "iter", type
                   | "fn", fun_type
                   | "{", [ type ], "}" (* map type *)
@@ -10235,9 +10239,12 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
                   | abstract_type
                   | userdata
                   | nominal_type
+                  | type_alias
+                  | basetype, "?"
                   ;
-    type          = "(", type, ")"
-                  | basetype, { "|", basetype }  (* "|" is for type options *)
+    type          = basetype
+                  | "(", type, ")"
+                  | type, { "|", type }, [ "?" ]  (* "|" is for type options, "?" is for implicit "| none" *)
                   ;
     fun_type      = [ type_vars ],
                     "(", [ [ ident, ":" ], type, { ",", [ ident, ":" ], type }, ], ")",
