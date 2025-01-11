@@ -9992,9 +9992,10 @@ In the following grammar, white space and comments are omitted:
                   ;
     arity_def     = "|", number, "<", number, "|" (* set min/max *)
                   | "|", number, "|"              (* set min and max *)
+                  | "|", fun_type, "|"
                   | "|", "|"                      (* no enforcement *)
                   ;
-    function      = [ "\:", ident ], [ ("fn", fun_type ], "{", [ arity_def ], block, "}"
+    function      = [ "\:", ident ], "{", [ arity_def ], block, "}"
                   | "\", [ arity_def ], statement
                   ;
     var           = ident
@@ -10249,12 +10250,14 @@ This syntax describes the accepted format strigns for the `std:bytes:pack` and
     type_q        = basetype
                   | "(", type, ")"
                   ;
-    type          = basetype
-                  | type, "?"                (* "?" is for implicit "| none" *)
+    type          = type, "?"                (* "?" is for implicit "| none" *)
                   | type_q, { "|", type_q }  (* "|" is for type options *)
                   ;
     fun_type      = [ type_vars ],
                     "(", [ [ ident, ":" ], type, { ",", [ ident, ":" ], type }, ], ")",
+                    [ "->", type_q ]
+                  | [ type_vars ],
+                    [ [ ident, ":" ], type, { ",", [ ident, ":" ], type }, ],
                     [ "->", type_q ]
                   ;
 ```

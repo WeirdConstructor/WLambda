@@ -2668,19 +2668,26 @@ pub(crate) fn compile(
 
                     let func_prog = Rc::new(func_prog);
 
-                    ce_sub.borrow_mut().explicit_arity.0 =
-                        match explicit_arity.at(0).unwrap_or(VVal::None) {
-                            VVal::Int(i) => ArityParam::Limit(i as usize),
-                            VVal::Bol(true) => ArityParam::Limit(0),
-                            _ => ArityParam::Undefined,
-                        };
+                    let func_typ = if explicit_arity.is_type() {
+                        ce_sub.borrow_mut().explicit_arity.0 = ArityParam::Undefined;
+                        ce_sub.borrow_mut().explicit_arity.1 = ArityParam::Undefined;
+                        explicit_arity.t()
+                    } else {
+                        ce_sub.borrow_mut().explicit_arity.0 =
+                            match explicit_arity.at(0).unwrap_or(VVal::None) {
+                                VVal::Int(i) => ArityParam::Limit(i as usize),
+                                VVal::Bol(true) => ArityParam::Limit(0),
+                                _ => ArityParam::Undefined,
+                            };
 
-                    ce_sub.borrow_mut().explicit_arity.1 =
-                        match explicit_arity.at(1).unwrap_or(VVal::None) {
-                            VVal::Int(i) => ArityParam::Limit(i as usize),
-                            VVal::Bol(true) => ArityParam::Infinite,
-                            _ => ArityParam::Undefined,
-                        };
+                        ce_sub.borrow_mut().explicit_arity.1 =
+                            match explicit_arity.at(1).unwrap_or(VVal::None) {
+                                VVal::Int(i) => ArityParam::Limit(i as usize),
+                                VVal::Bol(true) => ArityParam::Infinite,
+                                _ => ArityParam::Undefined,
+                            };
+                        Type::any()
+                    };
 
                     let deciding_min_arity =
                         if ce_sub.borrow().explicit_arity.0 != ArityParam::Undefined {
@@ -2712,9 +2719,6 @@ pub(crate) fn compile(
                     let upvs = ce_sub.borrow_mut().get_upval_pos();
                     let upvalues = vec![];
 
-                    // TODO: Types! Pass them in via AST from type checker.
-                    let typ = Type::any();
-
                     let fun_template = VValFun::new_prog(
                         func_prog,
                         upvalues,
@@ -2722,7 +2726,7 @@ pub(crate) fn compile(
                         min_args,
                         max_args,
                         false,
-                        typ,
+                        func_typ,
                         Some(fun_spos),
                         Rc::new(upvs),
                         label,
@@ -2933,7 +2937,7 @@ pub(crate) fn compile(
                     pw_store_if_needed!(prog, store, {
                         let expr_res_pos = expr.eval(prog);
                         let typ_pos = prog.data_pos(typ.clone());
-                        prog.op_new_pair(&SynPos::empty(), typ_pos, expr_res_pos, store);
+                        prog.op_new_pair(&SynPos::empty(), expr_res_pos, typ_pos, store);
                     })
                 }
                 Syntax::DebugPrint => {

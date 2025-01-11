@@ -55,13 +55,19 @@ impl SourceAnnotation {
         };
     }
 
-    pub fn is_start(&self) -> bool { return self.is_area_start; }
-    pub fn is_end(&self) -> bool { return self.is_area_end; }
+    pub fn is_start(&self) -> bool {
+        return self.is_area_start;
+    }
+    pub fn is_end(&self) -> bool {
+        return self.is_area_end;
+    }
 
-    pub fn get_syntax(&self) -> Syntax { return self.syn; }
+    pub fn get_syntax(&self) -> Syntax {
+        return self.syn;
+    }
 
     pub fn get_childs(&self) -> Option<Vec<usize>> {
-        return self.childs.clone()
+        return self.childs.clone();
     }
 
     pub fn append_child_id(&mut self, id: usize) {
@@ -116,17 +122,22 @@ pub struct State {
     annotations: Vec<SourceAnnotation>,
     annotation_stack: Vec<usize>,
     last_syn: VVal,
+    try_mode: bool,
 }
 
 pub fn annotate_node<T, E>(ps: &mut State, syn: Syntax, f: T) -> Result<VVal, E>
 where
     T: FnOnce(&mut State, &mut Option<Syntax>) -> Result<VVal, E>,
 {
+    let mut new_syn = None;
+    if ps.try_mode {
+        return f(ps, &mut new_syn);
+    }
+
     let cur_last = ps.last_syn.clone();
     let ann_id = ps.annot(syn);
     ps.annotation_stack.push(ann_id);
     ps.last_syn = ps.syn(syn);
-    let mut new_syn = None;
     let res = f(ps, &mut new_syn);
     ps.annotation_stack.pop();
     if let Ok(node) = res {
@@ -148,11 +159,15 @@ pub fn annotate<T, R>(ps: &mut State, syn: Syntax, f: T) -> R
 where
     T: FnOnce(&mut State, &mut Option<Syntax>) -> R,
 {
+    let mut new_syn = None;
+    if ps.try_mode {
+        return f(ps, &mut new_syn);
+    }
+
     let cur_last = ps.last_syn.clone();
     let ann_id = ps.annot(syn);
     ps.annotation_stack.push(ann_id);
     ps.last_syn = ps.syn(syn);
-    let mut new_syn = None;
     let res = f(ps, &mut new_syn);
     ps.annotation_stack.pop();
     if let Some(new_syn) = new_syn {
@@ -657,10 +672,12 @@ impl State {
 
     pub fn consume_token(&mut self, expected_char: char, syn: Syntax) -> bool {
         if self.consume_if_eq(expected_char) {
-            self.with_new_annotation(syn, |ps, ann| {
-                ann.ch_ptr_start = ps.ch_ptr - 1;
-                ann.ch_ptr_end = ps.ch_ptr;
-            });
+            if !self.try_mode {
+                self.with_new_annotation(syn, |ps, ann| {
+                    ann.ch_ptr_start = ps.ch_ptr - 1;
+                    ann.ch_ptr_end = ps.ch_ptr;
+                });
+            }
             self.last_syn = self.syn(syn);
             true
         } else {
@@ -670,10 +687,12 @@ impl State {
 
     pub fn consume_tokens(&mut self, expected: &str, syn: Syntax) -> bool {
         if self.consume_lookahead(expected) {
-            self.with_new_annotation(syn, |ps, ann| {
-                ann.ch_ptr_start = ps.ch_ptr - expected.len();
-                ann.ch_ptr_end = ps.ch_ptr;
-            });
+            if !self.try_mode {
+                self.with_new_annotation(syn, |ps, ann| {
+                    ann.ch_ptr_start = ps.ch_ptr - expected.len();
+                    ann.ch_ptr_end = ps.ch_ptr;
+                });
+            }
             self.last_syn = self.syn(syn);
             true
         } else {
@@ -696,11 +715,13 @@ impl State {
     pub fn consume_area_start_tokens(&mut self, expected: &str, syn: Syntax) -> bool {
         let mut res = false;
         if self.consume_lookahead(expected) {
-            self.with_new_annotation(syn, |ps, ann| {
-                ann.is_area_start = true;
-                ann.ch_ptr_start = ps.ch_ptr - expected.len();
-                ann.ch_ptr_end = ps.ch_ptr;
-            });
+            if !self.try_mode {
+                self.with_new_annotation(syn, |ps, ann| {
+                    ann.is_area_start = true;
+                    ann.ch_ptr_start = ps.ch_ptr - expected.len();
+                    ann.ch_ptr_end = ps.ch_ptr;
+                });
+            }
             self.last_syn = self.syn(syn);
             res = true;
         }
@@ -716,11 +737,13 @@ impl State {
     pub fn consume_area_end_tokens(&mut self, expected: &str, syn: Syntax) -> bool {
         let mut res = false;
         if self.consume_lookahead(expected) {
-            self.with_new_annotation(syn, |ps, ann| {
-                ann.is_area_end = true;
-                ann.ch_ptr_start = ps.ch_ptr - expected.len();
-                ann.ch_ptr_end = ps.ch_ptr;
-            });
+            if !self.try_mode {
+                self.with_new_annotation(syn, |ps, ann| {
+                    ann.is_area_end = true;
+                    ann.ch_ptr_start = ps.ch_ptr - expected.len();
+                    ann.ch_ptr_end = ps.ch_ptr;
+                });
+            }
             self.last_syn = self.syn(syn);
             res = true;
         }
@@ -736,11 +759,13 @@ impl State {
     pub fn consume_area_start_token(&mut self, expected_char: char, syn: Syntax) -> bool {
         let mut res = false;
         if self.consume_if_eq(expected_char) {
-            self.with_new_annotation(syn, |ps, ann| {
-                ann.is_area_start = true;
-                ann.ch_ptr_start = ps.ch_ptr - 1;
-                ann.ch_ptr_end = ps.ch_ptr;
-            });
+            if !self.try_mode {
+                self.with_new_annotation(syn, |ps, ann| {
+                    ann.is_area_start = true;
+                    ann.ch_ptr_start = ps.ch_ptr - 1;
+                    ann.ch_ptr_end = ps.ch_ptr;
+                });
+            }
             self.last_syn = self.syn(syn);
             res = true;
         }
@@ -750,11 +775,13 @@ impl State {
     pub fn consume_area_end_token(&mut self, expected_char: char, syn: Syntax) -> bool {
         let mut res = false;
         if self.consume_if_eq(expected_char) {
-            self.with_new_annotation(syn, |ps, ann| {
-                ann.is_area_end = true;
-                ann.ch_ptr_start = ps.ch_ptr - 1;
-                ann.ch_ptr_end = ps.ch_ptr;
-            });
+            if !self.try_mode {
+                self.with_new_annotation(syn, |ps, ann| {
+                    ann.is_area_end = true;
+                    ann.ch_ptr_start = ps.ch_ptr - 1;
+                    ann.ch_ptr_end = ps.ch_ptr;
+                });
+            }
             self.last_syn = self.syn(syn);
             res = true;
         }
@@ -824,6 +851,34 @@ impl State {
             self.consume();
         }
         self.spart(start, self.ch_ptr)
+    }
+
+    pub fn try_parse<F>(&mut self, mut try_fn: F) -> bool
+    where
+        F: FnMut(&mut Self) -> bool,
+    {
+        let prev_line_no = self.line_no;
+        let prev_indent = self.indent;
+        let prev_line_indent = self.line_indent;
+        let prev_col_no = self.col_no;
+        let prev_last_tok_char = self.last_tok_char;
+        let prev_last_non_wsc_ch_ptr = self.last_non_wsc_ch_ptr;
+        let prev_last_syn = self.last_syn.clone();
+
+        let prev_try = self.try_mode;
+        self.try_mode = true;
+        let res = try_fn(self);
+        self.try_mode = prev_try;
+
+        self.line_no = prev_line_no;
+        self.indent = prev_indent;
+        self.line_indent = prev_line_indent;
+        self.col_no = prev_col_no;
+        self.last_tok_char = prev_last_tok_char;
+        self.last_non_wsc_ch_ptr = prev_last_non_wsc_ch_ptr;
+        self.last_syn = prev_last_syn;
+
+        res
     }
 
     pub fn indent_pos(&self) -> IndentPos {
@@ -928,10 +983,12 @@ impl State {
                 // The previous line was an empty line.
                 let col = (self.col_no - 1) as usize;
                 let nl_ptr = if self.ch_ptr < col { self.ch_ptr } else { self.ch_ptr - col };
-                self.with_new_annotation(Syntax::TNL, |_ps, ann| {
-                    ann.ch_ptr_start = nl_ptr;
-                    ann.ch_ptr_end = nl_ptr;
-                });
+                if !self.try_mode {
+                    self.with_new_annotation(Syntax::TNL, |_ps, ann| {
+                        ann.ch_ptr_start = nl_ptr;
+                        ann.ch_ptr_end = nl_ptr;
+                    });
+                }
             }
             self.line_no += 1;
             self.indent = Some(0);
@@ -1029,6 +1086,7 @@ impl State {
             annotations: Vec::new(),
             annotation_stack: Vec::new(),
             last_syn: VVal::None,
+            try_mode: false,
         }
     }
 

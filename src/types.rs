@@ -50,6 +50,12 @@ impl TypedVVal {
     }
 }
 
+impl std::fmt::Display for TypedVVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "TypedVVal vval={}, typ={}", self.vval, self.typ)
+    }
+}
+
 fn type_var(
     ast: &VVal,
     ce: &mut Rc<RefCell<CompileEnv>>,
@@ -144,26 +150,9 @@ fn type_binop(
     let ret_type = if let TypeHint::Expect(t) = type_hint { t.as_type() } else { Type::Any };
     let chk_typ = Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
 
-    let mut bound_vars = vec![];
-    let res = resolve_type(&op_type, &chk_typ, &mut bound_vars, &mut |name| {
-        let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
-        if vartype.is_type() {
-            Some(value.t())
-        } else {
-            None
-        }
-    });
-    let operation_typ = match res {
-        TypeResolveResult::Match { typ } => typ,
-        TypeResolveResult::Conflict { expected, got, reason } => {
-            return Err(ast.compile_err(format!(
-                "Type error, expected:\n {}\ngot: {}\n=> reason: {}",
-                expected.s(),
-                got.s(),
-                reason
-            )));
-        }
-    };
+    let operation_typ = resolve_and_check(&op_type, &chk_typ, ce, ast, || {
+        format!("operator call '{}'", op.token())
+    })?;
 
     if let Type::Function(_args, ret_type, _bound_vars) = operation_typ.as_ref() {
         eprintln!("RetType: {}", ret_type.s());
@@ -175,6 +164,36 @@ fn type_binop(
             operation_typ.s()
         )))
     }
+}
+
+fn type_func(
+    ast: &VVal,
+    type_hint: TypeHint,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<TypedVVal, CompileError> {
+    // let mut fun_spos = spos.clone();
+    // fun_spos.set_name(&ce.borrow().recent_var);
+    //
+    // let mut func_ce = CompileEnv::create_env(Some(ce.clone()));
+    // let ce_sub = func_ce.clone();
+    //
+    // let label = ast.at(1).unwrap();
+    // let explicit_arity = ast.at(2).unwrap();
+    //
+    // let mut func_prog = Prog::new();
+    //
+    // let func_pw = compile_stmts(ast, 3, &mut func_ce)?;
+    // func_pw.eval_to(&mut func_prog, ResPos::Value(ResValue::Ret));
+    // func_prog.op_end();
+    //
+    // let func_prog = Rc::new(func_prog);
+    //
+    // let func_typ = if explicit_arity.is_type() {
+    //     ce_sub.borrow_mut().explicit_arity.0 = ArityParam::Undefined;
+    //     ce_sub.borrow_mut().explicit_arity.1 = ArityParam::Undefined;
+    //     explicit_arity.t()
+
+    Ok(TypedVVal::new(Type::none(), ast.clone()))
 }
 
 fn type_block(
@@ -238,9 +257,13 @@ fn type_def(
         } else {
             let next_local = ce.borrow_mut().next_local();
             let tv = type_pass(&value, TypeHint::from_type(&var_typ), ce)?;
-            let _typ = tv.typ;
+            println!("TPPPP: {} <=> {}", tv, var_typ);
+            let typ = tv.typ;
 
-            ce.borrow_mut().def_local(&varname, next_local, var_typ);
+            let real_var_typ = resolve_and_check(&var_typ, &typ, ce, ast, || {
+                format!("variable definition '{}'", &varname)
+            })?;
+            ce.borrow_mut().def_local(&varname, next_local, real_var_typ);
         }
     }
 
@@ -256,21 +279,64 @@ fn type_deftype(
 ) -> Result<TypedVVal, CompileError> {
     let (typename, typ) = (ast.v_s_raw(1), ast.v_(2));
 
-    let new_named = Type::named(&typename);
+    let new_typ = if Some('@') == typename.chars().nth(0) {
+        Type::aliased(&typename)
+    } else {
+        Type::named(&typename)
+    };
 
     if is_global {
-        if let VarPos::Global(r) = ce.borrow_mut().def(&typename, true, new_named) {
+        if let VarPos::Global(r) = ce.borrow_mut().def(&typename, true, new_typ) {
             r.set_ref(typ);
         } else {
             panic!("Defining global did not return a global!");
         }
     } else {
         let next_local = ce.borrow_mut().next_local();
-        ce.borrow_mut().def_local(&typename, next_local, new_named);
+        ce.borrow_mut().def_local(&typename, next_local, new_typ);
+        println!("DEFTYPE {} => {}", typename, typ);
         ce.borrow_mut().set_compiletime_value(&typename, &typ);
     }
 
     Ok(TypedVVal::new(Type::typ(), ast.clone()))
+}
+
+fn resolve_and_check<F>(
+    typ: &Rc<Type>,
+    chk_typ: &Rc<Type>,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    ast: &VVal,
+    err_cb: F,
+) -> Result<Rc<Type>, CompileError>
+where
+    F: Fn() -> String,
+{
+    let mut bound_vars = vec![];
+    let res = resolve_type(typ, chk_typ, &mut bound_vars, &mut |name| {
+        let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
+        eprintln!("get comptime {}: {} => {} {:?}", name, value, vartype.s(), vartype);
+        if vartype.is_alias() {
+            eprintln!("IS ALIAS! {}", name);
+            Some(value.t())
+        } else if vartype.is_type() {
+            Some(value.t())
+        } else {
+            None
+        }
+    });
+
+    match res {
+        TypeResolveResult::Match { typ } => Ok(typ),
+        TypeResolveResult::Conflict { expected, got, reason } => {
+            return Err(ast.compile_err(format!(
+                "Type error, expected ({}), but got ({}); in {}\n=> reason: {}",
+                expected.s(),
+                got.s(),
+                err_cb(),
+                reason
+            )));
+        }
+    }
 }
 
 fn type_assign(
@@ -291,7 +357,6 @@ fn type_assign(
         // 3. check value types against var types.
         // let poses = vars.map_ok_skip(|v| ce.borrow_mut().get(&v.s_raw()).0, 0);
         Ok(TypedVVal::new(Type::none(), ast.clone()))
-
     } else {
         let varname = &vars.v_s_raw(0);
         let (pos, var_type) = ce.borrow_mut().get(varname);
@@ -310,29 +375,11 @@ fn type_assign(
         }
 
         let value_type = type_pass(&value, TypeHint::from_type(&var_type), ce)?;
-        let new_ast = VVal::vec3(vars, VVal::vec1(value_type.vval), destr);
+        let new_ast = VVal::vec4(ast.v_(0), vars, value_type.vval, destr);
 
-        let mut bound_vars = vec![];
-        let res = resolve_type(&var_type, &value_type.typ, &mut bound_vars, &mut |name| {
-            let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
-            if vartype.is_type() {
-                Some(value.t())
-            } else {
-                None
-            }
-        });
-
-        let operation_typ = match res {
-            TypeResolveResult::Match { typ } => typ,
-            TypeResolveResult::Conflict { expected, got, reason } => {
-                return Err(ast.compile_err(format!(
-                    "Type error, expected:\n {}\ngot: {}\n=> reason: {}",
-                    expected.s(),
-                    got.s(),
-                    reason
-                )));
-            }
-        };
+        resolve_and_check(&var_type, &value_type.typ, ce, ast, || {
+            format!("assignment to '{}'", &varname)
+        })?;
 
         Ok(TypedVVal::new(Type::none(), new_ast))
     }
@@ -373,10 +420,14 @@ pub(crate) fn type_pass(
                 Syntax::DefGlobType => type_deftype(ast, ce, true)?,
                 Syntax::Assign => type_assign(ast, ce, false)?,
                 Syntax::AssignRef => type_assign(ast, ce, true)?,
+                Syntax::DumpVM => TypedVVal::new(Type::none(), ast.clone()),
+                Syntax::DumpStack => TypedVVal::new(Type::none(), ast.clone()),
+                Syntax::Func => type_func(ast, type_hint, ce)?,
                 Syntax::TypeOf => {
                     let expr = ast.v_(1);
                     let res_type = type_pass(&expr, type_hint, ce)?;
-                    let new_ast = VVal::vec3(ast.v_(0), ast.v_(1), VVal::typ(res_type.typ.clone()));
+                    let new_ast =
+                        VVal::vec3(ast.v_(0), res_type.vval, VVal::typ(res_type.typ.clone()));
                     TypedVVal::new(res_type.typ, new_ast)
                 }
                 //                Syntax::DefGlobRef => compile_def(ast, ce, true),

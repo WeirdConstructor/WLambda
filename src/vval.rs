@@ -1962,6 +1962,7 @@ pub enum TypeConflictReason {
     UnionMatchesAmbigious(Rc<Vec<Rc<Type>>>, Rc<Type>),
     UnknownTypeVar(String),
     UnknownType(String),
+    UnknownTypeAlias(String),
 }
 
 impl std::fmt::Display for TypeConflictReason {
@@ -2034,6 +2035,9 @@ impl std::fmt::Display for TypeConflictReason {
             TypeConflictReason::UnknownTypeVar(name) => {
                 write!(f, "Unknown type variable '{}'", name)
             }
+            TypeConflictReason::UnknownTypeAlias(name) => {
+                write!(f, "Unknown type alias '{}'", name)
+            }
         }
     }
 }
@@ -2105,6 +2109,7 @@ pub enum Type {
     Tuple(Rc<Vec<Rc<Type>>>),
     Map(Rc<Type>),
     Ref(Rc<Type>),
+    Iter(Rc<Type>),
     Userdata(Rc<String>, Rc<Vec<(String, Rc<Type>)>>),
     Record(Rc<String>, Rc<TypeRecord>),
     Union(Rc<Vec<Rc<Type>>>),
@@ -2207,6 +2212,11 @@ impl Type {
         Rc::new(Type::Name(Rc::new(n.to_string()), None, None))
     }
 
+    pub fn aliased(n: &str) -> Rc<Self> {
+        Rc::new(Type::Alias(Rc::new(n.to_string()), None, None))
+    }
+
+
     pub fn fun_ret(t: Self) -> Rc<Type> {
         Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t), None))
     }
@@ -2259,75 +2269,6 @@ impl Type {
     pub fn ref_type(t: Rc<Self>) -> Rc<Type> {
         Rc::new(Type::Ref(t))
     }
-    //
-    //    pub fn match_call_type(&self, ret_type: Rc<Type>, args: &[Rc<Type>]) -> TypeMatch {
-    //        let expected = Rc::new(Type::Function(
-    //            Rc::new(args.iter().map(|a| (a.clone(), true)).collect()),
-    //            ret_type.clone(),
-    //        ));
-    //
-    //        match self {
-    //            Type::Union(types) => {
-    //                let mut last_no_match = None;
-    //                let mut matches = vec![];
-    //                for t in types.iter() {
-    //                    let match_res = t.match_call_type(ret_type.clone(), args);
-    //                    match match_res {
-    //                        TypeMatch::Match { got } => matches.push(got),
-    //                        _ => {
-    //                            last_no_match = Some(match_res);
-    //                        }
-    //                    }
-    //                }
-    //
-    //                if matches.is_empty() {
-    //                    // TODO: Might be a good idea to store the full matching path?
-    //                    if let Some(no_match) = last_no_match {
-    //                        no_match
-    //                    } else {
-    //                        TypeMatch::NoMatch { expected, got: Rc::new(self.clone()) }
-    //                    }
-    //                } else if matches.len() > 1 {
-    //                    TypeMatch::Ambigious { expected, candidates: matches }
-    //                } else {
-    //                    TypeMatch::Match { got: matches[0].clone() }
-    //                }
-    //            }
-    //            Type::Function(types, ret) => {
-    //                if !ret.isa_resolved(&ret_type) {
-    //                    return TypeMatch::NoMatchReturnType { expected: ret.clone(), got: ret_type };
-    //                }
-    //
-    //                for (i, (t, is_required)) in types.iter().enumerate() {
-    //                    if !is_required {
-    //                        // TODO: The functions should have a required arguments part,
-    //                        // and an optional part. The Optional part being none means: no optional part
-    //                        // and an Some(vec![]) there means, we got any amount of extra options???
-    //                        panic!("Unrequired Function arguments are not implemented yet!");
-    //                    }
-    //                    if let Some(arg_type) = args.get(i) {
-    //                        if !t.isa_resolved(arg_type) {
-    //                            return TypeMatch::NoMatchArgumentType {
-    //                                arg_idx: i,
-    //                                expected: t.clone(),
-    //                                got: arg_type.clone(),
-    //                            };
-    //                        }
-    //                    } else {
-    //                        return TypeMatch::NoMatchArgumentType {
-    //                            arg_idx: i,
-    //                            expected: t.clone(),
-    //                            got: Type::none(),
-    //                        };
-    //                    }
-    //                }
-    //
-    //                TypeMatch::Match { got: Rc::new(self.clone()) }
-    //            }
-    //            Type::Name(name, Some(t)) => t.match_call_type(ret_type, args),
-    //            _ => TypeMatch::NoMatch { expected, got: Rc::new(self.clone()) },
-    //        }
-    //    }
 
     pub fn is_any(&self) -> bool {
         matches!(self, Type::Any)
@@ -2341,96 +2282,9 @@ impl Type {
         matches!(self, Type::Type)
     }
 
-    //    pub fn isa_resolved(&self, chk_t: &Type) -> bool {
-    //        match self {
-    //            Type::Any => true,
-    //            Type::Bool => matches!(chk_t, Type::Bool),
-    //            Type::None => matches!(chk_t, Type::None),
-    //            Type::Str => matches!(chk_t, Type::Str),
-    //            Type::Bytes => matches!(chk_t, Type::Bytes),
-    //            Type::Sym => matches!(chk_t, Type::Sym),
-    //            Type::Byte => matches!(chk_t, Type::Byte),
-    //            Type::Char => matches!(chk_t, Type::Char),
-    //            Type::Syntax => matches!(chk_t, Type::Syntax),
-    //            Type::Type => matches!(chk_t, Type::Type),
-    //            Type::Int => matches!(chk_t, Type::Int),
-    //            Type::Float => matches!(chk_t, Type::Float),
-    //            Type::IVec2 => matches!(chk_t, Type::IVec2),
-    //            Type::IVec3 => matches!(chk_t, Type::IVec3),
-    //            Type::IVec4 => matches!(chk_t, Type::IVec4),
-    //            Type::FVec2 => matches!(chk_t, Type::FVec2),
-    //            Type::FVec3 => matches!(chk_t, Type::FVec3),
-    //            Type::FVec4 => matches!(chk_t, Type::FVec4),
-    //            Type::Opt(t) => {
-    //                if let Type::Opt(ot) = chk_t {
-    //                    t.isa_resolved(&ot)
-    //                } else {
-    //                    false
-    //                }
-    //            }
-    //            Type::Err(t) => {
-    //                if let Type::Err(ot) = chk_t {
-    //                    t.isa_resolved(&ot)
-    //                } else {
-    //                    false
-    //                }
-    //            }
-    //            Type::Pair(t, t2) => {
-    //                if let Type::Pair(ct, ct2) = chk_t {
-    //                    t.isa_resolved(&ct) && t2.isa_resolved(&ct2)
-    //                } else {
-    //                    false
-    //                }
-    //            }
-    //            Type::Lst(t) => {
-    //                if let Type::Lst(ot) = chk_t {
-    //                    t.isa_resolved(&ot)
-    //                } else {
-    //                    false
-    //                }
-    //            }
-    //            Type::Ref(t) => {
-    //                if let Type::Ref(ot) = chk_t {
-    //                    t.isa_resolved(&ot)
-    //                } else {
-    //                    false
-    //                }
-    //            }
-    //            Type::Map(t) => {
-    //                if let Type::Map(ot) = chk_t {
-    //                    t.isa_resolved(&ot)
-    //                } else {
-    //                    false
-    //                }
-    //            }
-    //            Type::Userdata(name, fields) => {
-    //                // TODO
-    //                false
-    //            }
-    //            Type::Record(name, record) => {
-    //                // TODO
-    //                false
-    //            }
-    //            Type::Tuple(types) => {
-    //                // TODO
-    //                false
-    //            }
-    //            Type::Union(types) => {
-    //                for t in types.iter() {
-    //                    if t.isa_resolved(chk_t) {
-    //                        return true;
-    //                    }
-    //                }
-    //                false
-    //            }
-    //            Type::Function(types, ret, type_vars) => {
-    //                // TODO
-    //                false
-    //            }
-    //            Type::Name(name, _binds) => false,
-    //            Type::Var(name, _limits) => false,
-    //        }
-    //    }
+    pub fn is_alias(&self) -> bool {
+        matches!(self, Type::Alias(_, _, _))
+    }
 
     pub fn eq(&self, other: &Self) -> bool {
         // TODO: Implement equality check!
@@ -2464,6 +2318,7 @@ impl Type {
             Type::Pair(t, t2) => format!("pair({}, {})", t.s(), t2.s()),
             Type::Lst(t) => format!("[{}]", t.s()),
             Type::Ref(t) => format!("ref {}", t.s()),
+            Type::Iter(t) => format!("iter {}", t.s()),
             Type::Map(t) => format!("{{{}}}", t.s()),
             Type::Userdata(name, fields) => {
                 let mut res = format!("userdata {} {{", name);
@@ -2634,6 +2489,7 @@ impl Type {
             }
             Type::Lst(t) => t.resolve_check(),
             Type::Ref(t) => t.resolve_check(),
+            Type::Iter(t) => t.resolve_check(),
             Type::Map(t) => t.resolve_check(),
             Type::Record(_name, record) => record.resolve_check(),
             Type::Userdata(_name, fields) => {
@@ -2685,6 +2541,12 @@ impl Type {
             Type::Ref(_) => Some(Rc::new(Type::Ref(other))),
             _ => None,
         }
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.s())
     }
 }
 
@@ -2961,12 +2823,24 @@ where
                 }
             }
         }
-        Type::Alias(_name, _binds, _type_env) => TypeResolveResult::Conflict {
-            expected: typ.clone(),
-            got: chk_t.clone(),
+        Type::Alias(name, _binds, _type_env) => {
+            let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
+                res_alias_typ
+            } else {
+                return TypeResolveResult::Conflict {
+                    expected: typ.clone(),
+                    got: chk_t.clone(),
+                    reason: TypeConflictReason::UnknownTypeAlias(name.to_string()),
+                };
+            };
 
-            reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
-        },
+            match resolve_type(&alias_typ, chk_t, bound_vars, name_resolver) {
+                TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+                TypeResolveResult::Conflict { expected, got, reason } => {
+                    return TypeResolveResult::Conflict { expected, got, reason };
+                }
+            }
+        }
         Type::Name(_name, _binds, _type_env) => {
             // case: Name == Name
             // case: Alias == Name
@@ -3233,6 +3107,12 @@ impl PartialEq for VVal {
 impl std::fmt::Debug for VValFun {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "&VValFun")
+    }
+}
+
+impl std::fmt::Display for VVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.s())
     }
 }
 

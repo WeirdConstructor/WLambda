@@ -1068,17 +1068,25 @@ fn parse_type_vars(ps: &mut State) -> Result<Option<Rc<Vec<(String, Rc<Type>)>>>
     Ok(Some(Rc::new(bindings)))
 }
 
-fn parse_fun_type(ps: &mut State) -> Result<VVal, ParseError> {
+fn parse_fun_type(ps: &mut State, with_quotes: bool) -> Result<VVal, ParseError> {
     let type_vars = parse_type_vars(ps)?;
 
-    if !ps.consume_area_start_token_wsc('(', Syntax::TQ) {
-        return Err(ps.err(ParseErrorKind::ExpectedToken('(', "function type start")));
+    if with_quotes {
+        if !ps.consume_area_start_token_wsc('(', Syntax::TQ) {
+            return Err(ps.err(ParseErrorKind::ExpectedToken('(', "function type start")));
+        }
     }
 
     let mut args = vec![];
 
     while ps.peek().unwrap_or(')') != ')' {
-        let ident = if is_ident_start(ps.expect_some(ps.peek())?) {
+        let ident = if ps.try_parse(|ps| {
+            if let Ok(_) = parse_identifier(ps) {
+                ps.skip_ws_and_comments();
+                return ps.lookahead(":");
+            }
+            false
+        }) {
             let ident = parse_identifier(ps)?;
             if !ps.consume_token_wsc(':', Syntax::TDelim) {
                 return Err(ps.err(ParseErrorKind::ExpectedToken(':', "function argument type")));
@@ -1089,6 +1097,10 @@ fn parse_fun_type(ps: &mut State) -> Result<VVal, ParseError> {
             None
         };
 
+        if ps.lookahead("->") {
+            break;
+        }
+
         let typ = parse_type(ps)?.t();
         args.push((typ, false, ident));
 
@@ -1097,14 +1109,16 @@ fn parse_fun_type(ps: &mut State) -> Result<VVal, ParseError> {
         }
     }
 
-    if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
-        return Err(ps.err(ParseErrorKind::ExpectedToken(')', "function type end")));
+    if with_quotes {
+        if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
+            return Err(ps.err(ParseErrorKind::ExpectedToken(')', "function type end")));
+        }
     }
 
     let mut ret_type = Type::none();
 
     if ps.consume_tokens_wsc("->", Syntax::TDelim) {
-        ret_type = parse_type(ps)?.t();
+        ret_type = parse_type_q(ps)?.t();
     }
 
     Ok(VVal::typ_box(Type::Function(Rc::new(args), ret_type, type_vars)))
@@ -1138,12 +1152,16 @@ fn parse_basetype(ps: &mut State) -> Result<VVal, ParseError> {
         "fvec3" => VVal::typ_box(Type::FVec3),
         "fvec4" => VVal::typ_box(Type::FVec4),
         "ref" => {
-            let typ = parse_type(ps)?;
+            let typ = parse_type_q(ps)?;
             VVal::typ_box(Type::Ref(typ.t()))
         }
         "optional" => {
-            let typ = parse_type(ps)?;
+            let typ = parse_type_q(ps)?;
             VVal::typ_box(Type::Opt(typ.t()))
+        }
+        "iter" => {
+            let typ = parse_type_q(ps)?;
+            VVal::typ_box(Type::Iter(typ.t()))
         }
         "pair" => {
             if !ps.consume_area_start_token_wsc('(', Syntax::TQ) {
@@ -1159,7 +1177,7 @@ fn parse_basetype(ps: &mut State) -> Result<VVal, ParseError> {
             }
             VVal::typ_box(Type::Pair(typ_1.t(), typ_2.t()))
         }
-        "fn" => parse_fun_type(ps)?,
+        "fn" => parse_fun_type(ps, true)?,
         // TODO: ref, list, record, userdata, ...
         _ => {
             let mut typename = typename;
@@ -1207,36 +1225,35 @@ fn parse_basetype(ps: &mut State) -> Result<VVal, ParseError> {
     Ok(typ)
 }
 
-fn parse_type_union(ps: &mut State) -> Result<VVal, ParseError> {
-    let mut typ = parse_basetype(ps)?;
+fn parse_type_q(ps: &mut State) -> Result<VVal, ParseError> {
+    if ps.lookahead("(") {
+        ps.consume_area_start_token_wsc('(', Syntax::TQ);
 
-    if ps.lookahead("|") {
-        let mut uniont = vec![typ.t()];
-        while ps.expect_some(ps.peek())? == '|' {
-            ps.consume_token_wsc('|', Syntax::TOp);
-            uniont.push(parse_type(ps)?.t());
+        let typ = parse_type(ps)?;
+
+        if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
+            return Err(ps.err(ParseErrorKind::ExpectedToken(')', "type end")));
         }
 
-        typ = VVal::typ_box(Type::Union(Rc::new(uniont)));
+        Ok(typ)
+    } else {
+        parse_basetype(ps)
     }
-
-    Ok(typ)
 }
 
 fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
-    // TODO: Handle type_q from the reference!
     annotate_node(ps, Syntax::Type, |ps, _| {
-        let mut typ = if ps.consume_area_start_token_wsc('(', Syntax::TQ) {
-            let typ = parse_type_union(ps)?;
+        let mut typ = parse_type_q(ps)?;
 
-            if !ps.consume_area_end_token_wsc(')', Syntax::TQ) {
-                return Err(ps.err(ParseErrorKind::ExpectedToken(')', "type end")));
+        if ps.lookahead("|") {
+            let mut uniont = vec![typ.t()];
+            while ps.expect_some(ps.peek())? == '|' {
+                ps.consume_token_wsc('|', Syntax::TOp);
+                uniont.push(parse_type_q(ps)?.t());
             }
 
-            typ
-        } else {
-            parse_type_union(ps)?
-        };
+            typ = VVal::typ_box(Type::Union(Rc::new(uniont)));
+        }
 
         if ps.consume_token_wsc('?', Syntax::T) {
             typ = VVal::typ_box(Type::Maybe(typ.t()));
@@ -2132,42 +2149,46 @@ fn parse_stmt(ps: &mut State) -> Result<VVal, ParseError> {
 /// Parses an arity definition for a function.
 fn parse_arity(ps: &mut State) -> Result<VVal, ParseError> {
     if !ps.consume_area_start_token_wsc('|', Syntax::Block) {
-        return Err(ps.err(ParseErrorKind::ExpectedToken('|', "arity definition start")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken('|', "function type definition start")));
     }
 
     if ps.at_end() {
-        return Err(ps.err(ParseErrorKind::EOF("parsing arity definition")));
+        return Err(ps.err(ParseErrorKind::EOF("parsing function type definition")));
     }
 
-    let arity = if ps.expect_some(ps.peek())? != '|' {
-        let min = parse_num(ps)?;
-        if !min.is_int() {
-            return Err(ps.err(ParseValueError::ExpectedMinArity));
-        }
-
-        let max = if ps.consume_if_eq_wsc('<') {
-            let max = parse_num(ps)?;
-            if !max.is_int() {
-                return Err(ps.err(ParseValueError::ExpectedMaxArity));
+    let arity = if matches!(ps.expect_some(ps.peek())?, '0'..='9' | '+' | '-') {
+        if ps.expect_some(ps.peek())? != '|' {
+            let min = parse_num(ps)?;
+            if !min.is_int() {
+                return Err(ps.err(ParseValueError::ExpectedMinArity));
             }
-            max
-        } else {
-            min.clone()
-        };
 
-        let arity = VVal::vec();
-        arity.push(min);
-        arity.push(max);
-        arity
+            let max = if ps.consume_if_eq_wsc('<') {
+                let max = parse_num(ps)?;
+                if !max.is_int() {
+                    return Err(ps.err(ParseValueError::ExpectedMaxArity));
+                }
+                max
+            } else {
+                min.clone()
+            };
+
+            let arity = VVal::vec();
+            arity.push(min);
+            arity.push(max);
+            arity
+        } else {
+            let arity = VVal::vec();
+            arity.push(VVal::Bol(true));
+            arity.push(VVal::Bol(true));
+            arity
+        }
     } else {
-        let arity = VVal::vec();
-        arity.push(VVal::Bol(true));
-        arity.push(VVal::Bol(true));
-        arity
+        parse_fun_type(ps, false)?
     };
 
     if !ps.consume_area_end_token_wsc('|', Syntax::Block) {
-        return Err(ps.err(ParseErrorKind::ExpectedToken('|', "arity definition end")));
+        return Err(ps.err(ParseErrorKind::ExpectedToken('|', "function type definition end")));
     }
 
     Ok(arity)
@@ -2730,7 +2751,10 @@ mod tests {
 
     #[test]
     fn check_const() {
-        assert_eq!(parse("!:const X = 32;"), "$[$%:Block,$[$%:DefConst,$[:X],32,$n,$[$type(any)]]]");
+        assert_eq!(
+            parse("!:const X = 32;"),
+            "$[$%:Block,$[$%:DefConst,$[:X],32,$n,$[$type(any)]]]"
+        );
         assert_eq!(
             parse("!:const X = 32.4;"),
             "$[$%:Block,$[$%:DefConst,$[:X],32.4,$n,$[$type(any)]]]"
