@@ -1475,7 +1475,7 @@ fn check_for_at_arity(
     }
 }
 
-fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
+pub fn fetch_object_key_access(ast: &VVal) -> Option<(Syntax, VVal, VVal)> {
     let syn = ast.v_(0).get_syn();
     match syn {
         Syntax::GetKey => Some((Syntax::GetKey, ast.v_(1), ast.v_(2))),

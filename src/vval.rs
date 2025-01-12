@@ -2266,6 +2266,13 @@ impl Type {
         ))
     }
 
+    pub fn get_return_type(&self) -> Option<Rc<Type>> {
+        match self {
+            Type::Function(_args, ret, _) => Some(ret.clone()),
+            _ => None,
+        }
+    }
+
     pub fn ref_type(t: Rc<Self>) -> Rc<Type> {
         Rc::new(Type::Ref(t))
     }

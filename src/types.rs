@@ -10,7 +10,7 @@ type information of course.
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::compiler::CompileEnv;
+use crate::compiler::{fetch_object_key_access, CompileEnv};
 use crate::ops::BinOp;
 use crate::vval::{resolve_type, CompileError, Syntax, Type, TypeResolveResult, VVal, VarPos};
 
@@ -171,6 +171,45 @@ fn type_func(
     type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
+    let (label, arity_type) = (ast.v_(1), ast.v_(2));
+
+    let fun_type = if arity_type.is_type() {
+        arity_type.t()
+    } else {
+        match &type_hint {
+            TypeHint::Expect(typ) => typ.clone(),
+            _ => Type::none(),
+        }
+    };
+
+    let mut ret_type = fun_type.get_return_type().unwrap_or_else(|| Type::none());
+
+    // TODO: Setup a function environment, holding the positional parameter types
+    //       and their names maybe?
+    println!("FUN_TYPE: {}, RET_TYPE: {}", fun_type, ret_type);
+    println!("FUN_TYPE: {:?}", fun_type);
+
+    let mut last_type = Type::none();
+    let stmts = ast.map_skip_vval(
+        |e, is_last| {
+            let tv = type_pass(
+                e,
+                if is_last { type_hint.clone() } else { TypeHint::Expect(Type::any()) },
+                ce,
+            )?;
+            last_type = tv.typ;
+            Ok(tv.vval)
+        },
+        3,
+    )?;
+
+    println!("LAST TYPE: {}, FUN_TYPE: {}, RET_TYPE: {}", last_type, fun_type, ret_type);
+
+    stmts.unshift(arity_type.clone());
+    stmts.unshift(label.clone());
+    stmts.unshift(ast.v_(0));
+    Ok(TypedVVal::new(last_type, stmts))
+
     // let mut fun_spos = spos.clone();
     // fun_spos.set_name(&ce.borrow().recent_var);
     //
@@ -193,7 +232,82 @@ fn type_func(
     //     ce_sub.borrow_mut().explicit_arity.1 = ArityParam::Undefined;
     //     explicit_arity.t()
 
-    Ok(TypedVVal::new(Type::none(), ast.clone()))
+    //    Ok(TypedVVal::new(Type::none(), ast.clone()))
+}
+
+fn type_call(
+    ast: &VVal,
+    type_hint: TypeHint,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<TypedVVal, CompileError> {
+    if let Some((syntax, object, key)) = fetch_object_key_access(&ast.at(1).unwrap()) {
+        panic!("Unimplemented GetKey/GetSym! {}", ast.s());
+    }
+
+    let symbol = if let Syntax::Var =
+        ast.at(1).unwrap_or(VVal::None).at(0).unwrap_or(VVal::None).get_syn()
+    {
+        let var = ast.at(1).unwrap().at(1).unwrap();
+        Some(var.s_raw())
+    } else {
+        None
+    };
+
+    if let Some(sym) = symbol {
+        match &sym[..] {
+            "?" => panic!("unimpl"),     // return compile_if(ast, ce),
+            "if" => panic!("unimpl"),    // return compile_if(ast, ce),
+            "while" => panic!("unimpl"), // return compile_while(ast, ce),
+            "iter" => panic!("unimpl"),  // return compile_iter(ast, ce),
+            "next" => panic!("unimpl"),  // return compile_next(ast, ce),
+            "break" => panic!("unimpl"), // return compile_break(ast, ce),
+            "match" => panic!("unimpl"), // return compile_match(ast, ce),
+            "jump" => panic!("unimpl"),  // return compile_jump(ast, ce),
+            _ => (),
+        }
+    }
+
+    let ret_type = match type_hint {
+        TypeHint::Expect(rt) => rt.clone(),
+        _ => Type::any(),
+    };
+
+    let mut args = vec![];
+    let mut fun_arg_types = vec![];
+    for (e, _) in ast.iter().skip(2) {
+        args.push(e);
+        fun_arg_types.push((Type::any(), false, None));
+    }
+    let argc = args.len() - 1;
+    let synth_fun_type = Rc::new(Type::Function(Rc::new(fun_arg_types), ret_type, None));
+
+    // Synthesize the function type (including return tyep) and pass it as
+    // type hint for the return type of the function?
+    // If we don't get a function type back, we need to synthesize it though...
+    // Maybe do two passes?
+    let called_thing = type_pass(&ast.v_(1), TypeHint::from_type(&synth_fun_type), ce)?;
+    println!("CALLED THING: {}", called_thing);
+    let real_fun_type = called_thing.typ.clone();
+
+    let mut type_checked_args = vec![];
+    let mut argc = 0;
+    let tmp = Type::any();
+    for e in args.iter() {
+        // TODO: Pass function argument types as hint
+        type_checked_args.push(type_pass(e, TypeHint::from_type(&tmp), ce)?);
+        argc += 1;
+    }
+    // TODO: Check expected arg values vs. real_fun_type args!
+
+    let fun_ast_node = called_thing.vval;
+    let mut new_ast = VVal::vec();
+    new_ast.push(ast.v_(0));
+    new_ast.push(fun_ast_node);
+    for arg_node in type_checked_args.iter() {
+        new_ast.push(arg_node.vval.clone());
+    }
+
+    Ok(TypedVVal::new(real_fun_type.get_return_type().unwrap_or_else(|| Type::any()), new_ast))
 }
 
 fn type_block(
@@ -423,6 +537,7 @@ pub(crate) fn type_pass(
                 Syntax::DumpVM => TypedVVal::new(Type::none(), ast.clone()),
                 Syntax::DumpStack => TypedVVal::new(Type::none(), ast.clone()),
                 Syntax::Func => type_func(ast, type_hint, ce)?,
+                Syntax::Call => type_call(ast, type_hint, ce)?,
                 Syntax::TypeOf => {
                     let expr = ast.v_(1);
                     let res_type = type_pass(&expr, type_hint, ce)?;

@@ -10512,6 +10512,12 @@ macro_rules! func {
     };
 }
 
+macro_rules! func_t {
+    ($g: ident, $name: expr, $cb: expr, $type: expr) => {
+        $g.fun_t($name, $cb, $type);
+    };
+}
+
 macro_rules! add_func {
     ($g: ident, $op: tt, $env: ident, $argc: ident, $b: block, $min: expr, $max: expr, $err_arg_ok: expr) => {
         $g.fun(stringify!($op), |$env: &mut Env, $argc: usize| $b, $min, $max, $err_arg_ok);
@@ -11347,13 +11353,12 @@ pub fn core_symbol_table() -> SymbolTable {
         Some(1),
         false
     );
-    func!(
+
+    func_t!(
         st,
         "int",
         |env: &mut Env, _argc: usize| { Ok(VVal::Int(env.arg(0).i())) },
-        Some(1),
-        Some(1),
-        false
+        Type::fun_1_ret("value", Type::Any, Type::Int)
     );
     func!(
         st,

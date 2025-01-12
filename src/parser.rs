@@ -1080,6 +1080,7 @@ fn parse_fun_type(ps: &mut State, with_quotes: bool) -> Result<VVal, ParseError>
     let mut args = vec![];
 
     while ps.peek().unwrap_or(')') != ')' {
+    println!("pre try [{}]", ps.rest().to_string());
         let ident = if ps.try_parse(|ps| {
             if let Ok(_) = parse_identifier(ps) {
                 ps.skip_ws_and_comments();
@@ -1087,6 +1088,7 @@ fn parse_fun_type(ps: &mut State, with_quotes: bool) -> Result<VVal, ParseError>
             }
             false
         }) {
+    println!("110post try [{}]", ps.rest().to_string());
             let ident = parse_identifier(ps)?;
             if !ps.consume_token_wsc(':', Syntax::TDelim) {
                 return Err(ps.err(ParseErrorKind::ExpectedToken(':', "function argument type")));
@@ -1096,12 +1098,15 @@ fn parse_fun_type(ps: &mut State, with_quotes: bool) -> Result<VVal, ParseError>
         } else {
             None
         };
+    println!("post try [{}]", ps.rest().to_string());
 
         if ps.lookahead("->") {
             break;
         }
 
+    println!("parse_typf {:?} [{}]", ident, ps.rest().to_string());
         let typ = parse_type(ps)?.t();
+        println!("PARSE TYPE ARG: {}", typ);
         args.push((typ, false, ident));
 
         if !ps.consume_token_wsc(',', Syntax::TDelim) {

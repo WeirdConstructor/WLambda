@@ -857,6 +857,7 @@ impl State {
     where
         F: FnMut(&mut Self) -> bool,
     {
+        let prev_ch_ptr = self.ch_ptr;
         let prev_line_no = self.line_no;
         let prev_indent = self.indent;
         let prev_line_indent = self.line_indent;
@@ -870,6 +871,7 @@ impl State {
         let res = try_fn(self);
         self.try_mode = prev_try;
 
+        self.ch_ptr = prev_ch_ptr;
         self.line_no = prev_line_no;
         self.indent = prev_indent;
         self.line_indent = prev_line_indent;
