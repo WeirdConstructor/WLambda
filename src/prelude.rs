@@ -10869,14 +10869,14 @@ pub fn core_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
 
     let num_type = Rc::new(Type::Int).union(Rc::new(Type::Float));
-    st.set_t("Num", VVal::Type(num_type), Rc::new(Type::Type));
+    st.set_t("@Num", VVal::Type(num_type), Rc::new(Type::Type));
     let nvec_type = Rc::new(Type::IVec2)
         .union(Rc::new(Type::IVec3))
         .union(Rc::new(Type::IVec4))
         .union(Rc::new(Type::FVec2))
         .union(Rc::new(Type::FVec3))
         .union(Rc::new(Type::FVec4));
-    st.set_t("NVec", VVal::Type(nvec_type), Rc::new(Type::Type));
+    st.set_t("@NVec", VVal::Type(nvec_type), Rc::new(Type::Type));
 
     // The implementations for +/- are essentially just like the `add_multi_op`
     // implementations, except for how they accept down to 1 parameter for
@@ -10901,10 +10901,10 @@ pub fn core_symbol_table() -> SymbolTable {
         })
     }, Type::fun_1_ret_is(
            "a", (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
-           &[(&"N", Type::named("Num").union(Type::named("NVec")))])
+           &[(&"N", Type::aliased("@Num").union(Type::aliased("@NVec")))])
        .union(Type::fun_2_ret_is(
            "a", (*Type::generic("N")).clone(), "b", (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
-           &[(&"N", Type::named("Num").union(Type::named("NVec")))])));
+           &[(&"N", Type::aliased("@Num").union(Type::aliased("@NVec")))])));
     add_func!(st, -, env, argc, {
         Ok(match (argc, env.arg(0)) {
             (0, _) => VVal::None,

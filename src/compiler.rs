@@ -873,6 +873,7 @@ impl EvalContext {
                 implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
                 explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
                 quote_func: false,
+                function_signature_stack: vec![],
             })),
             local: Rc::new(RefCell::new(Env::new_with_user(global, user))),
             types_enabled: false,
@@ -1244,6 +1245,9 @@ pub(crate) struct CompileEnv {
     pub recent_sym: String,
     /// If set, the next compile() is compiling a function as block.
     pub quote_func: bool,
+    /// A stack of currently compiled functions, containig the
+    /// information about function parameters and return values.
+    pub function_signature_stack: Vec<Rc<Type>>,
 }
 
 /// Reference type to a `CompileEnv`.
@@ -1264,6 +1268,7 @@ impl CompileEnv {
             recent_sym: String::new(),
             implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
+            function_signature_stack: vec![],
         }))
     }
 
@@ -1281,6 +1286,7 @@ impl CompileEnv {
             implicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             explicit_arity: (ArityParam::Undefined, ArityParam::Undefined),
             quote_func: false,
+            function_signature_stack: vec![],
         }))
     }
 
@@ -1371,6 +1377,18 @@ impl CompileEnv {
     pub fn pop_block_env(&mut self) -> (usize, usize) {
         let r = self.block_env.pop_env();
         r
+    }
+
+    pub fn push_function(&mut self, func_type: Rc<Type>) {
+        self.function_signature_stack.push(func_type);
+    }
+
+    pub fn current_function(&self) -> Option<&Rc<Type>> {
+        self.function_signature_stack.last()
+    }
+
+    pub fn pop_function(&mut self) {
+        self.function_signature_stack.pop();
     }
 
     pub fn get(&mut self, s: &str) -> (VarPos, Rc<Type>) {

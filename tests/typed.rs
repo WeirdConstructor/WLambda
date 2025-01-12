@@ -110,7 +110,7 @@ fn chk_types_aliasing() {
 //        "21"
 //    );
     assert_eq!(
-        v("!:type @Num (int | float); {|@Num, @Num -> int| int[_ + _1] } 10 12.6"),
+        v("!:type @X (int | float); {|@X, @X -> int| int[_ + _1] } 10 12.6"),
         "22"
     );
     assert_eq!(

@@ -2216,7 +2216,6 @@ impl Type {
         Rc::new(Type::Alias(Rc::new(n.to_string()), None, None))
     }
 
-
     pub fn fun_ret(t: Self) -> Rc<Type> {
         Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t), None))
     }
@@ -2264,6 +2263,32 @@ impl Type {
             Rc::new(t),
             Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), t.clone())).collect())),
         ))
+    }
+
+    pub fn get_parameter_tuple(&self) -> Rc<Type> {
+        match self {
+            Type::Function(args, _ret, _) => Rc::new(Type::Tuple(Rc::new(
+                args.iter()
+                    .map(|(arg_typ, optional, _name)| {
+                        if *optional {
+                            Rc::new(Type::Maybe(arg_typ.clone()))
+                        } else {
+                            arg_typ.clone()
+                        }
+                    })
+                    .collect(),
+            ))),
+            _ => Rc::new(Type::Tuple(Rc::new(vec![]))),
+        }
+    }
+
+    pub fn get_parameter_type(&self, param_idx: usize) -> Rc<Type> {
+        match self {
+            Type::Function(args, _ret, _) => {
+                args.get(param_idx).map(|arg| arg.0.clone()).unwrap_or_else(|| Type::none())
+            }
+            _ => Type::none(),
+        }
     }
 
     pub fn get_return_type(&self) -> Option<Rc<Type>> {
@@ -2605,6 +2630,51 @@ pub fn resolve_type<F>(
 where
     F: FnMut(&str) -> Option<Rc<Type>>,
 {
+    match chk_t.as_ref() {
+        Type::Union(_types) => {
+            panic!("resolve_type not implemented for Union in chk_t!");
+            // let mut matched_types = vec![];
+            // let mut conflicts = vec![];
+            // for t in types.iter() {
+            //     let mut bv = bound_vars.clone();
+            //
+            //     match resolve_type(t, chk_t, &mut bv, name_resolver) {
+            //         TypeResolveResult::Match { typ } => {
+            //             matched_types.push(typ);
+            //         }
+            //         TypeResolveResult::Conflict { reason, expected, .. } => {
+            //             conflicts.push((expected.clone(), reason))
+            //         }
+            //     }
+            // }
+            //
+            // if matched_types.len() == 1 {
+            //     TypeResolveResult::Match { typ: matched_types[0].clone() }
+            // } else if matched_types.len() > 1 {
+            //     TypeResolveResult::Conflict {
+            //         expected: typ.clone(),
+            //         got: chk_t.clone(),
+            //         reason: TypeConflictReason::UnionMatchesAmbigious(
+            //             Rc::new(matched_types),
+            //             chk_t.clone(),
+            //         ),
+            //     }
+            // } else {
+            //     TypeResolveResult::Conflict {
+            //         expected: typ.clone(),
+            //         got: chk_t.clone(),
+            //         reason: TypeConflictReason::UnionDidNotMatch(Rc::new(conflicts)),
+            //     }
+            // }
+            ()
+        }
+        Type::Alias(name, _binds, _type_env) => {
+            // TODO: Resolve alias, and try to match that against `typ`
+            ()
+        }
+        _ => (),
+    }
+
     match typ.as_ref() {
         Type::None => TypeResolveResult::Conflict {
             expected: typ.clone(),
@@ -2831,6 +2901,12 @@ where
             }
         }
         Type::Alias(name, _binds, _type_env) => {
+            if let Type::Alias(chk_name, _, _) = chk_t.as_ref() {
+                if chk_name == name {
+                    return TypeResolveResult::Match { typ: typ.clone() };
+                }
+            }
+
             let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
                 res_alias_typ
             } else {

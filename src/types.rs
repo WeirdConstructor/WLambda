@@ -62,40 +62,53 @@ fn type_var(
     capt_ref: bool,
 ) -> Result<TypedVVal, CompileError> {
     let var = ast.at(1).unwrap();
+    let cur_func_type =
+        ce.borrow().current_function().cloned().unwrap_or_else(|| Type::fun_ret(Type::None));
     let mut typ_val = var.with_s_ref(|var_s: &str| -> Result<TypedVVal, CompileError> {
         match var_s {
             "_" => {
                 ce.borrow_mut().set_impl_arity(1);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(0), ast.clone()));
             }
             "_1" => {
                 ce.borrow_mut().set_impl_arity(2);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(1), ast.clone()));
             }
             "_2" => {
                 ce.borrow_mut().set_impl_arity(3);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(2), ast.clone()));
             }
             "_3" => {
                 ce.borrow_mut().set_impl_arity(4);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(3), ast.clone()));
             }
             "_4" => {
                 ce.borrow_mut().set_impl_arity(5);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(4), ast.clone()));
             }
             "_5" => {
                 ce.borrow_mut().set_impl_arity(6);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(5), ast.clone()));
             }
             "_6" => {
                 ce.borrow_mut().set_impl_arity(7);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(6), ast.clone()));
             }
             "_7" => {
                 ce.borrow_mut().set_impl_arity(8);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(7), ast.clone()));
             }
             "_8" => {
                 ce.borrow_mut().set_impl_arity(9);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(8), ast.clone()));
             }
             "_9" => {
                 ce.borrow_mut().set_impl_arity(10);
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_type(9), ast.clone()));
             }
             "@" => {
                 ce.borrow_mut().set_impl_arity_infinite();
+                return Ok(TypedVVal::new(cur_func_type.get_parameter_tuple(), ast.clone()));
                 // TODO: @ type is a record/typed array, that is determined by the
                 //       function this code resides in. We can set the arity here,
                 //       implicitly, but to determine the type we need to check the function.
@@ -187,8 +200,8 @@ fn type_func(
     // TODO: Setup a function environment, holding the positional parameter types
     //       and their names maybe?
     println!("FUN_TYPE: {}, RET_TYPE: {}", fun_type, ret_type);
-    println!("FUN_TYPE: {:?}", fun_type);
 
+    ce.borrow_mut().push_function(fun_type.clone());
     let mut last_type = Type::none();
     let stmts = ast.map_skip_vval(
         |e, is_last| {
@@ -202,6 +215,7 @@ fn type_func(
         },
         3,
     )?;
+    ce.borrow_mut().pop_function();
 
     println!("LAST TYPE: {}, FUN_TYPE: {}, RET_TYPE: {}", last_type, fun_type, ret_type);
 
@@ -279,7 +293,7 @@ fn type_call(
         fun_arg_types.push((Type::any(), false, None));
     }
     let argc = args.len() - 1;
-    let synth_fun_type = Rc::new(Type::Function(Rc::new(fun_arg_types), ret_type, None));
+    let synth_fun_type = Rc::new(Type::Function(Rc::new(fun_arg_types), ret_type.clone(), None));
 
     // Synthesize the function type (including return tyep) and pass it as
     // type hint for the return type of the function?
@@ -294,9 +308,21 @@ fn type_call(
     let tmp = Type::any();
     for e in args.iter() {
         // TODO: Pass function argument types as hint
+        println!("ARG: {:?}", e.s());
         type_checked_args.push(type_pass(e, TypeHint::from_type(&tmp), ce)?);
         argc += 1;
     }
+    // Synthesize the function from the argument types:
+    let chk_func = Rc::new(Type::Function(
+        Rc::new(type_checked_args.iter().map(|arg| (arg.typ.clone(), false, None)).collect()),
+        ret_type,
+        None,
+    ));
+    println!("CHK_FUNC: {}", chk_func);
+    println!("REAL_FUN: {}", real_fun_type);
+    let res_typ =
+        resolve_and_check(&real_fun_type, &chk_func, ce, ast, || format!("function call"))?;
+    println!("RESULTING FUNCTION TYPE: {}", res_typ);
     // TODO: Check expected arg values vs. real_fun_type args!
 
     let fun_ast_node = called_thing.vval;
@@ -428,9 +454,8 @@ where
     let mut bound_vars = vec![];
     let res = resolve_type(typ, chk_typ, &mut bound_vars, &mut |name| {
         let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
-        eprintln!("get comptime {}: {} => {} {:?}", name, value, vartype.s(), vartype);
+        eprintln!("get comptime {}: {} => {}", name, value, vartype.s());
         if vartype.is_alias() {
-            eprintln!("IS ALIAS! {}", name);
             Some(value.t())
         } else if vartype.is_type() {
             Some(value.t())
