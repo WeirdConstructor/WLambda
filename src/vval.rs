@@ -6634,6 +6634,7 @@ impl serde::ser::Serialize for VVal {
 
         match self {
             VVal::Str(_) => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
+            VVal::Type(_) => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Sym(_) => self.with_s_ref(|s: &str| serializer.serialize_str(s)),
             VVal::Byt(b) => serializer.serialize_bytes(&b[..]),
             VVal::Chr(b) => match b {

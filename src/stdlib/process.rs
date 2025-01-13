@@ -37,9 +37,11 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
             if argc > 1 {
                 let args = env.arg(1).deref();
+                let mut argv = vec![];
                 for a in args.iter() {
-                    a.0.with_s_ref(|s| cmd.arg(s));
+                    argv.push(a.0.s_raw());
                 }
+                cmd.args(argv);
             }
 
             if env.arg(2).with_s_ref(|s| s == "inherit_out") {
@@ -60,6 +62,10 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
                 cmd.stdin(Stdio::piped());
                 cmd.stdout(Stdio::null());
                 cmd.stderr(Stdio::null());
+            } else if env.arg(2).with_s_ref(|s| s == "oe") {
+                cmd.stdin(Stdio::null());
+                cmd.stdout(Stdio::piped());
+                cmd.stderr(Stdio::piped());
             } else if env.arg(2).with_s_ref(|s| s == "o") {
                 cmd.stdin(Stdio::null());
                 cmd.stdout(Stdio::piped());
@@ -230,9 +236,11 @@ pub fn add_to_symtable(st: &mut SymbolTable) {
 
             if argc > 1 {
                 let args = env.arg(1).deref();
+                let mut argv = vec![];
                 for a in args.iter() {
-                    a.0.with_s_ref(|s| cmd.arg(s));
+                    argv.push(a.0.s_raw());
                 }
+                cmd.args(argv);
             }
 
             cmd.stdin(Stdio::null());

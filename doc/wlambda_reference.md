@@ -7968,6 +7968,7 @@ nor input is passed:
 * `:ioe` - create pipes for stdin, stdout and stderr.
 * `:io` - create pipes only for stdin and stdout.
 * `:ie` - create pipes only for stdin and stderr.
+* `:oe` - create pipes only for stdout and stderr.
 * `:i` - create pipes only for stdin.
 * `:o` - create pipes only for stdout.
 * `:e` - create pipes only for stderr.
@@ -7987,7 +7988,7 @@ std:assert ~ not result.success;
 std:assert result.status == 20;
 ```
 
-#### <a name="1133-stdprocessgetpipes-child-handle"></a>11.3.3 - std:process:get\_pipes _child-handle_
+#### <a name="1133-stdprocessgetpipes-child-handle"></a>11.3.3 - std:process:take\_pipes _child-handle_
 
 Retrieves the pipes of the child process handle once. A map will be returned with 3 keys in them,
 each with either a `$none` value, a `$<ChildReadPipe>` or `$<ChildWritePipe>` handle.
@@ -8111,6 +8112,26 @@ successful.
 
 Copies the file _src-file-path_ to the _dst-file-path_.
 Returns an error if something went wrong.
+
+#### - std:fs:path:cwd -> _string_
+
+Returns the current working directory as string.
+
+#### - std:fs:path:parent _string_ -> _string_
+
+Returns the parent directory of _string_.
+
+#### - std:fs:path:temp\_dir -> _string_
+
+Returns a temporary directory, where you may store temporary files.
+
+#### - std:fs:path:current\_exe -> _string_
+
+Returns the path to the current executable.
+
+#### - std:fs:path:current\_exe\_dir -> _string_
+
+Returns the path to the directory of the current executable.
 
 #### <a name="1145-stdfsreaddir-path-function"></a>11.4.5 - std:fs:read\_dir _path_ _function_
 

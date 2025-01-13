@@ -2623,7 +2623,7 @@ std:assert ~ (ivec $f(1.3, 2.7, -5.8))  == $i(1, 2, -5);
 There are eight functions for converting other values into vectors
 and vectors of integers into vectors of floats:
 
-- `ivec` 
+- `ivec`
 - `ivec2`
 - `ivec3`
 - `ivec4`
@@ -4391,7 +4391,7 @@ The following example demonstrates it:
 ```wlambda
 !add20 = { _ + 20 };
 
-!some_vec = $[1, 2 * 10, add20 10]; 
+!some_vec = $[1, 2 * 10, add20 10];
 
 ## Index calling:
 std:assert_eq (0 some_vec) 1;
@@ -5399,7 +5399,7 @@ while $true {
 std:assert_eq i 4;
 ```
 
-The first 
+The first
 
 #### <a name="512-iter-var-iterable-body"></a>5.1.2 - iter _var_ _iterable_ _body_
 
@@ -10722,7 +10722,7 @@ fn extract_pure_words(s: &str) -> VVal {
     // them to "its" or "youre"
     let mut cleaned = String::new();
     let mut in_seq = false;
-    let mut pre_chars : Vec<char> = Vec::new();
+    let mut pre_chars: Vec<char> = Vec::new();
     let mut count_postfix = 0;
     for c in s.chars() {
         if c.is_whitespace() {
@@ -10748,7 +10748,6 @@ fn extract_pure_words(s: &str) -> VVal {
                 count_postfix += 1;
             }
             pre_chars.push(c);
-
         } else {
             in_seq = true;
             pre_chars.push(c);
@@ -10764,12 +10763,14 @@ fn extract_pure_words(s: &str) -> VVal {
         pre_chars.clear();
     }
 
-    let s =
-        cleaned.replacen(
-            &['\n', '\r', '`', '´', '°', '^', '\\', '/', '\'', '\"',
-              '*', '-', ':', '.', ',', ';', '~', '_'][..],
-            " ",
-            s.len());
+    let s = cleaned.replacen(
+        &[
+            '\n', '\r', '`', '´', '°', '^', '\\', '/', '\'', '\"', '*', '-', ':', '.', ',', ';',
+            '~', '_',
+        ][..],
+        " ",
+        s.len(),
+    );
 
     for w in s.split_whitespace() {
         words.push(VVal::new_str(w));
@@ -10781,7 +10782,7 @@ fn extract_pure_words(s: &str) -> VVal {
 fn match_prefix_in(prefix_list: &[Vec<char>], seq: &[char]) -> Option<(usize, usize)> {
     for (i, pfx) in prefix_list.iter().enumerate() {
         if pfx.len() > 0 && pfx[pfx.len() - 1] == '$' {
-            if seq.starts_with(&pfx[0..(pfx.len() - 1)])  {
+            if seq.starts_with(&pfx[0..(pfx.len() - 1)]) {
                 let idx_next_char = pfx.len() - 1;
 
                 if idx_next_char < seq.len() && !seq[idx_next_char].is_alphabetic() {
@@ -10790,7 +10791,6 @@ fn match_prefix_in(prefix_list: &[Vec<char>], seq: &[char]) -> Option<(usize, us
                     return Some((i, pfx.len() - 1));
                 }
             }
-
         } else if pfx.len() > 0 && seq.starts_with(&pfx[..]) {
             let mut word_len = pfx.len();
             while word_len < seq.len() && seq[word_len].is_alphabetic() {
@@ -10804,14 +10804,12 @@ fn match_prefix_in(prefix_list: &[Vec<char>], seq: &[char]) -> Option<(usize, us
 }
 
 fn match_prefix_and_split_sequences(prefix_list: &[Vec<char>], s: &str) -> VVal {
-    let input : Vec<char> = s.chars().collect();
-    let scan_input : Vec<char> =
-        s.chars()
-         .map(|c| if let Some(lc) = c.to_lowercase().next() { lc } else { c })
-         .collect();
+    let input: Vec<char> = s.chars().collect();
+    let scan_input: Vec<char> =
+        s.chars().map(|c| if let Some(lc) = c.to_lowercase().next() { lc } else { c }).collect();
 
-    let mut sequences : Vec<(i64, Vec<char>)> = Vec::new();
-    let mut cur_unused_seq : Vec<char> = Vec::new();
+    let mut sequences: Vec<(i64, Vec<char>)> = Vec::new();
+    let mut cur_unused_seq: Vec<char> = Vec::new();
 
     let mut i = 0;
     while i < input.len() {
@@ -10846,7 +10844,7 @@ fn match_prefix_and_split_sequences(prefix_list: &[Vec<char>], s: &str) -> VVal 
 
     let ret = VVal::vec();
     for seq in sequences {
-        let s : String = seq.1.into_iter().collect();
+        let s: String = seq.1.into_iter().collect();
         ret.push(VVal::pair(VVal::Int(seq.0), VVal::new_str_mv(s)));
     }
 
@@ -11835,14 +11833,14 @@ fn dir_entry_to_vval(
 fn auto_correlate_longest_sublists_of_vv(v: &VVal, min_len: usize) -> VVal {
     use std::collections::HashMap;
 
-    let mut elem_id : u64 = 1;
-    let mut elem_id_map : HashMap<String, u64> = HashMap::new();
-    let mut id_elem_map : HashMap<u64, VVal> = HashMap::new();
+    let mut elem_id: u64 = 1;
+    let mut elem_id_map: HashMap<String, u64> = HashMap::new();
+    let mut id_elem_map: HashMap<u64, VVal> = HashMap::new();
 
-    let mut list_of_extra_values : Option<Vec<(usize, VVal)>> = None;
-    let mut list_of_lists : Vec<Vec<u64>> = Vec::new();
+    let mut list_of_extra_values: Option<Vec<(usize, VVal)>> = None;
+    let mut list_of_lists: Vec<Vec<u64>> = Vec::new();
     for (i, (v, _)) in v.iter().enumerate() {
-        let mut cur_vec : Vec<u64> = Vec::new();
+        let mut cur_vec: Vec<u64> = Vec::new();
 
         let list = if v.is_pair() {
             if list_of_extra_values.is_none() {
@@ -11872,8 +11870,7 @@ fn auto_correlate_longest_sublists_of_vv(v: &VVal, min_len: usize) -> VVal {
         list_of_lists.push(cur_vec);
     }
 
-    let autores : Vec<util::AutoCorrSubseq> =
-        util::auto_correlate_lists(&list_of_lists, min_len);
+    let autores: Vec<util::AutoCorrSubseq> = util::auto_correlate_lists(&list_of_lists, min_len);
 
     let result = VVal::vec();
     for ar in autores {
@@ -11901,7 +11898,9 @@ fn auto_correlate_longest_sublists_of_vv(v: &VVal, min_len: usize) -> VVal {
         } else {
             v.push(sv.clone());
         }
-        for el in &list_of_lists[ar.from_list_idx][ar.from_list_start_idx..(ar.from_list_start_idx + ar.len)] {
+        for el in &list_of_lists[ar.from_list_idx]
+            [ar.from_list_start_idx..(ar.from_list_start_idx + ar.len)]
+        {
             sv.push(id_elem_map.get(el).expect("correct internal indices").clone());
         }
         result.push(v);
@@ -11998,7 +11997,7 @@ pub fn std_symbol_table() -> SymbolTable {
             let list = env.arg(0);
             let i = env.arg(1).i();
             let v = env.arg(2);
-            let i : usize = if i < 0 {
+            let i: usize = if i < 0 {
                 let i = list.len() as i64 + (i + 1);
                 if i < 0 {
                     0
@@ -12182,7 +12181,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let i = env.arg(0).i();
             let v = env.arg(1);
-            let i : usize = if i < 0 {
+            let i: usize = if i < 0 {
                 let i = v.len() as i64 + i;
                 if i < 0 {
                     0
@@ -12604,7 +12603,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let parts = VVal::vec();
             env.arg(0).with_s_ref(|chars| {
-                let chars_class : Vec<char> = chars.chars().collect();
+                let chars_class: Vec<char> = chars.chars().collect();
 
                 env.arg(1).with_s_ref(|s| {
                     for p in s.split(&chars_class[..]) {
@@ -12624,7 +12623,7 @@ pub fn std_symbol_table() -> SymbolTable {
         |env: &mut Env, _argc: usize| {
             let parts = VVal::vec();
             env.arg(0).with_s_ref(|chars| {
-                let chars_class : Vec<char> = chars.chars().collect();
+                let chars_class: Vec<char> = chars.chars().collect();
 
                 env.arg(1).with_s_ref(|s| {
                     for p in s.split(&chars_class[..]) {
@@ -12679,29 +12678,28 @@ pub fn std_symbol_table() -> SymbolTable {
                     if in_quote && c == qchar {
                         in_quote = false;
                         if cur_part.len() > 0 {
-                            parts.push(
-                                VVal::pair(sy.clone(),
-                                    VVal::new_str_mv(
-                                        std::mem::replace(&mut cur_part, String::new()))));
+                            parts.push(VVal::pair(
+                                sy.clone(),
+                                VVal::new_str_mv(std::mem::replace(&mut cur_part, String::new())),
+                            ));
                         }
                     } else if c == qchar {
                         in_quote = true;
                         if cur_part.len() > 0 {
-                            parts.push(
-                                VVal::pair(VVal::None,
-                                    VVal::new_str_mv(
-                                        std::mem::replace(&mut cur_part, String::new()))));
+                            parts.push(VVal::pair(
+                                VVal::None,
+                                VVal::new_str_mv(std::mem::replace(&mut cur_part, String::new())),
+                            ));
                         }
                     } else {
                         cur_part.push(c);
                     }
                 }
                 if cur_part.len() > 0 {
-                    parts.push(
-                        VVal::pair(
-                            if in_quote { sy.clone() } else { VVal::None },
-                            VVal::new_str_mv(
-                                std::mem::replace(&mut cur_part, String::new()))));
+                    parts.push(VVal::pair(
+                        if in_quote { sy.clone() } else { VVal::None },
+                        VVal::new_str_mv(std::mem::replace(&mut cur_part, String::new())),
+                    ));
                 }
             });
 
@@ -12714,11 +12712,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(
         st,
         "str:nlp:en:extract_pure_words",
-        |env: &mut Env, _argc: usize| {
-            env.arg(0).with_s_ref(|s| {
-                Ok(extract_pure_words(s))
-            })
-        },
+        |env: &mut Env, _argc: usize| { env.arg(0).with_s_ref(|s| { Ok(extract_pure_words(s)) }) },
         Some(1),
         Some(1),
         false
@@ -12728,20 +12722,18 @@ pub fn std_symbol_table() -> SymbolTable {
         st,
         "str:nlp:match_prefix_and_split_sequences",
         |env: &mut Env, _argc: usize| {
-            let mut prefix_list : Vec<Vec<char>> = Vec::new();
+            let mut prefix_list: Vec<Vec<char>> = Vec::new();
             for (v, _) in env.arg(0).iter() {
                 v.with_s_ref(|s| {
-                    let chars =
-                        s.chars()
-                         .map(|c| if let Some(lc) = c.to_lowercase().next() { lc } else { c })
-                         .collect();
+                    let chars = s
+                        .chars()
+                        .map(|c| if let Some(lc) = c.to_lowercase().next() { lc } else { c })
+                        .collect();
                     prefix_list.push(chars);
                 });
             }
 
-            env.arg(1).with_s_ref(|s| {
-                Ok(match_prefix_and_split_sequences(&prefix_list[..], s))
-            })
+            env.arg(1).with_s_ref(|s| Ok(match_prefix_and_split_sequences(&prefix_list[..], s)))
         },
         Some(2),
         Some(2),
@@ -13211,7 +13203,7 @@ pub fn std_symbol_table() -> SymbolTable {
         st,
         "num:statistics",
         |env: &mut Env, argc: usize| {
-            let mut num : Vec<f64> = vec![];
+            let mut num: Vec<f64> = vec![];
             env.arg(0).with_iter(|iter| {
                 for (v, _k) in iter {
                     let f = v.f();
@@ -13221,7 +13213,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 }
             });
 
-            let mut percentiles : Vec<f64> = vec![0.25, 0.5, 0.75];
+            let mut percentiles: Vec<f64> = vec![0.25, 0.5, 0.75];
             if argc > 1 {
                 env.arg(1).with_iter(|iter| {
                     for (v, _k) in iter {
@@ -13239,10 +13231,10 @@ pub fn std_symbol_table() -> SymbolTable {
                 return Ok(VVal::map());
             }
 
-            let min : f64 = num[0];
-            let max : f64 = num[num.len() - 1];
-            let mut sum : f64 = 0.0;
-            let count : f64 = num.len() as f64;
+            let min: f64 = num[0];
+            let max: f64 = num[num.len() - 1];
+            let mut sum: f64 = 0.0;
+            let count: f64 = num.len() as f64;
 
             for n in &num {
                 sum += *n;
@@ -13258,7 +13250,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 let i = if i > num.len() { num.len() } else { i };
 
                 out_samples.push((num[j - 1] - num[i - 1]) * g + num[i - 1]);
-            };
+            }
 
             let avg = sum / count;
             let median = out_samples[1];
@@ -13521,6 +13513,93 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(
         st,
+        "fs:path:cwd",
+        |env: &mut Env, _argc: usize| {
+            match std::env::current_dir() {
+                Ok(pth) => Ok(VVal::new_str_mv(pth.as_path().to_string_lossy().to_string())),
+                Err(e) => {
+                    return Ok(env.new_err(format!(
+                        "Couldn't get the current working directory path: {}",
+                        e
+                    )))
+                }
+            }
+        },
+        Some(0),
+        Some(0),
+        false
+    );
+
+    func!(
+        st,
+        "fs:path:parent",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_s_ref(|s| match std::path::Path::new(s).parent() {
+                Some(pth) => Ok(VVal::new_str_mv(pth.to_string_lossy().to_string())),
+                None => Ok(VVal::None),
+            })
+        },
+        Some(1),
+        Some(1),
+        false
+    );
+
+    func!(
+        st,
+        "fs:path:temp_dir",
+        |env: &mut Env, _argc: usize| {
+            let path = std::env::temp_dir();
+            Ok(VVal::new_str_mv(path.as_path().to_string_lossy().to_string()))
+        },
+        Some(0),
+        Some(0),
+        false
+    );
+
+    func!(
+        st,
+        "fs:path:current_exe",
+        |env: &mut Env, _argc: usize| {
+            match std::env::current_exe() {
+                Ok(pth) => Ok(VVal::new_str_mv(pth.as_path().to_string_lossy().to_string())),
+                Err(e) => {
+                    return Ok(env.new_err(format!("Couldn't get the current_exe path: {}", e)))
+                }
+            }
+        },
+        Some(0),
+        Some(0),
+        false
+    );
+
+    func!(
+        st,
+        "fs:path:current_exe_dir",
+        |env: &mut Env, _argc: usize| {
+            match std::env::current_exe() {
+                Ok(pth) => match pth.as_path().parent() {
+                    Some(pth) => Ok(VVal::new_str_mv(pth.to_string_lossy().to_string())),
+                    None => {
+                        return Ok(env.new_err(format!(
+                            "Couldn't get the current_exe directory path, no parent on '{}'",
+                            pth.to_string_lossy()
+                        )))
+                    }
+                },
+                Err(e) => {
+                    return Ok(
+                        env.new_err(format!("Couldn't get the current_exe directory path: {}", e))
+                    )
+                }
+            }
+        },
+        Some(0),
+        Some(0),
+        false
+    );
+
+    func!(
+        st,
         "io:line",
         |env: &mut Env, _argc: usize| {
             let mut line = String::new();
@@ -13735,27 +13814,39 @@ pub fn std_symbol_table() -> SymbolTable {
             use std::fs::OpenOptions;
             use std::io::prelude::*;
 
-            let file =
-                OpenOptions::new().create(true).write(true).truncate(true).open(&tmp_filename);
+            let res = {
+                let file =
+                    OpenOptions::new().create(true).write(true).truncate(true).open(&tmp_filename);
 
-            match file {
-                Err(e) => Ok(env.new_err(format!("Couldn't open file '{}': {}", filename, e))),
-                Ok(mut f) => {
-                    if let Err(e) = f.write_all(&buf) {
-                        return Ok(env
-                            .new_err(format!("Couldn't write to file '{}': {}", tmp_filename, e)));
+                match file {
+                    Err(e) => Ok(env.new_err(format!("Couldn't open file '{}': {}", filename, e))),
+                    Ok(mut f) => {
+                        if let Err(e) = f.write_all(&buf) {
+                            return Ok(env.new_err(format!(
+                                "Couldn't write to file '{}': {}",
+                                tmp_filename, e
+                            )));
+                        }
+                        if let Err(e) = f.sync_all() {
+                            return Ok(env.new_err(format!(
+                                "Couldn't write and sync to file '{}': {}",
+                                tmp_filename, e
+                            )));
+                        }
+
+                        Ok(VVal::Bol(true))
                     }
-
-                    if let Err(e) = std::fs::rename(&tmp_filename, &filename) {
-                        return Ok(env.new_err(format!(
-                            "Couldn't rename file '{}' to file '{}': {}",
-                            tmp_filename, filename, e
-                        )));
-                    }
-
-                    Ok(VVal::Bol(true))
                 }
+            };
+
+            if let Err(e) = std::fs::rename(&tmp_filename, &filename) {
+                return Ok(env.new_err(format!(
+                    "Couldn't rename file '{}' to file '{}': {}",
+                    tmp_filename, filename, e
+                )));
             }
+
+            res
         },
         Some(2),
         Some(2),

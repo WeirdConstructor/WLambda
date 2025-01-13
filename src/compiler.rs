@@ -73,7 +73,7 @@ use crate::formatter;
 use crate::selector;
 use crate::struct_pattern;
 
-use crate::types::type_check;
+//use crate::types::type_check;
 
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
@@ -3131,7 +3131,7 @@ pub(crate) fn compile(
 /// This is an internal function.
 fn compile_vm_fun(ast: &VVal, ce: &mut Rc<RefCell<CompileEnv>>) -> Result<EvalNode, CompileError> {
     let mut cet = Rc::new(RefCell::new(ce.borrow().clone()));
-    let ast = type_check(ast, &mut cet)?;
+    // let ast = type_check(ast, &mut cet)?;
     let prog = compile_stmts(&ast, 1, ce)?;
 
     let mut p = Prog::new();
@@ -3154,11 +3154,11 @@ pub fn test_eval_to_string(s: &str) -> String {
         Ok(ast) => {
             let mut ce = CompileEnv::new(global.clone());
             let mut cet = Rc::new(RefCell::new(ce.borrow().clone()));
-            let typed_ast = match type_check(&ast, &mut cet) {
-                Ok(ast) => ast,
-                Err(e) => return format!("TYPE ERR: {}", e),
-            };
-            match compile(&typed_ast, &mut ce) {
+            // let typed_ast = match type_check(&ast, &mut cet) {
+            //     Ok(ast) => ast,
+            //     Err(e) => return format!("TYPE ERR: {}", e),
+            // };
+            match compile(&ast, &mut ce) {
                 Ok(prog) => {
                     let local_space = ce.borrow().get_local_space();
 

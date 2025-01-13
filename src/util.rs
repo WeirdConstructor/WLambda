@@ -414,7 +414,7 @@ struct PartMatcher<'a> {
 }
 
 impl<'a> PartMatcher<'a> {
-    fn new(part: &'a [u64], min_len: usize) -> PartMatcher {
+    fn new(part: &'a [u64], min_len: usize) -> PartMatcher<'a> {
         Self {
             part,
             min_len,
