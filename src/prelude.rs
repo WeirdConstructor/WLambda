@@ -13539,6 +13539,93 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(
         st,
+        "fs:path:cwd",
+        |env: &mut Env, _argc: usize| {
+            match std::env::current_dir() {
+                Ok(pth) => Ok(VVal::new_str_mv(pth.as_path().to_string_lossy().to_string())),
+                Err(e) => {
+                    return Ok(env.new_err(format!(
+                        "Couldn't get the current working directory path: {}",
+                        e
+                    )))
+                }
+            }
+        },
+        Some(0),
+        Some(0),
+        false
+    );
+
+    func!(
+        st,
+        "fs:path:parent",
+        |env: &mut Env, _argc: usize| {
+            env.arg(0).with_s_ref(|s| match std::path::Path::new(s).parent() {
+                Some(pth) => Ok(VVal::new_str_mv(pth.to_string_lossy().to_string())),
+                None => Ok(VVal::None),
+            })
+        },
+        Some(1),
+        Some(1),
+        false
+    );
+
+    func!(
+        st,
+        "fs:path:temp_dir",
+        |env: &mut Env, _argc: usize| {
+            let path = std::env::temp_dir();
+            Ok(VVal::new_str_mv(path.as_path().to_string_lossy().to_string()))
+        },
+        Some(0),
+        Some(0),
+        false
+    );
+
+    func!(
+        st,
+        "fs:path:current_exe",
+        |env: &mut Env, _argc: usize| {
+            match std::env::current_exe() {
+                Ok(pth) => Ok(VVal::new_str_mv(pth.as_path().to_string_lossy().to_string())),
+                Err(e) => {
+                    return Ok(env.new_err(format!("Couldn't get the current_exe path: {}", e)))
+                }
+            }
+        },
+        Some(0),
+        Some(0),
+        false
+    );
+
+    func!(
+        st,
+        "fs:path:current_exe_dir",
+        |env: &mut Env, _argc: usize| {
+            match std::env::current_exe() {
+                Ok(pth) => match pth.as_path().parent() {
+                    Some(pth) => Ok(VVal::new_str_mv(pth.to_string_lossy().to_string())),
+                    None => {
+                        return Ok(env.new_err(format!(
+                            "Couldn't get the current_exe directory path, no parent on '{}'",
+                            pth.to_string_lossy()
+                        )))
+                    }
+                },
+                Err(e) => {
+                    return Ok(
+                        env.new_err(format!("Couldn't get the current_exe directory path: {}", e))
+                    )
+                }
+            }
+        },
+        Some(0),
+        Some(0),
+        false
+    );
+
+    func!(
+        st,
         "io:line",
         |env: &mut Env, _argc: usize| {
             let mut line = String::new();
@@ -13753,27 +13840,39 @@ pub fn std_symbol_table() -> SymbolTable {
             use std::fs::OpenOptions;
             use std::io::prelude::*;
 
-            let file =
-                OpenOptions::new().create(true).write(true).truncate(true).open(&tmp_filename);
+            let res = {
+                let file =
+                    OpenOptions::new().create(true).write(true).truncate(true).open(&tmp_filename);
 
-            match file {
-                Err(e) => Ok(env.new_err(format!("Couldn't open file '{}': {}", filename, e))),
-                Ok(mut f) => {
-                    if let Err(e) = f.write_all(&buf) {
-                        return Ok(env
-                            .new_err(format!("Couldn't write to file '{}': {}", tmp_filename, e)));
+                match file {
+                    Err(e) => Ok(env.new_err(format!("Couldn't open file '{}': {}", filename, e))),
+                    Ok(mut f) => {
+                        if let Err(e) = f.write_all(&buf) {
+                            return Ok(env.new_err(format!(
+                                "Couldn't write to file '{}': {}",
+                                tmp_filename, e
+                            )));
+                        }
+                        if let Err(e) = f.sync_all() {
+                            return Ok(env.new_err(format!(
+                                "Couldn't write and sync to file '{}': {}",
+                                tmp_filename, e
+                            )));
+                        }
+
+                        Ok(VVal::Bol(true))
                     }
-
-                    if let Err(e) = std::fs::rename(&tmp_filename, &filename) {
-                        return Ok(env.new_err(format!(
-                            "Couldn't rename file '{}' to file '{}': {}",
-                            tmp_filename, filename, e
-                        )));
-                    }
-
-                    Ok(VVal::Bol(true))
                 }
+            };
+
+            if let Err(e) = std::fs::rename(&tmp_filename, &filename) {
+                return Ok(env.new_err(format!(
+                    "Couldn't rename file '{}' to file '{}': {}",
+                    tmp_filename, filename, e
+                )));
             }
+
+            res
         },
         Some(2),
         Some(2),

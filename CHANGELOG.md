@@ -28,6 +28,7 @@ available via `std:bytes:lzw:encode` and `std:bytes:lzw:decode`.
 * **Feature:** Added some vector functions, such as `std:insert`, `std:remove` and `std:shift`.
 * **Feature:** Added a lot of math constants, such as `std:const:PI`, `std:const:TAU`, ...
 * **Feature:** Added `std:add_uniq` to add elements to a collection, if they are not already present.
+* **Feature:** Added `std:fs:path:cwd`,`std:fs:path:parent`, `std:fs:path:temp_dir`, `std:fs:path:current_exe` and `std:fs:path:current_exe_dir`.
 
 0.8.1 (2022-03-05)
 ==================
