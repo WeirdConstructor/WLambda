@@ -2418,7 +2418,9 @@ impl Type {
                 } else {
                     String::from("")
                 };
-                let mut fun = limit_str + "(";
+                let mut fun = String::from("fn ");
+                fun += &limit_str;
+                fun += "(";
                 for (i, (t, opt, param_name)) in types.iter().enumerate() {
                     if i != 0 {
                         fun += ", ";
@@ -2669,8 +2671,17 @@ where
             ()
         }
         Type::Alias(name, _binds, _type_env) => {
-            // TODO: Resolve alias, and try to match that against `typ`
-            ()
+            let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
+                res_alias_typ.clone()
+            } else {
+                return TypeResolveResult::Conflict {
+                    expected: typ.clone(),
+                    got: chk_t.clone(),
+                    reason: TypeConflictReason::UnknownTypeAlias(name.to_string()),
+                };
+            };
+
+            return resolve_type(typ, &alias_typ, bound_vars, name_resolver);
         }
         _ => (),
     }

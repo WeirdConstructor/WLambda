@@ -163,12 +163,14 @@ fn type_binop(
     let ret_type = if let TypeHint::Expect(t) = type_hint { t.as_type() } else { Type::Any };
     let chk_typ = Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
 
+    println!("op_type={} chk_typ={}", op_type, chk_typ);
+
     let operation_typ = resolve_and_check(&op_type, &chk_typ, ce, ast, || {
         format!("operator call '{}'", op.token())
     })?;
 
     if let Type::Function(_args, ret_type, _bound_vars) = operation_typ.as_ref() {
-        eprintln!("RetType: {}", ret_type.s());
+        eprintln!("RetType: {} of operation typ {}", ret_type.s(), operation_typ);
         Ok(TypedVVal::new(ret_type.clone(), ast.clone()))
     } else {
         Err(ast.compile_err(format!(
