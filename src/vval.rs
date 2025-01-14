@@ -1927,24 +1927,24 @@ impl TypeRecord {
         res
     }
 
-    fn resolve_check(&self) -> TypeResolve {
-        let mut res = TypeResolve::Resolved;
-        for v in self.typedefs.iter() {
-            match v.1.resolve_check() {
-                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-                TypeResolve::Named => res = TypeResolve::Named,
-                TypeResolve::Resolved => (),
-            }
-        }
-        for v in self.fields.iter() {
-            match v.1.resolve_check() {
-                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-                TypeResolve::Named => res = TypeResolve::Named,
-                TypeResolve::Resolved => (),
-            }
-        }
-        res
-    }
+//    fn resolve_check(&self) -> TypeResolve {
+//        let mut res = TypeResolve::Resolved;
+//        for v in self.typedefs.iter() {
+//            match v.1.resolve_check() {
+//                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+//                TypeResolve::Named => res = TypeResolve::Named,
+//                TypeResolve::Resolved => (),
+//            }
+//        }
+//        for v in self.fields.iter() {
+//            match v.1.resolve_check() {
+//                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+//                TypeResolve::Named => res = TypeResolve::Named,
+//                TypeResolve::Resolved => (),
+//            }
+//        }
+//        res
+//    }
 }
 
 #[derive(Debug, Clone)]
@@ -2101,6 +2101,7 @@ pub enum TypeResolveResult {
 /// and values.
 #[derive(Debug, Clone)]
 pub enum Type {
+    Unknown,
     None,
     Any,
     Bool,
@@ -2142,6 +2143,7 @@ pub enum Type {
 }
 
 thread_local! {
+    pub static TYPE_RC_UNKNOWN: Rc<Type> = Rc::new(Type::Unknown);
     pub static TYPE_RC_NONE: Rc<Type> = Rc::new(Type::None);
     pub static TYPE_RC_ANY: Rc<Type> = Rc::new(Type::Any);
     pub static TYPE_RC_SYM: Rc<Type> = Rc::new(Type::Sym);
@@ -2159,6 +2161,9 @@ impl Type {
         TYPE_RC_NONE.with(|typ| typ.clone())
     }
 
+    pub fn unknown() -> Rc<Self> {
+        TYPE_RC_UNKNOWN.with(|typ| typ.clone())
+    }
     pub fn any() -> Rc<Self> {
         TYPE_RC_ANY.with(|typ| typ.clone())
     }
@@ -2344,6 +2349,7 @@ impl Type {
 
     pub fn s(&self) -> String {
         match self {
+            Type::Unknown => "unknown".to_string(),
             Type::Any => "any".to_string(),
             Type::Bool => "bool".to_string(),
             Type::None => "none".to_string(),
@@ -2500,88 +2506,89 @@ impl Type {
         }
     }
 
-    pub fn is_resolved(&self) -> bool {
-        match self.resolve_check() {
-            TypeResolve::Resolved => true,
-            _ => false,
-        }
-    }
+//    pub fn is_resolved(&self) -> bool {
+//        match self.resolve_check() {
+//            TypeResolve::Resolved => true,
+//            _ => false,
+//        }
+//    }
 
-    pub fn resolve_check(&self) -> TypeResolve {
-        match self {
-            Type::Any => return TypeResolve::Resolved,
-            Type::Bool => return TypeResolve::Resolved,
-            Type::None => return TypeResolve::Resolved,
-            Type::Str => return TypeResolve::Resolved,
-            Type::Bytes => return TypeResolve::Resolved,
-            Type::Sym => return TypeResolve::Resolved,
-            Type::Char => return TypeResolve::Resolved,
-            Type::Byte => return TypeResolve::Resolved,
-            Type::Syntax => return TypeResolve::Resolved,
-            Type::Type => return TypeResolve::Resolved,
-            Type::Int => return TypeResolve::Resolved,
-            Type::Float => return TypeResolve::Resolved,
-            Type::IVec2 => return TypeResolve::Resolved,
-            Type::IVec3 => return TypeResolve::Resolved,
-            Type::IVec4 => return TypeResolve::Resolved,
-            Type::FVec2 => return TypeResolve::Resolved,
-            Type::FVec3 => return TypeResolve::Resolved,
-            Type::FVec4 => return TypeResolve::Resolved,
-            Type::Opt(t) => return t.resolve_check(),
-            Type::Maybe(t) => return t.resolve_check(),
-            Type::Err(t) => return t.resolve_check(),
-            Type::Pair(t, t2) => {
-                let mut res = t.resolve_check();
-                match t2.resolve_check() {
-                    TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-                    TypeResolve::Named => res = TypeResolve::Named,
-                    TypeResolve::Resolved => (),
-                }
-                res
-            }
-            Type::Lst(t) => t.resolve_check(),
-            Type::Ref(t) => t.resolve_check(),
-            Type::Iter(t) => t.resolve_check(),
-            Type::Map(t) => t.resolve_check(),
-            Type::Record(_name, record) => record.resolve_check(),
-            Type::Userdata(_name, fields) => {
-                let mut res = TypeResolve::Resolved;
-                for t in fields.iter() {
-                    match t.1.resolve_check() {
-                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-                        TypeResolve::Named => res = TypeResolve::Named,
-                        TypeResolve::Resolved => (),
-                    }
-                }
-                res
-            }
-            Type::Tuple(types) | Type::Union(types) => {
-                let mut res = TypeResolve::Resolved;
-                for t in types.iter() {
-                    match t.resolve_check() {
-                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-                        TypeResolve::Named => res = TypeResolve::Named,
-                        TypeResolve::Resolved => (),
-                    }
-                }
-                res
-            }
-            Type::Function(types, ret, _limits) => {
-                let mut res = ret.resolve_check();
-                for t in types.iter() {
-                    match t.0.resolve_check() {
-                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-                        TypeResolve::Named => res = TypeResolve::Named,
-                        TypeResolve::Resolved => (),
-                    }
-                }
-                res
-            }
-            Type::Name(_name, _bindings, _typenv) => TypeResolve::Named,
-            Type::Alias(_name, _bindings, _typenv) => TypeResolve::Named,
-            Type::Var(_name, _limits) => TypeResolve::UnboundVars,
-        }
-    }
+//    pub fn resolve_check(&self) -> TypeResolve {
+//        match self {
+//            Type::Any => return TypeResolve::Resolved,
+//            Type::Any => return TypeResolve::Resolved,
+//            Type::Bool => return TypeResolve::Resolved,
+//            Type::None => return TypeResolve::Resolved,
+//            Type::Str => return TypeResolve::Resolved,
+//            Type::Bytes => return TypeResolve::Resolved,
+//            Type::Sym => return TypeResolve::Resolved,
+//            Type::Char => return TypeResolve::Resolved,
+//            Type::Byte => return TypeResolve::Resolved,
+//            Type::Syntax => return TypeResolve::Resolved,
+//            Type::Type => return TypeResolve::Resolved,
+//            Type::Int => return TypeResolve::Resolved,
+//            Type::Float => return TypeResolve::Resolved,
+//            Type::IVec2 => return TypeResolve::Resolved,
+//            Type::IVec3 => return TypeResolve::Resolved,
+//            Type::IVec4 => return TypeResolve::Resolved,
+//            Type::FVec2 => return TypeResolve::Resolved,
+//            Type::FVec3 => return TypeResolve::Resolved,
+//            Type::FVec4 => return TypeResolve::Resolved,
+//            Type::Opt(t) => return t.resolve_check(),
+//            Type::Maybe(t) => return t.resolve_check(),
+//            Type::Err(t) => return t.resolve_check(),
+//            Type::Pair(t, t2) => {
+//                let mut res = t.resolve_check();
+//                match t2.resolve_check() {
+//                    TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+//                    TypeResolve::Named => res = TypeResolve::Named,
+//                    TypeResolve::Resolved => (),
+//                }
+//                res
+//            }
+//            Type::Lst(t) => t.resolve_check(),
+//            Type::Ref(t) => t.resolve_check(),
+//            Type::Iter(t) => t.resolve_check(),
+//            Type::Map(t) => t.resolve_check(),
+//            Type::Record(_name, record) => record.resolve_check(),
+//            Type::Userdata(_name, fields) => {
+//                let mut res = TypeResolve::Resolved;
+//                for t in fields.iter() {
+//                    match t.1.resolve_check() {
+//                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+//                        TypeResolve::Named => res = TypeResolve::Named,
+//                        TypeResolve::Resolved => (),
+//                    }
+//                }
+//                res
+//            }
+//            Type::Tuple(types) | Type::Union(types) => {
+//                let mut res = TypeResolve::Resolved;
+//                for t in types.iter() {
+//                    match t.resolve_check() {
+//                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+//                        TypeResolve::Named => res = TypeResolve::Named,
+//                        TypeResolve::Resolved => (),
+//                    }
+//                }
+//                res
+//            }
+//            Type::Function(types, ret, _limits) => {
+//                let mut res = ret.resolve_check();
+//                for t in types.iter() {
+//                    match t.0.resolve_check() {
+//                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+//                        TypeResolve::Named => res = TypeResolve::Named,
+//                        TypeResolve::Resolved => (),
+//                    }
+//                }
+//                res
+//            }
+//            Type::Name(_name, _bindings, _typenv) => TypeResolve::Named,
+//            Type::Alias(_name, _bindings, _typenv) => TypeResolve::Named,
+//            Type::Var(_name, _limits) => TypeResolve::UnboundVars,
+//        }
+//    }
 
     pub fn wrap_simple(&self, other: Rc<Type>) -> Option<Rc<Type>> {
         match self {
@@ -2742,7 +2749,7 @@ where
             return resolve_type(typ, &alias_typ, bound_vars, name_resolver);
         }
         Type::Any => {
-            return if matches!(typ.as_ref(), Type::Any) {
+            return if matches!(typ.as_ref(), Type::Any | Type::Unknown) {
                 TypeResolveResult::Match { typ: typ.clone() }
             } else {
                 TypeResolveResult::Conflict {
@@ -2756,6 +2763,7 @@ where
     }
 
     match typ.as_ref() {
+        Type::Unknown => TypeResolveResult::Match { typ: chk_t.clone() },
         Type::None => TypeResolveResult::Conflict {
             expected: typ.clone(),
             got: chk_t.clone(),
@@ -2950,18 +2958,17 @@ where
                     };
                 }
 
-                // Return types are matched reverse. That means, the calling function
-                // needs to tell us, which return types are acceptable!
-                let matched_ret = match resolve_type(chk_ret, ret, bound_vars, name_resolver) {
+                println!("CHECKKKKKKKKKKKKKKKKKKKKK ret={}, chk_ret={}", ret, chk_ret);
+                let matched_ret = match resolve_type(ret, chk_ret, bound_vars, name_resolver) {
                     TypeResolveResult::Match { typ } => typ,
                     TypeResolveResult::Conflict { expected, got, .. } => {
                         return TypeResolveResult::Conflict {
                             // Should be correct, because we reversed chk_ret and ret.
-                            expected: got,
-                            got: expected,
+                            expected,
+                            got,
                             reason: TypeConflictReason::WrongReturnType(
-                                chk_ret.clone(),
                                 ret.clone(),
+                                chk_ret.clone(),
                             ),
                         };
                     }

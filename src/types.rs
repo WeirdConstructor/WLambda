@@ -143,16 +143,11 @@ fn type_binop(
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
     let (syn, a, b) = (ast.v_(0), ast.v_(1), ast.v_(2));
-    //    println!("SYN: {:?}", ce.borrow_mut().get("+"));
-    // TODO: Get Type of BinOp from Environment by `syn`.
     let op_type = match ce.borrow_mut().get_type(op.token()) {
         Some(t) => t,
         None => return Err(ast.compile_err(format!("Unknown type of operator: {}", ast.s()))),
     };
-    //    if !op_type.is_resolved() {
-    //        return Err(ast.compile_err(format!("Operator has unknown type: {}", op_type.s(),)));
-    //    }
-    //d// println!("TYPE: {:?}", op_type);
+    println!("BINOP: {} => {}", ast, op_type);
 
     // TODO: Get union type from first argument!
     let a_type = type_pass(&a, TypeHint::Infer, ce)?;
@@ -160,7 +155,7 @@ fn type_binop(
     // TODO: Get union type from second argument!
     let b_type = type_pass(&b, TypeHint::Infer, ce)?;
 
-    let ret_type = if let TypeHint::Expect(t) = type_hint { t.as_type() } else { Type::Any };
+    let ret_type = if let TypeHint::Expect(t) = type_hint { t.as_type() } else { Type::Unknown };
     let chk_typ = Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
 
     println!("op_type={} chk_typ={}", op_type, chk_typ);
@@ -168,6 +163,7 @@ fn type_binop(
     let operation_typ = resolve_and_check(&op_type, &chk_typ, ce, ast, || {
         format!("operator call '{}'", op.token())
     })?;
+    println!("resolved op_type={}", operation_typ);
 
     if let Type::Function(_args, ret_type, _bound_vars) = operation_typ.as_ref() {
         eprintln!("RetType: {} of operation typ {}", ret_type.s(), operation_typ);
@@ -193,33 +189,33 @@ fn type_func(
     } else {
         match &type_hint {
             TypeHint::Expect(typ) => typ.clone(),
-            _ => Type::none(),
+            _ => Type::unknown(),
         }
     };
 
-    let mut ret_type = fun_type.get_return_type().unwrap_or_else(|| Type::none());
+    let mut ret_type = fun_type.get_return_type().unwrap_or_else(|| Type::unknown());
 
     // TODO: Setup a function environment, holding the positional parameter types
     //       and their names maybe?
     println!("FUN_TYPE: {}, RET_TYPE: {}", fun_type, ret_type);
 
     ce.borrow_mut().push_function(fun_type.clone());
-    let mut last_type = Type::none();
+    let mut last_type = (VVal::None, Type::none());
     let stmts = ast.map_skip_vval(
         |e, is_last| {
             let tv = type_pass(
                 e,
-                if is_last { type_hint.clone() } else { TypeHint::Expect(Type::any()) },
+                if is_last { type_hint.clone() } else { TypeHint::Infer },
                 ce,
             )?;
-            last_type = tv.typ;
+            last_type = (e.clone(), tv.typ);
             Ok(tv.vval)
         },
         3,
     )?;
     ce.borrow_mut().pop_function();
 
-    println!("LAST TYPE: {}, FUN_TYPE: {}, RET_TYPE: {}", last_type, fun_type, ret_type);
+    println!("LAST TYPE: {}, FUN_TYPE: {}, RET_TYPE: {}", last_type.1, fun_type, ret_type);
 
     stmts.unshift(arity_type.clone());
     stmts.unshift(label.clone());
@@ -269,7 +265,7 @@ fn type_call(
         None
     };
 
-    if let Some(sym) = symbol {
+    if let Some(sym) = symbol.as_ref() {
         match &sym[..] {
             "?" => panic!("unimpl"),     // return compile_if(ast, ce),
             "if" => panic!("unimpl"),    // return compile_if(ast, ce),
@@ -285,14 +281,14 @@ fn type_call(
 
     let ret_type = match type_hint {
         TypeHint::Expect(rt) => rt.clone(),
-        _ => Type::any(),
+        _ => Type::unknown(),
     };
 
     let mut args = vec![];
     let mut fun_arg_types = vec![];
     for (e, _) in ast.iter().skip(2) {
         args.push(e);
-        fun_arg_types.push((Type::any(), false, None));
+        fun_arg_types.push((Type::unknown(), false, None));
     }
     let argc = args.len() - 1;
     let synth_fun_type = Rc::new(Type::Function(Rc::new(fun_arg_types), ret_type.clone(), None));
@@ -302,40 +298,41 @@ fn type_call(
     // If we don't get a function type back, we need to synthesize it though...
     // Maybe do two passes?
     let called_thing = type_pass(&ast.v_(1), TypeHint::from_type(&synth_fun_type), ce)?;
-    println!("CALLED THING: {}", called_thing);
+    println!("CALLED THING {}: {}", symbol.unwrap_or(String::from("?")), called_thing);
     let real_fun_type = called_thing.typ.clone();
+    let ret_type = real_fun_type.get_return_type().unwrap_or_else(|| Type::unknown());
 
     let mut type_checked_args = vec![];
     let mut argc = 0;
-    let tmp = Type::any();
+    let tmp = Type::unknown();
     for e in args.iter() {
-        // TODO: Pass function argument types as hint
-        println!("ARG: {:?}", e.s());
-        type_checked_args.push(type_pass(e, TypeHint::from_type(&tmp), ce)?);
+        let ty = type_pass(e, TypeHint::from_type(&tmp), ce)?;
+        println!("ARG: {:?} has type: {}", e.s(), ty);
+        type_checked_args.push(ty);
         argc += 1;
     }
     // Synthesize the function from the argument types:
     let chk_func = Rc::new(Type::Function(
         Rc::new(type_checked_args.iter().map(|arg| (arg.typ.clone(), false, None)).collect()),
-        ret_type,
+        ret_type.clone(),
         None,
     ));
     println!("CHK_FUNC: {}", chk_func);
     println!("REAL_FUN: {}", real_fun_type);
     let res_typ =
         resolve_and_check(&real_fun_type, &chk_func, ce, ast, || format!("function call"))?;
-    println!("RESULTING FUNCTION TYPE: {}", res_typ);
-    // TODO: Check expected arg values vs. real_fun_type args!
+    println!("RESULTING FUNCTION CALL TYPE: {}", res_typ);
 
     let fun_ast_node = called_thing.vval;
     let mut new_ast = VVal::vec();
     new_ast.push(ast.v_(0));
     new_ast.push(fun_ast_node);
+    new_ast.push(VVal::Type(res_typ));
     for arg_node in type_checked_args.iter() {
         new_ast.push(arg_node.vval.clone());
     }
 
-    Ok(TypedVVal::new(real_fun_type.get_return_type().unwrap_or_else(|| Type::any()), new_ast))
+    Ok(TypedVVal::new(ret_type, new_ast))
 }
 
 fn type_block(
@@ -344,12 +341,12 @@ fn type_block(
     type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
-    let mut last_type = Type::none();
+    let mut last_type = Type::unknown();
     let stmts = ast.map_skip_vval(
         |e, is_last| {
             let tv = type_pass(
                 e,
-                if is_last { type_hint.clone() } else { TypeHint::Expect(Type::any()) },
+                if is_last { type_hint.clone() } else { TypeHint::Infer },
                 ce,
             )?;
             last_type = tv.typ;
@@ -411,7 +408,7 @@ fn type_def(
 
     println!("Vars: {}, Types: {}", vars.s(), types.s());
 
-    Ok(TypedVVal::new(Type::any(), ast.clone()))
+    Ok(TypedVVal::new(Type::none(), ast.clone()))
 }
 
 fn type_deftype(
@@ -534,7 +531,8 @@ pub(crate) fn type_pass(
     type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
-    match ast {
+    let th = type_hint.clone();
+    let mut tv = match ast {
         VVal::Lst(_, _) => {
             let syn = ast.at(0).unwrap_or(VVal::None).get_syn();
             let v = match syn {
@@ -579,7 +577,7 @@ pub(crate) fn type_pass(
                     )
                 }
             };
-            Ok(v)
+            v
         }
         VVal::Pair(pair) => {
             // TODO: If type_hint is hinting a Pair, then deconstruct that!
@@ -592,10 +590,20 @@ pub(crate) fn type_pass(
             let a = type_pass(&pair.0, th_a, ce)?;
             let b = type_pass(&pair.1, th_b, ce)?;
 
-            Ok(TypedVVal::new(Type::pair(a.typ, b.typ), VVal::pair(a.vval, b.vval)))
+            TypedVVal::new(Type::pair(a.typ, b.typ), VVal::pair(a.vval, b.vval))
         }
-        _ => Ok(TypedVVal::new(ast.t(), ast.clone())),
+        _ => TypedVVal::new(ast.t(), ast.clone()),
+    };
+
+    if let TypeHint::Expect(expected_typ) = th {
+        println!("TESTINGXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX {} {}", expected_typ, tv);
+        let res_ty = resolve_and_check(&expected_typ, &tv.typ, ce, ast, || {
+            format!("expression: {}", ast.s())
+        })?;
+        tv.typ = res_ty;
     }
+
+    Ok(tv)
 }
 
 pub(crate) fn type_check(
