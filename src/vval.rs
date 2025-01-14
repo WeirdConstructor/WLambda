@@ -2101,7 +2101,7 @@ pub enum TypeResolveResult {
 /// and values.
 #[derive(Debug, Clone)]
 pub enum Type {
-    Unknown,
+    Unknown(String, usize),
     None,
     Any,
     Bool,
@@ -2143,7 +2143,6 @@ pub enum Type {
 }
 
 thread_local! {
-    pub static TYPE_RC_UNKNOWN: Rc<Type> = Rc::new(Type::Unknown);
     pub static TYPE_RC_NONE: Rc<Type> = Rc::new(Type::None);
     pub static TYPE_RC_ANY: Rc<Type> = Rc::new(Type::Any);
     pub static TYPE_RC_SYM: Rc<Type> = Rc::new(Type::Sym);
@@ -2161,8 +2160,8 @@ impl Type {
         TYPE_RC_NONE.with(|typ| typ.clone())
     }
 
-    pub fn unknown() -> Rc<Self> {
-        TYPE_RC_UNKNOWN.with(|typ| typ.clone())
+    pub fn unknown(hint: &str) -> Rc<Self> {
+        Rc::new(Type::Unknown(hint.to_string(), TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst)))
     }
     pub fn any() -> Rc<Self> {
         TYPE_RC_ANY.with(|typ| typ.clone())
@@ -2349,7 +2348,7 @@ impl Type {
 
     pub fn s(&self) -> String {
         match self {
-            Type::Unknown => "unknown".to_string(),
+            Type::Unknown(hint, id) => format!("unknown:{}_{}", hint, id),
             Type::Any => "any".to_string(),
             Type::Bool => "bool".to_string(),
             Type::None => "none".to_string(),
@@ -2749,7 +2748,7 @@ where
             return resolve_type(typ, &alias_typ, bound_vars, name_resolver);
         }
         Type::Any => {
-            return if matches!(typ.as_ref(), Type::Any | Type::Unknown) {
+            return if matches!(typ.as_ref(), Type::Any | Type::Unknown(_, _)) {
                 TypeResolveResult::Match { typ: typ.clone() }
             } else {
                 TypeResolveResult::Conflict {
@@ -2763,7 +2762,10 @@ where
     }
 
     match typ.as_ref() {
-        Type::Unknown => TypeResolveResult::Match { typ: chk_t.clone() },
+        Type::Unknown(_, _) => {
+            println!("UNKNOWN MATCHED: {} <= {}", typ, chk_t);
+            TypeResolveResult::Match { typ: chk_t.clone() }
+        }
         Type::None => TypeResolveResult::Conflict {
             expected: typ.clone(),
             got: chk_t.clone(),

@@ -155,7 +155,7 @@ fn type_binop(
     // TODO: Get union type from second argument!
     let b_type = type_pass(&b, TypeHint::Infer, ce)?;
 
-    let ret_type = if let TypeHint::Expect(t) = type_hint { t.as_type() } else { Type::Unknown };
+    let ret_type = if let TypeHint::Expect(t) = type_hint { t.as_type() } else { (*Type::unknown("binopret")).clone() };
     let chk_typ = Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
 
     println!("op_type={} chk_typ={}", op_type, chk_typ);
@@ -189,11 +189,11 @@ fn type_func(
     } else {
         match &type_hint {
             TypeHint::Expect(typ) => typ.clone(),
-            _ => Type::unknown(),
+            _ => Type::unknown("fun"),
         }
     };
 
-    let mut ret_type = fun_type.get_return_type().unwrap_or_else(|| Type::unknown());
+    let mut ret_type = fun_type.get_return_type().unwrap_or_else(|| Type::unknown("funret"));
 
     // TODO: Setup a function environment, holding the positional parameter types
     //       and their names maybe?
@@ -281,14 +281,14 @@ fn type_call(
 
     let ret_type = match type_hint {
         TypeHint::Expect(rt) => rt.clone(),
-        _ => Type::unknown(),
+        _ => Type::unknown("callret"),
     };
 
     let mut args = vec![];
     let mut fun_arg_types = vec![];
-    for (e, _) in ast.iter().skip(2) {
+    for (i, (e, _)) in ast.iter().skip(2).enumerate() {
         args.push(e);
-        fun_arg_types.push((Type::unknown(), false, None));
+        fun_arg_types.push((Type::unknown(&format!("callarg{}", i)), false, None));
     }
     let argc = args.len() - 1;
     let synth_fun_type = Rc::new(Type::Function(Rc::new(fun_arg_types), ret_type.clone(), None));
@@ -300,13 +300,12 @@ fn type_call(
     let called_thing = type_pass(&ast.v_(1), TypeHint::from_type(&synth_fun_type), ce)?;
     println!("CALLED THING {}: {}", symbol.unwrap_or(String::from("?")), called_thing);
     let real_fun_type = called_thing.typ.clone();
-    let ret_type = real_fun_type.get_return_type().unwrap_or_else(|| Type::unknown());
+    let ret_type = real_fun_type.get_return_type().unwrap_or_else(|| Type::unknown("rlfunret"));
 
     let mut type_checked_args = vec![];
     let mut argc = 0;
-    let tmp = Type::unknown();
-    for e in args.iter() {
-        let ty = type_pass(e, TypeHint::from_type(&tmp), ce)?;
+    for (i, e) in args.iter().enumerate() {
+        let ty = type_pass(e, TypeHint::from_type(&Type::unknown(&format!("arg{}", i))), ce)?;
         println!("ARG: {:?} has type: {}", e.s(), ty);
         type_checked_args.push(ty);
         argc += 1;
@@ -341,7 +340,7 @@ fn type_block(
     type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
-    let mut last_type = Type::unknown();
+    let mut last_type = Type::unknown("blk");
     let stmts = ast.map_skip_vval(
         |e, is_last| {
             let tv = type_pass(
