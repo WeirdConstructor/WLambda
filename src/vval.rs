@@ -1959,10 +1959,14 @@ pub enum TypeConflictReason {
     VarLimit(String, Rc<Type>, Rc<Type>),
     BoundVarTypeMismatch(String, Rc<Type>, Rc<Type>),
     UnionDidNotMatch(Rc<Vec<(Rc<Type>, TypeConflictReason)>>),
+    UnionCaseRequiredDidNotMatch(Rc<Type>, Rc<TypeConflictReason>),
     UnionMatchesAmbigious(Rc<Vec<Rc<Type>>>, Rc<Type>),
+    MaybeNoneNotCovered(Rc<Type>, Rc<Type>),
+    MaybeTypeNotCovered(Rc<Type>, Rc<Type>, Rc<Type>),
     UnknownTypeVar(String),
     UnknownType(String),
     UnknownTypeAlias(String),
+    AnyMustMatchAny(Rc<Type>),
 }
 
 impl std::fmt::Display for TypeConflictReason {
@@ -2003,6 +2007,11 @@ impl std::fmt::Display for TypeConflictReason {
                 }
                 Ok(())
             }
+            TypeConflictReason::UnionCaseRequiredDidNotMatch(case, reason) => {
+                writeln!(f, "Union case {} did not match, but it must:", case)?;
+                writeln!(f, "        => reason: {}", reason)?;
+                Ok(())
+            }
             TypeConflictReason::UnionMatchesAmbigious(matched, got) => {
                 writeln!(f, "Union matches ambigious: ")?;
                 for t in matched.iter() {
@@ -2037,6 +2046,15 @@ impl std::fmt::Display for TypeConflictReason {
             }
             TypeConflictReason::UnknownTypeAlias(name) => {
                 write!(f, "Unknown type alias '{}'", name)
+            }
+            TypeConflictReason::MaybeNoneNotCovered(exp, got) => {
+                write!(f, "`$none` variant of {} not covered, got: {}", exp, got)
+            }
+            TypeConflictReason::MaybeTypeNotCovered(exp, var_typ, got) => {
+                write!(f, "{} variant of {} not covered, got: {}", var_typ, exp, got)
+            }
+            TypeConflictReason::AnyMustMatchAny(got) => {
+                write!(f, "'Any' must match left hand side Any, but got: {}", got)
             }
         }
     }
@@ -2632,43 +2650,83 @@ pub fn resolve_type<F>(
 where
     F: FnMut(&str) -> Option<Rc<Type>>,
 {
+    if let Type::Alias(name, _binds, _type_env) = typ.as_ref() {
+        if let Type::Alias(chk_name, _, _) = chk_t.as_ref() {
+            if chk_name == name {
+                return TypeResolveResult::Match { typ: typ.clone() };
+            }
+        }
+
+        let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
+            res_alias_typ
+        } else {
+            return TypeResolveResult::Conflict {
+                expected: typ.clone(),
+                got: chk_t.clone(),
+                reason: TypeConflictReason::UnknownTypeAlias(name.to_string()),
+            };
+        };
+
+        return match resolve_type(&alias_typ, chk_t, bound_vars, name_resolver) {
+            TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+            TypeResolveResult::Conflict { expected, got, reason } => {
+                TypeResolveResult::Conflict { expected, got, reason }
+            }
+        };
+    };
+
     match chk_t.as_ref() {
-        Type::Union(_types) => {
-            panic!("resolve_type not implemented for Union in chk_t!");
-            // let mut matched_types = vec![];
-            // let mut conflicts = vec![];
-            // for t in types.iter() {
-            //     let mut bv = bound_vars.clone();
-            //
-            //     match resolve_type(t, chk_t, &mut bv, name_resolver) {
-            //         TypeResolveResult::Match { typ } => {
-            //             matched_types.push(typ);
-            //         }
-            //         TypeResolveResult::Conflict { reason, expected, .. } => {
-            //             conflicts.push((expected.clone(), reason))
-            //         }
-            //     }
-            // }
-            //
-            // if matched_types.len() == 1 {
-            //     TypeResolveResult::Match { typ: matched_types[0].clone() }
-            // } else if matched_types.len() > 1 {
-            //     TypeResolveResult::Conflict {
-            //         expected: typ.clone(),
-            //         got: chk_t.clone(),
-            //         reason: TypeConflictReason::UnionMatchesAmbigious(
-            //             Rc::new(matched_types),
-            //             chk_t.clone(),
-            //         ),
-            //     }
-            // } else {
-            //     TypeResolveResult::Conflict {
-            //         expected: typ.clone(),
-            //         got: chk_t.clone(),
-            //         reason: TypeConflictReason::UnionDidNotMatch(Rc::new(conflicts)),
-            //     }
-            // }
-            ()
+        Type::Maybe(chk_mb_t) => {
+            match resolve_type(typ, &Type::none(), bound_vars, name_resolver) {
+                TypeResolveResult::Conflict { reason: _, expected, got } => {
+                    return TypeResolveResult::Conflict {
+                        expected: typ.clone(),
+                        got: chk_t.clone(),
+                        reason: TypeConflictReason::MaybeNoneNotCovered(chk_t.clone(), got),
+                    };
+                }
+                _ => (),
+            }
+
+            let left_type = match resolve_type(typ, chk_mb_t, bound_vars, name_resolver) {
+                TypeResolveResult::Match { typ } => typ,
+                TypeResolveResult::Conflict { reason: _, expected, got } => {
+                    return TypeResolveResult::Conflict {
+                        expected: typ.clone(),
+                        got: chk_t.clone(),
+                        reason: TypeConflictReason::MaybeTypeNotCovered(
+                            expected,
+                            chk_mb_t.clone(),
+                            got,
+                        ),
+                    };
+                }
+            };
+
+            return TypeResolveResult::Match { typ: Rc::new(Type::Maybe(left_type)) };
+        }
+        Type::Union(types) => {
+            let mut matched_types = vec![];
+
+            for t in types.iter() {
+                let mut bv = bound_vars.clone();
+
+                match resolve_type(typ, t, &mut bv, name_resolver) {
+                    TypeResolveResult::Match { typ } => matched_types.push(typ),
+                    TypeResolveResult::Conflict { reason, expected, got } => {
+                        return TypeResolveResult::Conflict {
+                            expected,
+                            got,
+                            reason: TypeConflictReason::UnionCaseRequiredDidNotMatch(
+                                t.clone(),
+                                Rc::new(reason),
+                            ),
+                        };
+                    }
+                }
+            }
+
+            return TypeResolveResult::Match { typ: Rc::new(Type::Union(Rc::new(matched_types))) };
         }
         Type::Alias(name, _binds, _type_env) => {
             let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
@@ -2682,6 +2740,17 @@ where
             };
 
             return resolve_type(typ, &alias_typ, bound_vars, name_resolver);
+        }
+        Type::Any => {
+            return if matches!(typ.as_ref(), Type::Any) {
+                TypeResolveResult::Match { typ: typ.clone() }
+            } else {
+                TypeResolveResult::Conflict {
+                    expected: typ.clone(),
+                    got: chk_t.clone(),
+                    reason: TypeConflictReason::AnyMustMatchAny(typ.clone()),
+                }
+            };
         }
         _ => (),
     }
@@ -2912,27 +2981,11 @@ where
             }
         }
         Type::Alias(name, _binds, _type_env) => {
-            if let Type::Alias(chk_name, _, _) = chk_t.as_ref() {
-                if chk_name == name {
-                    return TypeResolveResult::Match { typ: typ.clone() };
-                }
-            }
-
-            let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
-                res_alias_typ
-            } else {
-                return TypeResolveResult::Conflict {
-                    expected: typ.clone(),
-                    got: chk_t.clone(),
-                    reason: TypeConflictReason::UnknownTypeAlias(name.to_string()),
-                };
-            };
-
-            match resolve_type(&alias_typ, chk_t, bound_vars, name_resolver) {
-                TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
-                TypeResolveResult::Conflict { expected, got, reason } => {
-                    return TypeResolveResult::Conflict { expected, got, reason };
-                }
+            // Does not happen, the Alias case is caught at the top and resolved immediately.
+            TypeResolveResult::Conflict {
+                expected: typ.clone(),
+                got: chk_t.clone(),
+                reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
             }
         }
         Type::Name(_name, _binds, _type_env) => {

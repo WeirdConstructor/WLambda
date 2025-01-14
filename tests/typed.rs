@@ -110,12 +110,17 @@ fn chk_types_aliasing() {
 //        "21"
 //    );
     assert_eq!(
-        v("!:type @X (int | float); {|@X, @X -> int| int[_ + _1] } 10 12.6"),
+        v(r#"!:type @X (int | float);
+            {|@X, @X -> int|
+                int[_ + (int _1)] }
+                10
+                12.6
+        "#),
         "22"
     );
     assert_eq!(
-        v("!:type @Num (int | float); !f = {|@Num, @Num -> str| int[_ + _1] }; f 10 11.2"),
-        "errror"
+        v("!:type @Num (int | float); !f = {|@Num, @Num -> str| int[_ + (int _1)] }; f 10 11.2"),
+        "errror about int returned, but str expected!"
     );
     assert_eq!(
         v("!:type @Num (int | float); !f = {|@Num, str -> int| int[_ + _1] }; f 10 11.2"),

@@ -224,7 +224,7 @@ fn type_func(
     stmts.unshift(arity_type.clone());
     stmts.unshift(label.clone());
     stmts.unshift(ast.v_(0));
-    Ok(TypedVVal::new(last_type, stmts))
+    Ok(TypedVVal::new(fun_type, stmts))
 
     // let mut fun_spos = spos.clone();
     // fun_spos.set_name(&ce.borrow().recent_var);
