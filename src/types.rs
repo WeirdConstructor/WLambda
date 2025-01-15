@@ -16,14 +16,14 @@ use crate::vval::{resolve_type, CompileError, Syntax, Type, TypeResolveResult, V
 
 #[derive(Debug, Clone)]
 pub(crate) enum TypeHint {
-    Infer,
+    DontCare,
     Expect(Rc<Type>),
 }
 
 impl TypeHint {
     fn from_type(ty: &Rc<Type>) -> Self {
         if ty.is_none() {
-            TypeHint::Infer
+            TypeHint::DontCare
         } else {
             TypeHint::Expect(ty.clone())
         }
@@ -150,12 +150,16 @@ fn type_binop(
     println!("BINOP: {} => {}", ast, op_type);
 
     // TODO: Get union type from first argument!
-    let a_type = type_pass(&a, TypeHint::Infer, ce)?;
+    let a_type = type_pass(&a, TypeHint::DontCare, ce)?;
 
     // TODO: Get union type from second argument!
-    let b_type = type_pass(&b, TypeHint::Infer, ce)?;
+    let b_type = type_pass(&b, TypeHint::DontCare, ce)?;
 
-    let ret_type = if let TypeHint::Expect(t) = type_hint { t.as_type() } else { (*Type::unknown("binopret")).clone() };
+    let ret_type = if let TypeHint::Expect(t) = type_hint {
+        t.as_type()
+    } else {
+        (*Type::unknown("binopret")).clone()
+    };
     let chk_typ = Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
 
     println!("op_type={} chk_typ={}", op_type, chk_typ);
@@ -203,11 +207,21 @@ fn type_func(
     let mut last_type = (VVal::None, Type::none());
     let stmts = ast.map_skip_vval(
         |e, is_last| {
-            let tv = type_pass(
-                e,
-                if is_last { type_hint.clone() } else { TypeHint::Infer },
-                ce,
-            )?;
+            let type_hint =
+                if is_last { TypeHint::from_type(&ret_type) } else { TypeHint::DontCare };
+            let mut tv = type_pass(e, type_hint.clone(), ce)?;
+            println!("COMP {}: {} => {}", is_last, e, tv);
+
+            if is_last {
+                if let TypeHint::Expect(ty) = &type_hint {
+                    println!("CHECK RET: {}", e);
+                    let res_ty = resolve_and_check(&ty, &tv.typ, ce, e, || {
+                        format!("last statement of function block")
+                    })?;
+                    tv.typ = res_ty;
+                }
+            }
+
             last_type = (e.clone(), tv.typ);
             Ok(tv.vval)
         },
@@ -326,7 +340,7 @@ fn type_call(
     let mut new_ast = VVal::vec();
     new_ast.push(ast.v_(0));
     new_ast.push(fun_ast_node);
-    new_ast.push(VVal::Type(res_typ));
+    //    new_ast.push(VVal::Type(res_typ));
     for arg_node in type_checked_args.iter() {
         new_ast.push(arg_node.vval.clone());
     }
@@ -343,11 +357,18 @@ fn type_block(
     let mut last_type = Type::unknown("blk");
     let stmts = ast.map_skip_vval(
         |e, is_last| {
-            let tv = type_pass(
-                e,
-                if is_last { type_hint.clone() } else { TypeHint::Infer },
-                ce,
-            )?;
+            let mut tv =
+                type_pass(e, if is_last { type_hint.clone() } else { TypeHint::DontCare }, ce)?;
+
+            if is_last {
+                if let TypeHint::Expect(ty) = &type_hint {
+                    let res_ty = resolve_and_check(&ty, &tv.typ, ce, ast, || {
+                        format!("last statement of block")
+                    })?;
+                    tv.typ = res_ty;
+                }
+            }
+
             last_type = tv.typ;
             Ok(tv.vval)
         },
@@ -450,17 +471,23 @@ where
     F: Fn() -> String,
 {
     let mut bound_vars = vec![];
-    let res = resolve_type(typ, chk_typ, &mut bound_vars, &mut |name| {
-        let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
-        eprintln!("get comptime {}: {} => {}", name, value, vartype.s());
-        if vartype.is_alias() {
-            Some(value.t())
-        } else if vartype.is_type() {
-            Some(value.t())
-        } else {
-            None
-        }
-    });
+    let res = resolve_type(
+        typ,
+        chk_typ,
+        &mut bound_vars,
+        &mut |name| {
+            let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
+            eprintln!("get comptime {}: {} => {}", name, value, vartype.s());
+            if vartype.is_alias() {
+                Some(value.t())
+            } else if vartype.is_type() {
+                Some(value.t())
+            } else {
+                None
+            }
+        },
+        0,
+    );
 
     match res {
         TypeResolveResult::Match { typ } => Ok(typ),
@@ -583,7 +610,7 @@ pub(crate) fn type_pass(
             let (th_a, th_b) = if let Some(&Type::Pair(ref atype, ref btype)) = type_hint.expect() {
                 (TypeHint::from_type(&atype), TypeHint::from_type(&btype))
             } else {
-                (TypeHint::Infer, TypeHint::Infer)
+                (TypeHint::DontCare, TypeHint::DontCare)
             };
 
             let a = type_pass(&pair.0, th_a, ce)?;
@@ -594,13 +621,13 @@ pub(crate) fn type_pass(
         _ => TypedVVal::new(ast.t(), ast.clone()),
     };
 
-    if let TypeHint::Expect(expected_typ) = th {
-        println!("TESTINGXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX {} {}", expected_typ, tv);
-        let res_ty = resolve_and_check(&expected_typ, &tv.typ, ce, ast, || {
-            format!("expression: {}", ast.s())
-        })?;
-        tv.typ = res_ty;
-    }
+    // if let TypeHint::Expect(expected_typ) = th {
+    //     println!("TESTINGXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX {} {}", expected_typ, tv);
+    //     let res_ty = resolve_and_check(&expected_typ, &tv.typ, ce, ast, || {
+    //         format!("expression: {}", ast.s())
+    //     })?;
+    //     tv.typ = res_ty;
+    // }
 
     Ok(tv)
 }
