@@ -13513,6 +13513,22 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(
         st,
+        "fs:path:join",
+        |env: &mut Env, argc: usize| {
+            let mut pth = std::path::Path::new(env.arg(0).s_raw().as_str()).to_path_buf();
+            for i in 1..argc {
+                pth = env.arg(i).with_s_ref(|s| pth.join(s));
+            }
+
+            Ok(VVal::new_str_mv(pth.as_path().to_string_lossy().to_string()))
+        },
+        Some(1),
+        None,
+        false
+    );
+
+    func!(
+        st,
         "fs:path:cwd",
         |env: &mut Env, _argc: usize| {
             match std::env::current_dir() {

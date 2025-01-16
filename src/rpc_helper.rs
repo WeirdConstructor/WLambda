@@ -16,7 +16,7 @@ file I/O could be done outside the WLambda control flow.
 
 use crate::compiler::*;
 use crate::threads::*;
-use crate::vval::{Env, VValFun, VVal};
+use crate::vval::{Env, VVal, VValFun};
 
 const RPC_MSG_CALL: i64 = 1;
 const RPC_MSG_SEND: i64 = 2;
@@ -55,9 +55,7 @@ impl RPCHandle {
     }
 
     pub fn make_stopper_handle(&self) -> RPCHandleStopper {
-        RPCHandleStopper {
-            handle: self.clone(),
-        }
+        RPCHandleStopper { handle: self.clone() }
     }
 
     pub fn register_global_functions(&self, prefix: &str, ctx: &mut EvalContext) {
@@ -65,9 +63,7 @@ impl RPCHandle {
         ctx.set_global_var(
             &format!("{}_eval", prefix),
             &VValFun::new_fun(
-                move |env: &mut Env, _argc: usize| {
-                    Ok(caller.eval(&env.arg(0).s_raw()))
-                },
+                move |env: &mut Env, _argc: usize| Ok(caller.eval(&env.arg(0).s_raw())),
                 Some(1),
                 Some(1),
                 false,
@@ -236,7 +232,6 @@ pub fn rpc_handler_cb<F: FnMut(&mut EvalContext)>(
     }
 }
 
-
 pub fn rpc_handler_step(
     ctx: &mut EvalContext,
     handle: &RPCHandle,
@@ -262,9 +257,7 @@ pub fn rpc_handler_step(
                     name.with_s_ref(|code| {
                         let ret = match ctx.eval(&code) {
                             Ok(v) => v,
-                            Err(e) => {
-                                VVal::err_msg(&format!("Panic in eval: {:?}", e))
-                            }
+                            Err(e) => VVal::err_msg(&format!("Panic in eval: {:?}", e)),
                         };
                         resp.send(&ret);
                     });

@@ -631,6 +631,7 @@ without any additional terms or conditions.
 
 #[cfg(feature = "serde_json")]
 pub mod chemistry;
+pub mod code_fmt;
 pub mod compiler;
 pub mod formatter;
 mod io;
@@ -638,7 +639,6 @@ pub mod nvec;
 pub mod ops;
 mod packer;
 pub mod parser;
-pub mod code_fmt;
 pub mod prelude;
 mod prog_writer;
 pub mod rpc_helper;
@@ -647,11 +647,11 @@ mod stdlib;
 mod str_int;
 pub mod struct_pattern;
 pub mod threads;
+pub mod types;
 pub mod util;
 pub mod vm;
 pub mod vval;
 pub mod vval_user_obj;
-pub mod types;
 
 pub use compiler::EvalContext;
 pub use compiler::GlobalEnv;

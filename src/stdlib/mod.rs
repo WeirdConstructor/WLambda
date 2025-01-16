@@ -9,15 +9,15 @@ mod process;
 mod util;
 mod xml;
 use super::compiler::*;
+mod consts;
 mod helpers;
 #[cfg(feature = "html")]
 mod html2vval;
 mod imap;
+mod io_types;
 #[cfg(feature = "html")]
 mod rcdom;
 mod sqlite;
-mod io_types;
-mod consts;
 pub use helpers::PendingResult;
 
 pub fn add_to_symtable(st: &mut SymbolTable) {

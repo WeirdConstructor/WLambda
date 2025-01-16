@@ -2530,13 +2530,22 @@ mod tests {
     #[test]
     fn check_const() {
         assert_eq!(parse("!:const X = 32;"), "$[$%:Block,$[$%:DefConst,$[:X],32,$n,$[type[any]]]]");
-        assert_eq!(parse("!:const X = 32.4;"), "$[$%:Block,$[$%:DefConst,$[:X],32.4,$n,$[type[any]]]]");
-        assert_eq!(parse("!:const X = :XX;"), "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Key,:XX],$n,$[type[any]]]]");
+        assert_eq!(
+            parse("!:const X = 32.4;"),
+            "$[$%:Block,$[$%:DefConst,$[:X],32.4,$n,$[type[any]]]]"
+        );
+        assert_eq!(
+            parse("!:const X = :XX;"),
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Key,:XX],$n,$[type[any]]]]"
+        );
         assert_eq!(
             parse("!:const X = \"fo\";"),
             "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Str,\"fo\"],$n,$[type[any]]]]"
         );
-        assert_eq!(parse("!:const X = $[120];"), "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Lst,120],$n,$[type[any]]]]");
+        assert_eq!(
+            parse("!:const X = $[120];"),
+            "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Lst,120],$n,$[type[any]]]]"
+        );
         assert_eq!(
             parse("!:const X = ${a=10};"),
             "$[$%:Block,$[$%:DefConst,$[:X],$[$%:Map,$[:a,10]],$n,$[type[any]]]]"
@@ -2559,7 +2568,10 @@ mod tests {
         assert_eq!(parse("10 11\n;12"), "$[$%:Block,$[$%:Call,10,11],12]");
         assert_eq!(parse("10 11\n;\n12"), "$[$%:Block,$[$%:Call,10,11],12]");
         assert_eq!(parse("10 11\n 12 13"), "$[$%:Block,$[$%:Call,10,11,12,13]]");
-        assert_eq!(parse("!x = 10 11\n 12"), "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12],$n,$[type[any]]]]");
+        assert_eq!(
+            parse("!x = 10 11\n 12"),
+            "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12],$n,$[type[any]]]]"
+        );
         assert_eq!(
             parse("!x = 10 11\n 12 13"),
             "$[$%:Block,$[$%:Def,$[:x],$[$%:Call,10,11,12,13],$n,$[type[any]]]]"

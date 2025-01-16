@@ -1273,7 +1273,7 @@ impl CompileEnv {
                             return Some(v.t());
                         }
                     } else {
-                        return None
+                        return None;
                     }
                 }
                 let parent = opt_p.unwrap().clone();
@@ -1289,7 +1289,7 @@ impl CompileEnv {
                     VarPos::UpValue(_) => None,
                     VarPos::Global(g) => Some(g.t()),
                     VarPos::Const(c) => Some(c.t()),
-                    VarPos::NoPos => None
+                    VarPos::NoPos => None,
                 }
             }
             VarPos::Global(g) => Some(g.t()),

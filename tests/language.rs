@@ -4592,12 +4592,12 @@ fn check_regex_patterns() {
         "$[\"abz\"]"
     );
 
-//    assert_eq!(
-//        ve(r#"
-//        "İ" &> $r/$&L*/;
-//    "#),
-//        ""
-//    );
+    //    assert_eq!(
+    //        ve(r#"
+    //        "İ" &> $r/$&L*/;
+    //    "#),
+    //        ""
+    //    );
 }
 
 #[test]
@@ -7880,21 +7880,24 @@ fn check_insert_remove_shift() {
 fn check_string_splits() {
     assert_eq!(
         ve("std:str:split_any \";, \" \"abc;;;feofoefe,, fewfioewfw;, 333\""),
-        "$[\"abc\",\"\",\"\",\"feofoefe\",\"\",\"\",\"fewfioewfw\",\"\",\"\",\"333\"]");
+        "$[\"abc\",\"\",\"\",\"feofoefe\",\"\",\"\",\"fewfioewfw\",\"\",\"\",\"333\"]"
+    );
     assert_eq!(ve("std:str:split_any \";, \" \"\""), "$[\"\"]");
     assert_eq!(ve("std:str:split_any \";, \" \"A; ,,\""), "$[\"A\",\"\",\"\",\"\",\"\"]");
     assert_eq!(ve("std:str:split_any \";, \" \"; ,,\""), "$[\"\",\"\",\"\",\"\",\"\"]");
 
     assert_eq!(
         ve("std:str:split_any_non_empty \";, \" \"abc;;;feofoefe,, fewfioewfw;, 333\""),
-        "$[\"abc\",\"feofoefe\",\"fewfioewfw\",\"333\"]");
+        "$[\"abc\",\"feofoefe\",\"fewfioewfw\",\"333\"]"
+    );
     assert_eq!(ve("std:str:split_any_non_empty \";, \" \"\""), "$[]");
     assert_eq!(ve("std:str:split_any_non_empty \";, \" \"A; ,,\""), "$[\"A\"]");
     assert_eq!(ve("std:str:split_any_non_empty \";, \" \"; ,,\""), "$[]");
 
     assert_eq!(
         ve("std:str:split_whitespace \"He told her    to get lost!\""),
-        "$[\"He\",\"told\",\"her\",\"to\",\"get\",\"lost!\"]");
+        "$[\"He\",\"told\",\"her\",\"to\",\"get\",\"lost!\"]"
+    );
 
     assert_eq!(
         ve("std:str:nlp:en:extract_pure_words \"He told her    to get lost, saying \\\"You lol\\\" *chuckling under his statements*!\""),
@@ -7902,7 +7905,8 @@ fn check_string_splits() {
 
     assert_eq!(
         ve("std:str:nlp:en:extract_pure_words \"You're You'rea it' it's\""),
-        "$[\"Youre\",\"You\",\"rea\",\"it\",\"its\"]");
+        "$[\"Youre\",\"You\",\"rea\",\"it\",\"its\"]"
+    );
 
     assert_eq!(
         ve("std:str:nlp:extract_quoted \"'\" \"He told her    to get lost, saying \\\'You lol\\\' *chuckling under his statements*!\""),
@@ -7910,24 +7914,21 @@ fn check_string_splits() {
 
     assert_eq!(
         ve("std:str:nlp:extract_quoted \"'\" \"'X'Y'''X'\""),
-        "$[$p(\'\\'\',\"X\"),$p($n,\"Y\"),$p('\\'',\"X\")]");
+        "$[$p(\'\\'\',\"X\"),$p($n,\"Y\"),$p('\\'',\"X\")]"
+    );
 
-    assert_eq!(
-        ve("std:str:nlp:extract_quoted \"'\" \"'OOOO\""),
-        "$[$p(\'\\'\',\"OOOO\")]");
+    assert_eq!(ve("std:str:nlp:extract_quoted \"'\" \"'OOOO\""), "$[$p(\'\\'\',\"OOOO\")]");
 
-    assert_eq!(
-        ve("std:str:nlp:extract_quoted \"'\" \"'\""),
-        "$[]");
+    assert_eq!(ve("std:str:nlp:extract_quoted \"'\" \"'\""), "$[]");
 
     assert_eq!(
         ve("std:str:nlp:extract_quoted \"He told her, \\\"You are fine!\\\"   \""),
-        "$[$p($n,\"He told her, \"),$p('\\\"',\"You are fine!\"),$p($n,\"   \")]");
+        "$[$p($n,\"He told her, \"),$p('\\\"',\"You are fine!\"),$p($n,\"   \")]"
+    );
 }
 
 #[test]
 fn check_auto_correlate() {
-
     assert_eq!(
         ve(r#"
             std:str:auto_correlate_longest_sublist $[
@@ -7984,7 +7985,9 @@ fn check_app_simple_cli() {
         ve(r#"
             !args = $[ ];
             std:app:simple_cli args "foo" "1.0.0" "A simple cli"
-        "#), "${}");
+        "#),
+        "${}"
+    );
 
     assert_eq!(
         ve(r#"
@@ -7992,21 +7995,27 @@ fn check_app_simple_cli() {
             !err = unwrap_err ~ std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-f", "--file", :FILE, :$required, "Input file"];
             bool ~ err &> $r/required\ arguments/
-        "#), "$true");
+        "#),
+        "$true"
+    );
 
     assert_eq!(
         ve(r#"
             !args = $[ "-f", "XX" ];
             std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-f", "--file", :FILE, :$required, "Input file"]
-        "#), "${f=\"XX\"}");
+        "#),
+        "${f=\"XX\"}"
+    );
 
     assert_eq!(
         ve(r#"
             !args = $[ "--file=XXX" ];
             std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-f", "--file", :FILE, :$required, "Input file"]
-        "#), "${f=\"XXX\"}");
+        "#),
+        "${f=\"XXX\"}"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8015,7 +8024,9 @@ fn check_app_simple_cli() {
                 $["-s", "--sort"]
                 $["--"];
             $[cfg.s, cfg.:--]
-        "#), "$[$true,$[\"XX\",\"abc\"]]");
+        "#),
+        "$[$true,$[\"XX\",\"abc\"]]"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8024,7 +8035,9 @@ fn check_app_simple_cli() {
                 $["-s", "--sort"]
                 $["--"];
             $[cfg.s, cfg.:--]
-        "#), "$[$true,$n]");
+        "#),
+        "$[$true,$n]"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8033,7 +8046,9 @@ fn check_app_simple_cli() {
                 $["-s", "--sort"]
                 $["--1"];
             bool ~ (unwrap_err cfg) &> $r/required\ arg/;
-        "#), "$true");
+        "#),
+        "$true"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8042,7 +8057,9 @@ fn check_app_simple_cli() {
                 $["-s", "--sort"]
                 $["--1"];
             $[cfg.s, cfg.:--1]
-        "#), "$[$false,$[\"X\"]]");
+        "#),
+        "$[$false,$[\"X\"]]"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8051,7 +8068,9 @@ fn check_app_simple_cli() {
                 $["-x", "--ex", $f]
                 $["-o", "--o", $t];
             $[cfg.x, cfg.o]
-        "#), "$[$true,$false]");
+        "#),
+        "$[$true,$false]"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8060,7 +8079,9 @@ fn check_app_simple_cli() {
                 $["-x", "--ex", $f]
                 $["-o", "--o", $t];
             $[cfg.x, cfg.o]
-        "#), "$[$false,$true]");
+        "#),
+        "$[$false,$true]"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8068,7 +8089,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-x", :ARG];
             bool ~ (unwrap_err cfg) &> $r/multiple\ times/;
-        "#), "$true");
+        "#),
+        "$true"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8076,7 +8099,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-x", :ARG, :$append];
             cfg.x
-        "#), "$[\"2\",\"4\",\"5\"]");
+        "#),
+        "$[\"2\",\"4\",\"5\"]"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8084,7 +8109,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-x", :X, :$default => "X"];
             cfg.x
-        "#), "\"X\"");
+        "#),
+        "\"X\""
+    );
 
     assert_eq!(
         ve(r#"
@@ -8092,7 +8119,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-x", :X, :$default => "X"];
             cfg.x
-        "#), "\"O\"");
+        "#),
+        "\"O\""
+    );
 
     assert_eq!(
         ve(r#"
@@ -8100,7 +8129,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-x", :X];
             bool ~ (unwrap_err cfg) &> $r/value\ is\ required/;
-        "#), "$true");
+        "#),
+        "$true"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8108,7 +8139,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-x", :X, $o("Y")];
             cfg.x
-        "#), "\"Y\"");
+        "#),
+        "\"Y\""
+    );
 
     assert_eq!(
         ve(r#"
@@ -8116,7 +8149,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-x", :X, $o("Y")];
             cfg.x
-        "#), "\"Y\"");
+        "#),
+        "\"Y\""
+    );
 
     assert_eq!(
         ve(r#"
@@ -8124,7 +8159,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-p", :PORT, 0 => 65535, :$default => 80];
             cfg.p
-        "#), "10");
+        "#),
+        "10"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8132,7 +8169,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-p", :PORT, 0 => 65535, :$default => 80];
             cfg.p
-        "#), "80");
+        "#),
+        "80"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8140,7 +8179,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-p", :PORT, 0 => 65535, :$default => 80];
             cfg.p
-        "#), "$n");
+        "#),
+        "$n"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8148,7 +8189,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-p", :PORT, 0 => 65535, $o(80)];
             cfg.p
-        "#), "80");
+        "#),
+        "80"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8156,7 +8199,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-r", :RANGE, -10 => 0];
             cfg.r
-        "#), "-2");
+        "#),
+        "-2"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8164,7 +8209,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-r", :RANGE, -10 => 0];
             cfg.r
-        "#), "-2");
+        "#),
+        "-2"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8172,7 +8219,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-r", :RANGE, -10 => 0, :$append];
             cfg.r
-        "#), "$[-2,0,-10]");
+        "#),
+        "$[-2,0,-10]"
+    );
 
     std::env::set_var("EV_PORT", "123");
     assert_eq!(
@@ -8181,7 +8230,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-r", :RANGE, 0 => 200, :$env => :EV_PORT];
             cfg
-        "#), "${r=123}");
+        "#),
+        "${r=123}"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8189,7 +8240,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["-r", :RANGE, 0 => 10, :$env => :EV_PORT];
             bool ~ (unwrap_err cfg) &> $r/123\ is\ not\ in/;
-        "#), "$true");
+        "#),
+        "$true"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8197,7 +8250,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["--mode", :MODE, $[:auto, :manual, :set]];
             cfg.mode
-        "#), "\"auto\"");
+        "#),
+        "\"auto\""
+    );
 
     assert_eq!(
         ve(r#"
@@ -8205,7 +8260,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["--mode", :MODE, $[:auto, :manual, :set]];
             bool ~ (unwrap_err cfg) &> $r/possible\ values\:*auto*manual*set/
-        "#), "$true");
+        "#),
+        "$true"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8213,7 +8270,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "foo" "1.0.0" "A simple cli"
                 $["--mode", :MODE, $[:auto, :manual, :set]];
             bool ~ (unwrap_err cfg) &> $r/invalid\ value*unset*auto*manual*set/
-        "#), "$true");
+        "#),
+        "$true"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8223,7 +8282,9 @@ fn check_app_simple_cli() {
                     $["-x"]
                 ];
             cfg._cmd => cfg.x
-        "#), "$p(\"print\",$true)");
+        "#),
+        "$p(\"print\",$true)"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8233,7 +8294,9 @@ fn check_app_simple_cli() {
                     $["-x"]
                 ];
             cfg._cmd => cfg.x
-        "#), "$p(\"print\",$true)");
+        "#),
+        "$p(\"print\",$true)"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8244,7 +8307,9 @@ fn check_app_simple_cli() {
                     $["-x"]
                 ];
             cfg._cmd => cfg.y
-        "#), "$p($n,$true)");
+        "#),
+        "$p($n,$true)"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8255,7 +8320,9 @@ fn check_app_simple_cli() {
                     $["-x"]
                 ];
             bool ~ (unwrap_err cfg) &> $r/Prints*nice/
-        "#), "$true");
+        "#),
+        "$true"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8265,7 +8332,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "test" "1.0.0" "A simple cli"
                 :$toml_config;
             cfg
-        "#), "${x=${y=\"z\"}}");
+        "#),
+        "${x=${y=\"z\"}}"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8275,7 +8344,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "test" "1.0.0" "A simple cli"
                 $["-c", "--config", :PATH, :$toml_config];
             cfg
-        "#), "${x=${y=\"z\"}}");
+        "#),
+        "${x=${y=\"z\"}}"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8286,7 +8357,9 @@ fn check_app_simple_cli() {
             !cfg = std:app:simple_cli args "test" "1.0.0" "A simple cli"
                 $["-c", "--config", :PATH, :$toml_config, :$append];
             cfg.x => cfg.j
-        "#), "$p(${y=\"z\"},${a=\"b\"})");
+        "#),
+        "$p(${y=\"z\"},${a=\"b\"})"
+    );
 }
 
 #[test]
@@ -8294,12 +8367,16 @@ fn check_merge() {
     assert_eq!(
         ve(r#"
             std:merge ${} ${a=:x};
-        "#), "${a=:x}");
+        "#),
+        "${a=:x}"
+    );
 
     assert_eq!(
         ve(r#"
             std:merge $[] ${1=:x, 2=:i, 0=:f} $[:b, :c];
-        "#), "$[:f,:x,:i]");
+        "#),
+        "$[:f,:x,:i]"
+    );
 }
 
 #[test]
@@ -8313,7 +8390,9 @@ fn check_add_uniq() {
             std:add_uniq x 10;
             std:add_uniq x 12;
             x
-        "#), "$[:a,10,:b,:c,12]");
+        "#),
+        "$[:a,10,:b,:c,12]"
+    );
 
     assert_eq!(
         ve(r#"
@@ -8324,7 +8403,9 @@ fn check_add_uniq() {
             std:add_uniq x 10;
             std:add_uniq x 12;
             x
-        "#), "${10=$true,12=$true,a=10,b=$true,c=$true}");
+        "#),
+        "${10=$true,12=$true,a=10,b=$true,c=$true}"
+    );
 }
 
 #[test]
@@ -8345,26 +8426,32 @@ fn check_num_stats() {
         }
     "#), "$[\"25.50\",\"40.00\",\"42.50\",\"33.18\",\"15.13\",\"16.60\",\"6.00\",\"49.00\",\"11.00\"]");
     assert_eq!(
-    ve(r#"
+        ve(r#"
         !r = std:num:statistics $[];
         $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count] {
             $+ ~ $F"{:4.2!f}" r.(k);
         }
-    "#), "$[\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\"]");
+    "#),
+        "$[\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\",\"0.00\"]"
+    );
     assert_eq!(
-    ve(r#"
+        ve(r#"
         !r = std:num:statistics $[1];
         $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count] {
             $+ ~ $F"{:4.2!f}" r.(k);
         }
-    "#), "$[\"1.00\",\"1.00\",\"1.00\",\"1.00\",\"0.00\",\"0.00\",\"1.00\",\"1.00\",\"1.00\"]");
+    "#),
+        "$[\"1.00\",\"1.00\",\"1.00\",\"1.00\",\"0.00\",\"0.00\",\"1.00\",\"1.00\",\"1.00\"]"
+    );
     assert_eq!(
-    ve(r#"
+        ve(r#"
         !r = std:num:statistics $[1,2];
         $@vec iter k $[:q1,:median,:q3,:avg, :avg_dev, :median_dev, :min, :max, :count] {
             $+ ~ $F"{:4.2!f}" r.(k);
         }
-    "#), "$[\"1.50\",\"1.50\",\"1.50\",\"1.50\",\"0.50\",\"0.50\",\"1.00\",\"2.00\",\"2.00\"]");
+    "#),
+        "$[\"1.50\",\"1.50\",\"1.50\",\"1.50\",\"0.50\",\"0.50\",\"1.00\",\"2.00\",\"2.00\"]"
+    );
     assert_eq!(
     ve(r#"
         !r = std:num:statistics $[1,2,3];
@@ -8380,12 +8467,14 @@ fn check_num_stats() {
         }
     "#), "$[\"1.50\",\"2.00\",\"2.50\",\"2.00\",\"0.82\",\"0.82\",\"1.00\",\"3.00\",\"3.00\",\"[1.00,3.00]\"]");
     assert_eq!(
-    ve(r#"
+        ve(r#"
         !r = std:num:statistics $[1,2,3];
         $@vec iter k $[:range, :midrange] {
             $+ ~ $F"{:4.2!f}" r.(k);
         }
-    "#), "$[\"2.00\",\"1.00\"]");
+    "#),
+        "$[\"2.00\",\"1.00\"]"
+    );
 }
 
 #[test]

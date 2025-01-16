@@ -45,7 +45,10 @@ fn wlambda_functions() {
     core_syms.sort();
     for core_sym in core_syms {
         total += 1;
-        if let Some(_) = documented_funs.iter().find(|f: &&String| { println!("TEST: {} {}", **f, core_sym); **f == core_sym }) {
+        if let Some(_) = documented_funs.iter().find(|f: &&String| {
+            println!("TEST: {} {}", **f, core_sym);
+            **f == core_sym
+        }) {
             println!("OK - '{}'", core_sym);
         } else {
             println!("MISSING - '{}'", core_sym);

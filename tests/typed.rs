@@ -25,7 +25,6 @@ fn ve(s: &str) -> String {
     wlambda::compiler::test_eval_to_string(s)
 }
 
-
 #[test]
 fn chk_types_add() {
     assert_eq!(ve("!x: float = 1 + \"2\"; x"), "10"); // Expecting a type error!

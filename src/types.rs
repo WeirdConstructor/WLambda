@@ -14,8 +14,8 @@ use std::rc::Rc;
 use crate::compiler::CompileEnv;
 use crate::ops::BinOp;
 use crate::vval::Syntax;
-use crate::vval::{Type, TypeResolve};
 use crate::vval::VVal;
+use crate::vval::{Type, TypeResolve};
 //
 //pub(crate) fn type_pass(
 //    ast: &VVal,
@@ -107,7 +107,13 @@ fn type_binop(
     };
     match op_type.resolve_check() {
         TypeResolve::Resolved => (),
-        e => return Err(ast.compile_err(format!("Operator has unknown type: {}, {:?}", op_type.s(), e))),
+        e => {
+            return Err(ast.compile_err(format!(
+                "Operator has unknown type: {}, {:?}",
+                op_type.s(),
+                e
+            )))
+        }
     }
     println!("TYPE: {:?}", op_type);
 

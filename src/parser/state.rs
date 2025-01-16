@@ -55,13 +55,19 @@ impl SourceAnnotation {
         };
     }
 
-    pub fn is_start(&self) -> bool { return self.is_area_start; }
-    pub fn is_end(&self) -> bool { return self.is_area_end; }
+    pub fn is_start(&self) -> bool {
+        return self.is_area_start;
+    }
+    pub fn is_end(&self) -> bool {
+        return self.is_area_end;
+    }
 
-    pub fn get_syntax(&self) -> Syntax { return self.syn; }
+    pub fn get_syntax(&self) -> Syntax {
+        return self.syn;
+    }
 
     pub fn get_childs(&self) -> Option<Vec<usize>> {
-        return self.childs.clone()
+        return self.childs.clone();
     }
 
     pub fn append_child_id(&mut self, id: usize) {

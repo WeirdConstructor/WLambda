@@ -369,169 +369,105 @@ fn exec_and_retrieve_sql_legacy(
                 let data = batch.column(col_i);
                 use odbc_api::buffers::AnySlice;
 
-                let rs =
-                    match data {
-                        AnySlice::Text(x) => {
-                            x.get(row_index).map(|s| {
-                                if let Ok(s) = std::str::from_utf8(s) {
-                                    VVal::new_str(s)
-                                } else {
-                                    VVal::new_str_mv(
-                                        s.iter().map(
-                                            |chr| std::char::from_u32(*chr as u32).unwrap_or('?'))
-                                        .collect::<String>())
-                                }
-                            })
-                        },
-                        AnySlice::WText(x) => {
-                            x.get(row_index).map(|s| {
-                                VVal::new_str_mv(U16String::from_vec(s).to_string_lossy())
-                            })
-                        },
-                        AnySlice::Binary(x) => {
-                            x.get(row_index).map(|s| {
-                                VVal::new_byt(s.to_vec())
-                            })
-                        },
-                        AnySlice::Date(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::vec3(
-                                    VVal::Int(i.year as i64),
-                                    VVal::Int(i.month as i64),
-                                    VVal::Int(i.day as i64))
-                            })
-                        },
-                        AnySlice::Time(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::vec3(
-                                    VVal::Int(i.hour as i64),
-                                    VVal::Int(i.minute as i64),
-                                    VVal::Int(i.second as i64))
-                            })
-                        },
-                        AnySlice::Timestamp(x) => {
-                            x.get(row_index).map(|i| {
-                                let ts =
-                                    VVal::vec3(
-                                        VVal::Int(i.year as i64),
-                                        VVal::Int(i.month as i64),
-                                        VVal::Int(i.day as i64));
-                                ts.push(VVal::Int(i.hour as i64));
-                                ts.push(VVal::Int(i.minute as i64));
-                                ts.push(VVal::Int(i.second as i64));
-                                ts
-                            })
-                        },
-                        AnySlice::F64(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::Flt(*i as f64)
-                            })
-                        },
-                        AnySlice::F32(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::Flt(*i as f64)
-                            })
-                        },
-                        AnySlice::I8(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::I16(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::I32(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::I64(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::U8(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::Bit(x) => {
-                            x.get(row_index).map(|i| {
-                                VVal::Bol(i.as_bool())
-                            })
-                        },
-                        AnySlice::NullableDate(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::vec3(
-                                    VVal::Int(i.year as i64),
-                                    VVal::Int(i.month as i64),
-                                    VVal::Int(i.day as i64))
-                            })
-                        },
-                        AnySlice::NullableTime(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::vec3(
-                                    VVal::Int(i.hour as i64),
-                                    VVal::Int(i.minute as i64),
-                                    VVal::Int(i.second as i64))
-                            })
-                        },
-                        AnySlice::NullableTimestamp(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                let ts =
-                                    VVal::vec3(
-                                        VVal::Int(i.year as i64),
-                                        VVal::Int(i.month as i64),
-                                        VVal::Int(i.day as i64));
-                                ts.push(VVal::Int(i.hour as i64));
-                                ts.push(VVal::Int(i.minute as i64));
-                                ts.push(VVal::Int(i.second as i64));
-                                ts
-                            })
-                        },
-                        AnySlice::NullableF64(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::Flt(*i as f64)
-                            })
-                        },
-                        AnySlice::NullableF32(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::Flt(*i as f64)
-                            })
-                        },
-                        AnySlice::NullableI8(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::NullableI16(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::NullableI32(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::NullableI64(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::NullableU8(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::Int(*i as i64)
-                            })
-                        },
-                        AnySlice::NullableBit(mut x) => {
-                            x.nth(row_index).flatten().map(|i| {
-                                VVal::Bol(i.as_bool())
-                            })
-                        },
-                    };
+                let rs = match data {
+                    AnySlice::Text(x) => x.get(row_index).map(|s| {
+                        if let Ok(s) = std::str::from_utf8(s) {
+                            VVal::new_str(s)
+                        } else {
+                            VVal::new_str_mv(
+                                s.iter()
+                                    .map(|chr| std::char::from_u32(*chr as u32).unwrap_or('?'))
+                                    .collect::<String>(),
+                            )
+                        }
+                    }),
+                    AnySlice::WText(x) => x
+                        .get(row_index)
+                        .map(|s| VVal::new_str_mv(U16String::from_vec(s).to_string_lossy())),
+                    AnySlice::Binary(x) => x.get(row_index).map(|s| VVal::new_byt(s.to_vec())),
+                    AnySlice::Date(x) => x.get(row_index).map(|i| {
+                        VVal::vec3(
+                            VVal::Int(i.year as i64),
+                            VVal::Int(i.month as i64),
+                            VVal::Int(i.day as i64),
+                        )
+                    }),
+                    AnySlice::Time(x) => x.get(row_index).map(|i| {
+                        VVal::vec3(
+                            VVal::Int(i.hour as i64),
+                            VVal::Int(i.minute as i64),
+                            VVal::Int(i.second as i64),
+                        )
+                    }),
+                    AnySlice::Timestamp(x) => x.get(row_index).map(|i| {
+                        let ts = VVal::vec3(
+                            VVal::Int(i.year as i64),
+                            VVal::Int(i.month as i64),
+                            VVal::Int(i.day as i64),
+                        );
+                        ts.push(VVal::Int(i.hour as i64));
+                        ts.push(VVal::Int(i.minute as i64));
+                        ts.push(VVal::Int(i.second as i64));
+                        ts
+                    }),
+                    AnySlice::F64(x) => x.get(row_index).map(|i| VVal::Flt(*i as f64)),
+                    AnySlice::F32(x) => x.get(row_index).map(|i| VVal::Flt(*i as f64)),
+                    AnySlice::I8(x) => x.get(row_index).map(|i| VVal::Int(*i as i64)),
+                    AnySlice::I16(x) => x.get(row_index).map(|i| VVal::Int(*i as i64)),
+                    AnySlice::I32(x) => x.get(row_index).map(|i| VVal::Int(*i as i64)),
+                    AnySlice::I64(x) => x.get(row_index).map(|i| VVal::Int(*i as i64)),
+                    AnySlice::U8(x) => x.get(row_index).map(|i| VVal::Int(*i as i64)),
+                    AnySlice::Bit(x) => x.get(row_index).map(|i| VVal::Bol(i.as_bool())),
+                    AnySlice::NullableDate(mut x) => x.nth(row_index).flatten().map(|i| {
+                        VVal::vec3(
+                            VVal::Int(i.year as i64),
+                            VVal::Int(i.month as i64),
+                            VVal::Int(i.day as i64),
+                        )
+                    }),
+                    AnySlice::NullableTime(mut x) => x.nth(row_index).flatten().map(|i| {
+                        VVal::vec3(
+                            VVal::Int(i.hour as i64),
+                            VVal::Int(i.minute as i64),
+                            VVal::Int(i.second as i64),
+                        )
+                    }),
+                    AnySlice::NullableTimestamp(mut x) => x.nth(row_index).flatten().map(|i| {
+                        let ts = VVal::vec3(
+                            VVal::Int(i.year as i64),
+                            VVal::Int(i.month as i64),
+                            VVal::Int(i.day as i64),
+                        );
+                        ts.push(VVal::Int(i.hour as i64));
+                        ts.push(VVal::Int(i.minute as i64));
+                        ts.push(VVal::Int(i.second as i64));
+                        ts
+                    }),
+                    AnySlice::NullableF64(mut x) => {
+                        x.nth(row_index).flatten().map(|i| VVal::Flt(*i as f64))
+                    }
+                    AnySlice::NullableF32(mut x) => {
+                        x.nth(row_index).flatten().map(|i| VVal::Flt(*i as f64))
+                    }
+                    AnySlice::NullableI8(mut x) => {
+                        x.nth(row_index).flatten().map(|i| VVal::Int(*i as i64))
+                    }
+                    AnySlice::NullableI16(mut x) => {
+                        x.nth(row_index).flatten().map(|i| VVal::Int(*i as i64))
+                    }
+                    AnySlice::NullableI32(mut x) => {
+                        x.nth(row_index).flatten().map(|i| VVal::Int(*i as i64))
+                    }
+                    AnySlice::NullableI64(mut x) => {
+                        x.nth(row_index).flatten().map(|i| VVal::Int(*i as i64))
+                    }
+                    AnySlice::NullableU8(mut x) => {
+                        x.nth(row_index).flatten().map(|i| VVal::Int(*i as i64))
+                    }
+                    AnySlice::NullableBit(mut x) => {
+                        x.nth(row_index).flatten().map(|i| VVal::Bol(i.as_bool()))
+                    }
+                };
 
                 let v = rs.unwrap_or(VVal::None);
 

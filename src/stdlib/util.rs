@@ -139,7 +139,7 @@ fn read_cfg(filepath: &str) -> Result<VVal, StackAction> {
                 #[cfg(feature = "toml")]
                 match VVal::from_toml(&contents) {
                     Ok(v) => {
-                        eprintln!("'{}' found.", filepath);
+                        // eprintln!("'{}' found.", filepath);
                         return Ok(v);
                     }
                     Err(e) => {
@@ -171,8 +171,8 @@ fn vv2command(
         if arg.is_sym() {
             arg.with_s_ref(|s| {
                 if s == "$toml_config" {
-                    let filename = String::from(dir_path) + "/" + &name + ".toml";
-                    let v = read_cfg(&filename)?;
+                    let filename = std::path::Path::new(dir_path).join(name.to_string() + ".toml");
+                    let v = read_cfg(&filename.to_string_lossy().to_string())?;
                     cfg.shallow_merge_from(&v);
 
                     Ok(())

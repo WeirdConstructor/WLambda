@@ -432,7 +432,7 @@ fn handle_request(
                     Ok(env.new_err(format!("http:server:try_respond error on responding: {}", e)))
                 }
             }
-        },
+        }
         Err(StackAction::Return(val)) => match pending_response.send(&val.1) {
             Ok(()) => Ok(req),
             Err(e) => {

@@ -171,6 +171,18 @@ fn main() {
     ctx.set_global_var("@dir", &VVal::None);
 
     if let Ok(exe_path) = std::env::current_exe() {
+        ctx.set_global_var(
+            "@path",
+            &VVal::new_str_mv(exe_path.as_path().to_string_lossy().to_string()),
+        );
+
+        match exe_path.as_path().parent() {
+            Some(pth) => {
+                ctx.set_global_var("@dir", &VVal::new_str_mv(pth.to_string_lossy().to_string()));
+            }
+            None => (),
+        }
+
         let buf: Vec<u8> = std::fs::read(exe_path).expect("wlambda.exe can open own EXE file");
 
         let mut exe_part = &buf[..];
@@ -243,11 +255,11 @@ fn main() {
                                     if file.name() == "main.wl" {
                                         main_file = Some(code);
                                     } else {
-                                        eprintln!(
-                                            "wltail preload: {} (len={})",
-                                            file.name(),
-                                            code.len()
-                                        );
+                                        // eprintln!(
+                                        //     "wltail preload: {} (len={})",
+                                        //     file.name(),
+                                        //     code.len()
+                                        // );
                                         lfmr.borrow_mut().preload(file.name(), code);
                                     }
                                 }
