@@ -1891,6 +1891,12 @@ pub enum CollectionAdd {
     Uniq,
 }
 
+static TYPE_VAR_ID: AtomicUsize = AtomicUsize::new(1);
+
+pub fn next_type_var_id() -> usize {
+    TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst)
+}
+
 /// A type to describe if a type is fully resolved/determined.
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum TypeResolve {
@@ -1927,24 +1933,24 @@ impl TypeRecord {
         res
     }
 
-//    fn resolve_check(&self) -> TypeResolve {
-//        let mut res = TypeResolve::Resolved;
-//        for v in self.typedefs.iter() {
-//            match v.1.resolve_check() {
-//                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-//                TypeResolve::Named => res = TypeResolve::Named,
-//                TypeResolve::Resolved => (),
-//            }
-//        }
-//        for v in self.fields.iter() {
-//            match v.1.resolve_check() {
-//                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-//                TypeResolve::Named => res = TypeResolve::Named,
-//                TypeResolve::Resolved => (),
-//            }
-//        }
-//        res
-//    }
+    //    fn bind_vars(&self, binding_env: &mut TypeVarBindingEnv) -> Self {
+    //        let mut res = TypeResolve::Resolved;
+    //        for v in self.typedefs.iter() {
+    //            match v.1.resolve_check() {
+    //                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+    //                TypeResolve::Named => res = TypeResolve::Named,
+    //                TypeResolve::Resolved => (),
+    //            }
+    //        }
+    //        for v in self.fields.iter() {
+    //            match v.1.resolve_check() {
+    //                TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
+    //                TypeResolve::Named => res = TypeResolve::Named,
+    //                TypeResolve::Resolved => (),
+    //            }
+    //        }
+    //        res
+    //    }
 }
 
 #[derive(Debug, Clone)]
@@ -2060,8 +2066,6 @@ impl std::fmt::Display for TypeConflictReason {
     }
 }
 
-static TYPE_VAR_ID: AtomicUsize = AtomicUsize::new(1);
-
 #[derive(Debug, Clone)]
 pub struct TypeEnv {
     parent: Option<Rc<TypeEnv>>,
@@ -2074,7 +2078,7 @@ impl TypeEnv {
         Self {
             parent: None,
             typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
-            id: TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst),
+            id: next_type_var_id(),
         }
     }
 
@@ -2082,12 +2086,171 @@ impl TypeEnv {
         Self {
             parent: Some(parent),
             typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
-            id: TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst),
+            id: next_type_var_id(),
         }
     }
 
     pub fn env_id(&self) -> usize {
         self.id
+    }
+}
+
+struct TypeVarBindingEnv {
+    env_stack: Vec<Vec<(String, Rc<Type>)>>,
+}
+
+#[derive(Clone, Debug)]
+enum TypeVarBindingError {
+    UnknownVar(String),
+    AlreadyBound(String, Rc<Type>),
+}
+
+impl Display for TypeVarBindingError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            TypeVarBindingError::UnknownVar(v) => write!(f, "Unknown type variable: {}", v),
+            TypeVarBindingError::AlreadyBound(v, t) => {
+                write!(f, "Type variable {} already bound: {}", v, t)
+            }
+        }
+    }
+}
+
+impl TypeVarBindingEnv {
+    pub fn new() -> Self {
+        let mut env_stack = Vec::new();
+        env_stack.push(Vec::new());
+        Self { env_stack }
+    }
+
+    pub fn push(&mut self) {
+        self.env_stack.push(Vec::new())
+    }
+
+    pub fn pop(&mut self) {
+        self.env_stack.pop();
+    }
+
+    pub fn lookup(&self, name: &str) -> Option<(usize, usize)> {
+        for i in 0..self.env_stack.len() {
+            let depth_idx = (self.env_stack.len() - 1) - i;
+            let env = self.env_stack.get(depth_idx).unwrap();
+            for (j, v) in env.iter().enumerate() {
+                if v.0 == name {
+                    return Some((depth_idx, j));
+                }
+            }
+        }
+        None
+    }
+
+    pub fn find(&self, name: &str) -> Option<Rc<Type>> {
+        let (depth_idx, idx) = self.lookup(name)?;
+        Some(self.env_stack[depth_idx][idx].1.clone())
+    }
+
+    pub fn bind(&mut self, name: &str, limit: Rc<Type>) -> Result<Rc<Type>, Rc<Type>> {
+        if let Some(t) = self.find(name) {
+            return Err(t);
+        }
+
+        let id = next_type_var_id();
+        let bound_typ = Rc::new(Type::BoundVar(Rc::new(name.to_string()), id, limit));
+        self.env_stack
+            .last_mut()
+            .expect("TypeVarBindingEnv has at least one frame on the env_stack")
+            .push((name.to_string(), bound_typ.clone()));
+
+        Ok(bound_typ)
+    }
+
+    pub fn bind_type_vars(&mut self, typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
+        let ret = match typ.as_ref() {
+            Type::Opt(t) => Rc::new(Type::Opt(self.bind_type_vars(t)?)),
+            Type::Maybe(t) => Rc::new(Type::Maybe(self.bind_type_vars(t)?)),
+            Type::Err(t) => Rc::new(Type::Err(self.bind_type_vars(t)?)),
+            Type::Lst(t) => Rc::new(Type::Lst(self.bind_type_vars(t)?)),
+            Type::Ref(t) => Rc::new(Type::Ref(self.bind_type_vars(t)?)),
+            Type::Iter(t) => Rc::new(Type::Iter(self.bind_type_vars(t)?)),
+            Type::Map(t) => Rc::new(Type::Map(self.bind_type_vars(t)?)),
+            Type::Pair(t, t2) => {
+                let t = self.bind_type_vars(t)?;
+                let t2 = self.bind_type_vars(t2)?;
+                Rc::new(Type::Pair(t, t2))
+            }
+            Type::Tuple(types) => {
+                let mut bound_types = Vec::new();
+
+                for t in types.iter() {
+                    bound_types.push(self.bind_type_vars(t)?);
+                }
+
+                Rc::new(Type::Tuple(Rc::new(bound_types)))
+            }
+            Type::Union(types) => {
+                let mut bound_types = Vec::new();
+
+                for t in types.iter() {
+                    bound_types.push(self.bind_type_vars(t)?);
+                }
+
+                Rc::new(Type::Union(Rc::new(bound_types)))
+            }
+            Type::Function(types, ret, type_var_limits) => {
+                self.push();
+                if let Some(type_var_limits) = type_var_limits {
+                    for (name, typ) in type_var_limits.iter() {
+                        if let Some(typ) = typ {
+                            let bound_limit_typ = self.bind_type_vars(typ)?;
+                            match self.bind(name, bound_limit_typ) {
+                                Ok(_) => (),
+                                Err(t) => {
+                                    return Err(TypeVarBindingError::AlreadyBound(
+                                        name.to_string(),
+                                        t,
+                                    ))
+                                }
+                            }
+                        } else {
+                            match self.bind(name, Type::any()) {
+                                Ok(_) => (),
+                                Err(t) => {
+                                    return Err(TypeVarBindingError::AlreadyBound(
+                                        name.to_string(),
+                                        t,
+                                    ))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let bound_ret = self.bind_type_vars(ret)?;
+
+                let mut bound_arg_types = Vec::new();
+                for (t, optional, paramname) in types.iter() {
+                    bound_arg_types.push((self.bind_type_vars(t)?, *optional, paramname.clone()));
+                }
+                self.pop();
+                Rc::new(Type::Function(
+                    Rc::new(bound_arg_types),
+                    bound_ret,
+                    type_var_limits.clone(),
+                ))
+            }
+            //        Type::Record(_name, record, type_vars) => {
+            //            record.resolve_check(),
+            //        }
+            Type::Var(name) => {
+                if let Some(typ) = self.find(name) {
+                    typ
+                } else {
+                    return Err(TypeVarBindingError::UnknownVar(name.to_string()));
+                }
+            }
+            _ => typ.clone(),
+        };
+        Ok(ret)
     }
 }
 
@@ -2130,16 +2293,17 @@ pub enum Type {
     Ref(Rc<Type>),
     Iter(Rc<Type>),
     Userdata(Rc<String>, Rc<Vec<(String, Rc<Type>)>>),
-    Record(Rc<String>, Rc<TypeRecord>),
+    Record(Rc<String>, Rc<TypeRecord>, Option<Rc<Vec<(String, Rc<Type>)>>>),
     Union(Rc<Vec<Rc<Type>>>),
     Function(
         Rc<Vec<(Rc<Type>, bool, Option<String>)>>,
         Rc<Type>,
-        Option<Rc<Vec<(String, Rc<Type>)>>>,
+        Option<Rc<Vec<(String, Option<Rc<Type>>)>>>,
     ),
     Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>, Option<Rc<TypeEnv>>),
     Alias(Rc<String>, Option<Rc<Vec<Rc<Type>>>>, Option<Rc<TypeEnv>>),
-    Var(Rc<String>, Option<Rc<Vec<String>>>),
+    BoundVar(Rc<String>, usize, Rc<Type>),
+    Var(Rc<String>),
 }
 
 thread_local! {
@@ -2161,7 +2325,7 @@ impl Type {
     }
 
     pub fn unknown(hint: &str) -> Rc<Self> {
-        Rc::new(Type::Unknown(hint.to_string(), TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst)))
+        Rc::new(Type::Unknown(hint.to_string(), next_type_var_id()))
     }
     pub fn any() -> Rc<Self> {
         TYPE_RC_ANY.with(|typ| typ.clone())
@@ -2216,18 +2380,11 @@ impl Type {
     }
 
     pub fn rc_new_var(n: &str) -> Rc<Self> {
-        Rc::new(Type::Var(
-            Rc::new(format!("{}{}", n, TYPE_VAR_ID.fetch_add(1, Ordering::SeqCst))),
-            None,
-        ))
+        Rc::new(Type::Var(Rc::new(format!("{}{}", n, next_type_var_id()))))
     }
 
     pub fn generic(n: &str) -> Rc<Self> {
-        Rc::new(Type::Var(Rc::new(n.to_string()), None))
-    }
-
-    pub fn generic_is(n: &str, limits: Vec<String>) -> Rc<Self> {
-        Rc::new(Type::Var(Rc::new(n.to_string()), Some(Rc::new(limits))))
+        Rc::new(Type::Var(Rc::new(n.to_string())))
     }
 
     pub fn named(n: &str) -> Rc<Self> {
@@ -2254,7 +2411,7 @@ impl Type {
         Rc::new(Type::Function(
             Rc::new(vec![(Rc::new(a1), false, Some(a1n.to_string()))]),
             Rc::new(t),
-            Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), t.clone())).collect())),
+            Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), Some(t.clone()))).collect())),
         ))
     }
 
@@ -2283,7 +2440,7 @@ impl Type {
                 (Rc::new(a2), false, Some(a2n.to_string())),
             ]),
             Rc::new(t),
-            Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), t.clone())).collect())),
+            Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), Some(t.clone()))).collect())),
         ))
     }
 
@@ -2389,7 +2546,7 @@ impl Type {
                 res += "}";
                 res
             }
-            Type::Record(name, record) => format!("record {} {{ {} }}", name, record.s()),
+            Type::Record(name, record, limits) => format!("record {} {{ {} }}", name, record.s()),
             Type::Tuple(types) => {
                 let mut res = String::from("[");
                 let mut first = true;
@@ -2432,9 +2589,11 @@ impl Type {
                             ls += ", ";
                         }
                         ls += varname.as_str();
-                        ls += " is (";
-                        ls += &limit_type.s();
-                        ls += ")";
+                        if let Some(limit_type) = limit_type {
+                            ls += " is (";
+                            ls += &limit_type.s();
+                            ls += ")";
+                        }
                     }
                     ls += "> ";
                     ls
@@ -2490,104 +2649,19 @@ impl Type {
                 s += ">";
                 s
             }
-            Type::Var(name, None) => format!("<{}>", *name),
-            Type::Var(name, Some(limits)) => {
-                let mut limit_list = String::from("");
-                for (i, l) in limits.iter().enumerate() {
-                    if i != 0 {
-                        limit_list += ", ";
-                    } else {
-                        limit_list += l.as_str();
-                    }
-                }
-                format!("<{} is {}>", *name, limit_list)
+            Type::BoundVar(name, id, limit_typ) => {
+                format!("<{}:{} is {}>", *name, *id, limit_typ.s())
             }
+            Type::Var(name) => format!("<{}>", *name),
         }
     }
 
-//    pub fn is_resolved(&self) -> bool {
-//        match self.resolve_check() {
-//            TypeResolve::Resolved => true,
-//            _ => false,
-//        }
-//    }
-
-//    pub fn resolve_check(&self) -> TypeResolve {
-//        match self {
-//            Type::Any => return TypeResolve::Resolved,
-//            Type::Any => return TypeResolve::Resolved,
-//            Type::Bool => return TypeResolve::Resolved,
-//            Type::None => return TypeResolve::Resolved,
-//            Type::Str => return TypeResolve::Resolved,
-//            Type::Bytes => return TypeResolve::Resolved,
-//            Type::Sym => return TypeResolve::Resolved,
-//            Type::Char => return TypeResolve::Resolved,
-//            Type::Byte => return TypeResolve::Resolved,
-//            Type::Syntax => return TypeResolve::Resolved,
-//            Type::Type => return TypeResolve::Resolved,
-//            Type::Int => return TypeResolve::Resolved,
-//            Type::Float => return TypeResolve::Resolved,
-//            Type::IVec2 => return TypeResolve::Resolved,
-//            Type::IVec3 => return TypeResolve::Resolved,
-//            Type::IVec4 => return TypeResolve::Resolved,
-//            Type::FVec2 => return TypeResolve::Resolved,
-//            Type::FVec3 => return TypeResolve::Resolved,
-//            Type::FVec4 => return TypeResolve::Resolved,
-//            Type::Opt(t) => return t.resolve_check(),
-//            Type::Maybe(t) => return t.resolve_check(),
-//            Type::Err(t) => return t.resolve_check(),
-//            Type::Pair(t, t2) => {
-//                let mut res = t.resolve_check();
-//                match t2.resolve_check() {
-//                    TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-//                    TypeResolve::Named => res = TypeResolve::Named,
-//                    TypeResolve::Resolved => (),
-//                }
-//                res
-//            }
-//            Type::Lst(t) => t.resolve_check(),
-//            Type::Ref(t) => t.resolve_check(),
-//            Type::Iter(t) => t.resolve_check(),
-//            Type::Map(t) => t.resolve_check(),
-//            Type::Record(_name, record) => record.resolve_check(),
-//            Type::Userdata(_name, fields) => {
-//                let mut res = TypeResolve::Resolved;
-//                for t in fields.iter() {
-//                    match t.1.resolve_check() {
-//                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-//                        TypeResolve::Named => res = TypeResolve::Named,
-//                        TypeResolve::Resolved => (),
-//                    }
-//                }
-//                res
-//            }
-//            Type::Tuple(types) | Type::Union(types) => {
-//                let mut res = TypeResolve::Resolved;
-//                for t in types.iter() {
-//                    match t.resolve_check() {
-//                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-//                        TypeResolve::Named => res = TypeResolve::Named,
-//                        TypeResolve::Resolved => (),
-//                    }
-//                }
-//                res
-//            }
-//            Type::Function(types, ret, _limits) => {
-//                let mut res = ret.resolve_check();
-//                for t in types.iter() {
-//                    match t.0.resolve_check() {
-//                        TypeResolve::UnboundVars => return TypeResolve::UnboundVars,
-//                        TypeResolve::Named => res = TypeResolve::Named,
-//                        TypeResolve::Resolved => (),
-//                    }
-//                }
-//                res
-//            }
-//            Type::Name(_name, _bindings, _typenv) => TypeResolve::Named,
-//            Type::Alias(_name, _bindings, _typenv) => TypeResolve::Named,
-//            Type::Var(_name, _limits) => TypeResolve::UnboundVars,
-//        }
-//    }
+    //    pub fn is_resolved(&self) -> bool {
+    //        match self.resolve_check() {
+    //            TypeResolve::Resolved => true,
+    //            _ => false,
+    //        }
+    //    }
 
     pub fn wrap_simple(&self, other: Rc<Type>) -> Option<Rc<Type>> {
         match self {
@@ -2658,7 +2732,9 @@ where
     F: FnMut(&str) -> Option<Rc<Type>>,
 {
     let mut indent = String::from("");
-    for _ in 0..depth { indent += "  "; }
+    for _ in 0..depth {
+        indent += "  ";
+    }
     if let Type::Alias(name, _binds, _type_env) = typ.as_ref() {
         eprintln!("{}resolve_type alias {} <= {}", indent, typ, chk_t);
         if let Type::Alias(chk_name, _, _) = chk_t.as_ref() {
@@ -2699,7 +2775,8 @@ where
                 _ => (),
             }
 
-            let left_type = match resolve_type(typ, chk_mb_t, bound_vars, name_resolver, depth + 1) {
+            let left_type = match resolve_type(typ, chk_mb_t, bound_vars, name_resolver, depth + 1)
+            {
                 TypeResolveResult::Match { typ } => typ,
                 TypeResolveResult::Conflict { reason: _, expected, got } => {
                     return TypeResolveResult::Conflict {
@@ -2781,7 +2858,7 @@ where
             reason: TypeConflictReason::Unresolved,
         },
         Type::Any => match chk_t.as_ref() {
-            Type::Var(name, _l) => {
+            Type::Var(name) => {
                 if let Some((_, typ)) =
                     bound_vars.iter().find(|var| var.0.as_str() == name.as_str())
                 {
@@ -2825,14 +2902,24 @@ where
         Type::FVec2 => resolve_type_trivial!(typ, chk_t, Type::FVec2),
         Type::FVec3 => resolve_type_trivial!(typ, chk_t, Type::FVec3),
         Type::FVec4 => resolve_type_trivial!(typ, chk_t, Type::FVec4),
-        Type::Opt(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Opt, bound_vars, name_resolver, depth),
+        Type::Opt(t) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Opt, bound_vars, name_resolver, depth)
+        }
         Type::Maybe(t) => {
             resolve_type_wrap1!(typ, t, chk_t, Type::Maybe, bound_vars, name_resolver, depth)
         }
-        Type::Err(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Err, bound_vars, name_resolver, depth),
-        Type::Lst(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Lst, bound_vars, name_resolver, depth),
-        Type::Ref(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Ref, bound_vars, name_resolver, depth),
-        Type::Map(t) => resolve_type_wrap1!(typ, t, chk_t, Type::Map, bound_vars, name_resolver, depth),
+        Type::Err(t) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Err, bound_vars, name_resolver, depth)
+        }
+        Type::Lst(t) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Lst, bound_vars, name_resolver, depth)
+        }
+        Type::Ref(t) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Ref, bound_vars, name_resolver, depth)
+        }
+        Type::Map(t) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Map, bound_vars, name_resolver, depth)
+        }
         Type::Pair(t, t2) => {
             if let Type::Pair(ct, ct2) = chk_t.as_ref() {
                 let ct = match resolve_type(t, ct, bound_vars, name_resolver, depth + 1) {
@@ -2901,16 +2988,15 @@ where
                 }
             }
         }
-        Type::Function(arg_types, ret, _type_vars) => {
+        Type::Function(arg_types, ret, type_var_limits) => {
             // TODO: do something with type_vars!
+            let mut bv = bound_vars.clone();
 
             // Only matches, if the other type is also a function type.
-            if let Type::Function(chk_arg_types, chk_ret, limits) = chk_t.as_ref() {
-                // TODO: Do not allocate if we don't have limits!
-                let mut bv = bound_vars.clone();
-                if let Some(limits) = limits {
-                    for (var, typ) in limits.iter() {
-                        bv.push((var.to_string(), typ.clone()));
+            if let Type::Function(chk_arg_types, chk_ret, type_var_limits) = chk_t.as_ref() {
+                if let Some(type_var_limits) = type_var_limits {
+                    for (var, typ) in type_var_limits.iter() {
+                        bv.push((var.to_string(), typ.clone().unwrap_or_else(|| Type::any())));
                     }
                 }
 
@@ -2921,20 +3007,25 @@ where
                         required += 1;
                     }
                     if let Some((chk_arg_typ, _optional, _param_names)) = chk_arg_types.get(i) {
-                        let matched_arg_typ =
-                            match resolve_type(t, chk_arg_typ, bound_vars, name_resolver, depth + 1) {
-                                TypeResolveResult::Match { typ } => typ,
-                                TypeResolveResult::Conflict { reason, .. } => {
-                                    return TypeResolveResult::Conflict {
-                                        expected: typ.clone(),
-                                        got: chk_t.clone(),
-                                        reason: TypeConflictReason::WrongArgumentType(
-                                            i,
-                                            Box::new(reason),
-                                        ),
-                                    }
+                        let matched_arg_typ = match resolve_type(
+                            t,
+                            chk_arg_typ,
+                            bound_vars,
+                            name_resolver,
+                            depth + 1,
+                        ) {
+                            TypeResolveResult::Match { typ } => typ,
+                            TypeResolveResult::Conflict { reason, .. } => {
+                                return TypeResolveResult::Conflict {
+                                    expected: typ.clone(),
+                                    got: chk_t.clone(),
+                                    reason: TypeConflictReason::WrongArgumentType(
+                                        i,
+                                        Box::new(reason),
+                                    ),
                                 }
-                            };
+                            }
+                        };
                         matched_args.push((matched_arg_typ, *optional, param_name.clone()));
                     } else {
                         if !optional {
@@ -2970,20 +3061,21 @@ where
                 }
 
                 println!("CHECKKKKKKKKKKKKKKKKKKKKK ret={}, chk_ret={}", ret, chk_ret);
-                let matched_ret = match resolve_type(ret, chk_ret, bound_vars, name_resolver, depth + 1) {
-                    TypeResolveResult::Match { typ } => typ,
-                    TypeResolveResult::Conflict { expected, got, .. } => {
-                        return TypeResolveResult::Conflict {
-                            // Should be correct, because we reversed chk_ret and ret.
-                            expected,
-                            got,
-                            reason: TypeConflictReason::WrongReturnType(
-                                ret.clone(),
-                                chk_ret.clone(),
-                            ),
-                        };
-                    }
-                };
+                let matched_ret =
+                    match resolve_type(ret, chk_ret, bound_vars, name_resolver, depth + 1) {
+                        TypeResolveResult::Match { typ } => typ,
+                        TypeResolveResult::Conflict { expected, got, .. } => {
+                            return TypeResolveResult::Conflict {
+                                // Should be correct, because we reversed chk_ret and ret.
+                                expected,
+                                got,
+                                reason: TypeConflictReason::WrongReturnType(
+                                    ret.clone(),
+                                    chk_ret.clone(),
+                                ),
+                            };
+                        }
+                    };
 
                 println!("MATCHED RET: {} <=> {} => {}", chk_ret.s(), ret.s(), matched_ret.s());
 
@@ -3040,7 +3132,7 @@ where
                 reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
             }
         }
-        Type::Var(name, _limits_might_be_not_needed_if_not_then_remove_from_type_thanks) => {
+        Type::Var(name) => {
             let bound_type = if let Some((_, typ)) =
                 bound_vars.iter().find(|var| var.0.as_str() == name.as_str())
             {
@@ -3051,20 +3143,21 @@ where
 
             if let Some(bound_type) = bound_type {
                 let bound_type = if let Type::Union(_) = typ.as_ref() {
-                    let bound_type = match resolve_type(typ, chk_t, bound_vars, name_resolver, depth + 1) {
-                        TypeResolveResult::Match { typ } => typ,
-                        TypeResolveResult::Conflict { expected: _, got: _, reason: _ } => {
-                            return TypeResolveResult::Conflict {
-                                expected: typ.clone(),
-                                got: chk_t.clone(),
-                                reason: TypeConflictReason::VarLimit(
-                                    name.to_string(),
-                                    typ.clone(),
-                                    chk_t.clone(),
-                                ),
+                    let bound_type =
+                        match resolve_type(typ, chk_t, bound_vars, name_resolver, depth + 1) {
+                            TypeResolveResult::Match { typ } => typ,
+                            TypeResolveResult::Conflict { expected: _, got: _, reason: _ } => {
+                                return TypeResolveResult::Conflict {
+                                    expected: typ.clone(),
+                                    got: chk_t.clone(),
+                                    reason: TypeConflictReason::VarLimit(
+                                        name.to_string(),
+                                        typ.clone(),
+                                        chk_t.clone(),
+                                    ),
+                                }
                             }
-                        }
-                    };
+                        };
                     bound_vars.insert(0, (name.to_string(), bound_type.clone()));
                     eprintln!("{}|---- bind {} <= {}", indent, name, bound_type);
                     bound_type

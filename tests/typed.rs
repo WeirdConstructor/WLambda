@@ -109,11 +109,24 @@ fn chk_types_aliasing() {
 //        v("!:type @Num (int | float); !f = {|@Num, @Num -> int| int[_ + _1] }; f 10 11.2"),
 //        "21"
 //    );
+//    assert_eq!(
+//        v(r#"!:type @X (int | float);
+//            {|@X -> int| _ } 10.1
+//        "#),
+//        "expected (int), but got (float); in last statement of function block"
+//    );
+//    assert_eq!(
+//        v(r#"!:type @X (int | float);
+//            {|@X, @X -> int| int _1 } 10 12.6
+//        "#),
+//        "12"
+//    );
     assert_eq!(
         v(r#"!:type @X (int | float);
-            {|@X -> int| _ } 10.1
+            !f: fn <N is @Num> (N) -> N = { _ };
+            f 12.6
         "#),
-        "expected (int), but got (float); in last statement of function block"
+        "22"
     );
     assert_eq!(
         v(r#"!:type @X (int | float);

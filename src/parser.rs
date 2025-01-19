@@ -1032,7 +1032,9 @@ fn parse_typename(ps: &mut State) -> Result<String, ParseError> {
     parse_ident(ps, true)
 }
 
-fn parse_type_vars(ps: &mut State) -> Result<Option<Rc<Vec<(String, Rc<Type>)>>>, ParseError> {
+fn parse_type_vars(
+    ps: &mut State,
+) -> Result<Option<Rc<Vec<(String, Option<Rc<Type>>)>>>, ParseError> {
     if !ps.consume_area_start_token_wsc('<', Syntax::TQ) {
         return Ok(None);
     }
@@ -1049,16 +1051,20 @@ fn parse_type_vars(ps: &mut State) -> Result<Option<Rc<Vec<(String, Rc<Type>)>>>
 
     let tvar = parse_typename(ps)?;
     ps.skip_ws_and_comments();
-    let constraint_type =
-        if ps.consume_tokens_wsc("is", Syntax::T) { parse_type(ps)?.t() } else { Type::any() };
-    bindings.push((tvar, constraint_type));
+    if ps.consume_tokens_wsc("is", Syntax::T) {
+        bindings.push((tvar, Some(parse_type(ps)?.t())));
+    } else {
+        bindings.push((tvar, None));
+    }
 
     while ps.consume_token_wsc(',', Syntax::TDelim) {
         let tvar = parse_typename(ps)?;
         ps.skip_ws_and_comments();
-        let constraint_type =
-            if ps.consume_tokens_wsc("is", Syntax::T) { parse_type(ps)?.t() } else { Type::any() };
-        bindings.push((tvar, constraint_type));
+        if ps.consume_tokens_wsc("is", Syntax::T) {
+            bindings.push((tvar, Some(parse_type(ps)?.t())));
+        } else {
+            bindings.push((tvar, None));
+        }
     }
 
     if !ps.consume_area_end_token_wsc('>', Syntax::TQ) {
