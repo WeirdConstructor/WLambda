@@ -12,7 +12,9 @@ use std::rc::Rc;
 
 use crate::compiler::{fetch_object_key_access, CompileEnv};
 use crate::ops::BinOp;
-use crate::vval::{resolve_type, CompileError, Syntax, Type, TypeResolveResult, VVal, VarPos};
+use crate::vval::{
+    resolve_type, CompileError, Syntax, Type, TypeResolveResult, TypeVarBindingEnv, VVal, VarPos,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) enum TypeHint {
@@ -305,7 +307,12 @@ fn type_call(
         fun_arg_types.push((Type::unknown(&format!("callarg{}", i)), false, None));
     }
     let argc = args.len() - 1;
-    let synth_fun_type = Rc::new(Type::Function(Rc::new(fun_arg_types), ret_type.clone(), None));
+    let synth_fun_type = TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
+        Rc::new(fun_arg_types),
+        ret_type.clone(),
+        None,
+    )))
+    .expect("properly synthesized function");
 
     // Synthesize the function type (including return tyep) and pass it as
     // type hint for the return type of the function?

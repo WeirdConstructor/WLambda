@@ -2095,12 +2095,13 @@ impl TypeEnv {
     }
 }
 
-struct TypeVarBindingEnv {
+#[derive(Clone, Debug)]
+pub struct TypeVarBindingEnv {
     env_stack: Vec<Vec<(String, Rc<Type>)>>,
 }
 
 #[derive(Clone, Debug)]
-enum TypeVarBindingError {
+pub enum TypeVarBindingError {
     UnknownVar(String),
     AlreadyBound(String, Rc<Type>),
 }
@@ -2146,7 +2147,9 @@ impl TypeVarBindingEnv {
 
     pub fn find(&self, name: &str) -> Option<Rc<Type>> {
         let (depth_idx, idx) = self.lookup(name)?;
-        Some(self.env_stack[depth_idx][idx].1.clone())
+        let found = self.env_stack[depth_idx][idx].1.clone();
+        println!("FINDING {} to {}", name, found);
+        Some(found)
     }
 
     pub fn bind(&mut self, name: &str, limit: Rc<Type>) -> Result<Rc<Type>, Rc<Type>> {
@@ -2160,8 +2163,17 @@ impl TypeVarBindingEnv {
             .last_mut()
             .expect("TypeVarBindingEnv has at least one frame on the env_stack")
             .push((name.to_string(), bound_typ.clone()));
+        println!("BINDING {} to {}", name, bound_typ);
 
         Ok(bound_typ)
+    }
+
+    pub fn bind_type(typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
+        println!("#bind_type input {}", typ);
+        let mut bindenv = Self::new();
+        let ret = bindenv.bind_type_vars(typ)?;
+        println!("#bind_type output {}", ret);
+        Ok(ret)
     }
 
     pub fn bind_type_vars(&mut self, typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
@@ -2225,12 +2237,14 @@ impl TypeVarBindingEnv {
                     }
                 }
 
-                let bound_ret = self.bind_type_vars(ret)?;
-
                 let mut bound_arg_types = Vec::new();
                 for (t, optional, paramname) in types.iter() {
+                    println!("ARGT: {}", t);
                     bound_arg_types.push((self.bind_type_vars(t)?, *optional, paramname.clone()));
                 }
+                let bound_ret = self.bind_type_vars(ret)?;
+                println!("FUNCTION BIND: {:?}", self);
+                println!("FUNCTION BIND OUT: {}", bound_ret);
                 self.pop();
                 Rc::new(Type::Function(
                     Rc::new(bound_arg_types),
@@ -2241,6 +2255,13 @@ impl TypeVarBindingEnv {
             //        Type::Record(_name, record, type_vars) => {
             //            record.resolve_check(),
             //        }
+            Type::Name(name, _binds, _type_env) => {
+                if let Some(typ) = self.find(name) {
+                    typ
+                } else {
+                    typ.clone()
+                }
+            }
             Type::Var(name) => {
                 if let Some(typ) = self.find(name) {
                     typ
@@ -2396,34 +2417,38 @@ impl Type {
     }
 
     pub fn fun_ret(t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t), None))
+        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t), None)))
+            .expect("Well formed function type")
     }
 
     pub fn fun_1_ret(a1n: &str, a1: Self, t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(
+        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
             Rc::new(vec![(Rc::new(a1), false, Some(a1n.to_string()))]),
             Rc::new(t),
             None,
-        ))
+        )))
+        .expect("Well formed function type")
     }
 
     pub fn fun_1_ret_is(a1n: &str, a1: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
-        Rc::new(Type::Function(
+        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
             Rc::new(vec![(Rc::new(a1), false, Some(a1n.to_string()))]),
             Rc::new(t),
             Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), Some(t.clone()))).collect())),
-        ))
+        )))
+        .expect("Well formed function type")
     }
 
     pub fn fun_2_ret(a1n: &str, a1: Self, a2n: &str, a2: Self, t: Self) -> Rc<Type> {
-        Rc::new(Type::Function(
+        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
             Rc::new(vec![
                 (Rc::new(a1), false, Some(a1n.to_string())),
                 (Rc::new(a2), false, Some(a2n.to_string())),
             ]),
             Rc::new(t),
             None,
-        ))
+        )))
+        .expect("Well formed function type")
     }
 
     pub fn fun_2_ret_is(
@@ -2434,14 +2459,15 @@ impl Type {
         t: Self,
         is: &[(&str, Rc<Type>)],
     ) -> Rc<Type> {
-        Rc::new(Type::Function(
+        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
             Rc::new(vec![
                 (Rc::new(a1), false, Some(a1n.to_string())),
                 (Rc::new(a2), false, Some(a2n.to_string())),
             ]),
             Rc::new(t),
             Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), Some(t.clone()))).collect())),
-        ))
+        )))
+        .expect("Well formed function type")
     }
 
     pub fn get_parameter_tuple(&self) -> Rc<Type> {
@@ -3130,6 +3156,32 @@ where
                 got: chk_t.clone(),
 
                 reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+            }
+        }
+        Type::BoundVar(_name, id, _limits) => {
+            if let Type::BoundVar(_name, chk_id, _limits) = chk_t.as_ref() {
+                // BoundVar == BoundVar
+                // => the IDs need to match.
+                // if the IDs match: nothing to do, matches.
+                // else case might be something like:
+                //      !f1: fn <N is @Num>(N) -> N = ...;
+                //      !f2: fn <X is int>(X) -> X;
+                //      .f1 = f2; // Question: Should that work?
+                //                // Answer: NO! f2 can't handle float as input!
+                //      .f2 = f1; // Question: Should that work?
+                //                // Answer: Yes, f1 is more generic than f2. That means, it
+                //                //         can definitively handle `int`.
+                if *id != *chk_id {
+                    TypeResolveResult::Conflict {
+                        expected: typ.clone(),
+                        got: chk_t.clone(),
+                        reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+                    }
+                } else {
+                    TypeResolveResult::Match { typ: chk_t.clone() }
+                }
+            } else {
+                // cases:
             }
         }
         Type::Var(name) => {
