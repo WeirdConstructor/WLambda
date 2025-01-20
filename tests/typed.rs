@@ -129,6 +129,20 @@ fn chk_types_aliasing() {
         "expected (fn (<N is @Num>) -> <N is @Num>), but got (fn (<X is int>) -> <X is int>); in assignment to 'f1'"
     );
     assert_eq!(
+        v(r#"std:types:is_typeof
+                ($type fn <X is int>(X) -> X)
+                ($type fn <N is @Num>(N) -> N);
+        "#),
+        "$type(fn (int) -> int)"
+    );
+    assert_eq!(
+        v(r#"unwrap_err ~ std:types:is_typeof
+                ($type fn <N is @Num>(N) -> N)
+                ($type fn <X is int>(X) -> X);
+        "#),
+        ""
+    );
+    assert_eq!(
         v(r#"!f1: fn <N is @Num>(N) -> N = { _ };
              !f2: fn <X is int>(X) -> X = { _ };
              .f2 = f1;

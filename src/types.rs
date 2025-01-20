@@ -130,7 +130,6 @@ fn type_var(
                 }
             }
         }
-        Ok(TypedVVal::new(Type::rc_new_var(&format!("V{}_", var_s)), ast.clone()))
     })?;
     if capt_ref {
         typ_val.typ = Rc::new(Type::Ref(typ_val.typ));
@@ -199,7 +198,7 @@ fn type_func(
         }
     };
 
-    let mut ret_type = fun_type.get_return_type().unwrap_or_else(|| Type::unknown("funret"));
+    let ret_type = fun_type.get_return_type().unwrap_or_else(|| Type::unknown("funret"));
 
     // TODO: Setup a function environment, holding the positional parameter types
     //       and their names maybe?
@@ -268,7 +267,7 @@ fn type_call(
     type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
-    if let Some((syntax, object, key)) = fetch_object_key_access(&ast.at(1).unwrap()) {
+    if let Some((_syntax, _object, _key)) = fetch_object_key_access(&ast.at(1).unwrap()) {
         panic!("Unimplemented GetKey/GetSym! {}", ast.s());
     }
 
@@ -306,7 +305,6 @@ fn type_call(
         args.push(e);
         fun_arg_types.push((Type::unknown(&format!("callarg{}", i)), false, None));
     }
-    let argc = args.len() - 1;
     let synth_fun_type = TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
         Rc::new(fun_arg_types),
         ret_type.clone(),
@@ -324,12 +322,10 @@ fn type_call(
     let ret_type = real_fun_type.get_return_type().unwrap_or_else(|| Type::unknown("rlfunret"));
 
     let mut type_checked_args = vec![];
-    let mut argc = 0;
     for (i, e) in args.iter().enumerate() {
         let ty = type_pass(e, TypeHint::from_type(&Type::unknown(&format!("arg{}", i))), ce)?;
         println!("ARG: {:?} has type: {}", e.s(), ty);
         type_checked_args.push(ty);
-        argc += 1;
     }
     // Synthesize the function from the argument types:
     let chk_func = Rc::new(Type::Function(
@@ -344,7 +340,7 @@ fn type_call(
     println!("RESULTING FUNCTION CALL TYPE: {}", res_typ);
 
     let fun_ast_node = called_thing.vval;
-    let mut new_ast = VVal::vec();
+    let new_ast = VVal::vec();
     new_ast.push(ast.v_(0));
     new_ast.push(fun_ast_node);
     //    new_ast.push(VVal::Type(res_typ));
@@ -513,7 +509,7 @@ where
 fn type_assign(
     ast: &VVal,
     ce: &mut Rc<RefCell<CompileEnv>>,
-    is_ref: bool,
+    _is_ref: bool, // TODO: Handle is_ref?!?!?
 ) -> Result<TypedVVal, CompileError> {
     let (vars, value, destr) = (ast.v_(1), ast.v_(2), ast.v_(3));
 
@@ -564,8 +560,7 @@ pub(crate) fn type_pass(
     type_hint: TypeHint,
     ce: &mut Rc<RefCell<CompileEnv>>,
 ) -> Result<TypedVVal, CompileError> {
-    let th = type_hint.clone();
-    let mut tv = match ast {
+    let tv = match ast {
         VVal::Lst(_, _) => {
             let syn = ast.at(0).unwrap_or(VVal::None).get_syn();
             let v = match syn {

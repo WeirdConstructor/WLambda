@@ -1914,9 +1914,6 @@ pub struct TypeRecord {
 }
 
 impl TypeRecord {
-    fn s(&self) -> String {
-        self.to_display(false)
-    }
     fn to_display(&self, extended: bool) -> String {
         let mut res = String::from("");
         for (i, v) in self.interfaces.iter().enumerate() {
@@ -2526,7 +2523,7 @@ impl Type {
         matches!(self, Type::Alias(_, _, _))
     }
 
-    pub fn eq(&self, other: &Self) -> bool {
+    pub fn eq(&self, _other: &Self) -> bool {
         // TODO: Implement equality check!
         //       Adhere to the TypeEnv the named/aliased types belong to!
         false
@@ -2585,7 +2582,7 @@ impl Type {
                 res += "}";
                 res
             }
-            Type::Record(name, record, limits) => {
+            Type::Record(name, record, _limits) => {
                 format!("record {} {{ {} }}", name, record.to_display(extended))
             }
             Type::Tuple(types) => {
@@ -2816,7 +2813,7 @@ where
         Type::Maybe(chk_mb_t) => {
             eprintln!("{}resolve_type rmaybe {} <= {}", indent, typ, chk_t);
             match resolve_type(typ, &Type::none(), bound_vars, name_resolver, depth + 1) {
-                TypeResolveResult::Conflict { reason: _, expected, got } => {
+                TypeResolveResult::Conflict { reason: _, expected: _, got } => {
                     return TypeResolveResult::Conflict {
                         expected: typ.clone(),
                         got: chk_t.clone(),
@@ -3039,7 +3036,7 @@ where
                 }
             }
         }
-        Type::Function(arg_types, ret, type_var_limits) => {
+        Type::Function(arg_types, ret, _type_var_limits) => {
             // TODO: do something with type_vars!
             let mut bv = bound_vars.clone();
 
@@ -3140,7 +3137,7 @@ where
                 }
             }
         }
-        Type::Alias(name, _binds, _type_env) => {
+        Type::Alias(_name, _binds, _type_env) => {
             // Does not happen, the Alias case is caught at the top and resolved immediately.
             TypeResolveResult::Conflict {
                 expected: typ.clone(),

@@ -13573,7 +13573,7 @@ pub fn std_symbol_table() -> SymbolTable {
     func!(
         st,
         "fs:path:temp_dir",
-        |env: &mut Env, _argc: usize| {
+        |_env: &mut Env, _argc: usize| {
             let path = std::env::temp_dir();
             Ok(VVal::new_str_mv(path.as_path().to_string_lossy().to_string()))
         },
@@ -15865,6 +15865,66 @@ pub fn std_symbol_table() -> SymbolTable {
         },
         Some(1),
         Some(1),
+        false
+    );
+
+    func!(
+        st,
+        "types:is_typeof",
+        |env: &mut Env, _argc: usize| {
+            use crate::vval::resolve_type;
+            let t1 = env.arg(0);
+            let t2 = env.arg(1);
+            let typ1 = TypeVarBindingEnv::bind_type(&t1.t());
+            let typ2 = TypeVarBindingEnv::bind_type(&t2.t());
+
+            let typ1 = match typ1 {
+                Ok(t) => t,
+                Err(e) => {
+                    return Ok(VVal::err_msg(&format!("Can't bind type {}: {}", t1, e)));
+                }
+            };
+
+            let typ2 = match typ2 {
+                Ok(t) => t,
+                Err(e) => {
+                    return Ok(VVal::err_msg(&format!("Can't bind type {}: {}", t2, e)));
+                }
+            };
+
+            let mut bound_vars = vec![];
+            let res = resolve_type(
+                &typ1,
+                &typ2,
+                &mut bound_vars,
+                &mut |name| {
+                    let value = env.global.borrow().get_var(name)?;
+                    let vartype = env.global.borrow().get_type(name)?;
+                    if vartype.is_alias() {
+                        Some(value.t())
+                    } else if vartype.is_type() {
+                        Some(value.t())
+                    } else {
+                        None
+                    }
+                },
+                0,
+            );
+
+            match res {
+                TypeResolveResult::Match { typ } => Ok(VVal::Type(typ)),
+                TypeResolveResult::Conflict { expected, got, reason } => {
+                    return Ok(VVal::err_msg(&format!(
+                        "Type error, expected ({}), but got ({}); reason: {}",
+                        expected.s(),
+                        got.s(),
+                        reason
+                    )));
+                }
+            }
+        },
+        Some(2),
+        Some(2),
         false
     );
 

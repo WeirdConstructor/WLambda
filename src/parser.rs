@@ -693,13 +693,6 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 let s = ps.syn(Syntax::TypeOf);
                 s.push(parse_expr(ps)?);
                 Ok(s)
-            } else if ps.consume_lookahead("is_subtypeof") {
-                // TODO: How should this behave???
-                ps.skip_ws_and_comments();
-                let s = ps.syn(Syntax::TypeOf);
-                s.push(parse_expr(ps)?);
-                s.push(parse_expr(ps)?);
-                Ok(s)
             } else if ps.consume_lookahead("type") {
                 ps.skip_ws_and_comments();
                 Ok(parse_bound_type(ps)?)
