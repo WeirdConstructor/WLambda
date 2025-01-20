@@ -1915,6 +1915,9 @@ pub struct TypeRecord {
 
 impl TypeRecord {
     fn s(&self) -> String {
+        self.to_display(false)
+    }
+    fn to_display(&self, extended: bool) -> String {
         let mut res = String::from("");
         for (i, v) in self.interfaces.iter().enumerate() {
             if i == 0 {
@@ -1925,10 +1928,10 @@ impl TypeRecord {
             res += v.as_str();
         }
         for v in self.typedefs.iter() {
-            res += &format!(" type {}: {}", v.0, v.1.s());
+            res += &format!(" type {}: {}", v.0, v.1.to_display(extended));
         }
         for v in self.fields.iter() {
-            res += &format!(" {}: {}", v.0, v.1.s());
+            res += &format!(" {}: {}", v.0, v.1.to_display(extended));
         }
         res
     }
@@ -2283,7 +2286,7 @@ pub enum TypeResolveResult {
 
 /// The definition of a type, that can be attached to functions, variables
 /// and values.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Type {
     Unknown(String, usize),
     None,
@@ -2529,7 +2532,15 @@ impl Type {
         false
     }
 
+    pub fn s_2(&self) -> String {
+        self.to_display(true)
+    }
+
     pub fn s(&self) -> String {
+        self.to_display(false)
+    }
+
+    pub fn to_display(&self, extended: bool) -> String {
         match self {
             Type::Unknown(hint, id) => format!("unknown:{}_{}", hint, id),
             Type::Any => "any".to_string(),
@@ -2550,14 +2561,16 @@ impl Type {
             Type::FVec2 => "fvec2".to_string(),
             Type::FVec3 => "fvec3".to_string(),
             Type::FVec4 => "fvec4".to_string(),
-            Type::Opt(t) => format!("optional {}", t.s()),
-            Type::Maybe(t) => format!("{}?", t.s()),
-            Type::Err(t) => format!("error {}", t.s()),
-            Type::Pair(t, t2) => format!("pair({}, {})", t.s(), t2.s()),
-            Type::Lst(t) => format!("[{}]", t.s()),
-            Type::Ref(t) => format!("ref {}", t.s()),
-            Type::Iter(t) => format!("iter {}", t.s()),
-            Type::Map(t) => format!("{{{}}}", t.s()),
+            Type::Opt(t) => format!("optional {}", t.to_display(extended)),
+            Type::Maybe(t) => format!("{}?", t.to_display(extended)),
+            Type::Err(t) => format!("error {}", t.to_display(extended)),
+            Type::Pair(t, t2) => {
+                format!("pair({}, {})", t.to_display(extended), t2.to_display(extended))
+            }
+            Type::Lst(t) => format!("[{}]", t.to_display(extended)),
+            Type::Ref(t) => format!("ref {}", t.to_display(extended)),
+            Type::Iter(t) => format!("iter {}", t.to_display(extended)),
+            Type::Map(t) => format!("{{{}}}", t.to_display(extended)),
             Type::Userdata(name, fields) => {
                 let mut res = format!("userdata {} {{", name);
                 let mut first = true;
@@ -2566,13 +2579,15 @@ impl Type {
                         res += ", ";
                     }
                     res += &t.0;
-                    res += &t.1.s();
+                    res += &t.1.to_display(extended);
                     first = false;
                 }
                 res += "}";
                 res
             }
-            Type::Record(name, record, limits) => format!("record {} {{ {} }}", name, record.s()),
+            Type::Record(name, record, limits) => {
+                format!("record {} {{ {} }}", name, record.to_display(extended))
+            }
             Type::Tuple(types) => {
                 let mut res = String::from("[");
                 let mut first = true;
@@ -2580,7 +2595,7 @@ impl Type {
                     if !first {
                         res += ", ";
                     }
-                    res += &t.s();
+                    res += &t.to_display(extended);
                     first = false;
                 }
                 res += "]";
@@ -2590,7 +2605,7 @@ impl Type {
                 let mut res = String::from("");
                 let mut first = true;
                 for t in types.iter() {
-                    let ts = t.s();
+                    let ts = t.to_display(extended);
                     if !first {
                         if ts.len() > 10 {
                             res += "\n| ";
@@ -2617,7 +2632,7 @@ impl Type {
                         ls += varname.as_str();
                         if let Some(limit_type) = limit_type {
                             ls += " is (";
-                            ls += &limit_type.s();
+                            ls += &limit_type.to_display(extended);
                             ls += ")";
                         }
                     }
@@ -2635,18 +2650,18 @@ impl Type {
                     }
                     if *opt {
                         fun += "[";
-                        fun += &t.s();
+                        fun += &t.to_display(extended);
                         fun += "]";
                     } else {
                         if let Some(param_name) = param_name {
                             fun += param_name.as_ref();
                             fun += ": ";
                         }
-                        fun += &t.s();
+                        fun += &t.to_display(extended);
                     }
                 }
                 fun += ") -> ";
-                fun += &ret.s();
+                fun += &ret.to_display(extended);
                 fun
             }
             Type::Alias(name, None, _) => format!("{}", *name),
@@ -2657,7 +2672,7 @@ impl Type {
                     if i != 0 {
                         s += ", ";
                     }
-                    s += &b.s();
+                    s += &b.to_display(extended);
                 }
                 s += ">";
                 s
@@ -2670,13 +2685,17 @@ impl Type {
                     if i != 0 {
                         s += ", ";
                     }
-                    s += &b.s();
+                    s += &b.to_display(extended);
                 }
                 s += ">";
                 s
             }
             Type::BoundVar(name, id, limit_typ) => {
-                format!("<{}:{} is {}>", *name, *id, limit_typ.s())
+                if extended {
+                    format!("<{}:{} is {}>", *name, *id, limit_typ.to_display(extended))
+                } else {
+                    format!("<{} is {}>", *name, limit_typ.to_display(extended))
+                }
             }
             Type::Var(name) => format!("<{}>", *name),
         }
@@ -2705,6 +2724,12 @@ impl Type {
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self.s())
+    }
+}
+
+impl Debug for Type {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.s_2())
     }
 }
 
@@ -3092,7 +3117,6 @@ where
                         TypeResolveResult::Match { typ } => typ,
                         TypeResolveResult::Conflict { expected, got, .. } => {
                             return TypeResolveResult::Conflict {
-                                // Should be correct, because we reversed chk_ret and ret.
                                 expected,
                                 got,
                                 reason: TypeConflictReason::WrongReturnType(
@@ -3158,8 +3182,8 @@ where
                 reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
             }
         }
-        Type::BoundVar(_name, id, _limits) => {
-            if let Type::BoundVar(_name, chk_id, _limits) = chk_t.as_ref() {
+        Type::BoundVar(_name, id, limit) => {
+            if let Type::BoundVar(_name, chk_id, chk_limit) = chk_t.as_ref() {
                 // BoundVar == BoundVar
                 // => the IDs need to match.
                 // if the IDs match: nothing to do, matches.
@@ -3172,16 +3196,26 @@ where
                 //                // Answer: Yes, f1 is more generic than f2. That means, it
                 //                //         can definitively handle `int`.
                 if *id != *chk_id {
-                    TypeResolveResult::Conflict {
-                        expected: typ.clone(),
-                        got: chk_t.clone(),
-                        reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+                    match resolve_type(chk_limit, limit, bound_vars, name_resolver, depth + 1) {
+                        TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+                        TypeResolveResult::Conflict { expected, got, .. } => {
+                            TypeResolveResult::Conflict {
+                                expected,
+                                got,
+                                reason: TypeConflictReason::WrongType(limit.clone(), chk_limit.clone()),
+                            }
+                        }
                     }
                 } else {
                     TypeResolveResult::Match { typ: chk_t.clone() }
                 }
             } else {
-                // cases:
+                // TODO: match the chk_t against the limits presented by BoundVar.
+                TypeResolveResult::Conflict {
+                    expected: typ.clone(),
+                    got: chk_t.clone(),
+                    reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+                }
             }
         }
         Type::Var(name) => {
