@@ -82,45 +82,47 @@ fn chk_types_function() {
 
 #[test]
 fn chk_types_aliasing() {
-    //    assert_eq!(v("!:type @Num int | float; !x: @Num = 10; x"), "10");
-    //    assert_eq!(v("!:type @Num int | float; !x: @Num = 10.3; x"), "10.3");
-    //    assert_eq!(
-    //        v("!:type @Num int | float; !x: @Num = \"test\"; $typeof x"),
-    //        "expected (int | float), but got (str); in variable definition 'x'"
-    //    );
-    //
-    //        assert_eq!(
-    //            v("!:type @Num int | float; !v: int = 10; !x: @Num = 0; .x = v; $typeof x"),
-    //            "$p($type(int),10)"
-    //        );
-    //        assert_eq!(
-    //            v("!:type @Num int | float; !v: float = 10.4; !x: @Num = 0; .x = v; $typeof x"),
-    //            "expected (int), but got (float); in assignment to 'x'"
-    //        );
-    //        assert_eq!(
-    //            v("!:type @Num int | float; !v: float = 10.4; !x: @Num = 0.0; .x = v; $typeof x"),
-    //            "$p($type(float),10.4)"
-    //        );
-    //        assert_eq!(
-    //            v("!:type @Num int | float; !v: str = \"test\"; !x: @Num = 0; .x = v; $typeof x"),
-    //            "expected (int), but got (str); in assignment to 'x'"
-    //        );
-    //    assert_eq!(
-    //        v("!:type @Num (int | float); !f = {|@Num, @Num -> int| int[_ + _1] }; f 10 11.2"),
-    //        "21"
-    //    );
-    //    assert_eq!(
-    //        v(r#"!:type @X (int | float);
-    //            {|@X -> int| _ } 10.1
-    //        "#),
-    //        "expected (int), but got (float); in last statement of function block"
-    //    );
-    //    assert_eq!(
-    //        v(r#"!:type @X (int | float);
-    //            {|@X, @X -> int| int _1 } 10 12.6
-    //        "#),
-    //        "12"
-    //    );
+    assert_eq!(v("!:type @Num int | float; !x: @Num = 10; x"), "10");
+    assert_eq!(v("!:type @Num int | float; !x: @Num = 10.3; x"), "10.3");
+    assert_eq!(
+        v("!:type @Num int | float; !x: @Num = \"test\"; $typeof x"),
+        "expected (int | float), but got (str); in variable definition 'x'"
+    );
+
+    assert_eq!(
+        v("!:type @Num int | float; !v: int = 10; !x: @Num = 0; .x = v; $typeof x"),
+        "$p($type(int),10)"
+    );
+    assert_eq!(
+        v("!:type @Num int | float; !v: float = 10.4; !x: @Num = 0; .x = v; $typeof x"),
+        "expected (int), but got (float); in assignment to 'x'"
+    );
+    assert_eq!(
+        v("!:type @Num int | float; !v: float = 10.4; !x: @Num = 0.0; .x = v; $typeof x"),
+        "$p($type(float),10.4)"
+    );
+    assert_eq!(
+        v("!:type @Num int | float; !v: str = \"test\"; !x: @Num = 0; .x = v; $typeof x"),
+        "expected (int), but got (str); in assignment to 'x'"
+    );
+    assert_eq!(
+        v(r#"!f = {|@Num, @Num -> int| int[_ + _1] };
+             f 10 11.2
+        "#),
+        "21"
+    );
+    assert_eq!(
+        v(r#"!:type @X (int | float);
+            {|@X -> int| _ } 10.1
+        "#),
+        "expected (int), but got (float); in last statement of function block"
+    );
+    assert_eq!(
+        v(r#"!:type @X (int | float);
+            {|@X, @X -> int| int _1 } 10 12.6
+        "#),
+        "12"
+    );
     assert_eq!(
         v(r#"!f1: fn <N is @Num>(N) -> N = { _ };
              !f2: fn <X is int>(X) -> X = { _ };
@@ -136,17 +138,17 @@ fn chk_types_aliasing() {
         "$type(fn (int) -> int)"
     );
     assert_eq!(
-        v(r#"unwrap_err ~ std:types:is_typeof
+        v(r#"panic ~ unwrap_err ~ std:types:is_typeof
                 ($type fn <N is @Num>(N) -> N)
                 ($type fn <X is int>(X) -> X);
         "#),
-        ""
+        "expected (fn <N is (@Num)> (<N is @Num>) -> <N is @Num>), but got (fn <X is (int)> (<X is int>) -> <X is int>); reason: Wrong argument 1, reason: Type variable <N is int> does not accept @Num"
     );
     assert_eq!(
         v(r#"!f1: fn <N is @Num>(N) -> N = { _ };
              !f2: fn <X is int>(X) -> X = { _ };
              .f2 = f1;
-             $typeof f2
+             ($typeof f2).0
             "#),
         ""
     );

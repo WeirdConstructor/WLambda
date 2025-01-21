@@ -1964,6 +1964,7 @@ pub enum TypeConflictReason {
     PairType(u8, Rc<Type>, Rc<Type>),
     VarLimit(String, Rc<Type>, Rc<Type>),
     BoundVarTypeMismatch(String, Rc<Type>, Rc<Type>),
+    BoundVarNotSubtype(String, Rc<Type>, Rc<Type>),
     UnionDidNotMatch(Rc<Vec<(Rc<Type>, TypeConflictReason)>>),
     UnionCaseRequiredDidNotMatch(Rc<Type>, Rc<TypeConflictReason>),
     UnionMatchesAmbigious(Rc<Vec<Rc<Type>>>, Rc<Type>),
@@ -2014,7 +2015,7 @@ impl std::fmt::Display for TypeConflictReason {
                 Ok(())
             }
             TypeConflictReason::UnionCaseRequiredDidNotMatch(case, reason) => {
-                writeln!(f, "Union case {} did not match, but it must:", case)?;
+                writeln!(f, "Union case mismatch '{}':", case)?;
                 writeln!(f, "        => reason: {}", reason)?;
                 Ok(())
             }
@@ -2033,6 +2034,15 @@ impl std::fmt::Display for TypeConflictReason {
                     varname,
                     expected.s(),
                     got.s()
+                )
+            }
+            TypeConflictReason::BoundVarNotSubtype(varname, typ, other) => {
+                writeln!(
+                    f,
+                    "Type variable <{} is {}> does not accept {}",
+                    varname,
+                    typ.s(),
+                    other.s()
                 )
             }
             TypeConflictReason::VarLimit(varname, expected, got) => {
@@ -2148,7 +2158,6 @@ impl TypeVarBindingEnv {
     pub fn find(&self, name: &str) -> Option<Rc<Type>> {
         let (depth_idx, idx) = self.lookup(name)?;
         let found = self.env_stack[depth_idx][idx].1.clone();
-        println!("FINDING {} to {}", name, found);
         Some(found)
     }
 
@@ -2163,16 +2172,15 @@ impl TypeVarBindingEnv {
             .last_mut()
             .expect("TypeVarBindingEnv has at least one frame on the env_stack")
             .push((name.to_string(), bound_typ.clone()));
-        println!("BINDING {} to {}", name, bound_typ);
 
         Ok(bound_typ)
     }
 
     pub fn bind_type(typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
-        println!("#bind_type input {}", typ);
+        //d// println!("#bind_type input {}", typ);
         let mut bindenv = Self::new();
         let ret = bindenv.bind_type_vars(typ)?;
-        println!("#bind_type output {}", ret);
+        //d// println!("#bind_type output {}", ret);
         Ok(ret)
     }
 
@@ -2239,12 +2247,9 @@ impl TypeVarBindingEnv {
 
                 let mut bound_arg_types = Vec::new();
                 for (t, optional, paramname) in types.iter() {
-                    println!("ARGT: {}", t);
                     bound_arg_types.push((self.bind_type_vars(t)?, *optional, paramname.clone()));
                 }
                 let bound_ret = self.bind_type_vars(ret)?;
-                println!("FUNCTION BIND: {:?}", self);
-                println!("FUNCTION BIND OUT: {}", bound_ret);
                 self.pop();
                 Rc::new(Type::Function(
                     Rc::new(bound_arg_types),
@@ -2423,7 +2428,7 @@ impl Type {
 
     pub fn fun_1_ret(a1n: &str, a1: Self, t: Self) -> Rc<Type> {
         TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
-            Rc::new(vec![(Rc::new(a1), false, Some(a1n.to_string()))]),
+            Rc::new(vec![(Rc::new(a1), false, if a1n.len() > 0 { Some(a1n.to_string()) } else { None })]),
             Rc::new(t),
             None,
         )))
@@ -2432,7 +2437,7 @@ impl Type {
 
     pub fn fun_1_ret_is(a1n: &str, a1: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
         TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
-            Rc::new(vec![(Rc::new(a1), false, Some(a1n.to_string()))]),
+            Rc::new(vec![(Rc::new(a1), false, if a1n.len() > 0 { Some(a1n.to_string()) } else { None })]),
             Rc::new(t),
             Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), Some(t.clone()))).collect())),
         )))
@@ -2442,8 +2447,8 @@ impl Type {
     pub fn fun_2_ret(a1n: &str, a1: Self, a2n: &str, a2: Self, t: Self) -> Rc<Type> {
         TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
             Rc::new(vec![
-                (Rc::new(a1), false, Some(a1n.to_string())),
-                (Rc::new(a2), false, Some(a2n.to_string())),
+                (Rc::new(a1), false, if a1n.len() > 0 { Some(a1n.to_string()) } else { None }),
+                (Rc::new(a2), false, if a2n.len() > 0 { Some(a2n.to_string()) } else { None }),
             ]),
             Rc::new(t),
             None,
@@ -2461,8 +2466,8 @@ impl Type {
     ) -> Rc<Type> {
         TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
             Rc::new(vec![
-                (Rc::new(a1), false, Some(a1n.to_string())),
-                (Rc::new(a2), false, Some(a2n.to_string())),
+                (Rc::new(a1), false, if a1n.len() > 0 { Some(a1n.to_string()) } else { None }),
+                (Rc::new(a2), false, if a2n.len() > 0 { Some(a2n.to_string()) } else { None }),
             ]),
             Rc::new(t),
             Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), Some(t.clone()))).collect())),
@@ -2522,6 +2527,11 @@ impl Type {
     pub fn is_alias(&self) -> bool {
         matches!(self, Type::Alias(_, _, _))
     }
+
+    pub fn is_bound_var(&self) -> bool {
+        matches!(self, Type::BoundVar(_, _, _))
+    }
+
 
     pub fn eq(&self, _other: &Self) -> bool {
         // TODO: Implement equality check!
@@ -2784,7 +2794,7 @@ where
         indent += "  ";
     }
     if let Type::Alias(name, _binds, _type_env) = typ.as_ref() {
-        eprintln!("{}resolve_type alias {} <= {}", indent, typ, chk_t);
+        eprintln!("{}resolve_type alias {:?} <= {:?}", indent, typ, chk_t);
         if let Type::Alias(chk_name, _, _) = chk_t.as_ref() {
             if chk_name == name {
                 return TypeResolveResult::Match { typ: typ.clone() };
@@ -2811,7 +2821,7 @@ where
 
     match chk_t.as_ref() {
         Type::Maybe(chk_mb_t) => {
-            eprintln!("{}resolve_type rmaybe {} <= {}", indent, typ, chk_t);
+            eprintln!("{}resolve_type rmaybe {:?} <= {:?}", indent, typ, chk_t);
             match resolve_type(typ, &Type::none(), bound_vars, name_resolver, depth + 1) {
                 TypeResolveResult::Conflict { reason: _, expected: _, got } => {
                     return TypeResolveResult::Conflict {
@@ -2842,7 +2852,7 @@ where
             return TypeResolveResult::Match { typ: Rc::new(Type::Maybe(left_type)) };
         }
         Type::Union(types) => {
-            eprintln!("{}resolve_type runion {} <= {}", indent, typ, chk_t);
+            eprintln!("{}resolve_type runion {:?} <= {:?}", indent, typ, chk_t);
             let mut matched_types = vec![];
 
             for t in types.iter() {
@@ -2866,7 +2876,7 @@ where
             return TypeResolveResult::Match { typ: Rc::new(Type::Union(Rc::new(matched_types))) };
         }
         Type::Alias(name, _binds, _type_env) => {
-            eprintln!("{}resolve_type ralias {} <= {}", indent, typ, chk_t);
+            eprintln!("{}resolve_type ralias {:?} <= {:?}", indent, typ, chk_t);
             let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
                 res_alias_typ.clone()
             } else {
@@ -2880,7 +2890,7 @@ where
             return resolve_type(typ, &alias_typ, bound_vars, name_resolver, depth + 1);
         }
         Type::Any => {
-            eprintln!("{}resolve_type rany {} <= {}", indent, typ, chk_t);
+            eprintln!("{}resolve_type rany {:?} <= {:?}", indent, typ, chk_t);
             return if matches!(typ.as_ref(), Type::Any | Type::Unknown(_, _)) {
                 TypeResolveResult::Match { typ: typ.clone() }
             } else {
@@ -2891,10 +2901,26 @@ where
                 }
             };
         }
+        Type::BoundVar(name, _id, limit) if !typ.is_bound_var() => {
+            return match resolve_type(typ, limit, bound_vars, name_resolver, depth + 1) {
+                TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+                TypeResolveResult::Conflict { reason: _, expected, got } => {
+                    return TypeResolveResult::Conflict {
+                        expected,
+                        got,
+                        reason: TypeConflictReason::BoundVarTypeMismatch(
+                            name.to_string(),
+                            limit.clone(),
+                            typ.clone(),
+                        ),
+                    };
+                }
+            }
+        }
         _ => (),
     }
 
-    eprintln!("{}resolve_type {} <= {}", indent, typ, chk_t);
+    eprintln!("{}resolve_type {:?} <= {:?}", indent, typ, chk_t);
     match typ.as_ref() {
         Type::Unknown(_, _) => {
             println!("UNKNOWN MATCHED: {} <= {}", typ, chk_t);
@@ -3179,7 +3205,7 @@ where
                 reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
             }
         }
-        Type::BoundVar(_name, id, limit) => {
+        Type::BoundVar(name, id, limit) => {
             if let Type::BoundVar(_name, chk_id, chk_limit) = chk_t.as_ref() {
                 // BoundVar == BoundVar
                 // => the IDs need to match.
@@ -3199,7 +3225,11 @@ where
                             TypeResolveResult::Conflict {
                                 expected,
                                 got,
-                                reason: TypeConflictReason::WrongType(limit.clone(), chk_limit.clone()),
+                                reason: TypeConflictReason::BoundVarNotSubtype(
+                                    name.to_string(),
+                                    chk_limit.clone(),
+                                    limit.clone(),
+                                ),
                             }
                         }
                     }
@@ -3242,7 +3272,7 @@ where
                             }
                         };
                     bound_vars.insert(0, (name.to_string(), bound_type.clone()));
-                    eprintln!("{}|---- bind {} <= {}", indent, name, bound_type);
+                    eprintln!("{}|---- bind {} <= {:?}", indent, name, bound_type);
                     bound_type
                 } else {
                     bound_type
@@ -3264,7 +3294,7 @@ where
                 }
             } else {
                 bound_vars.push((name.to_string(), chk_t.clone()));
-                eprintln!("{}|---- bind {} <= {}", indent, name, chk_t);
+                eprintln!("{}|---- bind {} <= {:?}", indent, name, chk_t);
                 TypeResolveResult::Match { typ: chk_t.clone() }
             }
         }
@@ -6109,6 +6139,7 @@ impl VVal {
 
             for (i, v) in b.borrow().iter().skip(skip).enumerate() {
                 let is_last = (i + 1) == len;
+                println!("I {} LEN {} {} ", i, len, is_last);
                 res.push(op(v, is_last)?);
             }
         }

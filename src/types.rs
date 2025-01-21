@@ -148,7 +148,7 @@ fn type_binop(
         Some(t) => t,
         None => return Err(ast.compile_err(format!("Unknown type of operator: {}", ast.s()))),
     };
-    println!("BINOP: {} => {}", ast, op_type);
+    println!("BINOP: {} => {:?}", ast, op_type);
 
     // TODO: Get union type from first argument!
     let a_type = type_pass(&a, TypeHint::DontCare, ce)?;
@@ -161,17 +161,17 @@ fn type_binop(
     } else {
         (*Type::unknown("binopret")).clone()
     };
-    let chk_typ = Type::fun_2_ret("a", (*a_type.typ).clone(), "b", (*b_type.typ).clone(), ret_type);
+    let required_typ = Type::fun_2_ret("", (*a_type.typ).clone(), "", (*b_type.typ).clone(), ret_type);
 
-    println!("op_type={} chk_typ={}", op_type, chk_typ);
+    println!("op_type={:?} => required_typ={:?}", op_type, required_typ);
 
-    let operation_typ = resolve_and_check(&op_type, &chk_typ, ce, ast, || {
+    let operation_typ = resolve_and_check(&required_typ, &op_type, ce, ast, || {
         format!("operator call '{}'", op.token())
     })?;
-    println!("resolved op_type={}", operation_typ);
+    println!("resolved op_type={:?}", operation_typ);
 
     if let Type::Function(_args, ret_type, _bound_vars) = operation_typ.as_ref() {
-        eprintln!("RetType: {} of operation typ {}", ret_type.s(), operation_typ);
+        eprintln!("RetType: {:?} of operation typ {:?}", ret_type.s(), operation_typ);
         Ok(TypedVVal::new(ret_type.clone(), ast.clone()))
     } else {
         Err(ast.compile_err(format!(
@@ -202,14 +202,23 @@ fn type_func(
 
     // TODO: Setup a function environment, holding the positional parameter types
     //       and their names maybe?
-    println!("FUN_TYPE: {}, RET_TYPE: {}", fun_type, ret_type);
+    println!("FUN_TYPE: {:?}, RET_TYPE: {:?}", fun_type, ret_type);
 
     ce.borrow_mut().push_function(fun_type.clone());
     let mut last_type = (VVal::None, Type::none());
+    println!("AST: {}", ast.s());
     let stmts = ast.map_skip_vval(
         |e, is_last| {
             let type_hint =
                 if is_last { TypeHint::from_type(&ret_type) } else { TypeHint::DontCare };
+            println!("COMP {}: {}", is_last, e);
+
+            let cur_func_type = ce
+                .borrow()
+                .current_function()
+                .cloned()
+                .unwrap_or_else(|| Type::fun_ret(Type::None));
+            println!("CUR FUNCTIONI: {}", cur_func_type);
             let mut tv = type_pass(e, type_hint.clone(), ce)?;
             println!("COMP {}: {} => {}", is_last, e, tv);
 
@@ -317,13 +326,14 @@ fn type_call(
     // If we don't get a function type back, we need to synthesize it though...
     // Maybe do two passes?
     let called_thing = type_pass(&ast.v_(1), TypeHint::from_type(&synth_fun_type), ce)?;
-    println!("CALLED THING {}: {}", symbol.unwrap_or(String::from("?")), called_thing);
+    println!("CALLED THING {}: {}", symbol.unwrap_or(String::from("?")), called_thing.typ);
     let real_fun_type = called_thing.typ.clone();
     let ret_type = real_fun_type.get_return_type().unwrap_or_else(|| Type::unknown("rlfunret"));
 
     let mut type_checked_args = vec![];
     for (i, e) in args.iter().enumerate() {
-        let ty = type_pass(e, TypeHint::from_type(&Type::unknown(&format!("arg{}", i))), ce)?;
+        let param_type = real_fun_type.get_parameter_type(i);
+        let ty = type_pass(e, TypeHint::from_type(&param_type), ce)?;
         println!("ARG: {:?} has type: {}", e.s(), ty);
         type_checked_args.push(ty);
     }

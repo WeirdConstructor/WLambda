@@ -10899,12 +10899,13 @@ pub fn core_symbol_table() -> SymbolTable {
                 VVal::Int(accum)
             }
         })
-    }, Type::fun_1_ret_is(
-           "a", (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
-           &[(&"N", Type::aliased("@Num").union(Type::aliased("@NVec")))])
-       .union(Type::fun_2_ret_is(
-           "a", (*Type::generic("N")).clone(), "b", (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
-           &[(&"N", Type::aliased("@Num").union(Type::aliased("@NVec")))])));
+    },
+//    Type::fun_1_ret_is(
+//           "a", (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
+//           &[(&"N", Type::aliased("@Num").union(Type::aliased("@NVec")))])
+       Type::fun_2_ret_is(
+           "", (*Type::generic("N")).clone(), "", (*Type::generic("N")).clone(), (*Type::generic("N")).clone(),
+           &[(&"N", Type::aliased("@Num"))]));
     add_func!(st, -, env, argc, {
         Ok(match (argc, env.arg(0)) {
             (0, _) => VVal::None,
