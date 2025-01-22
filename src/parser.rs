@@ -1226,7 +1226,7 @@ fn parse_basetype(ps: &mut State) -> Result<VVal, ParseError> {
             VVal::typ_box(Type::Pair(typ_1.t(), typ_2.t()))
         }
         "fn" => parse_fun_type(ps, true)?,
-        // TODO: ref, list, record, userdata, ...
+        // TODO: ref, record, userdata, ...
         _ => {
             let mut typename = typename;
             // type name!

@@ -130,6 +130,12 @@ fn chk_types_index() {
 }
 
 #[test]
+fn chk_types_index_named() {
+    assert_eq!(v("!:global type X [int]; std:types:type_at $type(X) 1"), "$type(int?)");
+    assert_eq!(v("!:global type @X [int] | {str}; std:types:type_at $type(@X) 1"), "$type(int? | str?)");
+}
+
+#[test]
 fn chk_types_function() {
     assert_eq!(v("!x: fn <O is (Num),X>(a: O, b: float) -> X = $n"), "");
 }
