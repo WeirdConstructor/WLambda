@@ -76,6 +76,60 @@ fn chk_types_add() {
 }
 
 #[test]
+fn chk_types_index() {
+    assert_eq!(v("!x = \"foo\"; x.1"), "'o'");
+    assert_eq!(v("!x = $b\"foo\"; x.1"), "$b'o'");
+
+    assert_eq!(v("std:types:type_at $type(str) 10"), "$type(char?)");
+    assert_eq!(v("std:types:type_at $type(bytes) 10"), "$type(byte?)");
+    assert_eq!(v("std:types:type_at $type(none) 10"), "$type(none)");
+    assert_eq!(v("std:types:type_at $type(bytes?) 10"), "$type(byte?)");
+    assert_eq!(v("std:types:type_at $type(str?) 10"), "$type(char?)");
+    assert_eq!(v("std:types:type_at $type(optional str) 10"), "$type(char?)");
+    assert_eq!(v("std:types:type_at $type(optional pair(int, str)) 10"), "$n");
+    assert_eq!(v("std:types:type_at $type(optional pair(int, str)) 0"), "$type(int?)");
+    assert_eq!(v("std:types:type_at $type(optional pair(int, str)) 1"), "$type(str?)");
+    assert_eq!(v("std:types:type_at $type(pair(int, str)?) 1"), "$type(str?)");
+    assert_eq!(v("std:types:type_at $type(pair(int, str)?) 10"), "$n");
+    assert_eq!(v("std:types:type_at $type(ivec2) 10"), "$n");
+    assert_eq!(v("std:types:type_at $type(ivec2) 0"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(ivec2) 1"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(ivec3) 10"), "$n");
+    assert_eq!(v("std:types:type_at $type(ivec3) 0"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(ivec3) 1"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(ivec3) 2"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(ivec4) 10"), "$n");
+    assert_eq!(v("std:types:type_at $type(ivec4) 0"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(ivec4) 1"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(ivec4) 2"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(ivec4) 3"), "$type(int)");
+    assert_eq!(v("std:types:type_at $type(fvec2) 10"), "$n");
+    assert_eq!(v("std:types:type_at $type(fvec2) 0"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(fvec2) 1"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(fvec3) 10"), "$n");
+    assert_eq!(v("std:types:type_at $type(fvec3) 0"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(fvec3) 1"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(fvec3) 2"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(fvec4) 10"), "$n");
+    assert_eq!(v("std:types:type_at $type(fvec4) 0"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(fvec4) 1"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(fvec4) 2"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(fvec4) 3"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(iter int) 3"), "$type(int?)");
+    assert_eq!(v("std:types:type_at $type(ref fvec3) 1"), "$type(float)");
+    assert_eq!(v("std:types:type_at $type(ref fvec3) 4"), "$n");
+    assert_eq!(v("std:types:type_at $type(ivec2 | ivec3 | ivec4) 3"), "$n");
+    assert_eq!(v("std:types:type_at $type(ivec2 | ivec3 | ivec4 | fvec2) 1"), "$type(int | int | int | float)");
+    assert_eq!(v("std:types:type_at $type([int]) 1"), "$type(int?)");
+    assert_eq!(v("std:types:type_at $type([int, str, int]) 3"), "$n");
+    assert_eq!(v("std:types:type_at $type([int, str, int]) 1"), "$type(str)");
+    assert_eq!(v("std:types:type_at $type({int}) 1"), "$type(int?)");
+    assert_eq!(v("std:types:type_at $type({int} | [int]) 1"), "$type(int? | int?)");
+    assert_eq!(v("std:types:type_at $type({int} | [int,str]) 1"), "$type(int? | str)");
+    assert_eq!(v("std:types:type_at $type({int} | [int,str]?) 1"), "$type((int? | str)?)");
+}
+
+#[test]
 fn chk_types_function() {
     assert_eq!(v("!x: fn <O is (Num),X>(a: O, b: float) -> X = $n"), "");
 }
@@ -150,7 +204,7 @@ fn chk_types_aliasing() {
              .f2 = f1;
              ($typeof f2).0
             "#),
-        ""
+        "$type(fn <X is int>(X) -> X)"
     );
     assert_eq!(
         v(r#"!:type @X (int | float);

@@ -161,7 +161,8 @@ fn type_binop(
     } else {
         (*Type::unknown("binopret")).clone()
     };
-    let required_typ = Type::fun_2_ret("", (*a_type.typ).clone(), "", (*b_type.typ).clone(), ret_type);
+    let required_typ =
+        Type::fun_2_ret("", (*a_type.typ).clone(), "", (*b_type.typ).clone(), ret_type);
 
     println!("op_type={:?} => required_typ={:?}", op_type, required_typ);
 
@@ -601,12 +602,28 @@ pub(crate) fn type_pass(
                 Syntax::DumpStack => TypedVVal::new(Type::none(), ast.clone()),
                 Syntax::Func => type_func(ast, type_hint, ce)?,
                 Syntax::Call => type_call(ast, type_hint, ce)?,
+                Syntax::GetIdx => {
+                    let value_type = type_pass(&ast.v_(1), TypeHint::DontCare, ce)?;
+                    let idx = ast.v_i(2);
+                    let idx = if idx < 0 { 0 as usize } else { idx as usize };
+                    match value_type.typ.type_at(idx) {
+                        Some(t) => {
+                            TypedVVal::new(t, VVal::vec3(ast.v_(0), value_type.vval, ast.v_(2)))
+                        }
+                        None => {
+                            return Err(ast.compile_err(format!(
+                                "Type error, ({}) has no index {}",
+                                value_type.typ, idx
+                            )))
+                        }
+                    }
+                }
                 Syntax::TypeOf => {
                     let expr = ast.v_(1);
                     let res_type = type_pass(&expr, type_hint, ce)?;
                     let new_ast =
                         VVal::vec3(ast.v_(0), res_type.vval, VVal::typ(res_type.typ.clone()));
-                    TypedVVal::new(res_type.typ, new_ast)
+                    TypedVVal::new(Type::pair(Type::typ(), res_type.typ), new_ast)
                 }
                 //                Syntax::DefGlobRef => compile_def(ast, ce, true),
                 _ => {

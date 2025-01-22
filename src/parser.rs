@@ -1132,6 +1132,51 @@ fn parse_fun_type(ps: &mut State, with_quotes: bool) -> Result<VVal, ParseError>
 }
 
 fn parse_basetype(ps: &mut State) -> Result<VVal, ParseError> {
+    match ps.expect_some(ps.peek())? {
+        '[' => {
+            // tuple or list
+            if !ps.consume_area_start_token_wsc('[', Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('[', "list/tuple type start")));
+            }
+
+            let typ = parse_type(ps)?;
+
+            if ps.lookahead(",") {
+                let mut tuple = vec![typ.t()];
+                while ps.consume_token_wsc(',', Syntax::TDelim) {
+                    tuple.push(parse_type(ps)?.t());
+                }
+
+                if !ps.consume_area_end_token_wsc(']', Syntax::TQ) {
+                    return Err(ps.err(ParseErrorKind::ExpectedToken(']', "tuple type end")));
+                }
+
+                return Ok(VVal::typ_box(Type::Tuple(Rc::new(tuple))));
+            } else {
+                if !ps.consume_area_end_token_wsc(']', Syntax::TQ) {
+                    return Err(ps.err(ParseErrorKind::ExpectedToken(']', "list type end")));
+                }
+
+                return Ok(VVal::typ(Type::vec(typ.t())));
+            }
+        }
+        '{' => {
+            // map
+            if !ps.consume_area_start_token_wsc('{', Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('{', "map type start")));
+            }
+
+            let typ = parse_type(ps)?;
+
+            if !ps.consume_area_end_token_wsc('}', Syntax::TQ) {
+                return Err(ps.err(ParseErrorKind::ExpectedToken('}', "map type end")));
+            }
+
+            return Ok(VVal::typ(Type::map(typ.t())));
+        }
+        _ => (),
+    }
+
     let typename = parse_typename(ps)?;
     ps.skip_ws_and_comments();
 

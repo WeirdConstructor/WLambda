@@ -1933,6 +1933,17 @@ impl TypeRecord {
         res
     }
 
+    fn type_at(&self, index: usize) -> Option<Rc<Type>> {
+        // TODO: Respect interfaces!
+        let key = format!("{}", index);
+        for field in self.fields.iter() {
+            if field.0 == key {
+                return Some(field.1.clone());
+            }
+        }
+        None
+    }
+
     //    fn bind_vars(&self, binding_env: &mut TypeVarBindingEnv) -> Self {
     //        let mut res = TypeResolve::Resolved;
     //        for v in self.typedefs.iter() {
@@ -2338,6 +2349,8 @@ thread_local! {
     pub static TYPE_RC_SYM: Rc<Type> = Rc::new(Type::Sym);
     pub static TYPE_RC_STR: Rc<Type> = Rc::new(Type::Str);
     pub static TYPE_RC_INT: Rc<Type> = Rc::new(Type::Int);
+    pub static TYPE_RC_CHAR: Rc<Type> = Rc::new(Type::Char);
+    pub static TYPE_RC_BYTE: Rc<Type> = Rc::new(Type::Byte);
     pub static TYPE_RC_FLOAT: Rc<Type> = Rc::new(Type::Float);
     pub static TYPE_RC_TYPE: Rc<Type> = Rc::new(Type::Type);
     pub static TYPE_RC_OPT_ANY: Rc<Type> = Rc::new(Type::Opt(Rc::new(Type::Any)));
@@ -2371,9 +2384,27 @@ impl Type {
     pub fn typ() -> Rc<Self> {
         TYPE_RC_TYPE.with(|typ| typ.clone())
     }
+    pub fn chr() -> Rc<Self> {
+        TYPE_RC_CHAR.with(|typ| typ.clone())
+    }
+    pub fn byt() -> Rc<Self> {
+        TYPE_RC_BYTE.with(|typ| typ.clone())
+    }
 
     pub fn pair(a: Rc<Self>, b: Rc<Self>) -> Rc<Self> {
         Rc::new(Type::Pair(a.clone(), b.clone()))
+    }
+
+    pub fn maybe(a: Rc<Self>) -> Rc<Self> {
+        Rc::new(Type::Maybe(a))
+    }
+
+    pub fn maybe_combined(a: Rc<Self>) -> Rc<Self> {
+        if a.is_maybe() {
+            a
+        } else {
+            Rc::new(Type::Maybe(a))
+        }
     }
 
     pub fn as_type(&self) -> Self {
@@ -2390,6 +2421,14 @@ impl Type {
 
     pub fn map_any() -> Rc<Self> {
         TYPE_RC_MAP_ANY.with(|typ| typ.clone())
+    }
+
+    pub fn map(t: Rc<Self>) -> Rc<Self> {
+        Rc::new(Type::Map(t))
+    }
+
+    pub fn vec(t: Rc<Self>) -> Rc<Self> {
+        Rc::new(Type::Lst(t))
     }
 
     pub fn union(&self, t: Rc<Type>) -> Rc<Self> {
@@ -2428,7 +2467,11 @@ impl Type {
 
     pub fn fun_1_ret(a1n: &str, a1: Self, t: Self) -> Rc<Type> {
         TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
-            Rc::new(vec![(Rc::new(a1), false, if a1n.len() > 0 { Some(a1n.to_string()) } else { None })]),
+            Rc::new(vec![(
+                Rc::new(a1),
+                false,
+                if a1n.len() > 0 { Some(a1n.to_string()) } else { None },
+            )]),
             Rc::new(t),
             None,
         )))
@@ -2437,7 +2480,11 @@ impl Type {
 
     pub fn fun_1_ret_is(a1n: &str, a1: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
         TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
-            Rc::new(vec![(Rc::new(a1), false, if a1n.len() > 0 { Some(a1n.to_string()) } else { None })]),
+            Rc::new(vec![(
+                Rc::new(a1),
+                false,
+                if a1n.len() > 0 { Some(a1n.to_string()) } else { None },
+            )]),
             Rc::new(t),
             Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), Some(t.clone()))).collect())),
         )))
@@ -2520,6 +2567,10 @@ impl Type {
         matches!(self, Type::None)
     }
 
+    pub fn is_maybe(&self) -> bool {
+        matches!(self, Type::Maybe(_))
+    }
+
     pub fn is_type(&self) -> bool {
         matches!(self, Type::Type)
     }
@@ -2532,6 +2583,94 @@ impl Type {
         matches!(self, Type::BoundVar(_, _, _))
     }
 
+    pub fn type_at(&self, index: usize) -> Option<Rc<Type>> {
+        match self {
+            Type::None => Some(Type::none()),
+            Type::Str => Some(Type::maybe(Type::chr())),
+            Type::Bytes => Some(Type::maybe(Type::byt())),
+            Type::Maybe(typ) => {
+                let ty = typ.type_at(index)?;
+                Some(Type::maybe_combined(ty))
+            }
+            Type::Opt(typ) => {
+                let ty = typ.type_at(index)?;
+                Some(Type::maybe_combined(ty))
+            }
+            Type::Pair(a, b) => match index {
+                0 => Some(a.clone()),
+                1 => Some(b.clone()),
+                _ => None,
+            },
+            Type::Lst(typ) => Some(Type::maybe(typ.clone())),
+            Type::Iter(typ) => Some(Type::maybe(typ.clone())),
+            Type::Ref(typ) => typ.type_at(index),
+            Type::Map(typ) => Some(Type::maybe(typ.clone())),
+            Type::Tuple(tpl) => {
+                if index < tpl.len() {
+                    Some(tpl.get(index)?.clone())
+                } else {
+                    None
+                }
+            }
+            Type::IVec2 => match index {
+                0 => Some(Type::int()),
+                1 => Some(Type::int()),
+                _ => None,
+            },
+            Type::IVec3 => match index {
+                0 => Some(Type::int()),
+                1 => Some(Type::int()),
+                2 => Some(Type::int()),
+                _ => None,
+            },
+            Type::IVec4 => match index {
+                0 => Some(Type::int()),
+                1 => Some(Type::int()),
+                2 => Some(Type::int()),
+                3 => Some(Type::int()),
+                _ => None,
+            },
+            Type::FVec2 => match index {
+                0 => Some(Type::float()),
+                1 => Some(Type::float()),
+                _ => None,
+            },
+            Type::FVec3 => match index {
+                0 => Some(Type::float()),
+                1 => Some(Type::float()),
+                2 => Some(Type::float()),
+                _ => None,
+            },
+            Type::FVec4 => match index {
+                0 => Some(Type::float()),
+                1 => Some(Type::float()),
+                2 => Some(Type::float()),
+                3 => Some(Type::float()),
+                _ => None,
+            },
+            Type::Union(types) => {
+                let mut union_out = vec![];
+                for ty in types.iter() {
+                    match ty.type_at(index) {
+                        Some(t) => union_out.push(t),
+                        None => return None,
+                    }
+                }
+                Some(Rc::new(Type::Union(Rc::new(union_out))))
+            }
+            Type::Record(_name, record, _tvars) => record.type_at(index),
+            Type::Userdata(_name, fields) => {
+                let key = format!("{}", index);
+                for field in fields.iter() {
+                    if field.0 == key {
+                        return Some(field.1.clone());
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
 
     pub fn eq(&self, _other: &Self) -> bool {
         // TODO: Implement equality check!
@@ -2545,6 +2684,39 @@ impl Type {
 
     pub fn s(&self) -> String {
         self.to_display(false)
+    }
+
+    pub fn is_self_quoted_display(&self) -> bool {
+        match self {
+            Type::Any
+            | Type::Bool
+            | Type::None
+            | Type::Str
+            | Type::Bytes
+            | Type::Sym
+            | Type::Byte
+            | Type::Char
+            | Type::Syntax
+            | Type::Type
+            | Type::Int
+            | Type::Float
+            | Type::IVec2
+            | Type::IVec3
+            | Type::IVec4
+            | Type::FVec2
+            | Type::FVec3
+            | Type::FVec4
+            | Type::Map(_)
+            | Type::Lst(_)
+            | Type::Tuple(_)
+            | Type::Record(_, _, _)
+            | Type::Alias(_, _, _)
+            | Type::Name(_, _, _)
+            | Type::BoundVar(_, _, _)
+            | Type::Var(_)
+            | Type::Pair(_, _) => true,
+            _ => false,
+        }
     }
 
     pub fn to_display(&self, extended: bool) -> String {
@@ -2569,7 +2741,13 @@ impl Type {
             Type::FVec3 => "fvec3".to_string(),
             Type::FVec4 => "fvec4".to_string(),
             Type::Opt(t) => format!("optional {}", t.to_display(extended)),
-            Type::Maybe(t) => format!("{}?", t.to_display(extended)),
+            Type::Maybe(t) => {
+                if t.is_self_quoted_display() {
+                    format!("{}?", t.to_display(extended))
+                } else {
+                    format!("({})?", t.to_display(extended))
+                }
+            }
             Type::Err(t) => format!("error {}", t.to_display(extended)),
             Type::Pair(t, t2) => {
                 format!("pair({}, {})", t.to_display(extended), t2.to_display(extended))

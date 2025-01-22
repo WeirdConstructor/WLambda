@@ -15871,6 +15871,47 @@ pub fn std_symbol_table() -> SymbolTable {
 
     func!(
         st,
+        "types:type_at",
+        |env: &mut Env, _argc: usize| {
+            let t1 = env.arg(0);
+            let typ1 = TypeVarBindingEnv::bind_type(&t1.t());
+
+            let typ1 = match typ1 {
+                Ok(t) => t,
+                Err(e) => {
+                    return Ok(VVal::err_msg(&format!("Can't bind type {}: {}", t1, e)));
+                }
+            };
+
+//            let mut bound_vars = vec![];
+            let idx = env.arg(1).i();
+            let idx = if idx < 0 { 0 as usize } else { idx as usize };
+            match typ1.type_at(idx) {
+                Some(t) => Ok(VVal::Type(t)),
+                None => Ok(VVal::None),
+            }
+//                &mut bound_vars,
+//                &mut |name| {
+//                    let value = env.global.borrow().get_var(name)?;
+//                    let vartype = env.global.borrow().get_type(name)?;
+//                    if vartype.is_alias() {
+//                        Some(value.t())
+//                    } else if vartype.is_type() {
+//                        Some(value.t())
+//                    } else {
+//                        None
+//                    }
+//                },
+//                0,
+//            );
+        },
+        Some(2),
+        Some(2),
+        false
+    );
+
+    func!(
+        st,
         "types:is_typeof",
         |env: &mut Env, _argc: usize| {
             use crate::vval::resolve_type;
