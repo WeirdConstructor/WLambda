@@ -161,12 +161,12 @@ fn type_binop(
     } else {
         (*Type::unknown("binopret")).clone()
     };
-    let required_typ =
+    let synthesized_type =
         Type::fun_2_ret("", (*a_type.typ).clone(), "", (*b_type.typ).clone(), ret_type);
 
-    println!("op_type={:?} => required_typ={:?}", op_type, required_typ);
+    println!("op_type={:?} => synthesized_type={:?}", op_type, synthesized_type);
 
-    let operation_typ = resolve_and_check(&required_typ, &op_type, ce, ast, || {
+    let operation_typ = resolve_and_check(&op_type, &synthesized_type, ce, ast, || {
         format!("operator call '{}'", op.token())
     })?;
     println!("resolved op_type={:?}", operation_typ);

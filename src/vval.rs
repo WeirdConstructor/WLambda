@@ -3124,17 +3124,7 @@ where
                 }
             }
             Type::Name(name, _bindings, _type_env) => {
-                // TODO: Use _type_env!
-                // If the type exists, then we can allow it in place of an `Any`.
-                if let Some(_) = name_resolver(name) {
-                    TypeResolveResult::Match { typ: typ.clone() }
-                } else {
-                    TypeResolveResult::Conflict {
-                        expected: typ.clone(),
-                        got: chk_t.clone(),
-                        reason: TypeConflictReason::UnknownType(name.to_string()),
-                    }
-                }
+                TypeResolveResult::Match { typ: chk_t.clone() }
             }
             t => TypeResolveResult::Match { typ: Rc::new(t.clone()) },
         },
@@ -3384,6 +3374,10 @@ where
             }
         }
         Type::BoundVar(name, id, limit) => {
+            // TODO: We must bind the var type to the variable with this specific ID.
+            //       And then we have to check if the variable is already bound (and matched)
+            //       to a specific type. Similar to the Type::Var(_) case below!
+
             if let Type::BoundVar(_name, chk_id, chk_limit) = chk_t.as_ref() {
                 // BoundVar == BoundVar
                 // => the IDs need to match.
@@ -3415,11 +3409,19 @@ where
                     TypeResolveResult::Match { typ: chk_t.clone() }
                 }
             } else {
-                // TODO: match the chk_t against the limits presented by BoundVar.
-                TypeResolveResult::Conflict {
-                    expected: typ.clone(),
-                    got: chk_t.clone(),
-                    reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+                match resolve_type(limit, chk_t, bound_vars, name_resolver, depth + 1) {
+                    TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+                    TypeResolveResult::Conflict { expected, got, .. } => {
+                        TypeResolveResult::Conflict {
+                            expected,
+                            got,
+                            reason: TypeConflictReason::BoundVarNotSubtype(
+                                name.to_string(),
+                                limit.clone(),
+                                chk_t.clone(),
+                            ),
+                        }
+                    }
                 }
             }
         }
