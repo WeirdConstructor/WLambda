@@ -15883,27 +15883,27 @@ pub fn std_symbol_table() -> SymbolTable {
                 }
             };
 
-//            let mut bound_vars = vec![];
+            //            let mut bound_vars = vec![];
             let idx = env.arg(1).i();
             let idx = if idx < 0 { 0 as usize } else { idx as usize };
             match typ1.type_at(idx) {
                 Some(t) => Ok(VVal::Type(t)),
                 None => Ok(VVal::None),
             }
-//                &mut bound_vars,
-//                &mut |name| {
-//                    let value = env.global.borrow().get_var(name)?;
-//                    let vartype = env.global.borrow().get_type(name)?;
-//                    if vartype.is_alias() {
-//                        Some(value.t())
-//                    } else if vartype.is_type() {
-//                        Some(value.t())
-//                    } else {
-//                        None
-//                    }
-//                },
-//                0,
-//            );
+            //                &mut bound_vars,
+            //                &mut |name| {
+            //                    let value = env.global.borrow().get_var(name)?;
+            //                    let vartype = env.global.borrow().get_type(name)?;
+            //                    if vartype.is_alias() {
+            //                        Some(value.t())
+            //                    } else if vartype.is_type() {
+            //                        Some(value.t())
+            //                    } else {
+            //                        None
+            //                    }
+            //                },
+            //                0,
+            //            );
         },
         Some(2),
         Some(2),
@@ -15954,7 +15954,14 @@ pub fn std_symbol_table() -> SymbolTable {
             );
 
             match res {
-                TypeResolveResult::Match { typ } => Ok(VVal::Type(typ)),
+                TypeResolveResult::Match { typ } => {
+                    Ok(VVal::Type(match TypeVarBindingEnv::bind_type(&typ) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            return Ok(VVal::err_msg(&format!("Can't bind type {}: {}", t2, e)));
+                        }
+                    }))
+                }
                 TypeResolveResult::Conflict { expected, got, reason } => {
                     return Ok(VVal::err_msg(&format!(
                         "Type error, expected ({}), but got ({}); reason: {}",

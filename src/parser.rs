@@ -1109,7 +1109,7 @@ fn parse_fun_type(ps: &mut State, with_quotes: bool) -> Result<VVal, ParseError>
         }
 
         let typ = parse_type(ps)?.t();
-        args.push((typ, false, ident));
+        args.push((typ, ident));
 
         if !ps.consume_token_wsc(',', Syntax::TDelim) {
             break;

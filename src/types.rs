@@ -150,36 +150,48 @@ fn type_binop(
     };
     println!("BINOP: {} => {:?}", ast, op_type);
 
-    // TODO: Get union type from first argument!
     let a_type = type_pass(&a, TypeHint::DontCare, ce)?;
-
-    // TODO: Get union type from second argument!
     let b_type = type_pass(&b, TypeHint::DontCare, ce)?;
 
-    let ret_type = if let TypeHint::Expect(t) = type_hint {
-        t.as_type()
+    let new_ast = VVal::vec3(syn, a_type.vval, b_type.vval);
+
+    let (op_args, op_ret) = op_type.fun_split_ret();
+
+    if let TypeHint::Expect(ret_type) = type_hint {
+        // In this case, we can bind the return type before the argument types.
+        // That will bind the variables in the function arguments by the return type.
+        let mut bound_vars = vec![];
+        let ret_type =
+            resolve_and_check_bound(&ret_type, &op_ret, &mut bound_vars, ce, ast, || {
+                format!("operator call '{}' with expected return type {}", op.token(), ret_type)
+            })?;
+
+        // Now synthesize the arguments and check their type against the operation's arguments:
+        let synth_args = Type::fun_2("", (*a_type.typ).clone(), "", (*b_type.typ).clone());
+        resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ce, ast, || {
+            format!("operator call '{}' with return type {}", op.token(), ret_type)
+        })?;
+
+        Ok(TypedVVal::new(ret_type, new_ast))
     } else {
-        (*Type::unknown("binopret")).clone()
-    };
-    let synthesized_type =
-        Type::fun_2_ret("", (*a_type.typ).clone(), "", (*b_type.typ).clone(), ret_type);
+        // We have no clue what the return type should be.
+        // So we try to infer it by synthesizing a function with the same return type as the operation.
+        // And then let the variable binding take care of the rest.
+        let synth_fun = Type::fun_2_ret(
+            "",
+            (*a_type.typ).clone(),
+            "",
+            (*b_type.typ).clone(),
+            Type::unknown_typ("ret_type"),
+        );
+        let op_fun_type = resolve_and_check(&op_type, &synth_fun, ce, ast, || {
+            format!("operator call '{}'", op.token())
+        })?;
 
-    println!("op_type={:?} => synthesized_type={:?}", op_type, synthesized_type);
-
-    let operation_typ = resolve_and_check(&op_type, &synthesized_type, ce, ast, || {
-        format!("operator call '{}'", op.token())
-    })?;
-    println!("resolved op_type={:?}", operation_typ);
-
-    if let Type::Function(_args, ret_type, _bound_vars) = operation_typ.as_ref() {
-        eprintln!("RetType: {:?} of operation typ {:?}", ret_type.s(), operation_typ);
-        Ok(TypedVVal::new(ret_type.clone(), ast.clone()))
-    } else {
-        Err(ast.compile_err(format!(
-            "Expected function type from operator {}, got: {}",
-            syn.s(),
-            operation_typ.s()
-        )))
+        Ok(TypedVVal::new(
+            op_fun_type.get_return_type().clone().unwrap_or_else(|| Type::unknown("opret")),
+            new_ast,
+        ))
     }
 }
 
@@ -313,7 +325,7 @@ fn type_call(
     let mut fun_arg_types = vec![];
     for (i, (e, _)) in ast.iter().skip(2).enumerate() {
         args.push(e);
-        fun_arg_types.push((Type::unknown(&format!("callarg{}", i)), false, None));
+        fun_arg_types.push((Type::unknown(&format!("callarg{}", i)), None));
     }
     let synth_fun_type = TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
         Rc::new(fun_arg_types),
@@ -340,7 +352,7 @@ fn type_call(
     }
     // Synthesize the function from the argument types:
     let chk_func = Rc::new(Type::Function(
-        Rc::new(type_checked_args.iter().map(|arg| (arg.typ.clone(), false, None)).collect()),
+        Rc::new(type_checked_args.iter().map(|arg| (arg.typ.clone(), None)).collect()),
         ret_type.clone(),
         None,
     ));
@@ -474,9 +486,10 @@ fn type_deftype(
     Ok(TypedVVal::new(Type::typ(), ast.clone()))
 }
 
-fn resolve_and_check<F>(
+fn resolve_and_check_bound<F>(
     typ: &Rc<Type>,
     chk_typ: &Rc<Type>,
+    bound_vars: &mut Vec<(usize, Rc<Type>)>,
     ce: &mut Rc<RefCell<CompileEnv>>,
     ast: &VVal,
     err_cb: F,
@@ -484,11 +497,10 @@ fn resolve_and_check<F>(
 where
     F: Fn() -> String,
 {
-    let mut bound_vars = vec![];
     let res = resolve_type(
         typ,
         chk_typ,
-        &mut bound_vars,
+        bound_vars,
         &mut |name| {
             let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
             eprintln!("get comptime {}: {} => {}", name, value, vartype.s());
@@ -515,6 +527,20 @@ where
             )));
         }
     }
+}
+
+fn resolve_and_check<F>(
+    typ: &Rc<Type>,
+    chk_typ: &Rc<Type>,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    ast: &VVal,
+    err_cb: F,
+) -> Result<Rc<Type>, CompileError>
+where
+    F: Fn() -> String,
+{
+    let mut bound_vars = vec![];
+    resolve_and_check_bound(typ, chk_typ, &mut bound_vars, ce, ast, err_cb)
 }
 
 fn type_assign(
