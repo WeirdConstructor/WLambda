@@ -161,6 +161,12 @@ fn type_binop(
         // In this case, we can bind the return type before the argument types.
         // That will bind the variables in the function arguments by the return type.
         let mut bound_vars = vec![];
+        println!("OOOOOOOOOOOBOUNDBOUND: {}", ret_type, op_ret);
+        // TODO: The following only works properly if the ret_type=Any (or generally more generic?)
+        //       it does not work if ret_type=int and op_ret=<N is @Num> - because of the
+        //       union subtype matching done here.
+        //
+        //       Maybe we need to run it twice, in both directions?
         let ret_type =
             resolve_and_check_bound(&ret_type, &op_ret, &mut bound_vars, ce, ast, || {
                 format!("operator call '{}' with expected return type {}", op.token(), ret_type)

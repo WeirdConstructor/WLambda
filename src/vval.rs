@@ -2610,7 +2610,7 @@ impl Type {
         if let Type::Function(args, ret, limit) = self {
             (
                 Rc::new(Type::Function(args.clone(), Type::none(), limit.clone())),
-                Rc::new(Type::Function(Rc::new(vec![]), ret.clone(), limit.clone())),
+                ret.clone()
             )
         } else {
             let dummy = Rc::new(Type::Function(Rc::new(vec![]), Type::none(), None));
