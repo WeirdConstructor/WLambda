@@ -10526,7 +10526,12 @@ macro_rules! add_func {
 
 macro_rules! add_func_t {
     ($g: ident, $op: tt, $env: ident, $argc: ident, $b: block, $type: expr) => {
-        $g.fun_t(stringify!($op), |$env: &mut Env, $argc: usize| $b, $type);
+        $g.fun_t(
+            stringify!($op),
+            |$env: &mut Env, $argc: usize| $b,
+            bind_type_names(&$type, &mut |name| $g.get_t(name).cloned())
+                .expect("prelude correctly defined"),
+        );
     };
 }
 

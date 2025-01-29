@@ -1967,6 +1967,7 @@ impl TypeRecord {
 #[derive(Debug, Clone)]
 pub enum TypeConflictReason {
     Unresolved,
+    FreeVariableEncountered(String),
     UnboundType(Rc<Type>),
     WrongType(Rc<Type>, Rc<Type>),
     WrongArgumentType(usize, Box<TypeConflictReason>),
@@ -1994,8 +1995,11 @@ impl std::fmt::Display for TypeConflictReason {
             TypeConflictReason::Unresolved => {
                 write!(f, "Encountered unresolved type. Type annotation needed.")
             }
+            TypeConflictReason::FreeVariableEncountered(name) => {
+                write!(f, "Bug in WLambda! Free variable encountered: {}", name)
+            }
             TypeConflictReason::UnboundType(ty) => {
-                write!(f, "Bug in WLambda! Unbound Type discovered: {:?}", ty)
+                write!(f, "Bug in WLambda! Unbound Type encountered: {:?}", ty)
             }
             TypeConflictReason::WrongType(exp, got) => {
                 write!(f, "Mismatch {} <=> {}", exp.s(), got.s())
@@ -2316,6 +2320,94 @@ pub fn bind_free_vars(typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
     let mut bindenv = TypeFreeVarBindingEnv::new();
     let ret = bindenv.bind_type_vars(typ)?;
     //d// println!("#bind_free_vars output {}", ret);
+    Ok(ret)
+}
+
+pub fn bind_type_names<F>(
+    typ: &Rc<Type>,
+    name_resolver: &mut F,
+) -> Result<Rc<Type>, TypeConflictReason>
+where
+    F: FnMut(&str) -> Option<Rc<Type>>,
+{
+    let ret = match typ.as_ref() {
+        Type::Opt(t) => Rc::new(Type::Opt(bind_type_names(t, name_resolver)?)),
+        Type::Maybe(t) => Rc::new(Type::Maybe(bind_type_names(t, name_resolver)?)),
+        Type::Err(t) => Rc::new(Type::Err(bind_type_names(t, name_resolver)?)),
+        Type::Lst(t) => Rc::new(Type::Lst(bind_type_names(t, name_resolver)?)),
+        Type::Ref(t) => Rc::new(Type::Ref(bind_type_names(t, name_resolver)?)),
+        Type::Iter(t) => Rc::new(Type::Iter(bind_type_names(t, name_resolver)?)),
+        Type::Map(t) => Rc::new(Type::Map(bind_type_names(t, name_resolver)?)),
+        Type::Pair(t, t2) => {
+            let t = bind_type_names(t, name_resolver)?;
+            let t2 = bind_type_names(t2, name_resolver)?;
+            Rc::new(Type::Pair(t, t2))
+        }
+        Type::Tuple(types) => {
+            let mut bound_types = Vec::new();
+
+            for t in types.iter() {
+                bound_types.push(bind_type_names(t, name_resolver)?);
+            }
+
+            Rc::new(Type::Tuple(Rc::new(bound_types)))
+        }
+        Type::Union(types) => {
+            let mut bound_types = Vec::new();
+
+            for t in types.iter() {
+                bound_types.push(bind_type_names(t, name_resolver)?);
+            }
+
+            Rc::new(Type::Union(Rc::new(bound_types)))
+        }
+        Type::Function(types, ret, type_var_limits) => {
+            let new_limits = if let Some(type_var_limits) = type_var_limits {
+                let mut new_limits = vec![];
+                for (name, typ) in type_var_limits.iter() {
+                    if let Some(typ) = typ {
+                        new_limits.push((name.clone(), Some(bind_type_names(typ, name_resolver)?)));
+                    } else {
+                        new_limits.push((name.clone(), None));
+                    }
+                }
+                Some(Rc::new(new_limits))
+            } else {
+                None
+            };
+
+            let mut bound_arg_types = Vec::new();
+            for (t, paramname) in types.iter() {
+                bound_arg_types.push((bind_type_names(t, name_resolver)?, paramname.clone()));
+            }
+            let bound_ret = bind_type_names(ret, name_resolver)?;
+
+            Rc::new(Type::Function(Rc::new(bound_arg_types), bound_ret, new_limits))
+        }
+        Type::Alias(name, binds) => {
+            if let Some(res_typ) = name_resolver(name) {
+                Rc::new(Type::BoundAlias(name.clone(), binds.clone(), res_typ))
+            } else {
+                return Err(TypeConflictReason::UnknownTypeAlias(name.to_string()));
+            }
+        }
+        Type::Name(name, binds) => {
+            if let Some(res_typ) = name_resolver(name) {
+                Rc::new(Type::BoundName(name.clone(), binds.clone(), res_typ))
+            } else {
+                return Err(TypeConflictReason::UnknownTypeAlias(name.to_string()));
+            }
+        }
+        Type::Var(name) => {
+            return Err(TypeConflictReason::FreeVariableEncountered(name.to_string()));
+        }
+        Type::BoundVar(name, limits, ty) => Rc::new(Type::BoundVar(
+            name.clone(),
+            limits.clone(),
+            bind_type_names(ty, name_resolver)?,
+        )),
+        _ => typ.clone(),
+    };
     Ok(ret)
 }
 
@@ -3019,11 +3111,7 @@ where
     }
 
     if chk_t.is_unbound() {
-        return TypeResolveResult::Conflict {
-            expected: typ.clone(),
-            got: chk_t.clone(),
-            reason: TypeConflictReason::UnboundType(chk_t.clone()),
-        };
+        return TypeResolveResult::Error { reason: TypeConflictReason::UnboundType(chk_t.clone()) };
     }
 
     let mut indent = String::from("");

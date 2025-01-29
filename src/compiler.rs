@@ -254,6 +254,12 @@ impl SymbolTable {
         self.symbols.get(&s2sym(name)).map(|r| &r.0)
     }
 
+    /// Retrieves the type of a value from the SymbolTable, if present.
+    #[allow(dead_code)]
+    pub fn get_t(&self, name: &str) -> Option<&Rc<Type>> {
+        self.symbols.get(&s2sym(name)).map(|r| &r.1)
+    }
+
     /// Helper function for building symbol tables with functions in them.
     ///
     /// See also `VValFun::new_fun` for more details.
