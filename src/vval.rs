@@ -1944,7 +1944,7 @@ impl TypeRecord {
         None
     }
 
-    //    fn bind_vars(&self, binding_env: &mut TypeVarBindingEnv) -> Self {
+    //    fn bind_vars(&self, binding_env: &mut TypeBindingEnv) -> Self {
     //        let mut res = TypeResolve::Resolved;
     //        for v in self.typedefs.iter() {
     //            match v.1.resolve_check() {
@@ -1967,6 +1967,7 @@ impl TypeRecord {
 #[derive(Debug, Clone)]
 pub enum TypeConflictReason {
     Unresolved,
+    UnboundType(Rc<Type>),
     WrongType(Rc<Type>, Rc<Type>),
     WrongArgumentType(usize, Box<TypeConflictReason>),
     ArgumentMissing(usize, Rc<Type>),
@@ -1992,6 +1993,9 @@ impl std::fmt::Display for TypeConflictReason {
         match self {
             TypeConflictReason::Unresolved => {
                 write!(f, "Encountered unresolved type. Type annotation needed.")
+            }
+            TypeConflictReason::UnboundType(ty) => {
+                write!(f, "Bug in WLambda! Unbound Type discovered: {:?}", ty)
             }
             TypeConflictReason::WrongType(exp, got) => {
                 write!(f, "Mismatch {} <=> {}", exp.s(), got.s())
@@ -2087,37 +2091,37 @@ impl std::fmt::Display for TypeConflictReason {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct TypeEnv {
-    parent: Option<Rc<TypeEnv>>,
-    typename_env: FnvHashMap<String, Rc<Type>>,
-    id: usize,
-}
-
-impl TypeEnv {
-    pub fn new() -> Self {
-        Self {
-            parent: None,
-            typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
-            id: next_type_var_id(),
-        }
-    }
-
-    pub fn new_with_parent(parent: Rc<Self>) -> Self {
-        Self {
-            parent: Some(parent),
-            typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
-            id: next_type_var_id(),
-        }
-    }
-
-    pub fn env_id(&self) -> usize {
-        self.id
-    }
-}
+// #[derive(Debug, Clone)]
+// pub struct TypeEnv {
+//     parent: Option<Rc<TypeEnv>>,
+//     typename_env: FnvHashMap<String, Rc<Type>>,
+//     id: usize,
+// }
+//
+// impl TypeEnv {
+//     pub fn new() -> Self {
+//         Self {
+//             parent: None,
+//             typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
+//             id: next_type_var_id(),
+//         }
+//     }
+//
+//     pub fn new_with_parent(parent: Rc<Self>) -> Self {
+//         Self {
+//             parent: Some(parent),
+//             typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
+//             id: next_type_var_id(),
+//         }
+//     }
+//
+//     pub fn env_id(&self) -> usize {
+//         self.id
+//     }
+// }
 
 #[derive(Clone, Debug)]
-pub struct TypeVarBindingEnv {
+pub struct TypeFreeVarBindingEnv {
     env_stack: Vec<Vec<(String, Rc<Type>, bool)>>,
 }
 
@@ -2138,7 +2142,7 @@ impl Display for TypeVarBindingError {
     }
 }
 
-impl TypeVarBindingEnv {
+impl TypeFreeVarBindingEnv {
     pub fn new() -> Self {
         let mut env_stack = Vec::new();
         env_stack.push(Vec::new());
@@ -2195,18 +2199,10 @@ impl TypeVarBindingEnv {
         let bound_typ = Rc::new(Type::BoundVar(Rc::new(name.to_string()), id, limit));
         self.env_stack
             .last_mut()
-            .expect("TypeVarBindingEnv has at least one frame on the env_stack")
+            .expect("TypeFreeVarBindingEnv has at least one frame on the env_stack")
             .push((name.to_string(), bound_typ.clone(), false));
 
         Ok(bound_typ)
-    }
-
-    pub fn bind_type(typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
-        //d// println!("#bind_type input {}", typ);
-        let mut bindenv = Self::new();
-        let ret = bindenv.bind_type_vars(typ)?;
-        //d// println!("#bind_type output {}", ret);
-        Ok(ret)
     }
 
     pub fn bind_type_vars(&mut self, typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
@@ -2293,7 +2289,7 @@ impl TypeVarBindingEnv {
                 self.pop();
                 Rc::new(Type::Function(Rc::new(bound_arg_types), bound_ret, used_limits))
             }
-            Type::Name(name, _binds, _type_env) => {
+            Type::Name(name, _binds) => {
                 if let Some(typ) = self.find(name) {
                     self.mark_used(name);
                     typ
@@ -2315,9 +2311,18 @@ impl TypeVarBindingEnv {
     }
 }
 
+pub fn bind_free_vars(typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
+    //d// println!("#bind_free_vars input {}", typ);
+    let mut bindenv = TypeFreeVarBindingEnv::new();
+    let ret = bindenv.bind_type_vars(typ)?;
+    //d// println!("#bind_free_vars output {}", ret);
+    Ok(ret)
+}
+
 #[derive(Debug, Clone)]
 pub enum TypeResolveResult {
     Conflict { expected: Rc<Type>, got: Rc<Type>, reason: TypeConflictReason },
+    Error { reason: TypeConflictReason },
     Match { typ: Rc<Type> },
 }
 
@@ -2361,10 +2366,12 @@ pub enum Type {
         Rc<Type>,
         Option<Rc<Vec<(String, Option<Rc<Type>>)>>>,
     ),
-    Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>, Option<Rc<TypeEnv>>),
-    Alias(Rc<String>, Option<Rc<Vec<Rc<Type>>>>, Option<Rc<TypeEnv>>),
-    BoundVar(Rc<String>, usize, Rc<Type>),
+    Name(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
+    BoundName(Rc<String>, Option<Rc<Vec<Rc<Type>>>>, Rc<Type>),
+    Alias(Rc<String>, Option<Rc<Vec<Rc<Type>>>>),
+    BoundAlias(Rc<String>, Option<Rc<Vec<Rc<Type>>>>, Rc<Type>),
     Var(Rc<String>),
+    BoundVar(Rc<String>, usize, Rc<Type>),
 }
 
 thread_local! {
@@ -2480,20 +2487,20 @@ impl Type {
     }
 
     pub fn named(n: &str) -> Rc<Self> {
-        Rc::new(Type::Name(Rc::new(n.to_string()), None, None))
+        Rc::new(Type::Name(Rc::new(n.to_string()), None))
     }
 
     pub fn aliased(n: &str) -> Rc<Self> {
-        Rc::new(Type::Alias(Rc::new(n.to_string()), None, None))
+        Rc::new(Type::Alias(Rc::new(n.to_string()), None))
     }
 
     pub fn fun_ret(t: Self) -> Rc<Type> {
-        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t), None)))
+        bind_free_vars(&Rc::new(Type::Function(Rc::new(vec![]), Rc::new(t), None)))
             .expect("Well formed function type")
     }
 
     pub fn fun_1_ret(a1n: &str, a1: Self, t: Self) -> Rc<Type> {
-        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
+        bind_free_vars(&Rc::new(Type::Function(
             Rc::new(vec![(Rc::new(a1), if a1n.len() > 0 { Some(a1n.to_string()) } else { None })]),
             Rc::new(t),
             None,
@@ -2502,7 +2509,7 @@ impl Type {
     }
 
     pub fn fun_1_ret_is(a1n: &str, a1: Self, t: Self, is: &[(&str, Rc<Type>)]) -> Rc<Type> {
-        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
+        bind_free_vars(&Rc::new(Type::Function(
             Rc::new(vec![(Rc::new(a1), if a1n.len() > 0 { Some(a1n.to_string()) } else { None })]),
             Rc::new(t),
             Some(Rc::new(is.iter().map(|(s, t)| (s.to_string(), Some(t.clone()))).collect())),
@@ -2511,7 +2518,7 @@ impl Type {
     }
 
     pub fn fun_2(a1n: &str, a1: Self, a2n: &str, a2: Self) -> Rc<Type> {
-        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
+        bind_free_vars(&Rc::new(Type::Function(
             Rc::new(vec![
                 (Rc::new(a1), if a1n.len() > 0 { Some(a1n.to_string()) } else { None }),
                 (Rc::new(a2), if a2n.len() > 0 { Some(a2n.to_string()) } else { None }),
@@ -2523,7 +2530,7 @@ impl Type {
     }
 
     pub fn fun_2_ret(a1n: &str, a1: Self, a2n: &str, a2: Self, t: Self) -> Rc<Type> {
-        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
+        bind_free_vars(&Rc::new(Type::Function(
             Rc::new(vec![
                 (Rc::new(a1), if a1n.len() > 0 { Some(a1n.to_string()) } else { None }),
                 (Rc::new(a2), if a2n.len() > 0 { Some(a2n.to_string()) } else { None }),
@@ -2542,7 +2549,7 @@ impl Type {
         t: Self,
         is: &[(&str, Rc<Type>)],
     ) -> Rc<Type> {
-        TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
+        bind_free_vars(&Rc::new(Type::Function(
             Rc::new(vec![
                 (Rc::new(a1), if a1n.len() > 0 { Some(a1n.to_string()) } else { None }),
                 (Rc::new(a2), if a2n.len() > 0 { Some(a2n.to_string()) } else { None }),
@@ -2598,8 +2605,16 @@ impl Type {
         matches!(self, Type::Type)
     }
 
+    pub fn is_unbound(&self) -> bool {
+        matches!(self, Type::Name(_, _) | Type::Alias(_, _) | Type::Var(_))
+    }
+
+    pub fn is_name(&self) -> bool {
+        matches!(self, Type::Name(_, _) | Type::BoundName(_, _, _))
+    }
+
     pub fn is_alias(&self) -> bool {
-        matches!(self, Type::Alias(_, _, _))
+        matches!(self, Type::Alias(_, _) | Type::BoundAlias(_, _, _))
     }
 
     pub fn is_bound_var(&self) -> bool {
@@ -2608,10 +2623,7 @@ impl Type {
 
     pub fn fun_split_ret(&self) -> (Rc<Type>, Rc<Type>) {
         if let Type::Function(args, ret, limit) = self {
-            (
-                Rc::new(Type::Function(args.clone(), Type::none(), limit.clone())),
-                ret.clone()
-            )
+            (Rc::new(Type::Function(args.clone(), Type::none(), limit.clone())), ret.clone())
         } else {
             let dummy = Rc::new(Type::Function(Rc::new(vec![]), Type::none(), None));
             (dummy.clone(), dummy)
@@ -2745,10 +2757,12 @@ impl Type {
             | Type::Lst(_)
             | Type::Tuple(_)
             | Type::Record(_, _, _)
-            | Type::Alias(_, _, _)
-            | Type::Name(_, _, _)
-            | Type::BoundVar(_, _, _)
+            | Type::Alias(_, _)
+            | Type::BoundAlias(_, _, _)
+            | Type::Name(_, _)
+            | Type::BoundName(_, _, _)
             | Type::Var(_)
+            | Type::BoundVar(_, _, _)
             | Type::Pair(_, _) => true,
             _ => false,
         }
@@ -2881,8 +2895,8 @@ impl Type {
                 fun += &ret.to_display(extended, true);
                 fun
             }
-            Type::Alias(name, None, _) => format!("{}", *name),
-            Type::Alias(name, Some(binds), _) => {
+            Type::BoundAlias(name, None, _) | Type::Alias(name, None) => format!("{}", *name),
+            Type::BoundAlias(name, Some(binds), _) | Type::Alias(name, Some(binds)) => {
                 let mut s = format!("{}", *name);
                 s += "<";
                 for (i, b) in binds.iter().enumerate() {
@@ -2894,8 +2908,8 @@ impl Type {
                 s += ">";
                 s
             }
-            Type::Name(name, None, _) => format!("{}", *name),
-            Type::Name(name, Some(binds), _) => {
+            Type::BoundName(name, None, _) | Type::Name(name, None) => format!("{}", *name),
+            Type::BoundName(name, Some(binds), _) | Type::Name(name, Some(binds)) => {
                 let mut s = format!("{}", *name);
                 s += "<";
                 for (i, b) in binds.iter().enumerate() {
@@ -2924,13 +2938,6 @@ impl Type {
             Type::Var(name) => format!("<{}>", *name),
         }
     }
-
-    //    pub fn is_resolved(&self) -> bool {
-    //        match self.resolve_check() {
-    //            TypeResolve::Resolved => true,
-    //            _ => false,
-    //        }
-    //    }
 
     pub fn wrap_simple(&self, other: Rc<Type>) -> Option<Rc<Type>> {
         match self {
@@ -2985,6 +2992,7 @@ macro_rules! resolve_type_wrap1 {
                         reason,
                     }
                 }
+                err => err,
             }
         } else {
             TypeResolveResult::Conflict {
@@ -3006,13 +3014,25 @@ pub fn resolve_type<F>(
 where
     F: FnMut(&str) -> Option<Rc<Type>>,
 {
+    if typ.is_unbound() {
+        return TypeResolveResult::Error { reason: TypeConflictReason::UnboundType(typ.clone()) };
+    }
+
+    if chk_t.is_unbound() {
+        return TypeResolveResult::Conflict {
+            expected: typ.clone(),
+            got: chk_t.clone(),
+            reason: TypeConflictReason::UnboundType(chk_t.clone()),
+        };
+    }
+
     let mut indent = String::from("");
     for _ in 0..depth {
         indent += "  ";
     }
-    if let Type::Alias(name, _binds, _type_env) = typ.as_ref() {
+    if let Type::Alias(name, _binds) = typ.as_ref() {
         eprintln!("{}resolve_type alias {:?} <= {:?}", indent, typ, chk_t);
-        if let Type::Alias(chk_name, _, _) = chk_t.as_ref() {
+        if let Type::Alias(chk_name, _) = chk_t.as_ref() {
             if chk_name == name {
                 return TypeResolveResult::Match { typ: typ.clone() };
             }
@@ -3033,8 +3053,9 @@ where
             TypeResolveResult::Conflict { expected, got, reason } => {
                 TypeResolveResult::Conflict { expected, got, reason }
             }
+            err => return err,
         };
-    } else if let Type::BoundVar(name, id, limit) = typ.as_ref() {
+    } else if let Type::BoundVar(_name, id, _limit) = typ.as_ref() {
         let typ = if let Some((_, typ)) = bound_vars.iter().find(|var| var.0 == *id) {
             Some(typ.clone())
         } else {
@@ -3056,6 +3077,7 @@ where
                         reason: TypeConflictReason::MaybeNoneNotCovered(chk_t.clone(), got),
                     };
                 }
+                x @ TypeResolveResult::Error { reason: _ } => return x,
                 _ => (),
             }
 
@@ -3073,6 +3095,7 @@ where
                         ),
                     };
                 }
+                x @ TypeResolveResult::Error { reason: _ } => return x,
             };
 
             return TypeResolveResult::Match { typ: Rc::new(Type::Maybe(left_type)) };
@@ -3096,12 +3119,14 @@ where
                             ),
                         };
                     }
+                    x @ TypeResolveResult::Error { reason: _ } => return x,
                 }
             }
 
             return TypeResolveResult::Match { typ: Rc::new(Type::Union(Rc::new(matched_types))) };
         }
-        Type::Alias(name, _binds, _type_env) => {
+        Type::BoundAlias(name, _binds, _) | Type::Alias(name, _binds) => {
+            // TODO: bind these earlier...
             eprintln!("{}resolve_type ralias {:?} <= {:?}", indent, typ, chk_t);
             let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
                 res_alias_typ.clone()
@@ -3141,6 +3166,7 @@ where
                         ),
                     };
                 }
+                x @ TypeResolveResult::Error { reason: _ } => return x,
             }
         }
         _ => (),
@@ -3177,9 +3203,7 @@ where
             //                    }
             //                }
             //            }
-            Type::Name(name, _bindings, _type_env) => {
-                TypeResolveResult::Match { typ: chk_t.clone() }
-            }
+            Type::Name(_name, _bindings) => TypeResolveResult::Match { typ: chk_t.clone() },
             t => TypeResolveResult::Match { typ: Rc::new(t.clone()) },
         },
         Type::Bool => resolve_type_trivial!(typ, chk_t, Type::Bool),
@@ -3227,6 +3251,7 @@ where
                         }
                     }
                     TypeResolveResult::Match { typ } => typ,
+                    x @ TypeResolveResult::Error { reason: _ } => return x,
                 };
 
                 let ct2 = match resolve_type(t2, ct2, bound_vars, name_resolver, depth + 1) {
@@ -3238,6 +3263,7 @@ where
                         }
                     }
                     TypeResolveResult::Match { typ } => typ,
+                    x @ TypeResolveResult::Error { reason: _ } => return x,
                 };
 
                 TypeResolveResult::Match { typ: Rc::new(Type::Pair(ct, ct2)) }
@@ -3262,6 +3288,7 @@ where
                     TypeResolveResult::Conflict { reason, expected, .. } => {
                         conflicts.push((expected.clone(), reason))
                     }
+                    x @ TypeResolveResult::Error { reason: _ } => return x,
                 }
             }
 
@@ -3286,7 +3313,7 @@ where
         }
         Type::Function(arg_types, ret, _type_var_limits) => {
             // TODO: do something with type_vars!
-            let mut bv = bound_vars.clone();
+            let mut _bv = bound_vars.clone();
 
             // Only matches, if the other type is also a function type.
             if let Type::Function(chk_arg_types, chk_ret, type_var_limits) = chk_t.as_ref() {
@@ -3317,6 +3344,7 @@ where
                                     ),
                                 }
                             }
+                            x @ TypeResolveResult::Error { reason: _ } => return x,
                         };
                         matched_args.push((matched_arg_typ, param_name.clone()));
                     } else {
@@ -3353,6 +3381,7 @@ where
                                 ),
                             };
                         }
+                        x @ TypeResolveResult::Error { reason: _ } => return x,
                     };
 
                 println!("MATCHED RET: {} <=> {} => {}", chk_ret.s(), ret.s(), matched_ret.s());
@@ -3372,7 +3401,7 @@ where
                 }
             }
         }
-        Type::Alias(_name, _binds, _type_env) => {
+        Type::BoundAlias(_name, _binds, _type) => {
             // Does not happen, the Alias case is caught at the top and resolved immediately.
             TypeResolveResult::Conflict {
                 expected: typ.clone(),
@@ -3380,7 +3409,15 @@ where
                 reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
             }
         }
-        Type::Name(_name, _binds, _type_env) => {
+        Type::Alias(_name, _binds) => {
+            // Does not happen, the Alias case is caught at the top and resolved immediately.
+            TypeResolveResult::Conflict {
+                expected: typ.clone(),
+                got: chk_t.clone(),
+                reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+            }
+        }
+        Type::Name(_name, _binds) => {
             // case: Name == Name
             // case: Alias == Name
             // case: Alias == Alias
@@ -3392,7 +3429,7 @@ where
             //              !:type Point record<N is Num> { x: N, y: N }
             //              !:type Pos record<S> { is Point<S> }
             //              !p : Point<Num> = as Pos<int>: ${ x: 10, y: 20 };
-            if let Type::Name(_chk_name, _chk_binds, _env) = chk_t.as_ref() {
+            if let Type::Name(_chk_name, _chk_binds) = chk_t.as_ref() {
             } else {
                 // we need to check if the `name` is an alias for the other type.
                 // !Num : type = $type int | float;
@@ -3445,6 +3482,7 @@ where
                                 ),
                             }
                         }
+                        x @ TypeResolveResult::Error { reason: _ } => return x,
                     }
                 } else {
                     TypeResolveResult::Match { typ: chk_t.clone() }
@@ -3466,6 +3504,7 @@ where
                             ),
                         }
                     }
+                    x @ TypeResolveResult::Error { reason: _ } => return x,
                 }
             }
         }

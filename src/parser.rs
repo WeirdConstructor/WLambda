@@ -20,7 +20,6 @@ to parse in this hand written parser.
 
 use crate::vval::Syntax;
 use crate::vval::Type;
-use crate::vval::TypeVarBindingEnv;
 use crate::vval::VVal;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -695,7 +694,7 @@ fn parse_special_value(ps: &mut State) -> Result<VVal, ParseError> {
                 Ok(s)
             } else if ps.consume_lookahead("type") {
                 ps.skip_ws_and_comments();
-                Ok(parse_bound_type(ps)?)
+                Ok(parse_type(ps)?)
             } else {
                 if ps.consume_lookahead("true") {
                     ps.skip_ws_and_comments();
@@ -1260,12 +1259,12 @@ fn parse_basetype(ps: &mut State) -> Result<VVal, ParseError> {
 
             if let Some(c) = typename.chars().nth(0) {
                 if c == '@' {
-                    VVal::typ_box(Type::Alias(Rc::new(typename), bindings, None))
+                    VVal::typ_box(Type::Alias(Rc::new(typename), bindings))
                 } else {
-                    VVal::typ_box(Type::Name(Rc::new(typename), bindings, None))
+                    VVal::typ_box(Type::Name(Rc::new(typename), bindings))
                 }
             } else {
-                VVal::typ_box(Type::Name(Rc::new(typename), bindings, None))
+                VVal::typ_box(Type::Name(Rc::new(typename), bindings))
             }
         }
     };
@@ -1309,16 +1308,6 @@ fn parse_type(ps: &mut State) -> Result<VVal, ParseError> {
 
         Ok(typ)
     })
-}
-
-fn parse_bound_type(ps: &mut State) -> Result<VVal, ParseError> {
-    let t = match TypeVarBindingEnv::bind_type(&parse_type(ps)?.t()) {
-        Ok(t) => t,
-        Err(e) => {
-            return Err(ps.err(ParseErrorKind::BadType(format!("{}", e))));
-        }
-    };
-    Ok(VVal::Type(t))
 }
 
 fn is_ident_start(c: char) -> bool {
@@ -2038,7 +2027,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
             let typename = parse_typename(ps)?;
             ps.skip_ws_and_comments();
             assign.push(VVal::new_str_mv(typename));
-            assign.push(parse_bound_type(ps)?);
+            assign.push(parse_type(ps)?);
             return Ok(assign);
         }
 
@@ -2059,7 +2048,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     ps.skip_ws_and_comments();
                     if is_def {
                         if ps.consume_token_wsc(':', Syntax::T) {
-                            types.push(parse_bound_type(ps)?);
+                            types.push(parse_type(ps)?);
                         } else {
                             types.push(VVal::type_any());
                         }
@@ -2086,7 +2075,7 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
 
                 if is_def {
                     if ps.consume_token_wsc(':', Syntax::T) {
-                        types.push(parse_bound_type(ps)?);
+                        types.push(parse_type(ps)?);
                     } else {
                         types.push(VVal::type_any());
                     }

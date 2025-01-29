@@ -13,7 +13,7 @@ use std::rc::Rc;
 use crate::compiler::{fetch_object_key_access, CompileEnv};
 use crate::ops::BinOp;
 use crate::vval::{
-    resolve_type, CompileError, Syntax, Type, TypeResolveResult, TypeVarBindingEnv, VVal, VarPos,
+    bind_free_vars, resolve_type, CompileError, Syntax, Type, TypeResolveResult, VVal, VarPos,
 };
 
 #[derive(Debug, Clone)]
@@ -161,7 +161,7 @@ fn type_binop(
         // In this case, we can bind the return type before the argument types.
         // That will bind the variables in the function arguments by the return type.
         let mut bound_vars = vec![];
-        println!("OOOOOOOOOOOBOUNDBOUND: {}", ret_type, op_ret);
+        println!("OOOOOOOOOOOBOUNDBOUND: {} - {}", ret_type, op_ret);
         // TODO: The following only works properly if the ret_type=Any (or generally more generic?)
         //       it does not work if ret_type=int and op_ret=<N is @Num> - because of the
         //       union subtype matching done here.
@@ -333,12 +333,9 @@ fn type_call(
         args.push(e);
         fun_arg_types.push((Type::unknown(&format!("callarg{}", i)), None));
     }
-    let synth_fun_type = TypeVarBindingEnv::bind_type(&Rc::new(Type::Function(
-        Rc::new(fun_arg_types),
-        ret_type.clone(),
-        None,
-    )))
-    .expect("properly synthesized function");
+    let synth_fun_type =
+        bind_free_vars(&Rc::new(Type::Function(Rc::new(fun_arg_types), ret_type.clone(), None)))
+            .expect("properly synthesized function");
 
     // Synthesize the function type (including return tyep) and pass it as
     // type hint for the return type of the function?
@@ -530,6 +527,13 @@ where
                 got.s(),
                 err_cb(),
                 reason
+            )));
+        }
+        TypeResolveResult::Error { reason } => {
+            return Err(ast.compile_err(format!(
+                "Error in resolve_type. {}; in {}",
+                reason,
+                err_cb()
             )));
         }
     }

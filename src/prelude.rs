@@ -15873,8 +15873,9 @@ pub fn std_symbol_table() -> SymbolTable {
         st,
         "types:type_at",
         |env: &mut Env, _argc: usize| {
+            use crate::vval::bind_free_vars;
             let t1 = env.arg(0);
-            let typ1 = TypeVarBindingEnv::bind_type(&t1.t());
+            let typ1 = bind_free_vars(&t1.t());
 
             let typ1 = match typ1 {
                 Ok(t) => t,
@@ -15914,11 +15915,11 @@ pub fn std_symbol_table() -> SymbolTable {
         st,
         "types:is_typeof",
         |env: &mut Env, _argc: usize| {
-            use crate::vval::resolve_type;
+            use crate::vval::{bind_free_vars, resolve_type};
             let t1 = env.arg(0);
             let t2 = env.arg(1);
-            let typ1 = TypeVarBindingEnv::bind_type(&t1.t());
-            let typ2 = TypeVarBindingEnv::bind_type(&t2.t());
+            let typ1 = bind_free_vars(&t1.t());
+            let typ2 = bind_free_vars(&t2.t());
 
             let typ1 = match typ1 {
                 Ok(t) => t,
@@ -15954,14 +15955,12 @@ pub fn std_symbol_table() -> SymbolTable {
             );
 
             match res {
-                TypeResolveResult::Match { typ } => {
-                    Ok(VVal::Type(match TypeVarBindingEnv::bind_type(&typ) {
-                        Ok(t) => t,
-                        Err(e) => {
-                            return Ok(VVal::err_msg(&format!("Can't bind type {}: {}", t2, e)));
-                        }
-                    }))
-                }
+                TypeResolveResult::Match { typ } => Ok(VVal::Type(match bind_free_vars(&typ) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return Ok(VVal::err_msg(&format!("Can't bind type {}: {}", t2, e)));
+                    }
+                })),
                 TypeResolveResult::Conflict { expected, got, reason } => {
                     return Ok(VVal::err_msg(&format!(
                         "Type error, expected ({}), but got ({}); reason: {}",
@@ -15969,6 +15968,9 @@ pub fn std_symbol_table() -> SymbolTable {
                         got.s(),
                         reason
                     )));
+                }
+                TypeResolveResult::Error { reason } => {
+                    return Ok(VVal::err_msg(&format!("Error in is_typeof. {}", reason)));
                 }
             }
         },
