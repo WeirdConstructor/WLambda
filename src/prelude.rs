@@ -10529,8 +10529,18 @@ macro_rules! add_func_t {
         $g.fun_t(
             stringify!($op),
             |$env: &mut Env, $argc: usize| $b,
-            bind_type_names(&$type, &mut |name| $g.get_t(name).cloned())
-                .expect("prelude correctly defined"),
+            bind_type_names(&$type, &mut |name| {
+                let value = $g.get(name)?;
+                let vartype = $g.get_t(name)?;
+                if vartype.is_alias() {
+                    Some(value.t())
+                } else if vartype.is_type() {
+                    Some(value.t())
+                } else {
+                    None
+                }
+            })
+            .expect("prelude correctly defined"),
         );
     };
 }

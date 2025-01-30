@@ -157,6 +157,9 @@ fn type_binop(
 
     let (op_args, op_ret) = op_type.fun_split_ret();
 
+    // Now synthesize the arguments and check their type against the operation's arguments:
+    let synth_args = Type::fun_2("", (*a_type.typ).clone(), "", (*b_type.typ).clone());
+
     if let TypeHint::Expect(ret_type) = type_hint {
         // In this case, we can bind the return type before the argument types.
         // That will bind the variables in the function arguments by the return type.
@@ -167,17 +170,37 @@ fn type_binop(
         //       union subtype matching done here.
         //
         //       Maybe we need to run it twice, in both directions?
-        let ret_type = resolve_and_check_bound(&ret_type, &op_ret, &mut bound_vars, ast, || {
+        println!("11111111111111111111111111111111111111111111");
+        if let Ok(ret_type) =
+            resolve_and_check_bound(&ret_type, &op_ret, &mut bound_vars, ast, || {
+                format!("operator call '{}' with expected return type {}", op.token(), ret_type)
+            })
+        {
+        println!("§BODUD2: {:?}", bound_vars);
+            if let Ok(synth_type) =
+                resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ast, || {
+                    format!("operator call '{}' with return type {}", op.token(), ret_type)
+                })
+            {
+                println!("Result type: {}", synth_args);
+                return Ok(TypedVVal::new(ret_type, new_ast));
+            }
+        }
+
+        bound_vars = vec![];
+        println!("222222222222222222222222222222222222222222222222222");
+        let ret_type = resolve_and_check_bound(&op_ret, &ret_type, &mut bound_vars, ast, || {
             format!("operator call '{}' with expected return type {}", op.token(), ret_type)
         })?;
+        println!("§BODUD: {:?}", bound_vars);
+        let synth_type =
+            resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ast, || {
+                format!("operator call '{}' with return type {}", op.token(), ret_type)
+            })?;
+        println!("Result2 type: {}", synth_args);
+        return Ok(TypedVVal::new(ret_type, new_ast));
 
-        // Now synthesize the arguments and check their type against the operation's arguments:
-        let synth_args = Type::fun_2("", (*a_type.typ).clone(), "", (*b_type.typ).clone());
-        resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ast, || {
-            format!("operator call '{}' with return type {}", op.token(), ret_type)
-        })?;
-
-        Ok(TypedVVal::new(ret_type, new_ast))
+        return Err(ast.compile_err(format!("Can't infer return type at: {}", ast.s())));
     } else {
         // We have no clue what the return type should be.
         // So we try to infer it by synthesizing a function with the same return type as the operation.

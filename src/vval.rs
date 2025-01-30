@@ -3111,6 +3111,7 @@ pub fn resolve_type(
         }
         // @Num <= X is OK if typein(@Num) <= X is OK
         (Type::BoundAlias(_name, _binds, alias_typ), _) => {
+        println!("ROOORO {} {}", alias_typ, chk_t);
             return match resolve_type(&alias_typ, chk_t, bound_vars, depth + 1) {
                 TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
                 TypeResolveResult::Conflict { expected, got, reason } => {
