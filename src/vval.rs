@@ -3109,6 +3109,7 @@ pub fn resolve_type(
         {
             return TypeResolveResult::Match { typ: chk_t.clone() };
         }
+        // @Num <= X is OK if typein(@Num) <= X is OK
         (Type::BoundAlias(_name, _binds, alias_typ), _) => {
             return match resolve_type(&alias_typ, chk_t, bound_vars, depth + 1) {
                 TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
@@ -3118,43 +3119,44 @@ pub fn resolve_type(
                 err => return err,
             };
         }
+        // <V> <= <V_> OK if V and V_ have the same color
         (Type::BoundVar(_name, id, _limit), Type::BoundVar(_name_chk, chk_id, _chk_limit))
             if *id == *chk_id =>
         {
             TypeResolveResult::Match { typ: chk_t.clone() }
         }
-        (Type::BoundVar(name, id, limit), Type::BoundVar(_name, chk_id, chk_limit))
-            if *id != *chk_id =>
-        {
-            // TODO: We must bind the var type to the variable with this specific ID.
-            //       And then we have to check if the variable is already bound (and matched)
-            //       to a specific type. Similar to the Type::Var(_) case below!
-
-            // BoundVar == BoundVar
-            // => the IDs need to match.
-            // if the IDs match: nothing to do, matches.
-            // else case might be something like:
-            //      !f1: fn <N is @Num>(N) -> N = ...;
-            //      !f2: fn <X is int>(X) -> X;
-            //      .f1 = f2; // Question: Should that work?
-            //                // Answer: NO! f2 can't handle float as input!
-            //      .f2 = f1; // Question: Should that work?
-            //                // Answer: Yes, f1 is more generic than f2. That means, it
-            //                //         can definitively handle `int`.
-            match resolve_type(chk_limit, limit, bound_vars, depth + 1) {
-                TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
-                TypeResolveResult::Conflict { expected, got, .. } => TypeResolveResult::Conflict {
-                    expected,
-                    got,
-                    reason: TypeConflictReason::BoundVarNotSubtype(
-                        name.to_string(),
-                        chk_limit.clone(),
-                        limit.clone(),
-                    ),
-                },
-                x @ TypeResolveResult::Error { reason: _ } => return x,
-            }
-        }
+//        (Type::BoundVar(name, id, limit), Type::BoundVar(_name, chk_id, chk_limit))
+//            if *id != *chk_id =>
+//        {
+//            // TODO: We must bind the var type to the variable with this specific ID.
+//            //       And then we have to check if the variable is already bound (and matched)
+//            //       to a specific type. Similar to the Type::Var(_) case below!
+//
+//            // BoundVar == BoundVar
+//            // => the IDs need to match.
+//            // if the IDs match: nothing to do, matches.
+//            // else case might be something like:
+//            //      !f1: fn <N is @Num>(N) -> N = ...;
+//            //      !f2: fn <X is int>(X) -> X;
+//            //      .f1 = f2; // Question: Should that work?
+//            //                // Answer: NO! f2 can't handle float as input!
+//            //      .f2 = f1; // Question: Should that work?
+//            //                // Answer: Yes, f1 is more generic than f2. That means, it
+//            //                //         can definitively handle `int`.
+//            match resolve_type(chk_limit, limit, bound_vars, depth + 1) {
+//                TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+//                TypeResolveResult::Conflict { expected, got, .. } => TypeResolveResult::Conflict {
+//                    expected,
+//                    got,
+//                    reason: TypeConflictReason::BoundVarNotSubtype(
+//                        name.to_string(),
+//                        chk_limit.clone(),
+//                        limit.clone(),
+//                    ),
+//                },
+//                x @ TypeResolveResult::Error { reason: _ } => return x,
+//            }
+//        }
         (Type::BoundVar(name, id, limit), _) => {
             let bv = bound_vars.iter().find(|var| var.0 == *id).cloned();
 
