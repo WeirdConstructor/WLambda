@@ -167,14 +167,13 @@ fn type_binop(
         //       union subtype matching done here.
         //
         //       Maybe we need to run it twice, in both directions?
-        let ret_type =
-            resolve_and_check_bound(&ret_type, &op_ret, &mut bound_vars, ce, ast, || {
-                format!("operator call '{}' with expected return type {}", op.token(), ret_type)
-            })?;
+        let ret_type = resolve_and_check_bound(&ret_type, &op_ret, &mut bound_vars, ast, || {
+            format!("operator call '{}' with expected return type {}", op.token(), ret_type)
+        })?;
 
         // Now synthesize the arguments and check their type against the operation's arguments:
         let synth_args = Type::fun_2("", (*a_type.typ).clone(), "", (*b_type.typ).clone());
-        resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ce, ast, || {
+        resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ast, || {
             format!("operator call '{}' with return type {}", op.token(), ret_type)
         })?;
 
@@ -190,7 +189,7 @@ fn type_binop(
             (*b_type.typ).clone(),
             Type::unknown_typ("ret_type"),
         );
-        let op_fun_type = resolve_and_check(&op_type, &synth_fun, ce, ast, || {
+        let op_fun_type = resolve_and_check(&op_type, &synth_fun, ast, || {
             format!("operator call '{}'", op.token())
         })?;
 
@@ -244,7 +243,7 @@ fn type_func(
             if is_last {
                 if let TypeHint::Expect(ty) = &type_hint {
                     println!("CHECK RET: {}", e);
-                    let res_ty = resolve_and_check(&ty, &tv.typ, ce, e, || {
+                    let res_ty = resolve_and_check(&ty, &tv.typ, e, || {
                         format!("last statement of function block")
                     })?;
                     tv.typ = res_ty;
@@ -361,8 +360,7 @@ fn type_call(
     ));
     println!("CHK_FUNC: {}", chk_func);
     println!("REAL_FUN: {}", real_fun_type);
-    let res_typ =
-        resolve_and_check(&real_fun_type, &chk_func, ce, ast, || format!("function call"))?;
+    let res_typ = resolve_and_check(&real_fun_type, &chk_func, ast, || format!("function call"))?;
     println!("RESULTING FUNCTION CALL TYPE: {}", res_typ);
 
     let fun_ast_node = called_thing.vval;
@@ -391,7 +389,7 @@ fn type_block(
 
             if is_last {
                 if let TypeHint::Expect(ty) = &type_hint {
-                    let res_ty = resolve_and_check(&ty, &tv.typ, ce, ast, || {
+                    let res_ty = resolve_and_check(&ty, &tv.typ, ast, || {
                         format!("last statement of block")
                     })?;
                     tv.typ = res_ty;
@@ -448,7 +446,7 @@ fn type_def(
             println!("TPPPP: {} <=> {}", tv, var_typ);
             let typ = tv.typ;
 
-            let real_var_typ = resolve_and_check(&var_typ, &typ, ce, ast, || {
+            let real_var_typ = resolve_and_check(&var_typ, &typ, ast, || {
                 format!("variable definition '{}'", &varname)
             })?;
             ce.borrow_mut().def_local(&varname, next_local, real_var_typ);
@@ -489,34 +487,36 @@ fn type_deftype(
     Ok(TypedVVal::new(Type::typ(), ast.clone()))
 }
 
+//fn bind_names<F>(
+//)
+//where
+//    F: Fn() -> String
+//{
+//
+//        &mut |name| {
+//            let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
+//            eprintln!("get comptime {}: {} => {}", name, value, vartype.s());
+//            if vartype.is_alias() {
+//                Some(value.t())
+//            } else if vartype.is_type() {
+//                Some(value.t())
+//            } else {
+//                None
+//            }
+//        },
+//}
+
 fn resolve_and_check_bound<F>(
     typ: &Rc<Type>,
     chk_typ: &Rc<Type>,
     bound_vars: &mut Vec<(usize, Rc<Type>)>,
-    ce: &mut Rc<RefCell<CompileEnv>>,
     ast: &VVal,
     err_cb: F,
 ) -> Result<Rc<Type>, CompileError>
 where
     F: Fn() -> String,
 {
-    let res = resolve_type(
-        typ,
-        chk_typ,
-        bound_vars,
-        &mut |name| {
-            let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
-            eprintln!("get comptime {}: {} => {}", name, value, vartype.s());
-            if vartype.is_alias() {
-                Some(value.t())
-            } else if vartype.is_type() {
-                Some(value.t())
-            } else {
-                None
-            }
-        },
-        0,
-    );
+    let res = resolve_type(typ, chk_typ, bound_vars, 0);
 
     match res {
         TypeResolveResult::Match { typ } => Ok(typ),
@@ -542,7 +542,6 @@ where
 fn resolve_and_check<F>(
     typ: &Rc<Type>,
     chk_typ: &Rc<Type>,
-    ce: &mut Rc<RefCell<CompileEnv>>,
     ast: &VVal,
     err_cb: F,
 ) -> Result<Rc<Type>, CompileError>
@@ -550,7 +549,7 @@ where
     F: Fn() -> String,
 {
     let mut bound_vars = vec![];
-    resolve_and_check_bound(typ, chk_typ, &mut bound_vars, ce, ast, err_cb)
+    resolve_and_check_bound(typ, chk_typ, &mut bound_vars, ast, err_cb)
 }
 
 fn type_assign(
@@ -591,7 +590,7 @@ fn type_assign(
         let value_type = type_pass(&value, TypeHint::from_type(&var_type), ce)?;
         let new_ast = VVal::vec4(ast.v_(0), vars, value_type.vval, destr);
 
-        resolve_and_check(&var_type, &value_type.typ, ce, ast, || {
+        resolve_and_check(&var_type, &value_type.typ, ast, || {
             format!("assignment to '{}'", &varname)
         })?;
 

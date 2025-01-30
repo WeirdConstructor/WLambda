@@ -15920,7 +15920,7 @@ pub fn std_symbol_table() -> SymbolTable {
         st,
         "types:is_typeof",
         |env: &mut Env, _argc: usize| {
-            use crate::vval::{bind_free_vars, resolve_type};
+            use crate::vval::{bind_free_vars, bind_type_names, resolve_type};
             let t1 = env.arg(0);
             let t2 = env.arg(1);
             let typ1 = bind_free_vars(&t1.t());
@@ -15940,24 +15940,45 @@ pub fn std_symbol_table() -> SymbolTable {
                 }
             };
 
+            let typ1 = bind_type_names(&typ1, &mut |name| {
+                let value = env.global.borrow().get_var(name)?;
+                let vartype = env.global.borrow().get_type(name)?;
+                if vartype.is_alias() {
+                    Some(value.t())
+                } else if vartype.is_type() {
+                    Some(value.t())
+                } else {
+                    None
+                }
+            });
+            let typ2 = bind_type_names(&typ2, &mut |name| {
+                let value = env.global.borrow().get_var(name)?;
+                let vartype = env.global.borrow().get_type(name)?;
+                if vartype.is_alias() {
+                    Some(value.t())
+                } else if vartype.is_type() {
+                    Some(value.t())
+                } else {
+                    None
+                }
+            });
+
+            let typ1 = match typ1 {
+                Ok(t) => t,
+                Err(e) => {
+                    return Ok(VVal::err_msg(&format!("Can't bind named type {}: {}", t1, e)));
+                }
+            };
+
+            let typ2 = match typ2 {
+                Ok(t) => t,
+                Err(e) => {
+                    return Ok(VVal::err_msg(&format!("Can't bind named type {}: {}", t2, e)));
+                }
+            };
+
             let mut bound_vars = vec![];
-            let res = resolve_type(
-                &typ1,
-                &typ2,
-                &mut bound_vars,
-                &mut |name| {
-                    let value = env.global.borrow().get_var(name)?;
-                    let vartype = env.global.borrow().get_type(name)?;
-                    if vartype.is_alias() {
-                        Some(value.t())
-                    } else if vartype.is_type() {
-                        Some(value.t())
-                    } else {
-                        None
-                    }
-                },
-                0,
-            );
+            let res = resolve_type(&typ1, &typ2, &mut bound_vars, 0);
 
             match res {
                 TypeResolveResult::Match { typ } => Ok(VVal::Type(match bind_free_vars(&typ) {

@@ -3056,24 +3056,10 @@ impl Debug for Type {
     }
 }
 
-macro_rules! resolve_type_trivial {
-    ($typ: ident, $chk_t: ident, $type: pat) => {
-        if matches!(**$chk_t, $type) {
-            TypeResolveResult::Match { typ: $typ.clone() }
-        } else {
-            TypeResolveResult::Conflict {
-                expected: $typ.clone(),
-                got: $chk_t.clone(),
-                reason: TypeConflictReason::WrongType($typ.clone(), $chk_t.clone()),
-            }
-        }
-    };
-}
-
 macro_rules! resolve_type_wrap1 {
-    ($typ: ident, $t: ident, $chk_t: ident, $pat: ident :: $pat2: ident, $bv: ident, $nr: ident, $depth: ident) => {
+    ($typ: ident, $t: ident, $chk_t: ident, $pat: ident :: $pat2: ident, $bv: ident, $depth: ident) => {
         if let $pat::$pat2(ot) = $chk_t.as_ref() {
-            match resolve_type($t, ot, $bv, $nr, $depth + 1) {
+            match resolve_type($t, ot, $bv, $depth + 1) {
                 TypeResolveResult::Match { typ } => TypeResolveResult::Match {
                     typ: $typ.wrap_simple(typ).unwrap_or_else(|| Rc::new(Type::None)),
                 },
@@ -3096,16 +3082,12 @@ macro_rules! resolve_type_wrap1 {
     };
 }
 
-pub fn resolve_type<F>(
+pub fn resolve_type(
     typ: &Rc<Type>,
     chk_t: &Rc<Type>,
     bound_vars: &mut Vec<(usize, Rc<Type>)>,
-    name_resolver: &mut F,
     depth: usize,
-) -> TypeResolveResult
-where
-    F: FnMut(&str) -> Option<Rc<Type>>,
-{
+) -> TypeResolveResult {
     if typ.is_unbound() {
         return TypeResolveResult::Error { reason: TypeConflictReason::UnboundType(typ.clone()) };
     }
@@ -3118,46 +3100,90 @@ where
     for _ in 0..depth {
         indent += "  ";
     }
-    if let Type::Alias(name, _binds) = typ.as_ref() {
-        eprintln!("{}resolve_type alias {:?} <= {:?}", indent, typ, chk_t);
-        if let Type::Alias(chk_name, _) = chk_t.as_ref() {
-            if chk_name == name {
-                return TypeResolveResult::Match { typ: typ.clone() };
-            }
-        }
 
-        let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
-            res_alias_typ
-        } else {
-            return TypeResolveResult::Conflict {
-                expected: typ.clone(),
-                got: chk_t.clone(),
-                reason: TypeConflictReason::UnknownTypeAlias(name.to_string()),
+    eprintln!("{}resolve_type {:?} <= {:?}", indent, typ, chk_t);
+    match (typ.as_ref(), chk_t.as_ref()) {
+        // @Num <= @Num  OK
+        (Type::BoundAlias(name, _binds, _typ), Type::BoundAlias(chk_name, _, chk_t))
+            if name == chk_name =>
+        {
+            return TypeResolveResult::Match { typ: chk_t.clone() };
+        }
+        (Type::BoundAlias(_name, _binds, alias_typ), _) => {
+            return match resolve_type(&alias_typ, chk_t, bound_vars, depth + 1) {
+                TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+                TypeResolveResult::Conflict { expected, got, reason } => {
+                    TypeResolveResult::Conflict { expected, got, reason }
+                }
+                err => return err,
             };
-        };
-
-        return match resolve_type(&alias_typ, chk_t, bound_vars, name_resolver, depth + 1) {
-            TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
-            TypeResolveResult::Conflict { expected, got, reason } => {
-                TypeResolveResult::Conflict { expected, got, reason }
-            }
-            err => return err,
-        };
-    } else if let Type::BoundVar(_name, id, _limit) = typ.as_ref() {
-        let typ = if let Some((_, typ)) = bound_vars.iter().find(|var| var.0 == *id) {
-            Some(typ.clone())
-        } else {
-            None
-        };
-        if let Some(typ) = typ {
-            return resolve_type(&typ, chk_t, bound_vars, name_resolver, depth + 1);
         }
-    };
+        (Type::BoundVar(_name, id, _limit), Type::BoundVar(_name_chk, chk_id, _chk_limit))
+            if *id == *chk_id =>
+        {
+            TypeResolveResult::Match { typ: chk_t.clone() }
+        }
+        (Type::BoundVar(name, id, limit), Type::BoundVar(_name, chk_id, chk_limit))
+            if *id != *chk_id =>
+        {
+            // TODO: We must bind the var type to the variable with this specific ID.
+            //       And then we have to check if the variable is already bound (and matched)
+            //       to a specific type. Similar to the Type::Var(_) case below!
 
-    match chk_t.as_ref() {
-        Type::Maybe(chk_mb_t) => {
+            // BoundVar == BoundVar
+            // => the IDs need to match.
+            // if the IDs match: nothing to do, matches.
+            // else case might be something like:
+            //      !f1: fn <N is @Num>(N) -> N = ...;
+            //      !f2: fn <X is int>(X) -> X;
+            //      .f1 = f2; // Question: Should that work?
+            //                // Answer: NO! f2 can't handle float as input!
+            //      .f2 = f1; // Question: Should that work?
+            //                // Answer: Yes, f1 is more generic than f2. That means, it
+            //                //         can definitively handle `int`.
+            match resolve_type(chk_limit, limit, bound_vars, depth + 1) {
+                TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
+                TypeResolveResult::Conflict { expected, got, .. } => TypeResolveResult::Conflict {
+                    expected,
+                    got,
+                    reason: TypeConflictReason::BoundVarNotSubtype(
+                        name.to_string(),
+                        chk_limit.clone(),
+                        limit.clone(),
+                    ),
+                },
+                x @ TypeResolveResult::Error { reason: _ } => return x,
+            }
+        }
+        (Type::BoundVar(name, id, limit), _) => {
+            let bv = bound_vars.iter().find(|var| var.0 == *id).cloned();
+
+            if let Some((_, typ)) = bv {
+                return resolve_type(&typ, chk_t, bound_vars, depth + 1);
+            } else {
+                match resolve_type(limit, chk_t, bound_vars, depth + 1) {
+                    TypeResolveResult::Match { typ } => {
+                        bound_vars.push((*id, typ.clone()));
+                        return TypeResolveResult::Match { typ };
+                    }
+                    TypeResolveResult::Conflict { expected, got, .. } => {
+                        TypeResolveResult::Conflict {
+                            expected,
+                            got,
+                            reason: TypeConflictReason::BoundVarNotSubtype(
+                                name.to_string(),
+                                limit.clone(),
+                                chk_t.clone(),
+                            ),
+                        }
+                    }
+                    x @ TypeResolveResult::Error { reason: _ } => return x,
+                }
+            }
+        }
+        (_, Type::Maybe(chk_mb_t)) => {
             eprintln!("{}resolve_type rmaybe {:?} <= {:?}", indent, typ, chk_t);
-            match resolve_type(typ, &Type::none(), bound_vars, name_resolver, depth + 1) {
+            match resolve_type(typ, &Type::none(), bound_vars, depth + 1) {
                 TypeResolveResult::Conflict { reason: _, expected: _, got } => {
                     return TypeResolveResult::Conflict {
                         expected: typ.clone(),
@@ -3169,8 +3195,7 @@ where
                 _ => (),
             }
 
-            let left_type = match resolve_type(typ, chk_mb_t, bound_vars, name_resolver, depth + 1)
-            {
+            let left_type = match resolve_type(typ, chk_mb_t, bound_vars, depth + 1) {
                 TypeResolveResult::Match { typ } => typ,
                 TypeResolveResult::Conflict { reason: _, expected, got } => {
                     return TypeResolveResult::Conflict {
@@ -3188,14 +3213,14 @@ where
 
             return TypeResolveResult::Match { typ: Rc::new(Type::Maybe(left_type)) };
         }
-        Type::Union(types) => {
+        (_, Type::Union(types)) => {
             eprintln!("{}resolve_type runion {:?} <= {:?}", indent, typ, chk_t);
             let mut matched_types = vec![];
 
             for t in types.iter() {
                 let mut bv = bound_vars.clone();
 
-                match resolve_type(typ, t, &mut bv, name_resolver, depth + 1) {
+                match resolve_type(typ, t, &mut bv, depth + 1) {
                     TypeResolveResult::Match { typ } => matched_types.push(typ),
                     TypeResolveResult::Conflict { reason, expected, got } => {
                         return TypeResolveResult::Conflict {
@@ -3213,22 +3238,12 @@ where
 
             return TypeResolveResult::Match { typ: Rc::new(Type::Union(Rc::new(matched_types))) };
         }
-        Type::BoundAlias(name, _binds, _) | Type::Alias(name, _binds) => {
-            // TODO: bind these earlier...
-            eprintln!("{}resolve_type ralias {:?} <= {:?}", indent, typ, chk_t);
-            let alias_typ = if let Some(res_alias_typ) = name_resolver(name) {
-                res_alias_typ.clone()
-            } else {
-                return TypeResolveResult::Conflict {
-                    expected: typ.clone(),
-                    got: chk_t.clone(),
-                    reason: TypeConflictReason::UnknownTypeAlias(name.to_string()),
-                };
-            };
 
-            return resolve_type(typ, &alias_typ, bound_vars, name_resolver, depth + 1);
+        (_, Type::BoundAlias(_name, _binds, alias_typ)) => {
+            eprintln!("{}resolve_type ralias {:?} <= {:?}", indent, typ, chk_t);
+            return resolve_type(typ, alias_typ, bound_vars, depth + 1);
         }
-        Type::Any => {
+        (_, Type::Any) => {
             eprintln!("{}resolve_type rany {:?} <= {:?}", indent, typ, chk_t);
             return if matches!(typ.as_ref(), Type::Any | Type::Unknown(_, _)) {
                 TypeResolveResult::Match { typ: typ.clone() }
@@ -3240,8 +3255,8 @@ where
                 }
             };
         }
-        Type::BoundVar(name, _id, limit) if !typ.is_bound_var() => {
-            return match resolve_type(typ, limit, bound_vars, name_resolver, depth + 1) {
+        (_, Type::BoundVar(name, _id, limit)) if !typ.is_bound_var() => {
+            return match resolve_type(typ, limit, bound_vars, depth + 1) {
                 TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
                 TypeResolveResult::Conflict { reason: _, expected, got } => {
                     return TypeResolveResult::Conflict {
@@ -3257,119 +3272,80 @@ where
                 x @ TypeResolveResult::Error { reason: _ } => return x,
             }
         }
-        _ => (),
-    }
-
-    eprintln!("{}resolve_type {:?} <= {:?}", indent, typ, chk_t);
-    match typ.as_ref() {
-        Type::Unknown(_, _) => {
+        (Type::Unknown(_, _), _) => {
             println!("UNKNOWN MATCHED: {} <= {}", typ, chk_t);
             TypeResolveResult::Match { typ: chk_t.clone() }
         }
-        Type::None => {
-            if let Type::None = chk_t.as_ref() {
-                TypeResolveResult::Match { typ: chk_t.clone() }
-            } else {
-                TypeResolveResult::Conflict {
-                    expected: typ.clone(),
-                    got: chk_t.clone(),
-                    reason: TypeConflictReason::Unresolved,
-                }
-            }
+        (Type::None, Type::None) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Any, chk_t) => TypeResolveResult::Match { typ: Rc::new(chk_t.clone()) },
+        (Type::Bool, Type::Bool) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Str, Type::Str) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Bytes, Type::Bytes) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Sym, Type::Sym) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Byte, Type::Byte) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Char, Type::Char) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Syntax, Type::Syntax) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Type, Type::Type) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Int, Type::Int) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Float, Type::Float) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::IVec2, Type::IVec2) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::IVec3, Type::IVec3) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::IVec4, Type::IVec4) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::FVec2, Type::FVec2) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::FVec3, Type::FVec3) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::FVec4, Type::FVec4) => TypeResolveResult::Match { typ: chk_t.clone() },
+        (Type::Opt(t), _) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Opt, bound_vars, depth)
         }
-        Type::Any => match chk_t.as_ref() {
-            //            Type::Var(name) => {
-            //                if let Some((_, typ)) =
-            //                    bound_vars.iter().find(|var| var.0.as_str() == name.as_str())
-            //                {
-            //                    TypeResolveResult::Match { typ: typ.clone() }
-            //                } else {
-            //                    TypeResolveResult::Conflict {
-            //                        expected: typ.clone(),
-            //                        got: chk_t.clone(),
-            //                        reason: TypeConflictReason::UnknownTypeVar(name.to_string()),
-            //                    }
-            //                }
-            //            }
-            Type::Name(_name, _bindings) => TypeResolveResult::Match { typ: chk_t.clone() },
-            t => TypeResolveResult::Match { typ: Rc::new(t.clone()) },
-        },
-        Type::Bool => resolve_type_trivial!(typ, chk_t, Type::Bool),
-        Type::Str => resolve_type_trivial!(typ, chk_t, Type::Str),
-        Type::Bytes => resolve_type_trivial!(typ, chk_t, Type::Bytes),
-        Type::Sym => resolve_type_trivial!(typ, chk_t, Type::Sym),
-        Type::Byte => resolve_type_trivial!(typ, chk_t, Type::Byte),
-        Type::Char => resolve_type_trivial!(typ, chk_t, Type::Char),
-        Type::Syntax => resolve_type_trivial!(typ, chk_t, Type::Syntax),
-        Type::Type => resolve_type_trivial!(typ, chk_t, Type::Type),
-        Type::Int => resolve_type_trivial!(typ, chk_t, Type::Int),
-        Type::Float => resolve_type_trivial!(typ, chk_t, Type::Float),
-        Type::IVec2 => resolve_type_trivial!(typ, chk_t, Type::IVec2),
-        Type::IVec3 => resolve_type_trivial!(typ, chk_t, Type::IVec3),
-        Type::IVec4 => resolve_type_trivial!(typ, chk_t, Type::IVec4),
-        Type::FVec2 => resolve_type_trivial!(typ, chk_t, Type::FVec2),
-        Type::FVec3 => resolve_type_trivial!(typ, chk_t, Type::FVec3),
-        Type::FVec4 => resolve_type_trivial!(typ, chk_t, Type::FVec4),
-        Type::Opt(t) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Opt, bound_vars, name_resolver, depth)
+        (Type::Maybe(t), _) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Maybe, bound_vars, depth)
         }
-        Type::Maybe(t) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Maybe, bound_vars, name_resolver, depth)
+        (Type::Err(t), _) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Err, bound_vars, depth)
         }
-        Type::Err(t) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Err, bound_vars, name_resolver, depth)
+        (Type::Lst(t), _) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Lst, bound_vars, depth)
         }
-        Type::Lst(t) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Lst, bound_vars, name_resolver, depth)
+        (Type::Ref(t), _) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Ref, bound_vars, depth)
         }
-        Type::Ref(t) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Ref, bound_vars, name_resolver, depth)
+        (Type::Map(t), _) => {
+            resolve_type_wrap1!(typ, t, chk_t, Type::Map, bound_vars, depth)
         }
-        Type::Map(t) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Map, bound_vars, name_resolver, depth)
-        }
-        Type::Pair(t, t2) => {
-            if let Type::Pair(ct, ct2) = chk_t.as_ref() {
-                let ct = match resolve_type(t, ct, bound_vars, name_resolver, depth + 1) {
-                    TypeResolveResult::Conflict { expected, reason, .. } => {
-                        return TypeResolveResult::Conflict {
-                            expected: Rc::new(Type::Pair(expected, ct2.clone())),
-                            got: chk_t.clone(),
-                            reason,
-                        }
+        (Type::Pair(t, t2), Type::Pair(ct, ct2)) => {
+            let ct = match resolve_type(t, ct, bound_vars, depth + 1) {
+                TypeResolveResult::Conflict { expected, reason, .. } => {
+                    return TypeResolveResult::Conflict {
+                        expected: Rc::new(Type::Pair(expected, ct2.clone())),
+                        got: chk_t.clone(),
+                        reason,
                     }
-                    TypeResolveResult::Match { typ } => typ,
-                    x @ TypeResolveResult::Error { reason: _ } => return x,
-                };
-
-                let ct2 = match resolve_type(t2, ct2, bound_vars, name_resolver, depth + 1) {
-                    TypeResolveResult::Conflict { reason, .. } => {
-                        return TypeResolveResult::Conflict {
-                            expected: Rc::new(Type::Pair(ct, ct2.clone())),
-                            got: chk_t.clone(),
-                            reason,
-                        }
-                    }
-                    TypeResolveResult::Match { typ } => typ,
-                    x @ TypeResolveResult::Error { reason: _ } => return x,
-                };
-
-                TypeResolveResult::Match { typ: Rc::new(Type::Pair(ct, ct2)) }
-            } else {
-                TypeResolveResult::Conflict {
-                    expected: typ.clone(),
-                    got: chk_t.clone(),
-                    reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
                 }
-            }
+                TypeResolveResult::Match { typ } => typ,
+                x @ TypeResolveResult::Error { reason: _ } => return x,
+            };
+
+            let ct2 = match resolve_type(t2, ct2, bound_vars, depth + 1) {
+                TypeResolveResult::Conflict { reason, .. } => {
+                    return TypeResolveResult::Conflict {
+                        expected: Rc::new(Type::Pair(ct, ct2.clone())),
+                        got: chk_t.clone(),
+                        reason,
+                    }
+                }
+                TypeResolveResult::Match { typ } => typ,
+                x @ TypeResolveResult::Error { reason: _ } => return x,
+            };
+
+            TypeResolveResult::Match { typ: Rc::new(Type::Pair(ct, ct2)) }
         }
-        Type::Union(types) => {
+        (Type::Union(types), _) => {
             let mut matched_types = vec![];
             let mut conflicts = vec![];
             for t in types.iter() {
                 let mut bv = bound_vars.clone();
 
-                match resolve_type(t, chk_t, &mut bv, name_resolver, depth + 1) {
+                match resolve_type(t, chk_t, &mut bv, depth + 1) {
                     TypeResolveResult::Match { typ } => {
                         matched_types.push(typ);
                     }
@@ -3399,269 +3375,104 @@ where
                 }
             }
         }
-        Type::Function(arg_types, ret, _type_var_limits) => {
-            // TODO: do something with type_vars!
-            let mut _bv = bound_vars.clone();
-
-            // Only matches, if the other type is also a function type.
-            if let Type::Function(chk_arg_types, chk_ret, type_var_limits) = chk_t.as_ref() {
-                //                if let Some(type_var_limits) = type_var_limits {
-                //                    for (var, typ) in type_var_limits.iter() {
-                //                        bv.push((var.to_string(), typ.clone().unwrap_or_else(|| Type::any())));
-                //                    }
-                //                }
-
-                let mut matched_args = vec![];
-                for (i, (t, param_name)) in arg_types.iter().enumerate() {
-                    if let Some((chk_arg_typ, _param_names)) = chk_arg_types.get(i) {
-                        let matched_arg_typ = match resolve_type(
-                            t,
-                            chk_arg_typ,
-                            bound_vars,
-                            name_resolver,
-                            depth + 1,
-                        ) {
-                            TypeResolveResult::Match { typ } => typ,
-                            TypeResolveResult::Conflict { reason, .. } => {
-                                return TypeResolveResult::Conflict {
-                                    expected: typ.clone(),
-                                    got: chk_t.clone(),
-                                    reason: TypeConflictReason::WrongArgumentType(
-                                        i,
-                                        Box::new(reason),
-                                    ),
-                                }
+        (
+            Type::Function(arg_types, ret, _type_var_limits),
+            Type::Function(chk_arg_types, chk_ret, type_var_limits_chk),
+        ) => {
+            let mut matched_args = vec![];
+            for (i, (t, param_name)) in arg_types.iter().enumerate() {
+                if let Some((chk_arg_typ, _param_names)) = chk_arg_types.get(i) {
+                    let matched_arg_typ = match resolve_type(t, chk_arg_typ, bound_vars, depth + 1)
+                    {
+                        TypeResolveResult::Match { typ } => typ,
+                        TypeResolveResult::Conflict { reason, .. } => {
+                            return TypeResolveResult::Conflict {
+                                expected: typ.clone(),
+                                got: chk_t.clone(),
+                                reason: TypeConflictReason::WrongArgumentType(i, Box::new(reason)),
                             }
-                            x @ TypeResolveResult::Error { reason: _ } => return x,
-                        };
-                        matched_args.push((matched_arg_typ, param_name.clone()));
-                    } else {
-                        return TypeResolveResult::Conflict {
-                            expected: typ.clone(),
-                            got: chk_t.clone(),
-                            reason: TypeConflictReason::ArgumentMissing(i, t.clone()),
-                        };
-                    }
-                }
-
-                if arg_types.len() != chk_arg_types.len() {
+                        }
+                        x @ TypeResolveResult::Error { reason: _ } => return x,
+                    };
+                    matched_args.push((matched_arg_typ, param_name.clone()));
+                } else {
                     return TypeResolveResult::Conflict {
                         expected: typ.clone(),
                         got: chk_t.clone(),
-                        reason: TypeConflictReason::ArgumentCountMismatch(
-                            arg_types.len(),
-                            chk_arg_types.len(),
-                        ),
+                        reason: TypeConflictReason::ArgumentMissing(i, t.clone()),
                     };
                 }
+            }
 
-                println!("CHECKKKKKKKKKKKKKKKKKKKKK ret={}, chk_ret={}", ret, chk_ret);
-                let matched_ret =
-                    match resolve_type(ret, chk_ret, bound_vars, name_resolver, depth + 1) {
-                        TypeResolveResult::Match { typ } => typ,
-                        TypeResolveResult::Conflict { expected, got, .. } => {
-                            return TypeResolveResult::Conflict {
-                                expected,
-                                got,
-                                reason: TypeConflictReason::WrongReturnType(
-                                    ret.clone(),
-                                    chk_ret.clone(),
-                                ),
-                            };
-                        }
-                        x @ TypeResolveResult::Error { reason: _ } => return x,
-                    };
-
-                println!("MATCHED RET: {} <=> {} => {}", chk_ret.s(), ret.s(), matched_ret.s());
-
-                TypeResolveResult::Match {
-                    typ: Rc::new(Type::Function(
-                        Rc::new(matched_args),
-                        matched_ret,
-                        type_var_limits.clone(),
-                    )),
-                }
-            } else {
-                TypeResolveResult::Conflict {
+            if arg_types.len() != chk_arg_types.len() {
+                return TypeResolveResult::Conflict {
                     expected: typ.clone(),
                     got: chk_t.clone(),
-                    reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+                    reason: TypeConflictReason::ArgumentCountMismatch(
+                        arg_types.len(),
+                        chk_arg_types.len(),
+                    ),
+                };
+            }
+
+            println!("CHECKKKKKKKKKKKKKKKKKKKKK ret={}, chk_ret={}", ret, chk_ret);
+            let matched_ret = match resolve_type(ret, chk_ret, bound_vars, depth + 1) {
+                TypeResolveResult::Match { typ } => typ,
+                TypeResolveResult::Conflict { expected, got, .. } => {
+                    return TypeResolveResult::Conflict {
+                        expected,
+                        got,
+                        reason: TypeConflictReason::WrongReturnType(ret.clone(), chk_ret.clone()),
+                    };
                 }
-            }
-        }
-        Type::BoundAlias(_name, _binds, _type) => {
-            // Does not happen, the Alias case is caught at the top and resolved immediately.
-            TypeResolveResult::Conflict {
-                expected: typ.clone(),
-                got: chk_t.clone(),
-                reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
-            }
-        }
-        Type::Alias(_name, _binds) => {
-            // Does not happen, the Alias case is caught at the top and resolved immediately.
-            TypeResolveResult::Conflict {
-                expected: typ.clone(),
-                got: chk_t.clone(),
-                reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
-            }
-        }
-        Type::Name(_name, _binds) => {
-            // case: Name == Name
-            // case: Alias == Name
-            // case: Alias == Alias
-            // case: Name == Alias
-            // case: Name<Num> == Name<int>
-            // case: Name<Num> == Name<int>
-            // case: Point<Num> = Pos<int>
-            //       with:
-            //              !:type Point record<N is Num> { x: N, y: N }
-            //              !:type Pos record<S> { is Point<S> }
-            //              !p : Point<Num> = as Pos<int>: ${ x: 10, y: 20 };
-            if let Type::Name(_chk_name, _chk_binds) = chk_t.as_ref() {
-            } else {
-                // we need to check if the `name` is an alias for the other type.
-                // !Num : type = $type int | float;
-                // !x : Num = 120;
-                // !x : Num = 120.21;
-            }
+                x @ TypeResolveResult::Error { reason: _ } => return x,
+            };
 
-            // TODO: check if the chk_t either is exactly that name, or if the type
-            //       behind the chk_t implementing the interface of this type.
-            //       That means, resolving the Name of chk_t, if chk_t is a name.
-            //       If chk_t is not a name:
+            println!("MATCHED RET: {} <=> {} => {}", chk_ret.s(), ret.s(), matched_ret.s());
 
-            //                if let Some(t) = name_resolver(name) {
-            //                }
-            TypeResolveResult::Conflict {
-                expected: typ.clone(),
-                got: chk_t.clone(),
-
-                reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
+            TypeResolveResult::Match {
+                typ: Rc::new(Type::Function(
+                    Rc::new(matched_args),
+                    matched_ret,
+                    type_var_limits_chk.clone(),
+                )),
             }
         }
-        Type::BoundVar(name, id, limit) => {
-            // TODO: We must bind the var type to the variable with this specific ID.
-            //       And then we have to check if the variable is already bound (and matched)
-            //       to a specific type. Similar to the Type::Var(_) case below!
-
-            if let Type::BoundVar(_name, chk_id, chk_limit) = chk_t.as_ref() {
-                // BoundVar == BoundVar
-                // => the IDs need to match.
-                // if the IDs match: nothing to do, matches.
-                // else case might be something like:
-                //      !f1: fn <N is @Num>(N) -> N = ...;
-                //      !f2: fn <X is int>(X) -> X;
-                //      .f1 = f2; // Question: Should that work?
-                //                // Answer: NO! f2 can't handle float as input!
-                //      .f2 = f1; // Question: Should that work?
-                //                // Answer: Yes, f1 is more generic than f2. That means, it
-                //                //         can definitively handle `int`.
-                if *id != *chk_id {
-                    match resolve_type(chk_limit, limit, bound_vars, name_resolver, depth + 1) {
-                        TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
-                        TypeResolveResult::Conflict { expected, got, .. } => {
-                            TypeResolveResult::Conflict {
-                                expected,
-                                got,
-                                reason: TypeConflictReason::BoundVarNotSubtype(
-                                    name.to_string(),
-                                    chk_limit.clone(),
-                                    limit.clone(),
-                                ),
-                            }
-                        }
-                        x @ TypeResolveResult::Error { reason: _ } => return x,
-                    }
-                } else {
-                    TypeResolveResult::Match { typ: chk_t.clone() }
-                }
-            } else {
-                match resolve_type(limit, chk_t, bound_vars, name_resolver, depth + 1) {
-                    TypeResolveResult::Match { typ } => {
-                        bound_vars.push((*id, typ.clone()));
-                        return TypeResolveResult::Match { typ };
-                    }
-                    TypeResolveResult::Conflict { expected, got, .. } => {
-                        TypeResolveResult::Conflict {
-                            expected,
-                            got,
-                            reason: TypeConflictReason::BoundVarNotSubtype(
-                                name.to_string(),
-                                limit.clone(),
-                                chk_t.clone(),
-                            ),
-                        }
-                    }
-                    x @ TypeResolveResult::Error { reason: _ } => return x,
-                }
-            }
-        }
-        //        Type::Var(name) => {
-        //            let bound_type = if let Some((_, typ)) =
-        //                bound_vars.iter().find(|var| var.0.as_str() == name.as_str())
-        //            {
-        //                Some(typ.clone())
+        //        Type::Name(_name, _binds) => {
+        //            // case: Name == Name
+        //            // case: Alias == Name
+        //            // case: Alias == Alias
+        //            // case: Name == Alias
+        //            // case: Name<Num> == Name<int>
+        //            // case: Name<Num> == Name<int>
+        //            // case: Point<Num> = Pos<int>
+        //            //       with:
+        //            //              !:type Point record<N is Num> { x: N, y: N }
+        //            //              !:type Pos record<S> { is Point<S> }
+        //            //              !p : Point<Num> = as Pos<int>: ${ x: 10, y: 20 };
+        //            if let Type::Name(_chk_name, _chk_binds) = chk_t.as_ref() {
         //            } else {
-        //                None
-        //            };
+        //                // we need to check if the `name` is an alias for the other type.
+        //                // !Num : type = $type int | float;
+        //                // !x : Num = 120;
+        //                // !x : Num = 120.21;
+        //            }
         //
-        //            if let Some(bound_type) = bound_type {
-        //                let bound_type = if let Type::Union(_) = typ.as_ref() {
-        //                    let bound_type =
-        //                        match resolve_type(typ, chk_t, bound_vars, name_resolver, depth + 1) {
-        //                            TypeResolveResult::Match { typ } => typ,
-        //                            TypeResolveResult::Conflict { expected: _, got: _, reason: _ } => {
-        //                                return TypeResolveResult::Conflict {
-        //                                    expected: typ.clone(),
-        //                                    got: chk_t.clone(),
-        //                                    reason: TypeConflictReason::VarLimit(
-        //                                        name.to_string(),
-        //                                        typ.clone(),
-        //                                        chk_t.clone(),
-        //                                    ),
-        //                                }
-        //                            }
-        //                        };
-        //                    bound_vars.insert(0, (name.to_string(), bound_type.clone()));
-        //                    eprintln!("{}|---- bind {} <= {:?}", indent, name, bound_type);
-        //                    bound_type
-        //                } else {
-        //                    bound_type
-        //                };
+        //            // TODO: check if the chk_t either is exactly that name, or if the type
+        //            //       behind the chk_t implementing the interface of this type.
+        //            //       That means, resolving the Name of chk_t, if chk_t is a name.
+        //            //       If chk_t is not a name:
         //
-        //                match resolve_type(&bound_type, chk_t, bound_vars, name_resolver, depth + 1) {
-        //                    TypeResolveResult::Match { typ } => TypeResolveResult::Match { typ },
-        //                    TypeResolveResult::Conflict { expected, got, .. } => {
-        //                        TypeResolveResult::Conflict {
-        //                            expected,
-        //                            got,
-        //                            reason: TypeConflictReason::BoundVarTypeMismatch(
-        //                                name.to_string(),
-        //                                bound_type.clone(),
-        //                                chk_t.clone(),
-        //                            ),
-        //                        }
-        //                    }
-        //                }
-        //            } else {
-        //                bound_vars.push((name.to_string(), chk_t.clone()));
-        //                eprintln!("{}|---- bind {} <= {:?}", indent, name, chk_t);
-        //                TypeResolveResult::Match { typ: chk_t.clone() }
+        //            //                if let Some(t) = name_resolver(name) {
+        //            //                }
+        //            TypeResolveResult::Conflict {
+        //                expected: typ.clone(),
+        //                got: chk_t.clone(),
+        //
+        //                reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
         //            }
         //        }
-        //        Type::Userdata(fields) => {
-        //            // TODO
-        //            false
-        //        }
-        //        Type::Record(record) => {
-        //            // TODO
-        //            false
-        //        }
-        //        Type::Tuple(types) => {
-        //            // TODO
-        //            false
-        //        }
-        _ => TypeResolveResult::Conflict {
+        (_, _) => TypeResolveResult::Conflict {
             expected: typ.clone(),
             got: chk_t.clone(),
             reason: TypeConflictReason::WrongType(typ.clone(), chk_t.clone()),
