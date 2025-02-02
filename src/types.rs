@@ -13,8 +13,32 @@ use std::rc::Rc;
 use crate::compiler::{fetch_object_key_access, CompileEnv};
 use crate::ops::BinOp;
 use crate::vval::{
-    bind_free_vars, resolve_type, CompileError, Syntax, Type, TypeResolveResult, VVal, VarPos,
+    bind_free_vars, bind_type_names, resolve_type, CompileError, Syntax, Type, VVal, VarPos,
 };
+
+pub(crate) fn bind(
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+    typ: &Rc<Type>,
+) -> Result<Rc<Type>, CompileError> {
+    match bind_free_vars(&typ) {
+        Ok(t) => match bind_type_names(&t, &mut |name| {
+            let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
+            eprintln!("get comptime {}: {} => {}", name, value, vartype.s());
+            if vartype.is_alias() {
+                Some(value.t())
+            } else if vartype.is_name() {
+                Some(value.t())
+            } else {
+                None
+            }
+        }) {
+            Ok(t) => Ok(t),
+            Err(e) => Err(ast.compile_err(format!("Can't bind names in type {}: {}", typ, e))),
+        },
+        Err(e) => Err(ast.compile_err(format!("Can't bind free variables in type {}: {}", typ, e))),
+    }
+}
 
 #[derive(Debug, Clone)]
 pub(crate) enum TypeHint {
@@ -176,13 +200,13 @@ fn type_binop(
                 format!("operator call '{}' with expected return type {}", op.token(), ret_type)
             })
         {
-        println!("§BODUD2: {:?}", bound_vars);
+            println!("§BODUD2: {:?}", bound_vars);
             if let Ok(synth_type) =
                 resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ast, || {
                     format!("operator call '{}' with return type {}", op.token(), ret_type)
                 })
             {
-                println!("Result type: {}", synth_args);
+                println!("Result type: {} => {}", synth_type, synth_args);
                 return Ok(TypedVVal::new(ret_type, new_ast));
             }
         }
@@ -197,10 +221,10 @@ fn type_binop(
             resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ast, || {
                 format!("operator call '{}' with return type {}", op.token(), ret_type)
             })?;
-        println!("Result2 type: {}", synth_args);
+        println!("Result2 type: {} => {}", synth_type, synth_args);
         return Ok(TypedVVal::new(ret_type, new_ast));
 
-        return Err(ast.compile_err(format!("Can't infer return type at: {}", ast.s())));
+        // return Err(ast.compile_err(format!("Can't infer return type at: {}", ast.s())));
     } else {
         // We have no clue what the return type should be.
         // So we try to infer it by synthesizing a function with the same return type as the operation.
@@ -446,8 +470,8 @@ fn type_def(
         let varname = vars.v_s_raw(0);
         ce.borrow_mut().recent_var = varname.clone();
 
-        let var_typ = types.v_(0).t();
-        println!("VAR TYPE DEF: {} = {}", varname, var_typ.s());
+        let var_typ = bind(ast, ce, &types.v_(0).t())?;
+        println!("VAR TYPE DEF: {} = {} in {}", varname, var_typ.s(), ast);
 
         if is_global {
             let tv = type_pass(&value, TypeHint::from_type(&var_typ), ce)?;
@@ -466,13 +490,16 @@ fn type_def(
         } else {
             let next_local = ce.borrow_mut().next_local();
             let tv = type_pass(&value, TypeHint::from_type(&var_typ), ce)?;
-            println!("TPPPP: {} <=> {}", tv, var_typ);
             let typ = tv.typ;
 
-            let real_var_typ = resolve_and_check(&var_typ, &typ, ast, || {
+            let real_res_typ = resolve_and_check(&var_typ, &typ, ast, || {
                 format!("variable definition '{}'", &varname)
             })?;
-            ce.borrow_mut().def_local(&varname, next_local, real_var_typ);
+            if var_typ.is_unknown() {
+                ce.borrow_mut().def_local(&varname, next_local, real_res_typ);
+            } else {
+                ce.borrow_mut().def_local(&varname, next_local, var_typ);
+            }
         }
     }
 
@@ -487,6 +514,8 @@ fn type_deftype(
     is_global: bool,
 ) -> Result<TypedVVal, CompileError> {
     let (typename, typ) = (ast.v_s_raw(1), ast.v_(2));
+    println!("DEF {} {}", is_global, ast);
+    let typ = VVal::typ(bind(ast, ce, &typ.t())?);
 
     let new_typ = if Some('@') == typename.chars().nth(0) {
         Type::aliased(&typename)
@@ -542,23 +571,8 @@ where
     let res = resolve_type(typ, chk_typ, bound_vars, 0);
 
     match res {
-        TypeResolveResult::Match { typ } => Ok(typ),
-        TypeResolveResult::Conflict { expected, got, reason } => {
-            return Err(ast.compile_err(format!(
-                "Type error, expected ({}), but got ({}); in {}\n=> reason: {}",
-                expected.s(),
-                got.s(),
-                err_cb(),
-                reason
-            )));
-        }
-        TypeResolveResult::Error { reason } => {
-            return Err(ast.compile_err(format!(
-                "Error in resolve_type. {}; in {}",
-                reason,
-                err_cb()
-            )));
-        }
+        Ok(typ) => Ok(typ),
+        Err(etyp) => Err(ast.compile_err(format!("Type error at {}: {}", err_cb(), etyp))),
     }
 }
 
@@ -596,6 +610,7 @@ fn type_assign(
     } else {
         let varname = &vars.v_s_raw(0);
         let (pos, var_type) = ce.borrow_mut().get(varname);
+        eprintln!("ASSSSSSSSSSIGN {} : {}", varname, var_type);
 
         match pos {
             VarPos::Const(_) => {
@@ -670,11 +685,18 @@ pub(crate) fn type_pass(
                         }
                         None => {
                             return Err(ast.compile_err(format!(
-                                "Type error, ({}) has no index {}",
+                                "Type error: ({}) has no index {}",
                                 value_type.typ, idx
                             )))
                         }
                     }
+                }
+                Syntax::TypCast => {
+                    let expr = ast.v_(2);
+                    let expr = type_pass(&expr, TypeHint::DontCare, ce)?;
+                    let typ = bind(ast, ce, &ast.v_(1).t())?;
+
+                    TypedVVal::new(typ, expr.vval)
                 }
                 Syntax::TypeOf => {
                     let expr = ast.v_(1);
@@ -704,6 +726,40 @@ pub(crate) fn type_pass(
             let b = type_pass(&pair.1, th_b, ce)?;
 
             TypedVVal::new(Type::pair(a.typ, b.typ), VVal::pair(a.vval, b.vval))
+        }
+        VVal::Type(typ) => {
+            let res = match bind_free_vars(&typ) {
+                Ok(t) => match bind_type_names(&t, &mut |name| {
+                    let (value, vartype) = ce.borrow_mut().get_compiletime_value(name)?;
+                    eprintln!("get comptime {}: {} => {}", name, value, vartype.s());
+                    if vartype.is_alias() {
+                        Some(value.t())
+                    } else if vartype.is_name() {
+                        Some(value.t())
+                    } else {
+                        None
+                    }
+                }) {
+                    Ok(t) => {
+                        eprintln!(
+                            "COMPILED TYPE {} to {}",
+                            typ.to_display(true, false),
+                            t.to_display(true, false)
+                        );
+                        t
+                    }
+                    Err(e) => {
+                        return Err(
+                            ast.compile_err(format!("Can't bind names in type {}: {}", typ, e))
+                        )
+                    }
+                },
+                Err(e) => {
+                    return Err(ast
+                        .compile_err(format!("Can't bind free variables in type {}: {}", typ, e)))
+                }
+            };
+            TypedVVal::new(Type::typ(), VVal::typ(res))
         }
         _ => TypedVVal::new(ast.t(), ast.clone()),
     };

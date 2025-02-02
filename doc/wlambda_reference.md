@@ -10029,8 +10029,8 @@ In the following grammar, white space and comments are omitted:
                      and lots of other places as stringy sentinel values
                   *)
                   ;
-    cast          = "as", type, ( ":", value | "(", expr, ")" )
-                  | "is", type, ( ":", value | "(", expr, ")" )
+    cast          = "as", type, ( value | "(", expr, ")" ) (* unsafe type cast *)
+                  | "is", type, ( value | "(", expr, ")" ) (* testing type *)
                   ;
     value         = number
                   | string_lit

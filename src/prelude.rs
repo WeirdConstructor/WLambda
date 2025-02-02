@@ -15888,18 +15888,8 @@ pub fn std_symbol_table() -> SymbolTable {
         st,
         "types:type_at",
         |env: &mut Env, _argc: usize| {
-            use crate::vval::bind_free_vars;
-            let t1 = env.arg(0);
-            let typ1 = bind_free_vars(&t1.t());
+            let typ1 = env.arg(0).t();
 
-            let typ1 = match typ1 {
-                Ok(t) => t,
-                Err(e) => {
-                    return Ok(VVal::err_msg(&format!("Can't bind type {}: {}", t1, e)));
-                }
-            };
-
-            //            let mut bound_vars = vec![];
             let idx = env.arg(1).i();
             let idx = if idx < 0 { 0 as usize } else { idx as usize };
             match typ1.type_at(idx) {
@@ -15991,22 +15981,14 @@ pub fn std_symbol_table() -> SymbolTable {
             let res = resolve_type(&typ1, &typ2, &mut bound_vars, 0);
 
             match res {
-                TypeResolveResult::Match { typ } => Ok(VVal::Type(match bind_free_vars(&typ) {
-                    Ok(t) => t,
+                Ok(typ) => match bind_free_vars(&typ) {
+                    Ok(t) => Ok(VVal::Type(t)),
                     Err(e) => {
                         return Ok(VVal::err_msg(&format!("Can't bind type {}: {}", t2, e)));
                     }
-                })),
-                TypeResolveResult::Conflict { expected, got, reason } => {
-                    return Ok(VVal::err_msg(&format!(
-                        "Type error, expected ({}), but got ({}); reason: {}",
-                        expected.s(),
-                        got.s(),
-                        reason
-                    )));
-                }
-                TypeResolveResult::Error { reason } => {
-                    return Ok(VVal::err_msg(&format!("Error in is_typeof. {}", reason)));
+                },
+                Err(e) => {
+                    return Ok(VVal::err_msg(&format!("Type error: {}", e,)));
                 }
             }
         },

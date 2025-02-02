@@ -1444,11 +1444,37 @@ fn parse_value(ps: &mut State) -> Result<VVal, ParseError> {
             }
         }),
         c if is_ident_start(c) => {
-            let ret = annotate_node(ps, Syntax::Var, |ps, _| {
+            let ret = annotate_node(ps, Syntax::Var, |ps, new_syn| {
                 let id = parse_identifier(ps)?;
-                Ok(make_var_from_last(ps, &id))
+                ps.skip_ws_and_comments();
+                if id == "as" {
+                    *new_syn = Some(Syntax::TypCast);
+                    let tcast = ps.syn(Syntax::TypCast);
+                    tcast.push(parse_type(ps)?);
+
+                    if ps.lookahead("(") {
+                        if !ps.consume_area_start_token_wsc('(', Syntax::TDelim) {
+                            return Err(ps.err(ParseErrorKind::ExpectedToken(
+                                '(',
+                                "type cast expression start",
+                            )));
+                        }
+                        let expr = parse_expr(ps)?;
+                        if !ps.consume_area_end_token_wsc(')', Syntax::TDelim) {
+                            return Err(ps.err(ParseErrorKind::ExpectedToken(
+                                ')',
+                                "type cast expression end",
+                            )));
+                        }
+                        tcast.push(expr);
+                    } else {
+                        tcast.push(parse_value(ps)?);
+                    }
+                    Ok(tcast)
+                } else {
+                    Ok(make_var_from_last(ps, &id))
+                }
             });
-            ps.skip_ws_and_comments();
             ret
         }
         _ => Err(ps.err(ParseValueError::Expected(
@@ -2050,7 +2076,10 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                         if ps.consume_token_wsc(':', Syntax::T) {
                             types.push(parse_type(ps)?);
                         } else {
-                            types.push(VVal::type_any());
+                            types.push(VVal::typ(Type::unknown(&format!(
+                                "assign_{}",
+                                ids.v_s(ids.len() - 1)
+                            ))));
                         }
                     }
 
@@ -2077,7 +2106,10 @@ fn parse_assignment(ps: &mut State, is_def: bool) -> Result<VVal, ParseError> {
                     if ps.consume_token_wsc(':', Syntax::T) {
                         types.push(parse_type(ps)?);
                     } else {
-                        types.push(VVal::type_any());
+                        types.push(VVal::typ(Type::unknown(&format!(
+                            "assign_{}",
+                            ids.v_s_raw(ids.len() - 1)
+                        ))));
                     }
                 }
             }
