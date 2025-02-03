@@ -161,6 +161,87 @@ fn type_var(
     Ok(typ_val)
 }
 
+fn type_function_call<F>(
+    fun: &VVal,
+    args: &[VVal],
+    ret_type_hint: TypeHint,
+    err_cb: F,
+    ast: &VVal,
+    ce: &mut Rc<RefCell<CompileEnv>>,
+) -> Result<(Rc<Type>, Vec<TypedVVal>), CompileError>
+where
+    F: Fn() -> String,
+{
+    let mut arg_types = Vec::new();
+    for arg in args.iter() {
+        arg_types.push(type_pass(&arg, TypeHint::DontCare, ce)?);
+    }
+
+    if let TypeHint::Expect(ret_type) = ret_type_hint {
+        let (fun_params, fun_ret) = fun.t().fun_split_ret();
+
+        let synth_fun_param_typ = bind(
+            ast,
+            ce,
+            &Rc::new(Type::Function(
+                Rc::new(arg_types.iter().map(|ty| (ty.typ.clone(), None)).collect()),
+                Type::none(),
+                None,
+            )),
+        )?;
+
+        let mut bound_vars = vec![];
+        if let Ok(ret_type) =
+            resolve_and_check_bound(&ret_type, &fun_ret, &mut bound_vars, ast, || {
+                format!("{}, with expected return type of ({})", err_cb(), ret_type)
+            })
+        {
+            if let Ok(_synth_type) = resolve_and_check_bound(
+                &fun_params,
+                &synth_fun_param_typ,
+                &mut bound_vars,
+                ast,
+                || format!("{}, with return type ({})", err_cb(), ret_type),
+            ) {
+                // println!("Result type: {} => {}", synth_type, synth_args);
+                return Ok((ret_type, arg_types));
+            }
+        }
+
+        bound_vars = vec![];
+        println!("222222222222222222222222222222222222222222222222222");
+        let ret_type = resolve_and_check_bound(&fun_ret, &ret_type, &mut bound_vars, ast, || {
+            format!("{}, with expected return type of ({})", err_cb(), ret_type)
+        })?;
+        println!("§BODUD: {:?}", bound_vars);
+        let _synth_type = resolve_and_check_bound(
+            &fun_params,
+            &synth_fun_param_typ,
+            &mut bound_vars,
+            ast,
+            || format!("{}, with return type ({})", err_cb(), ret_type),
+        )?;
+        // println!("Result2 type: {} => {}", synth_type, synth_args);
+        return Ok((ret_type, arg_types));
+    } else {
+        let synth_fun_typ = bind(
+            ast,
+            ce,
+            &Rc::new(Type::Function(
+                Rc::new(arg_types.iter().map(|ty| (ty.typ.clone(), None)).collect()),
+                Rc::new(Type::unknown_typ("ret_type")),
+                None,
+            )),
+        )?;
+
+        let resolved_fun_type = resolve_and_check(&fun.t(), &synth_fun_typ, ast, err_cb)?;
+
+        let ret_type =
+            resolved_fun_type.get_return_type().clone().unwrap_or_else(|| Type::unknown("opret"));
+        return Ok((ret_type, arg_types));
+    }
+}
+
 fn type_binop(
     ast: &VVal,
     op: BinOp,
