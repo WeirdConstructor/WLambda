@@ -610,7 +610,6 @@ fn type_assign(
     } else {
         let varname = &vars.v_s_raw(0);
         let (pos, var_type) = ce.borrow_mut().get(varname);
-        eprintln!("ASSSSSSSSSSIGN {} : {}", varname, var_type);
 
         match pos {
             VarPos::Const(_) => {

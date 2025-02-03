@@ -1978,8 +1978,7 @@ pub enum TypeConflictReason {
     VarLimit(String, Rc<Type>, Rc<Type>),
     BoundVarTypeMismatch(String, Rc<Type>, Rc<Type>),
     BoundVarNotSubtype(String, Rc<Type>, Rc<Type>),
-    UnionDidNotMatch(Rc<Vec<Rc<Type>>>),
-    UnionMatchesAmbigious(Rc<Vec<Rc<Type>>>, Rc<Type>),
+    UnionDidNotMatch(Rc<Type>, Rc<Type>, Rc<Vec<Rc<Type>>>),
     MaybeNoneNotCovered(Rc<Type>, Rc<Type>),
     MaybeTypeNotCovered(Rc<Type>, Rc<Type>, Rc<Type>),
     UnknownTypeVar(String),
@@ -2018,18 +2017,11 @@ impl std::fmt::Display for TypeConflictReason {
                     got.s()
                 )
             }
-            TypeConflictReason::UnionDidNotMatch(types) => {
-                writeln!(f, "No matching types in union:")?;
-                for typ in types.iter() {
-                    writeln!(f, "    | {}", typ.s())?;
-                }
-                Ok(())
-            }
-            TypeConflictReason::UnionMatchesAmbigious(matched, got) => {
-                writeln!(f, "Union matches ambigious: ")?;
-                for t in matched.iter() {
-                    writeln!(f, "    | {} <=> {}", t.s(), got.s())?;
-                }
+            TypeConflictReason::UnionDidNotMatch(exp, got, _types) => {
+                write!(f, "Expected union ({}), but got ({})", exp, got)?;
+                // for typ in types.iter() {
+                //     writeln!(f, "    | {}", typ.s())?;
+                // }
                 Ok(())
             }
             TypeConflictReason::BoundVarTypeMismatch(varname, expected, got) => {
@@ -3202,7 +3194,6 @@ pub fn resolve_type(
         }
         // @Num <= X is OK if typein(@Num) <= X is OK
         (Type::BoundAlias(name, binds, alias_typ), _) => {
-            println!("ROOORO {} {}", alias_typ, chk_t);
             match resolve_type(&alias_typ, chk_t, bound_vars, depth + 1) {
                 Ok(typ) => Ok(typ),
                 Err(typ) => Err(Rc::new(Type::TypeWrap(
@@ -3455,7 +3446,11 @@ pub fn resolve_type(
                 }
             }
 
-            Err(Rc::new(Type::TypeError(TypeConflictReason::UnionDidNotMatch(Rc::new(conflicts)))))
+            Err(Rc::new(Type::TypeError(TypeConflictReason::UnionDidNotMatch(
+                typ.clone(),
+                chk_t.clone(),
+                Rc::new(conflicts),
+            ))))
         }
         (
             Type::Function(arg_types, ret, _type_var_limits),

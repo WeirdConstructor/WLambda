@@ -83,7 +83,6 @@ fn chk_types_add() {
 #[test]
 fn chk_types_index1() {
     assert_eq!(v("!x = \"foo\"; x.1"), "'o'");
-    return;
     assert_eq!(v("!x = $b\"foo\"; x.1"), "$b'o'");
 
     assert_eq!(v("std:types:type_at $type(str) 10"), "$type(char?)");
@@ -158,25 +157,26 @@ fn chk_types_aliasing1() {
     assert_eq!(v("!:type @Num int | float; !x: @Num = 10.3; x"), "10.3");
     assert_eq!(
         v("!:type @Num int | float; !x: @Num = \"test\"; $typeof x"),
-        "expected (int | float), but got (str); in variable definition 'x'"
+        "alias: Expected union (int | float), but got (str)"
     );
 
     assert_eq!(
         v("!:type @Num int | float; !v: int = 10; !x: @Num = 0; .x = v; $typeof x"),
-        "$p($type(int),10)"
+        "$p($type(@Num),10)"
     );
     assert_eq!(
         v("!:type @Num int | float; !v: float = 10.4; !x: @Num = 0; .x = v; $typeof x"),
-        "expected (int), but got (float); in assignment to 'x'"
+        "$p($type(@Num),10.4)"
     );
     assert_eq!(
         v("!:type @Num int | float; !v: float = 10.4; !x: @Num = 0.0; .x = v; $typeof x"),
-        "$p($type(float),10.4)"
+        "$p($type(@Num),10.4)"
     );
     assert_eq!(
         v("!:type @Num int | float; !v: str = \"test\"; !x: @Num = 0; .x = v; $typeof x"),
-        "expected (int), but got (str); in assignment to 'x'"
+        "alias: Expected union (int | float), but got (str)"
     );
+    println!("---------------------------------------");
     assert_eq!(
         v(r#"!f = {|@Num, @Num -> int| int[_ + _1] };
              f 10 11.2
