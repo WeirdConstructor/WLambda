@@ -1916,6 +1916,16 @@ pub struct TypeRecord {
 }
 
 impl TypeRecord {
+    fn is_type_complete(&self) -> bool {
+        for (_, typ) in self.typedefs.iter() {
+            if !is_type_complete(typ) { return false; }
+        }
+
+        for (_, typ) in self.fields.iter() {
+            if !is_type_complete(typ) { return false; }
+        }
+    }
+
     fn to_display(&self, extended: bool, collapsed_vars: bool) -> String {
         let mut res = String::from("");
         for (i, v) in self.interfaces.iter().enumerate() {
@@ -2293,6 +2303,92 @@ impl TypeFreeVarBindingEnv {
         Ok(ret)
     }
 }
+
+/// Returns true, if the Type does not have any undefined/unknown Types in it's definition.
+pub fn is_type_complete(typ: &Rc<Type>) -> bool {
+    let ret = match typ.as_ref() {
+        Type::Unknown(_, _) => false,
+        Type::None => true,
+        Type::Any => true,
+        Type::Bool => true,
+        Type::Str => true,
+        Type::Bytes => true,
+        Type::Sym => true,
+        Type::Char => true,
+        Type::Byte => true,
+        Type::Syntax => true,
+        Type::Type => true,
+        Type::Int => true,
+        Type::Float => true,
+        Type::IVec2 => true,
+        Type::IVec3 => true,
+        Type::IVec4 => true,
+        Type::FVec2 => true,
+        Type::FVec3 => true,
+        Type::FVec4 => true,
+        Type::Opt(t) => is_type_complete(t),
+        Type::Maybe(t) => is_type_complete(t),
+        Type::Err(t) => is_type_complete(t),
+        Type::Lst(t) => is_type_complete(t),
+        Type::Ref(t) => is_type_complete(t),
+        Type::Iter(t) => is_type_complete(t),
+        Type::Map(t) => is_type_complete(t),
+        Type::Pair(t, t2) => {
+            is_type_complete(t) && is_type_complete(t2)
+        }
+        Type::Tuple(types) => {
+            for t in types.iter() {
+                if !is_type_complete(t) {
+                    return false;
+                }
+            }
+            true
+        }
+        Type::Union(types) => {
+            for t in types.iter() {
+                if !is_type_complete(t) {
+                    return false;
+                }
+            }
+
+            true
+        }
+        Type::Function(types, ret, type_var_limits) => {
+            if !is_type_complete(t) { return false; }
+
+            for t in types.iter() {
+                if !is_type_complete(t.0) {
+                    return false;
+                }
+            }
+
+            // Funktionen mit `where` können nicht komplett sein, sie brauchen Variablenauflösung.
+            if type_var_limits.is_some() { return false; }
+
+            true
+        }
+        Type::Record(_, record, _) => {
+            record.is_type_complete();
+        }
+        Type::BoundName(_name, _binds, _typ) => {
+            true
+        }
+        Type::Name(_name, _binds) => {
+            false
+        }
+        Type::BoundAlias(_name, _binds, typ) => {
+            is_type_complete(typ)
+        }
+        Type::Alias(_name, _binds) => {
+            false
+        }
+        Type::BoundVar(name, _, _) | Type::Var(name) => {
+            false
+        }
+    };
+    Ok(ret)
+}
+
 
 pub fn bind_free_vars(typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
     //d// println!("#bind_free_vars input {}", typ);
