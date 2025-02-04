@@ -10532,6 +10532,7 @@ macro_rules! add_func_t {
             bind_type_names(&$type, &mut |name| {
                 let value = $g.get(name)?;
                 let vartype = $g.get_t(name)?;
+                println!("BIND_NAMES in prelude {} => {} {}", name, value, vartype);
                 if vartype.is_alias() {
                     Some(value.t())
                 } else if vartype.is_type() {
@@ -10884,14 +10885,14 @@ pub fn core_symbol_table() -> SymbolTable {
     let mut st = SymbolTable::new();
 
     let num_type = Rc::new(Type::Int).union(Rc::new(Type::Float));
-    st.set_t("@Num", VVal::Type(num_type), Rc::new(Type::Type));
+    st.set_t("@Num", VVal::Type(num_type), Type::aliased("@Num"));
     let nvec_type = Rc::new(Type::IVec2)
         .union(Rc::new(Type::IVec3))
         .union(Rc::new(Type::IVec4))
         .union(Rc::new(Type::FVec2))
         .union(Rc::new(Type::FVec3))
         .union(Rc::new(Type::FVec4));
-    st.set_t("@NVec", VVal::Type(nvec_type), Rc::new(Type::Type));
+    st.set_t("@NVec", VVal::Type(nvec_type), Type::aliased("@NVec"));
 
     // The implementations for +/- are essentially just like the `add_multi_op`
     // implementations, except for how they accept down to 1 parameter for

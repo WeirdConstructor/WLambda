@@ -1993,7 +1993,6 @@ pub enum TypeConflictReason {
     PairType(u8, Rc<Type>, Rc<Type>),
     VarLimit(String, Rc<Type>, Rc<Type>),
     BoundVarTypeMismatch(String, Rc<Type>, Rc<Type>),
-    BoundVarNotSubtype(String, Rc<Type>, Rc<Type>),
     UnionDidNotMatch(Rc<Type>, Rc<Type>, Rc<Vec<Rc<Type>>>),
     MaybeNoneNotCovered(Rc<Type>, Rc<Type>),
     MaybeTypeNotCovered(Rc<Type>, Rc<Type>, Rc<Type>),
@@ -2016,7 +2015,7 @@ impl std::fmt::Display for TypeConflictReason {
                 write!(f, "Bug in WLambda! Unbound Type encountered: {:?}", ty)
             }
             TypeConflictReason::WrongType(exp, got) => {
-                write!(f, "expected {}, got {}", exp.s(), got.s())
+                write!(f, "expected ({}), got ({})", exp.s(), got.s())
             }
             TypeConflictReason::ArgumentMissing(idx, typ) => {
                 write!(f, "Argument {} missing, expected: {}", idx + 1, typ.s())
@@ -2043,26 +2042,16 @@ impl std::fmt::Display for TypeConflictReason {
             TypeConflictReason::BoundVarTypeMismatch(varname, expected, got) => {
                 writeln!(
                     f,
-                    "Type variable {} conflict, <{} is {}> but got: {}",
-                    varname,
+                    "Type variable <{} is {}>, but got: ({})",
                     varname,
                     expected.s(),
                     got.s()
                 )
             }
-            TypeConflictReason::BoundVarNotSubtype(varname, typ, other) => {
-                writeln!(
-                    f,
-                    "Type variable <{} is {}> does not accept {}",
-                    varname,
-                    typ.s(),
-                    other.s()
-                )
-            }
             TypeConflictReason::VarLimit(varname, expected, got) => {
                 writeln!(
                     f,
-                    "Type variable {} can't be bound, expected: {}, got {}",
+                    "Type variable {} can't be bound, expected: ({}), got ({})",
                     varname,
                     expected.s(),
                     got.s()
@@ -2421,6 +2410,7 @@ pub fn bind_type_names<F>(
 where
     F: FnMut(&str) -> Option<Rc<Type>>,
 {
+    println!("bind_type_names {}", typ);
     let ret = match typ.as_ref() {
         Type::Opt(t) => Rc::new(Type::Opt(bind_type_names(t, name_resolver)?)),
         Type::Maybe(t) => Rc::new(Type::Maybe(bind_type_names(t, name_resolver)?)),
@@ -2476,7 +2466,9 @@ where
             Rc::new(Type::Function(Rc::new(bound_arg_types), bound_ret, new_limits))
         }
         Type::Alias(name, binds) => {
+            println!("ALIAS {}", name);
             if let Some(res_typ) = name_resolver(name) {
+            println!("ALIAS2 {}", name);
                 Rc::new(Type::BoundAlias(name.clone(), binds.clone(), res_typ))
             } else {
                 return Err(TypeConflictReason::UnknownTypeAlias(name.to_string()));
@@ -3363,16 +3355,20 @@ pub fn resolve_type(
                     ))),
                 }
             } else {
+                println!("LIMIT: {} <=> {}", limit, chk_t);
                 match resolve_type(limit, tenv_l, chk_t, tenv_r, depth + 1) {
                     Ok(typ) => {
                         tenv_l.set(*id, typ.clone());
                         Ok(typ)
                     }
-                    Err(etyp) => Err(Rc::new(Type::TypeError(TypeConflictReason::VarLimit(
+                    Err(etyp) => {
+                    println!("AFTER LIMIT {}", etyp);
+                    Err(Rc::new(Type::TypeError(TypeConflictReason::VarLimit(
                         name.to_string(),
                         limit.clone(),
                         etyp,
-                    )))),
+                    ))))
+                    },
                 }
             }
         }
@@ -3408,6 +3404,7 @@ pub fn resolve_type(
                 match resolve_type(typ, tenv_l, t, tenv_r, depth + 1) {
                     Ok(typ) => variants.push(typ),
                     Err(etyp) => {
+                    println!("RUNIO ERR {} {}",etyp,chk_t);
                         return Err(chk_t
                             .wrap_at(TypPos::UnionVariant(i), etyp)
                             .expect("is union type"));
@@ -3439,6 +3436,7 @@ pub fn resolve_type(
                 match resolve_type(&typ, tenv_l, &chk_var_typ, tenv_r, depth + 1) {
                     Ok(etyp) => Ok(etyp),
                     Err(exptyp) => {
+                    println!("EPEPEPE {}", exptyp);
                         Err(TypPos::VarExpansion(name.to_string(), chk_var_typ.clone(), exptyp)
                             .wrap(typ.clone()))
                     }
@@ -3457,8 +3455,8 @@ pub fn resolve_type(
                 }
             }
         }
-        (Type::Unknown(_, _), _) => {
-            println!("UNKNOWN MATCHED: {} <= {}", typ, chk_t);
+        (Type::Unknown(_, id), _) => {
+            tenv_l.set(*id, chk_t.clone());
             Ok(chk_t.clone())
         }
         (Type::None, Type::None) => Ok(chk_t.clone()),
@@ -3594,6 +3592,10 @@ pub fn resolve_type(
                 matched_ret,
                 type_var_limits_chk.clone(),
             )))
+        }
+        (_, Type::Unknown(_, id)) => {
+            tenv_l.set(*id, typ.clone());
+            Ok(typ.clone())
         }
         //        Type::Name(_name, _binds) => {
         //            // case: Name == Name

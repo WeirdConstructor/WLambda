@@ -70,14 +70,14 @@ fn chk_types_parse_type_values() {
 
 #[test]
 fn chk_types_infer_var_type() {
-    assert_eq!(v("!x = 5 + 2; .x = 10.3; x"), "Err"); // Expecting error on assigning 10.3!
+        assert_eq!(v("!x = 5 + 2; .x = 10.3; x"), "at assignment to 'x': expected (int), got (float)"); // Expecting error on assigning 10.3!
 }
 
 #[test]
 fn chk_types_add() {
     assert_eq!(v("!x: int = 5 + 2; x"), "7");
-    assert_eq!(v("!x: float = 5 + 3; x"), "variable <N is float>: expected float, got int");
-    assert_eq!(v("!x: float = 1 + \"2\"; x"), "variable <N is float>: expected float, got int");
+    assert_eq!(v("!x: float = 5 + 3; x"), "variable <N is float>: expected (float), got (int)");
+    assert_eq!(v("!x: float = 1 + \"2\"; x"), "variable <N is float>: expected (float), got (int)");
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn chk_types_index_named() {
 
 #[test]
 fn chk_types_function() {
-    assert_eq!(v("!x: fn <O is (Num),X>(a: O, b: float) -> X = $n"), "");
+    assert_eq!(v("!:global type Num int | float; !x: fn <O is (Num),X>(a: O, b: float) -> X = $n"), "at variable definition 'x': expected (fn <O is Num, X>(a: O, b: float) -> X), got (none)");
 }
 
 #[test]
@@ -280,7 +280,7 @@ fn chk_types_named() {
     assert_eq!(v("!:global type Num int; !o: Num = as Num 10; $typeof o"), "$p($type(Num),10)");
     assert_eq!(
         v("!:global type Num int; !o: Num = 10.12; .o = 10; o"),
-        "at variable definition 'o': expected Num, got float"
+        "at variable definition 'o': expected (Num), got (float)"
     );
     assert_eq!(
         v("!:global type Num int; !o: Num = as Num 10.12; !o2: Num = as Num 10; .o = o2; o"),

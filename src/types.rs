@@ -49,7 +49,7 @@ pub(crate) enum TypeHint {
 
 impl TypeHint {
     fn from_type(ty: &Rc<Type>) -> Self {
-        if ty.is_none() {
+        if ty.is_none() || ty.is_unknown() {
             TypeHint::DontCare
         } else {
             TypeHint::Expect(ty.clone())
@@ -585,6 +585,7 @@ fn type_def(
             let real_res_typ = resolve_and_check(&var_typ, &typ, ast, || {
                 format!("variable definition '{}'", &varname)
             })?;
+            println!("FOFOFO {}", real_res_typ);
             if var_typ.is_unknown() {
                 ce.borrow_mut().def_local(&varname, next_local, real_res_typ);
             } else {
