@@ -15920,7 +15920,7 @@ pub fn std_symbol_table() -> SymbolTable {
         st,
         "types:is_typeof",
         |env: &mut Env, _argc: usize| {
-            use crate::vval::{bind_free_vars, bind_type_names, resolve_type};
+            use crate::vval::{bind_free_vars, bind_type_names, resolve_type, TypeEnv};
             let t1 = env.arg(0);
             let t2 = env.arg(1);
             let typ1 = bind_free_vars(&t1.t());
@@ -15977,8 +15977,7 @@ pub fn std_symbol_table() -> SymbolTable {
                 }
             };
 
-            let mut bound_vars = vec![];
-            let res = resolve_type(&typ1, &typ2, &mut bound_vars, 0);
+            let res = resolve_type(&typ1, &mut TypeEnv::new(), &typ2, &mut TypeEnv::new(), 0);
 
             match res {
                 Ok(typ) => match bind_free_vars(&typ) {

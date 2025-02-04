@@ -1918,12 +1918,18 @@ pub struct TypeRecord {
 impl TypeRecord {
     fn is_type_complete(&self) -> bool {
         for (_, typ) in self.typedefs.iter() {
-            if !is_type_complete(typ) { return false; }
+            if !is_type_complete(typ) {
+                return false;
+            }
         }
 
         for (_, typ) in self.fields.iter() {
-            if !is_type_complete(typ) { return false; }
+            if !is_type_complete(typ) {
+                return false;
+            }
         }
+
+        true
     }
 
     fn to_display(&self, extended: bool, collapsed_vars: bool) -> String {
@@ -2084,34 +2090,53 @@ impl std::fmt::Display for TypeConflictReason {
     }
 }
 
-// #[derive(Debug, Clone)]
-// pub struct TypeEnv {
-//     parent: Option<Rc<TypeEnv>>,
-//     typename_env: FnvHashMap<String, Rc<Type>>,
-//     id: usize,
-// }
-//
-// impl TypeEnv {
-//     pub fn new() -> Self {
-//         Self {
-//             parent: None,
-//             typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
-//             id: next_type_var_id(),
-//         }
-//     }
-//
-//     pub fn new_with_parent(parent: Rc<Self>) -> Self {
-//         Self {
-//             parent: Some(parent),
-//             typename_env: FnvHashMap::with_capacity_and_hasher(2, Default::default()),
-//             id: next_type_var_id(),
-//         }
-//     }
-//
-//     pub fn env_id(&self) -> usize {
-//         self.id
-//     }
-// }
+#[derive(Debug, Clone)]
+pub struct TypeEnv {
+    env: Vec<(usize, Rc<Type>)>,
+    marks: Vec<usize>,
+}
+
+impl TypeEnv {
+    pub fn new() -> Self {
+        Self { env: Vec::new(), marks: Vec::new() }
+    }
+
+    pub fn reset(&mut self) {
+        self.env.truncate(0);
+        self.marks.truncate(0);
+    }
+
+    pub fn get(&self, var_id: usize) -> Option<Rc<Type>> {
+        let (_var_id, typ) = self.env.iter().find(|var| var.0 == var_id)?;
+        Some(typ.clone())
+    }
+
+    pub fn mark_vars_old(&mut self) {
+        self.marks.push(self.env.len());
+    }
+
+    pub fn reset_new_vars(&mut self) {
+        if let Some(old_len) = self.marks.pop() {
+            self.env.truncate(old_len);
+        }
+    }
+
+    pub fn append_new_vars_from(&mut self, other_env: &TypeEnv) {
+        if let Some(other_old_len) = other_env.marks.last() {
+            for t in other_env.env.iter().skip(*other_old_len) {
+                self.env.push(t.clone());
+            }
+        }
+    }
+
+    pub fn set(&mut self, var_id: usize, typ: Rc<Type>) -> bool {
+        if self.env.iter().find(|var| var.0 == var_id).is_some() {
+            return false;
+        }
+        self.env.push((var_id, typ));
+        true
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct TypeFreeVarBindingEnv {
@@ -2306,7 +2331,7 @@ impl TypeFreeVarBindingEnv {
 
 /// Returns true, if the Type does not have any undefined/unknown Types in it's definition.
 pub fn is_type_complete(typ: &Rc<Type>) -> bool {
-    let ret = match typ.as_ref() {
+    match typ.as_ref() {
         Type::Unknown(_, _) => false,
         Type::None => true,
         Type::Any => true,
@@ -2333,9 +2358,7 @@ pub fn is_type_complete(typ: &Rc<Type>) -> bool {
         Type::Ref(t) => is_type_complete(t),
         Type::Iter(t) => is_type_complete(t),
         Type::Map(t) => is_type_complete(t),
-        Type::Pair(t, t2) => {
-            is_type_complete(t) && is_type_complete(t2)
-        }
+        Type::Pair(t, t2) => is_type_complete(t) && is_type_complete(t2),
         Type::Tuple(types) => {
             for t in types.iter() {
                 if !is_type_complete(t) {
@@ -2354,41 +2377,34 @@ pub fn is_type_complete(typ: &Rc<Type>) -> bool {
             true
         }
         Type::Function(types, ret, type_var_limits) => {
-            if !is_type_complete(t) { return false; }
+            if !is_type_complete(ret) {
+                return false;
+            }
 
             for t in types.iter() {
-                if !is_type_complete(t.0) {
+                if !is_type_complete(&t.0) {
                     return false;
                 }
             }
 
             // Funktionen mit `where` können nicht komplett sein, sie brauchen Variablenauflösung.
-            if type_var_limits.is_some() { return false; }
+            if type_var_limits.is_some() {
+                return false;
+            }
 
             true
         }
-        Type::Record(_, record, _) => {
-            record.is_type_complete();
-        }
-        Type::BoundName(_name, _binds, _typ) => {
-            true
-        }
-        Type::Name(_name, _binds) => {
-            false
-        }
-        Type::BoundAlias(_name, _binds, typ) => {
-            is_type_complete(typ)
-        }
-        Type::Alias(_name, _binds) => {
-            false
-        }
-        Type::BoundVar(name, _, _) | Type::Var(name) => {
-            false
-        }
-    };
-    Ok(ret)
+        Type::Record(_, record, _) => record.is_type_complete(),
+        Type::BoundName(_name, _binds, _typ) => true,
+        Type::Name(_name, _binds) => false,
+        Type::BoundAlias(_name, _binds, typ) => is_type_complete(typ),
+        Type::Alias(_name, _binds) => false,
+        Type::BoundVar(_name, _, _) | Type::Var(_name) => false,
+        Type::Userdata(_, _) => false,
+        Type::TypeError(_) => false,
+        Type::TypeWrap(_, _) => false,
+    }
 }
-
 
 pub fn bind_free_vars(typ: &Rc<Type>) -> Result<Rc<Type>, TypeVarBindingError> {
     //d// println!("#bind_free_vars input {}", typ);
@@ -3245,9 +3261,9 @@ impl Debug for Type {
 }
 
 macro_rules! resolve_type_wrap1 {
-    ($typ: ident, $t: ident, $chk_t: ident, $pat: ident :: $pat2: ident, $bv: ident, $depth: ident) => {
+    ($typ: ident, $t: ident, $tenv_l: ident, $chk_t: ident, $tenv_r: ident, $pat: ident :: $pat2: ident, $depth: ident) => {
         if let $pat::$pat2(ot) = $chk_t.as_ref() {
-            match resolve_type($t, ot, $bv, $depth + 1) {
+            match resolve_type($t, $tenv_l, ot, $tenv_r, $depth + 1) {
                 Ok(typ) => Ok($typ.wrap_simple(typ).unwrap_or_else(|| Rc::new(Type::None))),
                 Err(typ) => Err(TypPos::This
                     .wrap($chk_t.wrap_simple(typ).unwrap_or_else(|| Rc::new(Type::None)))),
@@ -3263,8 +3279,9 @@ macro_rules! resolve_type_wrap1 {
 
 pub fn resolve_type(
     typ: &Rc<Type>,
+    tenv_l: &mut TypeEnv,
     chk_t: &Rc<Type>,
-    bound_vars: &mut Vec<(usize, Rc<Type>)>,
+    tenv_r: &mut TypeEnv,
     depth: usize,
 ) -> Result<Rc<Type>, Rc<Type>> {
     if typ.is_unbound() {
@@ -3290,7 +3307,7 @@ pub fn resolve_type(
         }
         // @Num <= X is OK if typein(@Num) <= X is OK
         (Type::BoundAlias(name, binds, alias_typ), _) => {
-            match resolve_type(&alias_typ, chk_t, bound_vars, depth + 1) {
+            match resolve_type(&alias_typ, tenv_l, chk_t, tenv_r, depth + 1) {
                 Ok(typ) => Ok(typ),
                 Err(typ) => Err(Rc::new(Type::TypeWrap(
                     TypPos::InAlias,
@@ -3337,10 +3354,8 @@ pub fn resolve_type(
         //            }
         //        }
         (Type::BoundVar(name, id, limit), _) => {
-            let bv = bound_vars.iter().find(|var| var.0 == *id).cloned();
-
-            if let Some((_, vartyp)) = bv {
-                match resolve_type(&vartyp, chk_t, bound_vars, depth + 1) {
+            if let Some(vartyp) = tenv_l.get(*id) {
+                match resolve_type(&vartyp, tenv_l, chk_t, tenv_r, depth + 1) {
                     Ok(etyp) => Ok(etyp),
                     Err(exptyp) => Err(Rc::new(Type::TypeWrap(
                         TypPos::VarExpansion(name.to_string(), vartyp.clone(), exptyp),
@@ -3348,9 +3363,9 @@ pub fn resolve_type(
                     ))),
                 }
             } else {
-                match resolve_type(limit, chk_t, bound_vars, depth + 1) {
+                match resolve_type(limit, tenv_l, chk_t, tenv_r, depth + 1) {
                     Ok(typ) => {
-                        bound_vars.push((*id, typ.clone()));
+                        tenv_l.set(*id, typ.clone());
                         Ok(typ)
                     }
                     Err(etyp) => Err(Rc::new(Type::TypeError(TypeConflictReason::VarLimit(
@@ -3363,7 +3378,7 @@ pub fn resolve_type(
         }
         (_, Type::Maybe(chk_mb_t)) => {
             eprintln!("{}resolve_type rmaybe {:?} <= {:?}", indent, typ, chk_t);
-            match resolve_type(typ, &Type::none(), bound_vars, depth + 1) {
+            match resolve_type(typ, tenv_l, &Type::none(), tenv_r, depth + 1) {
                 Ok(_) => (),
                 Err(typ) => {
                     return Err(Rc::new(Type::TypeError(TypeConflictReason::MaybeNoneNotCovered(
@@ -3373,7 +3388,7 @@ pub fn resolve_type(
                 }
             }
 
-            match resolve_type(typ, chk_mb_t, bound_vars, depth + 1) {
+            match resolve_type(typ, tenv_l, chk_mb_t, tenv_r, depth + 1) {
                 Ok(typ) => Ok(Rc::new(Type::Maybe(typ))),
                 Err(typ) => Err(Rc::new(Type::TypeError(TypeConflictReason::MaybeTypeNotCovered(
                     chk_t.clone(),
@@ -3386,10 +3401,11 @@ pub fn resolve_type(
             eprintln!("{}resolve_type runion {:?} <= {:?}", indent, typ, chk_t);
             let mut variants = vec![];
 
+            tenv_r.mark_vars_old();
             for (i, t) in types.iter().enumerate() {
-                let mut bv = bound_vars.clone();
+                tenv_r.reset_new_vars();
 
-                match resolve_type(typ, t, &mut bv, depth + 1) {
+                match resolve_type(typ, tenv_l, t, tenv_r, depth + 1) {
                     Ok(typ) => variants.push(typ),
                     Err(etyp) => {
                         return Err(chk_t
@@ -3405,7 +3421,7 @@ pub fn resolve_type(
         (_, Type::BoundAlias(name, _binds, alias_typ)) => {
             eprintln!("{}resolve_type ralias {} {:?} <= {:?}", indent, name, typ, chk_t);
 
-            match resolve_type(typ, alias_typ, bound_vars, depth + 1) {
+            match resolve_type(typ, tenv_l, alias_typ, tenv_r, depth + 1) {
                 Ok(typ) => Ok(typ),
                 Err(etyp) => Err(chk_t.wrap_at(TypPos::InAlias, etyp).expect("is bound alias")),
             }
@@ -3419,20 +3435,18 @@ pub fn resolve_type(
             };
         }
         (_, Type::BoundVar(name, id, limit)) if !typ.is_bound_var() => {
-            let bv = bound_vars.iter().find(|var| var.0 == *id).cloned();
-
-            if let Some((_, vartyp)) = bv {
-                match resolve_type(&typ, &vartyp, bound_vars, depth + 1) {
+            if let Some(chk_var_typ) = tenv_r.get(*id) {
+                match resolve_type(&typ, tenv_l, &chk_var_typ, tenv_r, depth + 1) {
                     Ok(etyp) => Ok(etyp),
                     Err(exptyp) => {
-                        Err(TypPos::VarExpansion(name.to_string(), vartyp.clone(), exptyp)
+                        Err(TypPos::VarExpansion(name.to_string(), chk_var_typ.clone(), exptyp)
                             .wrap(typ.clone()))
                     }
                 }
             } else {
-                match resolve_type(typ, limit, bound_vars, depth + 1) {
+                match resolve_type(typ, tenv_l, limit, tenv_r, depth + 1) {
                     Ok(typ) => {
-                        bound_vars.push((*id, typ.clone()));
+                        tenv_r.set(*id, typ.clone());
                         Ok(typ)
                     }
                     Err(typ) => Err(Rc::new(Type::TypeError(TypeConflictReason::VarLimit(
@@ -3466,25 +3480,25 @@ pub fn resolve_type(
         (Type::FVec3, Type::FVec3) => Ok(chk_t.clone()),
         (Type::FVec4, Type::FVec4) => Ok(chk_t.clone()),
         (Type::Opt(t), _) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Opt, bound_vars, depth)
+            resolve_type_wrap1!(typ, t, tenv_l, chk_t, tenv_r, Type::Opt, depth)
         }
         (Type::Maybe(t), _) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Maybe, bound_vars, depth)
+            resolve_type_wrap1!(typ, t, tenv_l, chk_t, tenv_r, Type::Maybe, depth)
         }
         (Type::Err(t), _) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Err, bound_vars, depth)
+            resolve_type_wrap1!(typ, t, tenv_l, chk_t, tenv_r, Type::Err, depth)
         }
         (Type::Lst(t), _) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Lst, bound_vars, depth)
+            resolve_type_wrap1!(typ, t, tenv_l, chk_t, tenv_r, Type::Lst, depth)
         }
         (Type::Ref(t), _) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Ref, bound_vars, depth)
+            resolve_type_wrap1!(typ, t, tenv_l, chk_t, tenv_r, Type::Ref, depth)
         }
         (Type::Map(t), _) => {
-            resolve_type_wrap1!(typ, t, chk_t, Type::Map, bound_vars, depth)
+            resolve_type_wrap1!(typ, t, tenv_l, chk_t, tenv_r, Type::Map, depth)
         }
         (Type::Pair(t, t2), Type::Pair(ct, ct2)) => {
-            let ct = match resolve_type(t, ct, bound_vars, depth + 1) {
+            let ct = match resolve_type(t, tenv_l, ct, tenv_r, depth + 1) {
                 Ok(typ) => typ,
                 Err(etyp) => {
                     return Err(Rc::new(Type::TypeWrap(
@@ -3494,7 +3508,7 @@ pub fn resolve_type(
                 }
             };
 
-            let ct2 = match resolve_type(t2, ct2, bound_vars, depth + 1) {
+            let ct2 = match resolve_type(t2, tenv_l, ct2, tenv_r, depth + 1) {
                 Ok(typ) => typ,
                 Err(etyp) => {
                     return Err(Rc::new(Type::TypeWrap(
@@ -3519,16 +3533,12 @@ pub fn resolve_type(
         (Type::Union(types), _) => {
             let mut conflicts = vec![];
             for (i, t) in types.iter().enumerate() {
-                let mut bv = bound_vars.clone();
-                let prev_bv_len = bv.len();
+                let mut te_l = tenv_l.clone();
+                te_l.mark_vars_old();
 
-                match resolve_type(t, chk_t, &mut bv, depth + 1) {
+                match resolve_type(t, &mut te_l, chk_t, tenv_r, depth + 1) {
                     Ok(typ) => {
-                        if bv.len() > prev_bv_len {
-                            for i in prev_bv_len..bv.len() {
-                                bound_vars.push(bv[i].clone());
-                            }
-                        }
+                        tenv_l.append_new_vars_from(&te_l);
                         return Ok(typ);
                     }
                     Err(etyp) => {
@@ -3559,7 +3569,8 @@ pub fn resolve_type(
                 } else {
                     Type::none()
                 };
-                let matched_arg_typ = match resolve_type(t, &chk_arg_typ, bound_vars, depth + 1) {
+                let matched_arg_typ = match resolve_type(t, tenv_l, &chk_arg_typ, tenv_r, depth + 1)
+                {
                     Ok(typ) => typ,
                     Err(etyp) => {
                         return Err(chk_t
@@ -3571,7 +3582,7 @@ pub fn resolve_type(
                 matched_args.push((matched_arg_typ, param_name.clone()));
             }
 
-            let matched_ret = match resolve_type(ret, chk_ret, bound_vars, depth + 1) {
+            let matched_ret = match resolve_type(ret, tenv_l, chk_ret, tenv_r, depth + 1) {
                 Ok(typ) => typ,
                 Err(etyp) => {
                     return Err(chk_t.wrap_at(TypPos::ReturnValue, etyp).expect("is a function"))

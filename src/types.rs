@@ -13,7 +13,8 @@ use std::rc::Rc;
 use crate::compiler::{fetch_object_key_access, CompileEnv};
 use crate::ops::BinOp;
 use crate::vval::{
-    bind_free_vars, bind_type_names, resolve_type, CompileError, Syntax, Type, VVal, VarPos,
+    bind_free_vars, bind_type_names, resolve_type, CompileError, Syntax, Type, TypeEnv, VVal,
+    VarPos,
 };
 
 pub(crate) fn bind(
@@ -190,16 +191,18 @@ where
             )),
         )?;
 
-        let mut bound_vars = vec![];
+        let mut tenv_l = TypeEnv::new();
+        let mut tenv_r = TypeEnv::new();
         if let Ok(ret_type) =
-            resolve_and_check_bound(&ret_type, &fun_ret, &mut bound_vars, ast, || {
+            resolve_and_check_bound(&ret_type, &mut tenv_l, &fun_ret, &mut tenv_r, ast, || {
                 format!("{}, with expected return type of ({})", err_cb(), ret_type)
             })
         {
             if let Ok(_synth_type) = resolve_and_check_bound(
                 &fun_params,
+                &mut tenv_l,
                 &synth_fun_param_typ,
-                &mut bound_vars,
+                &mut tenv_r,
                 ast,
                 || format!("{}, with return type ({})", err_cb(), ret_type),
             ) {
@@ -208,16 +211,18 @@ where
             }
         }
 
-        bound_vars = vec![];
+        tenv_l.reset();
+        tenv_r.reset();
         println!("222222222222222222222222222222222222222222222222222");
-        let ret_type = resolve_and_check_bound(&fun_ret, &ret_type, &mut bound_vars, ast, || {
-            format!("{}, with expected return type of ({})", err_cb(), ret_type)
-        })?;
-        println!("§BODUD: {:?}", bound_vars);
+        let ret_type =
+            resolve_and_check_bound(&fun_ret, &mut tenv_l, &ret_type, &mut tenv_r, ast, || {
+                format!("{}, with expected return type of ({})", err_cb(), ret_type)
+            })?;
         let _synth_type = resolve_and_check_bound(
             &fun_params,
+            &mut tenv_l,
             &synth_fun_param_typ,
-            &mut bound_vars,
+            &mut tenv_r,
             ast,
             || format!("{}, with return type ({})", err_cb(), ret_type),
         )?;
@@ -268,7 +273,8 @@ fn type_binop(
     if let TypeHint::Expect(ret_type) = type_hint {
         // In this case, we can bind the return type before the argument types.
         // That will bind the variables in the function arguments by the return type.
-        let mut bound_vars = vec![];
+        let mut tenv_l = TypeEnv::new();
+        let mut tenv_r = TypeEnv::new();
         println!("OOOOOOOOOOOBOUNDBOUND: {} - {}", ret_type, op_ret);
         // TODO: The following only works properly if the ret_type=Any (or generally more generic?)
         //       it does not work if ret_type=int and op_ret=<N is @Num> - because of the
@@ -277,29 +283,32 @@ fn type_binop(
         //       Maybe we need to run it twice, in both directions?
         println!("11111111111111111111111111111111111111111111");
         if let Ok(ret_type) =
-            resolve_and_check_bound(&ret_type, &op_ret, &mut bound_vars, ast, || {
+            resolve_and_check_bound(&ret_type, &mut tenv_l, &op_ret, &mut tenv_r, ast, || {
                 format!("operator call '{}' with expected return type {}", op.token(), ret_type)
             })
         {
-            println!("§BODUD2: {:?}", bound_vars);
-            if let Ok(synth_type) =
-                resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ast, || {
-                    format!("operator call '{}' with return type {}", op.token(), ret_type)
-                })
-            {
+            if let Ok(synth_type) = resolve_and_check_bound(
+                &op_args,
+                &mut tenv_l,
+                &synth_args,
+                &mut tenv_r,
+                ast,
+                || format!("operator call '{}' with return type {}", op.token(), ret_type),
+            ) {
                 println!("Result type: {} => {}", synth_type, synth_args);
                 return Ok(TypedVVal::new(ret_type, new_ast));
             }
         }
 
-        bound_vars = vec![];
+        tenv_l.reset();
+        tenv_r.reset();
         println!("222222222222222222222222222222222222222222222222222");
-        let ret_type = resolve_and_check_bound(&op_ret, &ret_type, &mut bound_vars, ast, || {
-            format!("operator call '{}' with expected return type {}", op.token(), ret_type)
-        })?;
-        println!("§BODUD: {:?}", bound_vars);
+        let ret_type =
+            resolve_and_check_bound(&op_ret, &mut tenv_l, &ret_type, &mut tenv_r, ast, || {
+                format!("operator call '{}' with expected return type {}", op.token(), ret_type)
+            })?;
         let synth_type =
-            resolve_and_check_bound(&op_args, &synth_args, &mut bound_vars, ast, || {
+            resolve_and_check_bound(&op_args, &mut tenv_l, &synth_args, &mut tenv_r, ast, || {
                 format!("operator call '{}' with return type {}", op.token(), ret_type)
             })?;
         println!("Result2 type: {} => {}", synth_type, synth_args);
@@ -641,15 +650,16 @@ fn type_deftype(
 
 fn resolve_and_check_bound<F>(
     typ: &Rc<Type>,
+    tenv_l: &mut TypeEnv,
     chk_typ: &Rc<Type>,
-    bound_vars: &mut Vec<(usize, Rc<Type>)>,
+    tenv_r: &mut TypeEnv,
     ast: &VVal,
     err_cb: F,
 ) -> Result<Rc<Type>, CompileError>
 where
     F: Fn() -> String,
 {
-    let res = resolve_type(typ, chk_typ, bound_vars, 0);
+    let res = resolve_type(typ, tenv_l, chk_typ, tenv_r, 0);
 
     match res {
         Ok(typ) => Ok(typ),
@@ -666,8 +676,7 @@ fn resolve_and_check<F>(
 where
     F: Fn() -> String,
 {
-    let mut bound_vars = vec![];
-    resolve_and_check_bound(typ, chk_typ, &mut bound_vars, ast, err_cb)
+    resolve_and_check_bound(typ, &mut TypeEnv::new(), chk_typ, &mut TypeEnv::new(), ast, err_cb)
 }
 
 fn type_assign(
